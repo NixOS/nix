@@ -825,8 +825,13 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
     /* can't just use else-if instead of `!haveCached` because we need to unlock
        `drvPathResolutions` before it is locked in `Derivation::resolve`. */
     if (!haveCached && drv.type() == DerivationType::CAFloating) {
-        /* Resolve drv and use that path instead. */
-        auto pathResolved = writeDerivation(*this, drv.resolve(*this));
+        /* Try resolve drv and use that path instead. */
+        auto attempt = drv.tryResolve(*this);
+        if (!attempt)
+            /* If we cannot resolve the derivation, we cannot have any path
+               assigned so we return the map of all std::nullopts. */
+            return outputs;
+        auto pathResolved = writeDerivation(*this, *std::move(attempt));
         /* Store in memo table. */
         /* FIXME: memo logic should not be local-store specific, should have
            wrapper-method instead. */

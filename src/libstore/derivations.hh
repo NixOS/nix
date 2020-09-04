@@ -133,7 +133,7 @@ struct Derivation : BasicDerivation
        1. input drv outputs moved to input sources.
 
        2. placeholders replaced with realized input store paths. */
-    BasicDerivation resolve(Store & store);
+    std::optional<BasicDerivation> tryResolve(Store & store);
 
     Derivation() = default;
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }

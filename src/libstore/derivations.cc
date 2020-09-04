@@ -671,7 +671,7 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 Sync<DrvPathResolutions> drvPathResolutions;
 
-BasicDerivation Derivation::resolve(Store & store) {
+std::optional<BasicDerivation> Derivation::tryResolve(Store & store) {
     BasicDerivation resolved { *this };
 
     // Input paths that we'll want to rewrite in the derivation
@@ -683,7 +683,7 @@ BasicDerivation Derivation::resolve(Store & store) {
         for (auto & outputName : input.second) {
             auto actualPathOpt = inputDrvOutputs.at(outputName);
             if (!actualPathOpt)
-                throw Error("input drv '%s' wasn't yet built", store.printStorePath(input.first));
+                return std::nullopt;
             auto actualPath = *actualPathOpt;
             inputRewrites.emplace(
                 downstreamPlaceholder(store, input.first, outputName),

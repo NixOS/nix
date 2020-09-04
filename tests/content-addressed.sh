@@ -9,7 +9,7 @@ testDerivation () {
     local derivationPath=$1
     local commonArgs=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "$derivationPath" "--no-out-link")
     local out1 out2
-    out1=$(set -e; nix-build "${commonArgs[@]}" --arg seed 1)
+    out1=$(nix-build "${commonArgs[@]}" --arg seed 1)
     out2=$(nix-build "${commonArgs[@]}" --arg seed 2 "${secondSeedArgs[@]}")
     test "$out1" == "$out2"
 }
