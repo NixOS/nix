@@ -2065,7 +2065,7 @@ void linkOrCopy(const Path & from, const Path & to)
            file (e.g. 32000 of ext3), which is quite possible after a
            'nix-store --optimise'. FIXME: actually, why don't we just
            bind-mount in this case?
-           
+
            It can also fail with EPERM in BeegFS v7 and earlier versions
            which don't allow hard-links to other directories */
         if (errno != EMLINK && errno != EPERM)
@@ -4101,8 +4101,13 @@ void DerivationGoal::registerOutputs()
                     if (lstat(actualPath.c_str(), &st))
                         throw SysError("getting attributes of path '%1%'", actualPath);
                     mode |= 0200;
-                    if (chmod(actualPath.c_str(), mode) == -1)
-                        throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
+                    /* Try to change the perms, but only if the file isn't a
+                       symlink as symlinks permissions are mostly ignored and
+                       calling `chmod` on it will just forward the call to the
+                       target of the link. */
+                    if (!S_ISLNK(st.st_mode))
+                        if (chmod(actualPath.c_str(), mode) == -1)
+                            throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
                 }
                 if (rename(
                         actualPath.c_str(),
