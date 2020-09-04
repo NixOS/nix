@@ -718,7 +718,7 @@ typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
 
-struct KnownInitialOutputStatus {
+struct InitialOutputStatus {
     StorePath path;
     /* The output optional indicates whether it's already valid; i.e. exists
        and is registered. If we're repairing, inner bool indicates whether the
@@ -731,9 +731,9 @@ struct KnownInitialOutputStatus {
     }
 };
 
-struct InitialOutputStatus {
+struct InitialOutput {
     bool wanted;
-    std::optional<KnownInitialOutputStatus> known;
+    std::optional<InitialOutputStatus> known;
 };
 
 class DerivationGoal : public Goal
@@ -770,7 +770,7 @@ private:
        immediate input paths). */
     StorePathSet inputPaths;
 
-    std::map<std::string, InitialOutputStatus> initialOutputs;
+    std::map<std::string, InitialOutput> initialOutputs;
 
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
@@ -1050,11 +1050,14 @@ private:
     /* Forcibly kill the child process, if any. */
     void killChild();
 
-    /* Map a path to another (reproducably) so we can avoid overwriting outputs
+    /* Create alternative path calculated from but distinct from the
+       input, so we can avoid overwriting outputs (or other store paths)
        that already exist. */
     StorePath makeFallbackPath(const StorePath & path);
-    /* Make a path to another based on the output name alone, if one doesn't
-       want to use a random path for CA builds. */
+    /* Make a path to another based on the output name along with the
+       derivation hash. */
+    /* FIXME add option to randomize, so we can audit whether our
+       rewrites caught everything */
     StorePath makeFallbackPath(std::string_view outputName);
 
     void repairClosure();
@@ -2141,8 +2144,6 @@ void DerivationGoal::startBuilder()
            with the actual hashes. */
         auto scratchPath =
             !status.known
-                /* FIXME add option to randomize, so we can audit whether our
-                 * rewrites caught everything */
                 ? makeFallbackPath(outputName)
             : !needsHashRewrite()
                 /* Can always use original path in sandbox */
@@ -4582,19 +4583,19 @@ void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
     for (auto & i : queryPartialDerivationOutputMap()) {
-        InitialOutputStatus status {
+        InitialOutput info {
             .wanted = wantOutput(i.first, wantedOutputs),
         };
         if (i.second) {
             auto outputPath = *i.second;
-            status.known = {
+            info.known = {
                 .path = outputPath,
                 .valid = !worker.store.isValidPath(outputPath)
                     ? std::optional<bool> {}
                     : !checkHash || worker.pathContentsGood(outputPath),
             };
         }
-        initialOutputs.insert_or_assign(i.first, status);
+        initialOutputs.insert_or_assign(i.first, info);
     }
 }
 

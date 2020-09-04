@@ -145,6 +145,11 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 // FIXME: remove
 bool isDerivation(const string & fileName);
 
+/* Calculate the name that will be used for the store path for this
+   output.
+
+   This is usually <drv-name>-<output-name>, but is just <drv-name> when
+   the output name is "out". */
 std::string outputPathName(std::string_view drvName, std::string_view outputName);
 
 // known CA drv's output hashes, current just for fixed-output derivations
@@ -194,8 +199,21 @@ struct Sink;
 Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name);
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
+/* This creates an opaque and almost certainly unique string
+   deterministically from the output name.
+
+   It is used as a placeholder to allow derivations to refer to their
+   own outputs without needing to use the hash of a derivation in
+   itself, making the hash near-impossible to calculate. */
 std::string hashPlaceholder(const std::string & outputName);
 
+/* This creates an opaque and almost certainly unique string
+   deterministically from a derivation path and output name.
+
+   It is used as a placeholder to allow derivations to refer to
+   content-addressed paths whose content --- and thus the path
+   themselves --- isn't yet known. This occurs when a derivation has a
+   dependency which is a CA derivation. */
 std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
 
 }
