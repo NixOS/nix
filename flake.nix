@@ -66,7 +66,7 @@
           [
             buildPackages.bison
             buildPackages.flex
-            buildPackages.lowdown
+            (lib.getBin buildPackages.lowdown)
             buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
@@ -208,7 +208,7 @@
 
           src = lowdown-src;
 
-          outputs = [ "out" "dev" ];
+          outputs = [ "out" "bin" "dev" ];
 
           nativeBuildInputs = [ which ];
 
@@ -216,7 +216,7 @@
             ''
               ./configure \
                 PREFIX=${placeholder "dev"} \
-                BINDIR=${placeholder "out"}/bin
+                BINDIR=${placeholder "bin"}/bin
             '';
         };
 
