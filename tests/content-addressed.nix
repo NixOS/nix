@@ -13,9 +13,6 @@ rec {
       mkdir -p $out
       echo "Hello World" > $out/hello
     '';
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
   };
   rootCA = mkDerivation {
     name = "dependent";
