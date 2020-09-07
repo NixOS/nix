@@ -75,6 +75,21 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
     return new ExprString(symbols.create(t));
 }
 
+static Expr * unescapeIndStr(const char * s, size_t length)
+{
+    string t;
+    t.reserve(length);
+    char c;
+    while ((c = *s++)) {
+        if (c == '\r') {
+            /* Normalise CR and CR/LF into LF. */
+            t += '\n';
+            if (*s == '\n') s++; /* cr/lf */
+        }
+        else t += c;
+    }
+    return new ExprIndStr(t);
+}
 
 }
 
@@ -169,9 +184,9 @@ or          { return OR_KW; }
                 return STR;
               }
 
-\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
+\'\'(\ *(\r\n|\r|\n))?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
-                   yylval->e = new ExprIndStr(yytext);
+                   yylval->e = unescapeIndStr(yytext, yyleng);
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ |
