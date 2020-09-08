@@ -26,9 +26,11 @@ fi
 
 # macOS support for 10.12.6 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
-    macos_major=$(sw_vers -productVersion | cut -d '.' -f 2)
-    macos_minor=$(sw_vers -productVersion | cut -d '.' -f 3)
-    if [ "$macos_major" -lt 12 ] || { [ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]; }; then
+    IFS='.' read macos_major macos_minor macos_patch << EOF
+$(sw_vers -productVersion)
+EOF
+    if [ "$macos_major" -lt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -lt 12 ]; } || { [ "$macos_minor" -eq 12 ] && [ "$macos_patch" -lt 6 ]; }; then
+        # patch may not be present; command substitution for simplicity
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
         exit 1
     fi
@@ -90,7 +92,7 @@ while [ $# -gt 0 ]; do
             ) >&2
 
             # darwin and Catalina+
-            if [ "$(uname -s)" = "Darwin" ] && [ "$macos_major" -gt 14 ]; then
+            if [ "$(uname -s)" = "Darwin" ] && { [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 14 ]; }; }; then
                 (
                     echo " --darwin-use-unencrypted-nix-store-volume: Create an APFS volume for the Nix"
                     echo "              store and mount it at /nix. This is the recommended way to create"
@@ -111,7 +113,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
     fi
 
     info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
-    if ! [ -e $dest ] && [ -n "$info" ] && [ "$macos_major" -gt 14 ]; then
+    if ! [ -e $dest ] && [ -n "$info" ] && { [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 14 ]; }; }; then
         (
             echo ""
             echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
