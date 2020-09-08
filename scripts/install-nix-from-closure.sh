@@ -110,8 +110,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
         "$self/create-darwin-volume.sh"
     fi
 
-    info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
-    if ! [ -e $dest ] && [ -n "$info" ] && { [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 14 ]; }; }; then
+    writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
+    if ! [ -e $dest ] && [ "$writable" = "false" ]; then
         (
             echo ""
             echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
