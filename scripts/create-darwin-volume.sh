@@ -26,6 +26,20 @@ test_synthetic_conf() {
     grep -q "^nix$" /etc/synthetic.conf 2>/dev/null
 }
 
+# Create the paths defined in synthetic.conf, saving us a reboot.
+create_synthetic_objects(){
+    # Big Sur takes away the -B flag we were using and replaces it
+    # with a -t flag that appears to do the same thing (but they
+    # don't behave exactly the same way in terms of return values).
+    # This feels a little dirty, but as far as I can tell the
+    # simplest way to get the right one is to just throw away stderr
+    # and call both... :]
+    {
+        /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true # Big Sur
+        /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B || true # Catalina
+    } >/dev/null 2>&1
+}
+
 test_nix() {
     test -d "/nix"
 }
@@ -101,7 +115,7 @@ main() {
 
     if ! test_nix; then
         echo "Creating mountpoint for /nix..." >&2
-        /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B || true
+        create_synthetic_objects # the ones we defined in synthetic.conf
         if ! test_nix; then
             sudo mkdir -p /nix 2>/dev/null || true
         fi
