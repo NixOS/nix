@@ -5,42 +5,13 @@ root_disk() {
     diskutil info -plist /
 }
 
-apfs_volumes_for() {
-    disk=$1
-    diskutil apfs list -plist "$disk"
-}
-
-disk_identifier() {
-    xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" 2>/dev/null
-}
-
-volume_list_true() {
-    key=$1
-    xpath "/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='$key']/following-sibling::true[1]" 2> /dev/null
-}
-
-volume_get_string() {
-    key=$1 i=$2
-    xpath "/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict[$i]/key[text()='$key']/following-sibling::string[1]/text()" 2> /dev/null
+# i.e., "disk1"
+root_disk_identifier() {
+    diskutil info -plist / | xmllint --xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" -
 }
 
 find_nix_volume() {
-    disk=$1
-    i=1
-    volumes=$(apfs_volumes_for "$disk")
-    while true; do
-        name=$(echo "$volumes" | volume_get_string "Name" "$i")
-        if [ -z "$name" ]; then
-            break
-        fi
-        case "$name" in
-            [Nn]ix*)
-                echo "$name"
-                break
-                ;;
-        esac
-        i=$((i+1))
-    done
+    diskutil apfs list -plist "$1" | xmllint --xpath "(/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='Name']/following-sibling::string[starts-with(translate(text(),'N','n'),'nix')]/text())[1]" - 2>/dev/null || true
 }
 
 test_fstab() {
@@ -89,9 +60,7 @@ test_t2_chip_present(){
 }
 
 test_filevault_in_use() {
-    disk=$1
-    #      list vols on disk | get value of Filevault key | value is true
-    apfs_volumes_for "$disk" | volume_list_true FileVault | grep -q true
+    fdesetup isactive >/dev/null
 }
 
 # use after error msg for conditions we don't understand
@@ -143,12 +112,12 @@ main() {
         fi
     fi
 
-    disk=$(root_disk | disk_identifier)
+    disk="$(root_disk_identifier)"
     volume=$(find_nix_volume "$disk")
     if [ -z "$volume" ]; then
         echo "Creating a Nix Store volume..." >&2
 
-        if test_filevault_in_use "$disk"; then
+        if test_filevault_in_use; then
             # TODO: Not sure if it's in-scope now, but `diskutil apfs list`
             # shows both filevault and encrypted at rest status, and it
             # may be the more semantic way to test for this? It'll show
@@ -178,6 +147,7 @@ main() {
     if ! test_fstab; then
         echo "Configuring /etc/fstab..." >&2
         label=$(echo "$volume" | sed 's/ /\\040/g')
+        # shellcheck disable=SC2209
         printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
     fi
 }
