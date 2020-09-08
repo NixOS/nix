@@ -69,7 +69,7 @@ struct Installable
 
     virtual FlakeRef nixpkgsFlakeRef() const
     {
-        return std::move(FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}}));
+        return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
     }
 };
 

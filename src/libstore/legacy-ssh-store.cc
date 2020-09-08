@@ -9,8 +9,6 @@
 
 namespace nix {
 
-static std::string uriScheme = "ssh://";
-
 struct LegacySSHStore : public Store
 {
     const Setting<int> maxConnections{this, 1, "max-connections", "maximum number of concurrent SSH connections"};
@@ -36,6 +34,9 @@ struct LegacySSHStore : public Store
     ref<Pool<Connection>> connections;
 
     SSHMaster master;
+
+    static std::vector<std::string> uriPrefixes() { return {"ssh"}; }
+
 
     LegacySSHStore(const string & host, const Params & params)
         : Store(params)
@@ -84,7 +85,7 @@ struct LegacySSHStore : public Store
 
     string getUri() override
     {
-        return uriScheme + host;
+        return uriPrefixes()[0] + "://" + host;
     }
 
     void queryPathInfoUncached(const StorePath & path,
@@ -325,12 +326,6 @@ public:
     }
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<LegacySSHStore>(std::string(uri, uriScheme.size()), params);
-});
+[[maybe_unused]] static RegisterStoreImplementation<LegacySSHStore> regStore();
 
 }

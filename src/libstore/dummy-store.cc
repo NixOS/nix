@@ -2,23 +2,25 @@
 
 namespace nix {
 
-static std::string uriScheme = "dummy://";
-
 struct DummyStore : public Store
 {
-    DummyStore(const Params & params)
+    DummyStore(const std::string uri, const Params & params)
         : Store(params)
     { }
 
     string getUri() override
     {
-        return uriScheme;
+        return uriPrefixes()[0] + "://";
     }
 
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         callback(nullptr);
+    }
+
+    static std::vector<std::string> uriPrefixes() {
+        return {"dummy"};
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
@@ -48,12 +50,6 @@ struct DummyStore : public Store
     { unsupported("buildDerivation"); }
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (uri != uriScheme) return nullptr;
-    return std::make_shared<DummyStore>(params);
-});
+[[maybe_unused]] static RegisterStoreImplementation<DummyStore> regStore();
 
 }

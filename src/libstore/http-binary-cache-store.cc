@@ -24,7 +24,8 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const Params & params, const Path & _cacheUri)
+        const Path & _cacheUri,
+        const Params & params)
         : BinaryCacheStore(params)
         , cacheUri(_cacheUri)
     {
@@ -55,6 +56,13 @@ public:
         }
     }
 
+    static std::vector<std::string> uriPrefixes()
+    {
+        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
+        auto ret = std::vector<std::string>({"http", "https"});
+        if (forceHttp) ret.push_back("file");
+        return ret;
+    }
 protected:
 
     void maybeDisable()
@@ -162,18 +170,6 @@ protected:
 
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-    if (std::string(uri, 0, 7) != "http://" &&
-        std::string(uri, 0, 8) != "https://" &&
-        (!forceHttp || std::string(uri, 0, 7) != "file://"))
-        return 0;
-    auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
-    store->init();
-    return store;
-});
+[[maybe_unused]] static RegisterStoreImplementation<HttpBinaryCacheStore> regStore();
 
 }

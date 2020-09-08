@@ -193,7 +193,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const Params & params, const std::string & bucketName)
+        const std::string & bucketName,
+        const Params & params)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
@@ -426,17 +427,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return paths;
     }
 
+    static std::vector<std::string> uriPrefixes() { return {"s3"}; }
+
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, 5) != "s3://") return 0;
-    auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, std::string(uri, 5));
-    store->init();
-    return store;
-});
+[[maybe_unused]] static RegisterStoreImplementation<S3BinaryCacheStoreImpl> regStore();
 
 }
 

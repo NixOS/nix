@@ -13,7 +13,8 @@ private:
 public:
 
     LocalBinaryCacheStore(
-        const Params & params, const Path & binaryCacheDir)
+        const Path & binaryCacheDir,
+        const Params & params)
         : BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
@@ -25,6 +26,8 @@ public:
     {
         return "file://" + binaryCacheDir;
     }
+
+    static std::vector<std::string> uriPrefixes();
 
 protected:
 
@@ -85,16 +88,14 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
+std::vector<std::string> LocalBinaryCacheStore::uriPrefixes()
 {
-    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1" ||
-        std::string(uri, 0, 7) != "file://")
-        return 0;
-    auto store = std::make_shared<LocalBinaryCacheStore>(params, std::string(uri, 7));
-    store->init();
-    return store;
-});
+    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1")
+        return {};
+    else
+        return {"file"};
+}
+
+[[maybe_unused]] static RegisterStoreImplementation<LocalBinaryCacheStore> regStore();
 
 }

@@ -33,6 +33,7 @@ MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
 MakeError(BadStorePath, Error);
 
+MakeError(InvalidStoreURI, Error);
 
 class FSAccessor;
 class NarInfoDiskCache;
@@ -198,6 +199,8 @@ protected:
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
     Store(const Params & params);
+
+    std::shared_ptr<Config> getConfig();
 
 public:
 
@@ -744,23 +747,29 @@ StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
    ‘substituters’ option and various legacy options. */
 std::list<ref<Store>> getDefaultSubstituters();
 
+struct StoreFactory
+{
+    std::vector<std::string> uriPrefixes;
+    std::function<std::shared_ptr<Store> (const std::string & uri, const Store::Params & params)> open;
+};
+typedef std::vector<StoreFactory> Implementations;
+static Implementations * implementations = new Implementations;
 
-/* Store implementation registration. */
-typedef std::function<std::shared_ptr<Store>(
-    const std::string & uri, const Store::Params & params)> OpenStore;
-
+template<typename T>
 struct RegisterStoreImplementation
 {
-    typedef std::vector<OpenStore> Implementations;
-    static Implementations * implementations;
-
-    RegisterStoreImplementation(OpenStore fun)
+    RegisterStoreImplementation()
     {
-        if (!implementations) implementations = new Implementations;
-        implementations->push_back(fun);
+        StoreFactory factory{
+            .uriPrefixes = T::uriPrefixes(),
+            .open =
+                ([](const std::string & uri, const Store::Params & params)
+                 -> std::shared_ptr<Store>
+                 { return std::make_shared<T>(uri, params); })
+        };
+        implementations->push_back(factory);
     }
 };
-
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes

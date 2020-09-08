@@ -1009,6 +1009,11 @@ Derivation Store::readDerivation(const StorePath & drvPath)
     }
 }
 
+std::shared_ptr<Config> Store::getConfig()
+{
+    return shared_from_this();
+}
+
 
 }
 
@@ -1018,9 +1023,6 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 
 
 namespace nix {
-
-
-RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_)
@@ -1033,24 +1035,6 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
         uri = uri_.substr(0, q);
     }
     return {uri, params};
-}
-
-ref<Store> openStore(const std::string & uri_,
-    const Store::Params & extraParams)
-{
-    auto [uri, uriParams] = splitUriAndParams(uri_);
-    auto params = extraParams;
-    params.insert(uriParams.begin(), uriParams.end());
-
-    for (auto fun : *RegisterStoreImplementation::implementations) {
-        auto store = fun(uri, params);
-        if (store) {
-            store->warnUnknownSettings();
-            return ref<Store>(store);
-        }
-    }
-
-    throw Error("don't know how to open Nix store '%s'", uri);
 }
 
 static bool isNonUriPath(const std::string & spec) {
@@ -1080,10 +1064,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
     }
 }
 
-
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
+std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
     switch (getStoreType(uri, get(params, "state").value_or(settings.nixStateDir))) {
         case tDaemon:
@@ -1098,8 +1079,30 @@ static RegisterStoreImplementation regStore([](
         default:
             return nullptr;
     }
-});
+}
 
+ref<Store> openStore(const std::string & uri_,
+    const Store::Params & extraParams)
+{
+    auto [uri, uriParams] = splitUriAndParams(uri_);
+    auto params = extraParams;
+    params.insert(uriParams.begin(), uriParams.end());
+
+    if (auto store = openFromNonUri(uri, params)) {
+        store->warnUnknownSettings();
+        return ref<Store>(store);
+    }
+
+    for (auto implem : *implementations) {
+        auto store = implem.open(uri, params);
+        if (store) {
+            store->warnUnknownSettings();
+            return ref<Store>(store);
+        }
+    }
+
+    throw Error("don't know how to open Nix store '%s'", uri);
+}
 
 std::list<ref<Store>> getDefaultSubstituters()
 {

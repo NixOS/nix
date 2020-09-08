@@ -8,8 +8,6 @@
 
 namespace nix {
 
-static std::string uriScheme = "ssh-ng://";
-
 class SSHStore : public RemoteStore
 {
 public:
@@ -32,9 +30,11 @@ public:
     {
     }
 
+    static std::vector<std::string> uriPrefixes() { return {"ssh-ng"}; }
+
     std::string getUri() override
     {
-        return uriScheme + host;
+        return uriPrefixes()[0] + "://" + host;
     }
 
     bool sameMachine() override
@@ -76,12 +76,6 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     return conn;
 }
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<SSHStore>(std::string(uri, uriScheme.size()), params);
-});
+[[maybe_unused]] static RegisterStoreImplementation<SSHStore> regStore();
 
 }

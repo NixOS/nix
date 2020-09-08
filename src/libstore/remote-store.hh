@@ -150,6 +150,9 @@ public:
 
     std::string getUri() override;
 
+    static std::vector<std::string> uriPrefixes()
+    { return {"unix"}; }
+
     bool sameMachine() override
     { return true; }
 
