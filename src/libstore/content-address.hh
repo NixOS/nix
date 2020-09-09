@@ -12,24 +12,16 @@ enum struct FileIngestionMethod : uint8_t {
 
 struct TextHash {
     Hash hash;
-    bool operator ==(TextHash otherHash) const noexcept {
-        return hash == otherHash.hash;
-    };
-    bool operator !=(TextHash otherHash) const noexcept {
-        return hash != otherHash.hash;
-    };
+    bool operator ==(const TextHash & otherHash) const noexcept;
+    bool operator !=(const TextHash & otherHash) const noexcept;
 };
 
 /// Pair of a hash, and how the file system was ingested
 struct FixedOutputHash {
     FileIngestionMethod method;
     Hash hash;
-    bool operator ==(FixedOutputHash otherHash) const noexcept {
-        return method == otherHash.method && hash == otherHash.hash;
-    };
-    bool operator !=(FixedOutputHash otherHash) const noexcept {
-        return method != otherHash.method && hash == otherHash.hash;
-    };
+    bool operator ==(const FixedOutputHash & therHash) const noexcept;
+    bool operator !=(const FixedOutputHash & therHash) const noexcept;
     std::string printMethodAlgo() const;
 };
 
