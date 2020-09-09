@@ -4298,11 +4298,13 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    ValidPathInfos infos2;
-    for (auto & [outputName, newInfo] : infos) {
-        infos2.push_back(newInfo);
+    {
+        ValidPathInfos infos2;
+        for (auto & [outputName, newInfo] : infos) {
+            infos2.push_back(newInfo);
+        }
+        worker.store.registerValidPaths(infos2);
     }
-    worker.store.registerValidPaths(infos2);
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
@@ -4314,16 +4316,21 @@ void DerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
-    for (auto & [outputName, newInfo] : infos) {
-        if (useDerivation)
-            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
-        else {
-            /* Once a floating CA derivations reaches this point, it must
-               already be resolved, drvPath the basic derivation path, and
-               a file existsing at that path for sake of the DB's foreign key. */
-            assert(drv->type() != DerivationType::CAFloating);
-        }
+    bool isCaFloating = drv->type() == DerivationType::CAFloating;
+
+    auto drvPath2 = drvPath;
+    if (!useDerivation && isCaFloating) {
+        /* Once a floating CA derivations reaches this point, it
+           must already be resolved, so we don't bother trying to
+           downcast drv to get would would just be an empty
+           inputDrvs field. */
+        Derivation drv2 { *drv };
+        drvPath2 = writeDerivation(worker.store, drv2);
     }
+
+    if (useDerivation || isCaFloating)
+        for (auto & [outputName, newInfo] : infos)
+            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
 }
 
 
