@@ -309,19 +309,27 @@ public:
             out.insert(i);
     }
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
+    std::set<OwnedStorePathOrDesc> queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override
     {
         auto conn(connections->get());
+
+        StorePathSet paths2;
+        for (auto & pathOrDesc : paths)
+            paths2.insert(bakeCaIfNeeded(pathOrDesc));
 
         conn->to
             << cmdQueryValidPaths
             << false // lock
             << maybeSubstitute;
-        WorkerProto<StorePathSet>::write(*this, conn->to, paths);
+        WorkerProto<StorePathSet>::write(*this, conn->to, paths2);
         conn->to.flush();
 
-        return WorkerProto<StorePathSet>::read(*this, conn->from);
+        auto res = WorkerProto<StorePathSet>::read(*this, conn->from);
+        std::set<OwnedStorePathOrDesc> res2;
+        for (auto & r : res)
+            res2.insert(r);
+        return res2;
     }
 
     void connect() override

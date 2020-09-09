@@ -302,19 +302,28 @@ bool RemoteStore::isValidPathUncached(StorePathOrDesc pathOrDesc)
 }
 
 
-StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+std::set<OwnedStorePathOrDesc> RemoteStore::queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(getConnection());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
-        StorePathSet res;
+        std::set<OwnedStorePathOrDesc> res;
         for (auto & i : paths)
-            if (isValidPath(i)) res.insert(i);
+            if (isValidPath(borrowStorePathOrDesc(i)))
+                res.insert(i);
         return res;
     } else {
+        StorePathSet paths2;
+        for (auto & pathOrDesc : paths)
+            paths2.insert(bakeCaIfNeeded(pathOrDesc));
+        // FIXME make new version to take advantage of desc case
         conn->to << wopQueryValidPaths;
-        WorkerProto<StorePathSet>::write(*this, conn->to, paths);
+        WorkerProto<StorePathSet>::write(*this, conn->to, paths2);
         conn.processStderr();
-        return WorkerProto<StorePathSet>::read(*this, conn->from);
+        auto res = WorkerProto<StorePathSet>::read(*this, conn->from);
+        std::set<OwnedStorePathOrDesc> res2;
+        for (auto & r : res)
+            res2.insert(r);
+        return res2;
     }
 }
 

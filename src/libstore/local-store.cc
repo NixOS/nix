@@ -754,11 +754,11 @@ bool LocalStore::isValidPathUncached(StorePathOrDesc pathOrDesc)
 }
 
 
-StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+std::set<OwnedStorePathOrDesc> LocalStore::queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths, SubstituteFlag maybeSubstitute)
 {
-    StorePathSet res;
+    std::set<OwnedStorePathOrDesc> res;
     for (auto & i : paths)
-        if (isValidPath(i)) res.insert(i);
+        if (isValidPath(borrowStorePathOrDesc(i))) res.insert(i);
     return res;
 }
 

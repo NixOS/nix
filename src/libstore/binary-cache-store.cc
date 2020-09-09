@@ -108,7 +108,7 @@ std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 {
-    auto narInfoFile = narInfoFileFor(bakeCaIfNeeded(narInfo->path));
+    auto narInfoFile = narInfoFileFor(narInfo->path);
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
