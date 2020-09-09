@@ -37,6 +37,9 @@ struct LegacySSHStore : public Store
 
     static std::vector<std::string> uriPrefixes() { return {"ssh"}; }
 
+    LegacySSHStore(const Params & params)
+        : LegacySSHStore("dummy", params)
+    {}
 
     LegacySSHStore(const string & host, const Params & params)
         : Store(params)

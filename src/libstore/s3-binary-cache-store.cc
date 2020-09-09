@@ -192,6 +192,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     S3Helper s3Helper;
 
+    S3BinaryCacheStoreImpl(const Params & params)
+        : S3BinaryCacheStoreImpl("dummy-bucket", params) {}
+
     S3BinaryCacheStoreImpl(
         const std::string & bucketName,
         const Params & params)

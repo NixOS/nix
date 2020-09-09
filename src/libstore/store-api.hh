@@ -200,9 +200,12 @@ protected:
 
     Store(const Params & params);
 
-    std::shared_ptr<Config> getConfig();
-
 public:
+    /**
+     * Perform any necessary effectful operation to make the store up and
+     * running
+     */
+    virtual void init() {};
 
     virtual ~Store() { }
 
@@ -749,7 +752,8 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 struct StoreFactory
 {
-    std::function<std::shared_ptr<Store> (const std::string & uri, const Store::Params & params)> open;
+    std::function<std::shared_ptr<Store> (const std::string & uri, const Store::Params & params)> create;
+    std::function<std::shared_ptr<Store> (const Store::Params & params)> createDummy;
 };
 struct Implementations
 {
@@ -760,10 +764,14 @@ struct Implementations
     {
         if (!registered) registered = new std::vector<StoreFactory>();
         StoreFactory factory{
-            .open =
+            .create =
                 ([](const std::string & uri, const Store::Params & params)
                  -> std::shared_ptr<Store>
                  { return std::make_shared<T>(uri, params); }),
+            .createDummy =
+                ([](const Store::Params & params)
+                 -> std::shared_ptr<Store>
+                 { return std::make_shared<T>(params); })
         };
         registered->push_back(factory);
     }

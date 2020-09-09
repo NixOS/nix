@@ -58,7 +58,7 @@ public:
 
 public:
 
-    virtual void init();
+    virtual void init() override;
 
 private:
 

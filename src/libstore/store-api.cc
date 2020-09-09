@@ -1094,8 +1094,9 @@ ref<Store> openStore(const std::string & uri_,
     }
 
     for (auto implem : *Implementations::registered) {
-        auto store = implem.open(uri, params);
+        auto store = implem.create(uri, params);
         if (store) {
+            store->init();
             store->warnUnknownSettings();
             return ref<Store>(store);
         }

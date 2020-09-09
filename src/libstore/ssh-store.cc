@@ -17,6 +17,12 @@ public:
     const Setting<Path> remoteProgram{(Store*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
     const Setting<std::string> remoteStore{(Store*) this, "", "remote-store", "URI of the store on the remote system"};
 
+    SSHStore(
+        const Params & params)
+        : SSHStore("dummy", params)
+    {
+    }
+
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
         , RemoteStore(params)

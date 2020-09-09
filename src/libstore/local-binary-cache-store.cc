@@ -13,6 +13,12 @@ private:
 public:
 
     LocalBinaryCacheStore(
+        const Params & params)
+        : LocalBinaryCacheStore("dummy", params)
+    {
+    }
+
+    LocalBinaryCacheStore(
         const Path & binaryCacheDir,
         const Params & params)
         : BinaryCacheStore(params)

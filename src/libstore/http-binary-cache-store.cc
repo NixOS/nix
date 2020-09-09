@@ -24,6 +24,12 @@ private:
 public:
 
     HttpBinaryCacheStore(
+        const Params & params)
+        : HttpBinaryCacheStore("dummy", params)
+    {
+    }
+
+    HttpBinaryCacheStore(
         const Path & _cacheUri,
         const Params & params)
         : BinaryCacheStore(params)

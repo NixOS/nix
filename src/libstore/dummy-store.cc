@@ -5,6 +5,10 @@ namespace nix {
 struct DummyStore : public Store
 {
     DummyStore(const std::string uri, const Params & params)
+        : DummyStore(params)
+    { }
+
+    DummyStore(const Params & params)
         : Store(params)
     { }
 
