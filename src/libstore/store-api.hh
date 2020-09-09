@@ -749,25 +749,32 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 struct StoreFactory
 {
-    std::vector<std::string> uriPrefixes;
     std::function<std::shared_ptr<Store> (const std::string & uri, const Store::Params & params)> open;
 };
-typedef std::vector<StoreFactory> Implementations;
-static Implementations * implementations = new Implementations;
+struct Implementations
+{
+    static std::vector<StoreFactory> * registered;
+
+    template<typename T>
+    static void add()
+    {
+        if (!registered) registered = new std::vector<StoreFactory>();
+        StoreFactory factory{
+            .open =
+                ([](const std::string & uri, const Store::Params & params)
+                 -> std::shared_ptr<Store>
+                 { return std::make_shared<T>(uri, params); }),
+        };
+        registered->push_back(factory);
+    }
+};
 
 template<typename T>
 struct RegisterStoreImplementation
 {
     RegisterStoreImplementation()
     {
-        StoreFactory factory{
-            .uriPrefixes = T::uriPrefixes(),
-            .open =
-                ([](const std::string & uri, const Store::Params & params)
-                 -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(uri, params); })
-        };
-        implementations->push_back(factory);
+        Implementations::add<T>();
     }
 };
 

@@ -982,6 +982,6 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-[[maybe_unused]] static RegisterStoreImplementation<UDSRemoteStore> regStore();
+static RegisterStoreImplementation<UDSRemoteStore> regStore;
 
 }

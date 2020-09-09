@@ -170,6 +170,6 @@ protected:
 
 };
 
-[[maybe_unused]] static RegisterStoreImplementation<HttpBinaryCacheStore> regStore();
+static RegisterStoreImplementation<HttpBinaryCacheStore> regStore;
 
 }

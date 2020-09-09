@@ -50,6 +50,6 @@ struct DummyStore : public Store
     { unsupported("buildDerivation"); }
 };
 
-[[maybe_unused]] static RegisterStoreImplementation<DummyStore> regStore();
+static RegisterStoreImplementation<DummyStore> regStore;
 
 }

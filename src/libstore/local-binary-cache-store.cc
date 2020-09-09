@@ -96,6 +96,6 @@ std::vector<std::string> LocalBinaryCacheStore::uriPrefixes()
         return {"file"};
 }
 
-[[maybe_unused]] static RegisterStoreImplementation<LocalBinaryCacheStore> regStore();
+static RegisterStoreImplementation<LocalBinaryCacheStore> regStore;
 
 }

@@ -76,6 +76,6 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     return conn;
 }
 
-[[maybe_unused]] static RegisterStoreImplementation<SSHStore> regStore();
+static RegisterStoreImplementation<SSHStore> regStore;
 
 }

@@ -326,6 +326,6 @@ public:
     }
 };
 
-[[maybe_unused]] static RegisterStoreImplementation<LegacySSHStore> regStore();
+static RegisterStoreImplementation<LegacySSHStore> regStore;
 
 }

@@ -1093,7 +1093,7 @@ ref<Store> openStore(const std::string & uri_,
         return ref<Store>(store);
     }
 
-    for (auto implem : *implementations) {
+    for (auto implem : *Implementations::registered) {
         auto store = implem.open(uri, params);
         if (store) {
             store->warnUnknownSettings();
@@ -1136,5 +1136,6 @@ std::list<ref<Store>> getDefaultSubstituters()
     return stores;
 }
 
+std::vector<StoreFactory> * Implementations::registered = 0;
 
 }
