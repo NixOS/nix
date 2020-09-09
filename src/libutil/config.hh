@@ -206,7 +206,9 @@ protected:
 
     virtual std::string to_string() const = 0;
 
-    virtual nlohmann::json toJSON();
+    nlohmann::json toJSON();
+
+    virtual std::map<std::string, nlohmann::json> toJSONObject();
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -251,7 +253,12 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    nlohmann::json toJSON() override;
+    std::map<std::string, nlohmann::json> toJSONObject() override
+    {
+        auto obj = AbstractSetting::toJSONObject();
+        obj.emplace("value", value);
+        return obj;
+    }
 };
 
 template<typename T>
