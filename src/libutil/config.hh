@@ -222,6 +222,7 @@ class BaseSetting : public AbstractSetting
 protected:
 
     T value;
+    const T defaultValue;
 
 public:
 
@@ -231,6 +232,7 @@ public:
         const std::set<std::string> & aliases = {})
         : AbstractSetting(name, description, aliases)
         , value(def)
+        , defaultValue(def)
     { }
 
     operator const T &() const { return value; }
@@ -257,6 +259,7 @@ public:
     {
         auto obj = AbstractSetting::toJSONObject();
         obj.emplace("value", value);
+        obj.emplace("defaultValue", defaultValue);
         return obj;
     }
 };
