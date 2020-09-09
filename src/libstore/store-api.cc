@@ -847,6 +847,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                             return i.second == storePath;
                         });
                         // drv file is always CA
+                        srcStore->ensurePath(drvPath);
                         copyStorePath(srcStore, dstStore, drvPath, repair, checkSigs);
                         dstStore->buildPaths({{
                             drvPath,
