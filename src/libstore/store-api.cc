@@ -1009,12 +1009,6 @@ Derivation Store::readDerivation(const StorePath & drvPath)
     }
 }
 
-std::shared_ptr<Config> Store::getConfig()
-{
-    return shared_from_this();
-}
-
-
 }
 
 
