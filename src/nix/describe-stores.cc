@@ -20,7 +20,11 @@ struct CmdDescribeStores : Command, MixJSON
     {
 
         if (json) {
-            auto availableStores = *implementations;
+            auto res = nlohmann::json::array();
+            for (auto & implem : *Implementations::registered) {
+                auto storeConfig = implem.getConfig();
+                std::cout << storeConfig->toJSON().dump() << std::endl;
+            }
         } else {
             throw Error("Only json is available for describe-stores");
         }
