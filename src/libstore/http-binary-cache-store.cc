@@ -7,7 +7,12 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
-class HttpBinaryCacheStore : public BinaryCacheStore
+struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+{
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+};
+
+class HttpBinaryCacheStore : public BinaryCacheStore, public HttpBinaryCacheStoreConfig
 {
 private:
 
@@ -24,15 +29,10 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const Params & params)
-        : HttpBinaryCacheStore("dummy", params)
-    {
-    }
-
-    HttpBinaryCacheStore(
         const Path & _cacheUri,
         const Params & params)
         : BinaryCacheStore(params)
+        , HttpBinaryCacheStoreConfig(params)
         , cacheUri(_cacheUri)
     {
         if (cacheUri.back() == '/')
@@ -176,6 +176,6 @@ protected:
 
 };
 
-static RegisterStoreImplementation<HttpBinaryCacheStore> regStore;
+static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regStore;
 
 }

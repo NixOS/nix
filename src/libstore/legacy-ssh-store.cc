@@ -9,15 +9,21 @@
 
 namespace nix {
 
-struct LegacySSHStore : public Store
+struct LegacySSHStoreConfig : virtual StoreConfig
 {
+    using StoreConfig::StoreConfig;
     const Setting<int> maxConnections{this, 1, "max-connections", "maximum number of concurrent SSH connections"};
     const Setting<Path> sshKey{this, "", "ssh-key", "path to an SSH private key"};
     const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
     const Setting<std::string> remoteStore{this, "", "remote-store", "URI of the store on the remote system"};
+};
 
+struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
+{
     // Hack for getting remote build log output.
+    // Intentionally not in `StoreConfig` so that it doesn't appear in the
+    // documentation
     const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     struct Connection
@@ -37,12 +43,9 @@ struct LegacySSHStore : public Store
 
     static std::vector<std::string> uriPrefixes() { return {"ssh"}; }
 
-    LegacySSHStore(const Params & params)
-        : LegacySSHStore("dummy", params)
-    {}
-
     LegacySSHStore(const string & host, const Params & params)
-        : Store(params)
+        : LegacySSHStoreConfig(params)
+        , Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
@@ -329,6 +332,6 @@ public:
     }
 };
 
-static RegisterStoreImplementation<LegacySSHStore> regStore;
+static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regStore;
 
 }

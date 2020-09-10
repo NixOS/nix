@@ -172,8 +172,9 @@ S3Helper::FileTransferResult S3Helper::getObject(
     return res;
 }
 
-struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
+struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
     const Setting<std::string> profile{this, "", "profile", "The name of the AWS configuration profile to use."};
     const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
     const Setting<std::string> scheme{this, "", "scheme", "The scheme to use for S3 requests, https by default."};
@@ -185,20 +186,21 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         this, false, "multipart-upload", "whether to use multi-part uploads"};
     const Setting<uint64_t> bufferSize{
         this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+};
 
+struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCacheStoreConfig
+{
     std::string bucketName;
 
     Stats stats;
 
     S3Helper s3Helper;
 
-    S3BinaryCacheStoreImpl(const Params & params)
-        : S3BinaryCacheStoreImpl("dummy-bucket", params) {}
-
     S3BinaryCacheStoreImpl(
         const std::string & bucketName,
         const Params & params)
-        : S3BinaryCacheStore(params)
+        : S3BinaryCacheStoreConfig(params)
+        , S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
@@ -434,7 +436,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
 };
 
-static RegisterStoreImplementation<S3BinaryCacheStoreImpl> regStore;
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regStore;
 
 }
 

@@ -4,7 +4,12 @@
 
 namespace nix {
 
-class LocalBinaryCacheStore : public BinaryCacheStore
+struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+{
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+};
+
+class LocalBinaryCacheStore : public BinaryCacheStore, public virtual LocalBinaryCacheStoreConfig
 {
 private:
 
@@ -13,15 +18,10 @@ private:
 public:
 
     LocalBinaryCacheStore(
-        const Params & params)
-        : LocalBinaryCacheStore("dummy", params)
-    {
-    }
-
-    LocalBinaryCacheStore(
         const Path & binaryCacheDir,
         const Params & params)
-        : BinaryCacheStore(params)
+        : LocalBinaryCacheStoreConfig(params)
+        , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
     }
@@ -102,6 +102,6 @@ std::vector<std::string> LocalBinaryCacheStore::uriPrefixes()
         return {"file"};
 }
 
-static RegisterStoreImplementation<LocalBinaryCacheStore> regStore;
+static RegisterStoreImplementation<LocalBinaryCacheStore, LocalBinaryCacheStoreConfig> regStore;
 
 }

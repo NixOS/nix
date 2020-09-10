@@ -8,23 +8,22 @@
 
 namespace nix {
 
-class SSHStore : public RemoteStore
+struct SSHStoreConfig : virtual RemoteStoreConfig
+{
+    using RemoteStoreConfig::RemoteStoreConfig;
+    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
+    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+};
+
+class SSHStore : public RemoteStore, public virtual SSHStoreConfig
 {
 public:
 
-    const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(Store*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{(Store*) this, "", "remote-store", "URI of the store on the remote system"};
-
-    SSHStore(
-        const Params & params)
-        : SSHStore("dummy", params)
-    {
-    }
-
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
+        , RemoteStoreConfig(params)
         , RemoteStore(params)
         , host(host)
         , master(
@@ -82,6 +81,6 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     return conn;
 }
 
-static RegisterStoreImplementation<SSHStore> regStore;
+static RegisterStoreImplementation<SSHStore, SSHStoreConfig> regStore;
 
 }

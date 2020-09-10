@@ -11,9 +11,9 @@ namespace nix {
 
 struct NarInfo;
 
-class BinaryCacheStore : public Store
+struct BinaryCacheStoreConfig : virtual StoreConfig
 {
-public:
+    using StoreConfig::StoreConfig;
 
     const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
     const Setting<bool> writeNARListing{this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
@@ -22,6 +22,10 @@ public:
     const Setting<Path> localNarCache{this, "", "local-nar-cache", "path to a local cache of NARs"};
     const Setting<bool> parallelCompression{this, false, "parallel-compression",
         "enable multi-threading compression, available for xz only currently"};
+};
+
+class BinaryCacheStore : public Store, public virtual BinaryCacheStoreConfig
+{
 
 private:
 

@@ -2,6 +2,8 @@
 
 namespace nix {
 
+struct DummyStoreConfig : StoreConfig {};
+
 struct DummyStore : public Store
 {
     DummyStore(const std::string uri, const Params & params)
@@ -54,6 +56,6 @@ struct DummyStore : public Store
     { unsupported("buildDerivation"); }
 };
 
-static RegisterStoreImplementation<DummyStore> regStore;
+static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regStore;
 
 }

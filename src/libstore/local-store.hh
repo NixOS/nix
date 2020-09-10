@@ -95,7 +95,7 @@ public:
 
 private:
 
-    Setting<bool> requireSigs{(Store*) this,
+    Setting<bool> requireSigs{(StoreConfig*) this,
         settings.requireSigs,
         "require-sigs", "whether store paths should have a trusted signature on import"};
 

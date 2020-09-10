@@ -145,12 +145,9 @@ struct BuildResult
     }
 };
 
-
-class Store : public std::enable_shared_from_this<Store>, public Config
+struct StoreConfig : public Config
 {
-public:
-
-    typedef std::map<std::string, std::string> Params;
+    using Config::Config;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
         "store", "path to the Nix store"};
@@ -167,6 +164,14 @@ public:
     Setting<StringSet> systemFeatures{this, settings.systemFeatures,
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
+
+};
+
+class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
+{
+public:
+
+    typedef std::map<std::string, std::string> Params;
 
 protected:
 
@@ -632,22 +637,25 @@ protected:
 
 };
 
-
-class LocalFSStore : public virtual Store
+struct LocalFSStoreConfig : virtual StoreConfig
 {
-public:
-
-    // FIXME: the (Store*) cast works around a bug in gcc that causes
+    using StoreConfig::StoreConfig;
+    // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
     // it to omit the call to the Setting constructor. Clang works fine
     // either way.
-    const PathSetting rootDir{(Store*) this, true, "",
+    const PathSetting rootDir{(StoreConfig*) this, true, "",
         "root", "directory prefixed to all other paths"};
-    const PathSetting stateDir{(Store*) this, false,
+    const PathSetting stateDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
         "state", "directory where Nix will store state"};
-    const PathSetting logDir{(Store*) this, false,
+    const PathSetting logDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
         "log", "directory where Nix will store state"};
+};
+
+class LocalFSStore : public virtual Store, public LocalFSStoreConfig
+{
+public:
 
     const static string drvsLogDir;
 
@@ -753,13 +761,13 @@ std::list<ref<Store>> getDefaultSubstituters();
 struct StoreFactory
 {
     std::function<std::shared_ptr<Store> (const std::string & uri, const Store::Params & params)> create;
-    std::function<std::shared_ptr<Store> (const Store::Params & params)> createDummy;
+    std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
 struct Implementations
 {
     static std::vector<StoreFactory> * registered;
 
-    template<typename T>
+    template<typename T, typename TConfig>
     static void add()
     {
         if (!registered) registered = new std::vector<StoreFactory>();
@@ -768,21 +776,21 @@ struct Implementations
                 ([](const std::string & uri, const Store::Params & params)
                  -> std::shared_ptr<Store>
                  { return std::make_shared<T>(uri, params); }),
-            .createDummy =
-                ([](const Store::Params & params)
-                 -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(params); })
+            .getConfig =
+                ([]()
+                 -> std::shared_ptr<StoreConfig>
+                 { return std::make_shared<TConfig>(); })
         };
         registered->push_back(factory);
     }
 };
 
-template<typename T>
+template<typename T, typename TConfig>
 struct RegisterStoreImplementation
 {
     RegisterStoreImplementation()
     {
-        Implementations::add<T>();
+        Implementations::add<T, TConfig>();
     }
 };
 
