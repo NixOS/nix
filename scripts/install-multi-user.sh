@@ -71,11 +71,9 @@ uninstall_directions() {
     subheader "Uninstalling nix:"
     local step=0
 
-    if [ -e /run/systemd/system ] && poly_service_installed_check; then
+    if poly_service_installed_check; then
         step=$((step + 1))
         poly_service_uninstall_directions "$step"
-    else
-        step=$((step + 1))
     fi
 
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -255,40 +253,20 @@ function finish_success {
         echo "To try again later, run \"sudo -i nix-channel --update nixpkgs\"."
     fi
 
-    if [ -e /run/systemd/system ]; then
-        cat <<EOF
+    cat <<EOF
 
 Before Nix will work in your existing shells, you'll need to close
 them and open them again. Other than that, you should be ready to go.
 
 Try it! Open a new terminal, and type:
-
+$(poly_extra_try_me_commands)
   $ nix-shell -p nix-info --run "nix-info -m"
-
+$(poly_extra_setup_instructions)
 Thank you for using this installer. If you have any feedback, don't
 hesitate:
 
 $(contactme)
 EOF
-    else
-        cat <<EOF
-
-Before Nix will work in your existing shells, you'll need to close
-them and open them again. Other than that, you should be ready to go.
-
-Try it! Open a new terminal, and type:
-
-  $ sudo nix-daemon
-  $ nix-shell -p nix-info --run "nix-info -m"
-
-Additionally, you may want to add nix-daemon to your init-system.
-
-Thank you for using this installer. If you have any feedback, don't
-hesitate:
-
-$(contactme)
-EOF
-   fi
 
 }
 
@@ -725,9 +703,7 @@ main() {
     setup_default_profile
     place_nix_configuration
 
-    if [ -e /run/systemd/system ]; then
-        poly_configure_nix_daemon_service
-    fi
+    poly_configure_nix_daemon_service
 
     trap finish_success EXIT
 }
