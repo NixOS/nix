@@ -608,24 +608,20 @@ EOF
 }
 
 configure_shell_profile() {
-    # If there is an /etc/profile.d directory, we want to ensure there
-    # is a nix.sh within it, so we can use the following loop to add
-    # the source lines to it. Note that I'm _not_ adding the source
-    # lines here, because we want to be using the regular machinery.
-    #
-    # If we go around that machinery, it becomes more complicated and
-    # adds complications to the uninstall instruction generator and
-    # old instruction sniffer as well.
-    if [ -d /etc/profile.d ]; then
-        _sudo "create a stub /etc/profile.d/nix.sh which will be updated" \
-              touch /etc/profile.d/nix.sh
-    fi
-
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
             _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
                   cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+        else
+            # try to create the file if its directory exists
+            target_dir="$(dirname "$profile_target")"
+            if [ -d "$target_dir" ]; then
+                _sudo "to create a stub $profile_target which will be updated" \
+                    touch "$profile_target"
+            fi
+        fi
 
+        if [ -e "$profile_target" ]; then
             shell_source_lines \
                 | _sudo "extend your $profile_target with nix-daemon settings" \
                         tee -a "$profile_target"
