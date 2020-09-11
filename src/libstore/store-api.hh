@@ -148,6 +148,8 @@ struct BuildResult
 struct StoreConfig : public Config
 {
     using Config::Config;
+    StoreConfig() = delete;
+
 
     const PathSetting storeDir_{this, false, settings.nixStore,
         "store", "path to the Nix store"};
