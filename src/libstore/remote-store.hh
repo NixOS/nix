@@ -165,11 +165,11 @@ class UDSRemoteStore : public LocalFSStore, public RemoteStore, public virtual U
 public:
 
     UDSRemoteStore(const Params & params);
-    UDSRemoteStore(std::string path, const Params & params);
+    UDSRemoteStore(const std::string scheme, std::string path, const Params & params);
 
     std::string getUri() override;
 
-    static std::vector<std::string> uriPrefixes()
+    static std::set<std::string> uriSchemes()
     { return {"unix"}; }
 
     bool sameMachine() override

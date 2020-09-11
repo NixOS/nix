@@ -22,7 +22,7 @@ class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig
 {
 public:
 
-    SSHStore(const std::string & host, const Params & params)
+    SSHStore([[maybe_unused]] const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , Store(params)
         , RemoteStoreConfig(params)
@@ -38,11 +38,11 @@ public:
     {
     }
 
-    static std::vector<std::string> uriPrefixes() { return {"ssh-ng"}; }
+    static std::set<std::string> uriSchemes() { return {"ssh-ng"}; }
 
     std::string getUri() override
     {
-        return uriPrefixes()[0] + "://" + host;
+        return *uriSchemes().begin() + "://" + host;
     }
 
     bool sameMachine() override

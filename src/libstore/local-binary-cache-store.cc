@@ -18,6 +18,7 @@ private:
 public:
 
     LocalBinaryCacheStore(
+        [[maybe_unused]] const std::string scheme,
         const Path & binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
@@ -35,7 +36,7 @@ public:
         return "file://" + binaryCacheDir;
     }
 
-    static std::vector<std::string> uriPrefixes();
+    static std::set<std::string> uriSchemes();
 
 protected:
 
@@ -96,7 +97,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-std::vector<std::string> LocalBinaryCacheStore::uriPrefixes()
+std::set<std::string> LocalBinaryCacheStore::uriSchemes()
 {
     if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1")
         return {};

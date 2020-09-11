@@ -8,7 +8,7 @@ struct DummyStoreConfig : StoreConfig {
 
 struct DummyStore : public Store, public virtual DummyStoreConfig
 {
-    DummyStore(const std::string uri, const Params & params)
+    DummyStore(const std::string scheme, const std::string uri, const Params & params)
         : DummyStore(params)
     { }
 
@@ -21,7 +21,7 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
 
     string getUri() override
     {
-        return uriPrefixes()[0] + "://";
+        return *uriSchemes().begin();
     }
 
     void queryPathInfoUncached(const StorePath & path,
@@ -30,7 +30,7 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
         callback(nullptr);
     }
 
-    static std::vector<std::string> uriPrefixes() {
+    static std::set<std::string> uriSchemes() {
         return {"dummy"};
     }
 

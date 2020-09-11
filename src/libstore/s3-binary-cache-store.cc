@@ -197,6 +197,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCache
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
+        [[maybe_unused]] const std::string & scheme,
         const std::string & bucketName,
         const Params & params)
         : StoreConfig(params)
@@ -434,7 +435,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCache
         return paths;
     }
 
-    static std::vector<std::string> uriPrefixes() { return {"s3"}; }
+    static std::set<std::string> uriSchemes() { return {"s3"}; }
 
 };
 

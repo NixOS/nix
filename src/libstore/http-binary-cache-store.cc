@@ -29,13 +29,14 @@ private:
 public:
 
     HttpBinaryCacheStore(
+        const std::string & scheme,
         const Path & _cacheUri,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , BinaryCacheStore(params)
         , HttpBinaryCacheStoreConfig(params)
-        , cacheUri(_cacheUri)
+        , cacheUri(scheme + "://" + _cacheUri)
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -64,11 +65,11 @@ public:
         }
     }
 
-    static std::vector<std::string> uriPrefixes()
+    static std::set<std::string> uriSchemes()
     {
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-        auto ret = std::vector<std::string>({"http", "https"});
-        if (forceHttp) ret.push_back("file");
+        auto ret = std::set<std::string>({"http", "https"});
+        if (forceHttp) ret.insert("file");
         return ret;
     }
 protected:

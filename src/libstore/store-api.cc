@@ -1078,25 +1078,35 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
 ref<Store> openStore(const std::string & uri_,
     const Store::Params & extraParams)
 {
-    auto [uri, uriParams] = splitUriAndParams(uri_);
     auto params = extraParams;
-    params.insert(uriParams.begin(), uriParams.end());
+    try {
+        auto parsedUri = parseURL(uri_);
+        params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
-    if (auto store = openFromNonUri(uri, params)) {
-        store->warnUnknownSettings();
-        return ref<Store>(store);
+        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
+
+        for (auto implem : *Implementations::registered) {
+            if (implem.uriSchemes.count(parsedUri.scheme)) {
+                auto store = implem.create(parsedUri.scheme, baseURI, params);
+                if (store) {
+                    store->init();
+                    store->warnUnknownSettings();
+                    return ref<Store>(store);
+                }
+            }
+        }
     }
+    catch (BadURL) {
+        auto [uri, uriParams] = splitUriAndParams(uri_);
+        params.insert(uriParams.begin(), uriParams.end());
 
-    for (auto implem : *Implementations::registered) {
-        auto store = implem.create(uri, params);
-        if (store) {
-            store->init();
+        if (auto store = openFromNonUri(uri, params)) {
             store->warnUnknownSettings();
             return ref<Store>(store);
         }
     }
 
-    throw Error("don't know how to open Nix store '%s'", uri);
+    throw Error("don't know how to open Nix store '%s'", uri_);
 }
 
 std::list<ref<Store>> getDefaultSubstituters()

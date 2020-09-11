@@ -760,7 +760,8 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 struct StoreFactory
 {
-    std::function<std::shared_ptr<Store> (const std::string & uri, const Store::Params & params)> create;
+    std::set<std::string> uriSchemes;
+    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
 struct Implementations
@@ -773,13 +774,14 @@ struct Implementations
         if (!registered) registered = new std::vector<StoreFactory>();
         StoreFactory factory{
             .create =
-                ([](const std::string & uri, const Store::Params & params)
+                ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
                  -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(uri, params); }),
+                 { return std::make_shared<T>(scheme, uri, params); }),
             .getConfig =
                 ([]()
                  -> std::shared_ptr<StoreConfig>
-                 { return std::make_shared<TConfig>(); })
+                 { return std::make_shared<TConfig>(StringMap({})); }),
+            .uriSchemes = T::uriSchemes()
         };
         registered->push_back(factory);
     }

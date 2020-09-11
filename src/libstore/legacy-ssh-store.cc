@@ -41,9 +41,9 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
 
     SSHMaster master;
 
-    static std::vector<std::string> uriPrefixes() { return {"ssh"}; }
+    static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const string & host, const Params & params)
+    LegacySSHStore(const string & scheme, const string & host, const Params & params)
         : StoreConfig(params)
         , LegacySSHStoreConfig(params)
         , Store(params)
@@ -92,7 +92,7 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
 
     string getUri() override
     {
-        return uriPrefixes()[0] + "://" + host;
+        return *uriSchemes().begin() + "://" + host;
     }
 
     void queryPathInfoUncached(const StorePath & path,
