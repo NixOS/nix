@@ -10,7 +10,7 @@ in certain situations. In addition, it has the following new features:
   - The Nix installer now supports performing a Multi-User
     installation for Linux computers which are running systemd. You
     can select a Multi-User installation by passing the `--daemon`
-    flag to the installer: `sh <(curl https://nixos.org/nix/install)
+    flag to the installer: `sh <(curl -L https://nixos.org/nix/install)
     --daemon`.
 
     The multi-user installer cannot handle systems with SELinux. If
