@@ -2883,7 +2883,7 @@ struct RestrictedStore : public LocalFSStore
     DerivationGoal & goal;
 
     RestrictedStore(const Params & params, ref<LocalStore> next, DerivationGoal & goal)
-        : Store(params), LocalFSStore(params), next(next), goal(goal)
+        : StoreConfig(params), LocalFSStoreConfig(params), Store(params), LocalFSStore(params), next(next), goal(goal)
     { }
 
     Path getRealStoreDir() override

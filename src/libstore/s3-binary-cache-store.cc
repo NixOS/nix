@@ -199,7 +199,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCache
     S3BinaryCacheStoreImpl(
         const std::string & bucketName,
         const Params & params)
-        : S3BinaryCacheStoreConfig(params)
+        : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , S3BinaryCacheStoreConfig(params)
         , S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)

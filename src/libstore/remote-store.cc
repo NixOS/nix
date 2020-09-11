@@ -124,7 +124,10 @@ ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 
 
 UDSRemoteStore::UDSRemoteStore(const Params & params)
-    : Store(params)
+    : StoreConfig(params)
+    , Store(params)
+    , LocalFSStoreConfig(params)
+    , RemoteStoreConfig(params)
     , UDSRemoteStoreConfig(params)
     , LocalFSStore(params)
     , RemoteStore(params)

@@ -31,7 +31,9 @@ public:
     HttpBinaryCacheStore(
         const Path & _cacheUri,
         const Params & params)
-        : BinaryCacheStore(params)
+        : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , BinaryCacheStore(params)
         , HttpBinaryCacheStoreConfig(params)
         , cacheUri(_cacheUri)
     {

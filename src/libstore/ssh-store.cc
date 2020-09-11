@@ -11,20 +11,23 @@ namespace nix {
 struct SSHStoreConfig : virtual RemoteStoreConfig
 {
     using RemoteStoreConfig::RemoteStoreConfig;
+
     const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
     const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
 };
 
-class SSHStore : public RemoteStore, public virtual SSHStoreConfig
+class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig
 {
 public:
 
     SSHStore(const std::string & host, const Params & params)
-        : Store(params)
+        : StoreConfig(params)
+        , Store(params)
         , RemoteStoreConfig(params)
         , RemoteStore(params)
+        , SSHStoreConfig(params)
         , host(host)
         , master(
             host,

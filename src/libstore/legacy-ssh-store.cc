@@ -44,7 +44,8 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
     static std::vector<std::string> uriPrefixes() { return {"ssh"}; }
 
     LegacySSHStore(const string & host, const Params & params)
-        : LegacySSHStoreConfig(params)
+        : StoreConfig(params)
+        , LegacySSHStoreConfig(params)
         , Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(

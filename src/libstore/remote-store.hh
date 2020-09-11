@@ -148,7 +148,8 @@ private:
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
     UDSRemoteStoreConfig(const Store::Params & params)
-        : LocalFSStoreConfig(params)
+        : StoreConfig(params)
+        , LocalFSStoreConfig(params)
         , RemoteStoreConfig(params)
     {
     }

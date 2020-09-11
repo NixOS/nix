@@ -2,17 +2,22 @@
 
 namespace nix {
 
-struct DummyStoreConfig : StoreConfig {};
+struct DummyStoreConfig : StoreConfig {
+    using StoreConfig::StoreConfig;
+};
 
-struct DummyStore : public Store
+struct DummyStore : public Store, public virtual DummyStoreConfig
 {
     DummyStore(const std::string uri, const Params & params)
         : DummyStore(params)
     { }
 
     DummyStore(const Params & params)
-        : Store(params)
-    { }
+        : StoreConfig(params)
+        , DummyStoreConfig(params)
+        , Store(params)
+    {
+    }
 
     string getUri() override
     {

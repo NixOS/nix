@@ -653,7 +653,7 @@ struct LocalFSStoreConfig : virtual StoreConfig
         "log", "directory where Nix will store state"};
 };
 
-class LocalFSStore : public virtual Store, public LocalFSStoreConfig
+class LocalFSStore : public virtual Store, public virtual LocalFSStoreConfig
 {
 public:
 
