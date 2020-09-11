@@ -91,11 +91,11 @@ static void expectType(EvalState & state, ValueType type,
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state, Value * value, const PosIdx pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath);
+    const std::optional<Path> & baseDir, InputPath lockRootPath, bool defaultRef = true);
 
 static FlakeInput parseFlakeInput(EvalState & state,
     const std::string & inputName, Value * value, const PosIdx pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath)
+    const std::optional<Path> & baseDir, InputPath lockRootPath, bool defaultRef = true)
 {
     expectType(state, nAttrs, *value, pos);
 
@@ -119,7 +119,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean;
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath, false);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputPath(attr.value->string.s));
@@ -168,7 +168,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
             input.ref = parseFlakeRef(*url, baseDir, true, input.isFlake);
     }
 
-    if (!input.follows && !input.ref)
+    if (!input.follows && !input.ref && defaultRef)
         input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
 
     return input;
@@ -176,7 +176,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state, Value * value, const PosIdx pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath)
+    const std::optional<Path> & baseDir, InputPath lockRootPath, bool defaultRef)
 {
     std::map<FlakeId, FlakeInput> inputs;
 
@@ -189,7 +189,8 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
                 inputAttr.value,
                 inputAttr.pos,
                 baseDir,
-                lockRootPath));
+                lockRootPath,
+                defaultRef));
     }
 
     return inputs;

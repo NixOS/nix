@@ -38,6 +38,11 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
  * set.  If not otherwise specified, a "ref" will be generated to a
  * 'type="indirect"' flake, which is treated as simply the name of a
  * flake to be resolved in the registry.
+ *
+ * FlakeInputs (a map from FlakeId to FlakeInput) is used to represent
+ * overrides, and in that case, a FlakeInput may have neither "ref"
+ * nor "follows", in which case it is an empty node in the override
+ * graph.
  */
 
 struct FlakeInput
