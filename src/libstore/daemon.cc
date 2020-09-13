@@ -2,7 +2,6 @@
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "store-api.hh"
-#include "local-store.hh"
 #include "finally.hh"
 #include "affinity.hh"
 #include "archive.hh"
