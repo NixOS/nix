@@ -679,6 +679,44 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 }
 
 
+StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+{
+    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
+
+    auto conn(getConnection());
+
+    conn->to
+        << wopAddToStore
+        << name
+        << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+        << (method == FileIngestionMethod::Recursive ? 1 : 0)
+        << printHashType(hashAlgo);
+
+    try {
+        conn->to.written = 0;
+        conn->to.warn = true;
+        connections->incCapacity();
+        {
+            Finally cleanup([&]() { connections->decCapacity(); });
+            dump.drainInto(conn->to);
+        }
+        conn->to.warn = false;
+        conn.processStderr();
+    } catch (SysError & e) {
+        /* Daemon closed while we were sending the path. Probably OOM
+           or I/O error. */
+        if (e.errNo == EPIPE)
+            try {
+                conn.processStderr();
+            } catch (EndOfFile & e) { }
+        throw;
+    }
+
+    return parseStorePath(readString(conn->from));
+}
+
+
 StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
