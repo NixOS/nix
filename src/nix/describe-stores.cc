@@ -27,7 +27,16 @@ struct CmdDescribeStores : Command, MixJSON
         if (json) {
             std::cout << res;
         } else {
-            throw Error("Only json is available for describe-stores");
+            for (auto & [storeName, storeConfig] : res.items()) {
+                std::cout << "## " << storeName << std::endl << std::endl;
+                for (auto & [optionName, optionDesc] : storeConfig.items()) {
+                    std::cout << "### " << optionName << std::endl << std::endl;
+                    std::cout << optionDesc["description"].get<std::string>() << std::endl;
+                    std::cout << "default: " << optionDesc["defaultValue"] << std::endl <<std::endl;
+                    if (!optionDesc["aliases"].empty())
+                        std::cout << "aliases: " << optionDesc["aliases"] << std::endl << std::endl;
+                }
+            }
         }
     }
 };
