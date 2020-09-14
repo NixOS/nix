@@ -2872,11 +2872,16 @@ void DerivationGoal::writeStructuredAttrs()
     chownToBuilder(tmpDir + "/.attrs.sh");
 }
 
+struct RestrictedStoreConfig : LocalFSStoreConfig
+{
+    using LocalFSStoreConfig::LocalFSStoreConfig;
+    const std::string name() { return "Restricted Store"; }
+};
 
 /* A wrapper around LocalStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
-struct RestrictedStore : public LocalFSStore
+struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConfig
 {
     ref<LocalStore> next;
 

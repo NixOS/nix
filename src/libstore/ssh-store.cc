@@ -16,6 +16,8 @@ struct SSHStoreConfig : virtual RemoteStoreConfig
     const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+
+    const std::string name() override { return "SSH Store"; }
 };
 
 class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig

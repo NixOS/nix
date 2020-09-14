@@ -10,6 +10,8 @@ MakeError(UploadToHTTP, Error);
 struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+
+    const std::string name() override { return "Http Binary Cache Store"; }
 };
 
 class HttpBinaryCacheStore : public BinaryCacheStore, public HttpBinaryCacheStoreConfig

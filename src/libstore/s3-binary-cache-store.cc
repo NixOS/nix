@@ -186,6 +186,8 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
         this, false, "multipart-upload", "whether to use multi-part uploads"};
     const Setting<uint64_t> bufferSize{
         this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+
+    const std::string name() override { return "S3 Binary Cache Store"; }
 };
 
 struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCacheStoreConfig

@@ -7,6 +7,8 @@ namespace nix {
 struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+
+    const std::string name() override { return "Local Binary Cache Store"; }
 };
 
 class LocalBinaryCacheStore : public BinaryCacheStore, public virtual LocalBinaryCacheStoreConfig

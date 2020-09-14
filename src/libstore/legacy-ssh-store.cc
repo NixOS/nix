@@ -17,6 +17,8 @@ struct LegacySSHStoreConfig : virtual StoreConfig
     const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
     const Setting<std::string> remoteStore{this, "", "remote-store", "URI of the store on the remote system"};
+
+    const std::string name() override { return "Legacy SSH Store"; }
 };
 
 struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig

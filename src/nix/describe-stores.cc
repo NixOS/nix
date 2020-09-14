@@ -18,13 +18,14 @@ struct CmdDescribeStores : Command, MixJSON
 
     void run() override
     {
-
+        auto res = nlohmann::json::object();
+        for (auto & implem : *Implementations::registered) {
+            auto storeConfig = implem.getConfig();
+            auto storeName = storeConfig->name();
+            res[storeName] = storeConfig->toJSON();
+        }
         if (json) {
-            auto res = nlohmann::json::array();
-            for (auto & implem : *Implementations::registered) {
-                auto storeConfig = implem.getConfig();
-                std::cout << storeConfig->toJSON().dump() << std::endl;
-            }
+            std::cout << res;
         } else {
             throw Error("Only json is available for describe-stores");
         }

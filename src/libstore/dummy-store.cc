@@ -4,6 +4,8 @@ namespace nix {
 
 struct DummyStoreConfig : virtual StoreConfig {
     using StoreConfig::StoreConfig;
+
+    const std::string name() override { return "Dummy Store"; }
 };
 
 struct DummyStore : public Store, public virtual DummyStoreConfig
