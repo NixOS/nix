@@ -43,8 +43,11 @@ StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
 {
     StorePathCAMap paths;
     auto count = readNum<size_t>(from);
-    while (count--)
-        paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
+    while (count--) {
+        auto path = store.parseStorePath(readString(from));
+        auto ca = parseContentAddressOpt(readString(from));
+        paths.insert_or_assign(path, ca);
+    }
     return paths;
 }
 
