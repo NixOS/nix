@@ -25,9 +25,7 @@ public:
     SSHStore([[maybe_unused]] const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , Store(params)
-        , RemoteStoreConfig(params)
         , RemoteStore(params)
-        , SSHStoreConfig(params)
         , host(host)
         , master(
             host,

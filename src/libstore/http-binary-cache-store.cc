@@ -33,9 +33,7 @@ public:
         const Path & _cacheUri,
         const Params & params)
         : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
         , BinaryCacheStore(params)
-        , HttpBinaryCacheStoreConfig(params)
         , cacheUri(scheme + "://" + _cacheUri)
     {
         if (cacheUri.back() == '/')

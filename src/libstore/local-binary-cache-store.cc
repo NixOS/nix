@@ -22,8 +22,6 @@ public:
         const Path & binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , LocalBinaryCacheStoreConfig(params)
         , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {

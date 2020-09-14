@@ -24,6 +24,31 @@
 
 namespace nix {
 
+/**
+ * About the class hierarchy of the store implementations:
+ *
+ * Each store type `Foo` consists of two classes:
+ *
+ * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
+ *   for the store
+ *
+ *   It should only contain members of type `const Setting<T>` (or subclasses
+ *   of it) and inherit the constructors of `StoreConfig`
+ *   (`using StoreConfig::StoreConfig`).
+ *
+ * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
+ *   implementation of the store.
+ *
+ *   This class is expected to have a constructor `Foo(const Params & params)`
+ *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
+ *   `assertion failure` when trying to instantiate it).
+ *
+ * You can then register the new store using:
+ *
+ * ```
+ * cpp static RegisterStoreImplementation<Foo, FooConfig> regStore;
+ * ```
+ */
 
 MakeError(SubstError, Error);
 MakeError(BuildError, Error); // denotes a permanent build failure
@@ -148,7 +173,26 @@ struct BuildResult
 struct StoreConfig : public Config
 {
     using Config::Config;
-    StoreConfig() = delete;
+
+    /**
+     * When constructing a store implementation, we pass in a map `params` of
+     * parameters that's supposed to initialize the associated config.
+     * To do that, we must use the `StoreConfig(StringMap & params)`
+     * constructor, so we'd like to `delete` its default constructor to enforce
+     * it.
+     *
+     * However, actually deleting it means that all the subclasses of
+     * `StoreConfig` will have their default constructor deleted (because it's
+     * supposed to call the deleted default constructor of `StoreConfig`). But
+     * because we're always using virtual inheritance, the constructors of
+     * child classes will never implicitely call this one, so deleting it will
+     * be more painful than anything else.
+     *
+     * So we `assert(false)` here to ensure at runtime that the right
+     * constructor is always called without having to redefine a custom
+     * constructor for each `*Config` class.
+     */
+    StoreConfig() { assert(false); }
 
 
     const PathSetting storeDir_{this, false, settings.nixStore,

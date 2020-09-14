@@ -2,7 +2,7 @@
 
 namespace nix {
 
-struct DummyStoreConfig : StoreConfig {
+struct DummyStoreConfig : virtual StoreConfig {
     using StoreConfig::StoreConfig;
 };
 
@@ -14,7 +14,6 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
 
     DummyStore(const Params & params)
         : StoreConfig(params)
-        , DummyStoreConfig(params)
         , Store(params)
     {
     }

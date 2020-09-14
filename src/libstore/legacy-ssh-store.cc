@@ -45,7 +45,6 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
 
     LegacySSHStore(const string & scheme, const string & host, const Params & params)
         : StoreConfig(params)
-        , LegacySSHStoreConfig(params)
         , Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
