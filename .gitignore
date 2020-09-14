@@ -126,4 +126,10 @@ GRTAGS
 GSYMS
 GTAGS
 
+# ccls
+/.ccls-cache
+
+# auto-generated compilation database
+compile_commands.json
+
 nix-rust/target
