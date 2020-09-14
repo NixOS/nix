@@ -24,7 +24,7 @@ class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig
 {
 public:
 
-    SSHStore([[maybe_unused]] const std::string & scheme, const std::string & host, const Params & params)
+    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , Store(params)
         , RemoteStore(params)

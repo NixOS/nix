@@ -820,6 +820,7 @@ struct Implementations
     {
         if (!registered) registered = new std::vector<StoreFactory>();
         StoreFactory factory{
+            .uriSchemes = T::uriSchemes(),
             .create =
                 ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
                  -> std::shared_ptr<Store>
@@ -827,8 +828,7 @@ struct Implementations
             .getConfig =
                 ([]()
                  -> std::shared_ptr<StoreConfig>
-                 { return std::make_shared<TConfig>(StringMap({})); }),
-            .uriSchemes = T::uriSchemes()
+                 { return std::make_shared<TConfig>(StringMap({})); })
         };
         registered->push_back(factory);
     }

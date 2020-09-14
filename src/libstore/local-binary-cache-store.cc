@@ -20,7 +20,7 @@ private:
 public:
 
     LocalBinaryCacheStore(
-        [[maybe_unused]] const std::string scheme,
+        const std::string scheme,
         const Path & binaryCacheDir,
         const Params & params)
         : StoreConfig(params)

@@ -133,7 +133,7 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 
 UDSRemoteStore::UDSRemoteStore(
-        [[maybe_unused]] const std::string scheme,
+        const std::string scheme,
         std::string socket_path,
         const Params & params)
     : UDSRemoteStore(params)
