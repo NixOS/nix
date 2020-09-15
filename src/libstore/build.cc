@@ -718,16 +718,25 @@ typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
 
+/* Unless we are repairing, we don't both to test validity and just assume it,
+   so the choices are `Absent` or `Valid`. */
+enum struct PathStatus {
+    Corrupt,
+    Absent,
+    Valid,
+};
+
 struct InitialOutputStatus {
     StorePath path;
-    /* The output optional indicates whether it's already valid; i.e. exists
-       and is registered. If we're repairing, inner bool indicates whether the
-       valid path is in fact not corrupt. Otherwise, the inner bool is always
-       true (assumed no corruption). */
-    std::optional<bool> valid;
+    PathStatus status;
     /* Valid in the store, and additionally non-corrupt if we are repairing */
     bool isValid() const {
-        return valid && *valid;
+        return status == PathStatus::Valid;
+    }
+    /* Merely present, allowed to be corrupt */
+    bool isPresent() const {
+        return status == PathStatus::Corrupt
+            || status == PathStatus::Valid;
     }
 };
 
@@ -2148,10 +2157,10 @@ void DerivationGoal::startBuilder()
             : !needsHashRewrite()
                 /* Can always use original path in sandbox */
                 ? status.known->path
-            : !status.known->valid
+            : !status.known->isPresent()
                 /* If path doesn't yet exist can just use it */
                 ? status.known->path
-            : buildMode != bmRepair && !*status.known->valid
+            : buildMode != bmRepair && !status.known->isValid()
                 /* If we aren't repairing we'll delete a corrupted path, so we
                    can use original path */
                 ? status.known->path
@@ -2161,7 +2170,7 @@ void DerivationGoal::startBuilder()
         scratchOutputs.insert_or_assign(outputName, scratchPath);
 
         /* A non-removed corrupted path needs to be stored here, too */
-        if (buildMode == bmRepair && !*status.known->valid)
+        if (buildMode == bmRepair && !status.known->isValid())
             redirectedBadOutputs.insert(status.known->path);
 
         /* Substitute output placeholders with the scratch output paths.
@@ -4596,9 +4605,11 @@ void DerivationGoal::checkPathValidity()
             auto outputPath = *i.second;
             info.known = {
                 .path = outputPath,
-                .valid = !worker.store.isValidPath(outputPath)
-                    ? std::optional<bool> {}
-                    : !checkHash || worker.pathContentsGood(outputPath),
+                .status = !worker.store.isValidPath(outputPath)
+                    ? PathStatus::Absent
+                    : !checkHash || worker.pathContentsGood(outputPath)
+                    ? PathStatus::Valid
+                    : PathStatus::Corrupt,
             };
         }
         initialOutputs.insert_or_assign(i.first, info);
