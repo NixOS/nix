@@ -12,11 +12,11 @@ namespace nix {
 struct LegacySSHStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
-    const Setting<int> maxConnections{this, 1, "max-connections", "maximum number of concurrent SSH connections"};
-    const Setting<Path> sshKey{this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
-    const Setting<std::string> remoteStore{this, "", "remote-store", "URI of the store on the remote system"};
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
+    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
+    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
 
     const std::string name() override { return "Legacy SSH Store"; }
 };
@@ -24,9 +24,9 @@ struct LegacySSHStoreConfig : virtual StoreConfig
 struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
 {
     // Hack for getting remote build log output.
-    // Intentionally not in `StoreConfig` so that it doesn't appear in the
-    // documentation
-    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
+    // the documentation
+    const Setting<int> logFD{(StoreConfig*) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     struct Connection
     {
