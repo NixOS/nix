@@ -4081,7 +4081,7 @@ void DerivationGoal::registerOutputs()
            floating CA derivations and hash-mismatching fixed-output
            derivations. */
         PathLocks dynamicOutputLock;
-        auto optFixedPath = output.pathOpt(worker.store, drv->name, outputName);
+        auto optFixedPath = output.path(worker.store, drv->name, outputName);
         if (!optFixedPath ||
             worker.store.printStorePath(*optFixedPath) != finalDestPath)
         {
@@ -4574,7 +4574,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
     if (drv->type() != DerivationType::CAFloating) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
-            res.insert_or_assign(name, output.pathOpt(worker.store, drv->name, name));
+            res.insert_or_assign(name, output.path(worker.store, drv->name, name));
         return res;
     } else {
         return worker.store.queryPartialDerivationOutputMap(drvPath);
