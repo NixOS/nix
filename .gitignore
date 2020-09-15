@@ -107,7 +107,7 @@ perl/Makefile.config
 
 /src/resolve-system-dependencies/resolve-system-dependencies
 
-inst/
+outputs/
 
 *.a
 *.o
@@ -125,5 +125,11 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+# ccls
+/.ccls-cache
+
+# auto-generated compilation database
+compile_commands.json
 
 nix-rust/target

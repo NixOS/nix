@@ -131,6 +131,10 @@ protected:
 
     friend struct ConnectionHandle;
 
+    virtual ref<FSAccessor> getFSAccessor() override;
+
+    virtual void narFromPath(const StorePath & path, Sink & sink) override;
+
 private:
 
     std::atomic_bool failed{false};
@@ -148,6 +152,12 @@ public:
 
     bool sameMachine() override
     { return true; }
+
+    ref<FSAccessor> getFSAccessor() override
+    { return LocalFSStore::getFSAccessor(); }
+
+    void narFromPath(const StorePath & path, Sink & sink) override
+    { LocalFSStore::narFromPath(path, sink); }
 
 private:
 

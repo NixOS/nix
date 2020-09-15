@@ -39,7 +39,7 @@ To build Nix itself in this shell:
 
 ```console
 [nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags
+[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/inst
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
