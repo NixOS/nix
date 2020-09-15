@@ -4251,22 +4251,28 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    {
-        ValidPathInfos infos2;
-        for (auto & [outputName, newInfo] : infos) {
-            /* FIXME: we will want to track this mapping in the DB whether or
-               not we have a drv file. */
-            if (useDerivation)
-                worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
-            infos2.push_back(newInfo);
-        }
-        worker.store.registerValidPaths(infos2);
+    ValidPathInfos infos2;
+    for (auto & [outputName, newInfo] : infos) {
+        infos2.push_back(newInfo);
     }
+    worker.store.registerValidPaths(infos2);
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
     if (delayedException)
         std::rethrow_exception(delayedException);
+
+    /* If we made it this far, we are sure the output matches the derivation
+       (since the delayedException would be a fixed output CA mismatch). That
+       means it's safe to link the derivation to the output hash. We must do
+       that for floating CA derivations, which otherwise couldn't be cached,
+       but it's fine to do in all cases. */
+    for (auto & [outputName, newInfo] : infos) {
+        /* FIXME: we will want to track this mapping in the DB whether or
+           not we have a drv file. */
+        if (useDerivation)
+            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
+    }
 }
 
 
