@@ -1,11 +1,11 @@
 #include "crypto.hh"
+#include "fs-accessor.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
 #include "json.hh"
-#include "derivations.hh"
 #include "url.hh"
 #include "archive.hh"
 
@@ -357,6 +357,17 @@ bool Store::PathInfoCacheValue::isKnownNow()
         : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
 
     return std::chrono::steady_clock::now() < time_point + ttl;
+}
+
+OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
+    auto resp = queryPartialDerivationOutputMap(path);
+    OutputPathMap result;
+    for (auto & [outName, optOutPath] : resp) {
+        if (!optOutPath)
+            throw Error("output '%s' has no store path mapped to it", outName);
+        result.insert_or_assign(outName, *optOutPath);
+    }
+    return result;
 }
 
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
@@ -969,6 +980,26 @@ Strings ValidPathInfo::shortRefs() const
     for (auto & r : references)
         refs.push_back(std::string(r.to_string()));
     return refs;
+}
+
+
+Derivation Store::derivationFromPath(const StorePath & drvPath)
+{
+    ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
+    auto accessor = getFSAccessor();
+    try {
+        return parseDerivation(*this,
+            accessor->readFile(printStorePath(drvPath)),
+            Derivation::nameFromPath(drvPath));
+    } catch (FormatError & e) {
+        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+    }
 }
 
 

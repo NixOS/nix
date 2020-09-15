@@ -51,7 +51,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    OutputPathMap queryDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
@@ -112,7 +112,7 @@ public:
 
         virtual ~Connection();
 
-        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0);
+        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };
 
     ref<Connection> openConnectionWrapper();
@@ -131,6 +131,10 @@ protected:
 
     friend struct ConnectionHandle;
 
+    virtual ref<FSAccessor> getFSAccessor() override;
+
+    virtual void narFromPath(const StorePath & path, Sink & sink) override;
+
 private:
 
     std::atomic_bool failed{false};
@@ -148,6 +152,12 @@ public:
 
     bool sameMachine() override
     { return true; }
+
+    ref<FSAccessor> getFSAccessor() override
+    { return LocalFSStore::getFSAccessor(); }
+
+    void narFromPath(const StorePath & path, Sink & sink) override
+    { LocalFSStore::narFromPath(path, sink); }
 
 private:
 

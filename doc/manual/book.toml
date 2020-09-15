@@ -1,0 +1,2 @@
+[output.html]
+additional-css = ["custom.css"]

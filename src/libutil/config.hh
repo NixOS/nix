@@ -4,6 +4,8 @@
 
 #include "types.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 #pragma once
 
 namespace nix {
@@ -42,8 +44,6 @@ namespace nix {
 
 class Args;
 class AbstractSetting;
-class JSONPlaceholder;
-class JSONObject;
 
 class AbstractConfig
 {
@@ -97,7 +97,7 @@ public:
      * Outputs all settings to JSON
      * - out: JSONObject to write the configuration to
      */
-    virtual void toJSON(JSONObject & out) = 0;
+    virtual nlohmann::json toJSON() = 0;
 
     /**
      * Converts settings to `Args` to be used on the command line interface
@@ -167,7 +167,7 @@ public:
 
     void resetOverriden() override;
 
-    void toJSON(JSONObject & out) override;
+    nlohmann::json toJSON() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 };
@@ -206,7 +206,7 @@ protected:
 
     virtual std::string to_string() const = 0;
 
-    virtual void toJSON(JSONPlaceholder & out);
+    virtual nlohmann::json toJSON();
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -251,7 +251,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    void toJSON(JSONPlaceholder & out) override;
+    nlohmann::json toJSON() override;
 };
 
 template<typename T>
@@ -319,7 +319,7 @@ struct GlobalConfig : public AbstractConfig
 
     void resetOverriden() override;
 
-    void toJSON(JSONObject & out) override;
+    nlohmann::json toJSON() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

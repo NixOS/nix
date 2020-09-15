@@ -85,8 +85,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path LocalFSStore::addPermRoot(const StorePath & storePath,
-    const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
+Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 
@@ -95,47 +94,12 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath,
                 "creating a garbage collector root (%1%) in the Nix store is forbidden "
                 "(are you running nix-build inside the store?)", gcRoot);
 
-    if (indirect) {
-        /* Don't clobber the link if it already exists and doesn't
-           point to the Nix store. */
-        if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
-            throw Error("cannot create symlink '%1%'; already exists", gcRoot);
-        makeSymlink(gcRoot, printStorePath(storePath));
-        addIndirectRoot(gcRoot);
-    }
-
-    else {
-        if (!allowOutsideRootsDir) {
-            Path rootsDir = canonPath((format("%1%/%2%") % stateDir % gcRootsDir).str());
-
-            if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
-                throw Error(
-                    "path '%1%' is not a valid garbage collector root; "
-                    "it's not in the directory '%2%'",
-                    gcRoot, rootsDir);
-        }
-
-        if (baseNameOf(gcRoot) == std::string(storePath.to_string()))
-            writeFile(gcRoot, "");
-        else
-            makeSymlink(gcRoot, printStorePath(storePath));
-    }
-
-    /* Check that the root can be found by the garbage collector.
-       !!! This can be very slow on machines that have many roots.
-       Instead of reading all the roots, it would be more efficient to
-       check if the root is in a directory in or linked from the
-       gcroots directory. */
-    if (settings.checkRootReachability) {
-        auto roots = findRoots(false);
-        if (roots[storePath].count(gcRoot) == 0)
-            logWarning({
-                .name = "GC root",
-                .hint = hintfmt("warning: '%1%' is not in a directory where the garbage collector looks for roots; "
-                    "therefore, '%2%' might be removed by the garbage collector",
-                    gcRoot, printStorePath(storePath))
-            });
-    }
+    /* Don't clobber the link if it already exists and doesn't
+       point to the Nix store. */
+    if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
+        throw Error("cannot create symlink '%1%'; already exists", gcRoot);
+    makeSymlink(gcRoot, printStorePath(storePath));
+    addIndirectRoot(gcRoot);
 
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from

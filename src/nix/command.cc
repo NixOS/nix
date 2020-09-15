@@ -4,11 +4,24 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 
+#include <nlohmann/json.hpp>
+
 extern char * * environ __attribute__((weak));
 
 namespace nix {
 
 Commands * RegisterCommand::commands = nullptr;
+
+void NixMultiCommand::printHelp(const string & programName, std::ostream & out)
+{
+    MultiCommand::printHelp(programName, out);
+}
+
+nlohmann::json NixMultiCommand::toJSON()
+{
+    // FIXME: use Command::toJSON() as well.
+    return MultiCommand::toJSON();
+}
 
 StoreCommand::StoreCommand()
 {
@@ -121,7 +134,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
     switchLink(profile2,
         createGeneration(
             ref<LocalFSStore>(store),
-            profile2, store->printStorePath(storePath)));
+            profile2, storePath));
 }
 
 void MixProfile::updateProfile(const Buildables & buildables)
