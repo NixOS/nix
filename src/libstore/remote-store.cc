@@ -299,6 +299,8 @@ struct ConnectionHandle
             std::rethrow_exception(ex);
         }
     }
+
+    void withFramedSink(std::function<void(Sink & sink)> fun);
 };
 
 
@@ -557,78 +559,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << repair << !checkSigs;
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
-
-            conn->to.flush();
-
-            std::exception_ptr ex;
-
-            struct FramedSink : BufferedSink
-            {
-                ConnectionHandle & conn;
-                std::exception_ptr & ex;
-
-                FramedSink(ConnectionHandle & conn, std::exception_ptr & ex) : conn(conn), ex(ex)
-                { }
-
-                ~FramedSink()
-                {
-                    try {
-                        conn->to << 0;
-                        conn->to.flush();
-                    } catch (...) {
-                        ignoreException();
-                    }
-                }
-
-                void write(const unsigned char * data, size_t len) override
-                {
-                    /* Don't send more data if the remote has
-                       encountered an error. */
-                    if (ex) {
-                        auto ex2 = ex;
-                        ex = nullptr;
-                        std::rethrow_exception(ex2);
-                    }
-                    conn->to << len;
-                    conn->to(data, len);
-                };
-            };
-
-            /* Handle log messages / exceptions from the remote on a
-               separate thread. */
-            std::thread stderrThread([&]()
-            {
-                try {
-                    conn.processStderr(nullptr, nullptr, false);
-                } catch (...) {
-                    ex = std::current_exception();
-                }
-            });
-
-            Finally joinStderrThread([&]()
-            {
-                if (stderrThread.joinable()) {
-                    stderrThread.join();
-                    if (ex) {
-                        try {
-                            std::rethrow_exception(ex);
-                        } catch (...) {
-                            ignoreException();
-                        }
-                    }
-                }
-            });
-
-            {
-                FramedSink sink(conn, ex);
+            conn.withFramedSink([&](Sink & sink) {
                 copyNAR(source, sink);
-                sink.flush();
-            }
-
-            stderrThread.join();
-            if (ex)
-                std::rethrow_exception(ex);
-
+            });
         } else if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21) {
             conn.processStderr(0, &source);
         } else {
@@ -679,41 +612,59 @@ StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
+StorePath RemoteStore::addToStoreFromDump(Source & narSource, const string & name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
     auto conn(getConnection());
 
-    conn->to
-        << wopAddToStore
-        << name
-        << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-        << (method == FileIngestionMethod::Recursive ? 1 : 0)
-        << printHashType(hashAlgo);
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
 
-    try {
-        conn->to.written = 0;
-        conn->to.warn = true;
-        connections->incCapacity();
-        {
-            Finally cleanup([&]() { connections->decCapacity(); });
-            dump.drainInto(conn->to);
-        }
-        conn->to.warn = false;
-        conn.processStderr();
-    } catch (SysError & e) {
-        /* Daemon closed while we were sending the path. Probably OOM
-           or I/O error. */
-        if (e.errNo == EPIPE)
-            try {
-                conn.processStderr();
-            } catch (EndOfFile & e) { }
-        throw;
+        conn->to
+            << wopAddToStoreCANar
+            << name
+            << (method == FileIngestionMethod::Recursive ? 1 : 0)
+            << printHashType(hashAlgo);
+
+        conn.withFramedSink([&](Sink & sink) {
+            copyNAR(narSource, sink);
+        });
+
+        return parseStorePath(readString(conn->from));
+
     }
+    else {
 
-    return parseStorePath(readString(conn->from));
+        conn->to
+            << wopAddToStore
+            << name
+            << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+            << (method == FileIngestionMethod::Recursive ? 1 : 0)
+            << printHashType(hashAlgo);
+
+        try {
+            conn->to.written = 0;
+            conn->to.warn = true;
+            connections->incCapacity();
+            {
+                Finally cleanup([&]() { connections->decCapacity(); });
+                narSource.drainInto(conn->to);
+            }
+            conn->to.warn = false;
+            conn.processStderr();
+        } catch (SysError & e) {
+            /* Daemon closed while we were sending the path. Probably OOM
+              or I/O error. */
+            if (e.errNo == EPIPE)
+                try {
+                    conn.processStderr();
+                } catch (EndOfFile & e) { }
+            throw;
+        }
+
+        return parseStorePath(readString(conn->from));
+    }
 }
 
 
@@ -1021,6 +972,82 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     }
 
     return nullptr;
+}
+
+
+struct FramedSink : nix::BufferedSink
+{
+    ConnectionHandle & conn;
+    std::exception_ptr & ex;
+
+    FramedSink(ConnectionHandle & conn, std::exception_ptr & ex) : conn(conn), ex(ex)
+    { }
+
+    ~FramedSink()
+    {
+        try {
+            conn->to << 0;
+            conn->to.flush();
+        } catch (...) {
+            ignoreException();
+        }
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        /* Don't send more data if the remote has
+            encountered an error. */
+        if (ex) {
+            auto ex2 = ex;
+            ex = nullptr;
+            std::rethrow_exception(ex2);
+        }
+        conn->to << len;
+        conn->to(data, len);
+    };
+};
+
+void
+ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun) {
+    (*this)->to.flush();
+
+    std::exception_ptr ex;
+
+    /* Handle log messages / exceptions from the remote on a
+        separate thread. */
+    std::thread stderrThread([&]()
+    {
+        try {
+            processStderr(nullptr, nullptr, false);
+        } catch (...) {
+            ex = std::current_exception();
+        }
+    });
+
+    Finally joinStderrThread([&]()
+    {
+        if (stderrThread.joinable()) {
+            stderrThread.join();
+            if (ex) {
+                try {
+                    std::rethrow_exception(ex);
+                } catch (...) {
+                    ignoreException();
+                }
+            }
+        }
+    });
+
+    {
+        FramedSink sink(*this, ex);
+        fun(sink);
+        sink.flush();
+    }
+
+    stderrThread.join();
+    if (ex)
+        std::rethrow_exception(ex);
+
 }
 
 static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regStore;

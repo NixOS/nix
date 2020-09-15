@@ -406,4 +406,51 @@ struct StreamToSourceAdapter : Source
 };
 
 
+/* Like SizedSource, but guarantees that the whole frame is consumed after
+   destruction. This ensures that the original stream is in a known state. */
+struct FramedSource : Source
+{
+    Source & from;
+    bool eof = false;
+    std::vector<unsigned char> pending;
+    size_t pos = 0;
+
+    FramedSource(Source & from) : from(from)
+    { }
+
+    ~FramedSource()
+    {
+        if (!eof) {
+            while (true) {
+                auto n = readInt(from);
+                if (!n) break;
+                std::vector<unsigned char> data(n);
+                from(data.data(), n);
+            }
+        }
+    }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        if (eof) throw EndOfFile("reached end of FramedSource");
+
+        if (pos >= pending.size()) {
+            size_t len = readInt(from);
+            if (!len) {
+                eof = true;
+                return 0;
+            }
+            pending = std::vector<unsigned char>(len);
+            pos = 0;
+            from(pending.data(), len);
+        }
+
+        auto n = std::min(len, pending.size() - pos);
+        memcpy(data, pending.data() + pos, n);
+        pos += n;
+        return n;
+    }
+};
+
+
 }

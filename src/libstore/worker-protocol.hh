@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x118
+#define PROTOCOL_VERSION 0x119
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -17,7 +17,7 @@ typedef enum {
     wopQueryPathHash = 4, // obsolete
     wopQueryReferences = 5, // obsolete
     wopQueryReferrers = 6,
-    wopAddToStore = 7,
+    wopAddToStore = 7, // obsolete since Nix 3.0, use wopAddToStoreCANar
     wopAddTextToStore = 8,
     wopBuildPaths = 9,
     wopEnsurePath = 10,
@@ -50,6 +50,7 @@ typedef enum {
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
     wopQueryDerivationOutputMap = 41,
+    wopAddToStoreCANar = 42, // since Nix 3.0
 } WorkerOp;
 
 

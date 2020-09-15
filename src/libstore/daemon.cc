@@ -393,6 +393,34 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopAddToStoreCANar: {
+        HashType hashAlgo;
+        std::string baseName;
+        FileIngestionMethod method;
+        {
+            uint8_t recursive;
+            std::string hashAlgoRaw;
+            from >> baseName >> recursive >> hashAlgoRaw;
+            if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
+            method = FileIngestionMethod { recursive };
+            hashAlgo = parseHashType(hashAlgoRaw);
+        }
+
+        logger->startWork();
+        std::optional<StorePath> path;
+        {
+            FramedSource narSource(from);
+            path = store->addToStoreFromDump(narSource, baseName, method, hashAlgo);
+        }
+        logger->stopWork();
+
+        if (path /* always */) {
+            to << store->printStorePath(*path);
+        }
+        break;
+    }
+
     case wopAddTextToStore: {
         string suffix = readString(from);
         string s = readString(from);
@@ -748,59 +776,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             info.ultimate = false;
 
         if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
-
-            struct FramedSource : Source
-            {
-                Source & from;
-                bool eof = false;
-                std::vector<unsigned char> pending;
-                size_t pos = 0;
-
-                FramedSource(Source & from) : from(from)
-                { }
-
-                ~FramedSource()
-                {
-                    if (!eof) {
-                        while (true) {
-                            auto n = readInt(from);
-                            if (!n) break;
-                            std::vector<unsigned char> data(n);
-                            from(data.data(), n);
-                        }
-                    }
-                }
-
-                size_t read(unsigned char * data, size_t len) override
-                {
-                    if (eof) throw EndOfFile("reached end of FramedSource");
-
-                    if (pos >= pending.size()) {
-                        size_t len = readInt(from);
-                        if (!len) {
-                            eof = true;
-                            return 0;
-                        }
-                        pending = std::vector<unsigned char>(len);
-                        pos = 0;
-                        from(pending.data(), len);
-                    }
-
-                    auto n = std::min(len, pending.size() - pos);
-                    memcpy(data, pending.data() + pos, n);
-                    pos += n;
-                    return n;
-                }
-            };
-
             logger->startWork();
-
             {
                 FramedSource source(from);
                 store->addToStore(info, source, (RepairFlag) repair,
                     dontCheckSigs ? NoCheckSigs : CheckSigs);
             }
-
             logger->stopWork();
         }
 
