@@ -32,6 +32,7 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   recursive.sh \
+  describe-stores.sh \
   flakes.sh \
   content-addressed.sh
   # parallel.sh
