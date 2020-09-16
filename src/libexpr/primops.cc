@@ -1704,7 +1704,7 @@ static RegisterPrimOp primop_toFile({
         ...
         cp ${configFile} $out/etc/foo.conf
       ";
-    ```
+      ```
 
       Note that `${configFile}` is an
       [antiquotation](language-values.md), so the result of the
