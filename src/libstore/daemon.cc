@@ -408,16 +408,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         }
 
         logger->startWork();
-        std::optional<StorePath> path;
-        {
+        // Destructor of FramedSource must run before stopWork.
+        StorePath path = [&](){
             FramedSource narSource(from);
-            path = store->addToStoreFromDump(narSource, baseName, method, hashAlgo);
-        }
+            return store->addToStoreFromDump(narSource, baseName, method, hashAlgo);
+        }();
         logger->stopWork();
 
-        if (path /* always */) {
-            to << store->printStorePath(*path);
-        }
+        to << store->printStorePath(path);
+
         break;
     }
 
