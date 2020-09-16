@@ -1,6 +1,7 @@
 source common.sh
 
 export TEST_VAR=foo # for eval-okay-getenv.nix
+export NIX_REMOTE=dummy://
 
 nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grep -q Hello
 (! nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grep -q Hello)

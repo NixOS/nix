@@ -27,6 +27,7 @@ struct DerivationOutputInputAddressed
 struct DerivationOutputCAFixed
 {
     FixedOutputHash hash; /* hash used for expected hash computation */
+    StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
 /* Floating-output derivations, whose output paths are content addressed, but
@@ -47,16 +48,22 @@ struct DerivationOutput
         DerivationOutputCAFloating
     > output;
     std::optional<HashType> hashAlgoOpt(const Store & store) const;
-    std::optional<StorePath> pathOpt(const Store & store, std::string_view drvName) const;
-    /* DEPRECATED: Remove after CA drvs are fully implemented */
-    StorePath path(const Store & store, std::string_view drvName) const {
-        auto p = pathOpt(store, drvName);
-        if (!p) throw UnimplementedError("floating content-addressed derivations are not yet implemented");
-        return *p;
-    }
+    /* Note, when you use this function you should make sure that you're passing
+       the right derivation name. When in doubt, you should use the safer
+       interface provided by BasicDerivation::outputsAndOptPaths */
+    std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
+
+/* These are analogues to the previous DerivationOutputs data type, but they
+   also contains, for each output, the (optional) store path in which it would
+   be written. To calculate values of these types, see the corresponding
+   functions in BasicDerivation */
+typedef std::map<string, std::pair<DerivationOutput, StorePath>>
+  DerivationOutputsAndPaths;
+typedef std::map<string, std::pair<DerivationOutput, std::optional<StorePath>>>
+  DerivationOutputsAndOptPaths;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
@@ -101,11 +108,13 @@ struct BasicDerivation
     /* Return true iff this is a fixed-output derivation. */
     DerivationType type() const;
 
-    /* Return the output paths of a derivation. */
-    StorePathSet outputPaths(const Store & store) const;
-
     /* Return the output names of a derivation. */
     StringSet outputNames() const;
+
+    /* Calculates the maps that contains all the DerivationOutputs, but
+       augmented with knowledge of the Store paths they would be written
+       into. */
+    DerivationOutputsAndOptPaths outputsAndOptPaths(const Store & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
 };
@@ -127,14 +136,21 @@ class Store;
 enum RepairFlag : bool { NoRepair = false, Repair = true };
 
 /* Write a derivation to the Nix store, and return its path. */
-StorePath writeDerivation(ref<Store> store,
-    const Derivation & drv, std::string_view name, RepairFlag repair = NoRepair);
+StorePath writeDerivation(Store & store,
+    const Derivation & drv, RepairFlag repair = NoRepair);
 
 /* Read a derivation from a file. */
-Derivation readDerivation(const Store & store, const Path & drvPath, std::string_view name);
+Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
 
 // FIXME: remove
 bool isDerivation(const string & fileName);
+
+/* Calculate the name that will be used for the store path for this
+   output.
+
+   This is usually <drv-name>-<output-name>, but is just <drv-name> when
+   the output name is "out". */
+std::string outputPathName(std::string_view drvName, std::string_view outputName);
 
 // known CA drv's output hashes, current just for fixed-output derivations
 // whose output hashes are always known since they are fixed up-front.
@@ -183,6 +199,21 @@ struct Sink;
 Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name);
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
 
+/* This creates an opaque and almost certainly unique string
+   deterministically from the output name.
+
+   It is used as a placeholder to allow derivations to refer to their
+   own outputs without needing to use the hash of a derivation in
+   itself, making the hash near-impossible to calculate. */
 std::string hashPlaceholder(const std::string & outputName);
+
+/* This creates an opaque and almost certainly unique string
+   deterministically from a derivation path and output name.
+
+   It is used as a placeholder to allow derivations to refer to
+   content-addressed paths whose content --- and thus the path
+   themselves --- isn't yet known. This occurs when a derivation has a
+   dependency which is a CA derivation. */
+std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
 
 }

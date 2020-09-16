@@ -1,11 +1,11 @@
 #include "crypto.hh"
+#include "fs-accessor.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
 #include "json.hh"
-#include "derivations.hh"
 #include "url.hh"
 #include "archive.hh"
 
@@ -140,21 +140,28 @@ StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view p
 */
 
 
-StorePath Store::makeStorePath(const string & type,
-    const Hash & hash, std::string_view name) const
+StorePath Store::makeStorePath(std::string_view type,
+    std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":" + hash.to_string(Base16, true) + ":" + storeDir + ":" + std::string(name);
+    string s = std::string { type } + ":" + std::string { hash }
+        + ":" + storeDir + ":" + std::string { name };
     auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath(h, name);
 }
 
 
-StorePath Store::makeOutputPath(const string & id,
+StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
-    return makeStorePath("output:" + id, hash,
-        std::string(name) + (id == "out" ? "" : "-" + id));
+    return makeStorePath(type, hash.to_string(Base16, true), name);
+}
+
+
+StorePath Store::makeOutputPath(std::string_view id,
+    const Hash & hash, std::string_view name) const
+{
+    return makeStorePath("output:" + std::string { id }, hash, outputPathName(name, id));
 }
 
 
@@ -320,8 +327,10 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
 
-    ValidPathInfo info(makeFixedOutputPath(method, hash, name));
-    info.narHash = narHash;
+    ValidPathInfo info {
+        makeFixedOutputPath(method, hash, name),
+        narHash,
+    };
     info.narSize = narSize;
     info.ca = FixedOutputHash { .method = method, .hash = hash };
 
@@ -355,6 +364,17 @@ bool Store::PathInfoCacheValue::isKnownNow()
         : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
 
     return std::chrono::steady_clock::now() < time_point + ttl;
+}
+
+OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
+    auto resp = queryPartialDerivationOutputMap(path);
+    OutputPathMap result;
+    for (auto & [outName, optOutPath] : resp) {
+        if (!optOutPath)
+            throw Error("output '%s' has no store path mapped to it", outName);
+        result.insert_or_assign(outName, *optOutPath);
+    }
+    return result;
 }
 
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
@@ -565,7 +585,7 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash->to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -597,7 +617,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             auto info = queryPathInfo(storePath);
 
             jsonPath
-                .attr("narHash", info->narHash->to_string(hashBase, true))
+                .attr("narHash", info->narHash.to_string(hashBase, true))
                 .attr("narSize", info->narSize);
 
             {
@@ -725,20 +745,6 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         info = info2;
     }
 
-    if (!info->narHash) {
-        StringSink sink;
-        srcStore->narFromPath({storePath}, sink);
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->narHash = hashString(htSHA256, *sink.s);
-        if (!info->narSize) info2->narSize = sink.s->size();
-        if (info->ultimate) info2->ultimate = false;
-        info = info2;
-
-        StringSource source(*sink.s);
-        dstStore->addToStore(*info, source, repair, checkSigs);
-        return;
-    }
-
     if (info->ultimate) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->ultimate = false;
@@ -746,12 +752,12 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     }
 
     auto source = sinkToSource([&](Sink & sink) {
-        LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-            sink(data, len);
+        LambdaSink progressSink([&](const unsigned char * data, size_t len) {
             total += len;
             act.progress(total, info->narSize);
         });
-        srcStore->narFromPath(storePath, wrapperSink);
+        TeeSink tee { sink, progressSink };
+        srcStore->narFromPath(storePath, tee);
     }, [&]() {
            throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore->printStorePath(storePath), srcStore->getUri());
     });
@@ -863,19 +869,22 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
-std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, bool hashGiven)
+std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {
     std::string path;
     getline(str, path);
     if (str.eof()) { return {}; }
-    ValidPathInfo info(store.parseStorePath(path));
-    if (hashGiven) {
+    if (!hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = Hash::parseAny(s, htSHA256);
+        auto narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
-        if (!string2Int(s, info.narSize)) throw Error("number expected");
+        uint64_t narSize;
+        if (!string2Int(s, narSize)) throw Error("number expected");
+        hashGiven = { narHash, narSize };
     }
+    ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
+    info.narSize = hashGiven->second;
     std::string deriver;
     getline(str, deriver);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
@@ -910,12 +919,12 @@ string showPaths(const PathSet & paths)
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
-    if (narSize == 0 || !narHash)
-        throw Error("cannot calculate fingerprint of path '%s' because its size/hash is not known",
+    if (narSize == 0)
+        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash->to_string(Base32, true) + ";"
+        + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -978,6 +987,26 @@ Strings ValidPathInfo::shortRefs() const
     for (auto & r : references)
         refs.push_back(std::string(r.to_string()));
     return refs;
+}
+
+
+Derivation Store::derivationFromPath(const StorePath & drvPath)
+{
+    ensurePath(drvPath);
+    return readDerivation(drvPath);
+}
+
+
+Derivation Store::readDerivation(const StorePath & drvPath)
+{
+    auto accessor = getFSAccessor();
+    try {
+        return parseDerivation(*this,
+            accessor->readFile(printStorePath(drvPath)),
+            Derivation::nameFromPath(drvPath));
+    } catch (FormatError & e) {
+        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+    }
 }
 
 
