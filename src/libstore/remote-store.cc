@@ -94,6 +94,7 @@ void write(const Store & store, Sink & out, const std::optional<StorePath> & sto
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : Store(params)
+    , RemoteStoreConfig(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
             [this]() { return openConnectionWrapper(); },
@@ -123,19 +124,21 @@ ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 
 
 UDSRemoteStore::UDSRemoteStore(const Params & params)
-    : Store(params)
+    : StoreConfig(params)
+    , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
 {
 }
 
 
-UDSRemoteStore::UDSRemoteStore(std::string socket_path, const Params & params)
-    : Store(params)
-    , LocalFSStore(params)
-    , RemoteStore(params)
-    , path(socket_path)
+UDSRemoteStore::UDSRemoteStore(
+        const std::string scheme,
+        std::string socket_path,
+        const Params & params)
+    : UDSRemoteStore(params)
 {
+    path.emplace(socket_path);
 }
 
 
@@ -982,14 +985,6 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-static std::string uriScheme = "unix://";
-
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<UDSRemoteStore>(std::string(uri, uriScheme.size()), params);
-});
+static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regStore;
 
 }

@@ -346,7 +346,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 
 
 Store::Store(const Params & params)
-    : Config(params)
+    : StoreConfig(params)
     , state({(size_t) pathInfoCacheSize})
 {
 }
@@ -1009,7 +1009,6 @@ Derivation Store::readDerivation(const StorePath & drvPath)
     }
 }
 
-
 }
 
 
@@ -1018,9 +1017,6 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 
 
 namespace nix {
-
-
-RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_)
@@ -1033,24 +1029,6 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
         uri = uri_.substr(0, q);
     }
     return {uri, params};
-}
-
-ref<Store> openStore(const std::string & uri_,
-    const Store::Params & extraParams)
-{
-    auto [uri, uriParams] = splitUriAndParams(uri_);
-    auto params = extraParams;
-    params.insert(uriParams.begin(), uriParams.end());
-
-    for (auto fun : *RegisterStoreImplementation::implementations) {
-        auto store = fun(uri, params);
-        if (store) {
-            store->warnUnknownSettings();
-            return ref<Store>(store);
-        }
-    }
-
-    throw Error("don't know how to open Nix store '%s'", uri);
 }
 
 static bool isNonUriPath(const std::string & spec) {
@@ -1080,10 +1058,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
     }
 }
 
-
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
+std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
     switch (getStoreType(uri, get(params, "state").value_or(settings.nixStateDir))) {
         case tDaemon:
@@ -1098,8 +1073,41 @@ static RegisterStoreImplementation regStore([](
         default:
             return nullptr;
     }
-});
+}
 
+ref<Store> openStore(const std::string & uri_,
+    const Store::Params & extraParams)
+{
+    auto params = extraParams;
+    try {
+        auto parsedUri = parseURL(uri_);
+        params.insert(parsedUri.query.begin(), parsedUri.query.end());
+
+        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
+
+        for (auto implem : *Implementations::registered) {
+            if (implem.uriSchemes.count(parsedUri.scheme)) {
+                auto store = implem.create(parsedUri.scheme, baseURI, params);
+                if (store) {
+                    store->init();
+                    store->warnUnknownSettings();
+                    return ref<Store>(store);
+                }
+            }
+        }
+    }
+    catch (BadURL &) {
+        auto [uri, uriParams] = splitUriAndParams(uri_);
+        params.insert(uriParams.begin(), uriParams.end());
+
+        if (auto store = openFromNonUri(uri, params)) {
+            store->warnUnknownSettings();
+            return ref<Store>(store);
+        }
+    }
+
+    throw Error("don't know how to open Nix store '%s'", uri_);
+}
 
 std::list<ref<Store>> getDefaultSubstituters()
 {
@@ -1133,5 +1141,6 @@ std::list<ref<Store>> getDefaultSubstituters()
     return stores;
 }
 
+std::vector<StoreFactory> * Implementations::registered = 0;
 
 }

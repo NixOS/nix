@@ -30,8 +30,19 @@ struct OptimiseStats
     uint64_t blocksFreed = 0;
 };
 
+struct LocalStoreConfig : virtual LocalFSStoreConfig
+{
+    using LocalFSStoreConfig::LocalFSStoreConfig;
 
-class LocalStore : public LocalFSStore
+    Setting<bool> requireSigs{(StoreConfig*) this,
+        settings.requireSigs,
+        "require-sigs", "whether store paths should have a trusted signature on import"};
+
+    const std::string name() override { return "Local Store"; }
+};
+
+
+class LocalStore : public LocalFSStore, public virtual LocalStoreConfig
 {
 private:
 
@@ -94,10 +105,6 @@ public:
     const Path fnTempRoots;
 
 private:
-
-    Setting<bool> requireSigs{(Store*) this,
-        settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
 
     const PublicKeys & getPublicKeys();
 

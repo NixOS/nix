@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "config.hh"
+#include "abstractsettingtojson.hh"
 #include "util.hh"
 
 #include <map>

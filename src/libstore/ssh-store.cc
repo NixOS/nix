@@ -8,19 +8,25 @@
 
 namespace nix {
 
-static std::string uriScheme = "ssh-ng://";
+struct SSHStoreConfig : virtual RemoteStoreConfig
+{
+    using RemoteStoreConfig::RemoteStoreConfig;
 
-class SSHStore : public RemoteStore
+    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
+    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+
+    const std::string name() override { return "SSH Store"; }
+};
+
+class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig
 {
 public:
 
-    const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(Store*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{(Store*) this, "", "remote-store", "URI of the store on the remote system"};
-
-    SSHStore(const std::string & host, const Params & params)
-        : Store(params)
+    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
+        : StoreConfig(params)
+        , Store(params)
         , RemoteStore(params)
         , host(host)
         , master(
@@ -32,9 +38,11 @@ public:
     {
     }
 
+    static std::set<std::string> uriSchemes() { return {"ssh-ng"}; }
+
     std::string getUri() override
     {
-        return uriScheme + host;
+        return *uriSchemes().begin() + "://" + host;
     }
 
     bool sameMachine() override
@@ -76,12 +84,6 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     return conn;
 }
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<SSHStore>(std::string(uri, uriScheme.size()), params);
-});
+static RegisterStoreImplementation<SSHStore, SSHStoreConfig> regStore;
 
 }
