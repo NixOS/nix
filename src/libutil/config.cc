@@ -1,5 +1,6 @@
 #include "config.hh"
 #include "args.hh"
+#include "abstractsettingtojson.hh"
 
 #include <nlohmann/json.hpp>
 

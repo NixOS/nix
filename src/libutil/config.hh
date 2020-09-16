@@ -4,7 +4,7 @@
 
 #include "types.hh"
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 #pragma once
 
@@ -255,13 +255,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    std::map<std::string, nlohmann::json> toJSONObject() override
-    {
-        auto obj = AbstractSetting::toJSONObject();
-        obj.emplace("value", value);
-        obj.emplace("defaultValue", defaultValue);
-        return obj;
-    }
+    std::map<std::string, nlohmann::json> toJSONObject() override;
 };
 
 template<typename T>
