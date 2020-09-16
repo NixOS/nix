@@ -3565,10 +3565,13 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
-    sDerivationNix = symbols.create(path);
-    evalFile(path, v);
-    addConstant("derivation", v);
+    try {
+        string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
+        sDerivationNix = symbols.create(path);
+        evalFile(path, v);
+        addConstant("derivation", v);
+    } catch (SysError &) {
+    }
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
