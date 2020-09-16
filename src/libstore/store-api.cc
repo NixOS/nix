@@ -1096,7 +1096,7 @@ ref<Store> openStore(const std::string & uri_,
             }
         }
     }
-    catch (BadURL) {
+    catch (BadURL &) {
         auto [uri, uriParams] = splitUriAndParams(uri_);
         params.insert(uriParams.begin(), uriParams.end());
 
