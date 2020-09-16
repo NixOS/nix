@@ -718,16 +718,25 @@ typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
 
+/* Unless we are repairing, we don't both to test validity and just assume it,
+   so the choices are `Absent` or `Valid`. */
+enum struct PathStatus {
+    Corrupt,
+    Absent,
+    Valid,
+};
+
 struct InitialOutputStatus {
     StorePath path;
-    /* The output optional indicates whether it's already valid; i.e. exists
-       and is registered. If we're repairing, inner bool indicates whether the
-       valid path is in fact not corrupt. Otherwise, the inner bool is always
-       true (assumed no corruption). */
-    std::optional<bool> valid;
+    PathStatus status;
     /* Valid in the store, and additionally non-corrupt if we are repairing */
     bool isValid() const {
-        return valid && *valid;
+        return status == PathStatus::Valid;
+    }
+    /* Merely present, allowed to be corrupt */
+    bool isPresent() const {
+        return status == PathStatus::Corrupt
+            || status == PathStatus::Valid;
     }
 };
 
@@ -2186,10 +2195,10 @@ void DerivationGoal::startBuilder()
             : !needsHashRewrite()
                 /* Can always use original path in sandbox */
                 ? status.known->path
-            : !status.known->valid
+            : !status.known->isPresent()
                 /* If path doesn't yet exist can just use it */
                 ? status.known->path
-            : buildMode != bmRepair && !*status.known->valid
+            : buildMode != bmRepair && !status.known->isValid()
                 /* If we aren't repairing we'll delete a corrupted path, so we
                    can use original path */
                 ? status.known->path
@@ -2199,7 +2208,7 @@ void DerivationGoal::startBuilder()
         scratchOutputs.insert_or_assign(outputName, scratchPath);
 
         /* A non-removed corrupted path needs to be stored here, too */
-        if (buildMode == bmRepair && !*status.known->valid)
+        if (buildMode == bmRepair && !status.known->isValid())
             redirectedBadOutputs.insert(status.known->path);
 
         /* Substitute output placeholders with the scratch output paths.
@@ -4110,7 +4119,7 @@ void DerivationGoal::registerOutputs()
            floating CA derivations and hash-mismatching fixed-output
            derivations. */
         PathLocks dynamicOutputLock;
-        auto optFixedPath = output.pathOpt(worker.store, drv->name, outputName);
+        auto optFixedPath = output.path(worker.store, drv->name, outputName);
         if (!optFixedPath ||
             worker.store.printStorePath(*optFixedPath) != finalDestPath)
         {
@@ -4289,26 +4298,32 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    {
-        ValidPathInfos infos2;
-        for (auto & [outputName, newInfo] : infos) {
-            if (useDerivation)
-                worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
-            else {
-                /* Once a floating CA derivations reaches this point, it must
-                   already be resolved, drvPath the basic derivation path, and
-                   a file existsing at that path for sake of the DB's foreign key. */
-                assert(drv->type() != DerivationType::CAFloating);
-            }
-            infos2.push_back(newInfo);
-        }
-        worker.store.registerValidPaths(infos2);
+    ValidPathInfos infos2;
+    for (auto & [outputName, newInfo] : infos) {
+        infos2.push_back(newInfo);
     }
+    worker.store.registerValidPaths(infos2);
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
     if (delayedException)
         std::rethrow_exception(delayedException);
+
+    /* If we made it this far, we are sure the output matches the derivation
+       (since the delayedException would be a fixed output CA mismatch). That
+       means it's safe to link the derivation to the output hash. We must do
+       that for floating CA derivations, which otherwise couldn't be cached,
+       but it's fine to do in all cases. */
+    for (auto & [outputName, newInfo] : infos) {
+        if (useDerivation)
+            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
+        else {
+            /* Once a floating CA derivations reaches this point, it must
+               already be resolved, drvPath the basic derivation path, and
+               a file existsing at that path for sake of the DB's foreign key. */
+            assert(drv->type() != DerivationType::CAFloating);
+        }
+    }
 }
 
 
@@ -4601,7 +4616,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
     if (drv->type() != DerivationType::CAFloating) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
-            res.insert_or_assign(name, output.pathOpt(worker.store, drv->name, name));
+            res.insert_or_assign(name, output.path(worker.store, drv->name, name));
         return res;
     } else {
         return worker.store.queryPartialDerivationOutputMap(drvPath);
@@ -4632,9 +4647,11 @@ void DerivationGoal::checkPathValidity()
             auto outputPath = *i.second;
             info.known = {
                 .path = outputPath,
-                .valid = !worker.store.isValidPath(outputPath)
-                    ? std::optional<bool> {}
-                    : !checkHash || worker.pathContentsGood(outputPath),
+                .status = !worker.store.isValidPath(outputPath)
+                    ? PathStatus::Absent
+                    : !checkHash || worker.pathContentsGood(outputPath)
+                    ? PathStatus::Valid
+                    : PathStatus::Corrupt,
             };
         }
         initialOutputs.insert_or_assign(i.first, info);

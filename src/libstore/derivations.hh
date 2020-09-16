@@ -52,7 +52,7 @@ struct DerivationOutput
     /* Note, when you use this function you should make sure that you're passing
        the right derivation name. When in doubt, you should use the safer
        interface provided by BasicDerivation::outputsAndOptPaths */
-    std::optional<StorePath> pathOpt(const Store & store, std::string_view drvName, std::string_view outputName) const;
+    std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;

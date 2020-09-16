@@ -1,5 +1,6 @@
 #include "serialise.hh"
 #include "util.hh"
+#include "remote-fs-accessor.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
@@ -43,8 +44,11 @@ StorePathCAMap readStorePathCAMap(const Store & store, Source & from)
 {
     StorePathCAMap paths;
     auto count = readNum<size_t>(from);
-    while (count--)
-        paths.insert_or_assign(store.parseStorePath(readString(from)), parseContentAddressOpt(readString(from)));
+    while (count--) {
+        auto path = store.parseStorePath(readString(from));
+        auto ca = parseContentAddressOpt(readString(from));
+        paths.insert_or_assign(path, ca);
+    }
     return paths;
 }
 
@@ -476,10 +480,26 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 
 std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
-    auto conn(getConnection());
-    conn->to << wopQueryDerivationOutputMap << printStorePath(path);
-    conn.processStderr();
-    return worker_proto::read(*this, conn->from, Phantom<std::map<std::string, std::optional<StorePath>>> {});
+    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
+        auto conn(getConnection());
+        conn->to << wopQueryDerivationOutputMap << printStorePath(path);
+        conn.processStderr();
+        return worker_proto::read(*this, conn->from, Phantom<std::map<std::string, std::optional<StorePath>>> {});
+    } else {
+        // Fallback for old daemon versions.
+        // For floating-CA derivations (and their co-dependencies) this is an
+        // under-approximation as it only returns the paths that can be inferred
+        // from the derivation itself (and not the ones that are known because
+        // the have been built), but as old stores don't handle floating-CA
+        // derivations this shouldn't matter
+        auto derivation = readDerivation(path);
+        auto outputsWithOptPaths = derivation.outputsAndOptPaths(*this);
+        std::map<std::string, std::optional<StorePath>> ret;
+        for (auto & [outputName, outputAndPath] : outputsWithOptPaths) {
+            ret.emplace(outputName, outputAndPath.second);
+        }
+        return ret;
+    }
 
 }
 
@@ -868,6 +888,18 @@ RemoteStore::Connection::~Connection()
     }
 }
 
+void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
+{
+    auto conn(connections->get());
+    conn->to << wopNarFromPath << printStorePath(path);
+    conn->processStderr();
+    copyNAR(conn->from, sink);
+}
+
+ref<FSAccessor> RemoteStore::getFSAccessor()
+{
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
+}
 
 static Logger::Fields readFields(Source & from)
 {

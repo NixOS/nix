@@ -40,10 +40,6 @@ public:
     bool sameMachine() override
     { return false; }
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
-
-    ref<FSAccessor> getFSAccessor() override;
-
 private:
 
     struct Connection : RemoteStore::Connection
@@ -67,19 +63,6 @@ private:
         */
     };
 };
-
-void SSHStore::narFromPath(const StorePath & path, Sink & sink)
-{
-    auto conn(connections->get());
-    conn->to << wopNarFromPath << printStorePath(path);
-    conn->processStderr();
-    copyNAR(conn->from, sink);
-}
-
-ref<FSAccessor> SSHStore::getFSAccessor()
-{
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
-}
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {

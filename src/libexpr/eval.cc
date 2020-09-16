@@ -87,6 +87,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
             else if (*i == '\t') str << "\\t";
+            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
             else str << *i;
         str << "\"";
         break;
@@ -1348,7 +1349,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    mkAttrs(*actualArgs, std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
 
     if (fun.lambda.fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass

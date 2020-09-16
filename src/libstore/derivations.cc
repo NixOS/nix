@@ -7,7 +7,7 @@
 
 namespace nix {
 
-std::optional<StorePath> DerivationOutput::pathOpt(const Store & store, std::string_view drvName, std::string_view outputName) const
+std::optional<StorePath> DerivationOutput::path(const Store & store, std::string_view drvName, std::string_view outputName) const
 {
     return std::visit(overloaded {
         [](DerivationOutputInputAddressed doi) -> std::optional<StorePath> {
@@ -557,7 +557,7 @@ DerivationOutputsAndOptPaths BasicDerivation::outputsAndOptPaths(const Store & s
     for (auto output : outputs)
         outsAndOptPaths.insert(std::make_pair(
             output.first,
-            std::make_pair(output.second, output.second.pathOpt(store, name, output.first))
+            std::make_pair(output.second, output.second.path(store, name, output.first))
             )
         );
     return outsAndOptPaths;

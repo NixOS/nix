@@ -91,7 +91,7 @@ static void mkOutputString(EvalState & state, Value & v,
     const StorePath & drvPath, const BasicDerivation & drv,
     std::pair<string, DerivationOutput> o)
 {
-    auto optOutputPath = o.second.pathOpt(*state.store, drv.name, o.first);
+    auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
     mkString(
         *state.allocAttr(v, state.symbols.create(o.first)),
         optOutputPath
