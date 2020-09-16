@@ -24,12 +24,12 @@ $(d)/%.8: $(d)/src/command-ref/%.md
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	$(trace-gen) lowdown -sT man $^ -o $@
 
-$(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.jq
-	jq -r -f doc/manual/generate-manpage.jq $< > $@
+$(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+	$(trace-gen) $(bindir)/nix eval --experimental-features nix-command --impure --raw --expr 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))' > $@
 
-$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.jq $(d)/src/command-ref/conf-file-prefix.md
-	cat doc/manual/src/command-ref/conf-file-prefix.md > $@
-	jq -r -f doc/manual/generate-options.jq $< >> $@
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
+	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@
+	$(trace-gen) $(bindir)/nix eval --experimental-features nix-command --impure --raw --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@
 
 $(d)/nix.json: $(bindir)/nix
 	$(trace-gen) $(bindir)/nix __dump-args > $@
@@ -37,9 +37,9 @@ $(d)/nix.json: $(bindir)/nix
 $(d)/conf-file.json: $(bindir)/nix
 	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy $(bindir)/nix show-config --json --experimental-features nix-command > $@
 
-$(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.jq $(d)/src/expressions/builtins-prefix.md
-	cat doc/manual/src/expressions/builtins-prefix.md > $@
-	jq -r -f doc/manual/generate-builtins.jq $< >> $@
+$(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
+	@cat doc/manual/src/expressions/builtins-prefix.md > $@
+	$(trace-gen) $(bindir)/nix eval --experimental-features nix-command --impure --raw --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@
 
 $(d)/builtins.json: $(bindir)/nix
 	$(trace-gen) $(bindir)/nix __dump-builtins > $@
