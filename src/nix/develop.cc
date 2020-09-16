@@ -145,7 +145,10 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath}});
 
-    for (auto & outPath : drv.outputPaths(*store)) {
+    for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
+        auto & [_1, optPath] = outputAndOptPath;
+        assert(optPath);
+        auto & outPath = *optPath;
         assert(store->isValidPath(outPath));
         auto outPathS = store->toRealPath(outPath);
         if (lstat(outPathS).st_size)

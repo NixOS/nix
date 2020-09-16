@@ -279,6 +279,11 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
 
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
+    void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output);
+    void linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
+
     Path getRealStoreDir() override { return realStoreDir; }
 
     void createUser(const std::string & userName, uid_t userId) override;

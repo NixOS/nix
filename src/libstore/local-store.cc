@@ -578,10 +578,29 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                 envHasRightPath(path, i.first);
             },
             [&](DerivationOutputCAFloating _) {
-                throw UnimplementedError("floating CA output derivations are not yet implemented");
+                /* Nothing to check */
             },
         }, i.second.output);
     }
+}
+
+
+void LocalStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+{
+    auto state(_state.lock());
+    return linkDeriverToPath(*state, queryValidPathId(*state, deriver), outputName, output);
+}
+
+void LocalStore::linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
+{
+    retrySQLite<void>([&]() {
+        state.stmtAddDerivationOutput.use()
+            (deriver)
+            (outputName)
+            (printStorePath(output))
+            .exec();
+    });
+
 }
 
 
@@ -618,12 +637,11 @@ uint64_t LocalStore::addValidPath(State & state,
            registration above is undone. */
         if (checkOutputs) checkDerivationOutputs(info.path, drv);
 
-        for (auto & i : drv.outputsAndPaths(*this)) {
-            state.stmtAddDerivationOutput.use()
-                (id)
-                (i.first)
-                (printStorePath(i.second.second))
-                .exec();
+        for (auto & i : drv.outputsAndOptPaths(*this)) {
+            /* Floating CA derivations have indeterminate output paths until
+               they are built, so don't register anything in that case */
+            if (i.second.second)
+                linkDeriverToPath(state, id, i.first, *i.second.second);
         }
     }
 
