@@ -209,7 +209,7 @@ __sudo() {
 
     echo "I am executing:"
     echo ""
-    printf "    $ sudo %s\\n" "$cmd"
+    printf "    $ sudo --preserve-env=NIX_IGNORE_SYMLINK_STORE %s\\n" "$cmd"
     echo ""
     echo "$expl"
     echo ""
@@ -223,7 +223,7 @@ _sudo() {
     if ! headless; then
         __sudo "$expl" "$*"
     fi
-    sudo "$@"
+    sudo --preserve-env=NIX_IGNORE_SYMLINK_STORE "$@"
 }
 
 
