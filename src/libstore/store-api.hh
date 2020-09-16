@@ -24,6 +24,31 @@
 
 namespace nix {
 
+/**
+ * About the class hierarchy of the store implementations:
+ *
+ * Each store type `Foo` consists of two classes:
+ *
+ * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
+ *   for the store
+ *
+ *   It should only contain members of type `const Setting<T>` (or subclasses
+ *   of it) and inherit the constructors of `StoreConfig`
+ *   (`using StoreConfig::StoreConfig`).
+ *
+ * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
+ *   implementation of the store.
+ *
+ *   This class is expected to have a constructor `Foo(const Params & params)`
+ *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
+ *   `assertion failure` when trying to instantiate it).
+ *
+ * You can then register the new store using:
+ *
+ * ```
+ * cpp static RegisterStoreImplementation<Foo, FooConfig> regStore;
+ * ```
+ */
 
 MakeError(SubstError, Error);
 MakeError(BuildError, Error); // denotes a permanent build failure
@@ -33,6 +58,7 @@ MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
 MakeError(BadStorePath, Error);
 
+MakeError(InvalidStoreURI, Error);
 
 class FSAccessor;
 class NarInfoDiskCache;
@@ -144,12 +170,31 @@ struct BuildResult
     }
 };
 
-
-class Store : public std::enable_shared_from_this<Store>, public Config
+struct StoreConfig : public Config
 {
-public:
+    using Config::Config;
 
-    typedef std::map<std::string, std::string> Params;
+    /**
+     * When constructing a store implementation, we pass in a map `params` of
+     * parameters that's supposed to initialize the associated config.
+     * To do that, we must use the `StoreConfig(StringMap & params)`
+     * constructor, so we'd like to `delete` its default constructor to enforce
+     * it.
+     *
+     * However, actually deleting it means that all the subclasses of
+     * `StoreConfig` will have their default constructor deleted (because it's
+     * supposed to call the deleted default constructor of `StoreConfig`). But
+     * because we're always using virtual inheritance, the constructors of
+     * child classes will never implicitely call this one, so deleting it will
+     * be more painful than anything else.
+     *
+     * So we `assert(false)` here to ensure at runtime that the right
+     * constructor is always called without having to redefine a custom
+     * constructor for each `*Config` class.
+     */
+    StoreConfig() { assert(false); }
+
+    virtual const std::string name() = 0;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
         "store", "path to the Nix store"};
@@ -166,6 +211,14 @@ public:
     Setting<StringSet> systemFeatures{this, settings.systemFeatures,
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
+
+};
+
+class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
+{
+public:
+
+    typedef std::map<std::string, std::string> Params;
 
 protected:
 
@@ -200,6 +253,11 @@ protected:
     Store(const Params & params);
 
 public:
+    /**
+     * Perform any necessary effectful operation to make the store up and
+     * running
+     */
+    virtual void init() {};
 
     virtual ~Store() { }
 
@@ -247,10 +305,12 @@ public:
     StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
-    StorePath makeStorePath(const string & type,
+    StorePath makeStorePath(std::string_view type,
+        std::string_view hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(const string & id,
+    StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(FileIngestionMethod method,
@@ -624,22 +684,25 @@ protected:
 
 };
 
-
-class LocalFSStore : public virtual Store
+struct LocalFSStoreConfig : virtual StoreConfig
 {
-public:
-
-    // FIXME: the (Store*) cast works around a bug in gcc that causes
+    using StoreConfig::StoreConfig;
+    // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
     // it to omit the call to the Setting constructor. Clang works fine
     // either way.
-    const PathSetting rootDir{(Store*) this, true, "",
+    const PathSetting rootDir{(StoreConfig*) this, true, "",
         "root", "directory prefixed to all other paths"};
-    const PathSetting stateDir{(Store*) this, false,
+    const PathSetting stateDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
         "state", "directory where Nix will store state"};
-    const PathSetting logDir{(Store*) this, false,
+    const PathSetting logDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
         "log", "directory where Nix will store state"};
+};
+
+class LocalFSStore : public virtual Store, public virtual LocalFSStoreConfig
+{
+public:
 
     const static string drvsLogDir;
 
@@ -732,23 +795,43 @@ ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
    ‘substituters’ option and various legacy options. */
 std::list<ref<Store>> getDefaultSubstituters();
 
-
-/* Store implementation registration. */
-typedef std::function<std::shared_ptr<Store>(
-    const std::string & uri, const Store::Params & params)> OpenStore;
-
-struct RegisterStoreImplementation
+struct StoreFactory
 {
-    typedef std::vector<OpenStore> Implementations;
-    static Implementations * implementations;
+    std::set<std::string> uriSchemes;
+    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
+    std::function<std::shared_ptr<StoreConfig> ()> getConfig;
+};
+struct Implementations
+{
+    static std::vector<StoreFactory> * registered;
 
-    RegisterStoreImplementation(OpenStore fun)
+    template<typename T, typename TConfig>
+    static void add()
     {
-        if (!implementations) implementations = new Implementations;
-        implementations->push_back(fun);
+        if (!registered) registered = new std::vector<StoreFactory>();
+        StoreFactory factory{
+            .uriSchemes = T::uriSchemes(),
+            .create =
+                ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
+                 -> std::shared_ptr<Store>
+                 { return std::make_shared<T>(scheme, uri, params); }),
+            .getConfig =
+                ([]()
+                 -> std::shared_ptr<StoreConfig>
+                 { return std::make_shared<TConfig>(StringMap({})); })
+        };
+        registered->push_back(factory);
     }
 };
 
+template<typename T, typename TConfig>
+struct RegisterStoreImplementation
+{
+    RegisterStoreImplementation()
+    {
+        Implementations::add<T, TConfig>();
+    }
+};
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes

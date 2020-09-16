@@ -162,11 +162,6 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else abort();
 }
 
-template<> nlohmann::json BaseSetting<SandboxMode>::toJSON()
-{
-    return AbstractSetting::toJSON();
-}
-
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({

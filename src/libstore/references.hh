@@ -7,6 +7,8 @@ namespace nix {
 
 std::pair<PathSet, HashResult> scanForReferences(const Path & path, const PathSet & refs);
 
+PathSet scanForReferences(Sink & toTee, const Path & path, const PathSet & refs);
+
 struct RewritingSink : Sink
 {
     std::string from, to, prev;

@@ -145,7 +145,10 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath}});
 
-    for (auto & outPath : drv.outputPaths(*store)) {
+    for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
+        auto & [_1, optPath] = outputAndOptPath;
+        assert(optPath);
+        auto & outPath = *optPath;
         assert(store->isValidPath(outPath));
         auto outPathS = store->toRealPath(outPath);
         if (lstat(outPathS).st_size)
@@ -389,7 +392,7 @@ struct CmdDevelop : Common, MixEnvironment
 
             auto bashInstallable = std::make_shared<InstallableFlake>(
                 state,
-                std::move(installable->nixpkgsFlakeRef()),
+                installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 lockFlags);
