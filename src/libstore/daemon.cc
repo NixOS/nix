@@ -366,6 +366,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                         return store->addTextToStore(name, contents, refs);
                     },
                     [&](FixedOutputHashMethod &fohm) -> StorePath {
+                        if (!refs.empty())
+                            throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
                         return store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType);
                     },
                 }, contentAddressMethod);
