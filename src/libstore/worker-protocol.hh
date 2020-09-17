@@ -18,7 +18,7 @@ typedef enum {
     wopQueryReferences = 5, // obsolete
     wopQueryReferrers = 6,
     wopAddToStore = 7,
-    wopAddTextToStore = 8,
+    wopAddTextToStore = 8, // obsolete since 1.25, Nix 3.0. Use wopAddToStore
     wopBuildPaths = 9,
     wopEnsurePath = 10,
     wopAddTempRoot = 11,

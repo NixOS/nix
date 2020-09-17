@@ -526,12 +526,8 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method, HashType hashType, RepairFlag repair)
+StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references)
 {
-    if (repair) throw Error("repairing is not supported when adding to store through the Nix daemon");
-    StorePathSet references;
-
     auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
@@ -539,7 +535,7 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         conn->to
             << wopAddToStore
             << name
-            << renderContentAddressMethod(FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType });
+            << renderContentAddressMethod(caMethod);
         writeStorePaths(*this, conn->to, references);
 
         conn.withFramedSink([&](Sink & sink) {
@@ -552,40 +548,58 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
 
-        conn->to
-            << wopAddToStore
-            << name
-            << ((hashType == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-            << (method == FileIngestionMethod::Recursive ? 1 : 0)
-            << printHashType(hashType);
+        std::visit(overloaded {
+            [&](TextHashMethod thm) -> void {
+                std::string s = dump.drain();
+                conn->to << wopAddTextToStore << name << s;
+                writeStorePaths(*this, conn->to, references);
+                conn.processStderr();
+            },
+            [&](FixedOutputHashMethod fohm) -> void {
+                conn->to
+                    << wopAddToStore
+                    << name
+                    << ((fohm.hashType == htSHA256 && fohm.fileIngestionMethod == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+                    << (fohm.fileIngestionMethod == FileIngestionMethod::Recursive ? 1 : 0)
+                    << printHashType(fohm.hashType);
 
-        try {
-            conn->to.written = 0;
-            conn->to.warn = true;
-            connections->incCapacity();
-            {
-                Finally cleanup([&]() { connections->decCapacity(); });
-                if (method == FileIngestionMethod::Recursive) {
-                    dump.drainInto(conn->to);
-                } else {
-                    std::string contents = dump.drain();
-                    dumpString(contents, conn->to);
-                }
-            }
-            conn->to.warn = false;
-            conn.processStderr();
-        } catch (SysError & e) {
-            /* Daemon closed while we were sending the path. Probably OOM
-              or I/O error. */
-            if (e.errNo == EPIPE)
                 try {
+                    conn->to.written = 0;
+                    conn->to.warn = true;
+                    connections->incCapacity();
+                    {
+                        Finally cleanup([&]() { connections->decCapacity(); });
+                        if (fohm.fileIngestionMethod == FileIngestionMethod::Recursive) {
+                            dump.drainInto(conn->to);
+                        } else {
+                            std::string contents = dump.drain();
+                            dumpString(contents, conn->to);
+                        }
+                    }
+                    conn->to.warn = false;
                     conn.processStderr();
-                } catch (EndOfFile & e) { }
-            throw;
-        }
+                } catch (SysError & e) {
+                    /* Daemon closed while we were sending the path. Probably OOM
+                      or I/O error. */
+                    if (e.errNo == EPIPE)
+                        try {
+                            conn.processStderr();
+                        } catch (EndOfFile & e) { }
+                    throw;
+                }
 
+            }
+        }, caMethod);
         return parseStorePath(readString(conn->from));
     }
+}
+
+StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method, HashType hashType, RepairFlag repair)
+{
+    if (repair) throw Error("repairing is not supported when adding to store through the Nix daemon");
+    StorePathSet references;
+    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references);
 }
 
 
@@ -646,13 +660,8 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
-
-    auto conn(getConnection());
-    conn->to << wopAddTextToStore << name << s;
-    writeStorePaths(*this, conn->to, references);
-
-    conn.processStderr();
-    return parseStorePath(readString(conn->from));
+    StringSource source(s);
+    return addCAToStore(source, name, TextHashMethod{}, references);
 }
 
 
