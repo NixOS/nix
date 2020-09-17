@@ -349,47 +349,74 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        HashType hashAlgo;
-        std::string baseName;
-        FileIngestionMethod method;
-        {
-            bool fixed;
-            uint8_t recursive;
-            std::string hashAlgoRaw;
-            from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
-            if (recursive > (uint8_t) FileIngestionMethod::Recursive)
-                throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
-            method = FileIngestionMethod { recursive };
-            /* Compatibility hack. */
-            if (!fixed) {
-                hashAlgoRaw = "sha256";
-                method = FileIngestionMethod::Recursive;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 25) {
+            auto name = readString(from);
+            auto camStr = readString(from);
+            auto refs = readStorePaths<StorePathSet>(*store, from);
+
+            logger->startWork();
+            StorePath path = [&]() -> StorePath {
+                // NB: FramedSource must be out of scope before logger->stopWork();
+                ContentAddressMethod contentAddressMethod = parseContentAddressMethod(camStr);
+                FramedSource source(from);
+                return std::visit(overloaded {
+                    [&](TextHashMethod &_) -> StorePath {
+                        // We could stream this by changing Store
+                        std::string contents = source.drain();
+                        return store->addTextToStore(name, contents, refs);
+                    },
+                    [&](FixedOutputHashMethod &fohm) -> StorePath {
+                        return store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType);
+                    },
+                }, contentAddressMethod);
+            }();
+            logger->stopWork();
+
+            to << store->printStorePath(path);
+
+        } else {
+            HashType hashAlgo;
+            std::string baseName;
+            FileIngestionMethod method;
+            {
+                bool fixed;
+                uint8_t recursive;
+                std::string hashAlgoRaw;
+                from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
+                if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                    throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
+                method = FileIngestionMethod { recursive };
+                /* Compatibility hack. */
+                if (!fixed) {
+                    hashAlgoRaw = "sha256";
+                    method = FileIngestionMethod::Recursive;
+                }
+                hashAlgo = parseHashType(hashAlgoRaw);
             }
-            hashAlgo = parseHashType(hashAlgoRaw);
+
+            StringSink saved;
+            TeeSource savedNARSource(from, saved);
+            RetrieveRegularNARSink savedRegular { saved };
+
+            if (method == FileIngestionMethod::Recursive) {
+                /* Get the entire NAR dump from the client and save it to
+                  a string so that we can pass it to
+                  addToStoreFromDump(). */
+                ParseSink sink; /* null sink; just parse the NAR */
+                parseDump(sink, savedNARSource);
+            } else
+                parseDump(savedRegular, from);
+
+            logger->startWork();
+            if (!savedRegular.regular) throw Error("regular file expected");
+
+            // FIXME: try to stream directly from `from`.
+            StringSource dumpSource { *saved.s };
+            auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+            logger->stopWork();
+
+            to << store->printStorePath(path);
         }
-
-        StringSink saved;
-        TeeSource savedNARSource(from, saved);
-        RetrieveRegularNARSink savedRegular { saved };
-
-        if (method == FileIngestionMethod::Recursive) {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNARSource);
-        } else
-            parseDump(savedRegular, from);
-
-        logger->startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
-
-        // FIXME: try to stream directly from `from`.
-        StringSource dumpSource { *saved.s };
-        auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
-        logger->stopWork();
-
-        to << store->printStorePath(path);
         break;
     }
 

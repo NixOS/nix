@@ -526,6 +526,69 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 }
 
 
+StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method, HashType hashType, RepairFlag repair)
+{
+    if (repair) throw Error("repairing is not supported when adding to store through the Nix daemon");
+    StorePathSet references;
+
+    auto conn(getConnection());
+
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
+
+        conn->to
+            << wopAddToStore
+            << name
+            << renderContentAddressMethod(FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType });
+        writeStorePaths(*this, conn->to, references);
+
+        conn.withFramedSink([&](Sink & sink) {
+            dump.drainInto(sink);
+        });
+
+        return parseStorePath(readString(conn->from));
+
+    }
+    else {
+        if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
+
+        conn->to
+            << wopAddToStore
+            << name
+            << ((hashType == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+            << (method == FileIngestionMethod::Recursive ? 1 : 0)
+            << printHashType(hashType);
+
+        try {
+            conn->to.written = 0;
+            conn->to.warn = true;
+            connections->incCapacity();
+            {
+                Finally cleanup([&]() { connections->decCapacity(); });
+                if (method == FileIngestionMethod::Recursive) {
+                    dump.drainInto(conn->to);
+                } else {
+                    std::string contents = dump.drain();
+                    dumpString(contents, conn->to);
+                }
+            }
+            conn->to.warn = false;
+            conn.processStderr();
+        } catch (SysError & e) {
+            /* Daemon closed while we were sending the path. Probably OOM
+              or I/O error. */
+            if (e.errNo == EPIPE)
+                try {
+                    conn.processStderr();
+                } catch (EndOfFile & e) { }
+            throw;
+        }
+
+        return parseStorePath(readString(conn->from));
+    }
+}
+
+
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
@@ -576,46 +639,6 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             conn.processStderr(0, nullptr);
         }
     }
-}
-
-
-StorePath RemoteStore::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
-{
-    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
-
-    auto conn(getConnection());
-
-    Path srcPath(absPath(_srcPath));
-
-    conn->to
-        << wopAddToStore
-        << name
-        << ((hashAlgo == htSHA256 && method == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-        << (method == FileIngestionMethod::Recursive ? 1 : 0)
-        << printHashType(hashAlgo);
-
-    try {
-        conn->to.written = 0;
-        conn->to.warn = true;
-        connections->incCapacity();
-        {
-            Finally cleanup([&]() { connections->decCapacity(); });
-            dumpPath(srcPath, conn->to, filter);
-        }
-        conn->to.warn = false;
-        conn.processStderr();
-    } catch (SysError & e) {
-        /* Daemon closed while we were sending the path. Probably OOM
-           or I/O error. */
-        if (e.errNo == EPIPE)
-            try {
-                conn.processStderr();
-            } catch (EndOfFile & e) { }
-        throw;
-    }
-
-    return parseStorePath(readString(conn->from));
 }
 
 
