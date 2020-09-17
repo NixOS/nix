@@ -15,3 +15,6 @@ out1=$(nix-build "${commonArgs[@]}" ./content-addressed.nix --arg seed 1)
 out2=$(nix-build "${commonArgs[@]}" ./content-addressed.nix --arg seed 2)
 
 test $out1 == $out2
+
+nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
+nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
