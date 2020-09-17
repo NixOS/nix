@@ -346,7 +346,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 
 
 Store::Store(const Params & params)
-    : Config(params)
+    : StoreConfig(params)
     , state({(size_t) pathInfoCacheSize})
 {
 }
@@ -1009,7 +1009,6 @@ Derivation Store::readDerivation(const StorePath & drvPath)
     }
 }
 
-
 }
 
 
@@ -1018,9 +1017,6 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 
 
 namespace nix {
-
-
-RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_)
@@ -1035,24 +1031,6 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
     return {uri, params};
 }
 
-ref<Store> openStore(const std::string & uri_,
-    const Store::Params & extraParams)
-{
-    auto [uri, uriParams] = splitUriAndParams(uri_);
-    auto params = extraParams;
-    params.insert(uriParams.begin(), uriParams.end());
-
-    for (auto fun : *RegisterStoreImplementation::implementations) {
-        auto store = fun(uri, params);
-        if (store) {
-            store->warnUnknownSettings();
-            return ref<Store>(store);
-        }
-    }
-
-    throw Error("don't know how to open Nix store '%s'", uri);
-}
-
 static bool isNonUriPath(const std::string & spec) {
     return
         // is not a URL
@@ -1062,44 +1040,62 @@ static bool isNonUriPath(const std::string & spec) {
         && spec.find("/") != std::string::npos;
 }
 
-StoreType getStoreType(const std::string & uri, const std::string & stateDir)
+std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
-    if (uri == "daemon") {
-        return tDaemon;
-    } else if (uri == "local" || isNonUriPath(uri)) {
-        return tLocal;
-    } else if (uri == "" || uri == "auto") {
+    if (uri == "" || uri == "auto") {
+        auto stateDir = get(params, "state").value_or(settings.nixStateDir);
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            return tLocal;
+            return std::make_shared<LocalStore>(params);
         else if (pathExists(settings.nixDaemonSocketFile))
-            return tDaemon;
+            return std::make_shared<UDSRemoteStore>(params);
         else
-            return tLocal;
+            return std::make_shared<LocalStore>(params);
+    } else if (uri == "daemon") {
+        return std::make_shared<UDSRemoteStore>(params);
+    } else if (uri == "local") {
+        return std::make_shared<LocalStore>(params);
+    } else if (isNonUriPath(uri)) {
+        Store::Params params2 = params;
+        params2["root"] = absPath(uri);
+        return std::make_shared<LocalStore>(params2);
     } else {
-        return tOther;
+        return nullptr;
     }
 }
 
-
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
+ref<Store> openStore(const std::string & uri_,
+    const Store::Params & extraParams)
 {
-    switch (getStoreType(uri, get(params, "state").value_or(settings.nixStateDir))) {
-        case tDaemon:
-            return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
-        case tLocal: {
-            Store::Params params2 = params;
-            if (isNonUriPath(uri)) {
-                params2["root"] = absPath(uri);
-            }
-            return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
-        }
-        default:
-            return nullptr;
-    }
-});
+    auto params = extraParams;
+    try {
+        auto parsedUri = parseURL(uri_);
+        params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
+        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
+
+        for (auto implem : *Implementations::registered) {
+            if (implem.uriSchemes.count(parsedUri.scheme)) {
+                auto store = implem.create(parsedUri.scheme, baseURI, params);
+                if (store) {
+                    store->init();
+                    store->warnUnknownSettings();
+                    return ref<Store>(store);
+                }
+            }
+        }
+    }
+    catch (BadURL &) {
+        auto [uri, uriParams] = splitUriAndParams(uri_);
+        params.insert(uriParams.begin(), uriParams.end());
+
+        if (auto store = openFromNonUri(uri, params)) {
+            store->warnUnknownSettings();
+            return ref<Store>(store);
+        }
+    }
+
+    throw Error("don't know how to open Nix store '%s'", uri_);
+}
 
 std::list<ref<Store>> getDefaultSubstituters()
 {
@@ -1133,5 +1129,6 @@ std::list<ref<Store>> getDefaultSubstituters()
     return stores;
 }
 
+std::vector<StoreFactory> * Implementations::registered = 0;
 
 }

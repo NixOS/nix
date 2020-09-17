@@ -1704,7 +1704,7 @@ static RegisterPrimOp primop_toFile({
         ...
         cp ${configFile} $out/etc/foo.conf
       ";
-    ```
+      ```
 
       Note that `${configFile}` is an
       [antiquotation](language-values.md), so the result of the
@@ -3565,9 +3565,10 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
-    sDerivationNix = symbols.create(path);
-    evalFile(path, v);
+    sDerivationNix = symbols.create("//builtin/derivation.nix");
+    eval(parse(
+        #include "primops/derivation.nix.gen.hh"
+        , foFile, sDerivationNix, "/", staticBaseEnv), v);
     addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' set,

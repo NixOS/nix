@@ -392,7 +392,7 @@ struct CmdDevelop : Common, MixEnvironment
 
             auto bashInstallable = std::make_shared<InstallableFlake>(
                 state,
-                std::move(installable->nixpkgsFlakeRef()),
+                installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 lockFlags);

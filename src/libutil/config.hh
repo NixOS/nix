@@ -206,7 +206,9 @@ protected:
 
     virtual std::string to_string() const = 0;
 
-    virtual nlohmann::json toJSON();
+    nlohmann::json toJSON();
+
+    virtual std::map<std::string, nlohmann::json> toJSONObject();
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -220,6 +222,7 @@ class BaseSetting : public AbstractSetting
 protected:
 
     T value;
+    const T defaultValue;
 
 public:
 
@@ -229,6 +232,7 @@ public:
         const std::set<std::string> & aliases = {})
         : AbstractSetting(name, description, aliases)
         , value(def)
+        , defaultValue(def)
     { }
 
     operator const T &() const { return value; }
@@ -251,7 +255,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    nlohmann::json toJSON() override;
+    std::map<std::string, nlohmann::json> toJSONObject() override;
 };
 
 template<typename T>

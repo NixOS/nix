@@ -22,7 +22,8 @@
 namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(const Params & params)
-    : Store(params)
+    : BinaryCacheStoreConfig(params)
+    , Store(params)
 {
     if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));

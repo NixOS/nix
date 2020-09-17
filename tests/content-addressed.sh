@@ -22,3 +22,6 @@ secondSeedArgs=(-j0)
 # dependent derivations always being already built.
 #testDerivation dependentCA
 testDerivation transitivelyDependentCA
+
+nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
+nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true

@@ -42,7 +42,8 @@ namespace nix {
 
 
 LocalStore::LocalStore(const Params & params)
-    : Store(params)
+    : StoreConfig(params)
+    , Store(params)
     , LocalFSStore(params)
     , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
         "physical path to the Nix store"}
