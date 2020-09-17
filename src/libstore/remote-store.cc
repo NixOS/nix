@@ -957,39 +957,6 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-
-struct FramedSink : nix::BufferedSink
-{
-    ConnectionHandle & conn;
-    std::exception_ptr & ex;
-
-    FramedSink(ConnectionHandle & conn, std::exception_ptr & ex) : conn(conn), ex(ex)
-    { }
-
-    ~FramedSink()
-    {
-        try {
-            conn->to << 0;
-            conn->to.flush();
-        } catch (...) {
-            ignoreException();
-        }
-    }
-
-    void write(const unsigned char * data, size_t len) override
-    {
-        /* Don't send more data if the remote has
-            encountered an error. */
-        if (ex) {
-            auto ex2 = ex;
-            ex = nullptr;
-            std::rethrow_exception(ex2);
-        }
-        conn->to << len;
-        conn->to(data, len);
-    };
-};
-
 void
 ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun) {
     (*this)->to.flush();
@@ -1022,7 +989,7 @@ ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun) {
     });
 
     {
-        FramedSink sink(*this, ex);
+        FramedSink sink((*this)->to, ex);
         fun(sink);
         sink.flush();
     }

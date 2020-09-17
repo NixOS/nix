@@ -406,8 +406,13 @@ struct StreamToSourceAdapter : Source
 };
 
 
-/* Like SizedSource, but guarantees that the whole frame is consumed after
-   destruction. This ensures that the original stream is in a known state. */
+/* A source that reads a distinct format of concatenated chunks back into its
+   logical form, in order to guarantee a known state to the original stream,
+   even in the event of errors.
+
+   Use with FramedSink, which also allows the logical stream to be terminated
+   in the event of an exception.
+*/
 struct FramedSource : Source
 {
     Source & from;
@@ -450,6 +455,43 @@ struct FramedSource : Source
         pos += n;
         return n;
     }
+};
+
+/* Write as chunks in the format expected by FramedSource.
+
+   The exception_ptr reference can be used to terminate the stream when you
+   detect that an error has occurred on the remote end.
+*/
+struct FramedSink : nix::BufferedSink
+{
+    BufferedSink & to;
+    std::exception_ptr & ex;
+
+    FramedSink(BufferedSink & to, std::exception_ptr & ex) : to(to), ex(ex)
+    { }
+
+    ~FramedSink()
+    {
+        try {
+            to << 0;
+            to.flush();
+        } catch (...) {
+            ignoreException();
+        }
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        /* Don't send more data if the remote has
+            encountered an error. */
+        if (ex) {
+            auto ex2 = ex;
+            ex = nullptr;
+            std::rethrow_exception(ex2);
+        }
+        to << len;
+        to(data, len);
+    };
 };
 
 
