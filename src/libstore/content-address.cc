@@ -52,7 +52,7 @@ std::string renderContentAddressMethod(ContentAddressMethod cam) {
   Parses content address strings up to the hash.
  */
 static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & rest) {
-    std::string wholeInput(rest);
+    std::string_view wholeInput { rest };
 
     std::string_view prefix;
     {
