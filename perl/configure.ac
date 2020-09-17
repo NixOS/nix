@@ -70,19 +70,6 @@ PKG_CHECK_MODULES([NIX], [nix-store])
 
 NEED_PROG([NIX], [nix])
 
-# Get nix configure values
-export NIX_REMOTE=daemon
-nixbindir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixBinDir)
-nixlibexecdir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixLibexecDir)
-nixlocalstatedir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixLocalstateDir)
-nixsysconfdir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixSysconfDir)
-nixstoredir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixStoreDir)
-AC_SUBST(nixbindir)
-AC_SUBST(nixlibexecdir)
-AC_SUBST(nixlocalstatedir)
-AC_SUBST(nixsysconfdir)
-AC_SUBST(nixstoredir)
-
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'

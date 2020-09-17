@@ -12,15 +12,6 @@ perl/Makefile.config
 /svn-revision
 /libtool
 
-/corepkgs/config.nix
-
-# /corepkgs/channels/
-/corepkgs/channels/unpack.sh
-
-# /corepkgs/nar/
-/corepkgs/nar/nar.sh
-/corepkgs/nar/unnar.sh
-
 # /doc/manual/
 /doc/manual/*.1
 /doc/manual/*.5
