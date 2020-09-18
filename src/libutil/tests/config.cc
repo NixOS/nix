@@ -161,7 +161,7 @@ namespace nix {
         Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
         setting.assign("value");
 
-        ASSERT_EQ(config.toJSON().dump(), R"#({"name-of-the-setting":{"aliases":[],"description":"description\n","value":"value"}})#");
+        ASSERT_EQ(config.toJSON().dump(), R"#({"name-of-the-setting":{"aliases":[],"defaultValue":"","description":"description\n","value":"value"}})#");
     }
 
     TEST(Config, setSettingAlias) {

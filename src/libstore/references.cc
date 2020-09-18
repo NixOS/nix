@@ -79,9 +79,17 @@ void RefScanSink::operator () (const unsigned char * data, size_t len)
 std::pair<PathSet, HashResult> scanForReferences(const string & path,
     const PathSet & refs)
 {
-    RefScanSink refsSink;
     HashSink hashSink { htSHA256 };
-    TeeSink sink { refsSink, hashSink };
+    auto found = scanForReferences(hashSink, path, refs);
+    auto hash = hashSink.finish();
+    return std::pair<PathSet, HashResult>(found, hash);
+}
+
+PathSet scanForReferences(Sink & toTee,
+    const string & path, const PathSet & refs)
+{
+    RefScanSink refsSink;
+    TeeSink sink { refsSink, toTee };
     std::map<string, Path> backMap;
 
     /* For efficiency (and a higher hit rate), just search for the
@@ -111,9 +119,7 @@ std::pair<PathSet, HashResult> scanForReferences(const string & path,
         found.insert(j->second);
     }
 
-    auto hash = hashSink.finish();
-
-    return std::pair<PathSet, HashResult>(found, hash);
+    return found;
 }
 
 

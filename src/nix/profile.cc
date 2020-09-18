@@ -180,7 +180,9 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
 
                 ProfileElement element;
-                element.storePaths = {drv.outPath}; // FIXME
+                if (!drv.outPath)
+                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
+                element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
                     installable2->flakeRef,
                     resolvedRef,
@@ -191,7 +193,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                 manifest.elements.emplace_back(std::move(element));
             } else
-                throw Error("'nix profile install' does not support argument '%s'", installable->what());
+                throw UnimplementedError("'nix profile install' does not support argument '%s'", installable->what());
         }
 
         store->buildPaths(pathsToBuild);
@@ -349,7 +351,9 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                element.storePaths = {drv.outPath}; // FIXME
+                if (!drv.outPath)
+                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
+                element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
                     installable.flakeRef,
                     resolvedRef,
