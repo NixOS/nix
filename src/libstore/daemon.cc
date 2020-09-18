@@ -353,6 +353,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             auto name = readString(from);
             auto camStr = readString(from);
             auto refs = readStorePaths<StorePathSet>(*store, from);
+            bool repairBool;
+            from >> repairBool;
+            auto repair = RepairFlag{repairBool};
 
             logger->startWork();
             StorePath path = [&]() -> StorePath {
@@ -368,7 +371,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     [&](FixedOutputHashMethod &fohm) -> StorePath {
                         if (!refs.empty())
                             throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
-                        return store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType);
+                        return store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
                     },
                 }, contentAddressMethod);
             }();

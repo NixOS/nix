@@ -63,7 +63,7 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
-    StorePath addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references);
+    StorePath addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references, RepairFlag repair);
 
     StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;

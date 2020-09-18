@@ -526,7 +526,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 }
 
 
-StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references)
+StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references, RepairFlag repair)
 {
     auto conn(getConnection());
 
@@ -537,6 +537,7 @@ StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentA
             << name
             << renderContentAddressMethod(caMethod);
         writeStorePaths(*this, conn->to, references);
+        conn->to << repair;
 
         conn.withFramedSink([&](Sink & sink) {
             dump.drainInto(sink);
@@ -597,9 +598,8 @@ StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentA
 StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
 {
-    if (repair) throw Error("repairing is not supported when adding to store through the Nix daemon");
     StorePathSet references;
-    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references);
+    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair);
 }
 
 
@@ -659,9 +659,8 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
-    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
     StringSource source(s);
-    return addCAToStore(source, name, TextHashMethod{}, references);
+    return addCAToStore(source, name, TextHashMethod{}, references, repair);
 }
 
 
