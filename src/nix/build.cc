@@ -8,7 +8,7 @@ using namespace nix;
 
 struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 {
-    Path outLink = "result";
+    std::optional<Path> outLink = "result";
     BuildMode buildMode = bmNormal;
 
     CmdBuild()
@@ -25,7 +25,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
         addFlag({
             .longName = "no-link",
             .description = "do not create a symlink to the build result",
-            .handler = {&outLink, Path("")},
+            .handler = {&outLink, {}},
         });
 
         addFlag({
@@ -64,19 +64,19 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
         if (dryRun) return;
 
-        if (outLink != "")
+        if (outLink)
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 for (size_t i = 0; i < buildables.size(); ++i)
                     std::visit(overloaded {
                         [&](BuildableOpaque bo) {
-                            std::string symlink = outLink;
+                            std::string symlink = *outLink;
                             if (i) symlink += fmt("-%d", i);
                             store2->addPermRoot(bo.path, absPath(symlink));
                         },
                         [&](BuildableFromDrv bfd) {
                             auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
                             for (auto & output : builtOutputs) {
-                                std::string symlink = outLink;
+                                std::string symlink = *outLink;
                                 if (i) symlink += fmt("-%d", i);
                                 if (output.first != "out") symlink += fmt("-%s", output.first);
                                 store2->addPermRoot(output.second, absPath(symlink));
