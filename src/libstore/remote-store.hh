@@ -63,8 +63,10 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    /* Add a content-addressable store path. `dump` will be drained. */
     ref<const ValidPathInfo> addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references, RepairFlag repair);
 
+    /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
     StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
 
