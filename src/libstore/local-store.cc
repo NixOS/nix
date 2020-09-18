@@ -109,7 +109,7 @@ LocalStore::LocalStore(const Params & params)
     }
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1") {
+    if (!settings.ignoreSymlinkStore) {
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
