@@ -244,6 +244,16 @@ variables are set, either log in again, or type
 
   . $p
 
-in your shell.
+in your Bash/Zsh shell.
+EOF
+fi
+
+if [ -n "$(command -v fish)" ]; then
+    cat >&2 <<EOF
+
+Beware: You seem to have Fish shell installed.
+        Nix is only installed for Bash/Zsh.
+        You can try using a plugin such as https://github.com/lilyball/nix-env.fish/.
+        For more information, see https://github.com/NixOS/nix/issues/440
 EOF
 fi
