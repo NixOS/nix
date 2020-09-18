@@ -1,6 +1,7 @@
 #include "logging.hh"
 #include "util.hh"
 #include "config.hh"
+#include "loggers.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
@@ -11,6 +12,16 @@ namespace nix {
 LoggerSettings loggerSettings;
 
 static GlobalConfig::Register rLoggerSettings(&loggerSettings);
+
+static auto rLoggerJSON = OnStartup([] {
+    registerLogger("internal-json", []() -> Logger* { return makeJSONLogger(*makeSimpleLogger(true)); });
+});
+static auto rLoggerRaw = OnStartup([] {
+    registerLogger("raw", []() -> Logger* { return makeSimpleLogger(false); });
+});
+static auto rLoggerRawWithLogs = OnStartup([] {
+    registerLogger("raw-with-logs", []() -> Logger* { return makeSimpleLogger(true); });
+});
 
 static thread_local ActivityId curActivity = 0;
 

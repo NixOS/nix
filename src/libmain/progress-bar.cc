@@ -3,6 +3,7 @@
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
+#include "loggers.hh"
 
 #include <atomic>
 #include <map>
@@ -10,6 +11,13 @@
 #include <iostream>
 
 namespace nix {
+
+static auto rLoggerBar = OnStartup([] {
+    registerLogger("bar", []() -> Logger* { return makeProgressBar(false); });
+});
+static auto rLoggerBarWithLogs = OnStartup([] {
+    registerLogger("bar-with-logs", []() -> Logger* { return makeProgressBar(true); });
+});
 
 static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
 {

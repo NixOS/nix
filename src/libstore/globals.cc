@@ -3,7 +3,6 @@
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
-#include "loggers.hh"
 
 #include <algorithm>
 #include <map>
@@ -204,18 +203,35 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
+static void logFormatCompleter(size_t index, std::string_view prefix)
+{
+    for (auto & builder : registeredLoggers)
+        if (hasPrefix(builder->name, prefix))
+            completions->add(builder->name);
+}
+
+std::string listLogFormats()
+{
+    std::string res;
+
+    for (auto format = logFormats.begin(); format != logFormats.end(); ++format) {
+        if (!res.empty()) res += ", ";
+        if (std::next(format) == logFormats.end()) res += "or ";
+        res += "'";
+        res += *format;
+        res += "'";
+    }
+
+    return res;
+}
+
 template<> void BaseSetting<LogFormat>::set(const std::string & str, bool append)
 {
-    if (str == "raw")
-        value = LogFormat::raw;
-    else if (str == "raw-with-logs")
-        value = LogFormat::rawWithLogs;
-    else if (str == "internal-json")
-        value = LogFormat::internalJson;
-    else if (str == "bar")
-        value = LogFormat::bar;
-    else if (str == "bar-with-logs")
-        value = LogFormat::barWithLogs;
+    if (str == "raw") value = LogFormat::raw;
+    else if (str == "raw-with-logs") value = LogFormat::rawWithLogs;
+    else if (str == "internal-json") value = LogFormat::internalJson;
+    else if (str == "bar") value = LogFormat::bar;
+    else if (str == "bar-with-logs") value = LogFormat::barWithLogs;
     else throw UsageError("option '%s' has an invalid value '%s'", name, str);
 
     createDefaultLogger();
@@ -240,14 +256,36 @@ template<> void BaseSetting<LogFormat>::convertToArg(Args & args, const std::str
 {
     args.addFlag({
         .longName = name,
-        .description = "format of log output; `raw`, `raw-with-logs`, `internal-json`, `bar`, "
-                        "or `bar-with-logs`",
+        .description = fmt("format of log output; %s", listLogFormats()),
         .category = category,
         .labels = {"format"},
         .handler = {[&](std::string format) {
             settings.logFormat.set(format);
-        }}
+        }},
+        .completer = logFormatCompleter
     });
+}
+
+void setLogFormat(const LogFormat & logFormat)
+{
+    settings.logFormat = logFormat;
+    createDefaultLogger();
+}
+
+Logger* makeDefaultLogger()
+{
+    for (auto & builder : registeredLoggers) {
+        if (builder->name == settings.logFormat.to_string()) {
+            return builder->builder();
+        }
+    }
+
+    throw UsageError("Unknown logger '%s'", settings.logFormat.to_string());
+}
+
+void createDefaultLogger()
+{
+    logger = makeDefaultLogger();
 }
 
 void MaxBuildJobsSetting::set(const std::string & str, bool append)
