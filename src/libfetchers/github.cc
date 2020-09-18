@@ -77,7 +77,7 @@ struct GitArchiveInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != type()) return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified")
+            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified" && name != "url")
                 throw Error("unsupported input attribute '%s'", name);
 
         getStrAttr(attrs, "owner");
