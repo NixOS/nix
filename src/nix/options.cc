@@ -45,12 +45,12 @@ struct CmdListOptions : InstallableCommand
 
             state->forceAttrs(*option->value);
 
-            std::string description = ANSI_ITALIC "<no description>" ANSI_NORMAL;
-            auto aDescription = option->value->attrs->get(state->symbols.create("description"));
-            if (aDescription)
+            std::string doc = ANSI_ITALIC "<no description>" ANSI_NORMAL;
+            auto aDoc = option->value->attrs->get(state->symbols.create("doc"));
+            if (aDoc)
                 // FIXME: render markdown.
-                description = state->forceString(*aDescription->value);
-            logger->stdout("  " ANSI_BOLD "Description:" ANSI_NORMAL " %s", description);
+                doc = state->forceString(*aDoc->value);
+            logger->stdout("  " ANSI_BOLD "Description:" ANSI_NORMAL " %s", doc);
 
             auto aValue = aFinal->value->attrs->get(option->name);
             assert(aValue);

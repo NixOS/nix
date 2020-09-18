@@ -20,45 +20,38 @@
 using namespace nix;
 using namespace nix::flake;
 
-class FlakeCommand : virtual Args, public MixFlakeOptions
+FlakeCommand::FlakeCommand()
 {
-    std::string flakeUrl = ".";
+    expectArgs({
+        .label = "flake-url",
+        .optional = true,
+        .handler = {&flakeUrl},
+        .completer = {[&](size_t, std::string_view prefix) {
+            completeFlakeRef(getStore(), prefix);
+        }}
+    });
+}
 
-public:
+FlakeRef FlakeCommand::getFlakeRef()
+{
+    return parseFlakeRef(flakeUrl, absPath(".")); //FIXME
+}
 
-    FlakeCommand()
-    {
-        expectArgs({
-            .label = "flake-url",
-            .optional = true,
-            .handler = {&flakeUrl},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
-            }}
-        });
-    }
+Flake FlakeCommand::getFlake()
+{
+    auto evalState = getEvalState();
+    return flake::getFlake(*evalState, getFlakeRef(), lockFlags.useRegistries);
+}
 
-    FlakeRef getFlakeRef()
-    {
-        return parseFlakeRef(flakeUrl, absPath(".")); //FIXME
-    }
+LockedFlake FlakeCommand::lockFlake()
+{
+    return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
+}
 
-    Flake getFlake()
-    {
-        auto evalState = getEvalState();
-        return flake::getFlake(*evalState, getFlakeRef(), lockFlags.useRegistries);
-    }
-
-    LockedFlake lockFlake()
-    {
-        return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
-    }
-
-    std::optional<FlakeRef> getFlakeRefForCompletion() override
-    {
-        return getFlakeRef();
-    }
-};
+std::optional<FlakeRef> FlakeCommand::getFlakeRefForCompletion()
+{
+    return getFlakeRef();
+}
 
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {

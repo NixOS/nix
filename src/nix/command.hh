@@ -58,6 +58,23 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     { return {}; }
 };
 
+class FlakeCommand : virtual Args, public MixFlakeOptions
+{
+    std::string flakeUrl = ".";
+
+public:
+
+    FlakeCommand();
+
+    FlakeRef getFlakeRef();
+
+    flake::Flake getFlake();
+
+    flake::LockedFlake lockFlake();
+
+    std::optional<FlakeRef> getFlakeRefForCompletion() override;
+};
+
 /* How to handle derivations in commands that operate on store paths. */
 enum class OperateOn {
     /* Operate on the output path. */

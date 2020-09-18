@@ -12,14 +12,14 @@ let
 
 in
 
-{ description ? null, extends ? [], options ? {}, config ? ({ config }: {}) } @ inArgs:
+{ doc ? null, extends ? [], options ? {}, config ? ({ config }: {}) } @ inArgs:
 
 let thisModule = rec {
   type = "module";
 
   _module = {
-    inherit description extends options config;
-  };
+    inherit extends options config;
+  } // (if doc != null then { inherit doc; } else {});
 
   _allModules = [thisModule] ++ builtins.concatLists (map (mod: assert mod.type or "<untyped>" == "module"; mod._allModules) extends);
 
