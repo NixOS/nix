@@ -5257,9 +5257,14 @@ void Worker::run(const Goals & _topGoals)
                             "or enable remote builds."
                             "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
                 else
-                   throw Error("unable to start any build; remote machines may not have "
-                            "all required system features."
-                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+                   throw Error("unable to start any build; either increase '--max-jobs' "
+                            "to also allow building locally, or ensure that the configured"
+                            "remote builder machines have all required system features."
+                            "For example, to enable the 'big-parallel' feature, use:"
+                            "\n    --builders 'yourbuilderhostname - - - - big-parallel'"
+                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds"
+                            "\nYou can enable -v verbosity to see why any machine "
+                            "was declined for any given build.");
 
             }
             assert(!awake.empty());

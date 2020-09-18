@@ -101,6 +101,13 @@ static int _main(int argc, char * * argv)
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
+
+            string drvstr;
+            if (drvPath.has_value())
+                drvstr = drvPath->to_string();
+            else
+                drvstr = "<unknown>";
+
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
             auto canBuildLocally = amWilling
@@ -123,11 +130,18 @@ static int _main(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
-                    if (m.enabled && std::find(m.systemTypes.begin(),
-                            m.systemTypes.end(),
-                            neededSystem) != m.systemTypes.end() &&
-                        m.allSupported(requiredFeatures) &&
-                        m.mandatoryMet(requiredFeatures)) {
+                    if (!m.enabled) {
+                        debug("declined remote machine '%s' because it is disabled", storeUri);
+                    } else if (std::find(m.systemTypes.begin(), m.systemTypes.end(), neededSystem)
+                        == m.systemTypes.end()) {
+                        printInfo("declined remote machine '%s' for building '%s' because it does not have the needed system type '%s", m.storeUri, drvstr, neededSystem);
+                    } else if (!m.allSupported(requiredFeatures)) {
+                        std::string joinedFeatures = concatStringsSep(" ", requiredFeatures); // includes leading space
+                        printInfo(format("declined remote machine '%1%' for building '%2%' because it does not have all required features: [ %3% ]") % m.storeUri % drvstr % joinedFeatures);
+                    } else if (!m.mandatoryMet(requiredFeatures)) {
+                        std::string joinedFeatures = concatStringsSep(" ", requiredFeatures); // includes leading space
+                        printInfo(format("declined remote machine '%1%' for building '%2%' because the derivation does not have all mandatory features to build on that machine: [ %3% ]") % m.storeUri % drvstr % joinedFeatures);
+                    } else {
                         rightType = true;
                         AutoCloseFD free;
                         uint64_t load = 0;
@@ -181,12 +195,6 @@ static int _main(int argc, char * * argv)
                         }
 
                         // add the template values.
-                        string drvstr;
-                        if (drvPath.has_value())
-                            drvstr = drvPath->to_string();
-                        else
-                            drvstr = "<unknown>";
-
                         auto hint = hintformat(hintstring);
                         hint
                           % drvstr
