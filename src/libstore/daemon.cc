@@ -239,6 +239,18 @@ struct ClientSettings
     }
 };
 
+static void writeValidPathInfo(ref<Store> store, unsigned int clientVersion, Sink & to, std::shared_ptr<const ValidPathInfo> info) {
+    to << (info->deriver ? store->printStorePath(*info->deriver) : "")
+       << info->narHash.to_string(Base16, false);
+    writeStorePaths(*store, to, info->references);
+    to << info->registrationTime << info->narSize;
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
+        to << info->ultimate
+           << info->sigs
+           << renderContentAddress(info->ca);
+    }
+}
+
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
@@ -358,26 +370,30 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             auto repair = RepairFlag{repairBool};
 
             logger->startWork();
-            StorePath path = [&]() -> StorePath {
+            auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
                 ContentAddressMethod contentAddressMethod = parseContentAddressMethod(camStr);
                 FramedSource source(from);
+                // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
-                    [&](TextHashMethod &_) -> StorePath {
+                    [&](TextHashMethod &_) {
                         // We could stream this by changing Store
                         std::string contents = source.drain();
-                        return store->addTextToStore(name, contents, refs);
+                        auto path = store->addTextToStore(name, contents, refs, repair);
+                        return store->queryPathInfo(path);
                     },
-                    [&](FixedOutputHashMethod &fohm) -> StorePath {
+                    [&](FixedOutputHashMethod &fohm) {
                         if (!refs.empty())
                             throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
-                        return store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                        return store->queryPathInfo(path);
                     },
                 }, contentAddressMethod);
             }();
             logger->stopWork();
 
-            to << store->printStorePath(path);
+            to << store->printStorePath(pathInfo->path);
+            writeValidPathInfo(store, clientVersion, to, pathInfo);
 
         } else {
             HashType hashAlgo;
@@ -706,15 +722,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash.to_string(Base16, false);
-            writeStorePaths(*store, to, info->references);
-            to << info->registrationTime << info->narSize;
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-                to << info->ultimate
-                   << info->sigs
-                   << renderContentAddress(info->ca);
-            }
+            writeValidPathInfo(store, clientVersion, to, info);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;

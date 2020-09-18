@@ -421,11 +421,27 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 }
 
 
+ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn, const StorePath & path) {
+    auto deriver = readString(conn->from);
+    auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
+    auto info = make_ref<ValidPathInfo>(path, narHash);
+    if (deriver != "") info->deriver = parseStorePath(deriver);
+    info->references = readStorePaths<StorePathSet>(*this, conn->from);
+    conn->from >> info->registrationTime >> info->narSize;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
+        conn->from >> info->ultimate;
+        info->sigs = readStrings<StringSet>(conn->from);
+        info->ca = parseContentAddressOpt(readString(conn->from));
+    }
+    return info;
+}
+
+
 void RemoteStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        std::shared_ptr<ValidPathInfo> info;
+        std::shared_ptr<const ValidPathInfo> info;
         {
             auto conn(getConnection());
             conn->to << wopQueryPathInfo << printStorePath(path);
@@ -441,17 +457,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            auto deriver = readString(conn->from);
-            auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
-            info = std::make_shared<ValidPathInfo>(path, narHash);
-            if (deriver != "") info->deriver = parseStorePath(deriver);
-            info->references = readStorePaths<StorePathSet>(*this, conn->from);
-            conn->from >> info->registrationTime >> info->narSize;
-            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-                conn->from >> info->ultimate;
-                info->sigs = readStrings<StringSet>(conn->from);
-                info->ca = parseContentAddressOpt(readString(conn->from));
-            }
+            info = readValidPathInfo(conn, path);
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -526,7 +532,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 }
 
 
-StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references, RepairFlag repair)
+ref<const ValidPathInfo> RemoteStore::addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references, RepairFlag repair)
 {
     auto conn(getConnection());
 
@@ -543,8 +549,8 @@ StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentA
             dump.drainInto(sink);
         });
 
-        return parseStorePath(readString(conn->from));
-
+        auto path = parseStorePath(readString(conn->from));
+        return readValidPathInfo(conn, path);
     }
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -591,7 +597,8 @@ StorePath RemoteStore::addCAToStore(Source & dump, const string & name, ContentA
 
             }
         }, caMethod);
-        return parseStorePath(readString(conn->from));
+        auto path = parseStorePath(readString(conn->from));
+        return queryPathInfo(path);
     }
 }
 
@@ -599,7 +606,7 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
 {
     StorePathSet references;
-    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair);
+    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
 }
 
 
@@ -660,7 +667,7 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
     StringSource source(s);
-    return addCAToStore(source, name, TextHashMethod{}, references, repair);
+    return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
 }
 
 
