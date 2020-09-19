@@ -12,9 +12,16 @@
 
 namespace nix {
 
-std::string listLogFormats();
-
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+
+struct LogFormatSetting : public BaseSetting<LogFormat>
+{
+    LogFormatSetting(Config * options,
+        LogFormat def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {});
+};
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -924,10 +931,9 @@ public:
           can enable this setting if you are sure you're not going to do that.
         )"};
 
-    // FIXME: default shows as "3", but should show as "bar", due to the default
-    // being an enum variant
-    Setting<LogFormat> logFormat{this, LogFormat::bar, "log-format",
-        fmt("Default build output logging format. Valid options are: %s.", listLogFormats())};
+    // FIXME: generated manpage is missing "bar" and "bar-with-logs" because
+    // they're registered outside libutil
+    LogFormatSetting logFormat{this, LogFormat::bar, "log-format", "Default logging format for build output."};
 
     Logger* makeDefaultLogger();
 };

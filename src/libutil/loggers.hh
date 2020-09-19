@@ -7,7 +7,7 @@ namespace nix {
 enum struct LogFormat {
     raw,
     rawWithLogs,
-    internalJson,
+    internalJSON,
     bar,
     barWithLogs,
 };
@@ -17,10 +17,8 @@ struct LoggerBuilder {
     std::function<Logger *()> builder;
 };
 
-extern std::set<std::string> logFormats;
-
-extern std::vector<std::shared_ptr<LoggerBuilder>> registeredLoggers;
-
 void registerLogger(std::string name, std::function<Logger *()> builder);
+
+std::vector<std::shared_ptr<LoggerBuilder>> getRegisteredLoggers();
 
 }

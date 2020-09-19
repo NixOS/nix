@@ -203,33 +203,46 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
-static void logFormatCompleter(size_t index, std::string_view prefix)
-{
-    for (auto & builder : registeredLoggers)
-        if (hasPrefix(builder->name, prefix))
-            completions->add(builder->name);
-}
+// This is necessary in order to show the log format's name, rather than an
+// integer, in JSON output.
+NLOHMANN_JSON_SERIALIZE_ENUM(LogFormat, {
+    {LogFormat::raw, "raw"},
+    {LogFormat::rawWithLogs, "raw-with-logs"},
+    {LogFormat::internalJSON, "internal-json"},
+    {LogFormat::bar, "bar"},
+    {LogFormat::barWithLogs, "bar-with-logs"},
+});
 
 std::string listLogFormats()
 {
     std::string res;
 
-    for (auto format = logFormats.begin(); format != logFormats.end(); ++format) {
+    auto loggers = getRegisteredLoggers();
+
+    for (auto format = loggers.begin(); format != loggers.end(); ++format) {
         if (!res.empty()) res += ", ";
-        if (std::next(format) == logFormats.end()) res += "or ";
-        res += "'";
-        res += *format;
-        res += "'";
+        if (std::next(format) == loggers.end()) res += "or ";
+        res += "'" + (*format)->name + "'";
     }
 
     return res;
+}
+
+LogFormatSetting::LogFormatSetting(Config * options,
+        LogFormat def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases)
+    : BaseSetting<LogFormat>(def, name, fmt("%s Valid options are: %s.", description, listLogFormats()), aliases)
+{
+    options->addSetting(this);
 }
 
 template<> void BaseSetting<LogFormat>::set(const std::string & str, bool append)
 {
     if (str == "raw") value = LogFormat::raw;
     else if (str == "raw-with-logs") value = LogFormat::rawWithLogs;
-    else if (str == "internal-json") value = LogFormat::internalJson;
+    else if (str == "internal-json") value = LogFormat::internalJSON;
     else if (str == "bar") value = LogFormat::bar;
     else if (str == "bar-with-logs") value = LogFormat::barWithLogs;
     else throw UsageError("option '%s' has an invalid value '%s'", name, str);
@@ -246,10 +259,17 @@ template<> std::string BaseSetting<LogFormat>::to_string() const
 {
     if (value == LogFormat::raw) return "raw";
     else if (value == LogFormat::rawWithLogs) return "raw-with-logs";
-    else if (value == LogFormat::internalJson) return "internal-json";
+    else if (value == LogFormat::internalJSON) return "internal-json";
     else if (value == LogFormat::bar) return "bar";
     else if (value == LogFormat::barWithLogs) return "bar-with-logs";
     else abort();
+}
+
+static void logFormatCompleter(size_t index, std::string_view prefix)
+{
+    for (auto & builder : getRegisteredLoggers())
+        if (hasPrefix(builder->name, prefix))
+            completions->add(builder->name);
 }
 
 template<> void BaseSetting<LogFormat>::convertToArg(Args & args, const std::string & category)
@@ -268,13 +288,13 @@ template<> void BaseSetting<LogFormat>::convertToArg(Args & args, const std::str
 
 void setLogFormat(const LogFormat & logFormat)
 {
-    settings.logFormat = logFormat;
+    settings.logFormat.assign(logFormat);
     createDefaultLogger();
 }
 
 Logger* makeDefaultLogger()
 {
-    for (auto & builder : registeredLoggers) {
+    for (auto & builder : getRegisteredLoggers()) {
         if (builder->name == settings.logFormat.to_string()) {
             return builder->builder();
         }
