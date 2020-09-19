@@ -1,7 +1,6 @@
 #include "progress-bar.hh"
 #include "util.hh"
 #include "sync.hh"
-#include "store-api.hh"
 #include "names.hh"
 #include "loggers.hh"
 

@@ -931,8 +931,6 @@ public:
           can enable this setting if you are sure you're not going to do that.
         )"};
 
-    // FIXME: generated manpage is missing "bar" and "bar-with-logs" because
-    // they're registered outside libutil
     LogFormatSetting logFormat{this, LogFormat::bar, "log-format", "Default logging format for build output."};
 
     Logger* makeDefaultLogger();
