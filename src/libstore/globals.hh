@@ -883,7 +883,7 @@ public:
         "Path or URI of the global flake registry."};
 
     Setting<bool> ignoreSymlinkStore{
-        this, false, "ignore-symlink-store",
+        this, false, "allow-symlinked-store",
         R"(
           If set to `true`, Nix will stop complaining if the store directory
           (typically /nix/store) contains symlink components.
