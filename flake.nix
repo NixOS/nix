@@ -2,7 +2,7 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
-  inputs.lowdown-src = { url = "github:edolstra/lowdown/no-structs-in-anonymous-unions"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
 
