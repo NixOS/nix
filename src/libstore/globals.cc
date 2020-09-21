@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "archive.hh"
 #include "args.hh"
+#include "abstractsettingtojson.hh"
 
 #include <algorithm>
 #include <map>
