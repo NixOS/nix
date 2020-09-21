@@ -41,7 +41,7 @@ Settings::Settings()
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
-    ignoreSymlinkStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
+    allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
     if (caFile == "") {

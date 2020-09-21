@@ -882,7 +882,7 @@ public:
     Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
         "Path or URI of the global flake registry."};
 
-    Setting<bool> ignoreSymlinkStore{
+    Setting<bool> allowSymlinkedStore{
         this, false, "allow-symlinked-store",
         R"(
           If set to `true`, Nix will stop complaining if the store directory

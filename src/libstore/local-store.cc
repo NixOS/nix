@@ -109,7 +109,7 @@ LocalStore::LocalStore(const Params & params)
     }
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (!settings.ignoreSymlinkStore) {
+    if (!settings.allowSymlinkedStore) {
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
