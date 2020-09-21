@@ -136,7 +136,7 @@
 
           enableParallelBuilding = true;
 
-          makeFlags = "profiledir=$(out)/etc/profile.d";
+          makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
           doCheck = true;
 
@@ -334,9 +334,6 @@
             # syntax-check generated dot files, it still requires some
             # fonts.  So provide those.
             FONTCONFIG_FILE = texFunctions.fontsConf;
-
-            # To test building without precompiled headers.
-            makeFlagsArray = [ "PRECOMPILE_HEADERS=0" ];
           };
 
         # System tests.
