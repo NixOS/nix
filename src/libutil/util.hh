@@ -12,12 +12,9 @@
 #include <signal.h>
 
 #include <functional>
-#include <limits>
-#include <cstdio>
 #include <map>
 #include <sstream>
 #include <optional>
-#include <iterator>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
