@@ -17,6 +17,7 @@
 #include "daemon.hh"
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
+#include "callback.hh"
 
 #include <algorithm>
 #include <iostream>

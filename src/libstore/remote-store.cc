@@ -10,6 +10,7 @@
 #include "pool.hh"
 #include "finally.hh"
 #include "logging.hh"
+#include "callback.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

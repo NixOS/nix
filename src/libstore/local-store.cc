@@ -6,6 +6,7 @@
 #include "derivations.hh"
 #include "nar-info.hh"
 #include "references.hh"
+#include "callback.hh"
 
 #include <iostream>
 #include <algorithm>
