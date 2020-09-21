@@ -1,5 +1,6 @@
 #include "lockfile.hh"
 #include "store-api.hh"
+#include "url-parts.hh"
 
 #include <nlohmann/json.hpp>
 

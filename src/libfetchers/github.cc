@@ -3,6 +3,7 @@
 #include "fetchers.hh"
 #include "globals.hh"
 #include "store-api.hh"
+#include "url-parts.hh"
 
 #include <nlohmann/json.hpp>
 
