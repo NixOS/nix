@@ -459,7 +459,8 @@ public:
     /* Like addToStore(), but the contents of the path are contained
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
-       false). */
+       false).
+       `dump` may be drained */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)

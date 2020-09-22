@@ -4,12 +4,14 @@
 
 namespace nix {
 
-std::string FixedOutputHash::printMethodAlgo() const {
+std::string FixedOutputHash::printMethodAlgo() const
+{
     return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
 
-std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
+std::string makeFileIngestionPrefix(const FileIngestionMethod m)
+{
     switch (m) {
     case FileIngestionMethod::Flat:
         return "";
@@ -26,7 +28,8 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
         + hash.to_string(Base32, true);
 }
 
-std::string renderContentAddress(ContentAddress ca) {
+std::string renderContentAddress(ContentAddress ca)
+{
     return std::visit(overloaded {
         [](TextHash th) {
             return "text:"
@@ -53,43 +56,86 @@ static FileIngestionMethod parseFileIngestionMethod_(std::string_view & rest) {
     return FileIngestionMethod::Flat;
 }
 
-ContentAddress parseContentAddress(std::string_view rawCa) {
-    auto rest = rawCa;
+std::string renderContentAddressMethod(ContentAddressMethod cam)
+{
+    return std::visit(overloaded {
+        [](TextHashMethod &th) {
+            return std::string{"text:"} + printHashType(htSHA256);
+        },
+        [](FixedOutputHashMethod &fshm) {
+            return "fixed:" + makeFileIngestionPrefix(fshm.fileIngestionMethod) + printHashType(fshm.hashType);
+        }
+    }, cam);
+}
+
+/*
+  Parses content address strings up to the hash.
+ */
+static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & rest)
+{
+    std::string_view wholeInput { rest };
 
     std::string_view prefix;
     {
         auto optPrefix = splitPrefixTo(rest, ':');
         if (!optPrefix)
-            throw UsageError("not a path-info content address because it is not in the form \"<prefix>:<rest>\": %s", rawCa);
+            throw UsageError("not a path-info content address because it is not in the form \"<prefix>:<rest>\": %s", wholeInput);
         prefix = *optPrefix;
     }
 
     // Switch on prefix
     if (prefix == "text") {
-        // No parsing of the method, "text" only support flat.
+        // No parsing of the ingestion method, "text" only support flat.
         HashType hashType = parseHashType_(rest);
         if (hashType != htSHA256)
             throw Error("text content address hash should use %s, but instead uses %s",
                 printHashType(htSHA256), printHashType(hashType));
-        return TextHash {
-            .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
-        };
+        return TextHashMethod {};
     } else if (prefix == "fixed") {
         auto method = parseFileIngestionMethod_(rest);
         HashType hashType = parseHashType_(rest);
-        return FixedOutputHash {
-            .method = method,
-            .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
+        return FixedOutputHashMethod {
+            .fileIngestionMethod = method,
+            .hashType = std::move(hashType),
         };
     } else
         throw UsageError("path-info content address prefix \"%s\" is unrecognized. Recogonized prefixes are \"text\" or \"fixed\"", prefix);
+}
+
+ContentAddress parseContentAddress(std::string_view rawCa) {
+    auto rest = rawCa;
+
+    ContentAddressMethod caMethod = parseContentAddressMethodPrefix(rest);
+
+    return std::visit(
+        overloaded {
+            [&](TextHashMethod thm) {
+                return ContentAddress(TextHash {
+                    .hash = Hash::parseNonSRIUnprefixed(rest, htSHA256)
+                });
+            },
+            [&](FixedOutputHashMethod fohMethod) {
+                return ContentAddress(FixedOutputHash {
+                    .method = fohMethod.fileIngestionMethod,
+                    .hash = Hash::parseNonSRIUnprefixed(rest, std::move(fohMethod.hashType)),
+                });
+            },
+        }, caMethod);
+}
+
+ContentAddressMethod parseContentAddressMethod(std::string_view caMethod)
+{
+    std::string_view asPrefix {std::string{caMethod} + ":"};
+    return parseContentAddressMethodPrefix(asPrefix);
+}
+
+std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt)
+{
+    return rawCaOpt == "" ? std::optional<ContentAddress>() : parseContentAddress(rawCaOpt);
 };
 
-std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
-    return rawCaOpt == "" ? std::optional<ContentAddress> {} : parseContentAddress(rawCaOpt);
-};
-
-std::string renderContentAddress(std::optional<ContentAddress> ca) {
+std::string renderContentAddress(std::optional<ContentAddress> ca)
+{
     return ca ? renderContentAddress(*ca) : "";
 }
 
