@@ -541,7 +541,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     const StorePathSet & references,
     RepairFlag repair)
 {
-    auto conn(getConnection());
+    std::optional<ConnectionHandle> conn_(getConnection());
+    auto & conn = *conn_;
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
 
@@ -605,6 +606,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
             }
         }, caMethod);
         auto path = parseStorePath(readString(conn->from));
+        // Release our connection to prevent a deadlock in queryPathInfo().
+        conn_.reset();
         return queryPathInfo(path);
     }
 }
