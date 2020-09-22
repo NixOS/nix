@@ -18,6 +18,7 @@ nix_tests = \
   build-remote-trustless-should-pass-1.sh \
   build-remote-trustless-should-pass-2.sh \
   build-remote-trustless-should-fail-0.sh \
+  ssh-relay.sh \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
@@ -35,7 +36,9 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   recursive.sh \
-  flakes.sh
+  describe-stores.sh \
+  flakes.sh \
+  content-addressed.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh # problem with fixed output derivations
   # build-remote-trustless-should-pass-0.sh # problem with legacy ssh-store only

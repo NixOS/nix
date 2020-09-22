@@ -1,84 +1,62 @@
-
 ifeq ($(doc_generate),yes)
 
-XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
-  --param section.autolabel 1 \
-  --param section.label.includes.component.label 1 \
-  --param xref.with.number.and.title 1 \
-  --param toc.section.depth 3 \
-  --param admon.style \'\' \
-  --param callout.graphics 0 \
-  --param contrib.inline.enabled 0 \
-  --stringparam generate.toc "book toc" \
-  --param keep.relative.image.uris 0
-
-docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/current
-docbookrng = http://docbook.org/xml/5.0/rng/docbook.rng
-
-MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
-
-
-# Do XInclude processing / RelaxNG validation
-$(d)/manual.xmli: $(d)/manual.xml $(MANUAL_SRCS) $(d)/version.txt
-	$(trace-gen) $(xmllint) --nonet --xinclude $< -o $@.tmp
-	@mv $@.tmp $@
-
-$(d)/version.txt:
-	$(trace-gen) echo -n $(PACKAGE_VERSION) > $@
-
-# Note: RelaxNG validation requires xmllint >= 2.7.4.
-$(d)/manual.is-valid: $(d)/manual.xmli
-	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manual \
-	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  $(xmllint) --nonet --noout --relaxng $(docbookrng) -
-	@touch $@
-
-clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
-
-dist-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
-
+MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
 
 # Generate man pages.
 man-pages := $(foreach n, \
-  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
+  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 nix.1 \
   nix-collect-garbage.1 \
   nix-prefetch-url.1 nix-channel.1 \
   nix-hash.1 nix-copy-closure.1 \
   nix.conf.5 nix-daemon.8, \
   $(d)/$(n))
 
-$(firstword $(man-pages)): $(d)/manual.xmli $(d)/manual.is-valid
-	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manpage \
-	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  (cd doc/manual && $(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl -)
-
-$(wordlist 2, $(words $(man-pages)), $(man-pages)): $(firstword $(man-pages))
-
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 dist-files += $(man-pages)
 
+nix-eval = $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw --expr
+
+$(d)/%.1: $(d)/src/command-ref/%.md
+	$(trace-gen) lowdown -sT man $^ -o $@
+
+$(d)/%.8: $(d)/src/command-ref/%.md
+	$(trace-gen) lowdown -sT man $^ -o $@
+
+$(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
+	$(trace-gen) lowdown -sT man $^ -o $@
+
+$(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+	$(trace-gen) $(nix-eval) 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))' > $@.tmp
+	@mv $@.tmp $@
+
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
+	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
+	$(trace-gen) $(nix-eval) 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@mv $@.tmp $@
+
+$(d)/nix.json: $(bindir)/nix
+	$(trace-gen) $(bindir)/nix __dump-args > $@.tmp
+	@mv $@.tmp $@
+
+$(d)/conf-file.json: $(bindir)/nix
+	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	@mv $@.tmp $@
+
+$(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
+	@cat doc/manual/src/expressions/builtins-prefix.md > $@.tmp
+	$(trace-gen) $(nix-eval) 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@mv $@.tmp $@
+
+$(d)/builtins.json: $(bindir)/nix
+	$(trace-gen) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
+	mv $@.tmp $@
 
 # Generate the HTML manual.
-$(d)/manual.html: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
-	$(trace-gen) $(XSLTPROC) --xinclude --stringparam profile.condition manual \
-	  $(docbookxsl)/profiling/profile.xsl $< | \
-	  $(XSLTPROC) --output $@ $(docbookxsl)/xhtml/docbook.xsl -
+install: $(docdir)/manual/index.html
 
-$(foreach file, $(d)/manual.html, $(eval $(call install-data-in, $(file), $(docdir)/manual)))
-
-$(foreach file, $(wildcard $(d)/figures/*.png), $(eval $(call install-data-in, $(file), $(docdir)/manual/figures)))
-
-$(eval $(call install-symlink, manual.html, $(docdir)/manual/index.html))
-
-
-all: $(d)/manual.html
-
-
-
-clean-files += $(d)/manual.html
-
-dist-files += $(d)/manual.html
-
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/command-ref/nix.md $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
+	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
+	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
 endif

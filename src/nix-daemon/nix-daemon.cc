@@ -1,5 +1,6 @@
 #include "shared.hh"
 #include "local-store.hh"
+#include "remote-store.hh"
 #include "util.hh"
 #include "serialise.hh"
 #include "archive.hh"
@@ -297,45 +298,29 @@ static int _main(int argc, char * * argv)
         };
 
         if (stdio) {
-            if (getStoreType() == tDaemon) {
+            if (auto store = openUncachedStore().dynamic_pointer_cast<RemoteStore>()) {
                 ensureNoTrustedFlag();
-                //  Forward on this connection to the real daemon
-                auto socketPath = settings.nixDaemonSocketFile;
-                auto s = socket(PF_UNIX, SOCK_STREAM, 0);
-                if (s == -1)
-                    throw SysError("creating Unix domain socket");
+                auto conn = store->openConnectionWrapper();
+                int from = conn->from.fd;
+                int to = conn->to.fd;
 
-                auto socketDir = dirOf(socketPath);
-                if (chdir(socketDir.c_str()) == -1)
-                    throw SysError("changing to socket directory '%1%'", socketDir);
-
-                auto socketName = std::string(baseNameOf(socketPath));
-                auto addr = sockaddr_un{};
-                addr.sun_family = AF_UNIX;
-                if (socketName.size() + 1 >= sizeof(addr.sun_path))
-                    throw Error("socket name %1% is too long", socketName);
-                strcpy(addr.sun_path, socketName.c_str());
-
-                if (connect(s, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-                    throw SysError("cannot connect to daemon at %1%", socketPath);
-
-                auto nfds = (s > STDIN_FILENO ? s : STDIN_FILENO) + 1;
+                auto nfds = std::max(from, STDIN_FILENO) + 1;
                 while (true) {
                     fd_set fds;
                     FD_ZERO(&fds);
-                    FD_SET(s, &fds);
+                    FD_SET(from, &fds);
                     FD_SET(STDIN_FILENO, &fds);
                     if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
                         throw SysError("waiting for data from client or server");
-                    if (FD_ISSET(s, &fds)) {
-                        auto res = splice(s, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+                    if (FD_ISSET(from, &fds)) {
+                        auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
                             throw SysError("splicing data from daemon socket to stdout");
                         else if (res == 0)
                             throw EndOfFile("unexpected EOF from daemon socket");
                     }
                     if (FD_ISSET(STDIN_FILENO, &fds)) {
-                        auto res = splice(STDIN_FILENO, nullptr, s, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+                        auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
                             throw SysError("splicing data from stdin to daemon socket");
                         else if (res == 0)

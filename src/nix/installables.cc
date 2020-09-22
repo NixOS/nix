@@ -76,7 +76,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "override a specific flake input (e.g. 'dwarffs/nixpkgs')",
+        .description = "override a specific flake input (e.g. `dwarffs/nixpkgs`)",
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
@@ -116,7 +116,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "file",
         .shortName = 'f',
-        .description = "evaluate FILE rather than the default",
+        .description = "evaluate *file* rather than the default",
         .labels = {"file"},
         .handler = {&file},
         .completer = completePath
@@ -124,7 +124,7 @@ SourceExprCommand::SourceExprCommand()
 
     addFlag({
         .longName ="expr",
-        .description = "evaluate attributes from EXPR",
+        .description = "evaluate attributes from *expr*",
         .labels = {"expr"},
         .handler = {&expr}
     });
@@ -302,10 +302,10 @@ struct InstallableStorePath : Installable
     Buildables toBuildables() override
     {
         if (storePath.isDerivation()) {
-            std::map<std::string, StorePath> outputs;
+            std::map<std::string, std::optional<StorePath>> outputs;
             auto drv = store->readDerivation(storePath);
-            for (auto & i : drv.outputsAndPaths(*store))
-                outputs.emplace(i.first, i.second.second);
+            for (auto & [name, output] : drv.outputsAndOptPaths(*store))
+                outputs.emplace(name, output.second);
             return {
                 BuildableFromDrv {
                     .drvPath = storePath,
@@ -331,7 +331,7 @@ Buildables InstallableValue::toBuildables()
 {
     Buildables res;
 
-    std::map<StorePath, OutputPathMap> drvsToOutputs;
+    std::map<StorePath, std::map<std::string, std::optional<StorePath>>> drvsToOutputs;
 
     // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
@@ -674,8 +674,11 @@ StorePathSet toStorePaths(ref<Store> store,
                     outPaths.insert(bo.path);
                 },
                 [&](BuildableFromDrv bfd) {
-                    for (auto & output : bfd.outputs)
-                        outPaths.insert(output.second);
+                    for (auto & output : bfd.outputs) {
+                        if (!output.second)
+                            throw Error("Cannot operate on output of unbuilt CA drv");
+                        outPaths.insert(*output.second);
+                    }
                 },
             }, b);
     } else {

@@ -1,0 +1,21 @@
+with builtins;
+with import ./utils.nix;
+
+options:
+
+concatStrings (map
+  (name:
+    let option = options.${name}; in
+    "  - `${name}`  \n\n"
+    + concatStrings (map (s: "    ${s}\n") (splitLines option.description)) + "\n\n"
+    + "    **Default:** " + (
+      if option.value == "" || option.value == []
+      then "*empty*"
+      else if isBool option.value
+      then (if option.value then "`true`" else "`false`")
+      else "`" + toString option.value + "`") + "\n\n"
+    + (if option.aliases != []
+       then "    **Deprecated alias:** " + (concatStringsSep ", " (map (s: "`${s}`") option.aliases)) + "\n\n"
+       else "")
+    )
+  (attrNames options))
