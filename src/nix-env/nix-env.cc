@@ -230,7 +230,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
-        selectors.push_back(DrvName("*"));
+        selectors.emplace_back("*");
 
     DrvInfos elems;
     set<unsigned int> done;

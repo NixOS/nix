@@ -1,24 +1,39 @@
 #include "store-api.hh"
+#include "callback.hh"
 
 namespace nix {
 
-static std::string uriScheme = "dummy://";
+struct DummyStoreConfig : virtual StoreConfig {
+    using StoreConfig::StoreConfig;
 
-struct DummyStore : public Store
+    const std::string name() override { return "Dummy Store"; }
+};
+
+struct DummyStore : public Store, public virtual DummyStoreConfig
 {
-    DummyStore(const Params & params)
-        : Store(params)
+    DummyStore(const std::string scheme, const std::string uri, const Params & params)
+        : DummyStore(params)
     { }
+
+    DummyStore(const Params & params)
+        : StoreConfig(params)
+        , Store(params)
+    {
+    }
 
     string getUri() override
     {
-        return uriScheme;
+        return *uriSchemes().begin();
     }
 
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         callback(nullptr);
+    }
+
+    static std::set<std::string> uriSchemes() {
+        return {"dummy"};
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
@@ -48,12 +63,6 @@ struct DummyStore : public Store
     { unsupported("buildDerivation"); }
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (uri != uriScheme) return nullptr;
-    return std::make_shared<DummyStore>(params);
-});
+static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regStore;
 
 }
