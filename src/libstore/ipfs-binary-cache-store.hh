@@ -6,10 +6,9 @@ namespace nix {
 
 MakeError(UploadToIPFS, Error);
 
-class IPFSBinaryCacheStore : public Store
+struct IPFSBinaryCacheStoreConfig : virtual StoreConfig
 {
-
-public:
+    using StoreConfig::StoreConfig;
 
     const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
     const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
@@ -20,13 +19,20 @@ public:
     const Setting<bool> _allowModify{this, false, "allow-modify",
         "allow Nix to update IPFS/IPNS address when appropriate"};
 
-private:
+    const std::string name() override { return "IPFS Store"; }
+};
+
+class IPFSBinaryCacheStore : public virtual Store, public virtual IPFSBinaryCacheStoreConfig
+{
+
+public:
 
     bool allowModify;
 
     std::unique_ptr<SecretKey> secretKey;
     std::string narMagic;
 
+    std::string cacheScheme;
     std::string cacheUri;
     std::string daemonUri;
 
@@ -45,12 +51,17 @@ private:
 
 public:
 
-    IPFSBinaryCacheStore(const Params & params, const Path & _cacheUri);
+    IPFSBinaryCacheStore(const Params & params);
+
+    IPFSBinaryCacheStore(const std::string & scheme, const std::string & uri, const Params & params);
 
     std::string getUri() override
     {
-        return cacheUri;
+        return cacheScheme + "://" + cacheUri;
     }
+
+    static std::set<std::string> uriSchemes()
+    { return {"ipfs", "ipns"}; }
 
 private:
 
