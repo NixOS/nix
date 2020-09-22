@@ -340,7 +340,7 @@ T readNum(Source & source)
         ((uint64_t) buf[6] << 48) |
         ((uint64_t) buf[7] << 56);
 
-    if (n > std::numeric_limits<T>::max())
+    if (n > (uint64_t)std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
 
     return (T) n;
