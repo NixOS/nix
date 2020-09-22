@@ -4,11 +4,13 @@
 
 namespace nix {
 
-std::string FixedOutputHash::printMethodAlgo() const {
+std::string FixedOutputHash::printMethodAlgo() const
+{
     return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
-std::string makeFileIngestionPrefix(const FileIngestionMethod m) {
+std::string makeFileIngestionPrefix(const FileIngestionMethod m)
+{
     switch (m) {
     case FileIngestionMethod::Flat:
         return "";
@@ -26,7 +28,8 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
         + hash.to_string(Base32, true);
 }
 
-std::string renderContentAddress(ContentAddress ca) {
+std::string renderContentAddress(ContentAddress ca)
+{
     return std::visit(overloaded {
         [](TextHash th) {
             return "text:" + th.hash.to_string(Base32, true);
@@ -37,7 +40,8 @@ std::string renderContentAddress(ContentAddress ca) {
     }, ca);
 }
 
-std::string renderContentAddressMethod(ContentAddressMethod cam) {
+std::string renderContentAddressMethod(ContentAddressMethod cam)
+{
     return std::visit(overloaded {
         [](TextHashMethod &th) {
             return std::string{"text:"} + printHashType(htSHA256);
@@ -51,7 +55,8 @@ std::string renderContentAddressMethod(ContentAddressMethod cam) {
 /*
   Parses content address strings up to the hash.
  */
-static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & rest) {
+static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & rest)
+{
     std::string_view wholeInput { rest };
 
     std::string_view prefix;
@@ -113,16 +118,19 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
         }, caMethod);
 }
 
-ContentAddressMethod parseContentAddressMethod(std::string_view caMethod) {
+ContentAddressMethod parseContentAddressMethod(std::string_view caMethod)
+{
     std::string_view asPrefix {std::string{caMethod} + ":"};
     return parseContentAddressMethodPrefix(asPrefix);
 }
 
-std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt) {
-    return rawCaOpt == "" ? std::optional<ContentAddress> {} : parseContentAddress(rawCaOpt);
+std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt)
+{
+    return rawCaOpt == "" ? std::optional<ContentAddress>() : parseContentAddress(rawCaOpt);
 };
 
-std::string renderContentAddress(std::optional<ContentAddress> ca) {
+std::string renderContentAddress(std::optional<ContentAddress> ca)
+{
     return ca ? renderContentAddress(*ca) : "";
 }
 

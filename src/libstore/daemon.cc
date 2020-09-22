@@ -239,7 +239,12 @@ struct ClientSettings
     }
 };
 
-static void writeValidPathInfo(ref<Store> store, unsigned int clientVersion, Sink & to, std::shared_ptr<const ValidPathInfo> info) {
+static void writeValidPathInfo(
+    ref<Store> store,
+    unsigned int clientVersion,
+    Sink & to,
+    std::shared_ptr<const ValidPathInfo> info)
+{
     to << (info->deriver ? store->printStorePath(*info->deriver) : "")
        << info->narHash.to_string(Base16, false);
     writeStorePaths(*store, to, info->references);

@@ -422,7 +422,8 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 }
 
 
-ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn, const StorePath & path) {
+ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn, const StorePath & path)
+{
     auto deriver = readString(conn->from);
     auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
     auto info = make_ref<ValidPathInfo>(path, narHash);
@@ -533,7 +534,12 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 }
 
 
-ref<const ValidPathInfo> RemoteStore::addCAToStore(Source & dump, const string & name, ContentAddressMethod caMethod, StorePathSet references, RepairFlag repair)
+ref<const ValidPathInfo> RemoteStore::addCAToStore(
+    Source & dump,
+    const string & name,
+    ContentAddressMethod caMethod,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     auto conn(getConnection());
 
@@ -602,6 +608,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(Source & dump, const string &
         return queryPathInfo(path);
     }
 }
+
 
 StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
@@ -964,8 +971,8 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-void
-ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun) {
+void ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun)
+{
     (*this)->to.flush();
 
     std::exception_ptr ex;
