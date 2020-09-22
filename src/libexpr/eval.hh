@@ -6,7 +6,6 @@
 #include "symbol-table.hh"
 #include "config.hh"
 
-#include <regex>
 #include <map>
 #include <optional>
 #include <unordered_map>
@@ -65,6 +64,11 @@ typedef std::list<SearchPathElem> SearchPath;
 void initGC();
 
 
+struct RegexCache;
+
+std::shared_ptr<RegexCache> makeRegexCache();
+
+
 class EvalState
 {
 public:
@@ -120,7 +124,7 @@ private:
     std::unordered_map<Path, Path> resolvedPaths;
 
     /* Cache used by prim_match(). */
-    std::unordered_map<std::string, std::regex> regexCache;
+    std::shared_ptr<RegexCache> regexCache;
 
 public:
 

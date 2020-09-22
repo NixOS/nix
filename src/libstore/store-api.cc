@@ -8,9 +8,7 @@
 #include "json.hh"
 #include "url.hh"
 #include "archive.hh"
-
-#include <future>
-
+#include "callback.hh"
 
 namespace nix {
 
