@@ -241,18 +241,187 @@ static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Va
     fetch(state, pos, args, v, "fetchurl", false, "");
 }
 
+static RegisterPrimOp primop_fetchurl({
+    .name = "__fetchurl",
+    .args = {"url"},
+    .doc = R"(
+      Download the specified URL and return the path of the downloaded
+      file. This function is not available if [restricted evaluation
+      mode](../command-ref/conf-file.md) is enabled.
+    )",
+    .fun = prim_fetchurl,
+});
+
 static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     fetch(state, pos, args, v, "fetchTarball", true, "source");
 }
+
+static RegisterPrimOp primop_fetchTarball({
+    .name = "fetchTarball",
+    .args = {"args"},
+    .doc = R"(
+      Download the specified URL, unpack it and return the path of the
+      unpacked tree. The file must be a tape archive (`.tar`) compressed
+      with `gzip`, `bzip2` or `xz`. The top-level path component of the
+      files in the tarball is removed, so it is best if the tarball
+      contains a single directory at top level. The typical use of the
+      function is to obtain external Nix expression dependencies, such as
+      a particular version of Nixpkgs, e.g.
+
+      ```nix
+      with import (fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz) {};
+
+      stdenv.mkDerivation { … }
+      ```
+
+      The fetched tarball is cached for a certain amount of time (1 hour
+      by default) in `~/.cache/nix/tarballs/`. You can change the cache
+      timeout either on the command line with `--option tarball-ttl number
+      of seconds` or in the Nix configuration file with this option: ` 
+      number of seconds to cache `.
+
+      Note that when obtaining the hash with ` nix-prefetch-url ` the
+      option `--unpack` is required.
+
+      This function can also verify the contents against a hash. In that
+      case, the function takes a set instead of a URL. The set requires
+      the attribute `url` and the attribute `sha256`, e.g.
+
+      ```nix
+      with import (fetchTarball {
+        url = "https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz";
+        sha256 = "1jppksrfvbk5ypiqdz4cddxdl8z6zyzdb2srq8fcffr327ld5jj2";
+      }) {};
+
+      stdenv.mkDerivation { … }
+      ```
+
+      This function is not available if [restricted evaluation
+      mode](../command-ref/conf-file.md) is enabled.
+    )",
+    .fun = prim_fetchTarball,
+});
 
 static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
 {
     fetchTree(state, pos, args, v, "git", true);
 }
 
-static RegisterPrimOp r2("__fetchurl", 1, prim_fetchurl);
-static RegisterPrimOp r3("fetchTarball", 1, prim_fetchTarball);
-static RegisterPrimOp r4("fetchGit", 1, prim_fetchGit);
+static RegisterPrimOp primop_fetchGit({
+    .name = "fetchGit",
+    .args = {"args"},
+    .doc = R"(
+      Fetch a path from git. *args* can be a URL, in which case the HEAD
+      of the repo at that URL is fetched. Otherwise, it can be an
+      attribute with the following attributes (all except `url` optional):
+
+        - url  
+          The URL of the repo.
+
+        - name  
+          The name of the directory the repo should be exported to in the
+          store. Defaults to the basename of the URL.
+
+        - rev  
+          The git revision to fetch. Defaults to the tip of `ref`.
+
+        - ref  
+          The git ref to look for the requested revision under. This is
+          often a branch or tag name. Defaults to `HEAD`.
+
+          By default, the `ref` value is prefixed with `refs/heads/`. As
+          of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
+          with `refs/`.
+
+        - submodules  
+          A Boolean parameter that specifies whether submodules should be
+          checked out. Defaults to `false`.
+
+      Here are some examples of how to use `fetchGit`.
+
+        - To fetch a private repository over SSH:
+
+          ```nix
+          builtins.fetchGit {
+            url = "git@github.com:my-secret/repository.git";
+            ref = "master";
+            rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+          }
+          ```
+
+        - To fetch an arbitrary reference:
+
+          ```nix
+          builtins.fetchGit {
+            url = "https://github.com/NixOS/nix.git";
+            ref = "refs/heads/0.5-release";
+          }
+          ```
+
+        - If the revision you're looking for is in the default branch of
+          the git repository you don't strictly need to specify the branch
+          name in the `ref` attribute.
+
+          However, if the revision you're looking for is in a future
+          branch for the non-default branch you will need to specify the
+          the `ref` attribute as well.
+
+          ```nix
+          builtins.fetchGit {
+            url = "https://github.com/nixos/nix.git";
+            rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+            ref = "1.11-maintenance";
+          }
+          ```
+
+          > **Note**
+          > 
+          > It is nice to always specify the branch which a revision
+          > belongs to. Without the branch being specified, the fetcher
+          > might fail if the default branch changes. Additionally, it can
+          > be confusing to try a commit from a non-default branch and see
+          > the fetch fail. If the branch is specified the fault is much
+          > more obvious.
+
+        - If the revision you're looking for is in the default branch of
+          the git repository you may omit the `ref` attribute.
+
+          ```nix
+          builtins.fetchGit {
+            url = "https://github.com/nixos/nix.git";
+            rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+          }
+          ```
+
+        - To fetch a specific tag:
+
+          ```nix
+          builtins.fetchGit {
+            url = "https://github.com/nixos/nix.git";
+            ref = "refs/tags/1.9";
+          }
+          ```
+
+        - To fetch the latest version of a remote branch:
+
+          ```nix
+          builtins.fetchGit {
+            url = "ssh://git@github.com/nixos/nix.git";
+            ref = "master";
+          }
+          ```
+
+          > **Note**
+          > 
+          > Nix will refetch the branch in accordance with
+          > the option `tarball-ttl`.
+
+          > **Note**
+          > 
+          > This behavior is disabled in *Pure evaluation mode*.
+    )",
+    .fun = prim_fetchGit,
+});
 
 }

@@ -6,21 +6,28 @@
 #include "worker-protocol.hh"
 #include "ssh.hh"
 #include "derivations.hh"
+#include "callback.hh"
 
 namespace nix {
 
-static std::string uriScheme = "ssh://";
-
-struct LegacySSHStore : public Store
+struct LegacySSHStoreConfig : virtual StoreConfig
 {
-    const Setting<int> maxConnections{this, 1, "max-connections", "maximum number of concurrent SSH connections"};
-    const Setting<Path> sshKey{this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
-    const Setting<std::string> remoteStore{this, "", "remote-store", "URI of the store on the remote system"};
+    using StoreConfig::StoreConfig;
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
+    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
+    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
 
+    const std::string name() override { return "Legacy SSH Store"; }
+};
+
+struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
+{
     // Hack for getting remote build log output.
-    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
+    // the documentation
+    const Setting<int> logFD{(StoreConfig*) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     struct Connection
     {
@@ -37,8 +44,11 @@ struct LegacySSHStore : public Store
 
     SSHMaster master;
 
-    LegacySSHStore(const string & host, const Params & params)
-        : Store(params)
+    static std::set<std::string> uriSchemes() { return {"ssh"}; }
+
+    LegacySSHStore(const string & scheme, const string & host, const Params & params)
+        : StoreConfig(params)
+        , Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
@@ -84,7 +94,7 @@ struct LegacySSHStore : public Store
 
     string getUri() override
     {
-        return uriScheme + host;
+        return *uriSchemes().begin() + "://" + host;
     }
 
     void queryPathInfoUncached(StorePathOrDesc pathOrDesc,
@@ -326,12 +336,6 @@ public:
     }
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<LegacySSHStore>(std::string(uri, uriScheme.size()), params);
-});
+static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regStore;
 
 }

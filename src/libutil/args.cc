@@ -3,6 +3,8 @@
 
 #include <glob.h>
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 void Args::addFlag(Flag && flag_)
@@ -205,7 +207,44 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-static void hashTypeCompleter(size_t index, std::string_view prefix) 
+nlohmann::json Args::toJSON()
+{
+    auto flags = nlohmann::json::object();
+
+    for (auto & [name, flag] : longFlags) {
+        auto j = nlohmann::json::object();
+        if (flag->shortName)
+            j["shortName"] = std::string(1, flag->shortName);
+        if (flag->description != "")
+            j["description"] = flag->description;
+        if (flag->category != "")
+            j["category"] = flag->category;
+        if (flag->handler.arity != ArityAny)
+            j["arity"] = flag->handler.arity;
+        if (!flag->labels.empty())
+            j["labels"] = flag->labels;
+        flags[name] = std::move(j);
+    }
+
+    auto args = nlohmann::json::array();
+
+    for (auto & arg : expectedArgs) {
+        auto j = nlohmann::json::object();
+        j["label"] = arg.label;
+        j["optional"] = arg.optional;
+        if (arg.handler.arity != ArityAny)
+            j["arity"] = arg.handler.arity;
+        args.push_back(std::move(j));
+    }
+
+    auto res = nlohmann::json::object();
+    res["description"] = description();
+    res["flags"] = std::move(flags);
+    res["args"] = std::move(args);
+    return res;
+}
+
+static void hashTypeCompleter(size_t index, std::string_view prefix)
 {
     for (auto & type : hashTypes)
         if (hasPrefix(type, prefix))
@@ -313,11 +352,29 @@ void Command::printHelp(const string & programName, std::ostream & out)
     }
 }
 
+nlohmann::json Command::toJSON()
+{
+    auto exs = nlohmann::json::array();
+
+    for (auto & example : examples()) {
+        auto ex = nlohmann::json::object();
+        ex["description"] = example.description;
+        ex["command"] = chomp(stripIndentation(example.command));
+        exs.push_back(std::move(ex));
+    }
+
+    auto res = Args::toJSON();
+    res["examples"] = std::move(exs);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
+    return res;
+}
+
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
     expectArgs({
-        .label = "command",
+        .label = "subcommand",
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
@@ -385,6 +442,22 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
         return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
+}
+
+nlohmann::json MultiCommand::toJSON()
+{
+    auto cmds = nlohmann::json::object();
+
+    for (auto & [name, commandFun] : commands) {
+        auto command = commandFun();
+        auto j = command->toJSON();
+        j["category"] = categories[command->category()];
+        cmds[name] = std::move(j);
+    }
+
+    auto res = Args::toJSON();
+    res["commands"] = std::move(cmds);
+    return res;
 }
 
 }

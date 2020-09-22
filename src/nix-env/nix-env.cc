@@ -230,7 +230,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
-        selectors.push_back(DrvName("*"));
+        selectors.emplace_back("*");
 
     DrvInfos elems;
     set<unsigned int> done;
@@ -709,7 +709,9 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(ref<LocalFSStore>(store2), globals.profile, drv.queryOutPath());
+    Path generation = createGeneration(
+        ref<LocalFSStore>(store2), globals.profile,
+        store2->parseStorePath(drv.queryOutPath()));
     switchLink(globals.profile, generation);
 }
 

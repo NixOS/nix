@@ -44,16 +44,6 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
-
-            /* Add the output of this derivation to the allowed
-               paths. */
-            if (allowedPaths) {
-                auto drv = store->derivationFromPath(ctx);
-                DerivationOutputs::iterator i = drv.outputs.find(outputName);
-                if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
-            }
         }
     }
 
@@ -69,15 +59,57 @@ void EvalState::realiseContext(const PathSet & context)
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);
+
+    /* Add the output of this derivations to the allowed
+       paths. */
+    if (allowedPaths) {
+        for (auto & [drvPath, outputs] : drvs) {
+            auto outputPaths = store->queryDerivationOutputMap(drvPath);
+            for (auto & outputName : outputs) {
+                if (outputPaths.count(outputName) == 0)
+                    throw Error("derivation '%s' does not have an output named '%s'",
+                            store->printStorePath(drvPath), outputName);
+                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
+            }
+        }
+    }
 }
 
+/* Add and attribute to the given attribute map from the output name to
+   the output path, or a placeholder.
+
+   Where possible the path is used, but for floating CA derivations we
+   may not know it. For sake of determinism we always assume we don't
+   and instead put in a place holder. In either case, however, the
+   string context will contain the drv path and output name, so
+   downstream derivations will have the proper dependency, and in
+   addition, before building, the placeholder will be rewritten to be
+   the actual path.
+
+   The 'drv' and 'drvPath' outputs must correspond. */
+static void mkOutputString(EvalState & state, Value & v,
+    const StorePath & drvPath, const BasicDerivation & drv,
+    std::pair<string, DerivationOutput> o)
+{
+    auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
+    mkString(
+        *state.allocAttr(v, state.symbols.create(o.first)),
+        optOutputPath
+            ? state.store->printStorePath(*optOutputPath)
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            /* FIXME: we need to depend on the basic derivation, not
+               derivation */
+            : downstreamPlaceholder(*state.store, drvPath, o.first),
+        {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
+}
 
 /* Load and evaluate an expression from path specified by the
    argument. */
-static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
+    Path path = state.coerceToPath(pos, vPath, context);
 
     try {
         state.realiseContext(context);
@@ -99,6 +131,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             return std::nullopt;
         return storePath;
     };
+
     if (auto optStorePath = isValidDerivationInStore()) {
         auto storePath = *optStorePath;
         Derivation drv = state.store->readDerivation(storePath);
@@ -113,9 +146,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        for (const auto & o : drv.outputsAndPaths(*state.store)) {
-            v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.second), {"!" + o.first + "!" + path});
+        for (const auto & o : drv.outputs) {
+            mkOutputString(state, w, storePath, drv, o);
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -133,17 +165,18 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         mkApp(v, **fun, w);
         state.forceAttrs(v, pos);
     } else {
-        state.forceAttrs(*args[0]);
-        if (args[0]->attrs->empty())
+        if (!vScope)
             state.evalFile(realPath, v);
         else {
-            Env * env = &state.allocEnv(args[0]->attrs->size());
+            state.forceAttrs(*vScope);
+
+            Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
             StaticEnv staticEnv(false, &state.staticBaseEnv);
 
             unsigned int displ = 0;
-            for (auto & attr : *args[0]->attrs) {
+            for (auto & attr : *vScope->attrs) {
                 staticEnv.vars[attr.name] = displ;
                 env->values[displ++] = attr.value;
             }
@@ -156,6 +189,76 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     }
 }
 
+static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
+    .name = "scopedImport",
+    .arity = 2,
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        import(state, pos, *args[1], args[0], v);
+    }
+});
+
+static RegisterPrimOp primop_import({
+    .name = "import",
+    .args = {"path"},
+    .doc = R"(
+      Load, parse and return the Nix expression in the file *path*. If
+      *path* is a directory, the file ` default.nix ` in that directory
+      is loaded. Evaluation aborts if the file doesn’t exist or contains
+      an incorrect Nix expression. `import` implements Nix’s module
+      system: you can put any Nix expression (such as a set or a
+      function) in a separate file, and use it from Nix expressions in
+      other files.
+
+      > **Note**
+      >
+      > Unlike some languages, `import` is a regular function in Nix.
+      > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
+      > are [normal path values](language-values.md).
+
+      A Nix expression loaded by `import` must not contain any *free
+      variables* (identifiers that are not defined in the Nix expression
+      itself and are not built-in). Therefore, it cannot refer to
+      variables that are in scope at the call site. For instance, if you
+      have a calling expression
+
+      ```nix
+      rec {
+        x = 123;
+        y = import ./foo.nix;
+      }
+      ```
+
+      then the following `foo.nix` will give an error:
+
+      ```nix
+      x + 456
+      ```
+
+      since `x` is not in scope in `foo.nix`. If you want `x` to be
+      available in `foo.nix`, you should pass it as a function argument:
+
+      ```nix
+      rec {
+        x = 123;
+        y = import ./foo.nix x;
+      }
+      ```
+
+      and
+
+      ```nix
+      x: x + 456
+      ```
+
+      (The function argument doesn’t have to be called `x` in `foo.nix`;
+      any name would work.)
+    )",
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        import(state, pos, *args[0], nullptr, v);
+    }
+});
 
 /* Want reasonable symbol names, so extern C */
 /* !!! Should we pass the Pos or the file name too? */
@@ -275,6 +378,16 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
     mkString(v, state.symbols.create(t));
 }
 
+static RegisterPrimOp primop_typeOf({
+    .name = "__typeOf",
+    .args = {"e"},
+    .doc = R"(
+      Return a string representing the type of the value *e*, namely
+      `"int"`, `"bool"`, `"string"`, `"path"`, `"null"`, `"set"`,
+      `"list"`, `"lambda"` or `"float"`.
+    )",
+    .fun = prim_typeOf,
+});
 
 /* Determine whether the argument is the null value. */
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -283,6 +396,18 @@ static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Valu
     mkBool(v, args[0]->type == tNull);
 }
 
+static RegisterPrimOp primop_isNull({
+    .name = "isNull",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to `null`, and `false` otherwise.
+
+      > **Warning**
+      > 
+      > This function is *deprecated*; just write `e == null` instead.
+    )",
+    .fun = prim_isNull,
+});
 
 /* Determine whether the argument is a function. */
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -302,6 +427,14 @@ static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, 
     mkBool(v, res);
 }
 
+static RegisterPrimOp primop_isFunction({
+    .name = "__isFunction",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a function, and `false` otherwise.
+    )",
+    .fun = prim_isFunction,
+});
 
 /* Determine whether the argument is an integer. */
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -310,12 +443,30 @@ static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value
     mkBool(v, args[0]->type == tInt);
 }
 
+static RegisterPrimOp primop_isInt({
+    .name = "__isInt",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to an integer, and `false` otherwise.
+    )",
+    .fun = prim_isInt,
+});
+
 /* Determine whether the argument is a float. */
 static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tFloat);
 }
+
+static RegisterPrimOp primop_isFloat({
+    .name = "__isFloat",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a float, and `false` otherwise.
+    )",
+    .fun = prim_isFloat,
+});
 
 /* Determine whether the argument is a string. */
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -324,6 +475,14 @@ static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Va
     mkBool(v, args[0]->type == tString);
 }
 
+static RegisterPrimOp primop_isString({
+    .name = "__isString",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a string, and `false` otherwise.
+    )",
+    .fun = prim_isString,
+});
 
 /* Determine whether the argument is a Boolean. */
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -332,12 +491,30 @@ static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Valu
     mkBool(v, args[0]->type == tBool);
 }
 
+static RegisterPrimOp primop_isBool({
+    .name = "__isBool",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a bool, and `false` otherwise.
+    )",
+    .fun = prim_isBool,
+});
+
 /* Determine whether the argument is a path. */
 static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
     mkBool(v, args[0]->type == tPath);
 }
+
+static RegisterPrimOp primop_isPath({
+    .name = "__isPath",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a path, and `false` otherwise.
+    )",
+    .fun = prim_isPath,
+});
 
 struct CompareValues
 {
@@ -444,22 +621,43 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         v.listElems()[n++] = i;
 }
 
+static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
+    .name = "__genericClosure",
+    .arity = 1,
+    .fun = prim_genericClosure,
+});
 
-static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    throw Abort("evaluation aborted with the following error message: '%1%'", s);
-}
+static RegisterPrimOp primop_abort({
+    .name = "abort",
+    .args = {"s"},
+    .doc = R"(
+      Abort Nix expression evaluation and print the error message *s*.
+    )",
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        PathSet context;
+        string s = state.coerceToString(pos, *args[0], context);
+        throw Abort("evaluation aborted with the following error message: '%1%'", s);
+    }
+});
 
-
-static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    throw ThrownError(s);
-}
-
+static RegisterPrimOp primop_throw({
+    .name = "throw",
+    .args = {"s"},
+    .doc = R"(
+      Throw an error message *s*. This usually aborts Nix expression
+      evaluation, but in `nix-env -qa` and other commands that try to
+      evaluate a set of derivations to get information about those
+      derivations, a derivation that throws an error is silently skipped
+      (which is not the case for `abort`).
+    )",
+    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+      PathSet context;
+      string s = state.coerceToString(pos, *args[0], context);
+      throw ThrownError(s);
+    }
+});
 
 static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -473,6 +671,11 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
     }
 }
 
+static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
+    .name = "__addErrorContext",
+    .arity = 2,
+    .fun = prim_addErrorContext,
+});
 
 /* Try evaluating the argument. Success => {success=true; value=something;},
  * else => {success=false; value=false;} */
@@ -490,6 +693,22 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_tryEval({
+    .name = "__tryEval",
+    .args = {"e"},
+    .doc = R"(
+      Try to shallowly evaluate *e*. Return a set containing the
+      attributes `success` (`true` if *e* evaluated successfully,
+      `false` if an error was thrown) and `value`, equalling *e* if
+      successful and `false` otherwise. Note that this doesn't evaluate
+      *e* deeply, so ` let e = { x = throw ""; }; in (builtins.tryEval
+      e).success ` will be `true`. Using ` builtins.deepSeq ` one can
+      get the expected result: `let e = { x = throw ""; }; in
+      (builtins.tryEval (builtins.deepSeq e e)).success` will be
+      `false`.
+    )",
+    .fun = prim_tryEval,
+});
 
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -498,6 +717,22 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
     mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
+static RegisterPrimOp primop_getEnv({
+    .name = "__getEnv",
+    .args = {"s"},
+    .doc = R"(
+      `getEnv` returns the value of the environment variable *s*, or an
+      empty string if the variable doesn’t exist. This function should be
+      used with care, as it can introduce all sorts of nasty environment
+      dependencies in your Nix expression.
+
+      `getEnv` is used in Nix Packages to locate the file
+      `~/.nixpkgs/config.nix`, which contains user-local settings for Nix
+      Packages. (That is, it does a `getEnv "HOME"` to locate the user’s
+      home directory.)
+    )",
+    .fun = prim_getEnv,
+});
 
 /* Evaluate the first argument, then return the second argument. */
 static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -507,6 +742,15 @@ static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value &
     v = *args[1];
 }
 
+static RegisterPrimOp primop_seq({
+    .name = "__seq",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Evaluate *e1*, then evaluate and return *e2*. This ensures that a
+      computation is strict in the value of *e1*.
+    )",
+    .fun = prim_seq,
+});
 
 /* Evaluate the first argument deeply (i.e. recursing into lists and
    attrsets), then return the second argument. */
@@ -517,6 +761,16 @@ static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Val
     v = *args[1];
 }
 
+static RegisterPrimOp primop_deepSeq({
+    .name = "__deepSeq",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      This is like `seq e1 e2`, except that *e1* is evaluated *deeply*:
+      if it’s a list or set, its elements or attributes are also
+      evaluated recursively.
+    )",
+    .fun = prim_deepSeq,
+});
 
 /* Evaluate the first expression and print it on standard error.  Then
    return the second expression.  Useful for debugging. */
@@ -530,6 +784,17 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
     state.forceValue(*args[1], pos);
     v = *args[1];
 }
+
+static RegisterPrimOp primop_trace({
+    .name = "__trace",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Evaluate *e1* and print its abstract syntax representation on
+      standard error. Then return *e2*. This function is useful for
+      debugging.
+    )",
+    .fun = prim_trace,
+});
 
 
 /*************************************************************
@@ -852,19 +1117,26 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later. */
-    drvHashes.insert_or_assign(drvPath,
-        hashDerivationModulo(*state.store, Derivation(drv), false));
+       read them later.
+
+       However, we don't bother doing this for floating CA derivations because
+       their "hash modulo" is indeterminate until built. */
+    if (drv.type() != DerivationType::CAFloating)
+        drvHashes.insert_or_assign(drvPath,
+            hashDerivationModulo(*state.store, Derivation(drv), false));
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drv.outputsAndPaths(*state.store)) {
-        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.second), {"!" + i.first + "!" + drvPathS});
-    }
+    for (auto & i : drv.outputs)
+        mkOutputString(state, v, drvPath, drv, i);
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
+    .name = "derivationStrict",
+    .arity = 1,
+    .fun = prim_derivationStrict,
+});
 
 /* Return a placeholder string for the specified output that will be
    substituted by the corresponding output path at build time. For
@@ -877,6 +1149,17 @@ static void prim_placeholder(EvalState & state, const Pos & pos, Value * * args,
 {
     mkString(v, hashPlaceholder(state.forceStringNoCtx(*args[0], pos)));
 }
+
+static RegisterPrimOp primop_placeholder({
+    .name = "placeholder",
+    .args = {"output"},
+    .doc = R"(
+      Return a placeholder string for the specified *output* that will be
+      substituted by the corresponding output path at build time. Typical
+      outputs would be `"out"`, `"bin"` or `"dev"`.
+    )",
+    .fun = prim_placeholder,
+});
 
 
 /*************************************************************
@@ -892,6 +1175,15 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
     mkString(v, canonPath(path), context);
 }
 
+static RegisterPrimOp primop_toPath({
+    .name = "__toPath",
+    .args = {"s"},
+    .doc = R"(
+      **DEPRECATED.** Use `/. + "/path"` to convert a string into an absolute
+      path. For relative paths, use `./. + "/path"`.
+    )",
+    .fun = prim_toPath,
+});
 
 /* Allow a valid store path to be used in an expression.  This is
    useful in some generated expressions such as in nix-push, which
@@ -903,6 +1195,9 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
    corner cases. */
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    if (evalSettings.pureEval)
+        throw EvalError("builtins.storePath' is not allowed in pure evaluation mode");
+
     PathSet context;
     Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
@@ -921,6 +1216,23 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     mkString(v, path, context);
 }
 
+static RegisterPrimOp primop_storePath({
+    .name = "__storePath",
+    .args = {"path"},
+    .doc = R"(
+      This function allows you to define a dependency on an already
+      existing store path. For example, the derivation attribute `src
+      = builtins.storePath /nix/store/f1d18v1y…-source` causes the
+      derivation to depend on the specified path, which must exist or
+      be substitutable. Note that this differs from a plain path
+      (e.g. `src = /nix/store/f1d18v1y…-source`) in that the latter
+      causes the path to be *copied* again to the Nix store, resulting
+      in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
+
+      This function is not available in pure evaluation mode.
+    )",
+    .fun = prim_storePath,
+});
 
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -948,6 +1260,15 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     }
 }
 
+static RegisterPrimOp primop_pathExists({
+    .name = "__pathExists",
+    .args = {"path"},
+    .doc = R"(
+      Return `true` if the path *path* exists at evaluation time, and
+      `false` otherwise.
+    )",
+    .fun = prim_pathExists,
+});
 
 /* Return the base name of the given string, i.e., everything
    following the last slash. */
@@ -957,6 +1278,16 @@ static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, 
     mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
 }
 
+static RegisterPrimOp primop_baseNameOf({
+    .name = "baseNameOf",
+    .args = {"s"},
+    .doc = R"(
+      Return the *base name* of the string *s*, that is, everything
+      following the final slash in the string. This is similar to the GNU
+      `basename` command.
+    )",
+    .fun = prim_baseNameOf,
+});
 
 /* Return the directory of the given path, i.e., everything before the
    last slash.  Return either a path or a string depending on the type
@@ -968,6 +1299,16 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
     if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
 }
 
+static RegisterPrimOp primop_dirOf({
+    .name = "dirOf",
+    .args = {"s"},
+    .doc = R"(
+      Return the directory part of the string *s*, that is, everything
+      before the final slash in the string. This is similar to the GNU
+      `dirname` command.
+    )",
+    .fun = prim_dirOf,
+});
 
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -988,6 +1329,14 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(v, s.c_str());
 }
 
+static RegisterPrimOp primop_readFile({
+    .name = "__readFile",
+    .args = {"path"},
+    .doc = R"(
+      Return the contents of the file *path* as a string.
+    )",
+    .fun = prim_readFile,
+});
 
 /* Find a file in the Nix search path. Used to implement <x> paths,
    which are desugared to 'findFile __nixPath "x"'. */
@@ -1033,6 +1382,12 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
 }
 
+static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
+    .name = "__findFile",
+    .arity = 2,
+    .fun = prim_findFile,
+});
+
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1049,6 +1404,17 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
 }
+
+static RegisterPrimOp primop_hashFile({
+    .name = "__hashFile",
+    .args = {"type", "p"},
+    .doc = R"(
+      Return a base-16 representation of the cryptographic hash of the
+      file at path *p*. The hash algorithm specified by *type* must be one
+      of `"md5"`, `"sha1"`, `"sha256"` or `"sha512"`.
+    )",
+    .fun = prim_hashFile,
+});
 
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1081,6 +1447,25 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_readDir({
+    .name = "__readDir",
+    .args = {"path"},
+    .doc = R"(
+      Return the contents of the directory *path* as a set mapping
+      directory entries to the corresponding file type. For instance, if
+      directory `A` contains a regular file `B` and another directory
+      `C`, then `builtins.readDir ./A` will return the set
+
+      ```nix
+      { B = "regular"; C = "directory"; }
+      ```
+
+      The possible values for the file type are `"regular"`,
+      `"directory"`, `"symlink"` and `"unknown"`.
+    )",
+    .fun = prim_readDir,
+});
+
 
 /*************************************************************
  * Creating files
@@ -1098,6 +1483,102 @@ static void prim_toXML(EvalState & state, const Pos & pos, Value * * args, Value
     mkString(v, out.str(), context);
 }
 
+static RegisterPrimOp primop_toXML({
+    .name = "__toXML",
+    .args = {"e"},
+    .doc = R"(
+      Return a string containing an XML representation of *e*. The main
+      application for `toXML` is to communicate information with the
+      builder in a more structured format than plain environment
+      variables.
+
+      Here is an example where this is the case:
+
+      ```nix
+      { stdenv, fetchurl, libxslt, jira, uberwiki }:
+
+      stdenv.mkDerivation (rec {
+        name = "web-server";
+
+        buildInputs = [ libxslt ];
+
+        builder = builtins.toFile "builder.sh" "
+          source $stdenv/setup
+          mkdir $out
+          echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml ①
+        ";
+
+        stylesheet = builtins.toFile "stylesheet.xsl" ②
+         "<?xml version='1.0' encoding='UTF-8'?>
+          <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
+            <xsl:template match='/'>
+              <Configure>
+                <xsl:for-each select='/expr/list/attrs'>
+                  <Call name='addWebApplication'>
+                    <Arg><xsl:value-of select=\"attr[@name = 'path']/string/@value\" /></Arg>
+                    <Arg><xsl:value-of select=\"attr[@name = 'war']/path/@value\" /></Arg>
+                  </Call>
+                </xsl:for-each>
+              </Configure>
+            </xsl:template>
+          </xsl:stylesheet>
+        ";
+
+        servlets = builtins.toXML [ ③
+          { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
+          { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
+        ];
+      })
+      ```
+
+      The builder is supposed to generate the configuration file for a
+      [Jetty servlet container](http://jetty.mortbay.org/). A servlet
+      container contains a number of servlets (`*.war` files) each
+      exported under a specific URI prefix. So the servlet configuration
+      is a list of sets containing the `path` and `war` of the servlet
+      (①). This kind of information is difficult to communicate with the
+      normal method of passing information through an environment
+      variable, which just concatenates everything together into a
+      string (which might just work in this case, but wouldn’t work if
+      fields are optional or contain lists themselves). Instead the Nix
+      expression is converted to an XML representation with `toXML`,
+      which is unambiguous and can easily be processed with the
+      appropriate tools. For instance, in the example an XSLT stylesheet
+      (at point ②) is applied to it (at point ①) to generate the XML
+      configuration file for the Jetty server. The XML representation
+      produced at point ③ by `toXML` is as follows:
+
+      ```xml
+      <?xml version='1.0' encoding='utf-8'?>
+      <expr>
+        <list>
+          <attrs>
+            <attr name="path">
+              <string value="/bugtracker" />
+            </attr>
+            <attr name="war">
+              <path value="/nix/store/d1jh9pasa7k2...-jira/lib/atlassian-jira.war" />
+            </attr>
+          </attrs>
+          <attrs>
+            <attr name="path">
+              <string value="/wiki" />
+            </attr>
+            <attr name="war">
+              <path value="/nix/store/y6423b1yi4sx...-uberwiki/uberwiki.war" />
+            </attr>
+          </attrs>
+        </list>
+      </expr>
+      ```
+
+      Note that we used the `toFile` built-in to write the builder and
+      the stylesheet “inline” in the Nix expression. The path of the
+      stylesheet is spliced into the builder using the syntax `xsltproc
+      ${stylesheet}`.
+    )",
+    .fun = prim_toXML,
+});
 
 /* Convert the argument (which can be any Nix expression) to a JSON
    string.  Not all Nix expressions can be sensibly or completely
@@ -1110,6 +1591,19 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
     mkString(v, out.str(), context);
 }
 
+static RegisterPrimOp primop_toJSON({
+    .name = "__toJSON",
+    .args = {"e"},
+    .doc = R"(
+      Return a string containing a JSON representation of *e*. Strings,
+      integers, floats, booleans, nulls and lists are mapped to their JSON
+      equivalents. Sets (except derivations) are represented as objects.
+      Derivations are translated to a JSON string containing the
+      derivation’s output path. Paths are copied to the store and
+      represented as a JSON string of the resulting store path.
+    )",
+    .fun = prim_toJSON,
+});
 
 /* Parse a JSON string to a value. */
 static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1118,6 +1612,20 @@ static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Va
     parseJSON(state, s, v);
 }
 
+static RegisterPrimOp primop_fromJSON({
+    .name = "__fromJSON",
+    .args = {"e"},
+    .doc = R"(
+      Convert a JSON string to a Nix value. For example,
+
+      ```nix
+      builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
+      ```
+
+      returns the value `{ x = [ 1 2 3 ]; y = null; }`.
+    )",
+    .fun = prim_fromJSON,
+});
 
 /* Store a string in the Nix store as a source file that can be used
    as an input by derivations. */
@@ -1152,6 +1660,83 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
     mkString(v, storePath, {storePath});
 }
 
+static RegisterPrimOp primop_toFile({
+    .name = "__toFile",
+    .args = {"name", "s"},
+    .doc = R"(
+      Store the string *s* in a file in the Nix store and return its
+      path.  The file has suffix *name*. This file can be used as an
+      input to derivations. One application is to write builders
+      “inline”. For instance, the following Nix expression combines the
+      [Nix expression for GNU Hello](expression-syntax.md) and its
+      [build script](build-script.md) into one file:
+
+      ```nix
+      { stdenv, fetchurl, perl }:
+
+      stdenv.mkDerivation {
+        name = "hello-2.1.1";
+
+        builder = builtins.toFile "builder.sh" "
+          source $stdenv/setup
+
+          PATH=$perl/bin:$PATH
+
+          tar xvfz $src
+          cd hello-*
+          ./configure --prefix=$out
+          make
+          make install
+        ";
+
+        src = fetchurl {
+          url = "http://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz";
+          sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
+        };
+        inherit perl;
+      }
+      ```
+
+      It is even possible for one file to refer to another, e.g.,
+
+      ```nix
+      builder = let
+        configFile = builtins.toFile "foo.conf" "
+          # This is some dummy configuration file.
+          ...
+        ";
+      in builtins.toFile "builder.sh" "
+        source $stdenv/setup
+        ...
+        cp ${configFile} $out/etc/foo.conf
+      ";
+      ```
+
+      Note that `${configFile}` is an
+      [antiquotation](language-values.md), so the result of the
+      expression `configFile`
+      (i.e., a path like `/nix/store/m7p7jfny445k...-foo.conf`) will be
+      spliced into the resulting string.
+
+      It is however *not* allowed to have files mutually referring to each
+      other, like so:
+
+      ```nix
+      let
+        foo = builtins.toFile "foo" "...${bar}...";
+        bar = builtins.toFile "bar" "...${foo}...";
+      in foo
+      ```
+
+      This is not allowed because it would cause a cyclic dependency in
+      the computation of the cryptographic hashes for `foo` and `bar`.
+
+      It is also not possible to reference the result of a derivation. If
+      you are using Nixpkgs, the `writeTextFile` function is able to do
+      that.
+    )",
+    .fun = prim_toFile,
+});
 
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
     Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
@@ -1228,6 +1813,48 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
 }
 
+static RegisterPrimOp primop_filterSource({
+    .name = "__filterSource",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      This function allows you to copy sources into the Nix store while
+      filtering certain files. For instance, suppose that you want to use
+      the directory `source-dir` as an input to a Nix expression, e.g.
+
+      ```nix
+      stdenv.mkDerivation {
+        ...
+        src = ./source-dir;
+      }
+      ```
+
+      However, if `source-dir` is a Subversion working copy, then all
+      those annoying `.svn` subdirectories will also be copied to the
+      store. Worse, the contents of those directories may change a lot,
+      causing lots of spurious rebuilds. With `filterSource` you can
+      filter out the `.svn` directories:
+
+      ```nix
+      src = builtins.filterSource
+        (path: type: type != "directory" || baseNameOf path != ".svn")
+        ./source-dir;
+      ```
+
+      Thus, the first argument *e1* must be a predicate function that is
+      called for each regular file, directory or symlink in the source
+      tree *e2*. If the function returns `true`, the file is copied to the
+      Nix store, otherwise it is omitted. The function is called with two
+      arguments. The first is the full path of the file. The second is a
+      string that identifies the type of the file, which is either
+      `"regular"`, `"directory"`, `"symlink"` or `"unknown"` (for other
+      kinds of files such as device nodes or fifos — but note that those
+      cannot be copied to the Nix store, so if the predicate returns
+      `true` for them, the copy will fail). If you exclude a directory,
+      the entire corresponding subtree of *e2* will be excluded.
+    )",
+    .fun = prim_filterSource,
+});
+
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
@@ -1273,6 +1900,41 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     addPath(state, pos, name, path, filterFun, method, expectedHash, v);
 }
 
+static RegisterPrimOp primop_path({
+    .name = "__path",
+    .args = {"args"},
+    .doc = R"(
+      An enrichment of the built-in path type, based on the attributes
+      present in *args*. All are optional except `path`:
+
+        - path  
+          The underlying path.
+
+        - name  
+          The name of the path when added to the store. This can used to
+          reference paths that have nix-illegal characters in their names,
+          like `@`.
+
+        - filter  
+          A function of the type expected by `builtins.filterSource`,
+          with the same semantics.
+
+        - recursive  
+          When `false`, when `path` is added to the store it is with a
+          flat hash, rather than a hash of the NAR serialization of the
+          file. Thus, `path` must refer to a regular file, not a
+          directory. This allows similar behavior to `fetchurl`. Defaults
+          to `true`.
+
+        - sha256  
+          When provided, this is the expected hash of the file at the
+          path. Evaluation will fail if the hash is incorrect, and
+          providing a hash allows `builtins.path` to be used even when the
+          `pure-eval` nix config option is on.
+    )",
+    .fun = prim_path,
+});
+
 
 /*************************************************************
  * Sets
@@ -1295,6 +1957,16 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
               [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
 }
 
+static RegisterPrimOp primop_attrNames({
+    .name = "__attrNames",
+    .args = {"set"},
+    .doc = R"(
+      Return the names of the attributes in the set *set* in an
+      alphabetically sorted list. For instance, `builtins.attrNames { y
+      = 1; x = "foo"; }` evaluates to `[ "x" "y" ]`.
+    )",
+    .fun = prim_attrNames,
+});
 
 /* Return the values of the attributes in a set as a list, in the same
    order as attrNames. */
@@ -1315,6 +1987,15 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
         v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
 }
 
+static RegisterPrimOp primop_attrValues({
+    .name = "__attrValues",
+    .args = {"set"},
+    .doc = R"(
+      Return the values of the attributes in the set *set* in the order
+      corresponding to the sorted attribute names.
+    )",
+    .fun = prim_attrValues,
+});
 
 /* Dynamic version of the `.' operator. */
 void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1334,9 +2015,20 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     v = *i->value;
 }
 
+static RegisterPrimOp primop_getAttr({
+    .name = "__getAttr",
+    .args = {"s", "set"},
+    .doc = R"(
+      `getAttr` returns the attribute named *s* from *set*. Evaluation
+      aborts if the attribute doesn’t exist. This is a dynamic version of
+      the `.` operator, since *s* is an expression rather than an
+      identifier.
+    )",
+    .fun = prim_getAttr,
+});
 
 /* Return position information of the specified attribute. */
-void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
@@ -1347,6 +2039,11 @@ void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, V
         state.mkPos(v, i->pos);
 }
 
+static RegisterPrimOp primop_unsafeGetAttrPos(RegisterPrimOp::Info {
+    .name = "__unsafeGetAttrPos",
+    .arity = 2,
+    .fun = prim_unsafeGetAttrPos,
+});
 
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1356,6 +2053,16 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
     mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
 
+static RegisterPrimOp primop_hasAttr({
+    .name = "__hasAttr",
+    .args = {"s", "set"},
+    .doc = R"(
+      `hasAttr` returns `true` if *set* has an attribute named *s*, and
+      `false` otherwise. This is a dynamic version of the `?` operator,
+      since *s* is an expression rather than an identifier.
+    )",
+    .fun = prim_hasAttr,
+});
 
 /* Determine whether the argument is a set. */
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1364,6 +2071,14 @@ static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Val
     mkBool(v, args[0]->type == tAttrs);
 }
 
+static RegisterPrimOp primop_isAttrs({
+    .name = "__isAttrs",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a set, and `false` otherwise.
+    )",
+    .fun = prim_isAttrs,
+});
 
 static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1387,6 +2102,21 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     }
 }
 
+static RegisterPrimOp primop_removeAttrs({
+    .name = "removeAttrs",
+    .args = {"set", "list"},
+    .doc = R"(
+      Remove the attributes listed in *list* from *set*. The attributes
+      don’t have to exist in *set*. For instance,
+
+      ```nix
+      removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]
+      ```
+
+      evaluates to `{ y = 2; }`.
+    )",
+    .fun = prim_removeAttrs,
+});
 
 /* Builds a set from a list specifying (name, value) pairs.  To be
    precise, a list [{name = "name1"; value = value1;} ... {name =
@@ -1428,10 +2158,31 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_listToAttrs({
+    .name = "__listToAttrs",
+    .args = {"e"},
+    .doc = R"(
+      Construct a set from a list specifying the names and values of each
+      attribute. Each element of the list should be a set consisting of a
+      string-valued attribute `name` specifying the name of the attribute,
+      and an attribute `value` specifying its value. Example:
 
-/* Return the right-biased intersection of two sets as1 and as2,
-   i.e. a set that contains every attribute from as2 that is also a
-   member of as1. */
+      ```nix
+      builtins.listToAttrs
+        [ { name = "foo"; value = 123; }
+          { name = "bar"; value = 456; }
+        ]
+      ```
+
+      evaluates to
+
+      ```nix
+      { foo = 123; bar = 456; }
+      ```
+    )",
+    .fun = prim_listToAttrs,
+});
+
 static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
@@ -1446,14 +2197,16 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
     }
 }
 
+static RegisterPrimOp primop_intersectAttrs({
+    .name = "__intersectAttrs",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return a set consisting of the attributes in the set *e2* that also
+      exist in the set *e1*.
+    )",
+    .fun = prim_intersectAttrs,
+});
 
-/* Collect each attribute named `attr' from a list of attribute sets.
-   Sets that don't contain the named attribute are ignored.
-
-   Example:
-     catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
-     => [1 2]
-*/
 static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
@@ -1475,20 +2228,23 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
         v.listElems()[n] = res[n];
 }
 
+static RegisterPrimOp primop_catAttrs({
+    .name = "__catAttrs",
+    .args = {"attr", "list"},
+    .doc = R"(
+      Collect each attribute named *attr* from a list of attribute
+      sets.  Attrsets that don't contain the named attribute are
+      ignored. For example,
 
-/* Return a set containing the names of the formal arguments expected
-   by the function `f'.  The value of each attribute is a Boolean
-   denoting whether the corresponding argument has a default value.  For instance,
+      ```nix
+      builtins.catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
+      ```
 
-      functionArgs ({ x, y ? 123}: ...)
-   => { x = false; y = true; }
+      evaluates to `[1 2]`.
+    )",
+    .fun = prim_catAttrs,
+});
 
-   "Formal argument" here refers to the attributes pattern-matched by
-   the function.  Plain lambdas are not included, e.g.
-
-      functionArgs (x: ...)
-   => { }
-*/
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
@@ -1513,8 +2269,24 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_functionArgs({
+    .name = "__functionArgs",
+    .args = {"f"},
+    .doc = R"(
+      Return a set containing the names of the formal arguments expected
+      by the function *f*. The value of each attribute is a Boolean
+      denoting whether the corresponding argument has a default value. For
+      instance, `functionArgs ({ x, y ? 123}: ...) = { x = false; y =
+      true; }`.
 
-/* Apply a function to every element of an attribute set. */
+      "Formal argument" here refers to the attributes pattern-matched by
+      the function. Plain lambdas are not included, e.g. `functionArgs (x:
+      ...) = { }`.
+    )",
+    .fun = prim_functionArgs,
+});
+
+/*  */
 static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[1], pos);
@@ -1530,6 +2302,20 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     }
 }
 
+static RegisterPrimOp primop_mapAttrs({
+    .name = "__mapAttrs",
+    .args = {"f", "attrset"},
+    .doc = R"(
+      Apply function *f* to every element of *attrset*. For example,
+
+      ```nix
+      builtins.mapAttrs (name: value: value * 10) { a = 1; b = 2; }
+      ```
+
+      evaluates to `{ a = 10; b = 20; }`.
+    )",
+    .fun = prim_mapAttrs,
+});
 
 
 /*************************************************************
@@ -1544,6 +2330,14 @@ static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Valu
     mkBool(v, args[0]->isList());
 }
 
+static RegisterPrimOp primop_isList({
+    .name = "__isList",
+    .args = {"e"},
+    .doc = R"(
+      Return `true` if *e* evaluates to a list, and `false` otherwise.
+    )",
+    .fun = prim_isList,
+});
 
 static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Value & v)
 {
@@ -1557,13 +2351,21 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
     v = *list.listElems()[n];
 }
 
-
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     elemAt(state, pos, *args[0], state.forceInt(*args[1], pos), v);
 }
 
+static RegisterPrimOp primop_elemAt({
+    .name = "__elemAt",
+    .args = {"xs", "n"},
+    .doc = R"(
+      Return element *n* from the list *xs*. Elements are counted starting
+      from 0. A fatal error occurs if the index is out of bounds.
+    )",
+    .fun = prim_elemAt,
+});
 
 /* Return the first element of a list. */
 static void prim_head(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1571,6 +2373,16 @@ static void prim_head(EvalState & state, const Pos & pos, Value * * args, Value 
     elemAt(state, pos, *args[0], 0, v);
 }
 
+static RegisterPrimOp primop_head({
+    .name = "__head",
+    .args = {"list"},
+    .doc = R"(
+      Return the first element of a list; abort evaluation if the argument
+      isn’t a list or is an empty list. You can test whether a list is
+      empty by comparing it with `[]`.
+    )",
+    .fun = prim_head,
+});
 
 /* Return a list consisting of everything but the first element of
    a list.  Warning: this function takes O(n) time, so you probably
@@ -1589,6 +2401,21 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
         v.listElems()[n] = args[0]->listElems()[n + 1];
 }
 
+static RegisterPrimOp primop_tail({
+    .name = "__tail",
+    .args = {"list"},
+    .doc = R"(
+      Return the second to last elements of a list; abort evaluation if
+      the argument isn’t a list or is an empty list.
+
+      > **Warning**
+      > 
+      > This function should generally be avoided since it's inefficient:
+      > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
+      > list by repeatedly calling `tail` takes O(n^2) time.
+    )",
+    .fun = prim_tail,
+});
 
 /* Apply a function to every element of a list. */
 static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1602,6 +2429,21 @@ static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value &
             *args[0], *args[1]->listElems()[n]);
 }
 
+static RegisterPrimOp primop_map({
+    .name = "map",
+    .args = {"f", "list"},
+    .doc = R"(
+      Apply the function *f* to each element in the list *list*. For
+      example,
+
+      ```nix
+      map (x: "foo" + x) [ "bar" "bla" "abc" ]
+      ```
+
+      evaluates to `[ "foobar" "foobla" "fooabc" ]`.
+    )",
+    .fun = prim_map,
+});
 
 /* Filter a list using a predicate; that is, return a list containing
    every element from the list for which the predicate function
@@ -1633,6 +2475,15 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
     }
 }
 
+static RegisterPrimOp primop_filter({
+    .name = "__filter",
+    .args = {"f", "list"},
+    .doc = R"(
+      Return a list consisting of the elements of *list* for which the
+      function *f* returns `true`.
+    )",
+    .fun = prim_filter,
+});
 
 /* Return true if a list contains a given element. */
 static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1647,6 +2498,15 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
     mkBool(v, res);
 }
 
+static RegisterPrimOp primop_elem({
+    .name = "__elem",
+    .args = {"x", "xs"},
+    .doc = R"(
+      Return `true` if a value equal to *x* occurs in the list *xs*, and
+      `false` otherwise.
+    )",
+    .fun = prim_elem,
+});
 
 /* Concatenate a list of lists. */
 static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1655,6 +2515,14 @@ static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args,
     state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos);
 }
 
+static RegisterPrimOp primop_concatLists({
+    .name = "__concatLists",
+    .args = {"lists"},
+    .doc = R"(
+      Concatenate a list of lists into a single list.
+    )",
+    .fun = prim_concatLists,
+});
 
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1663,6 +2531,14 @@ static void prim_length(EvalState & state, const Pos & pos, Value * * args, Valu
     mkInt(v, args[0]->listSize());
 }
 
+static RegisterPrimOp primop_length({
+    .name = "__length",
+    .args = {"e"},
+    .doc = R"(
+      Return the length of the list *e*.
+    )",
+    .fun = prim_length,
+});
 
 /* Reduce a list by applying a binary operator, from left to
    right. The operator is applied strictly. */
@@ -1687,6 +2563,18 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
     }
 }
 
+static RegisterPrimOp primop_foldlStrict({
+    .name = "__foldl'",
+    .args = {"op", "nul", "list"},
+    .doc = R"(
+      Reduce a list by applying a binary operator, from left to right,
+      e.g. `foldl’ op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
+      ...`. The operator is applied strictly, i.e., its arguments are
+      evaluated first. For example, `foldl’ (x: y: x + y) 0 [1 2 3]`
+      evaluates to 6.
+    )",
+    .fun = prim_foldlStrict,
+});
 
 static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1712,12 +2600,30 @@ static void prim_any(EvalState & state, const Pos & pos, Value * * args, Value &
     anyOrAll(true, state, pos, args, v);
 }
 
+static RegisterPrimOp primop_any({
+    .name = "__any",
+    .args = {"pred", "list"},
+    .doc = R"(
+      Return `true` if the function *pred* returns `true` for at least one
+      element of *list*, and `false` otherwise.
+    )",
+    .fun = prim_any,
+});
 
 static void prim_all(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     anyOrAll(false, state, pos, args, v);
 }
 
+static RegisterPrimOp primop_all({
+    .name = "__all",
+    .args = {"pred", "list"},
+    .doc = R"(
+      Return `true` if the function *pred* returns `true` for all elements
+      of *list*, and `false` otherwise.
+    )",
+    .fun = prim_all,
+});
 
 static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1738,6 +2644,21 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
     }
 }
 
+static RegisterPrimOp primop_genList({
+    .name = "__genList",
+    .args = {"generator", "length"},
+    .doc = R"(
+      Generate list of size *length*, with each element *i* equal to the
+      value returned by *generator* `i`. For example,
+
+      ```nix
+      builtins.genList (x: x * x) 5
+      ```
+
+      returns the list `[ 0 1 4 9 16 ]`.
+    )",
+    .fun = prim_genList,
+});
 
 static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v);
 
@@ -1773,6 +2694,26 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
     std::stable_sort(v.listElems(), v.listElems() + len, comparator);
 }
 
+static RegisterPrimOp primop_sort({
+    .name = "__sort",
+    .args = {"comparator", "list"},
+    .doc = R"(
+      Return *list* in sorted order. It repeatedly calls the function
+      *comparator* with two elements. The comparator should return `true`
+      if the first element is less than the second, and `false` otherwise.
+      For example,
+
+      ```nix
+      builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
+      ```
+
+      produces the list `[ 42 77 147 249 483 526 ]`.
+
+      This is a stable sort: it preserves the relative order of elements
+      deemed equal by the comparator.
+    )",
+    .fun = prim_sort,
+});
 
 static void prim_partition(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1811,9 +2752,29 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_partition({
+    .name = "__partition",
+    .args = {"pred", "list"},
+    .doc = R"(
+      Given a predicate function *pred*, this function returns an
+      attrset containing a list named `right`, containing the elements
+      in *list* for which *pred* returned `true`, and a list named
+      `wrong`, containing the elements for which it returned
+      `false`. For example,
 
-/* concatMap = f: list: concatLists (map f list); */
-/* C++-version is to avoid allocating `mkApp', call `f' eagerly */
+      ```nix
+      builtins.partition (x: x > 10) [1 23 9 3 42]
+      ```
+
+      evaluates to
+
+      ```nix
+      { right = [ 23 42 ]; wrong = [ 1 9 3 ]; }
+      ```
+    )",
+    .fun = prim_partition,
+});
+
 static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceFunction(*args[0], pos);
@@ -1840,6 +2801,16 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     }
 }
 
+static RegisterPrimOp primop_concatMap({
+    .name = "__concatMap",
+    .args = {"f", "list"},
+    .doc = R"(
+      This function is equivalent to `builtins.concatLists (map f list)`
+      but is more efficient.
+    )",
+    .fun = prim_concatMap,
+});
+
 
 /*************************************************************
  * Integer arithmetic
@@ -1856,6 +2827,14 @@ static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value &
         mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
 }
 
+static RegisterPrimOp primop_add({
+    .name = "__add",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the sum of the numbers *e1* and *e2*.
+    )",
+    .fun = prim_add,
+});
 
 static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1867,6 +2846,14 @@ static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value &
         mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
 }
 
+static RegisterPrimOp primop_sub({
+    .name = "__sub",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the difference between the numbers *e1* and *e2*.
+    )",
+    .fun = prim_sub,
+});
 
 static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1878,6 +2865,14 @@ static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value &
         mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
 }
 
+static RegisterPrimOp primop_mul({
+    .name = "__mul",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the product of the numbers *e1* and *e2*.
+    )",
+    .fun = prim_mul,
+});
 
 static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1907,20 +2902,56 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     }
 }
 
+static RegisterPrimOp primop_div({
+    .name = "__div",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the quotient of the numbers *e1* and *e2*.
+    )",
+    .fun = prim_div,
+});
+
 static void prim_bitAnd(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     mkInt(v, state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
 }
+
+static RegisterPrimOp primop_bitAnd({
+    .name = "__bitAnd",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the bitwise AND of the integers *e1* and *e2*.
+    )",
+    .fun = prim_bitAnd,
+});
 
 static void prim_bitOr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     mkInt(v, state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
 }
 
+static RegisterPrimOp primop_bitOr({
+    .name = "__bitOr",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the bitwise OR of the integers *e1* and *e2*.
+    )",
+    .fun = prim_bitOr,
+});
+
 static void prim_bitXor(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     mkInt(v, state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
 }
+
+static RegisterPrimOp primop_bitXor({
+    .name = "__bitXor",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return the bitwise XOR of the integers *e1* and *e2*.
+    )",
+    .fun = prim_bitXor,
+});
 
 static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1929,6 +2960,17 @@ static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Va
     CompareValues comp;
     mkBool(v, comp(args[0], args[1]));
 }
+
+static RegisterPrimOp primop_lessThan({
+    .name = "__lessThan",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Return `true` if the number *e1* is less than the number *e2*, and
+      `false` otherwise. Evaluation aborts if either *e1* or *e2* does not
+      evaluate to a number.
+    )",
+    .fun = prim_lessThan,
+});
 
 
 /*************************************************************
@@ -1946,6 +2988,29 @@ static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(v, s, context);
 }
 
+static RegisterPrimOp primop_toString({
+    .name = "toString",
+    .args = {"e"},
+    .doc = R"(
+      Convert the expression *e* to a string. *e* can be:
+
+        - A string (in which case the string is returned unmodified).
+
+        - A path (e.g., `toString /foo/bar` yields `"/foo/bar"`.
+
+        - A set containing `{ __toString = self: ...; }`.
+
+        - An integer.
+
+        - A list, in which case the string representations of its elements
+          are joined with spaces.
+
+        - A Boolean (`false` yields `""`, `true` yields `"1"`).
+
+        - `null`, which yields the empty string.
+    )",
+    .fun = prim_toString,
+});
 
 /* `substring start len str' returns the substring of `str' starting
    at character position `min(start, stringLength str)' inclusive and
@@ -1967,6 +3032,25 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
 }
 
+static RegisterPrimOp primop_substring({
+    .name = "__substring",
+    .args = {"start", "len", "s"},
+    .doc = R"(
+      Return the substring of *s* from character position *start*
+      (zero-based) up to but not including *start + len*. If *start* is
+      greater than the length of the string, an empty string is returned,
+      and if *start + len* lies beyond the end of the string, only the
+      substring up to the end of the string is returned. *start* must be
+      non-negative. For example,
+
+      ```nix
+      builtins.substring 0 3 "nixos"
+      ```
+
+      evaluates to `"nix"`.
+    )",
+    .fun = prim_substring,
+});
 
 static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1975,6 +3059,15 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
     mkInt(v, s.size());
 }
 
+static RegisterPrimOp primop_stringLength({
+    .name = "__stringLength",
+    .args = {"e"},
+    .doc = R"(
+      Return the length of the string *e*. If *e* is not a string,
+      evaluation is aborted.
+    )",
+    .fun = prim_stringLength,
+});
 
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1993,18 +3086,36 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     mkString(v, hashString(*ht, s).to_string(Base16, false), context);
 }
 
+static RegisterPrimOp primop_hashString({
+    .name = "__hashString",
+    .args = {"type", "s"},
+    .doc = R"(
+      Return a base-16 representation of the cryptographic hash of string
+      *s*. The hash algorithm specified by *type* must be one of `"md5"`,
+      `"sha1"`, `"sha256"` or `"sha512"`.
+    )",
+    .fun = prim_hashString,
+});
 
-/* Match a regular expression against a string and return either
-   ‘null’ or a list containing substring matches. */
+struct RegexCache
+{
+    std::unordered_map<std::string, std::regex> cache;
+};
+
+std::shared_ptr<RegexCache> makeRegexCache()
+{
+    return std::make_shared<RegexCache>();
+}
+
 void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        auto regex = state.regexCache.find(re);
-        if (regex == state.regexCache.end())
-            regex = state.regexCache.emplace(re, std::regex(re, std::regex::extended)).first;
+        auto regex = state.regexCache->cache.find(re);
+        if (regex == state.regexCache->cache.end())
+            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
@@ -2041,6 +3152,41 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
     }
 }
 
+static RegisterPrimOp primop_match({
+    .name = "__match",
+    .args = {"regex", "str"},
+    .doc = R"s(
+      Returns a list if the [extended POSIX regular
+      expression](http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04)
+      *regex* matches *str* precisely, otherwise returns `null`. Each item
+      in the list is a regex group.
+
+      ```nix
+      builtins.match "ab" "abc"
+      ```
+
+      Evaluates to `null`.
+
+      ```nix
+      builtins.match "abc" "abc"
+      ```
+
+      Evaluates to `[ ]`.
+
+      ```nix
+      builtins.match "a(b)(c)" "abc"
+      ```
+
+      Evaluates to `[ "b" "c" ]`.
+
+      ```nix
+      builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
+      ```
+
+      Evaluates to `[ "foo" ]`.
+    )s",
+    .fun = prim_match,
+});
 
 /* Split a string with a regular expression, and return a list of the
    non-matching parts interleaved by the lists of the matching groups. */
@@ -2114,8 +3260,44 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
     }
 }
 
+static RegisterPrimOp primop_split({
+    .name = "__split",
+    .args = {"regex", "str"},
+    .doc = R"s(
+      Returns a list composed of non matched strings interleaved with the
+      lists of the [extended POSIX regular
+      expression](http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04)
+      *regex* matches of *str*. Each item in the lists of matched
+      sequences is a regex group.
 
-static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * args, Value & v)
+      ```nix
+      builtins.split "(a)b" "abc"
+      ```
+
+      Evaluates to `[ "" [ "a" ] "c" ]`.
+
+      ```nix
+      builtins.split "([ac])" "abc"
+      ```
+
+      Evaluates to `[ "" [ "a" ] "b" [ "c" ] "" ]`.
+
+      ```nix
+      builtins.split "(a)|(c)" "abc"
+      ```
+
+      Evaluates to `[ "" [ "a" null ] "b" [ null "c" ] "" ]`.
+
+      ```nix
+      builtins.split "([[:upper:]]+)" "  FOO   "
+      ```
+
+      Evaluates to `[ " " [ "FOO" ] " " ]`.
+    )s",
+    .fun = prim_split,
+});
+
+static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
 
@@ -2134,6 +3316,16 @@ static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * a
     mkString(v, res, context);
 }
 
+static RegisterPrimOp primop_concatStringsSep({
+    .name = "__concatStringsSep",
+    .args = {"separator", "list"},
+    .doc = R"(
+      Concatenate a list of strings with a separator between each
+      element, e.g. `concatStringsSep "/" ["usr" "local" "bin"] ==
+      "usr/local/bin"`.
+    )",
+    .fun = prim_concatStringsSep,
+});
 
 static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2193,6 +3385,22 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     mkString(v, res, context);
 }
 
+static RegisterPrimOp primop_replaceStrings({
+    .name = "__replaceStrings",
+    .args = {"from", "to", "s"},
+    .doc = R"(
+      Given string *s*, replace every occurrence of the strings in *from*
+      with the corresponding string in *to*. For example,
+
+      ```nix
+      builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
+      ```
+
+      evaluates to `"fabir"`.
+    )",
+    .fun = prim_replaceStrings,
+});
+
 
 /*************************************************************
  * Versions
@@ -2209,6 +3417,19 @@ static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args
     v.attrs->sort();
 }
 
+static RegisterPrimOp primop_parseDrvName({
+    .name = "__parseDrvName",
+    .args = {"s"},
+    .doc = R"(
+      Split the string *s* into a package name and version. The package
+      name is everything up to but not including the first dash followed
+      by a digit, and the version is everything following that dash. The
+      result is returned in a set `{ name, version }`. Thus,
+      `builtins.parseDrvName "nix-0.12pre12876"` returns `{ name =
+      "nix"; version = "0.12pre12876"; }`.
+    )",
+    .fun = prim_parseDrvName,
+});
 
 static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2217,6 +3438,18 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
     mkInt(v, compareVersions(version1, version2));
 }
 
+static RegisterPrimOp primop_compareVersions({
+    .name = "__compareVersions",
+    .args = {"s1", "s2"},
+    .doc = R"(
+      Compare two strings representing versions and return `-1` if
+      version *s1* is older than version *s2*, `0` if they are the same,
+      and `1` if *s1* is newer than *s2*. The version comparison
+      algorithm is the same as the one used by [`nix-env
+      -u`](../command-ref/nix-env.md#operation---upgrade).
+    )",
+    .fun = prim_compareVersions,
+});
 
 static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2237,6 +3470,17 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
     }
 }
 
+static RegisterPrimOp primop_splitVersion({
+    .name = "__splitVersion",
+    .args = {"s"},
+    .doc = R"(
+      Split a string representing a version into its components, by the
+      same version splitting logic underlying the version comparison in
+      [`nix-env -u`](../command-ref/nix-env.md#operation---upgrade).
+    )",
+    .fun = prim_splitVersion,
+});
+
 
 /*************************************************************
  * Primop registration
@@ -2250,7 +3494,20 @@ RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
     std::optional<std::string> requiredFeature)
 {
     if (!primOps) primOps = new PrimOps;
-    primOps->push_back({name, arity, fun, requiredFeature});
+    primOps->push_back({
+        .name = name,
+        .args = {},
+        .arity = arity,
+        .requiredFeature = std::move(requiredFeature),
+        .fun = fun
+    });
+}
+
+
+RegisterPrimOp::RegisterPrimOp(Info && info)
+{
+    if (!primOps) primOps = new PrimOps;
+    primOps->push_back(std::move(info));
 }
 
 
@@ -2273,15 +3530,6 @@ void EvalState::createBaseEnv()
 
     mkNull(v);
     addConstant("null", v);
-
-    auto vThrow = addPrimOp("throw", 1, prim_throw);
-
-    auto addPurityError = [&](const std::string & name) {
-        Value * v2 = allocValue();
-        mkString(*v2, fmt("'%s' is not allowed in pure evaluation mode", name));
-        mkApp(v, *vThrow, *v2);
-        addConstant(name, v);
-    };
 
     if (!evalSettings.pureEval) {
         mkInt(v, time(0));
@@ -2307,132 +3555,16 @@ void EvalState::createBaseEnv()
     addConstant("__langVersion", v);
 
     // Miscellaneous
-    auto vScopedImport = addPrimOp("scopedImport", 2, prim_scopedImport);
-    Value * v2 = allocValue();
-    mkAttrs(*v2, 0);
-    mkApp(v, *vScopedImport, *v2);
-    forceValue(v);
-    addConstant("import", v);
     if (evalSettings.enableNativeCode) {
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
     }
-    addPrimOp("__typeOf", 1, prim_typeOf);
-    addPrimOp("isNull", 1, prim_isNull);
-    addPrimOp("__isFunction", 1, prim_isFunction);
-    addPrimOp("__isString", 1, prim_isString);
-    addPrimOp("__isInt", 1, prim_isInt);
-    addPrimOp("__isFloat", 1, prim_isFloat);
-    addPrimOp("__isBool", 1, prim_isBool);
-    addPrimOp("__isPath", 1, prim_isPath);
-    addPrimOp("__genericClosure", 1, prim_genericClosure);
-    addPrimOp("abort", 1, prim_abort);
-    addPrimOp("__addErrorContext", 2, prim_addErrorContext);
-    addPrimOp("__tryEval", 1, prim_tryEval);
-    addPrimOp("__getEnv", 1, prim_getEnv);
-
-    // Strictness
-    addPrimOp("__seq", 2, prim_seq);
-    addPrimOp("__deepSeq", 2, prim_deepSeq);
-
-    // Debugging
-    addPrimOp("__trace", 2, prim_trace);
-
-    // Paths
-    addPrimOp("__toPath", 1, prim_toPath);
-    if (evalSettings.pureEval)
-        addPurityError("__storePath");
-    else
-        addPrimOp("__storePath", 1, prim_storePath);
-    addPrimOp("__pathExists", 1, prim_pathExists);
-    addPrimOp("baseNameOf", 1, prim_baseNameOf);
-    addPrimOp("dirOf", 1, prim_dirOf);
-    addPrimOp("__readFile", 1, prim_readFile);
-    addPrimOp("__readDir", 1, prim_readDir);
-    addPrimOp("__findFile", 2, prim_findFile);
-    addPrimOp("__hashFile", 2, prim_hashFile);
-
-    // Creating files
-    addPrimOp("__toXML", 1, prim_toXML);
-    addPrimOp("__toJSON", 1, prim_toJSON);
-    addPrimOp("__fromJSON", 1, prim_fromJSON);
-    addPrimOp("__toFile", 2, prim_toFile);
-    addPrimOp("__filterSource", 2, prim_filterSource);
-    addPrimOp("__path", 1, prim_path);
-
-    // Sets
-    addPrimOp("__attrNames", 1, prim_attrNames);
-    addPrimOp("__attrValues", 1, prim_attrValues);
-    addPrimOp("__getAttr", 2, prim_getAttr);
-    addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
-    addPrimOp("__hasAttr", 2, prim_hasAttr);
-    addPrimOp("__isAttrs", 1, prim_isAttrs);
-    addPrimOp("removeAttrs", 2, prim_removeAttrs);
-    addPrimOp("__listToAttrs", 1, prim_listToAttrs);
-    addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
-    addPrimOp("__catAttrs", 2, prim_catAttrs);
-    addPrimOp("__functionArgs", 1, prim_functionArgs);
-    addPrimOp("__mapAttrs", 2, prim_mapAttrs);
-
-    // Lists
-    addPrimOp("__isList", 1, prim_isList);
-    addPrimOp("__elemAt", 2, prim_elemAt);
-    addPrimOp("__head", 1, prim_head);
-    addPrimOp("__tail", 1, prim_tail);
-    addPrimOp("map", 2, prim_map);
-    addPrimOp("__filter", 2, prim_filter);
-    addPrimOp("__elem", 2, prim_elem);
-    addPrimOp("__concatLists", 1, prim_concatLists);
-    addPrimOp("__length", 1, prim_length);
-    addPrimOp("__foldl'", 3, prim_foldlStrict);
-    addPrimOp("__any", 2, prim_any);
-    addPrimOp("__all", 2, prim_all);
-    addPrimOp("__genList", 2, prim_genList);
-    addPrimOp("__sort", 2, prim_sort);
-    addPrimOp("__partition", 2, prim_partition);
-    addPrimOp("__concatMap", 2, prim_concatMap);
-
-    // Integer arithmetic
-    addPrimOp("__add", 2, prim_add);
-    addPrimOp("__sub", 2, prim_sub);
-    addPrimOp("__mul", 2, prim_mul);
-    addPrimOp("__div", 2, prim_div);
-    addPrimOp("__bitAnd", 2, prim_bitAnd);
-    addPrimOp("__bitOr", 2, prim_bitOr);
-    addPrimOp("__bitXor", 2, prim_bitXor);
-    addPrimOp("__lessThan", 2, prim_lessThan);
-
-    // String manipulation
-    addPrimOp("toString", 1, prim_toString);
-    addPrimOp("__substring", 3, prim_substring);
-    addPrimOp("__stringLength", 1, prim_stringLength);
-    addPrimOp("__hashString", 2, prim_hashString);
-    addPrimOp("__match", 2, prim_match);
-    addPrimOp("__split", 2, prim_split);
-    addPrimOp("__concatStringsSep", 2, prim_concatStringSep);
-    addPrimOp("__replaceStrings", 3, prim_replaceStrings);
-
-    // Versions
-    addPrimOp("__parseDrvName", 1, prim_parseDrvName);
-    addPrimOp("__compareVersions", 2, prim_compareVersions);
-    addPrimOp("__splitVersion", 1, prim_splitVersion);
-
-    // Derivations
-    addPrimOp("derivationStrict", 1, prim_derivationStrict);
-    addPrimOp("placeholder", 1, prim_placeholder);
-
-    /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
-    string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
-    sDerivationNix = symbols.create(path);
-    evalFile(path, v);
-    addConstant("derivation", v);
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
-        v2 = v.listElems()[n++] = allocValue();
+        auto v2 = v.listElems()[n++] = allocValue();
         mkAttrs(*v2, 2);
         mkString(*allocAttr(*v2, symbols.create("path")), i.second);
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
@@ -2443,7 +3575,21 @@ void EvalState::createBaseEnv()
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
             if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
-                addPrimOp(primOp.name, primOp.arity, primOp.primOp);
+                addPrimOp({
+                    .fun = primOp.fun,
+                    .arity = std::max(primOp.args.size(), primOp.arity),
+                    .name = symbols.create(primOp.name),
+                    .args = std::move(primOp.args),
+                    .doc = primOp.doc,
+                });
+
+    /* Add a wrapper around the derivation primop that computes the
+       `drvPath' and `outPath' attributes lazily. */
+    sDerivationNix = symbols.create("//builtin/derivation.nix");
+    eval(parse(
+        #include "primops/derivation.nix.gen.hh"
+        , foFile, sDerivationNix, "/", staticBaseEnv), v);
+    addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */

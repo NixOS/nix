@@ -938,7 +938,7 @@ struct CmdFlakeShow : FlakeCommand
     }
 };
 
-struct CmdFlake : virtual MultiCommand, virtual Command
+struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
         : MultiCommand({
@@ -967,11 +967,6 @@ struct CmdFlake : virtual MultiCommand, virtual Command
         settings.requireExperimentalFeature("flakes");
         command->second->prepare();
         command->second->run();
-    }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
     }
 };
 

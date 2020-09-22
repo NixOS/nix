@@ -3,14 +3,15 @@
 #include "fetchers.hh"
 #include "globals.hh"
 #include "store-api.hh"
+#include "url-parts.hh"
 
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
 
-// A github or gitlab url
-const static std::string urlRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
-std::regex urlRegex(urlRegexS, std::regex::ECMAScript);
+// A github or gitlab host
+const static std::string hostRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
+std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
 {
@@ -50,9 +51,9 @@ struct GitArchiveInputScheme : InputScheme
                     throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
                 ref = value;
             }
-            else if (name == "url") {
-                if (!std::regex_match(value, urlRegex))
-                    throw BadURL("URL '%s' contains an invalid instance url", url.url);
+            else if (name == "host") {
+                if (!std::regex_match(value, hostRegex))
+                    throw BadURL("URL '%s' contains an invalid instance host", url.url);
                 host_url = value;
             }
             // FIXME: barf on unsupported attributes
@@ -67,7 +68,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("repo", path[1]);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
         if (ref) input.attrs.insert_or_assign("ref", *ref);
-        if (host_url) input.attrs.insert_or_assign("url", *host_url);
+        if (host_url) input.attrs.insert_or_assign("host", *host_url);
 
         return input;
     }
@@ -77,7 +78,7 @@ struct GitArchiveInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != type()) return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified")
+            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified" && name != "host")
                 throw Error("unsupported input attribute '%s'", name);
 
         getStrAttr(attrs, "owner");
@@ -185,11 +186,21 @@ struct GitHubInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "github"; }
 
+    void addAccessToken(std::string & url) const
+    {
+        std::string accessToken = settings.githubAccessToken.get();
+        if (accessToken != "")
+            url += "?access_token=" + accessToken;
+    }
+
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
         auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+
+        addAccessToken(url);
+
         auto json = nlohmann::json::parse(
             readFile(store->toRealPath(store->makeFixedOutputPathFromCA(
                 downloadFile(store, url, "source", false).storePath))));
@@ -202,14 +213,12 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
+        auto host_url = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
-        std::string accessToken = settings.githubAccessToken.get();
-        if (accessToken != "")
-            url += "?access_token=" + accessToken;
+        addAccessToken(url);
 
         return url;
     }
@@ -230,7 +239,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("gitlab.com");
+        auto host_url = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
         auto json = nlohmann::json::parse(readFile(

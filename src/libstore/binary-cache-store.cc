@@ -11,6 +11,7 @@
 #include "nar-accessor.hh"
 #include "json.hh"
 #include "thread-pool.hh"
+#include "callback.hh"
 
 #include <chrono>
 #include <future>
@@ -22,7 +23,8 @@
 namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(const Params & params)
-    : Store(params)
+    : BinaryCacheStoreConfig(params)
+    , Store(params)
 {
     if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
@@ -383,16 +385,16 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
 
     ValidPathInfo info {
         *this,
-		{ 
-			name,
-				FixedOutputInfo {
-    		    {
-    		        .method = method,
-    		        .hash = *h,
-    		    },
-    		    {},
-    		},
-    	},
+        {
+            name,
+                FixedOutputInfo {
+                {
+                    .method = method,
+                    .hash = *h,
+                },
+                {},
+            },
+        },
         Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
     };
 

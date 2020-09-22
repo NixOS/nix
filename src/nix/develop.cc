@@ -15,7 +15,7 @@ struct Var
 {
     bool exported = true;
     bool associative = false;
-    std::string value; // quoted string or array
+    std::string quoted; // quoted string or array
 };
 
 struct BuildEnvironment
@@ -75,12 +75,12 @@ BuildEnvironment readEnvironment(const Path & path)
 
         else if (std::regex_search(pos, file.cend(), match, varRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
-            res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .value = match[2] }});
+            res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .quoted = match[2] }});
         }
 
         else if (std::regex_search(pos, file.cend(), match, assocArrayRegex, std::regex_constants::match_continuous)) {
             pos = match[0].second;
-            res.env.insert({match[1], Var { .associative = true, .value = match[2] }});
+            res.env.insert({match[1], Var { .associative = true, .quoted = match[2] }});
         }
 
         else if (std::regex_search(pos, file.cend(), match, functionRegex, std::regex_constants::match_continuous)) {
@@ -91,6 +91,8 @@ BuildEnvironment readEnvironment(const Path & path)
         else throw Error("shell environment '%s' has unexpected line '%s'",
             path, file.substr(pos - file.cbegin(), 60));
     }
+
+    res.env.erase("__output");
 
     return res;
 }
@@ -125,27 +127,35 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
-    for (auto & output : drv.outputs)
-        drv.env.erase(output.first);
-    drv.outputs = {{"out", DerivationOutput { .output = DerivationOutputInputAddressed { .path = StorePath::dummy }}}};
-    drv.env["out"] = "";
-    drv.env["_outputs_saved"] = drv.env["outputs"];
-    drv.env["outputs"] = "out";
+    for (auto & output : drv.outputs) {
+        output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+        drv.env[output.first] = "";
+    }
     drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
-    auto shellOutPath = store->makeOutputPath("out", h, drv.name);
-    drv.outputs.insert_or_assign("out", DerivationOutput { .output = DerivationOutputInputAddressed {
-                .path = shellOutPath
-            } });
-    drv.env["out"] = store->printStorePath(shellOutPath);
-    auto shellDrvPath2 = writeDerivation(*store, drv);
+
+    for (auto & output : drv.outputs) {
+        auto outPath = store->makeOutputPath(output.first, h, drv.name);
+        output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+        drv.env[output.first] = store->printStorePath(outPath);
+    }
+
+    auto shellDrvPath = writeDerivation(*store, drv);
 
     /* Build the derivation. */
-    store->buildPaths({{shellDrvPath2}});
+    store->buildPaths({{shellDrvPath}});
 
-    assert(store->isValidPath(shellOutPath));
+    for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
+        auto & [_1, optPath] = outputAndOptPath;
+        assert(optPath);
+        auto & outPath = *optPath;
+        assert(store->isValidPath(outPath));
+        auto outPathS = store->toRealPath(outPath);
+        if (lstat(outPathS).st_size)
+            return outPath;
+    }
 
-    return shellOutPath;
+    throw Error("get-env.sh failed to produce an environment");
 }
 
 struct Common : InstallableCommand, MixProfile
@@ -171,8 +181,12 @@ struct Common : InstallableCommand, MixProfile
         "UID",
     };
 
-    void makeRcScript(const BuildEnvironment & buildEnvironment, std::ostream & out)
+    std::string makeRcScript(
+        const BuildEnvironment & buildEnvironment,
+        const Path & outputsDir = absPath(".") + "/outputs")
     {
+        std::ostringstream out;
+
         out << "unset shellHook\n";
 
         out << "nix_saved_PATH=\"$PATH\"\n";
@@ -180,9 +194,9 @@ struct Common : InstallableCommand, MixProfile
         for (auto & i : buildEnvironment.env) {
             if (!ignoreVars.count(i.first) && !hasPrefix(i.first, "BASH_")) {
                 if (i.second.associative)
-                    out << fmt("declare -A %s=(%s)\n", i.first, i.second.value);
+                    out << fmt("declare -A %s=(%s)\n", i.first, i.second.quoted);
                 else {
-                    out << fmt("%s=%s\n", i.first, i.second.value);
+                    out << fmt("%s=%s\n", i.first, i.second.quoted);
                     if (i.second.exported)
                         out << fmt("export %s\n", i.first);
                 }
@@ -193,13 +207,26 @@ struct Common : InstallableCommand, MixProfile
 
         out << buildEnvironment.bashFunctions << "\n";
 
-        // FIXME: set outputs
-
         out << "export NIX_BUILD_TOP=\"$(mktemp -d --tmpdir nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
 
         out << "eval \"$shellHook\"\n";
+
+        /* Substitute occurrences of output paths. */
+        auto outputs = buildEnvironment.env.find("outputs");
+        assert(outputs != buildEnvironment.env.end());
+
+        // FIXME: properly unquote 'outputs'.
+        StringMap rewrites;
+        for (auto & outputName : tokenizeString<std::vector<std::string>>(replaceStrings(outputs->second.quoted, "'", ""))) {
+            auto from = buildEnvironment.env.find(outputName);
+            assert(from != buildEnvironment.env.end());
+            // FIXME: unquote
+            rewrites.insert({from->second.quoted, outputsDir + "/" + outputName});
+        }
+
+        return rewriteStrings(out.str(), rewrites);
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -240,6 +267,7 @@ struct Common : InstallableCommand, MixProfile
 struct CmdDevelop : Common, MixEnvironment
 {
     std::vector<std::string> command;
+    std::optional<std::string> phase;
 
     CmdDevelop()
     {
@@ -252,6 +280,43 @@ struct CmdDevelop : Common, MixEnvironment
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
             }}
+        });
+
+        addFlag({
+            .longName = "phase",
+            .description = "phase to run (e.g. `build` or `configure`)",
+            .labels = {"phase-name"},
+            .handler = {&phase},
+        });
+
+        addFlag({
+            .longName = "configure",
+            .description = "run the configure phase",
+            .handler = {&phase, {"configure"}},
+        });
+
+        addFlag({
+            .longName = "build",
+            .description = "run the build phase",
+            .handler = {&phase, {"build"}},
+        });
+
+        addFlag({
+            .longName = "check",
+            .description = "run the check phase",
+            .handler = {&phase, {"check"}},
+        });
+
+        addFlag({
+            .longName = "install",
+            .description = "run the install phase",
+            .handler = {&phase, {"install"}},
+        });
+
+        addFlag({
+            .longName = "installcheck",
+            .description = "run the installcheck phase",
+            .handler = {&phase, {"installCheck"}},
         });
     }
 
@@ -288,19 +353,31 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
-        std::ostringstream ss;
-        makeRcScript(buildEnvironment, ss);
+        auto script = makeRcScript(buildEnvironment);
 
-        ss << fmt("rm -f '%s'\n", rcFilePath);
+        if (verbosity >= lvlDebug)
+            script += "set -x\n";
 
-        if (!command.empty()) {
+        script += fmt("rm -f '%s'\n", rcFilePath);
+
+        if (phase) {
+            if (!command.empty())
+                throw UsageError("you cannot use both '--command' and '--phase'");
+            // FIXME: foundMakefile is set by buildPhase, need to get
+            // rid of that.
+            script += fmt("foundMakefile=1\n");
+            script += fmt("runHook %1%Phase\n", *phase);
+            script += fmt("exit 0\n", *phase);
+        }
+
+        else if (!command.empty()) {
             std::vector<std::string> args;
             for (auto s : command)
                 args.push_back(shellEscape(s));
-            ss << fmt("exec %s\n", concatStringsSep(" ", args));
+            script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
 
-        writeFull(rcFileFd.get(), ss.str());
+        writeFull(rcFileFd.get(), script);
 
         stopProgressBar();
 
@@ -315,7 +392,7 @@ struct CmdDevelop : Common, MixEnvironment
 
             auto bashInstallable = std::make_shared<InstallableFlake>(
                 state,
-                std::move(installable->nixpkgsFlakeRef()),
+                installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 lockFlags);
@@ -362,7 +439,7 @@ struct CmdPrintDevEnv : Common
 
         stopProgressBar();
 
-        makeRcScript(buildEnvironment, std::cout);
+        std::cout << makeRcScript(buildEnvironment);
     }
 };
 

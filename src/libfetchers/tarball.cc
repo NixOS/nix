@@ -78,9 +78,9 @@ DownloadFileResult downloadFile(
             },
         };
         ValidPathInfo info {
-        	*store,
-        	StorePathDescriptor { *storePath },
-        	hashString(htSHA256, *sink.s),
+            *store,
+            StorePathDescriptor { *storePath },
+            hashString(htSHA256, *sink.s),
         };
         info.narSize = sink.s->size();
         auto source = StringSource { *sink.s };

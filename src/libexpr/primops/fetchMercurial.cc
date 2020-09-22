@@ -3,8 +3,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "url.hh"
-
-#include <regex>
+#include "url-parts.hh"
 
 namespace nix {
 

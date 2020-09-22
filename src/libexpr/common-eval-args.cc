@@ -29,7 +29,7 @@ MixEvalArgs::MixEvalArgs()
     addFlag({
         .longName = "include",
         .shortName = 'I',
-        .description = "add a path to the list of locations used to look up <...> file names",
+        .description = "add a path to the list of locations used to look up `<...>` file names",
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}
     });

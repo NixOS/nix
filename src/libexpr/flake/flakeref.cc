@@ -1,6 +1,7 @@
 #include "flakeref.hh"
 #include "store-api.hh"
 #include "url.hh"
+#include "url-parts.hh"
 #include "fetchers.hh"
 #include "registry.hh"
 

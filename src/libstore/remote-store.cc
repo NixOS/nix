@@ -1,5 +1,6 @@
 #include "serialise.hh"
 #include "util.hh"
+#include "remote-fs-accessor.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
@@ -9,6 +10,7 @@
 #include "pool.hh"
 #include "finally.hh"
 #include "logging.hh"
+#include "callback.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -69,9 +71,19 @@ void WorkerProto<std::optional<StorePath>>::write(const Store & store, Sink & ou
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : Store(params)
+    , RemoteStoreConfig(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
-            [this]() { return openConnectionWrapper(); },
+            [this]() {
+                auto conn = openConnectionWrapper();
+                try {
+                    initConnection(*conn);
+                } catch (...) {
+                    failed = true;
+                    throw;
+                }
+                return conn;
+            },
             [this](const ref<Connection> & r) {
                 return
                     r->to.good()
@@ -98,19 +110,21 @@ ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 
 
 UDSRemoteStore::UDSRemoteStore(const Params & params)
-    : Store(params)
+    : StoreConfig(params)
+    , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
 {
 }
 
 
-UDSRemoteStore::UDSRemoteStore(std::string socket_path, const Params & params)
-    : Store(params)
-    , LocalFSStore(params)
-    , RemoteStore(params)
-    , path(socket_path)
+UDSRemoteStore::UDSRemoteStore(
+        const std::string scheme,
+        std::string socket_path,
+        const Params & params)
+    : UDSRemoteStore(params)
 {
+    path.emplace(socket_path);
 }
 
 
@@ -153,8 +167,6 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     conn->to.fd = conn->fd.get();
 
     conn->startTime = std::chrono::steady_clock::now();
-
-    initConnection(*conn);
 
     return conn;
 }
@@ -463,10 +475,26 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 
 std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
-    auto conn(getConnection());
-    conn->to << wopQueryDerivationOutputMap << printStorePath(path);
-    conn.processStderr();
-    return WorkerProto<std::map<std::string, std::optional<StorePath>>>::read(*this, conn->from);
+    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
+        auto conn(getConnection());
+        conn->to << wopQueryDerivationOutputMap << printStorePath(path);
+        conn.processStderr();
+        return WorkerProto<std::map<std::string, std::optional<StorePath>>>::read(*this, conn->from);
+    } else {
+        // Fallback for old daemon versions.
+        // For floating-CA derivations (and their co-dependencies) this is an
+        // under-approximation as it only returns the paths that can be inferred
+        // from the derivation itself (and not the ones that are known because
+        // the have been built), but as old stores don't handle floating-CA
+        // derivations this shouldn't matter
+        auto derivation = readDerivation(path);
+        auto outputsWithOptPaths = derivation.outputsAndOptPaths(*this);
+        std::map<std::string, std::optional<StorePath>> ret;
+        for (auto & [outputName, outputAndPath] : outputsWithOptPaths) {
+            ret.emplace(outputName, outputAndPath.second);
+        }
+        return ret;
+    }
 }
 
 std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & hashPart)
@@ -855,6 +883,19 @@ RemoteStore::Connection::~Connection()
     }
 }
 
+void RemoteStore::narFromPath(StorePathOrDesc pathOrDesc, Sink & sink)
+{
+    auto path = bakeCaIfNeeded(pathOrDesc);
+    auto conn(connections->get());
+    conn->to << wopNarFromPath << printStorePath(path);
+    conn->processStderr();
+    copyNAR(conn->from, sink);
+}
+
+ref<FSAccessor> RemoteStore::getFSAccessor()
+{
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
+}
 
 static Logger::Fields readFields(Source & from)
 {
@@ -937,14 +978,6 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-static std::string uriScheme = "unix://";
-
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
-    return std::make_shared<UDSRemoteStore>(std::string(uri, uriScheme.size()), params);
-});
+static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regStore;
 
 }

@@ -49,9 +49,7 @@ struct CmdDoctor : StoreCommand
     {
         logger->log("Running checks against store uri: " + store->getUri());
 
-        auto type = getStoreType();
-
-        if (type < tOther) {
+        if (store.dynamic_pointer_cast<LocalFSStore>()) {
             success &= checkNixInPath();
             success &= checkProfileRoots(store);
         }
