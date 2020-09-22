@@ -147,6 +147,12 @@ bool Settings::isWSL1()
 
 const string nixVersion = PACKAGE_VERSION;
 
+NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
+    {SandboxMode::smEnabled, true},
+    {SandboxMode::smRelaxed, "relaxed"},
+    {SandboxMode::smDisabled, false},
+});
+
 template<> void BaseSetting<SandboxMode>::set(const std::string & str)
 {
     if (str == "true") value = smEnabled;
