@@ -11,17 +11,21 @@ namespace nix {
 
 struct NarInfo;
 
-class BinaryCacheStore : public Store
+struct BinaryCacheStoreConfig : virtual StoreConfig
 {
-public:
+    using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
-    const Setting<bool> writeNARListing{this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
-    const Setting<bool> writeDebugInfo{this, false, "index-debug-info", "whether to index DWARF debug info files by build ID"};
-    const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
-    const Setting<Path> localNarCache{this, "", "local-nar-cache", "path to a local cache of NARs"};
-    const Setting<bool> parallelCompression{this, false, "parallel-compression",
+    const Setting<std::string> compression{(StoreConfig*) this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
+    const Setting<bool> writeNARListing{(StoreConfig*) this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
+    const Setting<bool> writeDebugInfo{(StoreConfig*) this, false, "index-debug-info", "whether to index DWARF debug info files by build ID"};
+    const Setting<Path> secretKeyFile{(StoreConfig*) this, "", "secret-key", "path to secret key used to sign the binary cache"};
+    const Setting<Path> localNarCache{(StoreConfig*) this, "", "local-nar-cache", "path to a local cache of NARs"};
+    const Setting<bool> parallelCompression{(StoreConfig*) this, false, "parallel-compression",
         "enable multi-threading compression, available for xz only currently"};
+};
+
+class BinaryCacheStore : public Store, public virtual BinaryCacheStoreConfig
+{
 
 private:
 
@@ -58,7 +62,7 @@ public:
 
 public:
 
-    virtual void init();
+    virtual void init() override;
 
 private:
 

@@ -314,11 +314,14 @@ SV * derivationFromPath(char * drvPath)
             hash = newHV();
 
             HV * outputs = newHV();
-            for (auto & i : drv.outputsAndPaths(*store()))
+            for (auto & i : drv.outputsAndOptPaths(*store())) {
                 hv_store(
                     outputs, i.first.c_str(), i.first.size(),
-                    newSVpv(store()->printStorePath(i.second.second).c_str(), 0),
+                    !i.second.second
+                        ? newSV(0) /* null value */
+                        : newSVpv(store()->printStorePath(*i.second.second).c_str(), 0),
                     0);
+            }
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
@@ -359,3 +362,13 @@ void addTempRoot(char * storePath)
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+
+SV * getBinDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixBinDir.c_str(), 0)));
+
+
+SV * getStoreDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixStore.c_str(), 0)));

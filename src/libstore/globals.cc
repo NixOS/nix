@@ -3,6 +3,7 @@
 #include "archive.hh"
 #include "args.hh"
 #include "sync.hh"
+#include "abstract-setting-to-json.hh"
 
 #include <algorithm>
 #include <map>
@@ -10,6 +11,8 @@
 #include <dlfcn.h>
 #include <sys/utsname.h>
 #include <unordered_set>
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -165,11 +168,6 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
     else abort();
-}
-
-template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
-{
-    AbstractSetting::toJSON(out);
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)

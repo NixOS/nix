@@ -16,18 +16,22 @@ struct FdSource;
 template<typename T> class Pool;
 struct ConnectionHandle;
 
+struct RemoteStoreConfig : virtual StoreConfig
+{
+    using StoreConfig::StoreConfig;
+
+    const Setting<int> maxConnections{(StoreConfig*) this, 1,
+            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
+
+    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this, std::numeric_limits<unsigned int>::max(),
+            "max-connection-age", "number of seconds to reuse a connection"};
+};
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual Store
+class RemoteStore : public virtual Store, public virtual RemoteStoreConfig
 {
 public:
-
-    const Setting<int> maxConnections{(Store*) this, 1,
-            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
-
-    const Setting<unsigned int> maxConnectionAge{(Store*) this, std::numeric_limits<unsigned int>::max(),
-            "max-connection-age", "number of seconds to reuse a connection"};
 
     virtual bool sameMachine() = 0;
 
@@ -103,8 +107,6 @@ public:
 
     void flushBadConnections();
 
-protected:
-
     struct Connection
     {
         AutoCloseFD fd;
@@ -120,6 +122,8 @@ protected:
 
     ref<Connection> openConnectionWrapper();
 
+protected:
+
     virtual ref<Connection> openConnection() = 0;
 
     void initConnection(Connection & conn);
@@ -132,23 +136,53 @@ protected:
 
     friend struct ConnectionHandle;
 
+    virtual ref<FSAccessor> getFSAccessor() override;
+
+    virtual void narFromPath(StorePathOrDesc pathOrDesc, Sink & sink) override;
+
 private:
 
     std::atomic_bool failed{false};
 
 };
 
-class UDSRemoteStore : public LocalFSStore, public RemoteStore
+struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
+{
+    UDSRemoteStoreConfig(const Store::Params & params)
+        : StoreConfig(params)
+        , LocalFSStoreConfig(params)
+        , RemoteStoreConfig(params)
+    {
+    }
+
+    UDSRemoteStoreConfig()
+        : UDSRemoteStoreConfig(Store::Params({}))
+    {
+    }
+
+    const std::string name() override { return "Local Daemon Store"; }
+};
+
+class UDSRemoteStore : public LocalFSStore, public RemoteStore, public virtual UDSRemoteStoreConfig
 {
 public:
 
     UDSRemoteStore(const Params & params);
-    UDSRemoteStore(std::string path, const Params & params);
+    UDSRemoteStore(const std::string scheme, std::string path, const Params & params);
 
     std::string getUri() override;
 
+    static std::set<std::string> uriSchemes()
+    { return {"unix"}; }
+
     bool sameMachine() override
     { return true; }
+
+    ref<FSAccessor> getFSAccessor() override
+    { return LocalFSStore::getFSAccessor(); }
+
+    void narFromPath(StorePathOrDesc path, Sink & sink) override
+    { LocalFSStore::narFromPath(path, sink); }
 
 private:
 

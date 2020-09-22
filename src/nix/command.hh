@@ -21,6 +21,13 @@ static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;
 
+struct NixMultiCommand : virtual MultiCommand, virtual Command
+{
+    void printHelp(const string & programName, std::ostream & out) override;
+
+    nlohmann::json toJSON() override;
+};
+
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
 {

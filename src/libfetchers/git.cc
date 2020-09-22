@@ -4,6 +4,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "git.hh"
+#include "url-parts.hh"
 
 #include <sys/time.h>
 

@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
+#include "url-parts.hh"
 
 #include <sys/time.h>
 
@@ -196,7 +197,7 @@ struct MercurialInputScheme : InputScheme
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             return {
-                Tree { 
+                Tree {
                     store->toRealPath(store->makeFixedOutputPathFromCA(storePath)),
                     std::move(storePath)
                 },

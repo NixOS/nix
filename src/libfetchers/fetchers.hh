@@ -26,7 +26,7 @@ struct InputScheme;
 
 struct Input
 {
-    friend class InputScheme;
+    friend struct InputScheme;
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;

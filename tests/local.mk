@@ -16,6 +16,7 @@ nix_tests = \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
+  ssh-relay.sh \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
@@ -33,7 +34,9 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   recursive.sh \
-  flakes.sh
+  describe-stores.sh \
+  flakes.sh \
+  content-addressed.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh \
 

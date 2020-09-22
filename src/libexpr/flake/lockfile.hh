@@ -7,7 +7,7 @@
 
 namespace nix {
 class Store;
-struct StorePath;
+class StorePath;
 }
 
 namespace nix::flake {

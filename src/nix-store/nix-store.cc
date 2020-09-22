@@ -34,7 +34,6 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 static Path gcRoot;
 static int rootNr = 0;
-static bool indirectRoot = false;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
@@ -65,6 +64,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
 
     if (path.path.isDerivation()) {
         if (build) store->buildPaths({path});
+        auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
@@ -77,7 +77,8 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
+            auto outPath = outputPaths.at(i->first);
+            auto retPath = store->printStorePath(outPath);
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -85,10 +86,10 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                     Path rootName = gcRoot;
                     if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out") rootName += "-" + i->first;
-                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName, indirectRoot);
+                    retPath = store2->addPermRoot(outPath, rootName);
                 }
             }
-            outputs.insert(outPath);
+            outputs.insert(retPath);
         }
         return outputs;
     }
@@ -104,7 +105,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 Path rootName = gcRoot;
                 rootNr++;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName, indirectRoot)};
+                return {store2->addPermRoot(path.path, rootName)};
             }
         }
         return {store->printStorePath(path.path)};
@@ -224,8 +225,13 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputsAndPaths(*store))
-            outputs.insert(i.second.second);
+        if (forceRealise)
+            return store->queryDerivationOutputs(storePath);
+        for (auto & i : drv.outputsAndOptPaths(*store)) {
+            if (!i.second.second)
+                throw UsageError("Cannot use output path of floating content-addressed derivation until we know what it is (e.g. by building it)");
+            outputs.insert(*i.second.second);
+        }
         return outputs;
     }
     else return {storePath};
@@ -315,11 +321,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qOutputs: {
             for (auto & i : opArgs) {
-                auto i2 = store->followLinksToStorePath(i);
-                if (forceRealise) realisePath({i2});
-                Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputsAndPaths(*store))
-                    cout << fmt("%1%\n", store->printStorePath(j.second.second));
+                auto outputs = maybeUseOutputs(store->followLinksToStorePath(i), true, forceRealise);
+                for (auto & outputPath : outputs)
+                    cout << fmt("%1%\n", store->printStorePath(outputPath));
             }
             break;
         }
@@ -1094,7 +1098,7 @@ static int _main(int argc, char * * argv)
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
             else if (*arg == "--indirect")
-                indirectRoot = true;
+                ;
             else if (*arg == "--no-output")
                 noOutput = true;
             else if (*arg != "" && arg->at(0) == '-') {

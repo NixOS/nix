@@ -152,7 +152,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         debug(format("switching to new user environment"));
-        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
+        Path generation = createGeneration(ref<LocalFSStore>(store2), profile,
+            store2->parseStorePath(topLevelOut));
         switchLink(profile, generation);
     }
 

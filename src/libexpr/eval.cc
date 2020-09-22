@@ -87,6 +87,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
             else if (*i == '\t') str << "\\t";
+            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
             else str << *i;
         str << "\"";
         break;
@@ -355,6 +356,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
+    , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -369,7 +371,11 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
-    addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+
+    try {
+        addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+    } catch (Error &) {
+    }
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
@@ -381,10 +387,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
             auto path = r.second;
 
             if (store->isInStore(r.second)) {
-                StorePathSet closure;
-                store->computeFSClosure(store->toStorePath(r.second).first, closure);
-                for (auto & path : closure)
-                    allowedPaths->insert(store->printStorePath(path));
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                    for (auto & path : closure)
+                        allowedPaths->insert(store->printStorePath(path));
+                } catch (InvalidPath &) {
+                    allowedPaths->insert(r.second);
+                }
             } else
                 allowedPaths->insert(r.second);
         }
@@ -509,7 +519,7 @@ Value * EvalState::addPrimOp(const string & name,
     if (arity == 0) {
         auto vPrimOp = allocValue();
         vPrimOp->type = tPrimOp;
-        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
+        vPrimOp->primOp = new PrimOp { .fun = primOp, .arity = 1, .name = sym };
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
@@ -517,7 +527,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->type = tPrimOp;
-    v->primOp = new PrimOp(primOp, arity, sym);
+    v->primOp = new PrimOp { .fun = primOp, .arity = arity, .name = sym };
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
@@ -525,9 +535,56 @@ Value * EvalState::addPrimOp(const string & name,
 }
 
 
+Value * EvalState::addPrimOp(PrimOp && primOp)
+{
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
+    if (primOp.arity == 0) {
+        primOp.arity = 1;
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(std::move(primOp));
+        Value v;
+        mkApp(v, *vPrimOp, *vPrimOp);
+        return addConstant(primOp.name, v);
+    }
+
+    Symbol envName = primOp.name;
+    if (hasPrefix(primOp.name, "__"))
+        primOp.name = symbols.create(std::string(primOp.name, 2));
+
+    Value * v = allocValue();
+    v->type = tPrimOp;
+    v->primOp = new PrimOp(std::move(primOp));
+    staticBaseEnv.vars[envName] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
+    return v;
+}
+
+
 Value & EvalState::getBuiltin(const string & name)
 {
     return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+}
+
+
+std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
+{
+    if (v.type == tPrimOp || v.type == tPrimOpApp) {
+        auto v2 = &v;
+        while (v2->type == tPrimOpApp)
+            v2 = v2->primOpApp.left;
+        if (v2->primOp->doc)
+            return Doc {
+                .pos = noPos,
+                .name = v2->primOp->name,
+                .arity = v2->primOp->arity,
+                .args = v2->primOp->args,
+                .doc = v2->primOp->doc,
+            };
+    }
+    return {};
 }
 
 
@@ -1297,7 +1354,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    mkAttrs(*actualArgs, std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
 
     if (fun.lambda.fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass

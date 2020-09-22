@@ -32,6 +32,7 @@ extern "C" {
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
+#include "markdown.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -419,7 +420,8 @@ bool NixRepl::processLine(string line)
              << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n";
+             << "  :u <expr>     Build derivation, then start nix-shell\n"
+             << "  :doc <expr>   Show documentation of a builtin function\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -494,8 +496,8 @@ bool NixRepl::processLine(string line)
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPathRaw}) == 0) {
                 auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputsAndPaths(*state->store))
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.second));
+                for (auto & i : drv.outputsAndOptPaths(*state->store))
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPathRaw});
@@ -512,6 +514,29 @@ bool NixRepl::processLine(string line)
 
     else if (command == ":q" || command == ":quit")
         return false;
+
+    else if (command == ":doc") {
+        Value v;
+        evalString(arg, v);
+        if (auto doc = state->getDoc(v)) {
+            std::string markdown;
+
+            if (!doc->args.empty() && doc->name) {
+                auto args = doc->args;
+                for (auto & arg : args)
+                    arg = "*" + arg + "*";
+
+                markdown +=
+                    "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
+                    + concatStringsSep(" ", args) + "\n\n";
+            }
+
+            markdown += trim(stripIndentation(doc->doc));
+
+            std::cout << renderMarkdownToTerminal(markdown);
+        } else
+            throw Error("value does not have documentation");
+    }
 
     else if (command != "")
         throw Error("unknown command '%1%'", command);
@@ -786,7 +811,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         return {
           Example{
             "Display all special commands within the REPL:",
-              "nix repl\n  nix-repl> :?"
+            "nix repl\nnix-repl> :?"
           }
         };
     }
