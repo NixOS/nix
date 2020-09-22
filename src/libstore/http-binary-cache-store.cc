@@ -2,12 +2,20 @@
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
+#include "callback.hh"
 
 namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
-class HttpBinaryCacheStore : public BinaryCacheStore
+struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+{
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+
+    const std::string name() override { return "Http Binary Cache Store"; }
+};
+
+class HttpBinaryCacheStore : public BinaryCacheStore, public HttpBinaryCacheStoreConfig
 {
 private:
 
@@ -24,9 +32,12 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const Params & params, const Path & _cacheUri)
-        : BinaryCacheStore(params)
-        , cacheUri(_cacheUri)
+        const std::string & scheme,
+        const Path & _cacheUri,
+        const Params & params)
+        : StoreConfig(params)
+        , BinaryCacheStore(params)
+        , cacheUri(scheme + "://" + _cacheUri)
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -55,6 +66,13 @@ public:
         }
     }
 
+    static std::set<std::string> uriSchemes()
+    {
+        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
+        auto ret = std::set<std::string>({"http", "https"});
+        if (forceHttp) ret.insert("file");
+        return ret;
+    }
 protected:
 
     void maybeDisable()
@@ -85,7 +103,7 @@ protected:
         checkEnabled();
 
         try {
-            FileTransferRequest request(cacheUri + "/" + path);
+            FileTransferRequest request(makeRequest(path));
             request.head = true;
             getFileTransfer()->download(request);
             return true;
@@ -103,7 +121,7 @@ protected:
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
-        auto req = FileTransferRequest(cacheUri + "/" + path);
+        auto req = makeRequest(path);
         req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
         req.mimeType = mimeType;
         try {
@@ -115,8 +133,11 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        FileTransferRequest request(cacheUri + "/" + path);
-        return request;
+        return FileTransferRequest(
+            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
+            ? path
+            : cacheUri + "/" + path);
+
     }
 
     void getFile(const std::string & path, Sink & sink) override
@@ -159,18 +180,6 @@ protected:
 
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-    if (std::string(uri, 0, 7) != "http://" &&
-        std::string(uri, 0, 8) != "https://" &&
-        (!forceHttp || std::string(uri, 0, 7) != "file://"))
-        return 0;
-    auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
-    store->init();
-    return store;
-});
+static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regStore;
 
 }

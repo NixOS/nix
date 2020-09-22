@@ -41,5 +41,3 @@ sandbox_shell = @sandbox_shell@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
 system = @system@
-xmllint = @xmllint@
-xsltproc = @xsltproc@
