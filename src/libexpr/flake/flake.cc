@@ -367,7 +367,7 @@ LockedFlake lockFlake(
 
                 /* If we have an --update-input flag for an input
                    of this input, then we must fetch the flake to
-                   to update it. */
+                   update it. */
                 auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
 
                 auto hasChildUpdate =
