@@ -93,7 +93,7 @@ void Source::operator () (unsigned char * data, size_t len)
 }
 
 
-std::string Source::drain()
+void Source::drainInto(Sink & sink)
 {
     std::string s;
     std::vector<unsigned char> buf(8192);
@@ -101,12 +101,19 @@ std::string Source::drain()
         size_t n;
         try {
             n = read(buf.data(), buf.size());
-            s.append((char *) buf.data(), n);
+            sink(buf.data(), n);
         } catch (EndOfFile &) {
             break;
         }
     }
-    return s;
+}
+
+
+std::string Source::drain()
+{
+    StringSink s;
+    drainInto(s);
+    return *s.s;
 }
 
 
