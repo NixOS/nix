@@ -63,12 +63,20 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    /* Add a content-addressable store path. `dump` will be drained. */
+    ref<const ValidPathInfo> addCAToStore(
+        Source & dump,
+        const string & name,
+        ContentAddressMethod caMethod,
+        const StorePathSet & references,
+        RepairFlag repair);
+
+    /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
-
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
@@ -138,6 +146,8 @@ protected:
     virtual ref<FSAccessor> getFSAccessor() override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
+
+    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
 
 private:
 
