@@ -6,6 +6,7 @@
 #include "derivations.hh"
 #include "nar-info.hh"
 #include "references.hh"
+#include "callback.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -109,7 +110,7 @@ LocalStore::LocalStore(const Params & params)
     }
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1") {
+    if (!settings.allowSymlinkedStore) {
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {

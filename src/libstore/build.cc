@@ -17,6 +17,7 @@
 #include "daemon.hh"
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
+#include "callback.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -2947,14 +2948,6 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
     {
         next->addToStore(info, narSource, repair, checkSigs);
         goal.addDependency(info.path);
-    }
-
-    StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
-    {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
-        goal.addDependency(path);
-        return path;
     }
 
     StorePath addTextToStore(const string & name, const string & s,
