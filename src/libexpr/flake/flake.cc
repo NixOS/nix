@@ -215,10 +215,9 @@ static Flake getFlake(
 
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         expectType(state, tLambda, *outputs->value, *outputs->pos);
-        flake.vOutputs = allocRootValue(outputs->value);
 
-        if ((*flake.vOutputs)->lambda.fun->matchAttrs) {
-            for (auto & formal : (*flake.vOutputs)->lambda.fun->formals->formals) {
+        if (outputs->value->lambda.fun->matchAttrs) {
+            for (auto & formal : outputs->value->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {
                         .ref = parseFlakeRef(formal.name)
