@@ -493,7 +493,8 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if (!fullDrv.inputDrvs.empty() && fullDrv.type() == DerivationType::CAFloating) {
+        if ((!fullDrv.inputDrvs.empty() &&
+             fullDrv.type() == DerivationType::CAFloating) || fullDrv.type() == DerivationType::DeferredInputAddressed) {
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
                aliasing that resolved derivation goal */
@@ -3165,6 +3166,15 @@ void DerivationGoal::registerOutputs()
             },
             [&](DerivationOutputCAFloating dof) {
                 return newInfoFromCA(dof);
+            },
+                [&](DerivationOutputDeferred) {
+                // No derivation should reach that point without having been
+                // rewritten first
+                assert(false);
+                // Ugly, but the compiler insists on having this return a value
+                // of type `ValidPathInfo` despite the `assert(false)`, so
+                // let's provide it
+                return *(ValidPathInfo*)0;
             },
         }, output.output);
 

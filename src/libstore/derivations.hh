@@ -41,12 +41,18 @@ struct DerivationOutputCAFloating
     HashType hashType;
 };
 
+/* Input-addressed output which depends on a (CA) derivation whose hash isn't
+ * known atm
+ */
+struct DerivationOutputDeferred {};
+
 struct DerivationOutput
 {
     std::variant<
         DerivationOutputInputAddressed,
         DerivationOutputCAFixed,
-        DerivationOutputCAFloating
+        DerivationOutputCAFloating,
+        DerivationOutputDeferred
     > output;
     std::optional<HashType> hashAlgoOpt(const Store & store) const;
     /* Note, when you use this function you should make sure that you're passing
@@ -72,6 +78,7 @@ typedef std::map<string, string> StringPairs;
 
 enum struct DerivationType : uint8_t {
     InputAddressed,
+    DeferredInputAddressed,
     CAFixed,
     CAFloating,
 };
@@ -167,9 +174,12 @@ std::string outputPathName(std::string_view drvName, std::string_view outputName
 // whose output hashes are always known since they are fixed up-front.
 typedef std::map<std::string, Hash> CaOutputHashes;
 
+struct UnknownHashes {};
+
 typedef std::variant<
     Hash, // regular DRV normalized hash
-    CaOutputHashes
+    CaOutputHashes, // Fixed-output derivation hashes
+    UnknownHashes // Deferred hashes for floating outputs drvs and their dependencies
 > DrvHashModulo;
 
 /* Returns hashes with the details of fixed-output subderivations
