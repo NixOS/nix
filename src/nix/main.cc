@@ -185,6 +185,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
+        evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
         auto res = nlohmann::json::object();
         auto builtins = state.baseEnv.values[0]->attrs;

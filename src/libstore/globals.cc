@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "archive.hh"
 #include "args.hh"
+#include "abstract-setting-to-json.hh"
 
 #include <algorithm>
 #include <map>
@@ -160,11 +161,6 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
     else abort();
-}
-
-template<> nlohmann::json BaseSetting<SandboxMode>::toJSON()
-{
-    return AbstractSetting::toJSON();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)

@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
+#include "url-parts.hh"
 
 #include <sys/time.h>
 
