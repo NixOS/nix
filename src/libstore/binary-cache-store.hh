@@ -72,7 +72,7 @@ private:
 
     void writeNarInfo(ref<NarInfo> narInfo);
 
-    StorePath addToStoreCommon(
+    ref<const ValidPathInfo> addToStoreCommon(
         Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
         std::function<ValidPathInfo(HashResult)> mkInfo);
 

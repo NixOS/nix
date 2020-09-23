@@ -142,7 +142,7 @@ struct FileSource : FdSource
     }
 };
 
-StorePath BinaryCacheStore::addToStoreCommon(
+ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
     std::function<ValidPathInfo(HashResult)> mkInfo)
 {
@@ -297,7 +297,7 @@ StorePath BinaryCacheStore::addToStoreCommon(
 
     stats.narInfoWrite++;
 
-    return narInfo->path;
+    return narInfo;
 }
 
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
@@ -330,7 +330,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & nam
         };
         info.narSize = nar.second;
         return info;
-    });
+    })->path;
 }
 
 bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
@@ -430,7 +430,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
         info.narSize = nar.second;
         info.references = references;
         return info;
-    });
+    })->path;
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
