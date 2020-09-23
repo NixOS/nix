@@ -2,7 +2,6 @@
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "store-api.hh"
-#include "local-store.hh"
 #include "finally.hh"
 #include "affinity.hh"
 #include "archive.hh"
@@ -241,6 +240,23 @@ struct ClientSettings
     }
 };
 
+static void writeValidPathInfo(
+    ref<Store> store,
+    unsigned int clientVersion,
+    Sink & to,
+    std::shared_ptr<const ValidPathInfo> info)
+{
+    to << (info->deriver ? store->printStorePath(*info->deriver) : "")
+       << info->narHash.to_string(Base16, false);
+    WorkerProto<StorePathSet>::write(*store, to, info->referencesPossiblyToSelf());
+    to << info->registrationTime << info->narSize;
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
+        to << info->ultimate
+           << info->sigs
+           << renderContentAddress(info->ca);
+    }
+}
+
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
@@ -351,58 +367,88 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        HashType hashAlgo;
-        std::string baseName;
-        FileIngestionMethod method;
-        {
-            bool fixed;
-            uint8_t recursive;
-            std::string hashAlgoRaw;
-            from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
-            if (recursive > (uint8_t) FileIngestionMethod::Recursive)
-                throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
-            method = FileIngestionMethod { recursive };
-            /* Compatibility hack. */
-            if (!fixed) {
-                hashAlgoRaw = "sha256";
-                method = FileIngestionMethod::Recursive;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 25) {
+            auto name = readString(from);
+            auto camStr = readString(from);
+            auto refs = WorkerProto<StorePathSet>::read(*store, from);
+            bool repairBool;
+            from >> repairBool;
+            auto repair = RepairFlag{repairBool};
+
+            logger->startWork();
+            auto pathInfo = [&]() {
+                // NB: FramedSource must be out of scope before logger->stopWork();
+                ContentAddressMethod contentAddressMethod = parseContentAddressMethod(camStr);
+                FramedSource source(from);
+                // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
+                return std::visit(overloaded {
+                    [&](TextHashMethod &_) {
+                        // We could stream this by changing Store
+                        std::string contents = source.drain();
+                        auto path = store->addTextToStore(name, contents, refs, repair);
+                        return store->queryPathInfo(path);
+                    },
+                    [&](FixedOutputHashMethod &fohm) {
+                        if (!refs.empty())
+                            throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
+                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                        return store->queryPathInfo(path);
+                    },
+                }, contentAddressMethod);
+            }();
+            logger->stopWork();
+
+            to << store->printStorePath(pathInfo->path);
+            writeValidPathInfo(store, clientVersion, to, pathInfo);
+
+        } else {
+            HashType hashAlgo;
+            std::string baseName;
+            FileIngestionMethod method;
+            {
+                bool fixed;
+                uint8_t recursive;
+                std::string hashAlgoRaw;
+                from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
+                if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                    throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
+                method = FileIngestionMethod { recursive };
+                /* Compatibility hack. */
+                if (!fixed) {
+                    hashAlgoRaw = "sha256";
+                    method = FileIngestionMethod::Recursive;
+                }
+                hashAlgo = parseHashType(hashAlgoRaw);
             }
-            hashAlgo = parseHashType(hashAlgoRaw);
-        }
 
-        StringSink saved;
-        TeeSource savedNARSource(from, saved);
-        RetrieveRegularNARSink savedRegular { saved };
+            StringSink saved;
+            TeeSource savedNARSource(from, saved);
+            RetrieveRegularNARSink savedRegular { saved };
 
-        switch (method) {
-        case FileIngestionMethod::Recursive: {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNARSource);
-            break;
-        }
-        case FileIngestionMethod::Git: {
-            ParseSink sink;
-            parseGit(sink, savedNARSource, store->storeDir, store->storeDir);
-            break;
-        }
-        case FileIngestionMethod::Flat: {
-            parseDump(savedRegular, from);
-            break;
-        }
-        }
+            if (method == FileIngestionMethod::Recursive) {
+                /* Get the entire NAR dump from the client and save it to
+                  a string so that we can pass it to
+                  addToStoreFromDump(). */
+                ParseSink sink; /* null sink; just parse the NAR */
+                parseDump(sink, savedNARSource);
+            } else if (method == FileIngestionMethod::Flat) {
+                parseDump(savedRegular, from);
+            } else {
+                /* Should have validated above that no other file ingestion
+                   method was used. */
+                assert(false);
+            }
 
-        logger->startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
+            logger->startWork();
+            if (!savedRegular.regular) throw Error("regular file expected");
 
-        // FIXME: try to stream directly from `from`.
-        StringSource dumpSource { *saved.s };
-        auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
-        logger->stopWork();
+            // FIXME: try to stream directly from `from`.
+            StringSource dumpSource { *saved.s };
+            auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+            logger->stopWork();
 
-        to << store->printStorePath(path);
+            to << store->printStorePath(path);
+        }
         break;
     }
 
@@ -684,15 +730,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash.to_string(Base16, false);
-            WorkerProto<StorePathSet>::write(*store, to, info->referencesPossiblyToSelf());
-            to << info->registrationTime << info->narSize;
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-                to << info->ultimate
-                   << info->sigs
-                   << renderContentAddress(info->ca);
-            }
+            writeValidPathInfo(store, clientVersion, to, info);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
@@ -758,59 +796,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             info.ultimate = false;
 
         if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
-
-            struct FramedSource : Source
-            {
-                Source & from;
-                bool eof = false;
-                std::vector<unsigned char> pending;
-                size_t pos = 0;
-
-                FramedSource(Source & from) : from(from)
-                { }
-
-                ~FramedSource()
-                {
-                    if (!eof) {
-                        while (true) {
-                            auto n = readInt(from);
-                            if (!n) break;
-                            std::vector<unsigned char> data(n);
-                            from(data.data(), n);
-                        }
-                    }
-                }
-
-                size_t read(unsigned char * data, size_t len) override
-                {
-                    if (eof) throw EndOfFile("reached end of FramedSource");
-
-                    if (pos >= pending.size()) {
-                        size_t len = readInt(from);
-                        if (!len) {
-                            eof = true;
-                            return 0;
-                        }
-                        pending = std::vector<unsigned char>(len);
-                        pos = 0;
-                        from(pending.data(), len);
-                    }
-
-                    auto n = std::min(len, pending.size() - pos);
-                    memcpy(data, pending.data() + pos, n);
-                    pos += n;
-                    return n;
-                }
-            };
-
             logger->startWork();
-
             {
                 FramedSource source(from);
                 store->addToStore(info, source, (RepairFlag) repair,
                     dontCheckSigs ? NoCheckSigs : CheckSigs);
             }
-
             logger->stopWork();
         }
 
