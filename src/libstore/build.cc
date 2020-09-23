@@ -3735,15 +3735,12 @@ void DerivationGoal::runChild()
 }
 
 
-static void moveCheckToStore(const Path & src, const Path & dst)
+/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
+   it's a directory and we're not root (to be able to update the
+   directory's parent link ".."). */
+static void movePath(const Path & src, const Path & dst)
 {
-    /* For the rename of directory to succeed, we must be running as root or
-       the directory must be made temporarily writable (to update the
-       directory's parent link ".."). */
-    struct stat st;
-    if (lstat(src.c_str(), &st) == -1) {
-        throw SysError("getting attributes of path '%1%'", src);
-    }
+    auto st = lstat(src);
 
     bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
 
@@ -3942,6 +3939,10 @@ void DerivationGoal::registerOutputs()
                 sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
                 StringSource source(*sink.s);
                 restorePath(actualPath, source);
+
+                /* FIXME: set proper permissions in restorePath() so
+                   we don't have to do another traversal. */
+                canonicalisePathMetaData(actualPath, -1, inodesSeen);
             }
         };
 
@@ -4024,7 +4025,7 @@ void DerivationGoal::registerOutputs()
             [&](DerivationOutputInputAddressed output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
-                /* Preemtively add rewrite rule for final hash, as that is
+                /* Preemptively add rewrite rule for final hash, as that is
                    what the NAR hash will use rather than normalized-self references */
                 if (scratchPath != requiredFinalPath)
                     outputRewrites.insert_or_assign(
@@ -4098,27 +4099,9 @@ void DerivationGoal::registerOutputs()
                    else. No moving needed. */
                 assert(newInfo.ca);
             } else {
-                /* Temporarily add write perm so we can move, will be fixed
-                   later. */
-                {
-                    struct stat st;
-                    auto & mode = st.st_mode;
-                    if (lstat(actualPath.c_str(), &st))
-                        throw SysError("getting attributes of path '%1%'", actualPath);
-                    mode |= 0200;
-                    /* Try to change the perms, but only if the file isn't a
-                       symlink as symlinks permissions are mostly ignored and
-                       calling `chmod` on it will just forward the call to the
-                       target of the link. */
-                    if (!S_ISLNK(st.st_mode))
-                        if (chmod(actualPath.c_str(), mode) == -1)
-                            throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
-                }
-                if (rename(
-                        actualPath.c_str(),
-                        worker.store.toRealPath(finalDestPath).c_str()) == -1)
-                    throw SysError("moving build output '%1%' from it's temporary location to the Nix store", finalDestPath);
-                actualPath = worker.store.toRealPath(finalDestPath);
+                auto destPath = worker.store.toRealPath(finalDestPath);
+                movePath(actualPath, destPath);
+                actualPath = destPath;
             }
         }
 
@@ -4128,9 +4111,9 @@ void DerivationGoal::registerOutputs()
             if (newInfo.narHash != oldInfo.narHash) {
                 worker.checkMismatch = true;
                 if (settings.runDiffHook || settings.keepFailed) {
-                    Path dst = worker.store.toRealPath(finalDestPath + checkSuffix);
+                    auto dst = worker.store.toRealPath(finalDestPath + checkSuffix);
                     deletePath(dst);
-                    moveCheckToStore(actualPath, dst);
+                    movePath(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
