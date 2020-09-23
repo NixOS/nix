@@ -1675,6 +1675,33 @@ void DerivationGoal::tryLocalBuild() {
 }
 
 
+static void chmod_(const Path & path, mode_t mode)
+{
+    if (chmod(path.c_str(), mode) == -1)
+        throw SysError("setting permissions on '%s'", path);
+}
+
+
+/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
+   it's a directory and we're not root (to be able to update the
+   directory's parent link ".."). */
+static void movePath(const Path & src, const Path & dst)
+{
+    auto st = lstat(src);
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError("renaming '%1%' to '%2%'", src, dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
 void replaceValidPath(const Path & storePath, const Path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
@@ -1683,12 +1710,20 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
        we're repairing (say) Glibc, we end up with a broken system. */
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
     if (pathExists(storePath))
-        rename(storePath.c_str(), oldPath.c_str());
-    if (rename(tmpPath.c_str(), storePath.c_str()) == -1) {
-        auto ex = SysError("moving '%s' to '%s'", tmpPath, storePath);
-        rename(oldPath.c_str(), storePath.c_str()); // attempt to recover
-        throw ex;
+        movePath(storePath, oldPath);
+
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            // attempt to recover
+            movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreException();
+        }
+        throw;
     }
+
     deletePath(oldPath);
 }
 
@@ -2003,13 +2038,6 @@ HookReply DerivationGoal::tryBuildHook()
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
-}
-
-
-static void chmod_(const Path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
 }
 
 
@@ -3728,26 +3756,6 @@ void DerivationGoal::runChild()
         writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
         _exit(1);
     }
-}
-
-
-/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
-   it's a directory and we're not root (to be able to update the
-   directory's parent link ".."). */
-static void movePath(const Path & src, const Path & dst)
-{
-    auto st = lstat(src);
-
-    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
-
-    if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
-
-    if (rename(src.c_str(), dst.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", src, dst);
-
-    if (changePerm)
-        chmod_(dst, st.st_mode);
 }
 
 
