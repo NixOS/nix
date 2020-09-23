@@ -2367,10 +2367,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : inputPaths) {
             auto p = worker.store.printStorePath(i);
             Path r = worker.store.toRealPath(p);
-            struct stat st;
-            if (lstat(r.c_str(), &st))
-                throw SysError("getting attributes of path '%s'", p);
-            if (S_ISDIR(st.st_mode))
+            if (S_ISDIR(lstat(r).st_mode))
                 dirsInChroot.insert_or_assign(p, r);
             else
                 linkOrCopy(r, chrootRootDir + p);
@@ -3144,9 +3141,7 @@ void DerivationGoal::addDependency(const StorePath & path)
             if (pathExists(target))
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
 
-            struct stat st;
-            if (lstat(source.c_str(), &st))
-                throw SysError("getting attributes of path '%s'", source);
+            auto st = lstat(source);
 
             if (S_ISDIR(st.st_mode)) {
 

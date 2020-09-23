@@ -66,9 +66,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     sink << "(";
 
