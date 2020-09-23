@@ -27,6 +27,8 @@ struct ArchiveSettings : Config
         #endif
         "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+    Setting<bool> preallocateContents{this, true, "preallocate-contents",
+        "Whether to preallocate files when writing objects with known size."};
 };
 
 static ArchiveSettings archiveSettings;
@@ -325,6 +327,9 @@ struct RestoreSink : ParseSink
 
     void preallocateContents(uint64_t len)
     {
+        if (!archiveSettings.preallocateContents)
+            return;
+
 #if HAVE_POSIX_FALLOCATE
         if (len) {
             errno = posix_fallocate(fd.get(), 0, len);
