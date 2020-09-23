@@ -1675,7 +1675,7 @@ void DerivationGoal::tryLocalBuild() {
 }
 
 
-void replaceValidPath(const Path & storePath, const Path tmpPath)
+void replaceValidPath(const Path & storePath, const Path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
        tmpPath (the replacement), so we have to move it out of the
@@ -1685,8 +1685,9 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
     if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1) {
+        auto ex = SysError("moving '%s' to '%s'", tmpPath, storePath);
         rename(oldPath.c_str(), storePath.c_str()); // attempt to recover
-        throw SysError("moving '%s' to '%s'", tmpPath, storePath);
+        throw ex;
     }
     deletePath(oldPath);
 }
