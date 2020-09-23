@@ -13,5 +13,7 @@ jobs:
       with:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v10
+      with:
+        skip_adding_nixpkgs_channel: true
     #- run: nix flake check
     - run: nix-build -A checks.$(if [[ `uname` = Linux ]]; then echo x86_64-linux; else echo x86_64-darwin; fi)

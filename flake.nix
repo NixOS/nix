@@ -2,8 +2,9 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, lowdown-src }:
 
     let
 
@@ -57,15 +58,14 @@
         configureFlags =
           lib.optionals stdenv.isLinux [
             "--with-sandbox-shell=${sh}/bin/busybox"
+            "LDFLAGS=-fuse-ld=gold"
           ];
 
         buildDeps =
           [ bison
             flex
-            libxml2
-            libxslt
-            docbook5
-            docbook_xsl_ns
+            mdbook
+            lowdown
             autoconf-archive
             autoreconfHook
 
@@ -74,9 +74,6 @@
             openssl pkgconfig sqlite
             libarchive
             boost
-            (if lib.versionAtLeast lib.version "20.03pre"
-             then nlohmann_json
-             else nlohmann_json.override { multipleHeaders = true; })
             nlohmann_json
 
             # Tests
@@ -140,7 +137,7 @@
 
           enableParallelBuilding = true;
 
-          makeFlags = "profiledir=$(out)/etc/profile.d";
+          makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
           doCheck = true;
 
@@ -172,6 +169,7 @@
                 pkgconfig
                 pkgs.perl
                 boost
+                nlohmann_json
               ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
@@ -185,6 +183,30 @@
             postUnpack = "sourceRoot=$sourceRoot/perl";
           };
 
+        };
+
+        lowdown = with final; stdenv.mkDerivation {
+          name = "lowdown-0.7.1";
+
+          /*
+          src = fetchurl {
+            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.1.tar.gz;
+            hash = "sha512-1daoAQfYD0LdhK6aFhrSQvadjc5GsSPBZw0fJDb+BEHYMBLjqiUl2A7H8N+l0W4YfGKqbsPYSrCy4vct+7U6FQ==";
+          };
+          */
+
+          src = lowdown-src;
+
+          outputs = [ "out" "dev" ];
+
+          buildInputs = [ which ];
+
+          configurePhase =
+            ''
+              ./configure \
+                PREFIX=${placeholder "dev"} \
+                BINDIR=${placeholder "out"}/bin
+            '';
         };
 
       };
@@ -313,9 +335,6 @@
             # syntax-check generated dot files, it still requires some
             # fonts.  So provide those.
             FONTCONFIG_FILE = texFunctions.fontsConf;
-
-            # To test building without precompiled headers.
-            makeFlagsArray = [ "PRECOMPILE_HEADERS=0" ];
           };
 
         # System tests.
@@ -421,6 +440,8 @@
         stdenv.mkDerivation {
           name = "nix";
 
+          outputs = [ "out" "dev" "doc" ];
+
           buildInputs = buildDeps ++ propagatedDeps ++ perlDeps;
 
           inherit configureFlags;
@@ -431,11 +452,9 @@
 
           shellHook =
             ''
-              export prefix=$(pwd)/inst
-              configureFlags+=" --prefix=$prefix"
-              PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
               PATH=$prefix/bin:$PATH
               unset PYTHONPATH
+              export MANPATH=$out/share/man:$MANPATH
             '';
         });
 

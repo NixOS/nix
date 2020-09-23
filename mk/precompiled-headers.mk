@@ -1,4 +1,4 @@
-PRECOMPILE_HEADERS ?= 1
+PRECOMPILE_HEADERS ?= 0
 
 print-var-help += \
   echo "  PRECOMPILE_HEADERS ($(PRECOMPILE_HEADERS)): Whether to use precompiled headers to speed up the build";

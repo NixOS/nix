@@ -26,7 +26,7 @@ OPTIMIZE = 1
 ifeq ($(OPTIMIZE), 1)
   GLOBAL_CXXFLAGS += -O3
 else
-  GLOBAL_CXXFLAGS += -O0
+  GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
 endif
 
 include mk/lib.mk

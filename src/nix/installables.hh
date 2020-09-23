@@ -14,11 +14,19 @@ struct SourceExprCommand;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }
 
-struct Buildable
-{
-    std::optional<StorePath> drvPath;
-    std::map<std::string, StorePath> outputs;
+struct BuildableOpaque {
+    StorePath path;
 };
+
+struct BuildableFromDrv {
+    StorePath drvPath;
+    std::map<std::string, std::optional<StorePath>> outputs;
+};
+
+typedef std::variant<
+    BuildableOpaque,
+    BuildableFromDrv
+> Buildable;
 
 typedef std::vector<Buildable> Buildables;
 
@@ -54,14 +62,14 @@ struct Installable
     }
 
     virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursors(EvalState & state, bool useEvalCache);
+    getCursors(EvalState & state);
 
     std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
-    getCursor(EvalState & state, bool useEvalCache);
+    getCursor(EvalState & state);
 
     virtual FlakeRef nixpkgsFlakeRef() const
     {
-        return std::move(FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}}));
+        return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
     }
 };
 
@@ -74,7 +82,7 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        StorePath outPath;
+        std::optional<StorePath> outPath;
         std::string outputName;
     };
 
@@ -110,7 +118,7 @@ struct InstallableFlake : InstallableValue
     std::pair<Value *, Pos> toValue(EvalState & state) override;
 
     std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursors(EvalState & state, bool useEvalCache) override;
+    getCursors(EvalState & state) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
@@ -119,7 +127,6 @@ struct InstallableFlake : InstallableValue
 
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake,
-    bool useEvalCache);
+    std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }

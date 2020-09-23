@@ -12,24 +12,16 @@ perl/Makefile.config
 /svn-revision
 /libtool
 
-/corepkgs/config.nix
-
-# /corepkgs/channels/
-/corepkgs/channels/unpack.sh
-
-# /corepkgs/nar/
-/corepkgs/nar/nar.sh
-/corepkgs/nar/unnar.sh
-
 # /doc/manual/
-/doc/manual/manual.html
-/doc/manual/manual.xmli
-/doc/manual/manual.pdf
-/doc/manual/manual.is-valid
 /doc/manual/*.1
 /doc/manual/*.5
 /doc/manual/*.8
-/doc/manual/version.txt
+/doc/manual/nix.json
+/doc/manual/conf-file.json
+/doc/manual/builtins.json
+/doc/manual/src/command-ref/nix.md
+/doc/manual/src/command-ref/conf-file.md
+/doc/manual/src/expressions/builtins.md
 
 # /scripts/
 /scripts/nix-profile.sh
@@ -106,7 +98,7 @@ perl/Makefile.config
 
 /src/resolve-system-dependencies/resolve-system-dependencies
 
-inst/
+outputs/
 
 *.a
 *.o
@@ -124,5 +116,11 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+# ccls
+/.ccls-cache
+
+# auto-generated compilation database
+compile_commands.json
 
 nix-rust/target

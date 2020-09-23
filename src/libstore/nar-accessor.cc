@@ -49,7 +49,8 @@ struct NarAccessor : public FSAccessor
             : acc(acc), source(source)
         { }
 
-        void createMember(const Path & path, NarMember member) {
+        void createMember(const Path & path, NarMember member)
+        {
             size_t level = std::count(path.begin(), path.end(), '/');
             while (parents.size() > level) parents.pop();
 

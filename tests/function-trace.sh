@@ -32,8 +32,6 @@ expect_trace() {
 
 # failure inside a tryEval
 expect_trace 'builtins.tryEval (throw "example")' "
-function-trace entered undefined position at
-function-trace exited undefined position at
 function-trace entered (string):1:1 at
 function-trace entered (string):1:19 at
 function-trace exited (string):1:19 at
@@ -42,32 +40,24 @@ function-trace exited (string):1:1 at
 
 # Missing argument to a formal function
 expect_trace '({ x }: x) { }' "
-function-trace entered undefined position at
-function-trace exited undefined position at
 function-trace entered (string):1:1 at
 function-trace exited (string):1:1 at
 "
 
 # Too many arguments to a formal function
 expect_trace '({ x }: x) { x = "x"; y = "y"; }' "
-function-trace entered undefined position at
-function-trace exited undefined position at
 function-trace entered (string):1:1 at
 function-trace exited (string):1:1 at
 "
 
 # Not enough arguments to a lambda
 expect_trace '(x: y: x + y) 1' "
-function-trace entered undefined position at
-function-trace exited undefined position at
 function-trace entered (string):1:1 at
 function-trace exited (string):1:1 at
 "
 
 # Too many arguments to a lambda
 expect_trace '(x: x) 1 2' "
-function-trace entered undefined position at
-function-trace exited undefined position at
 function-trace entered (string):1:1 at
 function-trace exited (string):1:1 at
 function-trace entered (string):1:1 at
@@ -76,8 +66,6 @@ function-trace exited (string):1:1 at
 
 # Not a function
 expect_trace '1 2' "
-function-trace entered undefined position at
-function-trace exited undefined position at
 function-trace entered (string):1:1 at
 function-trace exited (string):1:1 at
 "

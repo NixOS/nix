@@ -11,6 +11,7 @@
 #include "nar-accessor.hh"
 #include "json.hh"
 #include "thread-pool.hh"
+#include "callback.hh"
 
 #include <chrono>
 #include <future>
@@ -22,7 +23,8 @@
 namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(const Params & params)
-    : Store(params)
+    : BinaryCacheStoreConfig(params)
+    , Store(params)
 {
     if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
@@ -143,7 +145,7 @@ struct FileSource : FdSource
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    assert(info.narHash && info.narSize);
+    assert(info.narSize);
 
     if (!repair && isValidPath(info.path)) {
         // FIXME: copyNAR -> null sink
@@ -218,7 +220,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
             }
         }
 
-        upsertFile(std::string(info.path.to_string()) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.hashPart()) + ".ls", jsonOut.str(), "application/json");
     }
 
     /* Optionally maintain an index of DWARF debug info files
@@ -311,14 +313,10 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
-    uint64_t narSize = 0;
+    LengthSink narSize;
+    TeeSink tee { sink, narSize };
 
-    LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
-        sink(data, len);
-        narSize += len;
-    });
-
-    auto decompressor = makeDecompressionSink(info->compression, wrapperSink);
+    auto decompressor = makeDecompressionSink(info->compression, tee);
 
     try {
         getFile(info->url, *decompressor);
@@ -330,7 +328,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 
     stats.narRead++;
     //stats.narReadCompressedBytes += nar->size(); // FIXME
-    stats.narReadBytes += narSize;
+    stats.narReadBytes += narSize.length;
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
@@ -384,7 +382,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
         h = hashString(hashAlgo, s);
     }
 
-    ValidPathInfo info(makeFixedOutputPath(method, *h, name));
+    ValidPathInfo info {
+        makeFixedOutputPath(method, *h, name),
+        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
+    };
 
     auto source = StringSource { *sink.s };
     addToStore(info, source, repair, CheckSigs);
@@ -395,7 +396,10 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
 StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
-    ValidPathInfo info(computeStorePathForText(name, s, references));
+    ValidPathInfo info {
+        computeStorePathForText(name, s, references),
+        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
+    };
     info.references = references;
 
     if (repair || !isValidPath(info.path)) {
