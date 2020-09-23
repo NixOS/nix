@@ -42,6 +42,7 @@ Settings::Settings()
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
+    allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
     if (caFile == "") {
@@ -146,6 +147,12 @@ bool Settings::isWSL1()
 }
 
 const string nixVersion = PACKAGE_VERSION;
+
+NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
+    {SandboxMode::smEnabled, true},
+    {SandboxMode::smRelaxed, "relaxed"},
+    {SandboxMode::smDisabled, false},
+});
 
 template<> void BaseSetting<SandboxMode>::set(const std::string & str)
 {

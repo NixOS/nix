@@ -63,4 +63,24 @@ void from_json(const nlohmann::json& j, ContentAddress & c);
 void to_json(nlohmann::json& j, const std::optional<ContentAddress> & c);
 void from_json(const nlohmann::json& j, std::optional<ContentAddress> & c);
 Hash getContentAddressHash(const ContentAddress & ca);
+
+/*
+  We only have one way to hash text with references, so this is single-value
+  type is only useful in std::variant.
+*/
+struct TextHashMethod { };
+struct FixedOutputHashMethod {
+  FileIngestionMethod fileIngestionMethod;
+  HashType hashType;
+};
+
+typedef std::variant<
+    TextHashMethod,
+    FixedOutputHashMethod
+  > ContentAddressMethod;
+
+ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
+
+std::string renderContentAddressMethod(ContentAddressMethod caMethod);
+
 }
