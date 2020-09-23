@@ -175,11 +175,8 @@ static Flake getFlake(
     auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, allowLookup, flakeCache);
 
-    // Guard against symlink attacks.
     auto flakeFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/flake.nix");
-    if (!isInDir(flakeFile, sourceInfo.actualPath))
-        throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
-            lockedRef, state.store->printStorePath(sourceInfo.storePath));
+    auto tomlFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/nix.toml");
 
     Flake flake {
         .originalRef = originalRef,
@@ -188,54 +185,84 @@ static Flake getFlake(
         .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
     };
 
-    if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
-
-    Value vInfo;
-    state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
-
-    expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
-
-    auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
-
-    if (vInfo.attrs->get(sEdition))
-        warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
-
-    if (auto description = vInfo.attrs->get(state.sDescription)) {
-        expectType(state, tString, *description->value, *description->pos);
-        flake.description = description->value->string.s;
-    }
-
     auto sInputs = state.symbols.create("inputs");
-
-    if (auto inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, *inputs->pos);
-
     auto sOutputs = state.symbols.create("outputs");
 
-    if (auto outputs = vInfo.attrs->get(sOutputs)) {
-        expectType(state, tLambda, *outputs->value, *outputs->pos);
+    if (pathExists(flakeFile)) {
+        // Guard against symlink attacks.
+        if (!isInDir(flakeFile, sourceInfo.actualPath))
+            throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
+                lockedRef, state.store->printStorePath(sourceInfo.storePath));
 
-        if (outputs->value->lambda.fun->matchAttrs) {
-            for (auto & formal : outputs->value->lambda.fun->formals->formals) {
-                if (formal.name != state.sSelf)
-                    flake.inputs.emplace(formal.name, FlakeInput {
-                        .ref = parseFlakeRef(formal.name)
-                    });
-            }
+        Value vInfo;
+        state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
+
+        expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
+
+        auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
+
+        if (vInfo.attrs->get(sEdition))
+            warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
+
+        if (auto description = vInfo.attrs->get(state.sDescription)) {
+            expectType(state, tString, *description->value, *description->pos);
+            flake.description = description->value->string.s;
         }
 
-    } else
-        throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
+        if (auto inputs = vInfo.attrs->get(sInputs))
+            flake.inputs = parseFlakeInputs(state, inputs->value, *inputs->pos);
 
-    for (auto & attr : *vInfo.attrs) {
-        if (attr.name != sEdition &&
-            attr.name != state.sDescription &&
-            attr.name != sInputs &&
-            attr.name != sOutputs)
-            throw Error("flake '%s' has an unsupported attribute '%s', at %s",
-                lockedRef, attr.name, *attr.pos);
+        if (auto outputs = vInfo.attrs->get(sOutputs)) {
+            expectType(state, tLambda, *outputs->value, *outputs->pos);
+
+            if (outputs->value->lambda.fun->matchAttrs) {
+                for (auto & formal : outputs->value->lambda.fun->formals->formals) {
+                    if (formal.name != state.sSelf)
+                        flake.inputs.emplace(formal.name, FlakeInput {
+                            .ref = parseFlakeRef(formal.name)
+                        });
+                }
+            }
+
+        } else
+            throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
+
+        for (auto & attr : *vInfo.attrs) {
+            if (attr.name != sEdition &&
+                attr.name != state.sDescription &&
+                attr.name != sInputs &&
+                attr.name != sOutputs)
+                throw Error("flake '%s' has an unsupported attribute '%s', at %s",
+                    lockedRef, attr.name, *attr.pos);
+        }
+
     }
+
+    else if (pathExists(tomlFile)) {
+        // Guard against symlink attacks.
+        if (!isInDir(tomlFile, sourceInfo.actualPath))
+            throw Error("'nix.toml' file of flake '%s' escapes from '%s'",
+                lockedRef, state.store->printStorePath(sourceInfo.storePath));
+
+        auto vToml = state.allocValue();
+        mkString(*vToml, readFile(tomlFile));
+        auto vFlake = state.allocValue();
+        prim_fromTOML(state, noPos, &vToml, *vFlake);
+        state.forceAttrs(*vFlake);
+
+        if (auto description = vFlake->attrs->get(state.sDescription)) {
+            expectType(state, tString, *description->value, *description->pos);
+            flake.description = description->value->string.s;
+        }
+
+        if (auto inputs = vFlake->attrs->get(sInputs))
+            flake.inputs = parseFlakeInputs(state, inputs->value, *inputs->pos);
+
+        // FIXME: complain about unknown attributes.
+    }
+
+    else
+        throw Error("source tree referenced by '%1%' does not contain a '%2%/flake.nix' or '%2%/nix.toml' file %3%", lockedRef, lockedRef.subdir, flakeFile);
 
     return flake;
 }

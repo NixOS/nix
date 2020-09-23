@@ -41,4 +41,6 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
 /* Execute a program and parse its output */
 void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v);
 
+void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
 }

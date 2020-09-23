@@ -5,7 +5,7 @@
 
 namespace nix {
 
-static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     using namespace cpptoml;
 
@@ -16,6 +16,8 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
     std::function<void(Value &, std::shared_ptr<base>)> visit;
 
     visit = [&](Value & v, std::shared_ptr<base> t) {
+
+        // FIXME: set attribute positions
 
         if (auto t2 = t->as_table()) {
 
