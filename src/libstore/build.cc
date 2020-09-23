@@ -3913,7 +3913,6 @@ void DerivationGoal::registerOutputs()
                 outputRewrites[std::string { scratchPath.hashPart() }] = std::string { finalStorePath.hashPart() };
         };
 
-        bool rewritten = false;
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
             [&](AlreadyRegistered skippedFinalPath) -> std::optional<StorePathSet> {
                 finish(skippedFinalPath.path);
@@ -3943,8 +3942,6 @@ void DerivationGoal::registerOutputs()
                 sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
                 StringSource source(*sink.s);
                 restorePath(actualPath, source);
-
-                rewritten = true;
             }
         };
 
@@ -4124,11 +4121,6 @@ void DerivationGoal::registerOutputs()
                 actualPath = worker.store.toRealPath(finalDestPath);
             }
         }
-
-        /* Get rid of all weird permissions.  This also checks that
-           all files are owned by the build user, if applicable. */
-        canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
 
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(newInfo.path)) continue;
