@@ -58,6 +58,7 @@
         configureFlags =
           lib.optionals stdenv.isLinux [
             "--with-sandbox-shell=${sh}/bin/busybox"
+            "LDFLAGS=-fuse-ld=gold"
           ];
 
         buildDeps =
