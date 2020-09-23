@@ -10,13 +10,13 @@ struct IPFSBinaryCacheStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
-    const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
-    const Setting<bool> parallelCompression{this, false, "parallel-compression",
+    const Setting<std::string> compression{(StoreConfig *)this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
+    const Setting<Path> secretKeyFile{(StoreConfig *)this, "", "secret-key", "path to secret key used to sign the binary cache"};
+    const Setting<bool> parallelCompression{(StoreConfig *)this, false, "parallel-compression",
         "enable multi-threading compression, available for xz only currently"};
 
     // FIXME: merge with allowModify bool
-    const Setting<bool> _allowModify{this, false, "allow-modify",
+    const Setting<bool> _allowModify{(StoreConfig *)this, false, "allow-modify",
         "allow Nix to update IPFS/IPNS address when appropriate"};
 
     const std::string name() override { return "IPFS Store"; }
@@ -50,8 +50,6 @@ public:
     Sync<State> _state;
 
 public:
-
-    IPFSBinaryCacheStore(const Params & params);
 
     IPFSBinaryCacheStore(const std::string & scheme, const std::string & uri, const Params & params);
 
