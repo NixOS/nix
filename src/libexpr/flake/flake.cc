@@ -48,17 +48,17 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                 resolvedRef = originalRef.resolve(state.store);
                 auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, fetchedResolved.value()});
-                fetched.emplace(fetchedResolved.value());
+                flakeCache.push_back({resolvedRef, *fetchedResolved});
+                fetched.emplace(*fetchedResolved);
             }
             else {
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
             }
         }
-        flakeCache.push_back({originalRef, fetched.value()});
+        flakeCache.push_back({originalRef, *fetched});
     }
 
-    auto [tree, lockedRef] = fetched.value();
+    auto [tree, lockedRef] = *fetched;
 
     debug("got tree '%s' from '%s'",
         state.store->printStorePath(tree.storePath), lockedRef);
