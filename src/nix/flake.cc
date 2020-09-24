@@ -563,7 +563,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto installable = InstallableFlake(
             evalState, std::move(templateFlakeRef),
             Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings(attrsPathPrefixes), lockFlags);
+            Strings(attrsPathPrefixes), lockFlags, nullptr);
 
         auto [cursor, attrPath] = installable.getCursor(*evalState);
 

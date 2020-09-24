@@ -78,7 +78,7 @@ struct CmdBundle : InstallableCommand
         auto bundler = InstallableFlake(
             evalState, std::move(bundlerFlakeRef),
             Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
-            Strings({"bundlers."}), lockFlags);
+            Strings({"bundlers."}), lockFlags, nullptr);
 
         Value * arg = evalState->allocValue();
         evalState->mkAttrs(*arg, 2);

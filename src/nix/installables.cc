@@ -13,6 +13,8 @@
 #include "url.hh"
 #include "registry.hh"
 
+#include "../cpptoml/cpptoml.h"
+
 #include <regex>
 #include <queue>
 
@@ -549,8 +551,61 @@ InstallableFlake::getCursors(EvalState & state)
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
-    if (!_lockedFlake)
+    if (!_lockedFlake) {
         _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+
+        if (options && options->size()) {
+            /* Get the modules defined by this flake. */
+            auto cache = openEvalCache(*state, _lockedFlake);
+            auto root = cache->getRoot();
+            auto aModules = root->maybeGetAttr(state->symbols.create("modules"));
+            if (!aModules)
+                throw Error("flake '%s' has no modules, so --arg cannot override anything", flakeRef);
+
+            auto toml = cpptoml::make_table();
+
+            auto base = cpptoml::make_table();
+            base->insert("type", "path");
+            base->insert("path", _lockedFlake->flake.sourceInfo->actualPath);
+            if (_lockedFlake->flake.lockedRef.subdir != "")
+                base->insert("dir", _lockedFlake->flake.lockedRef.subdir);
+            // FIXME: copy rev etc.
+            auto inputs = cpptoml::make_table();
+            inputs->insert("base", base);
+
+            toml->insert("inputs", inputs);
+
+            for (auto & moduleName : aModules->getAttrs()) {
+                auto module = cpptoml::make_table();
+                auto extends = cpptoml::make_array();
+                extends->push_back("base#" + (std::string) moduleName);
+                module->insert("extends", extends);
+                for (auto & option : options->lexicographicOrder()) {
+                    state->forceValue(*option->value);
+                    if (option->value->type == tString)
+                        module->insert(option->name, state->forceString(*option->value));
+                    else if (option->value->type == tInt)
+                        module->insert(option->name, option->value->integer);
+                    else
+                        throw Error("option '%s' is %s which is not supported",
+                            option->name, showType(*option->value));
+                }
+                toml->insert(moduleName, module);
+            }
+
+            auto tempDir = createTempDir();
+            AutoDelete cleanup(tempDir);
+
+            std::ostringstream str;
+            str << *toml;
+            debug("writing temporary flake:\n%s", str.str());
+            writeFile(tempDir + "/nix.toml", str.str());
+
+            _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state,
+                    parseFlakeRef("path://" + tempDir), lockFlags));
+        }
+    }
+
     return _lockedFlake;
 }
 
@@ -600,10 +655,14 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
             try {
                 auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
+                auto state = getEvalState();
                 result.push_back(std::make_shared<InstallableFlake>(
-                        getEvalState(), std::move(flakeRef),
+                        state,
+                        std::move(flakeRef),
                         fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                        getDefaultFlakeAttrPathPrefixes(), lockFlags));
+                        getDefaultFlakeAttrPathPrefixes(),
+                        lockFlags,
+                        getAutoArgs(*state)));
                 continue;
             } catch (...) {
                 ex = std::current_exception();

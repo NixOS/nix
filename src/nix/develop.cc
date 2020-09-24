@@ -395,7 +395,8 @@ struct CmdDevelop : Common, MixEnvironment
                 installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
-                lockFlags);
+                lockFlags,
+                nullptr);
 
             shell = state->store->printStorePath(
                 toStorePath(state->store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
