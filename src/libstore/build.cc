@@ -1675,7 +1675,34 @@ void DerivationGoal::tryLocalBuild() {
 }
 
 
-void replaceValidPath(const Path & storePath, const Path tmpPath)
+static void chmod_(const Path & path, mode_t mode)
+{
+    if (chmod(path.c_str(), mode) == -1)
+        throw SysError("setting permissions on '%s'", path);
+}
+
+
+/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
+   it's a directory and we're not root (to be able to update the
+   directory's parent link ".."). */
+static void movePath(const Path & src, const Path & dst)
+{
+    auto st = lstat(src);
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError("renaming '%1%' to '%2%'", src, dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
+void replaceValidPath(const Path & storePath, const Path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
        tmpPath (the replacement), so we have to move it out of the
@@ -1683,11 +1710,20 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
        we're repairing (say) Glibc, we end up with a broken system. */
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
     if (pathExists(storePath))
-        rename(storePath.c_str(), oldPath.c_str());
-    if (rename(tmpPath.c_str(), storePath.c_str()) == -1) {
-        rename(oldPath.c_str(), storePath.c_str()); // attempt to recover
-        throw SysError("moving '%s' to '%s'", tmpPath, storePath);
+        movePath(storePath, oldPath);
+
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            // attempt to recover
+            movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreException();
+        }
+        throw;
     }
+
     deletePath(oldPath);
 }
 
@@ -2002,13 +2038,6 @@ HookReply DerivationGoal::tryBuildHook()
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
-}
-
-
-static void chmod_(const Path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
 }
 
 
@@ -2367,10 +2396,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : inputPaths) {
             auto p = worker.store.printStorePath(i);
             Path r = worker.store.toRealPath(p);
-            struct stat st;
-            if (lstat(r.c_str(), &st))
-                throw SysError("getting attributes of path '%s'", p);
-            if (S_ISDIR(st.st_mode))
+            if (S_ISDIR(lstat(r).st_mode))
                 dirsInChroot.insert_or_assign(p, r);
             else
                 linkOrCopy(r, chrootRootDir + p);
@@ -3144,9 +3170,7 @@ void DerivationGoal::addDependency(const StorePath & path)
             if (pathExists(target))
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
 
-            struct stat st;
-            if (lstat(source.c_str(), &st))
-                throw SysError("getting attributes of path '%s'", source);
+            auto st = lstat(source);
 
             if (S_ISDIR(st.st_mode)) {
 
@@ -3735,29 +3759,6 @@ void DerivationGoal::runChild()
 }
 
 
-static void moveCheckToStore(const Path & src, const Path & dst)
-{
-    /* For the rename of directory to succeed, we must be running as root or
-       the directory must be made temporarily writable (to update the
-       directory's parent link ".."). */
-    struct stat st;
-    if (lstat(src.c_str(), &st) == -1) {
-        throw SysError("getting attributes of path '%1%'", src);
-    }
-
-    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
-
-    if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
-
-    if (rename(src.c_str(), dst.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", src, dst);
-
-    if (changePerm)
-        chmod_(dst, st.st_mode);
-}
-
-
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3858,7 +3859,7 @@ void DerivationGoal::registerOutputs()
            something like that. */
         canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
 
-        debug("scanning for references for output %1 in temp location '%1%'", outputName, actualPath);
+        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
 
         /* Pass blank Sink as we are not ready to hash data at this stage. */
         NullSink blank;
@@ -3913,7 +3914,6 @@ void DerivationGoal::registerOutputs()
                 outputRewrites[std::string { scratchPath.hashPart() }] = std::string { finalStorePath.hashPart() };
         };
 
-        bool rewritten = false;
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
             [&](AlreadyRegistered skippedFinalPath) -> std::optional<StorePathSet> {
                 finish(skippedFinalPath.path);
@@ -3944,7 +3944,9 @@ void DerivationGoal::registerOutputs()
                 StringSource source(*sink.s);
                 restorePath(actualPath, source);
 
-                rewritten = true;
+                /* FIXME: set proper permissions in restorePath() so
+                   we don't have to do another traversal. */
+                canonicalisePathMetaData(actualPath, -1, inodesSeen);
             }
         };
 
@@ -4027,7 +4029,7 @@ void DerivationGoal::registerOutputs()
             [&](DerivationOutputInputAddressed output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
-                /* Preemtively add rewrite rule for final hash, as that is
+                /* Preemptively add rewrite rule for final hash, as that is
                    what the NAR hash will use rather than normalized-self references */
                 if (scratchPath != requiredFinalPath)
                     outputRewrites.insert_or_assign(
@@ -4101,34 +4103,11 @@ void DerivationGoal::registerOutputs()
                    else. No moving needed. */
                 assert(newInfo.ca);
             } else {
-                /* Temporarily add write perm so we can move, will be fixed
-                   later. */
-                {
-                    struct stat st;
-                    auto & mode = st.st_mode;
-                    if (lstat(actualPath.c_str(), &st))
-                        throw SysError("getting attributes of path '%1%'", actualPath);
-                    mode |= 0200;
-                    /* Try to change the perms, but only if the file isn't a
-                       symlink as symlinks permissions are mostly ignored and
-                       calling `chmod` on it will just forward the call to the
-                       target of the link. */
-                    if (!S_ISLNK(st.st_mode))
-                        if (chmod(actualPath.c_str(), mode) == -1)
-                            throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
-                }
-                if (rename(
-                        actualPath.c_str(),
-                        worker.store.toRealPath(finalDestPath).c_str()) == -1)
-                    throw SysError("moving build output '%1%' from it's temporary location to the Nix store", finalDestPath);
-                actualPath = worker.store.toRealPath(finalDestPath);
+                auto destPath = worker.store.toRealPath(finalDestPath);
+                movePath(actualPath, destPath);
+                actualPath = destPath;
             }
         }
-
-        /* Get rid of all weird permissions.  This also checks that
-           all files are owned by the build user, if applicable. */
-        canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
 
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(newInfo.path)) continue;
@@ -4136,9 +4115,9 @@ void DerivationGoal::registerOutputs()
             if (newInfo.narHash != oldInfo.narHash) {
                 worker.checkMismatch = true;
                 if (settings.runDiffHook || settings.keepFailed) {
-                    Path dst = worker.store.toRealPath(finalDestPath + checkSuffix);
+                    auto dst = worker.store.toRealPath(finalDestPath + checkSuffix);
                     deletePath(dst);
-                    moveCheckToStore(actualPath, dst);
+                    movePath(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
