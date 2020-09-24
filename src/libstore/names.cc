@@ -1,8 +1,16 @@
 #include "names.hh"
 #include "util.hh"
 
+#include <regex>
+
 
 namespace nix {
+
+
+struct Regex
+{
+    std::regex regex;
+};
 
 
 DrvName::DrvName()
@@ -30,11 +38,18 @@ DrvName::DrvName(std::string_view s) : hits(0)
 }
 
 
+DrvName::~DrvName()
+{ }
+
+
 bool DrvName::matches(DrvName & n)
 {
     if (name != "*") {
-        if (!regex) regex = std::unique_ptr<std::regex>(new std::regex(name, std::regex::extended));
-        if (!std::regex_match(n.name, *regex)) return false;
+        if (!regex) {
+            regex = std::make_unique<Regex>();
+            regex->regex = std::regex(name, std::regex::extended);
+        }
+        if (!std::regex_match(n.name, regex->regex)) return false;
     }
     if (version != "" && version != n.version) return false;
     return true;
@@ -99,7 +114,7 @@ DrvNames drvNamesFromArgs(const Strings & opArgs)
 {
     DrvNames result;
     for (auto & i : opArgs)
-        result.push_back(DrvName(i));
+        result.emplace_back(i);
     return result;
 }
 

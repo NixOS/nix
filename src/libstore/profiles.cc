@@ -39,13 +39,10 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     for (auto & i : readDirectory(profileDir)) {
         if (auto n = parseName(profileName, i.name)) {
             auto path = profileDir + "/" + i.name;
-            struct stat st;
-            if (lstat(path.c_str(), &st) != 0)
-                throw SysError("statting '%1%'", path);
             gens.push_back({
                 .number = *n,
                 .path = path,
-                .creationTime = st.st_mtime
+                .creationTime = lstat(path).st_mtime
             });
         }
     }
@@ -72,7 +69,7 @@ static void makeName(const Path & profile, GenerationNumber num,
 }
 
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
+Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -82,7 +79,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
     if (gens.size() > 0) {
         Generation last = gens.back();
 
-        if (readLink(last.path) == outPath) {
+        if (readLink(last.path) == store->printStorePath(outPath)) {
             /* We only create a new generation symlink if it differs
                from the last one.
 
@@ -105,7 +102,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    store->addPermRoot(store->parseStorePath(outPath), generation, false, true);
+    store->addPermRoot(outPath, generation);
 
     return generation;
 }

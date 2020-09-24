@@ -20,7 +20,7 @@ private:
     mutable string name;
     mutable string system;
     mutable string drvPath;
-    mutable string outPath;
+    mutable std::optional<string> outPath;
     mutable string outputName;
     Outputs outputs;
 

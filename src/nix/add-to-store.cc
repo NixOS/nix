@@ -37,6 +37,14 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         return "add a path to the Nix store";
     }
 
+    std::string doc() override
+    {
+        return R"(
+          Copy the file or directory *path* to the Nix store, and
+          print the resulting store path on standard output.
+        )";
+    }
+
     Examples examples() override
     {
         return {

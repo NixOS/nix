@@ -6,6 +6,7 @@
 #include "derivations.hh"
 #include "nar-info.hh"
 #include "references.hh"
+#include "callback.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -42,7 +43,8 @@ namespace nix {
 
 
 LocalStore::LocalStore(const Params & params)
-    : Store(params)
+    : StoreConfig(params)
+    , Store(params)
     , LocalFSStore(params)
     , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
         "physical path to the Nix store"}
@@ -108,12 +110,11 @@ LocalStore::LocalStore(const Params & params)
     }
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1") {
+    if (!settings.allowSymlinkedStore) {
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
-            if (lstat(path.c_str(), &st))
-                throw SysError("getting status of '%1%'", path);
+            st = lstat(path);
             if (S_ISLNK(st.st_mode))
                 throw Error(
                         "the path '%1%' is a symlink; "
@@ -417,10 +418,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
-    canonicaliseTimestampAndPermissions(path, st);
+    canonicaliseTimestampAndPermissions(path, lstat(path));
 }
 
 
@@ -438,9 +436,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     }
 #endif
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
@@ -476,8 +472,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        ensure that we don't fail on hard links within the same build
        (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
     if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
-        assert(!S_ISDIR(st.st_mode));
-        if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
+        if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
@@ -520,9 +515,7 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
@@ -578,10 +571,29 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                 envHasRightPath(path, i.first);
             },
             [&](DerivationOutputCAFloating _) {
-                throw UnimplementedError("floating CA output derivations are not yet implemented");
+                /* Nothing to check */
             },
         }, i.second.output);
     }
+}
+
+
+void LocalStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+{
+    auto state(_state.lock());
+    return linkDeriverToPath(*state, queryValidPathId(*state, deriver), outputName, output);
+}
+
+void LocalStore::linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
+{
+    retrySQLite<void>([&]() {
+        state.stmtAddDerivationOutput.use()
+            (deriver)
+            (outputName)
+            (printStorePath(output))
+            .exec();
+    });
+
 }
 
 
@@ -623,12 +635,11 @@ uint64_t LocalStore::addValidPath(State & state,
            registration above is undone. */
         if (checkOutputs) checkDerivationOutputs(info.path, drv);
 
-        for (auto & i : drv.outputsAndPaths(*this)) {
-            state.stmtAddDerivationOutput.use()
-                (id)
-                (i.first)
-                (printStorePath(i.second.second))
-                .exec();
+        for (auto & i : drv.outputsAndOptPaths(*this)) {
+            /* Floating CA derivations have indeterminate output paths until
+               they are built, so don't register anything in that case */
+            if (i.second.second)
+                linkDeriverToPath(state, id, i.first, *i.second.second);
         }
     }
 
@@ -798,17 +809,21 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-OutputPathMap LocalStore::queryDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
-    return retrySQLite<OutputPathMap>([&]() {
+    std::map<std::string, std::optional<StorePath>> outputs;
+    BasicDerivation drv = readDerivation(path);
+    for (auto & [outName, _] : drv.outputs) {
+        outputs.insert_or_assign(outName, std::nullopt);
+    }
+    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
         auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
             (queryValidPathId(*state, path)));
 
-        OutputPathMap outputs;
         while (useQueryDerivationOutputs.next())
-            outputs.emplace(
+            outputs.insert_or_assign(
                 useQueryDerivationOutputs.getStr(0),
                 parseStorePath(useQueryDerivationOutputs.getStr(1))
             );
@@ -1455,7 +1470,7 @@ static void makeMutable(const Path & path)
 {
     checkInterrupt();
 
-    struct stat st = lstat(path);
+    auto st = lstat(path);
 
     if (!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) return;
 
