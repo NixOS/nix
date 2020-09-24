@@ -2236,6 +2236,11 @@ static RegisterPrimOp primop_catAttrs({
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
+    if (args[0]->type == tPrimOp || args[0]->type == tPrimOpApp) {
+        state.mkAttrs(v, 0);
+        return;
+    }
+
     if (args[0]->type != tLambda)
         throw TypeError({
             .hint = hintfmt("'functionArgs' requires a function"),
