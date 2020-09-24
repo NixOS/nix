@@ -475,8 +475,6 @@ static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath
     return h->second;
 }
 
-UnknownHashes unknownHashes;
-
 /* See the header for interface details. These are the implementation details.
 
    For fixed-output derivations, each hash in the map is not the
@@ -499,7 +497,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
     /* Return a fixed hash for fixed-output derivations. */
     switch (drv.type()) {
     case DerivationType::CAFloating:
-        return unknownHashes;
+        return UnknownHashes {};
     case DerivationType::CAFixed: {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
@@ -545,7 +543,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
             },
         }, res);
         if (hasUnknownHash) {
-            return unknownHashes;
+            return UnknownHashes {};
         }
     }
 
