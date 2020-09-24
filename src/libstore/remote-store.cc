@@ -440,6 +440,7 @@ ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn,
         info->sigs = readStrings<StringSet>(conn->from);
         info->viewCA() = parseContentAddressOpt(readString(conn->from));
     }
+    return info;
 }
 
 
