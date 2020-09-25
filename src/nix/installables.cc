@@ -534,8 +534,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
 InstallableFlake::getCursors(EvalState & state)
 {
-    auto evalCache = openEvalCache(state,
-        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, lockFlags)));
+    auto evalCache = openEvalCache(state, getLockedFlake());
 
     auto root = evalCache->getRoot();
 
