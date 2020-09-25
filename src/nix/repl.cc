@@ -233,6 +233,20 @@ namespace {
     void sigintHandler(int signo) {
         g_signal_received = signo;
     }
+
+#ifdef READLINE
+    int signalEventHook() {
+        if (g_signal_received) {
+            rl_replace_line("", 1);
+            rl_crlf();
+            rl_crlf();
+            rl_reset_line_state();
+            rl_redisplay();
+            g_signal_received = 0;
+        }
+        return 0;
+    }
+#endif
 }
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
@@ -258,6 +272,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #else
+    rl_signal_event_hook = signalEventHook;
     rl_completion_entry_function = completionEntry;
     rl_attempted_completion_function = completionAttempted;
     rl_completion_query_items = -1;
@@ -325,11 +340,14 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     Finally doFree([&]() { free(s); });
     restoreSignals();
 
+#ifndef READLINE
+    // readline doesn't return when encountering SIGINT, but editline does
     if (g_signal_received) {
         g_signal_received = 0;
         input.clear();
         return true;
     }
+#endif
 
     if (!s)
       return false;
