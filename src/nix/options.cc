@@ -7,6 +7,8 @@
 #include "json.hh"
 #include "value-to-json.hh"
 
+#include "../cpptoml/cpptoml.h"
+
 using namespace nix;
 
 struct CmdListOptions : InstallableCommand
@@ -71,3 +73,82 @@ struct CmdListOptions : InstallableCommand
 };
 
 static auto r1 = registerCommand<CmdListOptions>("list-options");
+
+struct CmdSetOption : InstallableCommand
+{
+    std::string name;
+    std::string value;
+
+    CmdSetOption()
+    {
+        // FIXME: type?
+        expectArg("name", &name);
+        expectArg("value", &value);
+    }
+
+    std::string description() override
+    {
+        return "set the value of an option in a Nix module";
+    }
+
+    Strings getDefaultFlakeAttrPathPrefixes()
+    {
+        return {
+            "modules.",
+        };
+    }
+
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        // FIXME: support this elsewhere.
+        return {"modules.default"};
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto state = getEvalState();
+
+        auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable);
+        if (!installable2)
+            throw UsageError("'nix set-option' only works on flakes");
+
+        //auto flake = flake::getFlake(*state, installable2->flakeRef, false);
+
+        auto path = installable2->flakeRef.input.getSourcePath();
+        if (!path)
+            throw Error("'nix set-option' only works on writable flakes");
+
+        auto tomlPath = *path + "/" + installable2->flakeRef.subdir + "/nix.toml";
+
+        if (!pathExists(tomlPath))
+            throw Error("'nix set-option' only works on flakes that have a 'nix.toml' file");
+
+        std::istringstream tomlStream(readFile(tomlPath));
+        auto root = cpptoml::parser(tomlStream).parse();
+
+        auto moduleName = *installable2->attrPaths.begin();
+
+        //throw UsageError("'nix set-option' only works on modules, not '%s'", moduleName);
+        if (hasPrefix(moduleName, "modules."))
+            moduleName = std::string(moduleName, 8);
+
+        printError("PATH = %s %s", tomlPath, moduleName);
+
+        // FIXME: validate module name.
+        auto module = root->get_table(moduleName);
+        if (!module)
+            throw Error("flake '%s' does not have a module named '%s'",
+                installable2->flakeRef, moduleName);
+
+        // FIXME: check that option 'name' exists.
+        module->insert(name, value);
+
+        std::ostringstream str;
+        str << *root;
+        writeFile(tomlPath, str.str());
+
+        // FIXME: markChangedFile()?
+    }
+};
+
+static auto r2 = registerCommand<CmdSetOption>("set-option");
