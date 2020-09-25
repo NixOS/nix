@@ -65,9 +65,9 @@ struct GitArchiveInputScheme : InputScheme
                     throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
                 ref = value;
             }
-            else if (name == "url") {
+            else if (name == "host") {
                 if (!std::regex_match(value, urlRegex))
-                    throw BadURL("URL '%s' contains an invalid instance url", url.url);
+                    throw BadURL("URL '%s' contains an invalid instance host", url.url);
                 host_url = value;
             }
             // FIXME: barf on unsupported attributes
@@ -82,7 +82,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("repo", path[1]);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
         if (ref) input.attrs.insert_or_assign("ref", *ref);
-        if (host_url) input.attrs.insert_or_assign("url", *host_url);
+        if (host_url) input.attrs.insert_or_assign("host", *host_url);
 
         return input;
     }
@@ -92,7 +92,7 @@ struct GitArchiveInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != type()) return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified")
+            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified" && name != "host")
                 throw Error("unsupported input attribute '%s'", name);
 
         getStrAttr(attrs, "owner");
@@ -208,9 +208,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
-            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers;
         std::string accessToken = settings.githubAccessToken.get();
@@ -230,9 +230,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
-            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
         std::string accessToken = settings.githubAccessToken.get();
@@ -246,9 +246,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     void clone(const Input & input, const Path & destDir) override
     {
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("github.com");
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
-                host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
             .clone(destDir);
     }
@@ -284,10 +284,14 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     DownloadUrl getDownloadUrl(const Input & input) const override
     {
-        // FIXME: This endpoint has a rate limit threshold of 5 requests per minute
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("gitlab.com");
+        // This endpoint has a rate limit threshold that may be
+        // server-specific and vary based whether the user is
+        // authenticated via an accessToken or not, but the usual rate
+        // is 10 reqs/sec/ip-addr.  See
+        // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
-            host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
         std::string accessToken = settings.gitlabAccessToken.get();
@@ -302,10 +306,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     void clone(const Input & input, const Path & destDir) override
     {
-        auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("gitlab.com");
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
         Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
-                host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
             .clone(destDir);
     }
