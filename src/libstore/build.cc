@@ -296,9 +296,21 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
-    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
-        const BasicDerivation & drv, BuildMode buildMode = bmNormal);
+
+    /* derivation goal */
+private:
+    std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
+        const StorePath & drvPath, const StringSet & wantedOutputs,
+        std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
+public:
+    std::shared_ptr<DerivationGoal> makeDerivationGoal(
+        const StorePath & drvPath,
+        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
+        const StorePath & drvPath, const BasicDerivation & drv,
+        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+
+    /* substitution goal */
     GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
@@ -949,10 +961,12 @@ private:
     friend struct RestrictedStore;
 
 public:
-    DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
-        Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(const StorePath & drvPath,
+        const StringSet & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        Worker & worker, BuildMode buildMode = bmNormal);
+        const StringSet & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     ~DerivationGoal();
 
     /* Whether we need to perform hash rewriting if there are valid output paths. */
@@ -1085,8 +1099,8 @@ private:
 const Path DerivationGoal::homeDir = "/homeless-shelter";
 
 
-DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
-    Worker & worker, BuildMode buildMode)
+DerivationGoal::DerivationGoal(const StorePath & drvPath,
+    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(true)
     , drvPath(drvPath)
@@ -1094,7 +1108,9 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & want
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = fmt("building of '%s'", worker.store.printStorePath(this->drvPath));
+    name = fmt(
+        "building of '%s' from .drv file",
+        StorePathWithOutputs { drvPath, wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1103,15 +1119,18 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & want
 
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-    Worker & worker, BuildMode buildMode)
+    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(false)
     , drvPath(drvPath)
+    , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
     state = &DerivationGoal::haveDerivation;
-    name = fmt("building of %s", StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
+    name = fmt(
+        "building of '%s' from in-memory derivation",
+        StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -5039,35 +5058,52 @@ Worker::~Worker()
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const StorePath & path,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
+    const StorePath & drvPath,
+    const StringSet & wantedOutputs,
+    std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
-    GoalPtr goal = derivationGoals[path].lock(); // FIXME
-    if (!goal) {
-        goal = std::make_shared<DerivationGoal>(path, wantedOutputs, *this, buildMode);
-        derivationGoals.insert_or_assign(path, goal);
+    WeakGoalPtr & abstract_goal_weak = derivationGoals[drvPath];
+    GoalPtr abstract_goal = abstract_goal_weak.lock(); // FIXME
+    std::shared_ptr<DerivationGoal> goal;
+    if (!abstract_goal) {
+        goal = mkDrvGoal();
+        abstract_goal_weak = goal;
         wakeUp(goal);
-    } else
-        (dynamic_cast<DerivationGoal *>(goal.get()))->addWantedOutputs(wantedOutputs);
+    } else {
+        goal = std::dynamic_pointer_cast<DerivationGoal>(abstract_goal);
+        assert(goal);
+        goal->addWantedOutputs(wantedOutputs);
+    }
     return goal;
 }
 
 
-std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
+    const StringSet & wantedOutputs, BuildMode buildMode)
 {
-    auto goal = std::make_shared<DerivationGoal>(drvPath, drv, *this, buildMode);
-    wakeUp(goal);
-    return goal;
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
+        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+    });
+}
+
+
+std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
+    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+{
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
+        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+    });
 }
 
 
 GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    GoalPtr goal = substitutionGoals[path].lock(); // FIXME
+    WeakGoalPtr & goal_weak = substitutionGoals[path];
+    GoalPtr goal = goal_weak.lock(); // FIXME
     if (!goal) {
         goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
-        substitutionGoals.insert_or_assign(path, goal);
+        goal_weak = goal;
         wakeUp(goal);
     }
     return goal;
@@ -5498,7 +5534,7 @@ BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDe
     BuildMode buildMode)
 {
     Worker worker(*this);
-    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, buildMode);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
     BuildResult result;
 
