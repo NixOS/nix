@@ -242,6 +242,7 @@ namespace {
             rl_crlf();
             rl_reset_line_state();
             rl_redisplay();
+            history_set_pos(history_length);
             g_signal_received = 0;
         }
         return 0;
@@ -265,6 +266,8 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     createDirs(dirOf(historyFile));
 #ifndef READLINE
     el_hist_size = 1000;
+#else
+    stifle_history(1000);
 #endif
     read_history(historyFile.c_str());
     curRepl = this;
@@ -304,6 +307,11 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 
         // We handled the current input fully, so we should clear it
         // and read brand new input.
+#ifdef READLINE
+        if (input != "") {
+            add_history(input.c_str());
+        }
+#endif
         input.clear();
         std::cout << std::endl;
     }
@@ -351,8 +359,10 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
 
     if (!s)
       return false;
+    if (!input.empty()) {
+        input += '\n';
+    }
     input += s;
-    input += '\n';
     return true;
 }
 
