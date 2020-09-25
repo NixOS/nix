@@ -356,6 +356,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
+    , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {

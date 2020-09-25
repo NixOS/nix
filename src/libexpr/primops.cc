@@ -2236,6 +2236,10 @@ static RegisterPrimOp primop_catAttrs({
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
+    if (args[0]->type == tPrimOpApp || args[0]->type == tPrimOp) {
+        state.mkAttrs(v, 0);
+        return;
+    }
     if (args[0]->type != tLambda)
         throw TypeError({
             .hint = hintfmt("'functionArgs' requires a function"),
@@ -3085,17 +3089,25 @@ static RegisterPrimOp primop_hashString({
     .fun = prim_hashString,
 });
 
-/* Match a regular expression against a string and return either
-   ‘null’ or a list containing substring matches. */
+struct RegexCache
+{
+    std::unordered_map<std::string, std::regex> cache;
+};
+
+std::shared_ptr<RegexCache> makeRegexCache()
+{
+    return std::make_shared<RegexCache>();
+}
+
 void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        auto regex = state.regexCache.find(re);
-        if (regex == state.regexCache.end())
-            regex = state.regexCache.emplace(re, std::regex(re, std::regex::extended)).first;
+        auto regex = state.regexCache->cache.find(re);
+        if (regex == state.regexCache->cache.end())
+            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
@@ -3565,13 +3577,11 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    try {
-        string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
-        sDerivationNix = symbols.create(path);
-        evalFile(path, v);
-        addConstant("derivation", v);
-    } catch (SysError &) {
-    }
+    sDerivationNix = symbols.create("//builtin/derivation.nix");
+    eval(parse(
+        #include "primops/derivation.nix.gen.hh"
+        , foFile, sDerivationNix, "/", staticBaseEnv), v);
+    addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */

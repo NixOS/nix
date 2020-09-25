@@ -51,6 +51,9 @@ Nix store is also printed.
     result to the Nix store. The resulting hash can be used with
     functions such as Nixpkgs’s `fetchzip` or `fetchFromGitHub`.
 
+  - `--executable`  
+    Set the executable bit on the downloaded file.
+
   - `--name` *name*  
     Override the name of the file in the Nix store. By default, this is
     `hash-basename`, where *basename* is the last component of *url*.

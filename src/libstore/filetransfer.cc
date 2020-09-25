@@ -5,6 +5,7 @@
 #include "s3.hh"
 #include "compression.hh"
 #include "finally.hh"
+#include "callback.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>

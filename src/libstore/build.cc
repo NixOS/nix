@@ -17,6 +17,7 @@
 #include "daemon.hh"
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
+#include "callback.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -295,9 +296,21 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
-    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
-        const BasicDerivation & drv, BuildMode buildMode = bmNormal);
+
+    /* derivation goal */
+private:
+    std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
+        const StorePath & drvPath, const StringSet & wantedOutputs,
+        std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
+public:
+    std::shared_ptr<DerivationGoal> makeDerivationGoal(
+        const StorePath & drvPath,
+        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
+        const StorePath & drvPath, const BasicDerivation & drv,
+        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+
+    /* substitution goal */
     GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
@@ -948,10 +961,12 @@ private:
     friend struct RestrictedStore;
 
 public:
-    DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
-        Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(const StorePath & drvPath,
+        const StringSet & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        Worker & worker, BuildMode buildMode = bmNormal);
+        const StringSet & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     ~DerivationGoal();
 
     /* Whether we need to perform hash rewriting if there are valid output paths. */
@@ -1084,8 +1099,8 @@ private:
 const Path DerivationGoal::homeDir = "/homeless-shelter";
 
 
-DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
-    Worker & worker, BuildMode buildMode)
+DerivationGoal::DerivationGoal(const StorePath & drvPath,
+    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(true)
     , drvPath(drvPath)
@@ -1093,7 +1108,9 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & want
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = fmt("building of '%s'", worker.store.printStorePath(this->drvPath));
+    name = fmt(
+        "building of '%s' from .drv file",
+        StorePathWithOutputs { drvPath, wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1102,15 +1119,18 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & want
 
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-    Worker & worker, BuildMode buildMode)
+    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(false)
     , drvPath(drvPath)
+    , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
     state = &DerivationGoal::haveDerivation;
-    name = fmt("building of %s", StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
+    name = fmt(
+        "building of '%s' from in-memory derivation",
+        StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1674,7 +1694,34 @@ void DerivationGoal::tryLocalBuild() {
 }
 
 
-void replaceValidPath(const Path & storePath, const Path tmpPath)
+static void chmod_(const Path & path, mode_t mode)
+{
+    if (chmod(path.c_str(), mode) == -1)
+        throw SysError("setting permissions on '%s'", path);
+}
+
+
+/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
+   it's a directory and we're not root (to be able to update the
+   directory's parent link ".."). */
+static void movePath(const Path & src, const Path & dst)
+{
+    auto st = lstat(src);
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError("renaming '%1%' to '%2%'", src, dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
+void replaceValidPath(const Path & storePath, const Path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
        tmpPath (the replacement), so we have to move it out of the
@@ -1682,11 +1729,20 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
        we're repairing (say) Glibc, we end up with a broken system. */
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
     if (pathExists(storePath))
-        rename(storePath.c_str(), oldPath.c_str());
-    if (rename(tmpPath.c_str(), storePath.c_str()) == -1) {
-        rename(oldPath.c_str(), storePath.c_str()); // attempt to recover
-        throw SysError("moving '%s' to '%s'", tmpPath, storePath);
+        movePath(storePath, oldPath);
+
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            // attempt to recover
+            movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreException();
+        }
+        throw;
     }
+
     deletePath(oldPath);
 }
 
@@ -2001,13 +2057,6 @@ HookReply DerivationGoal::tryBuildHook()
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
-}
-
-
-static void chmod_(const Path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
 }
 
 
@@ -2366,10 +2415,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : inputPaths) {
             auto p = worker.store.printStorePath(i);
             Path r = worker.store.toRealPath(p);
-            struct stat st;
-            if (lstat(r.c_str(), &st))
-                throw SysError("getting attributes of path '%s'", p);
-            if (S_ISDIR(st.st_mode))
+            if (S_ISDIR(lstat(r).st_mode))
                 dirsInChroot.insert_or_assign(p, r);
             else
                 linkOrCopy(r, chrootRootDir + p);
@@ -2949,14 +2995,6 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
         goal.addDependency(info.path);
     }
 
-    StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
-    {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
-        goal.addDependency(path);
-        return path;
-    }
-
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair = NoRepair) override
     {
@@ -3151,9 +3189,7 @@ void DerivationGoal::addDependency(const StorePath & path)
             if (pathExists(target))
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
 
-            struct stat st;
-            if (lstat(source.c_str(), &st))
-                throw SysError("getting attributes of path '%s'", source);
+            auto st = lstat(source);
 
             if (S_ISDIR(st.st_mode)) {
 
@@ -3742,29 +3778,6 @@ void DerivationGoal::runChild()
 }
 
 
-static void moveCheckToStore(const Path & src, const Path & dst)
-{
-    /* For the rename of directory to succeed, we must be running as root or
-       the directory must be made temporarily writable (to update the
-       directory's parent link ".."). */
-    struct stat st;
-    if (lstat(src.c_str(), &st) == -1) {
-        throw SysError("getting attributes of path '%1%'", src);
-    }
-
-    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
-
-    if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
-
-    if (rename(src.c_str(), dst.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", src, dst);
-
-    if (changePerm)
-        chmod_(dst, st.st_mode);
-}
-
-
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3865,7 +3878,7 @@ void DerivationGoal::registerOutputs()
            something like that. */
         canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
 
-        debug("scanning for references for output %1 in temp location '%1%'", outputName, actualPath);
+        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
 
         /* Pass blank Sink as we are not ready to hash data at this stage. */
         NullSink blank;
@@ -3920,7 +3933,6 @@ void DerivationGoal::registerOutputs()
                 outputRewrites[std::string { scratchPath.hashPart() }] = std::string { finalStorePath.hashPart() };
         };
 
-        bool rewritten = false;
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
             [&](AlreadyRegistered skippedFinalPath) -> std::optional<StorePathSet> {
                 finish(skippedFinalPath.path);
@@ -3951,7 +3963,9 @@ void DerivationGoal::registerOutputs()
                 StringSource source(*sink.s);
                 restorePath(actualPath, source);
 
-                rewritten = true;
+                /* FIXME: set proper permissions in restorePath() so
+                   we don't have to do another traversal. */
+                canonicalisePathMetaData(actualPath, -1, inodesSeen);
             }
         };
 
@@ -4034,7 +4048,7 @@ void DerivationGoal::registerOutputs()
             [&](DerivationOutputInputAddressed output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
-                /* Preemtively add rewrite rule for final hash, as that is
+                /* Preemptively add rewrite rule for final hash, as that is
                    what the NAR hash will use rather than normalized-self references */
                 if (scratchPath != requiredFinalPath)
                     outputRewrites.insert_or_assign(
@@ -4108,34 +4122,11 @@ void DerivationGoal::registerOutputs()
                    else. No moving needed. */
                 assert(newInfo.ca);
             } else {
-                /* Temporarily add write perm so we can move, will be fixed
-                   later. */
-                {
-                    struct stat st;
-                    auto & mode = st.st_mode;
-                    if (lstat(actualPath.c_str(), &st))
-                        throw SysError("getting attributes of path '%1%'", actualPath);
-                    mode |= 0200;
-                    /* Try to change the perms, but only if the file isn't a
-                       symlink as symlinks permissions are mostly ignored and
-                       calling `chmod` on it will just forward the call to the
-                       target of the link. */
-                    if (!S_ISLNK(st.st_mode))
-                        if (chmod(actualPath.c_str(), mode) == -1)
-                            throw SysError("changing mode of '%1%' to %2$o", actualPath, mode);
-                }
-                if (rename(
-                        actualPath.c_str(),
-                        worker.store.toRealPath(finalDestPath).c_str()) == -1)
-                    throw SysError("moving build output '%1%' from it's temporary location to the Nix store", finalDestPath);
-                actualPath = worker.store.toRealPath(finalDestPath);
+                auto destPath = worker.store.toRealPath(finalDestPath);
+                movePath(actualPath, destPath);
+                actualPath = destPath;
             }
         }
-
-        /* Get rid of all weird permissions.  This also checks that
-           all files are owned by the build user, if applicable. */
-        canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
 
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(newInfo.path)) continue;
@@ -4143,9 +4134,9 @@ void DerivationGoal::registerOutputs()
             if (newInfo.narHash != oldInfo.narHash) {
                 worker.checkMismatch = true;
                 if (settings.runDiffHook || settings.keepFailed) {
-                    Path dst = worker.store.toRealPath(finalDestPath + checkSuffix);
+                    auto dst = worker.store.toRealPath(finalDestPath + checkSuffix);
                     deletePath(dst);
-                    moveCheckToStore(actualPath, dst);
+                    movePath(actualPath, dst);
 
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
@@ -5067,35 +5058,52 @@ Worker::~Worker()
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const StorePath & path,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
+    const StorePath & drvPath,
+    const StringSet & wantedOutputs,
+    std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
-    GoalPtr goal = derivationGoals[path].lock(); // FIXME
-    if (!goal) {
-        goal = std::make_shared<DerivationGoal>(path, wantedOutputs, *this, buildMode);
-        derivationGoals.insert_or_assign(path, goal);
+    WeakGoalPtr & abstract_goal_weak = derivationGoals[drvPath];
+    GoalPtr abstract_goal = abstract_goal_weak.lock(); // FIXME
+    std::shared_ptr<DerivationGoal> goal;
+    if (!abstract_goal) {
+        goal = mkDrvGoal();
+        abstract_goal_weak = goal;
         wakeUp(goal);
-    } else
-        (dynamic_cast<DerivationGoal *>(goal.get()))->addWantedOutputs(wantedOutputs);
+    } else {
+        goal = std::dynamic_pointer_cast<DerivationGoal>(abstract_goal);
+        assert(goal);
+        goal->addWantedOutputs(wantedOutputs);
+    }
     return goal;
 }
 
 
-std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
+    const StringSet & wantedOutputs, BuildMode buildMode)
 {
-    auto goal = std::make_shared<DerivationGoal>(drvPath, drv, *this, buildMode);
-    wakeUp(goal);
-    return goal;
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
+        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+    });
+}
+
+
+std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
+    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+{
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
+        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+    });
 }
 
 
 GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    GoalPtr goal = substitutionGoals[path].lock(); // FIXME
+    WeakGoalPtr & goal_weak = substitutionGoals[path];
+    GoalPtr goal = goal_weak.lock(); // FIXME
     if (!goal) {
         goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
-        substitutionGoals.insert_or_assign(path, goal);
+        goal_weak = goal;
         wakeUp(goal);
     }
     return goal;
@@ -5526,7 +5534,7 @@ BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDe
     BuildMode buildMode)
 {
     Worker worker(*this);
-    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, buildMode);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
     BuildResult result;
 

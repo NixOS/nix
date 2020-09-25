@@ -8,9 +8,7 @@
 #include "json.hh"
 #include "url.hh"
 #include "archive.hh"
-
-#include <future>
-
+#include "callback.hh"
 
 namespace nix {
 
@@ -1040,38 +1038,26 @@ static bool isNonUriPath(const std::string & spec) {
         && spec.find("/") != std::string::npos;
 }
 
-StoreType getStoreType(const std::string & uri, const std::string & stateDir)
-{
-    if (uri == "daemon") {
-        return tDaemon;
-    } else if (uri == "local" || isNonUriPath(uri)) {
-        return tLocal;
-    } else if (uri == "" || uri == "auto") {
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            return tLocal;
-        else if (pathExists(settings.nixDaemonSocketFile))
-            return tDaemon;
-        else
-            return tLocal;
-    } else {
-        return tOther;
-    }
-}
-
 std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
-    switch (getStoreType(uri, get(params, "state").value_or(settings.nixStateDir))) {
-        case tDaemon:
-            return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
-        case tLocal: {
-            Store::Params params2 = params;
-            if (isNonUriPath(uri)) {
-                params2["root"] = absPath(uri);
-            }
-            return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
-        }
-        default:
-            return nullptr;
+    if (uri == "" || uri == "auto") {
+        auto stateDir = get(params, "state").value_or(settings.nixStateDir);
+        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+            return std::make_shared<LocalStore>(params);
+        else if (pathExists(settings.nixDaemonSocketFile))
+            return std::make_shared<UDSRemoteStore>(params);
+        else
+            return std::make_shared<LocalStore>(params);
+    } else if (uri == "daemon") {
+        return std::make_shared<UDSRemoteStore>(params);
+    } else if (uri == "local") {
+        return std::make_shared<LocalStore>(params);
+    } else if (isNonUriPath(uri)) {
+        Store::Params params2 = params;
+        params2["root"] = absPath(uri);
+        return std::make_shared<LocalStore>(params2);
+    } else {
+        return nullptr;
     }
 }
 
