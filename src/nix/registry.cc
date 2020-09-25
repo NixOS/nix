@@ -6,6 +6,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "registry.hh"
+#include <iterator>
 
 using namespace nix;
 using namespace nix::flake;
@@ -25,14 +26,35 @@ struct CmdRegistryList : StoreCommand
 
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
-                // FIXME: format nicely
-                logger->stdout("%s %s %s",
+                std::ostringstream ostr;
+                std::transform(
+                    entry.extraAttrs.begin(),
+                    entry.extraAttrs.end(),
+                    std::ostream_iterator<std::string>(ostr, ", "),
+                    [&](auto attr) {
+                        string v;
+                        switch (attr.second.index()) {
+                        case 0:
+                            v = std::get<std::string>(attr.second);
+                            break;
+                        case 1:
+                            v = fmt("%d", std::get<uint64_t>(attr.second));
+                            break;
+                        case 2:
+                            v = std::get<Explicit<bool> >(attr.second).t ? "true" : "false";
+                            break;
+                        }
+                        return attr.first + "=" + v;
+                    });
+                string const att = ostr.str();
+                logger->stdout("%s %28s %s%s",
                     registry->type == Registry::Flag   ? "flags " :
                     registry->type == Registry::User   ? "user  " :
-                    registry->type == Registry::System ? "system" :
-                    "global",
+                    registry->type == Registry::System ? "system" : "global",
                     entry.from.to_string(),
-                    entry.to.to_string());
+                    entry.to.to_string(),
+                    att.empty() ? "" : " " + att.substr(0, att.size()-2)
+                    );
             }
         }
     }
