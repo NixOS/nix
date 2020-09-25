@@ -26,7 +26,7 @@ struct CmdRegistryList : StoreCommand
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
-                logger->stdout_("%s %s %s",
+                logger->cout("%s %s %s",
                     registry->type == Registry::Flag   ? "flags " :
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :

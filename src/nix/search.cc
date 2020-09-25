@@ -147,13 +147,13 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("description", description);
                         } else {
                             auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
-                            if (results > 1) logger->stdout_("");
-                            logger->stdout_(
+                            if (results > 1) logger->cout("");
+                            logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
-                                logger->stdout_(
+                                logger->cout(
                                     "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
