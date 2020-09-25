@@ -268,6 +268,26 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
+template<> void BaseSetting<StringMap>::set(const std::string & str)
+{
+    auto kvpairs = tokenizeString<Strings>(str);
+    for (auto & s : kvpairs)
+    {
+        auto eq = s.find_first_of('=');
+        if (std::string::npos != eq)
+            value.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
+        // else ignored
+    }
+}
+
+template<> std::string BaseSetting<StringMap>::to_string() const
+{
+    Strings kvstrs;
+    std::transform(value.begin(), value.end(), back_inserter(kvstrs),
+        [&](auto kvpair){ return kvpair.first + "=" + kvpair.second; });
+    return concatStringsSep(" ", kvstrs);
+}
+
 template class BaseSetting<int>;
 template class BaseSetting<unsigned int>;
 template class BaseSetting<long>;
@@ -278,6 +298,7 @@ template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
+template class BaseSetting<StringMap>;
 
 void PathSetting::set(const std::string & str)
 {
