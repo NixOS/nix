@@ -20,10 +20,15 @@ nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd
 
 nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS) $(BOOST_LDFLAGS) -llowdown
 
-$(foreach name, \
-  nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \
-  $(eval $(call install-symlink, nix, $(bindir)/$(name))))
+INSTALLED_PROGRAMS = \
+	$(foreach name, \
+	nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \
+	$(bindir)/$(name))
+
+$(foreach prog, $(INSTALLED_PROGRAMS), $(eval $(call install-symlink, nix, $(prog))))
 $(eval $(call install-symlink, $(bindir)/nix, $(libexecdir)/nix/build-remote))
+
+test-deps: $(INSTALLED_PROGRAMS) $(bindir)/nix $(libexecdir)/nix/build-remote
 
 src/nix-env/user-env.cc: src/nix-env/buildenv.nix.gen.hh
 
