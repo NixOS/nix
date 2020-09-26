@@ -419,7 +419,8 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
 StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
-    auto path = computeStorePathForText(name, s, references);
+    auto textHash = hashString(htSHA256, s);
+    auto path = makeTextPath(name, textHash, references);
 
     if (!repair && isValidPath(path))
         return path;
@@ -428,6 +429,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info { path, nar.first };
         info.narSize = nar.second;
+        info.ca = TextHash { textHash };
         info.references = references;
         return info;
     })->path;
