@@ -173,8 +173,6 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     auto info = mkInfo(narHashSink.finish());
     auto narInfo = make_ref<NarInfo>(info);
-    narInfo->narSize = info.narSize; // FIXME needed?
-    narInfo->narHash = info.narHash; // FIXME needed?
     narInfo->compression = compression;
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
