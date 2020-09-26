@@ -39,23 +39,29 @@ To build Nix itself in this shell:
 
 ```console
 [nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/inst
+[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
-To install it in `$(pwd)/inst` and test it:
+To install it in `$(pwd)/outputs` and test it:
 
 ```console
 [nix-shell]$ make install
-[nix-shell]$ make installcheck
-[nix-shell]$ ./inst/bin/nix --version
-nix (Nix) 2.4
+[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ ./outputs/out/bin/nix --version
+nix (Nix) 3.0
 ```
 
 To run a functional test:
 
 ```console
 make tests/test-name-should-auto-complete.sh.test
+```
+
+To run the unit-tests for C++ code:
+
+```
+make check
 ```
 
 If you have a flakes-enabled Nix you can replace:
