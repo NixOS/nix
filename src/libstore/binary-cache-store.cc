@@ -401,19 +401,30 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
-    StringSink sink;
-    std::optional<Hash> h;
+
+    HashSink sink { hashAlgo };
     if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
-        h = hashString(hashAlgo, *sink.s);
     } else {
-        auto s = readFile(srcPath);
-        dumpString(s, sink);
-        h = hashString(hashAlgo, s);
+        readFile(srcPath, sink);
     }
+    auto h = sink.finish().first;
 
-    auto source = StringSource { *sink.s };
-    return addToStoreFromDump(source, name, FileIngestionMethod::Recursive, htSHA256, repair);
+    auto source = sinkToSource([&](Sink & sink) {
+        dumpPath(srcPath, sink, filter);
+    });
+    return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
+        ValidPathInfo info {
+            makeFixedOutputPath(method, h, name),
+            nar.first,
+        };
+        info.narSize = nar.second;
+        info.ca = FixedOutputHash {
+            .method = method,
+            .hash = h,
+        };
+        return info;
+    })->path;
 }
 
 StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
