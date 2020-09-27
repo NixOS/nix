@@ -73,7 +73,7 @@ public:
 
     StorePath computeStorePath(Store & store) const;
 
-    // Convience functions for common attributes.
+    // Convenience functions for common attributes.
     std::string getType() const;
     std::optional<Hash> getNarHash() const;
     std::optional<std::string> getRef() const;
