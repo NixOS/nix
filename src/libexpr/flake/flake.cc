@@ -199,7 +199,7 @@ static Flake getFlake(
     auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
 
     if (vInfo.attrs->get(sEdition))
-        warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
+        warn("flake '%s' has deprecated attribute 'edition'", flake.lockedRef);
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);
@@ -226,7 +226,7 @@ static Flake getFlake(
         }
 
     } else
-        throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
+        throw Error("flake '%s' lacks attribute 'outputs'", flake.lockedRef);
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != sEdition &&
@@ -234,7 +234,7 @@ static Flake getFlake(
             attr.name != sInputs &&
             attr.name != sOutputs)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
-                lockedRef, attr.name, *attr.pos);
+                flake.lockedRef, attr.name, *attr.pos);
     }
 
     return flake;
