@@ -663,9 +663,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
         if (name == "." || name == "..") continue;
         Path path = linksDir + "/" + name;
 
-        struct stat st;
-        if (lstat(path.c_str(), &st) == -1)
-            throw SysError("statting '%1%'", path);
+        auto st = lstat(path);
 
         if (st.st_nlink != 1) {
             actualSize += st.st_size;

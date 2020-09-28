@@ -546,6 +546,20 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            are in fact content-addressed if we don't trust them. */
         assert(derivationIsCA(drv.type()) || trusted);
 
+        /* Recompute the derivation path when we cannot trust the original. */
+        if (!trusted) {
+            /* Recomputing the derivation path for input-address derivations
+               makes it harder to audit them after the fact, since we need the
+               original not-necessarily-resolved derivation to verify the drv
+               derivation as adequate claim to the input-addressed output
+               paths. */
+            assert(derivationIsCA(drv.type()));
+
+            Derivation drv2;
+            static_cast<BasicDerivation &>(drv2) = drv;
+            drvPath = writeDerivation(*store, Derivation { drv2 });
+        }
+
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
