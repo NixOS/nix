@@ -676,7 +676,31 @@ nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1 
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
 # fail if override was ignored
 grep -v "the flag '--override-input flake2/flake1 flake1/master/$hash1' does not match any input" $errf
+
+# override to non-existent flake
+errf=$flake3Dir/ovrinp4.err
+! nix flake update $flake3Dir --override-input flake2/flake1 flake99 -vvvvv 2>$errf
+cat $errf
+grep "cannot find flake 'flake:flake99' in the flake registries" $errf
+
+# override to non-existent path
+errf=$flake3Dir/ovrinp5.err
+! nix flake update $flake3Dir --override-input flake2/flake1 $TEST_ROOT/flake99 -vvvvv 2>$errf
+cat $errf
+grep "No such file or directory" $errf
+
+# override of non-existent input is ignored, even if target is bogus flake
+errf=$flake3Dir/ovrinp6.err
+nix flake update $flake3Dir --override-input flake2/flake11 flake99 -vvvvv 2>$errf
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
+cat $errf
+grep "warning: the flag '--override-input flake2/flake11 flake:flake99' does not match any input" $errf
+
+# fail if bogus target path, even if override is an unused/non-existent input
+errf=$flake3Dir/ovrinp7.err
+! nix flake update $flake3Dir --override-input flake2/flake11 $TEST_ROOT/flake99 -vvvvv 2>$errf
+cat $errf
+grep "No such file or directory" $errf
 
 # Test --update-input.
 nix flake update $flake3Dir
