@@ -220,7 +220,8 @@ static Flake getFlake(
             for (auto & formal : outputs->value->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {
-                        .ref = parseFlakeRef(formal.name)
+                        .ref = parseFlakeRef(formal.name),
+                        .isFlake = true   // implicit inputs must always be a flake
                     });
             }
         }
@@ -393,6 +394,7 @@ LockedFlake lockFlake(
                             });
                         } else if (auto follows = std::get_if<1>(&i.second)) {
                             fakeInputs.emplace(i.first, FlakeInput {
+                                .isFlake = true,  // can only follow other flakes
                                 .follows = *follows,
                                 .absolute = true
                             });
