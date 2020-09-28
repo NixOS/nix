@@ -658,13 +658,24 @@ nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ
 
 # Test --override-input.
 git -C $flake3Dir reset --hard
-nix flake update $flake3Dir --override-input flake2/flake1 flake5 -vvvvv
+errf=$flake3Dir/ovrinp1.err
+nix flake update $flake3Dir --override-input flake2/flake1 flake5 -vvvvv 2>$errf
 [[ $(jq .nodes.flake1_2.locked.url $flake3Dir/flake.lock) =~ flake5 ]]
+cat $errf
+# fail if override was ignored
+grep -v "the flag '--override-input flake2/flake1 flake5' does not match any input" $errf
 
-nix flake update $flake3Dir --override-input flake2/flake1 flake1
+errf=$flake3Dir/ovrinp2.err
+nix flake update $flake3Dir --override-input flake2/flake1 flake1 2>$errf
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
+# fail if override was ignored
+grep -v "the flag '--override-input flake2/flake1 flake1' does not match any input" $errf
 
-nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
+errf=$flake3Dir/ovrinp3.err
+nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1 2>$errf
+[[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
+# fail if override was ignored
+grep -v "the flag '--override-input flake2/flake1 flake1/master/$hash1' does not match any input" $errf
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
 
 # Test --update-input.
