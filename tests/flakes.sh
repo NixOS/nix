@@ -702,7 +702,34 @@ errf=$flake3Dir/ovrinp7.err
 cat $errf
 grep "No such file or directory" $errf
 
+# Test build with input override for non-flake dir
+mkdir $TEST_ROOT/ovrinp
+echo alternate input override > $TEST_ROOT/ovrinp/README.md
+git -C $TEST_ROOT/ovrinp init
+git -C $TEST_ROOT/ovrinp config user.email "foobar@example.com"
+git -C $TEST_ROOT/ovrinp config user.name "Foobar"
+git -C $TEST_ROOT/ovrinp add README.md
+git -C $TEST_ROOT/ovrinp commit -m 'README in ovrinp'
+err=$flake3Dir/errnonovr
+nix build -o $TEST_ROOT/result $flake3Dir#fnord --override-input nonFlake $TEST_ROOT/ovrinp 2>$err
+grep -v "the flag '--override-input nonFlake $TEST_ROOT/ovrinp' does not match any input" $errf
+
+# make sure override does not persist (in lockfile)
+rm -rf $TEST_ROOT/ovrinp
+nix build -o $TEST_ROOT/result $flake3Dir#fnord
+
+# Test build with override-input to plain directory (not a git repo)
+mkdir $TEST_ROOT/plainovr
+echo plain input override > $TEST_ROOT/plainovr/README.md
+err=$flake3Dir/errplnovr
+nix build -o $TEST_ROOT/result $flake3Dir#fnord --override-input nonFlake $TEST_ROOT/plainovr 2>$err
+grep -v "the flag '--override-input nonFlake $TEST_ROOT/plainovr' does not match any input" $errf
+
+
 # Test --update-input.
+git -C $flake3Dir reset --hard
+nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
+
 nix flake update $flake3Dir
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) = $hash1 ]]
 
