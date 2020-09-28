@@ -1631,6 +1631,13 @@ void DerivationGoal::tryToBuild()
 
     actLock.reset();
 
+    state = &DerivationGoal::tryLocalBuild;
+    worker.wakeUp(shared_from_this());
+}
+
+void DerivationGoal::tryLocalBuild() {
+    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
+
     /* Make sure that we are allowed to start a build.  If this
        derivation prefers to be done locally, do it even if
        maxBuildJobs is 0. */
@@ -1640,12 +1647,6 @@ void DerivationGoal::tryToBuild()
         outputLocks.unlock();
         return;
     }
-
-    state = &DerivationGoal::tryLocalBuild;
-    worker.wakeUp(shared_from_this());
-}
-
-void DerivationGoal::tryLocalBuild() {
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
