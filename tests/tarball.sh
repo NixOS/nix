@@ -17,7 +17,7 @@ test_tarball() {
     local compressor="$2"
 
     tarball=$TEST_ROOT/tarball.tar$ext
-    (cd $TEST_ROOT && tar c tarball) | $compressor > $tarball
+    (cd $TEST_ROOT && tar cf - tarball) | $compressor > $tarball
 
     nix-env -f file://$tarball -qa --out-path | grep -q dependencies
 
