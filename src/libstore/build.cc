@@ -4315,19 +4315,19 @@ void DerivationGoal::registerOutputs()
        but it's fine to do in all cases. */
     bool isCaFloating = drv->type() == DerivationType::CAFloating;
 
-    auto drvPath2 = drvPath;
+    auto drvPathResolved = drvPath;
     if (!useDerivation && isCaFloating) {
         /* Once a floating CA derivations reaches this point, it
            must already be resolved, so we don't bother trying to
            downcast drv to get would would just be an empty
            inputDrvs field. */
         Derivation drv2 { *drv };
-        drvPath2 = writeDerivation(worker.store, drv2);
+        drvPathResolved = writeDerivation(worker.store, drv2);
     }
 
     if (useDerivation || isCaFloating)
         for (auto & [outputName, newInfo] : infos)
-            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
+            worker.store.linkDeriverToPath(drvPathResolved, outputName, newInfo.path);
 }
 
 
