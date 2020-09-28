@@ -166,31 +166,11 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     return inputs;
 }
 
-static Flake getFlake(
+static Flake ingestFlake(
     EvalState & state,
-    const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache)
+    Flake flake,
+    std::string flakeFile)
 {
-    auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-        state, originalRef, allowLookup, flakeCache);
-
-    // Guard against symlink attacks.
-    auto flakeFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/flake.nix");
-    if (!isInDir(flakeFile, sourceInfo.actualPath))
-        throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
-            lockedRef, state.store->printStorePath(sourceInfo.storePath));
-
-    Flake flake {
-        .originalRef = originalRef,
-        .resolvedRef = resolvedRef,
-        .lockedRef = lockedRef,
-        .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
-    };
-
-    if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
-
     Value vInfo;
     state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
 
@@ -239,6 +219,51 @@ static Flake getFlake(
     }
 
     return flake;
+}
+
+static std::variant<Flake, std::tuple<fetchers::Tree, FlakeRef, FlakeRef> > getInput(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    bool allowLookup,
+    FlakeCache & flakeCache)
+{
+    auto fetched = fetchOrSubstituteTree(state, originalRef, allowLookup, flakeCache);
+    auto [sourceInfo, resolvedRef, lockedRef] = fetched;
+
+    auto flakeFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/flake.nix");
+
+    if (!pathExists(flakeFile))
+        return fetched;
+
+    // Guard against symlink attacks.
+    if (!isInDir(flakeFile, sourceInfo.actualPath))
+        throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
+            lockedRef, state.store->printStorePath(sourceInfo.storePath));
+
+    return ingestFlake(state,
+                       Flake {
+                         .originalRef = originalRef,
+                         .resolvedRef = resolvedRef,
+                         .lockedRef = lockedRef,
+                         .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
+                      },
+                      flakeFile);
+}
+
+static Flake getFlake(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    bool allowLookup,
+    FlakeCache & flakeCache)
+{
+    auto inp = getInput(state, originalRef, allowLookup, flakeCache);
+
+    if (!std::holds_alternative<Flake>(inp))
+    {
+        auto [sourceInfo, resolvedRef, lockedRef] = std::get<1>(inp);
+        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
+    }
+    return std::get<Flake>(inp);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
@@ -412,27 +437,33 @@ LockedFlake lockFlake(
                 if (!lockFlags.allowMutable && !input.ref->input.isImmutable())
                     throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
-                if (input.isFlake) {
-                    auto inputFlake = getFlake(state, *input.ref, lockFlags.useRegistries, flakeCache);
+                auto fetchedInp = getInput(state, *input.ref, lockFlags.useRegistries, flakeCache);
+                bool const isFlake = std::holds_alternative<Flake>(fetchedInp);
 
-                    /* Note: in case of an --override-input, we use
-                       the *original* ref (input2.ref) for the
-                       "original" field, rather than the
-                       override. This ensures that the override isn't
-                       nuked the next time we update the lock
-                       file. That is, overrides are sticky unless you
-                       use --no-write-lock-file. */
-                    auto childNode = std::make_shared<LockedNode>(
-                        inputFlake.lockedRef, input2.ref ? *input2.ref : *input.ref);
+                /* Note: in case of an --override-input, we use
+                   the *original* ref (input2.ref) for the
+                   "original" field, rather than the
+                   override. This ensures that the override isn't
+                   nuked the next time we update the lock
+                   file. That is, overrides are sticky unless you
+                   use --no-write-lock-file. */
+                auto childNode = std::make_shared<LockedNode>(
+                    isFlake ?
+                    std::get<Flake>(fetchedInp).lockedRef :
+                    std::get<2>(std::get<1>(fetchedInp)),
+                    input2.ref ? *input2.ref : *input.ref,
+                    isFlake);
+                node->inputs.insert_or_assign(id, childNode);
 
-                    node->inputs.insert_or_assign(id, childNode);
-
+                if (isFlake) {
                     /* Guard against circular flake imports. */
                     for (auto & parent : parents)
                         if (parent == *input.ref)
                             throw Error("found circular import of flake '%s'", parent);
                     parents.push_back(*input.ref);
                     Finally cleanup([&]() { parents.pop_back(); });
+
+                    auto inputFlake = std::get<Flake>(fetchedInp);
 
                     /* Recursively process the inputs of this
                        flake. Also, unless we already have this flake
@@ -444,13 +475,6 @@ LockedFlake lockFlake(
                         ? std::dynamic_pointer_cast<const Node>(oldLock)
                         : LockFile::read(
                             inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root);
-                }
-
-                else {
-                    auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                        state, *input.ref, lockFlags.useRegistries, flakeCache);
-                    node->inputs.insert_or_assign(id,
-                        std::make_shared<LockedNode>(lockedRef, *input.ref, false));
                 }
             }
         }

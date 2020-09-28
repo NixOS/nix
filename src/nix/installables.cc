@@ -81,7 +81,7 @@ MixFlakeOptions::MixFlakeOptions()
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath(".")));
+                parseFlakeRef(flakeRef, absPath("."), true));
         }}
     });
 
