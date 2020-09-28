@@ -12,12 +12,19 @@ class Store;
 
 typedef std::string FlakeId;
 
-// The FlakeRef represents a local nix store reference to a flake
-// input for a Flake (it may be helpful to think of this object by the
-// alternate name of "InputRefForFlake").  It is constructed by
-// starting with an input description (usually the attrs or a url from
-// the flake file), locating a fetcher for that input, and then
-// capturing the Input object that fetcher generates (usually via
+// A flake reference specifies how to fetch a flake or raw source
+// (e.g. from a Git repository).  It is created from a URL-like syntax
+// (e.g. 'github:NixOS/patchelf'), an attrset representation (e.g. '{
+// type="github"; owner = "NixOS"; repo = "patchelf"; }'), or a local
+// path.
+//
+// Each flake will have a number of FlakeRef objects: one for each
+// input to the flake.
+//
+// The normal method of constructing a FlakeRef is by starting with an
+// input description (usually the attrs or a url from the flake file),
+// locating a fetcher for that input, and then capturing the Input
+// object that fetcher generates (usually via
 // FlakeRef::fromAttrs(attrs) or parseFlakeRef(url) calls).
 //
 // The actual fetch not have been performed yet (i.e. a FlakeRef may
