@@ -307,7 +307,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
         return;
     }
 
-    (void) addToStoreCommon(narSource, repair, checkSigs, {[&](HashResult nar) {
+    addToStoreCommon(narSource, repair, checkSigs, {[&](HashResult nar) {
         /* FIXME reinstate these, once we can correctly do hash modulo sink as
            needed. We need to throw here in case we uploaded a corrupted store path. */
         // assert(info.narHash == nar.first);
