@@ -17,25 +17,26 @@ struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 
-// FlakeInput is the 'Flake'-level parsed form of the "input" entries in
-// the flake file.
-//
-// A FlakeInput is normally constructed by the 'parseFlakeInput'
-// function which parses the input specification in the '.flake' file
-// to create a 'FlakeRef' (a fetcher, the fetcher-specific
-// representation of the input specification, and possibly the fetched
-// local store path result) and then creating this FlakeInput to hold
-// that FlakeRef, along with anything that might override that
-// FlakeRef (like command-line overrides or "follows" specifications).
-//
-// A FlakeInput is also sometimes constructed directly from a FlakeRef
-// instead of starting at the flake-file input specification
-// (e.g. overrides, follows, and implicit inputs).
-//
-// A FlakeInput will usually have one of either "ref" or "follows"
-// set.  If not otherwise specified, a "ref" will be generated to a
-// 'type="indirect"' flake, which is treated as simply the name of a
-// flake to be resolved in the registry.
+/* FlakeInput is the 'Flake'-level parsed form of the "input" entries
+ * in the flake file.
+ *
+ * A FlakeInput is normally constructed by the 'parseFlakeInput'
+ * function which parses the input specification in the '.flake' file
+ * to create a 'FlakeRef' (a fetcher, the fetcher-specific
+ * representation of the input specification, and possibly the fetched
+ * local store path result) and then creating this FlakeInput to hold
+ * that FlakeRef, along with anything that might override that
+ * FlakeRef (like command-line overrides or "follows" specifications).
+ *
+ * A FlakeInput is also sometimes constructed directly from a FlakeRef
+ * instead of starting at the flake-file input specification
+ * (e.g. overrides, follows, and implicit inputs).
+ *
+ * A FlakeInput will usually have one of either "ref" or "follows"
+ * set.  If not otherwise specified, a "ref" will be generated to a
+ * 'type="indirect"' flake, which is treated as simply the name of a
+ * flake to be resolved in the registry.
+ */
 
 struct FlakeInput
 {
