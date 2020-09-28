@@ -128,11 +128,12 @@ struct Derivation : BasicDerivation
     std::string unparse(const Store & store, bool maskOutputs,
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
-    /* Return the underlying basic derivation but with
+    /* Return the underlying basic derivation but with these changes:
 
-       1. input drv outputs moved to input sources.
+	   1. Input drvs are emptied, but the outputs of them that were used are
+	      added directly to input sources.
 
-       2. placeholders replaced with realized input store paths. */
+       2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);
 
     Derivation() = default;
