@@ -175,7 +175,7 @@ struct GitArchiveInputScheme : InputScheme
             headers.push_back(*url.access_token_header);
         }
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, headers, "source", true);
+        auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, headers);
 
         input.attrs.insert_or_assign("lastModified", lastModified);
 
@@ -215,7 +215,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, headers, "source", false).storePath)));
+                    downloadFile(store, url, "source", false, headers).storePath)));
         auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
@@ -271,7 +271,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, headers, "source", false).storePath)));
+                    downloadFile(store, url, "source", false, headers).storePath)));
         auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;

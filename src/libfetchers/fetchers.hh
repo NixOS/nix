@@ -118,15 +118,15 @@ struct DownloadFileResult
 DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
-    const Headers & headers,
     const std::string & name,
-    bool immutable);
+    bool immutable,
+    const Headers & headers = {});
 
 std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
-    const Headers & headers,
     const std::string & name,
-    bool immutable);
+    bool immutable,
+    const Headers & headers = {});
 
 }

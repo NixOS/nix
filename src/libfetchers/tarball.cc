@@ -12,9 +12,9 @@ namespace nix::fetchers {
 DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
-    const Headers & headers,
     const std::string & name,
-    bool immutable)
+    bool immutable,
+    const Headers & headers)
 {
     // FIXME: check store
 
@@ -38,7 +38,8 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return useCached();
 
-    FileTransferRequest request(url, headers);
+    FileTransferRequest request(url);
+    request.headers = headers;
     if (cached)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
     FileTransferResult res;
@@ -112,9 +113,9 @@ DownloadFileResult downloadFile(
 std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
-    const Headers & headers,
     const std::string & name,
-    bool immutable)
+    bool immutable,
+    const Headers & headers)
 {
     Attrs inAttrs({
         {"type", "tarball"},
@@ -130,7 +131,7 @@ std::pair<Tree, time_t> downloadTarball(
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
-    auto res = downloadFile(store, url, headers, name, immutable);
+    auto res = downloadFile(store, url, name, immutable, headers);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -225,7 +226,7 @@ struct TarballInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), Headers {}, "source", false).first;
+        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
         return {std::move(tree), input};
     }
 };
