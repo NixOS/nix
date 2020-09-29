@@ -1008,6 +1008,8 @@ private:
     void tryLocalBuild();
     void buildDone();
 
+    void resolvedFinished();
+
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
 
@@ -1483,8 +1485,40 @@ void DerivationGoal::inputsRealised()
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    if (useDerivation)
-        for (auto & [depDrvPath, wantedDepOutputs] : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
+    if (useDerivation) {
+        auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+
+        if (!fullDrv.inputDrvs.empty() && fullDrv.type() == DerivationType::CAFloating) {
+            /* We are be able to resolve this derivation based on the
+               now-known results of dependencies. If so, we become a stub goal
+               aliasing that resolved derivation goal */
+            std::optional attempt = fullDrv.tryResolve(worker.store);
+            assert(attempt);
+            Derivation drvResolved { *std::move(attempt) };
+
+            auto pathResolved = writeDerivation(worker.store, drvResolved);
+            /* Add to memotable to speed up downstream goal's queries with the
+               original derivation. */
+            drvPathResolutions.lock()->insert_or_assign(drvPath, pathResolved);
+
+            auto msg = fmt("Resolved derivation: '%s' -> '%s'",
+                worker.store.printStorePath(drvPath),
+                worker.store.printStorePath(pathResolved));
+            act = std::make_unique<Activity>(*logger, lvlInfo, actBuildWaiting, msg,
+                Logger::Fields {
+                       worker.store.printStorePath(drvPath),
+                       worker.store.printStorePath(pathResolved),
+                   });
+
+            auto resolvedGoal = worker.makeDerivationGoal(
+                pathResolved, wantedOutputs, buildMode);
+            addWaitee(resolvedGoal);
+
+            state = &DerivationGoal::resolvedFinished;
+            return;
+        }
+
+        for (auto & [depDrvPath, wantedDepOutputs] : fullDrv.inputDrvs) {
             /* Add the relevant output closures of the input derivation
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
@@ -1504,6 +1538,7 @@ void DerivationGoal::inputsRealised()
                         worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
             }
         }
+    }
 
     /* Second, the input sources. */
     worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
@@ -1962,6 +1997,9 @@ void DerivationGoal::buildDone()
     done(BuildResult::Built);
 }
 
+void DerivationGoal::resolvedFinished() {
+    done(BuildResult::Built);
+}
 
 HookReply DerivationGoal::tryBuildHook()
 {
@@ -4257,11 +4295,13 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    ValidPathInfos infos2;
-    for (auto & [outputName, newInfo] : infos) {
-        infos2.push_back(newInfo);
+    {
+        ValidPathInfos infos2;
+        for (auto & [outputName, newInfo] : infos) {
+            infos2.push_back(newInfo);
+        }
+        worker.store.registerValidPaths(infos2);
     }
-    worker.store.registerValidPaths(infos2);
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
@@ -4273,12 +4313,21 @@ void DerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
-    for (auto & [outputName, newInfo] : infos) {
-        /* FIXME: we will want to track this mapping in the DB whether or
-           not we have a drv file. */
-        if (useDerivation)
-            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
+    bool isCaFloating = drv->type() == DerivationType::CAFloating;
+
+    auto drvPathResolved = drvPath;
+    if (!useDerivation && isCaFloating) {
+        /* Once a floating CA derivations reaches this point, it
+           must already be resolved, so we don't bother trying to
+           downcast drv to get would would just be an empty
+           inputDrvs field. */
+        Derivation drv2 { *drv };
+        drvPathResolved = writeDerivation(worker.store, drv2);
     }
+
+    if (useDerivation || isCaFloating)
+        for (auto & [outputName, newInfo] : infos)
+            worker.store.linkDeriverToPath(drvPathResolved, outputName, newInfo.path);
 }
 
 
@@ -4568,7 +4617,7 @@ void DerivationGoal::flushLine()
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
-    if (drv->type() != DerivationType::CAFloating) {
+    if (!useDerivation || drv->type() != DerivationType::CAFloating) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
             res.insert_or_assign(name, output.path(worker.store, drv->name, name));
@@ -4580,7 +4629,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
 
 OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
-    if (drv->type() != DerivationType::CAFloating) {
+    if (!useDerivation || drv->type() != DerivationType::CAFloating) {
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
             res.insert_or_assign(name, *output.second);
