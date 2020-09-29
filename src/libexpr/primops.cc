@@ -4383,13 +4383,16 @@ void EvalState::createBaseEnv()
         .impureOnly = true,
     });
 
-    if (!evalSettings.pureEval) {
-        v.mkString(settings.thisSystem.get());
-    }
+    if (!evalSettings.pureEval)
+        v.mkString(evalSettings.getCurrentSystem());
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
-          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-system).
+          The value of the
+          [`eval-system`](@docroot@/command-ref/conf-file.md#conf-eval-system)
+          or else
+          [`system`](@docroot@/command-ref/conf-file.md#conf-system)
+          configuration option.
 
           It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
 

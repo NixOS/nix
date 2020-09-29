@@ -89,6 +89,12 @@ std::string EvalSettings::resolvePseudoUrl(std::string_view url)
         return std::string(url);
 }
 
+const std::string & EvalSettings::getCurrentSystem()
+{
+    const auto & evalSystem = currentSystem.get();
+    return evalSystem != "" ? evalSystem : settings.thisSystem.get();
+}
+
 EvalSettings evalSettings;
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
