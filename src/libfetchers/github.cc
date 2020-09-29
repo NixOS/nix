@@ -147,17 +147,7 @@ struct GitArchiveInputScheme : InputScheme
         auto tokens = settings.accessTokens.get();
         auto pat = tokens.find(host);
         if (pat == tokens.end())
-        {
-            if ("github.com" == host)
-            {
-                auto oldcfg = settings.githubAccessToken.get();
-                if (!oldcfg.empty()) {
-                    warn("using deprecated 'github-access-token' config value; please use 'access-tokens' instead");
-                    return oldcfg;
-                }
-            }
             return std::nullopt;
-        }
         return pat->second;
     }
 

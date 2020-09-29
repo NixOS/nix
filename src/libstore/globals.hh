@@ -859,9 +859,6 @@ public:
           are loaded as plugins (non-recursively).
         )"};
 
-    Setting<std::string> githubAccessToken{this, "", "github-access-token",
-        "GitHub access token to get access to GitHub data through the GitHub API for `github:<..>` flakes (deprecated, please use 'access-tokens' instead)."};
-
     Setting<StringMap> accessTokens{this, {}, "access-tokens",
         R"(
           Access tokens used to access protected GitHub, GitLab, or
