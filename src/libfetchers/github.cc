@@ -3,11 +3,24 @@
 #include "fetchers.hh"
 #include "globals.hh"
 #include "store-api.hh"
+#include "types.hh"
 #include "url-parts.hh"
 
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
+
+struct DownloadUrl
+{
+    std::string url;
+    std::optional<std::pair<std::string, std::string>> access_token_header;
+
+    DownloadUrl(const std::string & url)
+        : url(url) { }
+
+    DownloadUrl(const std::string & url, const std::pair<std::string, std::string> & access_token_header)
+        : url(url), access_token_header(access_token_header) { }
+};
 
 // A github or gitlab host
 const static std::string hostRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
@@ -16,6 +29,8 @@ std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 struct GitArchiveInputScheme : InputScheme
 {
     virtual std::string type() = 0;
+
+    virtual std::pair<std::string, std::string> accessHeaderFromToken(const std::string & token) const = 0;
 
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
@@ -132,7 +147,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual Hash getRevFromRef(nix::ref<Store> store, const Input & input) const = 0;
 
-    virtual std::string getDownloadUrl(const Input & input) const = 0;
+    virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
@@ -161,7 +176,12 @@ struct GitArchiveInputScheme : InputScheme
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url, "source", true);
+        Headers headers;
+        if (url.access_token_header) {
+            headers.push_back(*url.access_token_header);
+        }
+
+        auto [tree, lastModified] = downloadTarball(store, url.url, headers, "source", true);
 
         input.attrs.insert_or_assign("lastModified", lastModified);
 
@@ -183,11 +203,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "github"; }
 
-    void addAccessToken(std::string & url) const
-    {
-        std::string accessToken = settings.githubAccessToken.get();
-        if (accessToken != "")
-            url += "?access_token=" + accessToken;
+    std::pair<std::string, std::string> accessHeaderFromToken(const std::string & token) const {
+        return std::pair<std::string, std::string>("Authorization", fmt("token %s", token));
     }
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
@@ -196,18 +213,21 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
-        addAccessToken(url);
+        Headers headers;
+        std::string accessToken = settings.githubAccessToken.get();
+        if (accessToken != "")
+            headers.push_back(accessHeaderFromToken(accessToken));
 
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false).storePath)));
+                    downloadFile(store, url, headers, "source", false).storePath)));
         auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
 
-    std::string getDownloadUrl(const Input & input) const override
+    DownloadUrl getDownloadUrl(const Input & input) const override
     {
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
@@ -216,9 +236,13 @@ struct GitHubInputScheme : GitArchiveInputScheme
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
-        addAccessToken(url);
-
-        return url;
+        std::string accessToken = settings.githubAccessToken.get();
+        if (accessToken != "") {
+            auto auth_header = accessHeaderFromToken(accessToken);
+            return DownloadUrl(url, auth_header);
+        } else {
+            return DownloadUrl(url);
+        }
     }
 
     void clone(const Input & input, const Path & destDir) override
@@ -235,21 +259,31 @@ struct GitLabInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "gitlab"; }
 
+    std::pair<std::string, std::string> accessHeaderFromToken(const std::string & token) const {
+        return std::pair<std::string, std::string>("Authorization", fmt("Bearer %s", token));
+    }
+
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host_url = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+
+        Headers headers;
+        std::string accessToken = settings.gitlabAccessToken.get();
+        if (accessToken != "")
+            headers.push_back(accessHeaderFromToken(accessToken));
+
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false).storePath)));
+                    downloadFile(store, url, headers, "source", false).storePath)));
         auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
 
-    std::string getDownloadUrl(const Input & input) const override
+    DownloadUrl getDownloadUrl(const Input & input) const override
     {
         // FIXME: This endpoint has a rate limit threshold of 5 requests per minute
         auto host_url = maybeGetStrAttr(input.attrs, "url").value_or("gitlab.com");
@@ -257,12 +291,14 @@ struct GitLabInputScheme : GitArchiveInputScheme
             host_url, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
-        /* # FIXME: add privat token auth (`curl --header "PRIVATE-TOKEN: <your_access_token>"`)
-        std::string accessToken = settings.githubAccessToken.get();
-        if (accessToken != "")
-            url += "?access_token=" + accessToken;*/
+        std::string accessToken = settings.gitlabAccessToken.get();
+        if (accessToken != "") {
+            auto auth_header = accessHeaderFromToken(accessToken);
+            return DownloadUrl(url, auth_header);
+        } else {
+            return DownloadUrl(url);
+        }
 
-        return url;
     }
 
     void clone(const Input & input, const Path & destDir) override
