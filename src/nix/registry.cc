@@ -31,8 +31,8 @@ struct CmdRegistryList : StoreCommand
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
                     "global",
-                    entry.from.to_string(),
-                    entry.to.to_string());
+                    entry.from.toURLString(),
+                    entry.to.toURLString(attrsToQuery(entry.extraAttrs)));
             }
         }
     }
