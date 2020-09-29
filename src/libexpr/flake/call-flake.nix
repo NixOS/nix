@@ -43,7 +43,9 @@ let
 
           outputs = flake.outputs (inputs // { self = result; });
 
-          result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; };
+          result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo;
+                                              flakeDir = sourceInfo  + (if subdir != "" then "/" else "") + subdir;
+                                            };
         in
           if node.flake or true then
             assert builtins.isFunction flake.outputs;
