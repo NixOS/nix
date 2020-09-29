@@ -201,8 +201,8 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, Headers {}, name, (bool) expectedHash).first.storePath
-        : fetchers::downloadFile(state.store, *url, Headers{}, name, (bool) expectedHash).storePath;
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
+        : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     auto path = state.store->toRealPath(storePath);
 

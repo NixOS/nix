@@ -4,6 +4,7 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "types.hh"
+#include "url-parts.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -19,9 +20,9 @@ struct DownloadUrl
         : url(url), headers(headers) { }
 };
 
-// A github or gitlab url
-const static std::string urlRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
-std::regex urlRegex(urlRegexS, std::regex::ECMAScript);
+// A github or gitlab host
+const static std::string hostRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
+std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
 {
@@ -64,7 +65,7 @@ struct GitArchiveInputScheme : InputScheme
                 ref = value;
             }
             else if (name == "host") {
-                if (!std::regex_match(value, urlRegex))
+                if (!std::regex_match(value, hostRegex))
                     throw BadURL("URL '%s' contains an invalid instance host", url.url);
                 host_url = value;
             }
@@ -204,7 +205,7 @@ struct GitArchiveInputScheme : InputScheme
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, url.headers, "source", true);
+        auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, url.headers);
 
         input.attrs.insert_or_assign("lastModified", lastModified);
 
@@ -247,7 +248,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, headers, "source", false).storePath)));
+                    downloadFile(store, url, "source", false, headers).storePath)));
         auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
@@ -310,7 +311,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, headers, "source", false).storePath)));
+                    downloadFile(store, url, "source", false, headers).storePath)));
         auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;

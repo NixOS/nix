@@ -6,6 +6,7 @@
 #include "worker-protocol.hh"
 #include "ssh.hh"
 #include "derivations.hh"
+#include "callback.hh"
 
 namespace nix {
 

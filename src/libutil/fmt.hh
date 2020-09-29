@@ -1,7 +1,6 @@
 #pragma once
 
 #include <boost/format.hpp>
-#include <boost/algorithm/string/replace.hpp>
 #include <string>
 #include "ansicolor.hh"
 
