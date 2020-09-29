@@ -14,12 +14,6 @@ struct DownloadUrl
 {
     std::string url;
     std::optional<std::pair<std::string, std::string>> access_token_header;
-
-    DownloadUrl(const std::string & url)
-        : url(url) { }
-
-    DownloadUrl(const std::string & url, const std::pair<std::string, std::string> & access_token_header)
-        : url(url), access_token_header(access_token_header) { }
 };
 
 // A github or gitlab host
@@ -239,9 +233,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
         std::string accessToken = settings.githubAccessToken.get();
         if (accessToken != "") {
             auto auth_header = accessHeaderFromToken(accessToken);
-            return DownloadUrl(url, auth_header);
+            return DownloadUrl { url, auth_header };
         } else {
-            return DownloadUrl(url);
+            return DownloadUrl { url };
         }
     }
 
@@ -294,9 +288,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
         std::string accessToken = settings.gitlabAccessToken.get();
         if (accessToken != "") {
             auto auth_header = accessHeaderFromToken(accessToken);
-            return DownloadUrl(url, auth_header);
+            return DownloadUrl { url, auth_header };
         } else {
-            return DownloadUrl(url);
+            return DownloadUrl { url };
         }
 
     }
