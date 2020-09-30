@@ -140,15 +140,16 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    std::optional<std::string> getAccessToken(const std::string &host) const {
+    std::optional<std::string> getAccessToken(const std::string & host) const
+    {
         auto tokens = settings.accessTokens.get();
-        auto pat = tokens.find(host);
-        if (pat == tokens.end())
-            return std::nullopt;
-        return pat->second;
+        if (auto token = get(tokens, host))
+            return *token;
+        return {};
     }
 
-    Headers makeHeadersWithAuthTokens(const std::string & host) const {
+    Headers makeHeadersWithAuthTokens(const std::string & host) const
+    {
         Headers headers;
         auto accessToken = getAccessToken(host);
         if (accessToken) {
@@ -214,7 +215,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "github"; }
 
-    std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const {
+    std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const
+    {
         // Github supports PAT/OAuth2 tokens and HTTP Basic
         // Authentication.  The former simply specifies the token, the
         // latter can use the token as the password.  Only the first
@@ -268,7 +270,8 @@ struct GitLabInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "gitlab"; }
 
-    std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const {
+    std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const
+    {
         // Gitlab supports 4 kinds of authorization, two of which are
         // relevant here: OAuth2 and PAT (Private Access Token).  The
         // user can indicate which token is used by specifying the

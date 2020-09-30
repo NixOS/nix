@@ -893,10 +893,10 @@ public:
 
           ```nix
           input.foo = {
-            type="gitlab";
-            host="gitlab.mycompany.com";
-            owner="mycompany";
-            repo="pro";
+            type = "gitlab";
+            host = "gitlab.mycompany.com";
+            owner = "mycompany";
+            repo = "pro";
           };
           ```
 
