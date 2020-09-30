@@ -10,6 +10,8 @@ oops() {
     exit 1
 }
 
+umask 0022
+
 tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
           oops "Can't create temporary directory for downloading the Nix binary tarball")"
 cleanup() {

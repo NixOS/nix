@@ -2,6 +2,8 @@
 
 set -e
 
+umask 0022
+
 dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
