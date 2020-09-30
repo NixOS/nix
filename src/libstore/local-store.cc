@@ -114,8 +114,7 @@ LocalStore::LocalStore(const Params & params)
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
-            if (lstat(path.c_str(), &st))
-                throw SysError("getting status of '%1%'", path);
+            st = lstat(path);
             if (S_ISLNK(st.st_mode))
                 throw Error(
                         "the path '%1%' is a symlink; "
@@ -419,10 +418,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
-    canonicaliseTimestampAndPermissions(path, st);
+    canonicaliseTimestampAndPermissions(path, lstat(path));
 }
 
 
@@ -440,9 +436,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     }
 #endif
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
@@ -478,8 +472,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        ensure that we don't fail on hard links within the same build
        (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
     if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
-        assert(!S_ISDIR(st.st_mode));
-        if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
+        if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
@@ -522,9 +515,7 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
@@ -730,7 +721,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 {
     auto use(state.stmtQueryPathInfo.use()(printStorePath(path)));
     if (!use.next())
-        throw Error("path '%s' is not valid", printStorePath(path));
+        throw InvalidPath("path '%s' is not valid", printStorePath(path));
     return use.getInt(0);
 }
 
@@ -805,18 +796,58 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
 {
+    auto path = path_;
     std::map<std::string, std::optional<StorePath>> outputs;
-    BasicDerivation drv = readDerivation(path);
+    Derivation drv = readDerivation(path);
     for (auto & [outName, _] : drv.outputs) {
         outputs.insert_or_assign(outName, std::nullopt);
+    }
+    bool haveCached = false;
+    {
+        auto resolutions = drvPathResolutions.lock();
+        auto resolvedPathOptIter = resolutions->find(path);
+        if (resolvedPathOptIter != resolutions->end()) {
+            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
+            if (resolvedPathOpt)
+                path = *resolvedPathOpt;
+            haveCached = true;
+        }
+    }
+    /* can't just use else-if instead of `!haveCached` because we need to unlock
+       `drvPathResolutions` before it is locked in `Derivation::resolve`. */
+    if (!haveCached && drv.type() == DerivationType::CAFloating) {
+        /* Try resolve drv and use that path instead. */
+        auto attempt = drv.tryResolve(*this);
+        if (!attempt)
+            /* If we cannot resolve the derivation, we cannot have any path
+               assigned so we return the map of all std::nullopts. */
+            return outputs;
+        /* Just compute store path */
+        auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true);
+        /* Store in memo table. */
+        /* FIXME: memo logic should not be local-store specific, should have
+           wrapper-method instead. */
+        drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
+        path = std::move(pathResolved);
     }
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
-        auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
-            (queryValidPathId(*state, path)));
+        uint64_t drvId;
+        try {
+            drvId = queryValidPathId(*state, path);
+        } catch (InvalidPath &) {
+            /* FIXME? if the derivation doesn't exist, we cannot have a mapping
+               for it. */
+            return outputs;
+        }
+
+        auto useQueryDerivationOutputs {
+            state->stmtQueryDerivationOutputs.use()
+            (drvId)
+        };
 
         while (useQueryDerivationOutputs.next())
             outputs.insert_or_assign(
@@ -1455,7 +1486,7 @@ static void makeMutable(const Path & path)
 {
     checkInterrupt();
 
-    struct stat st = lstat(path);
+    auto st = lstat(path);
 
     if (!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) return;
 
