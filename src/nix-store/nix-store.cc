@@ -822,7 +822,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = nix::worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -852,19 +852,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                         }
                 }
 
-                nix::worker_proto::write(*store, out, store->queryValidPaths(paths));
+                worker_proto::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = nix::worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        nix::worker_proto::write(*store, out, info->references);
+                        worker_proto::write(*store, out, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -892,7 +892,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(nix::worker_proto::read(*store, in, Phantom<StorePathSet> {}), out);
+                store->exportPaths(worker_proto::read(*store, in, Phantom<StorePathSet> {}), out);
                 break;
             }
 
@@ -941,9 +941,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(nix::worker_proto::read(*store, in, Phantom<StorePathSet> {}),
+                store->computeFSClosure(worker_proto::read(*store, in, Phantom<StorePathSet> {}),
                     closure, false, includeOutputs);
-                nix::worker_proto::write(*store, out, closure);
+                worker_proto::write(*store, out, closure);
                 break;
             }
 
@@ -958,7 +958,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = nix::worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));

@@ -329,7 +329,7 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
         return res;
     } else {
         conn->to << wopQueryValidPaths;
-        nix::worker_proto::write(*this, conn->to, paths);
+        worker_proto::write(*this, conn->to, paths);
         conn.processStderr();
         return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
     }
@@ -341,7 +341,7 @@ StorePathSet RemoteStore::queryAllValidPaths()
     auto conn(getConnection());
     conn->to << wopQueryAllValidPaths;
     conn.processStderr();
-    return nix::worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+    return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
 }
 
 
@@ -358,7 +358,7 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
         return res;
     } else {
         conn->to << wopQuerySubstitutablePaths;
-        nix::worker_proto::write(*this, conn->to, paths);
+        worker_proto::write(*this, conn->to, paths);
         conn.processStderr();
         return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
     }

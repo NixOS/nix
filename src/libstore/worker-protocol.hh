@@ -153,7 +153,7 @@ void write(const Store & store, Sink & out, const std::optional<T> & optVal)
 {
     out << (uint64_t) (optVal ? 1 : 0);
     if (optVal)
-        nix::worker_proto::write(store, out, *optVal);
+        worker_proto::write(store, out, *optVal);
 }
 
 /* Specialization which uses and empty string for the empty case, taking
