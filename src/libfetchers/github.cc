@@ -15,9 +15,6 @@ struct DownloadUrl
 {
     std::string url;
     Headers headers;
-
-    DownloadUrl(const std::string & url, const Headers & headers)
-        : url(url), headers(headers) { }
 };
 
 // A github or gitlab host
@@ -254,7 +251,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
-        return DownloadUrl(url, headers);
+        return DownloadUrl { url, headers };
     }
 
     void clone(const Input & input, const Path & destDir) override
@@ -320,7 +317,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
-        return DownloadUrl(url, headers);
+        return DownloadUrl { url, headers };
     }
 
     void clone(const Input & input, const Path & destDir) override
