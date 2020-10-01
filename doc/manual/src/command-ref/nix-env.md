@@ -1,5 +1,3 @@
-Title: nix-env
-
 # Name
 
 `nix-env` - manipulate or query Nix user environments
