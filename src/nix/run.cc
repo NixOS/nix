@@ -167,6 +167,14 @@ struct CmdRun : InstallableCommand, RunCommon
                 "To run Blender:",
                 "nix run blender-bin"
             },
+            Example{
+                "To run vim from nixpkgs:",
+                "nix run nixpkgs#vim"
+            },
+            Example{
+                "To run vim from nixpkgs with arguments:",
+                "nix run nixpkgs#vim -- --help"
+            },
         };
     }
 
