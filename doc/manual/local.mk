@@ -40,7 +40,7 @@ $(d)/nix.json: $(bindir)/nix
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
