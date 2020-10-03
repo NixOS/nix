@@ -1,3 +1,5 @@
+#include <string_view>
+
 #include "types.hh"
 
 namespace nix {

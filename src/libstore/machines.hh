@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "types.hh"
 
 namespace nix {

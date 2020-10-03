@@ -1,8 +1,9 @@
 #pragma once
 
-#include "types.hh"
-
 #include <map>
+#include <string>
+
+#include "types.hh"
 
 namespace nix {
 
