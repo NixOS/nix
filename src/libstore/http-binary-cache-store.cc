@@ -73,6 +73,7 @@ public:
         if (forceHttp) ret.insert("file");
         return ret;
     }
+
 protected:
 
     void maybeDisable()

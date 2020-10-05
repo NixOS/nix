@@ -830,6 +830,7 @@ struct StoreFactory
     std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
+
 struct Implementations
 {
     static std::vector<StoreFactory> * registered;
