@@ -153,7 +153,7 @@ void MixProfile::updateProfile(const Buildables & buildables)
                 for (auto & output : bfd.outputs) {
                     /* Output path should be known because we just tried to
                        build it. */
-                    assert(!output.second);
+                    assert(output.second);
                     result.push_back(*output.second);
                 }
             },

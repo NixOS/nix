@@ -42,6 +42,8 @@ public:
 
     ParsedURL toURL() const;
 
+    std::string toURLString(const std::map<std::string, std::string> & extraQuery = {}) const;
+
     std::string to_string() const;
 
     Attrs toAttrs() const;
@@ -76,7 +78,7 @@ public:
 
     StorePathDescriptor computeStorePath(Store & store) const;
 
-    // Convience functions for common attributes.
+    // Convenience functions for common attributes.
     std::string getType() const;
     std::optional<Hash> getNarHash() const;
     std::optional<std::string> getRef() const;
@@ -122,13 +124,15 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable);
+    bool immutable,
+    const Headers & headers = {});
 
 std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable);
+    bool immutable,
+    const Headers & headers = {});
 
 std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
     Hash hash, std::string_view name);

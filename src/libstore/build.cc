@@ -296,9 +296,21 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
-    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const StorePath & drvPath,
-        const BasicDerivation & drv, BuildMode buildMode = bmNormal);
+
+    /* derivation goal */
+private:
+    std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
+        const StorePath & drvPath, const StringSet & wantedOutputs,
+        std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
+public:
+    std::shared_ptr<DerivationGoal> makeDerivationGoal(
+        const StorePath & drvPath,
+        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
+        const StorePath & drvPath, const BasicDerivation & drv,
+        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+
+    /* substitution goal */
     GoalPtr makeSubstitutionGoal(StorePathOrDesc storePath, RepairFlag repair = NoRepair);
 
     /* Remove a dead goal. */
@@ -949,10 +961,12 @@ private:
     friend struct RestrictedStore;
 
 public:
-    DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
-        Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(const StorePath & drvPath,
+        const StringSet & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        Worker & worker, BuildMode buildMode = bmNormal);
+        const StringSet & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     ~DerivationGoal();
 
     /* Whether we need to perform hash rewriting if there are valid output paths. */
@@ -993,6 +1007,8 @@ private:
     void tryToBuild();
     void tryLocalBuild();
     void buildDone();
+
+    void resolvedFinished();
 
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
@@ -1085,8 +1101,8 @@ private:
 const Path DerivationGoal::homeDir = "/homeless-shelter";
 
 
-DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs,
-    Worker & worker, BuildMode buildMode)
+DerivationGoal::DerivationGoal(const StorePath & drvPath,
+    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(true)
     , drvPath(drvPath)
@@ -1094,7 +1110,9 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & want
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = fmt("building of '%s'", worker.store.printStorePath(this->drvPath));
+    name = fmt(
+        "building of '%s' from .drv file",
+        StorePathWithOutputs { drvPath, wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1103,15 +1121,18 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const StringSet & want
 
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-    Worker & worker, BuildMode buildMode)
+    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , useDerivation(false)
     , drvPath(drvPath)
+    , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
     state = &DerivationGoal::haveDerivation;
-    name = fmt("building of %s", StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
+    name = fmt(
+        "building of '%s' from in-memory derivation",
+        StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1463,8 +1484,40 @@ void DerivationGoal::inputsRealised()
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    if (useDerivation)
-        for (auto & [depDrvPath, wantedDepOutputs] : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
+    if (useDerivation) {
+        auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+
+        if (!fullDrv.inputDrvs.empty() && fullDrv.type() == DerivationType::CAFloating) {
+            /* We are be able to resolve this derivation based on the
+               now-known results of dependencies. If so, we become a stub goal
+               aliasing that resolved derivation goal */
+            std::optional attempt = fullDrv.tryResolve(worker.store);
+            assert(attempt);
+            Derivation drvResolved { *std::move(attempt) };
+
+            auto pathResolved = writeDerivation(worker.store, drvResolved);
+            /* Add to memotable to speed up downstream goal's queries with the
+               original derivation. */
+            drvPathResolutions.lock()->insert_or_assign(drvPath, pathResolved);
+
+            auto msg = fmt("Resolved derivation: '%s' -> '%s'",
+                worker.store.printStorePath(drvPath),
+                worker.store.printStorePath(pathResolved));
+            act = std::make_unique<Activity>(*logger, lvlInfo, actBuildWaiting, msg,
+                Logger::Fields {
+                       worker.store.printStorePath(drvPath),
+                       worker.store.printStorePath(pathResolved),
+                   });
+
+            auto resolvedGoal = worker.makeDerivationGoal(
+                pathResolved, wantedOutputs, buildMode);
+            addWaitee(resolvedGoal);
+
+            state = &DerivationGoal::resolvedFinished;
+            return;
+        }
+
+        for (auto & [depDrvPath, wantedDepOutputs] : fullDrv.inputDrvs) {
             /* Add the relevant output closures of the input derivation
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
@@ -1484,6 +1537,7 @@ void DerivationGoal::inputsRealised()
                         worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
             }
         }
+    }
 
     /* Second, the input sources. */
     worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
@@ -1611,6 +1665,13 @@ void DerivationGoal::tryToBuild()
 
     actLock.reset();
 
+    state = &DerivationGoal::tryLocalBuild;
+    worker.wakeUp(shared_from_this());
+}
+
+void DerivationGoal::tryLocalBuild() {
+    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
+
     /* Make sure that we are allowed to start a build.  If this
        derivation prefers to be done locally, do it even if
        maxBuildJobs is 0. */
@@ -1620,12 +1681,6 @@ void DerivationGoal::tryToBuild()
         outputLocks.unlock();
         return;
     }
-
-    state = &DerivationGoal::tryLocalBuild;
-    worker.wakeUp(shared_from_this());
-}
-
-void DerivationGoal::tryLocalBuild() {
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
@@ -1941,6 +1996,9 @@ void DerivationGoal::buildDone()
     done(BuildResult::Built);
 }
 
+void DerivationGoal::resolvedFinished() {
+    done(BuildResult::Built);
+}
 
 HookReply DerivationGoal::tryBuildHook()
 {
@@ -2011,7 +2069,7 @@ HookReply DerivationGoal::tryBuildHook()
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    WorkerProto<StorePathSet>::write(worker.store, hook->sink, inputPaths);
+    worker_proto::write(worker.store, hook->sink, inputPaths);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
@@ -2022,7 +2080,7 @@ HookReply DerivationGoal::tryBuildHook()
             if (buildMode != bmCheck && status.known->isValid()) continue;
             missingPaths.insert(status.known->path);
         }
-        WorkerProto<StorePathSet>::write(worker.store, hook->sink, missingPaths);
+        worker_proto::write(worker.store, hook->sink, missingPaths);
     }
 
     hook->sink = FdSink();
@@ -4231,11 +4289,13 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    ValidPathInfos infos2;
-    for (auto & [outputName, newInfo] : infos) {
-        infos2.push_back(newInfo);
+    {
+        ValidPathInfos infos2;
+        for (auto & [outputName, newInfo] : infos) {
+            infos2.push_back(newInfo);
+        }
+        worker.store.registerValidPaths(infos2);
     }
-    worker.store.registerValidPaths(infos2);
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
@@ -4247,12 +4307,21 @@ void DerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
-    for (auto & [outputName, newInfo] : infos) {
-        /* FIXME: we will want to track this mapping in the DB whether or
-           not we have a drv file. */
-        if (useDerivation)
-            worker.store.linkDeriverToPath(drvPath, outputName, newInfo.path);
+    bool isCaFloating = drv->type() == DerivationType::CAFloating;
+
+    auto drvPathResolved = drvPath;
+    if (!useDerivation && isCaFloating) {
+        /* Once a floating CA derivations reaches this point, it
+           must already be resolved, so we don't bother trying to
+           downcast drv to get would would just be an empty
+           inputDrvs field. */
+        Derivation drv2 { *drv };
+        drvPathResolved = writeDerivation(worker.store, drv2);
     }
+
+    if (useDerivation || isCaFloating)
+        for (auto & [outputName, newInfo] : infos)
+            worker.store.linkDeriverToPath(drvPathResolved, outputName, newInfo.path);
 }
 
 
@@ -4542,7 +4611,7 @@ void DerivationGoal::flushLine()
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
-    if (drv->type() != DerivationType::CAFloating) {
+    if (!useDerivation || drv->type() != DerivationType::CAFloating) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
             res.insert_or_assign(name, output.path(worker.store, drv->name, name));
@@ -4554,7 +4623,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
 
 OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
-    if (drv->type() != DerivationType::CAFloating) {
+    if (!useDerivation || drv->type() != DerivationType::CAFloating) {
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
             res.insert_or_assign(name, *output.second);
@@ -5032,33 +5101,50 @@ Worker::~Worker()
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const StorePath & path,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
+    const StorePath & drvPath,
+    const StringSet & wantedOutputs,
+    std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
-    GoalPtr goal = derivationGoals[path].lock(); // FIXME
-    if (!goal) {
-        goal = std::make_shared<DerivationGoal>(path, wantedOutputs, *this, buildMode);
-        derivationGoals.insert_or_assign(path, goal);
+    WeakGoalPtr & abstract_goal_weak = derivationGoals[drvPath];
+    GoalPtr abstract_goal = abstract_goal_weak.lock(); // FIXME
+    std::shared_ptr<DerivationGoal> goal;
+    if (!abstract_goal) {
+        goal = mkDrvGoal();
+        abstract_goal_weak = goal;
         wakeUp(goal);
-    } else
-        (dynamic_cast<DerivationGoal *>(goal.get()))->addWantedOutputs(wantedOutputs);
+    } else {
+        goal = std::dynamic_pointer_cast<DerivationGoal>(abstract_goal);
+        assert(goal);
+        goal->addWantedOutputs(wantedOutputs);
+    }
     return goal;
 }
 
 
-std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
+    const StringSet & wantedOutputs, BuildMode buildMode)
 {
-    auto goal = std::make_shared<DerivationGoal>(drvPath, drv, *this, buildMode);
-    wakeUp(goal);
-    return goal;
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
+        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+    });
+}
+
+
+std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
+    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+{
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
+        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+    });
 }
 
 
 GoalPtr Worker::makeSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
 {
     auto p = store.bakeCaIfNeeded(path);
-    GoalPtr goal = substitutionGoals[p].lock(); // FIXME
+    WeakGoalPtr & goal_weak = substitutionGoals[p];
+    GoalPtr goal = goal_weak.lock(); // FIXME
     if (!goal) {
         auto optCA = std::get_if<1>(&path);
         goal = std::make_shared<SubstitutionGoal>(
@@ -5066,7 +5152,7 @@ GoalPtr Worker::makeSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
             *this,
             repair,
             optCA ? std::optional { *optCA } : std::nullopt);
-        substitutionGoals.insert_or_assign(p, goal);
+        goal_weak = goal;
         wakeUp(goal);
     }
     return goal;
@@ -5497,7 +5583,7 @@ BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDe
     BuildMode buildMode)
 {
     Worker worker(*this);
-    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, buildMode);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
     BuildResult result;
 

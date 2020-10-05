@@ -13,7 +13,12 @@ concatStrings (map
       then "*empty*"
       else if isBool option.value
       then (if option.value then "`true`" else "`false`")
-      else "`" + toString option.value + "`") + "\n\n"
+      else
+        # n.b. a StringMap value type is specified as a string, but
+        # this shows the value type.  The empty stringmap is "null" in
+        # JSON, but that converts to "{ }" here.
+        (if isAttrs option.value then "`\"\"`"
+         else "`" + toString option.value + "`")) + "\n\n"
     + (if option.aliases != []
        then "    **Deprecated alias:** " + (concatStringsSep ", " (map (s: "`${s}`") option.aliases)) + "\n\n"
        else "")

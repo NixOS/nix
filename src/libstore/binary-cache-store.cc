@@ -142,17 +142,10 @@ struct FileSource : FdSource
     }
 };
 
-void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
-    RepairFlag repair, CheckSigsFlag checkSigs)
+ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
+    Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
+    std::function<ValidPathInfo(HashResult)> mkInfo)
 {
-    assert(info.narSize);
-
-    if (!repair && isValidPath(info.path)) {
-        // FIXME: copyNAR -> null sink
-        narSource.drain();
-        return;
-    }
-
     auto [fdTemp, fnTemp] = createTempFile();
 
     AutoDelete autoDelete(fnTemp);
@@ -162,13 +155,15 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     /* Read the NAR simultaneously into a CompressionSink+FileSink (to
        write the compressed NAR to disk), into a HashSink (to get the
        NAR hash), and into a NarAccessor (to get the NAR listing). */
-    HashSink fileHashSink(htSHA256);
+    HashSink fileHashSink { htSHA256 };
     std::shared_ptr<FSAccessor> narAccessor;
+    HashSink narHashSink { htSHA256 };
     {
     FdSink fileSink(fdTemp.get());
-    TeeSink teeSink(fileSink, fileHashSink);
-    auto compressionSink = makeCompressionSink(compression, teeSink);
-    TeeSource teeSource(narSource, *compressionSink);
+    TeeSink teeSinkCompressed { fileSink, fileHashSink };
+    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed);
+    TeeSink teeSinkUncompressed { *compressionSink, narHashSink };
+    TeeSource teeSource { narSource, teeSinkUncompressed };
     narAccessor = makeNarAccessor(teeSource);
     compressionSink->finish();
     fileSink.flush();
@@ -176,9 +171,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 
     auto now2 = std::chrono::steady_clock::now();
 
+    auto info = mkInfo(narHashSink.finish());
     auto narInfo = make_ref<NarInfo>(info);
-    narInfo->narSize = info.narSize;
-    narInfo->narHash = info.narHash;
     narInfo->compression = compression;
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
@@ -299,6 +293,51 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     writeNarInfo(narInfo);
 
     stats.narInfoWrite++;
+
+    return narInfo;
+}
+
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource,
+    RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    if (!repair && isValidPath(info.path)) {
+        // FIXME: copyNAR -> null sink
+        narSource.drain();
+        return;
+    }
+
+    addToStoreCommon(narSource, repair, checkSigs, {[&](HashResult nar) {
+        /* FIXME reinstate these, once we can correctly do hash modulo sink as
+           needed. We need to throw here in case we uploaded a corrupted store path. */
+        // assert(info.narHash == nar.first);
+        // assert(info.narSize == nar.second);
+        return info;
+    }});
+}
+
+StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & name,
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+{
+    if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
+        unsupported("addToStoreFromDump");
+    return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
+        ValidPathInfo info {
+            *this,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = nar.first,
+                    },
+                    {},
+                },
+            },
+            nar.first,
+        };
+        info.narSize = nar.second;
+        return info;
+    })->path;
 }
 
 bool BinaryCacheStore::isValidPathUncached(StorePathOrDesc storePath)
@@ -367,60 +406,67 @@ void BinaryCacheStore::queryPathInfoUncached(StorePathOrDesc storePath,
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
-    // FIXME: some cut&paste from LocalStore::addToStore().
+    /* FIXME: Make BinaryCacheStore::addToStoreCommon support
+       non-recursive+sha256 so we can just use the default
+       implementation of this method in terms of addToStoreFromDump. */
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
-    StringSink sink;
-    std::optional<Hash> h;
+    HashSink sink { hashAlgo };
     if (method == FileIngestionMethod::Recursive) {
         dumpPath(srcPath, sink, filter);
-        h = hashString(hashAlgo, *sink.s);
     } else {
-        auto s = readFile(srcPath);
-        dumpString(s, sink);
-        h = hashString(hashAlgo, s);
+        readFile(srcPath, sink);
     }
+    auto h = sink.finish().first;
 
-    ValidPathInfo info {
-        *this,
-        {
-            name,
-                FixedOutputInfo {
-                {
-                    .method = method,
-                    .hash = *h,
+    auto source = sinkToSource([&](Sink & sink) {
+        dumpPath(srcPath, sink, filter);
+    });
+    return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
+        ValidPathInfo info {
+            *this,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = h,
+                    },
+                    {},
                 },
-                {},
             },
-        },
-        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
-    };
-
-    auto source = StringSource { *sink.s };
-    addToStore(info, source, repair, CheckSigs);
-
-    return std::move(info.path);
+            nar.first,
+        };
+        info.narSize = nar.second;
+        return info;
+    })->path;
 }
 
 StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
-    ValidPathInfo info {
-        computeStorePathForText(name, s, references),
-        Hash::dummy, // Will be fixed in addToStore, which recomputes nar hash
-    };
-    info.references = references;
+    auto textHash = hashString(htSHA256, s);
+    auto path = makeTextPath(name, TextInfo { textHash, references });
 
-    if (repair || !isValidPath(info.path)) {
-        StringSink sink;
-        dumpString(s, sink);
-        auto source = StringSource { *sink.s };
-        addToStore(info, source, repair, CheckSigs);
-    }
+    if (!repair && isValidPath(path))
+        return path;
 
-    return std::move(info.path);
+    auto source = StringSource { s };
+    return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
+        ValidPathInfo info {
+            *this,
+            {
+                .name = name,
+                .info = TextInfo {
+                    { .hash = textHash },
+                    references,
+                },
+            },
+            nar.first,
+        };
+        info.narSize = nar.second;
+        info.ca = TextHash { textHash };
+        return info;
+    })->path;
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()

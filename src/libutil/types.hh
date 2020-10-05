@@ -25,6 +25,8 @@ typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
+typedef vector<std::pair<string, string>> Headers;
+
 /* Helper class to run code at startup. */
 template<typename T>
 struct OnStartup

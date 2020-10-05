@@ -192,7 +192,7 @@ public:
     {
         expectArgs({
             .label = label,
-            .optional = true,
+            .optional = optional,
             .handler = {dest}
         });
     }

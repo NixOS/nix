@@ -9,7 +9,7 @@ for more details.
 
 ## Installation
 
-On Linux and macOS the easiest way to Install Nix is to run the following shell command
+On Linux and macOS the easiest way to install Nix is to run the following shell command
 (as a user other than root):
 
 ```console

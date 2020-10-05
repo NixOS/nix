@@ -66,96 +66,96 @@ typedef enum {
 class Store;
 struct Source;
 
+/* To guide overloading */
 template<typename T>
-struct WorkerProto {
-    static T read(const Store & store, Source & from);
-    static void write(const Store & store, Sink & out, const T & t);
-};
+struct Phantom {};
 
-#define MAKE_WORKER_PROTO(T) \
-    template<> \
-    struct WorkerProto< T > { \
-        static T read(const Store & store, Source & from); \
-        static void write(const Store & store, Sink & out, const T & t); \
-    }
 
-MAKE_WORKER_PROTO(std::string);
-MAKE_WORKER_PROTO(StorePath);
-MAKE_WORKER_PROTO(StorePathDescriptor);
+namespace worker_proto {
+/* FIXME maybe move more stuff inside here */
+
+#define MAKE_WORKER_PROTO(TEMPLATE, T) \
+    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
+    TEMPLATE void write(const Store & store, Sink & out, const T & str)
+
+MAKE_WORKER_PROTO(, std::string);
+MAKE_WORKER_PROTO(, StorePath);
+MAKE_WORKER_PROTO(, ContentAddress);
+MAKE_WORKER_PROTO(, StorePathDescriptor);
+
+MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
+MAKE_WORKER_PROTO(template<typename T>, std::optional<T>);
+
+#define X_ template<typename K, typename V>
+#define Y_ std::map<K, V>
+MAKE_WORKER_PROTO(X_, Y_);
+#undef X_
+#undef Y_
 
 template<typename T>
-struct WorkerProto<std::set<T>> {
-
-    static std::set<T> read(const Store & store, Source & from)
-    {
-        std::set<T> resSet;
-        auto size = readNum<size_t>(from);
-        while (size--) {
-            resSet.insert(WorkerProto<T>::read(store, from));
-        }
-        return resSet;
+std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
+{
+    std::set<T> resSet;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resSet.insert(read(store, from, Phantom<T> {}));
     }
+    return resSet;
+}
 
-    static void write(const Store & store, Sink & out, const std::set<T> & resSet)
-    {
-        out << resSet.size();
-        for (auto & key : resSet) {
-            WorkerProto<T>::write(store, out, key);
-        }
+template<typename T>
+void write(const Store & store, Sink & out, const std::set<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
     }
-
-};
+}
 
 template<typename K, typename V>
-struct WorkerProto<std::map<K, V>> {
-
-    static std::map<K, V> read(const Store & store, Source & from)
-    {
-        std::map<K, V> resMap;
-        auto size = readNum<size_t>(from);
-        while (size--) {
-            auto k = WorkerProto<K>::read(store, from);
-            auto v = WorkerProto<V>::read(store, from);
-            resMap.insert_or_assign(std::move(k), std::move(v));
-        }
-        return resMap;
+std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
+{
+    std::map<K, V> resMap;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        auto k = read(store, from, Phantom<K> {});
+        auto v = read(store, from, Phantom<V> {});
+        resMap.insert_or_assign(std::move(k), std::move(v));
     }
+    return resMap;
+}
 
-    static void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
-    {
-        out << resMap.size();
-        for (auto & i : resMap) {
-            WorkerProto<K>::write(store, out, i.first);
-            WorkerProto<V>::write(store, out, i.second);
-        }
+template<typename K, typename V>
+void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+{
+    out << resMap.size();
+    for (auto & i : resMap) {
+        write(store, out, i.first);
+        write(store, out, i.second);
     }
-
-};
+}
 
 template<typename T>
-struct WorkerProto<std::optional<T>> {
-
-    static std::optional<T> read(const Store & store, Source & from)
-    {
-        auto tag = readNum<uint8_t>(from);
-        switch (tag) {
-        case 0:
-            return std::nullopt;
-        case 1:
-            return WorkerProto<T>::read(store, from);
-        default:
-            throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
-        }
+std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _)
+{
+    auto tag = readNum<uint8_t>(from);
+    switch (tag) {
+    case 0:
+        return std::nullopt;
+    case 1:
+        return read(store, from, Phantom<T> {});
+    default:
+        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
     }
+}
 
-    static void write(const Store & store, Sink & out, const std::optional<T> & optVal)
-    {
-        out << (uint64_t) (optVal ? 1 : 0);
-        if (optVal)
-            WorkerProto<T>::write(store, out, *optVal);
-    }
-
-};
+template<typename T>
+void write(const Store & store, Sink & out, const std::optional<T> & optVal)
+{
+    out << (uint64_t) (optVal ? 1 : 0);
+    if (optVal)
+        worker_proto::write(store, out, *optVal);
+}
 
 /* Specialization which uses and empty string for the empty case, taking
    advantage of the fact these types always serialize to non-empty strings.
@@ -163,7 +163,9 @@ struct WorkerProto<std::optional<T>> {
    std::optional<T>, where <= is the compatability partial order, T is one of
    the types below.
  */
-MAKE_WORKER_PROTO(std::optional<StorePath>);
-MAKE_WORKER_PROTO(std::optional<ContentAddress>);
+MAKE_WORKER_PROTO(, std::optional<StorePath>);
+MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
+
+}
 
 }

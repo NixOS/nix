@@ -72,6 +72,10 @@ private:
 
     void writeNarInfo(ref<NarInfo> narInfo);
 
+    ref<const ValidPathInfo> addToStoreCommon(
+        Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
+        std::function<ValidPathInfo(HashResult)> mkInfo);
+
 public:
 
     bool isValidPathUncached(StorePathOrDesc path) override;
@@ -84,6 +88,9 @@ public:
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
+
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method, HashType hashAlgo,
