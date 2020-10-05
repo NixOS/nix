@@ -552,31 +552,17 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     // combinations that are currently prohibited.
     drv.type();
 
-    std::optional<Hash> h;
+    auto hashResult = hashDerivationModulo(*this, drv, true);
     for (auto & i : drv.outputs) {
-        std::visit(overloaded {
-            [&](DerivationOutputInputAddressed doia) {
-                if (!h) {
-                    // somewhat expensive so we do lazily
-                    auto temp = hashDerivationModulo(*this, drv, true);
-                    h = std::get<Hash>(temp);
-                }
+        if (auto outPath = i.second.path(*this, drvName, i.first)) {
+            envHasRightPath(*outPath, i.first);
+            if (auto h = std::get_if<Hash>(&hashResult)) {
                 StorePath recomputed = makeOutputPath(i.first, *h, drvName);
-                if (doia.path != recomputed)
+                if (*outPath != recomputed)
                     throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                        printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
-                envHasRightPath(doia.path, i.first);
-            },
-            [&](DerivationOutputCAFixed dof) {
-                StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
-                envHasRightPath(path, i.first);
-            },
-            [&](DerivationOutputCAFloating _) {
-                /* Nothing to check */
-            },
-            [&](DerivationOutputDeferred) {
-            },
-        }, i.second.output);
+                        printStorePath(drvPath), printStorePath(*outPath), printStorePath(recomputed));
+            }
+        }
     }
 }
 
