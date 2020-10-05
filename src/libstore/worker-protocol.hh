@@ -66,10 +66,6 @@ typedef enum {
 class Store;
 struct Source;
 
-template<class T> T readStorePaths(const Store & store, Source & from);
-
-void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
-
 /* To guide overloading */
 template<typename T>
 struct Phantom {};
@@ -78,45 +74,63 @@ struct Phantom {};
 namespace worker_proto {
 /* FIXME maybe move more stuff inside here */
 
-StorePath read(const Store & store, Source & from, Phantom<StorePath> _);
-void write(const Store & store, Sink & out, const StorePath & storePath);
+#define MAKE_WORKER_PROTO(TEMPLATE, T) \
+    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
+    TEMPLATE void write(const Store & store, Sink & out, const T & str)
+
+MAKE_WORKER_PROTO(, std::string);
+MAKE_WORKER_PROTO(, StorePath);
+MAKE_WORKER_PROTO(, ContentAddress);
+
+MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
+MAKE_WORKER_PROTO(template<typename T>, std::optional<T>);
+
+#define X_ template<typename K, typename V>
+#define Y_ std::map<K, V>
+MAKE_WORKER_PROTO(X_, Y_);
+#undef X_
+#undef Y_
 
 template<typename T>
-std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::map<std::string, T>> _);
-template<typename T>
-void write(const Store & store, Sink & out, const std::map<string, T> & resMap);
-template<typename T>
-std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _);
-template<typename T>
-void write(const Store & store, Sink & out, const std::optional<T> & optVal);
-
-/* Specialization which uses and empty string for the empty case, taking
-   advantage of the fact StorePaths always serialize to a non-empty string.
-   This is done primarily for backwards compatability, so that StorePath <=
-   std::optional<StorePath>, where <= is the compatability partial order.
- */
-template<>
-void write(const Store & store, Sink & out, const std::optional<StorePath> & optVal);
-
-template<typename T>
-std::map<std::string, T> read(const Store & store, Source & from, Phantom<std::map<std::string, T>> _)
+std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
 {
-    std::map<string, T> resMap;
-    auto size = (size_t)readInt(from);
+    std::set<T> resSet;
+    auto size = readNum<size_t>(from);
     while (size--) {
-        auto thisKey = readString(from);
-        resMap.insert_or_assign(std::move(thisKey), nix::worker_proto::read(store, from, Phantom<T> {}));
+        resSet.insert(read(store, from, Phantom<T> {}));
+    }
+    return resSet;
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::set<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
+    }
+}
+
+template<typename K, typename V>
+std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
+{
+    std::map<K, V> resMap;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        auto k = read(store, from, Phantom<K> {});
+        auto v = read(store, from, Phantom<V> {});
+        resMap.insert_or_assign(std::move(k), std::move(v));
     }
     return resMap;
 }
 
-template<typename T>
-void write(const Store & store, Sink & out, const std::map<string, T> & resMap)
+template<typename K, typename V>
+void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
 {
     out << resMap.size();
     for (auto & i : resMap) {
-        out << i.first;
-        nix::worker_proto::write(store, out, i.second);
+        write(store, out, i.first);
+        write(store, out, i.second);
     }
 }
 
@@ -128,26 +142,29 @@ std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<
     case 0:
         return std::nullopt;
     case 1:
-        return nix::worker_proto::read(store, from, Phantom<T> {});
+        return read(store, from, Phantom<T> {});
     default:
-        throw Error("got an invalid tag bit for std::optional: %#04x", tag);
+        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
     }
 }
 
 template<typename T>
 void write(const Store & store, Sink & out, const std::optional<T> & optVal)
 {
-    out << (optVal ? 1 : 0);
+    out << (uint64_t) (optVal ? 1 : 0);
     if (optVal)
-        nix::worker_proto::write(store, out, *optVal);
+        worker_proto::write(store, out, *optVal);
 }
 
+/* Specialization which uses and empty string for the empty case, taking
+   advantage of the fact these types always serialize to non-empty strings.
+   This is done primarily for backwards compatability, so that T <=
+   std::optional<T>, where <= is the compatability partial order, T is one of
+   the types below.
+ */
+MAKE_WORKER_PROTO(, std::optional<StorePath>);
+MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
 
 }
-
-
-StorePathCAMap readStorePathCAMap(const Store & store, Source & from);
-
-void writeStorePathCAMap(const Store & store, Sink & out, const StorePathCAMap & paths);
 
 }
