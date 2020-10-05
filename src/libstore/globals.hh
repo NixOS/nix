@@ -908,10 +908,6 @@ public:
           value.
           )"};
 
-    Setting<bool> allowExperimentalFeatures{this, true, "allow-experimental-features",
-        "Whether the use of experimental features other than those listed in "
-        "the option 'experimental-features' gives a warning rather than fatal error."};
-
     Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
