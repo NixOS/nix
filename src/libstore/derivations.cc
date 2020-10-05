@@ -9,76 +9,36 @@ namespace nix {
 
 std::optional<StorePath> DerivationOutput::path(const Store & store, std::string_view drvName, std::string_view outputName) const
 {
-    return std::visit(overloaded {
-        [](DerivationOutputInputAddressed doi) -> std::optional<StorePath> {
-            return { doi.path };
-        },
-        [&](DerivationOutputCAFixed dof) -> std::optional<StorePath> {
-            return {
-                dof.path(store, drvName, outputName)
-            };
-        },
-        [](DerivationOutputCAFloating dof) -> std::optional<StorePath> {
-            return std::nullopt;
-        },
-        [](DerivationOutputDeferred) -> std::optional<StorePath> {
-            return std::nullopt;
-        },
-    }, output);
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&output))
+        return { dof->path(store, drvName, outputName) };
+    if (auto doi = std::get_if<DerivationOutputInputAddressed>(&output))
+        return { doi->path };
+    return std::nullopt;
 }
 
 std::optional<FileIngestionMethod> DerivationOutput::fileIngestionMethod() const
 {
-    return std::visit(overloaded {
-        [](DerivationOutputInputAddressed doi) -> std::optional<FileIngestionMethod> {
-            return { std::nullopt };
-        },
-        [](DerivationOutputCAFixed dof) -> std::optional<FileIngestionMethod> {
-            return { dof.hash.method };
-        },
-        [](DerivationOutputCAFloating dof) -> std::optional<FileIngestionMethod> {
-            return { dof.method };
-        },
-        [](DerivationOutputDeferred) -> std::optional<FileIngestionMethod> {
-            return std::nullopt;
-        },
-    }, output);
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&output))
+        return { dof->hash.method };
+    if (auto dof = std::get_if<DerivationOutputCAFloating>(&output))
+        return { dof->method };
+    return std::nullopt;
 }
 
 std::optional<HashType> DerivationOutput::hashType() const
 {
-    return std::visit(overloaded {
-        [](DerivationOutputInputAddressed doi) -> std::optional<HashType> {
-            return { std::nullopt };
-        },
-        [](DerivationOutputCAFixed dof) -> std::optional<HashType> {
-            return { dof.hash.hash.type };
-        },
-        [](DerivationOutputCAFloating dof) -> std::optional<HashType> {
-            return { dof.hashType };
-        },
-        [](DerivationOutputDeferred) -> std::optional<HashType> {
-            return std::nullopt;
-        },
-    }, output);
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&output))
+        return { dof->hash.hash.type };
+    if (auto dof = std::get_if<DerivationOutputCAFloating>(&output))
+        return { dof->hashType };
+    return std::nullopt;
 }
 
 std::optional<Hash> DerivationOutput::hash() const
 {
-    return std::visit(overloaded {
-        [](DerivationOutputInputAddressed doi) -> std::optional<Hash> {
-            return { std::nullopt };
-        },
-        [](DerivationOutputCAFixed dof) -> std::optional<Hash> {
-            return { dof.hash.hash };
-        },
-        [](DerivationOutputCAFloating dof) -> std::optional<Hash> {
-            return std::nullopt;
-        },
-        [](DerivationOutputDeferred) -> std::optional<Hash> {
-            return std::nullopt;
-        },
-    }, output);
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&output))
+        return { dof->hash.hash };
+    return std::nullopt;
 }
 
 std::optional<std::string> DerivationOutput::hashMetaData() const
