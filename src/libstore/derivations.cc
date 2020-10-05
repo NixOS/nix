@@ -27,6 +27,71 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
     }, output);
 }
 
+std::optional<FileIngestionMethod> DerivationOutput::fileIngestionMethod() const
+{
+    return std::visit(overloaded {
+        [](DerivationOutputInputAddressed doi) -> std::optional<FileIngestionMethod> {
+            return { std::nullopt };
+        },
+        [](DerivationOutputCAFixed dof) -> std::optional<FileIngestionMethod> {
+            return { dof.hash.method };
+        },
+        [](DerivationOutputCAFloating dof) -> std::optional<FileIngestionMethod> {
+            return { dof.method };
+        },
+        [](DerivationOutputDeferred) -> std::optional<FileIngestionMethod> {
+            return std::nullopt;
+        },
+    }, output);
+}
+
+std::optional<HashType> DerivationOutput::hashType() const
+{
+    return std::visit(overloaded {
+        [](DerivationOutputInputAddressed doi) -> std::optional<HashType> {
+            return { std::nullopt };
+        },
+        [](DerivationOutputCAFixed dof) -> std::optional<HashType> {
+            return { dof.hash.hash.type };
+        },
+        [](DerivationOutputCAFloating dof) -> std::optional<HashType> {
+            return { dof.hashType };
+        },
+        [](DerivationOutputDeferred) -> std::optional<HashType> {
+            return std::nullopt;
+        },
+    }, output);
+}
+
+std::optional<Hash> DerivationOutput::hash() const
+{
+    return std::visit(overloaded {
+        [](DerivationOutputInputAddressed doi) -> std::optional<Hash> {
+            return { std::nullopt };
+        },
+        [](DerivationOutputCAFixed dof) -> std::optional<Hash> {
+            return { dof.hash.hash };
+        },
+        [](DerivationOutputCAFloating dof) -> std::optional<Hash> {
+            return std::nullopt;
+        },
+        [](DerivationOutputDeferred) -> std::optional<Hash> {
+            return std::nullopt;
+        },
+    }, output);
+}
+
+std::optional<std::string> DerivationOutput::hashMetaData() const
+{
+    if (auto ingestionMethod = fileIngestionMethod()) {
+        if (auto type = hashType())
+            return { makeFileIngestionPrefix(*ingestionMethod) + printHashType(*type) };
+        else
+            // We should never have a file ingestion method but no hash type
+            assert(false);
+    }
+    return std::nullopt;
+}
 
 StorePath DerivationOutputCAFixed::path(const Store & store, std::string_view drvName, std::string_view outputName) const {
     return store.makeFixedOutputPath(
@@ -320,28 +385,18 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
     for (auto & i : outputs) {
         if (first) first = false; else s += ',';
         s += '('; printUnquotedString(s, i.first);
-        std::visit(overloaded {
-            [&](DerivationOutputInputAddressed doi) {
-                s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(doi.path));
-                s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, "");
-            },
-            [&](DerivationOutputCAFixed dof) {
-                s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(dof.path(store, name, i.first)));
-                s += ','; printUnquotedString(s, dof.hash.printMethodAlgo());
-                s += ','; printUnquotedString(s, dof.hash.hash.to_string(Base16, false));
-            },
-            [&](DerivationOutputCAFloating dof) {
-                s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
-                s += ','; printUnquotedString(s, "");
-            },
-            [&](DerivationOutputDeferred) {
-                s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, "");
-            }
-        }, i.second.output);
+        s += ',';
+        if (auto outPath = i.second.path(store, name, i.first))
+            printUnquotedString(s, maskOutputs ? "" : store.printStorePath(*outPath));
+        else
+            printUnquotedString(s, "");
+        s += ',';
+        printUnquotedString(s, i.second.hashMetaData().value_or(""));
+        s += ',';
+        if (auto hash = i.second.hash())
+            printUnquotedString(s, hash->to_string(Base16, false));
+        else
+            printUnquotedString(s, "");
         s += ')';
     }
 
@@ -628,34 +683,22 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
     return in;
 }
 
-
 void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv)
 {
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
         out << i.first;
-        std::visit(overloaded {
-            [&](DerivationOutputInputAddressed doi) {
-                out << store.printStorePath(doi.path)
-                    << ""
-                    << "";
-            },
-            [&](DerivationOutputCAFixed dof) {
-                out << store.printStorePath(dof.path(store, drv.name, i.first))
-                    << dof.hash.printMethodAlgo()
-                    << dof.hash.hash.to_string(Base16, false);
-            },
-            [&](DerivationOutputCAFloating dof) {
-                out << ""
-                    << (makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType))
-                    << "";
-            },
-            [&](DerivationOutputDeferred) {
-                out << ""
-                    << ""
-                    << "";
-            },
-        }, i.second.output);
+        if (auto outPath = i.second.path(store, drv.name, i.first))
+            out << store.printStorePath(*outPath);
+        else
+            out << "";
+
+        out << i.second.hashMetaData().value_or("");
+
+        if (auto hash = i.second.hash())
+            out << hash->to_string(Base16, false);
+        else
+            out << "";
     }
     worker_proto::write(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;

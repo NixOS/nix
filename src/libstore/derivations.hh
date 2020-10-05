@@ -58,6 +58,23 @@ struct DerivationOutput
        the right derivation name. When in doubt, you should use the safer
        interface provided by BasicDerivation::outputsAndOptPaths */
     std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+
+    /*
+     * The following invariants should hold:
+     * - fileIngestionMethod()!=null <=> hashType()!=null
+     * - hash()!=null=>(fileIngestionMethod()!=null && hashType()!=null)
+     *
+     * (Possibly this should be encoded in the types themselves)
+     */
+    std::optional<FileIngestionMethod> fileIngestionMethod() const;
+    std::optional<HashType> hashType() const;
+    std::optional<Hash> hash() const;
+
+    /**
+     * Utility function to directly print the metadata of the hash as expected
+     * by the drv format.
+     */
+    std::optional<std::string> hashMetaData() const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
