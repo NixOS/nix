@@ -495,7 +495,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 worker_proto::write(*this, conn->to, references);
                 conn.processStderr();
             },
-            [&](FixedOutputHashMethod fohm) -> void {
+            [&](CAPathHashMethod fohm) -> void {
                 conn->to
                     << wopAddToStore
                     << name
@@ -542,7 +542,7 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
 {
     StorePathSet references;
-    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
+    return addCAToStore(dump, name, CAPathHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
 }
 
 

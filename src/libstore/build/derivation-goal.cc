@@ -3079,7 +3079,7 @@ void DerivationGoal::registerOutputs()
 
         auto newInfoFromCA = [&](const DerivationOutputCAFloating outputHash) -> ValidPathInfo {
             auto & st = outputStats.at(outputName);
-            if (outputHash.method == FileIngestionMethod::Flat) {
+            if (outputHash.hashMethod.fileIngestionMethod == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
@@ -3090,8 +3090,8 @@ void DerivationGoal::registerOutputs()
             rewriteOutput();
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath.hashPart() };
-            HashModuloSink caSink { outputHash.hashType, oldHashPart };
-            switch (outputHash.method) {
+            HashModuloSink caSink { outputHash.hashMethod.hashType, oldHashPart };
+            switch (outputHash.hashMethod.fileIngestionMethod) {
             case FileIngestionMethod::Recursive:
                 dumpPath(actualPath, caSink);
                 break;
@@ -3106,7 +3106,7 @@ void DerivationGoal::registerOutputs()
             auto narHashAndSize = narSink.finish();
             ValidPathInfo newInfo0 {
                 worker.store.makeFixedOutputPath(
-                    outputHash.method,
+                    outputHash.hashMethod.fileIngestionMethod,
                     got,
                     outputPathName(drv->name, outputName),
                     refs.second,
@@ -3115,7 +3115,7 @@ void DerivationGoal::registerOutputs()
             };
             newInfo0.narSize = narHashAndSize.second;
             newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
+                .method = outputHash.hashMethod.fileIngestionMethod,
                 .hash = got,
             };
             newInfo0.references = refs.second;
@@ -3148,8 +3148,10 @@ void DerivationGoal::registerOutputs()
             },
             [&](DerivationOutputCAFixed dof) {
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
-                    .method = dof.hash.method,
-                    .hashType = dof.hash.hash.type,
+                    .hashMethod = CAPathHashMethod {
+                        .fileIngestionMethod = dof.hash.method,
+                        .hashType = dof.hash.hash.type,
+                    }
                 });
 
                 /* Check wanted hash */

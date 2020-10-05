@@ -37,8 +37,7 @@ struct DerivationOutputCAFixed
 struct DerivationOutputCAFloating
 {
     /* information used for expected hash computation */
-    FileIngestionMethod method;
-    HashType hashType;
+    CAPathHashMethod hashMethod;
 };
 
 /* Input-addressed output which depends on a (CA) derivation whose hash isn't
@@ -61,13 +60,12 @@ struct DerivationOutput
 
     /*
      * The following invariants should hold:
-     * - fileIngestionMethod()!=null <=> hashType()!=null
-     * - hash()!=null=>(fileIngestionMethod()!=null && hashType()!=null)
+     * - hash()!=null=>caHashMethod()!=null
+     * - hash()!=null=>path()!=null
      *
      * (Possibly this should be encoded in the types themselves)
      */
-    std::optional<FileIngestionMethod> fileIngestionMethod() const;
-    std::optional<HashType> hashType() const;
+    std::optional<CAPathHashMethod> caHashMethod() const;
     std::optional<Hash> hash() const;
 
     /**

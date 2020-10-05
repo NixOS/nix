@@ -4,9 +4,22 @@
 
 namespace nix {
 
+std::string CAPathHashMethod::print() const
+{
+    return makeFileIngestionPrefix(fileIngestionMethod) + printHashType(hashType);
+}
+
+CAPathHashMethod FixedOutputHash::hashMethod() const
+{
+    return CAPathHashMethod {
+        .fileIngestionMethod = method,
+        .hashType = hash.type,
+    };
+}
+
 std::string FixedOutputHash::printMethodAlgo() const
 {
-    return makeFileIngestionPrefix(method) + printHashType(hash.type);
+    return hashMethod().print();
 }
 
 std::string makeFileIngestionPrefix(const FileIngestionMethod m)
@@ -46,7 +59,7 @@ std::string renderContentAddressMethod(ContentAddressMethod cam)
         [](TextHashMethod &th) {
             return std::string{"text:"} + printHashType(htSHA256);
         },
-        [](FixedOutputHashMethod &fshm) {
+        [](CAPathHashMethod &fshm) {
             return "fixed:" + makeFileIngestionPrefix(fshm.fileIngestionMethod) + printHashType(fshm.hashType);
         }
     }, cam);
@@ -89,7 +102,7 @@ static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & r
         if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
         HashType hashType = parseHashType_();
-        return FixedOutputHashMethod {
+        return CAPathHashMethod {
             .fileIngestionMethod = method,
             .hashType = std::move(hashType),
         };
@@ -109,7 +122,7 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
                     .hash = Hash::parseNonSRIUnprefixed(rest, htSHA256)
                 });
             },
-            [&](FixedOutputHashMethod fohMethod) {
+            [&](CAPathHashMethod fohMethod) {
                 return ContentAddress(FixedOutputHash {
                     .method = fohMethod.fileIngestionMethod,
                     .hash = Hash::parseNonSRIUnprefixed(rest, std::move(fohMethod.hashType)),

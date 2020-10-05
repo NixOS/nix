@@ -16,21 +16,12 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
     return std::nullopt;
 }
 
-std::optional<FileIngestionMethod> DerivationOutput::fileIngestionMethod() const
+std::optional<CAPathHashMethod> DerivationOutput::caHashMethod() const
 {
     if (auto dof = std::get_if<DerivationOutputCAFixed>(&output))
-        return { dof->hash.method };
+        return { dof->hash.hashMethod() };
     if (auto dof = std::get_if<DerivationOutputCAFloating>(&output))
-        return { dof->method };
-    return std::nullopt;
-}
-
-std::optional<HashType> DerivationOutput::hashType() const
-{
-    if (auto dof = std::get_if<DerivationOutputCAFixed>(&output))
-        return { dof->hash.hash.type };
-    if (auto dof = std::get_if<DerivationOutputCAFloating>(&output))
-        return { dof->hashType };
+        return { dof->hashMethod };
     return std::nullopt;
 }
 
@@ -43,13 +34,8 @@ std::optional<Hash> DerivationOutput::hash() const
 
 std::optional<std::string> DerivationOutput::hashMetaData() const
 {
-    if (auto ingestionMethod = fileIngestionMethod()) {
-        if (auto type = hashType())
-            return { makeFileIngestionPrefix(*ingestionMethod) + printHashType(*type) };
-        else
-            // We should never have a file ingestion method but no hash type
-            assert(false);
-    }
+    if (auto hashMethod = caHashMethod())
+        return { hashMethod->print() };
     return std::nullopt;
 }
 
@@ -205,8 +191,10 @@ static DerivationOutput parseDerivationOutput(const Store & store,
             assert(pathS == "");
             return DerivationOutput {
                 .output = DerivationOutputCAFloating {
-                    .method = std::move(method),
-                    .hashType = std::move(hashType),
+                    .hashMethod = CAPathHashMethod {
+                        .fileIngestionMethod = std::move(method),
+                        .hashType = std::move(hashType),
+                    },
                 },
             };
         }
@@ -433,9 +421,9 @@ DerivationType BasicDerivation::type() const
             [&](DerivationOutputCAFloating dof) {
                 floatingCAOutputs.insert(i.first);
                 if (!floatingHashType) {
-                    floatingHashType = dof.hashType;
+                    floatingHashType = dof.hashMethod.hashType;
                 } else {
-                    if (*floatingHashType != dof.hashType)
+                    if (*floatingHashType != dof.hashMethod.hashType)
                         throw Error("All floating outputs must use the same hash type");
                 }
             },
