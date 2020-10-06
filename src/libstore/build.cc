@@ -2678,6 +2678,8 @@ void DerivationGoal::startBuilder()
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
+            debug(format("builder process exited with '%1%' when setting up sandbox, "
+                         "falling back to sandbox = false") % res);
             useChroot = false;
             initTmpDir();
             goto fallback;
@@ -2696,13 +2698,23 @@ void DerivationGoal::startBuilder()
         uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
         uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
-        writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("%d %d 1") % sandboxUid % hostUid).str());
+        try {
+            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
+                (format("%d %d 1") % sandboxUid % hostUid).str());
 
-        writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+            writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
-        writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("%d %d 1") % sandboxGid % hostGid).str());
+            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
+                (format("%d %d 1") % sandboxGid % hostGid).str());
+        } catch (SysError & e) {
+            if (settings.sandboxFallback) {
+                debug(format("caught '%1%' while invoking sandbox, "
+                             "falling back to sandbox = false") % w.what());
+                useChroot = false;
+                initTmpDir();
+                goto fallback;
+            } else throw e;
+        }
 
         /* Save the mount namespace of the child. We have to do this
            *before* the child does a chroot. */
