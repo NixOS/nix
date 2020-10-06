@@ -454,9 +454,7 @@ public:
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
-    {
-        throw Error("addToStoreFromDump() is not supported by this store");
-    }
+    { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
@@ -479,8 +477,38 @@ public:
         BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
-       on-disk .drv file). Note that ‘drvPath’ is only used for
-       informational purposes. */
+       on-disk .drv file).
+
+       ‘drvPath’ is used to deduplicate worker goals so it is imperative that
+       is correct. That said, it doesn't literally need to be store path that
+       would be calculated from writing this derivation to the store: it is OK
+       if it instead is that of a Derivation which would resolve to this (by
+       taking the outputs of it's input derivations and adding them as input
+       sources) such that the build time referenceable-paths are the same.
+
+       In the input-addressed case, we usually *do* use an "original"
+       unresolved derivations's path, as that is what will be used in the
+       `buildPaths` case. Also, the input-addressed output paths are verified
+       only by that contents of that specific unresolved derivation, so it is
+       nice to keep that information around so if the original derivation is
+       ever obtained later, it can be verified whether the trusted user in fact
+       used the proper output path.
+
+       In the content-addressed case, we want to always use the
+       resolved drv path calculated from the provided derivation. This serves
+       two purposes:
+
+         - It keeps the operation trustless, by ruling out a maliciously
+           invalid drv path corresponding to a non-resolution-equivalent
+           derivation.
+
+         - For the floating case in particular, it ensures that the derivation
+           to output mapping respects the resolution equivalence relation, so
+           one cannot choose different resolution-equivalent derivations to
+           subvert dependency coherence (i.e. the property that one doesn't end
+           up with multiple different versions of dependencies without
+           explicitly choosing to allow it).
+    */
     virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) = 0;
 
@@ -517,7 +545,7 @@ public:
        - The collector isn't running, or it's just started but hasn't
          acquired the GC lock yet.  In that case we get and release
          the lock right away, then exit.  The collector scans the
-         permanent root and sees our's.
+         permanent root and sees ours.
 
        In either case the permanent root is seen by the collector. */
     virtual void syncWithGC() { };
@@ -802,6 +830,7 @@ struct StoreFactory
     std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
+
 struct Implementations
 {
     static std::vector<StoreFactory> * registered;
