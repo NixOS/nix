@@ -666,7 +666,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn.processStderr(0, source2.get());
 
         auto importedPaths = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-        assert(importedPaths.size() <= 1);
+        assert(importedPaths.empty() == 0); // doesn't include possible self reference
     }
 
     else {
