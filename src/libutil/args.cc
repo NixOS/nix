@@ -277,7 +277,7 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
     };
 }
 
-static void completePath(std::string_view prefix, bool onlyDirs)
+static void _completePath(std::string_view prefix, bool onlyDirs)
 {
     pathCompletions = true;
     glob_t globbuf;
@@ -300,12 +300,12 @@ static void completePath(std::string_view prefix, bool onlyDirs)
 
 void completePath(size_t, std::string_view prefix)
 {
-    completePath(prefix, false);
+    _completePath(prefix, false);
 }
 
 void completeDir(size_t, std::string_view prefix)
 {
-    completePath(prefix, true);
+    _completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)

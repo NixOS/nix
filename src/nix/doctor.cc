@@ -131,4 +131,4 @@ struct CmdDoctor : StoreCommand
     }
 };
 
-static auto r1 = registerCommand<CmdDoctor>("doctor");
+static auto rCmdDoctor = registerCommand<CmdDoctor>("doctor");

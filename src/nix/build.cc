@@ -88,4 +88,4 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
     }
 };
 
-static auto r1 = registerCommand<CmdBuild>("build");
+static auto rCmdBuild = registerCommand<CmdBuild>("build");

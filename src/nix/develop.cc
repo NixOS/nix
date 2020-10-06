@@ -443,5 +443,5 @@ struct CmdPrintDevEnv : Common
     }
 };
 
-static auto r1 = registerCommand<CmdPrintDevEnv>("print-dev-env");
-static auto r2 = registerCommand<CmdDevelop>("develop");
+static auto rCmdPrintDevEnv = registerCommand<CmdPrintDevEnv>("print-dev-env");
+static auto rCmdDevelop = registerCommand<CmdDevelop>("develop");

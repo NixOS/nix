@@ -63,6 +63,6 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
     { unsupported("buildDerivation"); }
 };
 
-static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regStore;
+static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
 
 }

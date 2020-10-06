@@ -24,6 +24,9 @@
 #endif
 
 
+namespace nix_store {
+
+
 using namespace nix;
 using std::cin;
 using std::cout;
@@ -1025,7 +1028,7 @@ static void opVersion(Strings opFlags, Strings opArgs)
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
-static int _main(int argc, char * * argv)
+static int main_nix_store(int argc, char * * argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1121,4 +1124,6 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-store", _main);
+static RegisterLegacyCommand r_nix_store("nix-store", main_nix_store);
+
+}

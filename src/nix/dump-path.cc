@@ -30,4 +30,4 @@ struct CmdDumpPath : StorePathCommand
     }
 };
 
-static auto r1 = registerCommand<CmdDumpPath>("dump-path");
+static auto rDumpPath = registerCommand<CmdDumpPath>("dump-path");

@@ -335,6 +335,6 @@ public:
     }
 };
 
-static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regStore;
+static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;
 
 }

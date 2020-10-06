@@ -1008,6 +1008,6 @@ void ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun)
 
 }
 
-static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regStore;
+static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regUDSRemoteStore;
 
 }

@@ -140,7 +140,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
     }
 };
 
-static auto r1 = registerCommand<CmdShell>("shell");
+static auto rCmdShell = registerCommand<CmdShell>("shell");
 
 struct CmdRun : InstallableCommand, RunCommon
 {
@@ -209,7 +209,7 @@ struct CmdRun : InstallableCommand, RunCommon
     }
 };
 
-static auto r2 = registerCommand<CmdRun>("run");
+static auto rCmdRun = registerCommand<CmdRun>("run");
 
 void chrootHelper(int argc, char * * argv)
 {

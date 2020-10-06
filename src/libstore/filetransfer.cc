@@ -31,7 +31,7 @@ namespace nix {
 
 FileTransferSettings fileTransferSettings;
 
-static GlobalConfig::Register r1(&fileTransferSettings);
+static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
 std::string resolveUri(const std::string & uri)
 {

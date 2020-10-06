@@ -334,7 +334,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
-static auto r2 = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
+static auto rGitHubInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
+static auto rGitLabInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
 
 }
