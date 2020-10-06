@@ -125,7 +125,6 @@ struct BasicDerivation
 
     bool isBuiltin() const;
 
-    /* Return true iff this is a fixed-output derivation. */
     DerivationType type() const;
 
     /* Return the output names of a derivation. */
@@ -146,6 +145,8 @@ struct Derivation : BasicDerivation
     /* Print a derivation. */
     std::string unparse(const Store & store, bool maskOutputs,
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
+
+    bool needsRewriting() const;
 
     /* Return the underlying basic derivation but with these changes:
 

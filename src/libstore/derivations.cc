@@ -453,7 +453,6 @@ DerivationType BasicDerivation::type() const
     }
 }
 
-
 DrvHashes drvHashes;
 
 /* pathDerivationModulo and hashDerivationModulo are mutually recursive
@@ -497,7 +496,6 @@ static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath
  */
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
-    /* Return a fixed hash for fixed-output derivations. */
     switch (drv.type()) {
     case DerivationType::CAFloating:
         return UnknownHashes {};
@@ -710,6 +708,16 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 
 Sync<DrvPathResolutions> drvPathResolutions;
+
+bool Derivation::needsRewriting() const
+{
+    auto myType = type();
+    if (myType == DerivationType::CAFloating && !inputDrvs.empty())
+        return true;
+    if (myType == DerivationType::DeferredInputAddressed)
+        return true;
+    return false;
+}
 
 std::optional<BasicDerivation> Derivation::tryResolve(Store & store) {
     BasicDerivation resolved { *this };
