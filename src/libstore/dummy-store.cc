@@ -18,8 +18,7 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
     DummyStore(const Params & params)
         : StoreConfig(params)
         , Store(params)
-    {
-    }
+    { }
 
     string getUri() override
     {

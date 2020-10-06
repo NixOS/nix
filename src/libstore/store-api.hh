@@ -194,6 +194,8 @@ struct StoreConfig : public Config
      */
     StoreConfig() { assert(false); }
 
+    virtual ~StoreConfig() { }
+
     virtual const std::string name() = 0;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
