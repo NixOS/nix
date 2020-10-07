@@ -83,13 +83,28 @@ MAKE_WORKER_PROTO(, StorePath);
 MAKE_WORKER_PROTO(, ContentAddress);
 
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
-MAKE_WORKER_PROTO(template<typename T>, std::optional<T>);
 
 #define X_ template<typename K, typename V>
 #define Y_ std::map<K, V>
 MAKE_WORKER_PROTO(X_, Y_);
 #undef X_
 #undef Y_
+
+/* These use the empty string for the null case, relying on the fact
+   that the underlying types never serialize to the empty string.
+
+   We do this instead of a generic std::optional<T> instance because
+   ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
+   the same reason, we don't have a std::variant<T..> instances (ordinal
+   tags 0...n).
+
+   We could the generic instances and then these as specializations for
+   compatability, but that's proven a bit finnicky, and also makes the
+   worker protocol harder to implement in other languages where such
+   specializations may not be allowed.
+ */
+MAKE_WORKER_PROTO(, std::optional<StorePath>);
+MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
 
 template<typename T>
 std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
@@ -133,37 +148,6 @@ void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
         write(store, out, i.second);
     }
 }
-
-template<typename T>
-std::optional<T> read(const Store & store, Source & from, Phantom<std::optional<T>> _)
-{
-    auto tag = readNum<uint8_t>(from);
-    switch (tag) {
-    case 0:
-        return std::nullopt;
-    case 1:
-        return read(store, from, Phantom<T> {});
-    default:
-        throw Error("got an invalid tag bit for std::optional: %#04x", (size_t)tag);
-    }
-}
-
-template<typename T>
-void write(const Store & store, Sink & out, const std::optional<T> & optVal)
-{
-    out << (uint64_t) (optVal ? 1 : 0);
-    if (optVal)
-        worker_proto::write(store, out, *optVal);
-}
-
-/* Specialization which uses and empty string for the empty case, taking
-   advantage of the fact these types always serialize to non-empty strings.
-   This is done primarily for backwards compatability, so that T <=
-   std::optional<T>, where <= is the compatability partial order, T is one of
-   the types below.
- */
-MAKE_WORKER_PROTO(, std::optional<StorePath>);
-MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
 
 }
 
