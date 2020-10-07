@@ -2355,7 +2355,8 @@ void DerivationGoal::startBuilder()
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
-                throw Error("while processing 'sandbox-paths': %s", e.what());
+                e.addTrace({}, "while processing 'sandbox-paths'");
+                throw;
             }
         for (auto & i : closure) {
             auto p = worker.store.printStorePath(i);
@@ -3809,7 +3810,7 @@ void DerivationGoal::runChild()
                     throw Error("unsupported builtin function '%1%'", string(drv->builder, 8));
                 _exit(0);
             } catch (std::exception & e) {
-                writeFull(STDERR_FILENO, "error: " + string(e.what()) + "\n");
+                writeFull(STDERR_FILENO, e.what() + "\n");
                 _exit(1);
             }
         }
