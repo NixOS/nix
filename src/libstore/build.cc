@@ -2737,9 +2737,12 @@ void DerivationGoal::startBuilder()
     /* Check if setting up the build environment failed. */
     while (true) {
         string msg = readLine(builderOut.readSide.get());
+        if (string(msg, 0, 1) == "\2") break;
         if (string(msg, 0, 1) == "\1") {
-            if (msg.size() == 1) break;
-            throw Error(string(msg, 1));
+            FdSource source(builderOut.readSide.get());
+            auto ex = readError(source);
+            ex.addTrace({}, "while setting up the build environment");
+            throw ex;
         }
         debug(msg);
     }
@@ -3785,7 +3788,7 @@ void DerivationGoal::runChild()
             args.push_back(rewriteStrings(i, inputRewrites));
 
         /* Indicate that we managed to set up the build environment. */
-        writeFull(STDERR_FILENO, string("\1\n"));
+        writeFull(STDERR_FILENO, string("\2\n"));
 
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
@@ -3815,8 +3818,11 @@ void DerivationGoal::runChild()
 
         throw SysError("executing '%1%'", drv->builder);
 
-    } catch (std::exception & e) {
-        writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
+    } catch (Error & e) {
+        writeFull(STDERR_FILENO, "\1\n");
+        FdSink sink(STDERR_FILENO);
+        sink << e;
+        sink.flush();
         _exit(1);
     }
 }
