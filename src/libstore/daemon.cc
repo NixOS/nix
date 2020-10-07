@@ -101,17 +101,20 @@ struct TunnelLogger : public Logger
 
     /* stopWork() means that we're done; stop sending stderr to the
        client. */
-    void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
+    void stopWork(const Error * ex = nullptr)
     {
         auto state(state_.lock());
 
         state->canSendStderr = false;
 
-        if (success)
+        if (!ex)
             to << STDERR_LAST;
         else {
-            to << STDERR_ERROR << msg;
-            if (status != 0) to << status;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
+                to << STDERR_ERROR << *ex;
+            } else {
+                to << STDERR_ERROR << ex->what() << ex->status;
+            }
         }
     }
 
@@ -935,10 +938,11 @@ void processConnection(
                    during addTextToStore() / importPath().  If that
                    happens, just send the error message and exit. */
                 bool errorAllowed = tunnelLogger->state_.lock()->canSendStderr;
-                tunnelLogger->stopWork(false, e.msg(), e.status);
+                tunnelLogger->stopWork(&e);
                 if (!errorAllowed) throw;
             } catch (std::bad_alloc & e) {
-                tunnelLogger->stopWork(false, "Nix daemon out of memory", 1);
+                auto ex = Error("Nix daemon out of memory");
+                tunnelLogger->stopWork(&ex);
                 throw;
             }
 
@@ -947,8 +951,13 @@ void processConnection(
             assert(!tunnelLogger->state_.lock()->canSendStderr);
         };
 
+    } catch (Error & e) {
+        tunnelLogger->stopWork(&e);
+        to.flush();
+        return;
     } catch (std::exception & e) {
-        tunnelLogger->stopWork(false, e.what(), 1);
+        auto ex = Error(e.what());
+        tunnelLogger->stopWork(&ex);
         to.flush();
         return;
     }

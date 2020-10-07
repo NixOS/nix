@@ -925,9 +925,13 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         }
 
         else if (msg == STDERR_ERROR) {
-            string error = readString(from);
-            unsigned int status = readInt(from);
-            return std::make_exception_ptr(Error(status, error));
+            if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
+                return std::make_exception_ptr(readError(from));
+            } else {
+                string error = readString(from);
+                unsigned int status = readInt(from);
+                return std::make_exception_ptr(Error(status, error));
+            }
         }
 
         else if (msg == STDERR_NEXT)
