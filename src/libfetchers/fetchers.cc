@@ -198,7 +198,13 @@ StorePath Input::computeStorePath(Store & store) const
     auto narHash = getNarHash();
     if (!narHash)
         throw Error("cannot compute store path for mutable input '%s'", to_string());
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, "source");
+    return store.makeFixedOutputPath("source", FixedOutputInfo {
+        {
+            .method = FileIngestionMethod::Recursive,
+            .hash = *narHash,
+        },
+        {},
+    });
 }
 
 std::string Input::getType() const

@@ -170,6 +170,8 @@ struct BuildResult
     }
 };
 
+typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
+
 struct StoreConfig : public Config
 {
     using Config::Config;
@@ -313,17 +315,11 @@ public:
     StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(FileIngestionMethod method,
-        const Hash & hash, std::string_view name,
-        const StorePathSet & references = {},
-        bool hasSelfReference = false) const;
+    StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
-    StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references = {}) const;
+    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
 
-    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
-        const StorePathSet & references = {},
-        bool hasSelfReference = false) const;
+    StorePath makeFixedOutputPathFromCA(const StorePathDescriptor & info) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store

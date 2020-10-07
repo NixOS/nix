@@ -10,5 +10,5 @@ namespace nix {
 
 void printValueAsXML(EvalState & state, bool strict, bool location,
     Value & v, std::ostream & out, PathSet & context);
-    
+
 }

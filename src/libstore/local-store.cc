@@ -567,7 +567,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                 envHasRightPath(doia.path, i.first);
             },
             [&](DerivationOutputCAFixed dof) {
-                StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
+                StorePath path = makeFixedOutputPath(drvName, { dof.hash, {} });
                 envHasRightPath(path, i.first);
             },
             [&](DerivationOutputCAFloating _) {
@@ -923,7 +923,10 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
 
             // recompute store path so that we can use a different store root
             if (path.second) {
-                subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
+                subPath = makeFixedOutputPathFromCA({
+                    .name = std::string { path.first.name() },
+                    .info = caWithoutRefs(*path.second),
+                });
                 if (sub->storeDir == storeDir)
                     assert(subPath == path.first);
                 if (subPath != path.first)
@@ -1164,7 +1167,18 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
     auto [hash, size] = hashSink->finish();
 
-    auto dstPath = makeFixedOutputPath(method, hash, name);
+    auto desc = StorePathDescriptor {
+        name,
+        FixedOutputInfo {
+            {
+                .method = method,
+                .hash = hash,
+            },
+            {},
+        },
+    };
+
+    auto dstPath = makeFixedOutputPathFromCA(desc);
 
     addTempRoot(dstPath);
 
@@ -1184,7 +1198,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
             autoGC();
 
             if (inMemory) {
-                 StringSource dumpSource { dump };
+                StringSource dumpSource { dump };
                 /* Restore from the NAR in memory. */
                 if (method == FileIngestionMethod::Recursive)
                     restorePath(realPath, dumpSource);
@@ -1209,9 +1223,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
             optimisePath(realPath);
 
-            ValidPathInfo info { dstPath, narHash.first };
+            ValidPathInfo info { *this, std::move(desc), narHash.first };
             info.narSize = narHash.second;
-            info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }
 
@@ -1226,7 +1239,10 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
-    auto dstPath = makeTextPath(name, hash, references);
+    auto dstPath = makeTextPath(name, TextInfo {
+        { .hash = hash },
+        references,
+    });
 
     addTempRoot(dstPath);
 

@@ -4056,25 +4056,24 @@ void DerivationGoal::registerOutputs()
                 break;
             }
             auto got = caSink.finish().first;
-            auto refs = rewriteRefs();
             HashModuloSink narSink { htSHA256, oldHashPart };
             dumpPath(actualPath, narSink);
             auto narHashAndSize = narSink.finish();
             ValidPathInfo newInfo0 {
-                worker.store.makeFixedOutputPath(
-                    outputHash.method,
-                    got,
-                    outputPathName(drv->name, outputName),
-                    refs.references,
-                    refs.hasSelfReference),
+                worker.store,
+                {
+                    .name = outputPathName(drv->name, outputName),
+                    .info = FixedOutputInfo {
+                        {
+                            .method = outputHash.method,
+                            .hash = got,
+                        },
+                        rewriteRefs(),
+                    },
+                },
                 narHashAndSize.first,
             };
             newInfo0.narSize = narHashAndSize.second;
-            newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
-                .hash = got,
-            };
-            static_cast<PathReferences<StorePath> &>(newInfo0) = refs;
 
             assert(newInfo0.ca);
             return newInfo0;
@@ -4861,7 +4860,10 @@ void SubstitutionGoal::tryNext()
     subs.pop_front();
 
     if (ca) {
-        subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+        subPath = sub->makeFixedOutputPathFromCA({
+            .name = std::string { storePath.name() },
+            .info = caWithoutRefs(*ca),
+        });
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {
@@ -4891,7 +4893,7 @@ void SubstitutionGoal::tryNext()
     }
 
     if (info->path != storePath) {
-        if (info->isContentAddressed(*sub) && info->references.empty()) {
+        if (info->isContentAddressed(*sub) && info->references.empty() && !info->hasSelfReference) {
             auto info2 = std::make_shared<ValidPathInfo>(*info);
             info2->path = storePath;
             info = info2;

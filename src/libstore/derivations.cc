@@ -27,8 +27,8 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
 
 StorePath DerivationOutputCAFixed::path(const Store & store, std::string_view drvName, std::string_view outputName) const {
     return store.makeFixedOutputPath(
-        hash.method, hash.hash,
-        outputPathName(drvName, outputName));
+        outputPathName(drvName, outputName),
+        { hash, {} });
 }
 
 

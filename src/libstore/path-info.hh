@@ -13,47 +13,6 @@ namespace nix {
 
 class Store;
 
-template<typename Ref>
-struct PathReferences
-{
-    std::set<Ref> references;
-    bool hasSelfReference = false;
-
-    /* Functions to view references + hasSelfReference as one set, mainly for
-       compatibility's sake. */
-    StorePathSet referencesPossiblyToSelf(const Ref & self) const;
-    void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
-    void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
-};
-
-template<typename Ref>
-StorePathSet PathReferences<Ref>::referencesPossiblyToSelf(const Ref & self) const
-{
-    StorePathSet refs { references };
-    if (hasSelfReference)
-        refs.insert(self);
-    return refs;
-}
-
-template<typename Ref>
-void PathReferences<Ref>::insertReferencePossiblyToSelf(const Ref & self, Ref && ref)
-{
-    if (ref == self)
-        hasSelfReference = true;
-    else
-        references.insert(std::move(ref));
-}
-
-template<typename Ref>
-void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs)
-{
-    if (refs.count(self))
-        hasSelfReference = true;
-        refs.erase(self);
-
-    references = refs;
-}
-
 
 struct SubstitutablePathInfo : PathReferences<StorePath>
 {
@@ -68,7 +27,6 @@ struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    // TODO document this
     Hash narHash;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
@@ -117,6 +75,8 @@ struct ValidPathInfo : PathReferences<StorePath>
 
     void sign(const Store & store, const SecretKey & secretKey);
 
+    std::optional<StorePathDescriptor> fullStorePathDescriptorOpt() const;
+
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
 
@@ -142,6 +102,9 @@ struct ValidPathInfo : PathReferences<StorePath>
 
     ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
     ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
+
+    ValidPathInfo(const Store & store,
+        StorePathDescriptor && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
 };

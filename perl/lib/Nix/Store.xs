@@ -111,7 +111,7 @@ SV * queryPathInfo(char * path, int base32)
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
             AV * arr = newAV();
-            for (auto & i : info->references)
+            for (auto & i : info->referencesPossiblyToSelf())
                 av_push(arr, newSVpv(store()->printStorePath(i).c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) arr)));
         } catch (Error & e) {
@@ -287,7 +287,13 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
         try {
             auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->makeFixedOutputPath(method, h, name);
+            auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
+                {
+                    .method = method,
+                    .hash = h,
+                },
+                {},
+            });
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
