@@ -58,8 +58,11 @@ struct GitInputScheme : InputScheme
     {
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash")
+        for (auto & [ name, value ] : attrs)
+            if (name != "type" && name != "url" && name != "ref" &&
+                name != "rev" && name != "shallow" && name != "submodules" &&
+                name != "lastModified" && name != "revCount" &&
+                name != "narHash" && name != "name")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
