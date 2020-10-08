@@ -599,6 +599,16 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
 }
 
+void RemoteStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+{
+    auto conn(getConnection());
+    conn->to << wopLinkDeriverToPath;
+    conn->to << printStorePath(deriver);
+    conn->to << outputName;
+    conn->to << printStorePath(output);
+    conn.processStderr();
+}
+
 
 void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {

@@ -859,6 +859,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopLinkDeriverToPath: {
+        logger->startWork();
+        auto drvPath = store->parseStorePath(readString(from));
+        auto outputName = readString(from);
+        auto outputPath = store->parseStorePath(readString(from));
+        store->linkDeriverToPath(drvPath, outputName, outputPath);
+        logger->stopWork();
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }
