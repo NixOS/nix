@@ -364,6 +364,17 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+std::optional<StorePath> Store::queryOutputPathOf(const StorePath & drvPath, const std::string & outputName)
+{
+    auto resp = queryPartialDerivationOutputMap(drvPath);
+    if (auto maybePathPtr = resp.find(outputName); maybePathPtr != resp.end()) {
+                return maybePathPtr->second;
+    } else {
+                return std::nullopt;
+    }
+}
+
+
 OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     auto resp = queryPartialDerivationOutputMap(path);
     OutputPathMap result;

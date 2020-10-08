@@ -866,6 +866,29 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopRegisterDrvOutput: {
+        logger->startWork();
+        auto outputId = DrvOutputId::parse(readString(from));
+        auto outputPath = StorePath(readString(from));
+        store->registerDrvOutput(outputId, DrvOutputInfo{outputPath});
+        logger->stopWork();
+        break;
+    }
+
+    case wopQueryDrvOutputInfo: {
+        logger->startWork();
+        auto outputId = DrvOutputId::parse(readString(from));
+        auto info = store->queryDrvOutputInfo(outputId);
+        logger->stopWork();
+        if (info) {
+            to << std::string(info->outPath.to_string());
+        }
+        else {
+            to << "";
+        }
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }

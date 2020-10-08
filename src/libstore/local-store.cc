@@ -581,13 +581,16 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 }
 
 
-void LocalStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+void LocalStore::registerDrvOutput(const DrvOutputId& id, const DrvOutputInfo & info)
 {
     auto state(_state.lock());
-    return linkDeriverToPath(*state, queryValidPathId(*state, deriver), outputName, output);
+    // XXX: This ignores the references of the output because we can
+    // recompute them later from the drv and the references of the associated
+    // store path, but doing so is both inefficient and fragile.
+    return registerDrvOutput_(*state, queryValidPathId(*state, id.drvPath), id.outputName, info.outPath);
 }
 
-void LocalStore::linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
+void LocalStore::registerDrvOutput_(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
 {
     retrySQLite<void>([&]() {
         state.stmtAddDerivationOutput.use()
@@ -637,7 +640,7 @@ uint64_t LocalStore::addValidPath(State & state,
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
             if (i.second.second)
-                linkDeriverToPath(state, id, i.first, *i.second.second);
+                registerDrvOutput_(state, id, i.first, *i.second.second);
         }
     }
 
@@ -1596,5 +1599,13 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
-
+std::optional<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutputId& id) {
+    auto outputPath = queryOutputPathOf(id.drvPath, id.outputName);
+    if (!(outputPath && isValidPath(*outputPath)))
+        return std::nullopt;
+    else
+        return {DrvOutputInfo{
+            .outPath = *outputPath,
+        }};
 }
+}  // namespace nix

@@ -444,6 +444,33 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
+std::optional<const DrvOutputInfo> BinaryCacheStore::queryDrvOutputInfo(const DrvOutputId & id)
+{
+    auto outputInfoFilePath =
+        "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName + ".doi";
+    auto rawOutputInfo = getFile(outputInfoFilePath);
+
+    if (rawOutputInfo) {
+        return { DrvOutputInfo::parse(*rawOutputInfo, outputInfoFilePath) };
+    } else {
+        return std::nullopt;
+    }
+}
+
+std::optional<StorePath> BinaryCacheStore::queryOutputPathOf(
+    const StorePath& drvPath,
+    const std::string& outputName) {
+    if(auto outputInfo = queryDrvOutputInfo(DrvOutputId{drvPath, outputName}))
+        return {outputInfo->outPath};
+    return std::nullopt;
+}
+
+void BinaryCacheStore::registerDrvOutput(const DrvOutputId & id, const DrvOutputInfo & info)
+{
+    auto filePath = "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName + ".doi";
+    upsertFile(filePath, info.to_string(), "text/x-nix-derivertopath");
+}
+
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), localNarCache);
