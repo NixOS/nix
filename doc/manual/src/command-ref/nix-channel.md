@@ -1,5 +1,3 @@
-Title: nix-channel
-
 # Name
 
 `nix-channel` - manage Nix channels
