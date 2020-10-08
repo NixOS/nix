@@ -208,6 +208,13 @@ public:
        garbage until it exceeds maxFree. */
     void autoGC(bool sync = true);
 
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
+    void registerDrvOutput(const DrvOutputId & outputId, const DrvOutputInfo & info) override;
+    void registerDrvOutput_(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
+
 private:
 
     int getSchema();
@@ -275,11 +282,6 @@ private:
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
-
-    /* Register the store path 'output' as the output named 'outputName' of
-       derivation 'deriver'. */
-    void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output);
-    void linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
 
     Path getRealStoreDir() override { return realStoreDir; }
 
