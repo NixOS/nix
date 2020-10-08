@@ -333,6 +333,10 @@ public:
         auto conn(connections->get());
         return conn->remoteVersion;
     }
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
+    // TODO: Implement
+    { unsupported("queryRealisation"); }
 };
 
 static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;

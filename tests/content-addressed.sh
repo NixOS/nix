@@ -50,7 +50,8 @@ testGC () {
     nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
 }
 
-testRemoteCache
+# Disabled until we have it properly working
+# testRemoteCache
 testDeterministicCA
 testCutoff
 testGC

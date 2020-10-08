@@ -2096,6 +2096,20 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
         /* Nothing to be done; 'path' must already be valid. */
     }
 
+    void registerDrvOutput(const Realisation & info) override
+    {
+        if (!goal.isAllowed(info.id.drvPath))
+            throw InvalidPath("cannot register unknown drv output '%s' in recursive Nix", printStorePath(info.id.drvPath));
+        next->registerDrvOutput(info);
+    }
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
+    {
+        if (!goal.isAllowed(id.drvPath))
+            throw InvalidPath("cannot query the output info for unknown derivation '%s' in recursive Nix", printStorePath(id.drvPath));
+        return next->queryRealisation(id);
+    }
+
     void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
@@ -3393,7 +3407,10 @@ void DerivationGoal::registerOutputs()
 
     if (useDerivation || isCaFloating)
         for (auto & [outputName, newInfo] : infos)
-            worker.store.linkDeriverToPath(drvPathResolved, outputName, newInfo.path);
+            worker.store.registerDrvOutput(
+                DrvOutputId{drvPathResolved, outputName},
+                DrvOutputInfo{.outPath = newInfo.path,
+                              .resolvedDrv = drvPathResolved});
 }
 
 
