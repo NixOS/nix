@@ -463,6 +463,18 @@ public:
     virtual StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
 
+    /**
+     * Add a mapping indicating that `deriver!outputName` maps to the output path
+     * `output`.
+     *
+     * This is redundant for known-input-addressed and fixed-output derivations
+     * as this information is already present in the drv file, but necessary for
+     * floating-ca derivations and their dependencies as there's no way to
+     * retrieve this information otherwise.
+     */
+    virtual void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+    { unsupported("linkDeriverToPath"); }
+
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;
 
