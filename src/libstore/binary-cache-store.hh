@@ -99,6 +99,12 @@ public:
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
+    void registerDrvOutput(const DrvOutputId & outputId, const DrvOutputInfo & info) override;
+
+    std::optional<StorePath> queryOutputPathOf(const StorePath & drvPath, const std::string & outputName) override;
+
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) override;
+
     void narFromPath(const StorePath & path, Sink & sink) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,

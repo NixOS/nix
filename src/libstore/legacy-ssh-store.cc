@@ -333,6 +333,10 @@ public:
         auto conn(connections->get());
         return conn->remoteVersion;
     }
+
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override
+    // TODO: Implement
+    { unsupported("queryDrvOutputInfo"); }
 };
 
 static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;

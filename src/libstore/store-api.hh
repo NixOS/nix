@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drv-output-info.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -391,6 +392,10 @@ protected:
 
 public:
 
+    virtual std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) = 0;
+
+    virtual std::optional<StorePath> queryOutputPathOf(const StorePath & drvPath, const std::string & outputName);
+
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const StorePath & path, StorePathSet & referrers)
@@ -462,6 +467,20 @@ public:
        a regular file containing the given string. */
     virtual StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
+
+    /**
+     * Add a mapping indicating that `deriver!outputName` maps to the output path
+     * `output`.
+     *
+     * This is redundant for known-input-addressed and fixed-output derivations
+     * as this information is already present in the drv file, but necessary for
+     * floating-ca derivations and their dependencies as there's no way to
+     * retrieve this information otherwise.
+     */
+    virtual void registerDrvOutput(const StorePath & deriver, const string & outputName, const DrvOutputInfo & output)
+    { registerDrvOutput(DrvOutputId{ deriver, outputName }, output); }
+    virtual void registerDrvOutput(const DrvOutputId &, const DrvOutputInfo & output)
+    { unsupported("registerDrvOutput"); }
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;

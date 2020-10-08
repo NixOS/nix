@@ -606,6 +606,34 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
 }
 
+void RemoteStore::registerDrvOutput(const DrvOutputId & outputId, const DrvOutputInfo & info)
+{
+    auto conn(getConnection());
+    conn->to << wopRegisterDrvOutput;
+    conn->to << outputId.to_string();
+    conn->to << std::string(info.outPath.to_string());
+    conn->to << stringify_refs(info.references);
+    conn.processStderr();
+}
+
+std::optional<const DrvOutputInfo> RemoteStore::queryDrvOutputInfo(const DrvOutputId & id)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryDrvOutputInfo;
+    conn->to << id.to_string();
+    conn.processStderr();
+    auto rawOutputPath = readString(conn->from);
+    if (rawOutputPath == "") {
+        return std::nullopt;
+    }
+    auto outputPath = StorePath(rawOutputPath);
+    std::set<DrvInput> references;
+    for (auto & ref : readStrings<Strings>(conn->from)) {
+        references.insert(DrvInput::parse(ref));
+    }
+    return {DrvOutputInfo{outputPath, references}};
+}
+
 
 void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
