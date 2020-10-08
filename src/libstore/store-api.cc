@@ -796,95 +796,147 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     dstStore->addToStore(*info, *source, repair, checkSigs);
 }
 
-
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
-    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const StorePathSet & storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
 {
-    auto valid = dstStore->queryValidPaths(storePaths, substitute);
+    std::set<PathOrOutputs> toBeCopied;
+    for (auto & path : storePaths) {
+        PathOrOutputs path_(path);
+        toBeCopied.insert(path_);
+    }
+    return copyPaths(srcStore, dstStore, toBeCopied, repair, checkSigs, substitute);
+}
+
+std::map<StorePath, StorePath> copyPaths(
+        ref<Store> srcStore, ref<Store> dstStore,
+        const std::set<PathOrOutputs> &storePaths,
+        RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+{
+    // XXX: This is certainly already defined somewhere else
+    struct OutputId {
+        StorePath drv;
+        std::string outputName;
+    };
+    // TODO: Use a set rather than a list
+    // (but requires implementing `comparable` for `OutputId`)
+    std::map<StorePath, std::list<OutputId>> pathToDerivers;
+    std::set<StorePath> pathsToCopy;
+    for (auto pathOrDrvOutput : storePaths) {
+        std::visit(overloaded {
+                [&](StorePath path) {
+                    pathsToCopy.insert(path);
+                    pathToDerivers.try_emplace(std::move(path), std::list<OutputId>());
+                },
+                [&](StorePathWithOutputs pathWithOutputs) {
+                    auto drvOutputs = srcStore->queryDerivationOutputMap(pathWithOutputs.path);
+                    for (auto & outputName : pathWithOutputs.outputs) {
+                        // TODO: Proper error checking in case the output
+                        // doesn't exist or hasn't been realised
+                        std::optional<StorePath> outputPath = drvOutputs.find(outputName)->second;
+                        // Ensure that the key is in the map
+                        pathsToCopy.insert(*outputPath);
+                        pathToDerivers.insert({*outputPath, std::list<OutputId>()});
+                        pathToDerivers[*outputPath].push_front(OutputId{std::move(pathWithOutputs.path), outputName});
+                    }
+                },
+            },
+            pathOrDrvOutput
+            );
+    }
+    auto valid = dstStore->queryValidPaths(pathsToCopy, substitute);
 
     StorePathSet missing;
-    for (auto & path : storePaths)
+    for (auto & path : pathsToCopy)
         if (!valid.count(path)) missing.insert(path);
 
     std::map<StorePath, StorePath> pathsMap;
-    for (auto & path : storePaths)
+    for (auto & path : pathsToCopy)
         pathsMap.insert_or_assign(path, path);
 
-    if (missing.empty()) return pathsMap;
+    if (!missing.empty()) {
+        Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+        std::atomic<size_t> nrDone{0};
+        std::atomic<size_t> nrFailed{0};
+        std::atomic<uint64_t> bytesExpected{0};
+        std::atomic<uint64_t> nrRunning{0};
 
-    std::atomic<size_t> nrDone{0};
-    std::atomic<size_t> nrFailed{0};
-    std::atomic<uint64_t> bytesExpected{0};
-    std::atomic<uint64_t> nrRunning{0};
+        auto showProgress = [&]() {
+            act.progress(nrDone, missing.size(), nrRunning, nrFailed);
+        };
 
-    auto showProgress = [&]() {
-        act.progress(nrDone, missing.size(), nrRunning, nrFailed);
-    };
+        ThreadPool pool;
 
-    ThreadPool pool;
+        processGraph<StorePath>(pool,
+            StorePathSet(missing.begin(), missing.end()),
 
-    processGraph<StorePath>(pool,
-        StorePathSet(missing.begin(), missing.end()),
+            [&](const StorePath & storePath) {
+                auto info = srcStore->queryPathInfo(storePath);
+                auto storePathForDst = storePath;
+                if (info->ca && info->references.empty()) {
+                    storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
+                    if (dstStore->storeDir == srcStore->storeDir)
+                        assert(storePathForDst == storePath);
+                    if (storePathForDst != storePath)
+                        debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
+                }
+                pathsMap.insert_or_assign(storePath, storePathForDst);
 
-        [&](const StorePath & storePath) {
-            auto info = srcStore->queryPathInfo(storePath);
-            auto storePathForDst = storePath;
-            if (info->ca && info->references.empty()) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
-                if (dstStore->storeDir == srcStore->storeDir)
-                    assert(storePathForDst == storePath);
-                if (storePathForDst != storePath)
-                    debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
-            }
-            pathsMap.insert_or_assign(storePath, storePathForDst);
+                if (dstStore->isValidPath(storePath)) {
+                    nrDone++;
+                    showProgress();
+                    return StorePathSet();
+                }
 
-            if (dstStore->isValidPath(storePath)) {
+                bytesExpected += info->narSize;
+                act.setExpected(actCopyPath, bytesExpected);
+
+                return info->references;
+            },
+
+            [&](const StorePath & storePath) {
+                checkInterrupt();
+
+                auto info = srcStore->queryPathInfo(storePath);
+
+                auto storePathForDst = storePath;
+                if (info->ca && info->references.empty()) {
+                    storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
+                    if (dstStore->storeDir == srcStore->storeDir)
+                        assert(storePathForDst == storePath);
+                    if (storePathForDst != storePath)
+                        debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
+                }
+                pathsMap.insert_or_assign(storePath, storePathForDst);
+
+                if (!dstStore->isValidPath(storePathForDst)) {
+                    MaintainCount<decltype(nrRunning)> mc(nrRunning);
+                    showProgress();
+                    try {
+                        copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                    } catch (Error &e) {
+                        nrFailed++;
+                        if (!settings.keepGoing)
+                            throw e;
+                        logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
+                        showProgress();
+                        return;
+                    }
+                }
+
                 nrDone++;
                 showProgress();
-                return StorePathSet();
-            }
+            });
+    }
 
-            bytesExpected += info->narSize;
-            act.setExpected(actCopyPath, bytesExpected);
-
-            return info->references;
-        },
-
-        [&](const StorePath & storePath) {
-            checkInterrupt();
-
-            auto info = srcStore->queryPathInfo(storePath);
-
-            auto storePathForDst = storePath;
-            if (info->ca && info->references.empty()) {
-                storePathForDst = dstStore->makeFixedOutputPathFromCA(storePath.name(), *info->ca);
-                if (dstStore->storeDir == srcStore->storeDir)
-                    assert(storePathForDst == storePath);
-                if (storePathForDst != storePath)
-                    debug("replaced path '%s' to '%s' for substituter '%s'", srcStore->printStorePath(storePath), dstStore->printStorePath(storePathForDst), dstStore->getUri());
-            }
-            pathsMap.insert_or_assign(storePath, storePathForDst);
-
-            if (!dstStore->isValidPath(storePathForDst)) {
-                MaintainCount<decltype(nrRunning)> mc(nrRunning);
-                showProgress();
-                try {
-                    copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
-                } catch (Error &e) {
-                    nrFailed++;
-                    if (!settings.keepGoing)
-                        throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
-                    showProgress();
-                    return;
-                }
-            }
-
-            nrDone++;
-            showProgress();
-        });
+    for (auto & [path, derivers] : pathToDerivers) {
+        for (auto & deriver : derivers) {
+            dstStore->linkDeriverToPath(deriver.drv, deriver.outputName, path);
+        }
+    }
 
     return pathsMap;
 }
