@@ -75,7 +75,14 @@ struct StorePathWithOutputs
     std::set<std::string> outputs;
 
     std::string to_string(const Store & store) const;
+
+    bool operator<(const StorePathWithOutputs & other) const
+    {
+        return path < other.path || outputs < other.outputs;
+    }
 };
+
+typedef std::variant<StorePath, StorePathWithOutputs> PathOrOutputs;
 
 std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 
