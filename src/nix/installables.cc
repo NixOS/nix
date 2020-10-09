@@ -627,49 +627,98 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-Buildables build(ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
+Buildables toBuildables(std::vector<std::shared_ptr<Installable>> installables)
+{
+    Buildables buildables;
+    for (auto & i : installables) {
+        for (auto & b : i->toBuildables()) {
+            buildables.push_back(b);
+        }
+    }
+    return buildables;
+}
+
+std::set<Buildable> buildableClosure(ref<Store> store, Buildable root)
+{
+    // XXX: Calling this on a `BuildableFromDrv` forgets all about the builders
+    // of the dependencies, which is probably not what we want
+    StorePathSet closure;
+    StorePathSet rawRoots = std::visit(
+        overloaded{
+            [&](BuildableOpaque bo) -> StorePathSet { return {bo.path}; },
+            [&](BuildableFromDrv bfd) {
+                auto outputs = store->queryDerivationOutputMap(bfd.drvPath);
+                // XXX: This assumes that the output name is valid and realised
+                StorePathSet outputPaths;
+                for (auto &output : bfd.outputs)
+                    outputPaths.insert(outputs.at(output.first));
+                return outputPaths;
+            },
+        },
+      root);
+    store->computeFSClosure(rawRoots, closure, false, false);
+    std::set<Buildable> res;
+    res.insert(root);
+    for (auto & path : closure) {
+        res.insert(BuildableOpaque{path});
+    }
+    return res;
+}
+std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots)
+{
+    std::set<Buildable> res;
+    for (auto & root : roots) {
+        auto partialRes = buildableClosure(store, root);
+        res.insert(partialRes.begin(), partialRes.end());
+    }
+    return res;
+}
+
+void build(ref<Store> store, Realise mode, Buildables buildables, BuildMode bMode)
 {
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
 
-    Buildables buildables;
-
     std::vector<StorePathWithOutputs> pathsToBuild;
 
-    for (auto & i : installables) {
-        for (auto & b : i->toBuildables()) {
-            std::visit(overloaded {
-                [&](BuildableOpaque bo) {
-                    pathsToBuild.push_back({bo.path});
-                },
-                [&](BuildableFromDrv bfd) {
-                    StringSet outputNames;
-                    for (auto & output : bfd.outputs)
-                        outputNames.insert(output.first);
-                    pathsToBuild.push_back({bfd.drvPath, outputNames});
-                },
-            }, b);
-            buildables.push_back(std::move(b));
-        }
+    for (auto & b : buildables) {
+        std::visit(overloaded {
+            [&](BuildableOpaque bo) {
+                pathsToBuild.push_back({bo.path});
+            },
+            [&](BuildableFromDrv bfd) {
+                StringSet outputNames;
+                for (auto & output : bfd.outputs)
+                    outputNames.insert(output.first);
+                pathsToBuild.push_back({bfd.drvPath, outputNames});
+            },
+        }, b);
     }
 
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
         store->buildPaths(pathsToBuild, bMode);
+}
 
+
+Buildables build(ref<Store> store, Realise mode,
+    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
+{
+    Buildables buildables = toBuildables(installables);
+    build(store, mode, buildables, bMode);
     return buildables;
 }
 
 StorePathSet toStorePaths(ref<Store> store,
     Realise mode, OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables)
+    Buildables buildables)
 {
     StorePathSet outPaths;
 
     if (operateOn == OperateOn::Output) {
-        for (auto & b : build(store, mode, installables))
+        build(store, mode, buildables);
+        for (auto & b : buildables)
             std::visit(overloaded {
                 [&](BuildableOpaque bo) {
                     outPaths.insert(bo.path);
@@ -686,13 +735,19 @@ StorePathSet toStorePaths(ref<Store> store,
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
-        for (auto & i : installables)
-            for (auto & b : i->toBuildables())
-                if (auto bfd = std::get_if<BuildableFromDrv>(&b))
-                    outPaths.insert(bfd->drvPath);
+        for (auto & b : buildables)
+            if (auto bfd = std::get_if<BuildableFromDrv>(&b))
+                outPaths.insert(bfd->drvPath);
     }
 
     return outPaths;
+}
+
+StorePathSet toStorePaths(ref<Store> store,
+    Realise mode, OperateOn operateOn,
+    std::vector<std::shared_ptr<Installable>> installables)
+{
+    return toStorePaths(store, mode, operateOn, toBuildables(installables));
 }
 
 StorePath toStorePath(ref<Store> store,
