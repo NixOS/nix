@@ -283,7 +283,17 @@ typedef std::vector<std::pair<std::string, std::string>> Table2;
 
 void printTable(std::ostream & out, const Table2 & table);
 
-extern std::shared_ptr<std::set<std::string>> completions;
+struct Completion {
+    std::string completion;
+    std::string description;
+
+    bool operator<(const Completion & other) const;
+};
+class Completions : public std::set<Completion> {
+public:
+    void add(std::string completion, std::string description = "");
+};
+extern std::shared_ptr<Completions> completions;
 extern bool pathCompletions;
 
 std::optional<std::string> needsCompletion(std::string_view s);
