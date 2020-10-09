@@ -19,10 +19,11 @@ void Args::addFlag(Flag && flag_)
 
 void Completions::add(std::string completion, std::string description)
 {
-    insert(Completion{
-            .completion = completion,
-            .description = description
-            });
+    assert(description.find('\n') == std::string::npos);
+    insert(Completion {
+        .completion = completion,
+        .description = description
+    });
 }
 
 bool Completion::operator<(const Completion & other) const
