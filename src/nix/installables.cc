@@ -292,30 +292,31 @@ Installable::getCursor(EvalState & state)
 struct InstallableStorePath : Installable
 {
     ref<Store> store;
-    StorePath storePath;
+    StorePathWithOutputs storePath;
 
-    InstallableStorePath(ref<Store> store, StorePath && storePath)
+    InstallableStorePath(ref<Store> store, StorePathWithOutputs && storePath)
         : store(store), storePath(std::move(storePath)) { }
 
-    std::string what() override { return store->printStorePath(storePath); }
+    std::string what() override { return storePath.to_string(*store); }
 
     Buildables toBuildables() override
     {
-        if (storePath.isDerivation()) {
+        if (storePath.path.isDerivation()) {
             std::map<std::string, std::optional<StorePath>> outputs;
-            auto drv = store->readDerivation(storePath);
+            auto drv = store->readDerivation(storePath.path);
             for (auto & [name, output] : drv.outputsAndOptPaths(*store))
-                outputs.emplace(name, output.second);
+                if (storePath.outputs.empty() || storePath.outputs.count(name))
+                    outputs.emplace(name, output.second);
             return {
                 BuildableFromDrv {
-                    .drvPath = storePath,
+                    .drvPath = storePath.path,
                     .outputs = std::move(outputs)
                 }
             };
         } else {
             return {
                 BuildableOpaque {
-                    .path = storePath,
+                    .path = storePath.path,
                 }
             };
         }
@@ -323,7 +324,7 @@ struct InstallableStorePath : Installable
 
     std::optional<StorePath> getStorePath() override
     {
-        return storePath;
+        return storePath.path;
     }
 };
 
@@ -595,7 +596,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
             if (s.find('/') != std::string::npos) {
                 try {
-                    result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
+                    result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePathWithOutputs(s)));
                     continue;
                 } catch (BadStorePath &) {
                 } catch (...) {
