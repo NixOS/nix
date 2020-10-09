@@ -1,5 +1,3 @@
-Title: nix-prefetch-url
-
 # Name
 
 `nix-prefetch-url` - copy a file from a URL into the store and print its hash
@@ -50,6 +48,9 @@ Nix store is also printed.
     Unpack the archive (which must be a tarball or zip file) and add the
     result to the Nix store. The resulting hash can be used with
     functions such as Nixpkgs’s `fetchzip` or `fetchFromGitHub`.
+
+  - `--executable`  
+    Set the executable bit on the downloaded file.
 
   - `--name` *name*  
     Override the name of the file in the Nix store. By default, this is

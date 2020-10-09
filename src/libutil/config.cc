@@ -1,5 +1,6 @@
 #include "config.hh"
 #include "args.hh"
+#include "abstract-setting-to-json.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -137,11 +138,7 @@ nlohmann::json Config::toJSON()
     auto res = nlohmann::json::object();
     for (auto & s : _settings)
         if (!s.second.isAlias) {
-            auto obj = nlohmann::json::object();
-            obj.emplace("description", s.second.setting->description);
-            obj.emplace("aliases", s.second.setting->aliases);
-            obj.emplace("value", s.second.setting->toJSON());
-            res.emplace(s.first, obj);
+            res.emplace(s.first, s.second.setting->toJSON());
         }
     return res;
 }
@@ -168,17 +165,19 @@ void AbstractSetting::setDefault(const std::string & str)
 
 nlohmann::json AbstractSetting::toJSON()
 {
-    return to_string();
+    return nlohmann::json(toJSONObject());
+}
+
+std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
+{
+    std::map<std::string, nlohmann::json> obj;
+    obj.emplace("description", description);
+    obj.emplace("aliases", aliases);
+    return obj;
 }
 
 void AbstractSetting::convertToArg(Args & args, const std::string & category)
 {
-}
-
-template<typename T>
-nlohmann::json BaseSetting<T>::toJSON()
-{
-    return value;
 }
 
 template<typename T>
@@ -259,11 +258,6 @@ template<> std::string BaseSetting<Strings>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> nlohmann::json BaseSetting<Strings>::toJSON()
-{
-    return value;
-}
-
 template<> void BaseSetting<StringSet>::set(const std::string & str)
 {
     value = tokenizeString<StringSet>(str);
@@ -274,9 +268,24 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> nlohmann::json BaseSetting<StringSet>::toJSON()
+template<> void BaseSetting<StringMap>::set(const std::string & str)
 {
-    return value;
+    auto kvpairs = tokenizeString<Strings>(str);
+    for (auto & s : kvpairs)
+    {
+        auto eq = s.find_first_of('=');
+        if (std::string::npos != eq)
+            value.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
+        // else ignored
+    }
+}
+
+template<> std::string BaseSetting<StringMap>::to_string() const
+{
+    Strings kvstrs;
+    std::transform(value.begin(), value.end(), back_inserter(kvstrs),
+        [&](auto kvpair){ return kvpair.first + "=" + kvpair.second; });
+    return concatStringsSep(" ", kvstrs);
 }
 
 template class BaseSetting<int>;
@@ -289,6 +298,7 @@ template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
+template class BaseSetting<StringMap>;
 
 void PathSetting::set(const std::string & str)
 {

@@ -24,6 +24,9 @@
 #endif
 
 
+namespace nix_store {
+
+
 using namespace nix;
 using std::cin;
 using std::cout;
@@ -64,6 +67,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
 
     if (path.path.isDerivation()) {
         if (build) store->buildPaths({path});
+        auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
@@ -76,7 +80,8 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
+            auto outPath = outputPaths.at(i->first);
+            auto retPath = store->printStorePath(outPath);
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -84,10 +89,10 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                     Path rootName = gcRoot;
                     if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out") rootName += "-" + i->first;
-                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName);
+                    retPath = store2->addPermRoot(outPath, rootName);
                 }
             }
-            outputs.insert(outPath);
+            outputs.insert(retPath);
         }
         return outputs;
     }
@@ -217,8 +222,13 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputsAndPaths(*store))
-            outputs.insert(i.second.second);
+        if (forceRealise)
+            return store->queryDerivationOutputs(storePath);
+        for (auto & i : drv.outputsAndOptPaths(*store)) {
+            if (!i.second.second)
+                throw UsageError("Cannot use output path of floating content-addressed derivation until we know what it is (e.g. by building it)");
+            outputs.insert(*i.second.second);
+        }
         return outputs;
     }
     else return {storePath};
@@ -308,11 +318,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qOutputs: {
             for (auto & i : opArgs) {
-                auto i2 = store->followLinksToStorePath(i);
-                if (forceRealise) realisePath({i2});
-                Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputsAndPaths(*store))
-                    cout << fmt("%1%\n", store->printStorePath(j.second.second));
+                auto outputs = maybeUseOutputs(store->followLinksToStorePath(i), true, forceRealise);
+                for (auto & outputPath : outputs)
+                    cout << fmt("%1%\n", store->printStorePath(outputPath));
             }
             break;
         }
@@ -817,7 +825,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = readStorePaths<StorePathSet>(*store, in);
+                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -847,19 +855,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                         }
                 }
 
-                writeStorePaths(*store, out, store->queryValidPaths(paths));
+                worker_proto::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = readStorePaths<StorePathSet>(*store, in);
+                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        writeStorePaths(*store, out, info->references);
+                        worker_proto::write(*store, out, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -887,7 +895,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(readStorePaths<StorePathSet>(*store, in), out);
+                store->exportPaths(worker_proto::read(*store, in, Phantom<StorePathSet> {}), out);
                 break;
             }
 
@@ -936,9 +944,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(readStorePaths<StorePathSet>(*store, in),
+                store->computeFSClosure(worker_proto::read(*store, in, Phantom<StorePathSet> {}),
                     closure, false, includeOutputs);
-                writeStorePaths(*store, out, closure);
+                worker_proto::write(*store, out, closure);
                 break;
             }
 
@@ -953,7 +961,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = readStorePaths<StorePathSet>(*store, in);
+                info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));
@@ -1020,7 +1028,7 @@ static void opVersion(Strings opFlags, Strings opArgs)
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
-static int _main(int argc, char * * argv)
+static int main_nix_store(int argc, char * * argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1116,4 +1124,6 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-store", _main);
+static RegisterLegacyCommand r_nix_store("nix-store", main_nix_store);
+
+}

@@ -117,7 +117,7 @@ features:
   - The binary tarball installer has been improved. You can now install
     Nix by running:
     
-        $ bash <(curl https://nixos.org/nix/install)
+        $ bash <(curl -L https://nixos.org/nix/install)
 
   - More evaluation errors include position information. For instance,
     selecting a missing attribute will print something like

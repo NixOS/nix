@@ -81,7 +81,7 @@ void printClosureDiff(
         auto beforeSize = totalSize(beforeVersions);
         auto afterSize = totalSize(afterVersions);
         auto sizeDelta = (int64_t) afterSize - (int64_t) beforeSize;
-        auto showDelta = abs(sizeDelta) >= 8 * 1024;
+        auto showDelta = std::abs(sizeDelta) >= 8 * 1024;
 
         std::set<std::string> removed, unchanged;
         for (auto & [version, _] : beforeVersions)
@@ -143,4 +143,4 @@ struct CmdDiffClosures : SourceExprCommand
     }
 };
 
-static auto r1 = registerCommand<CmdDiffClosures>("diff-closures");
+static auto rCmdDiffClosures = registerCommand<CmdDiffClosures>("diff-closures");

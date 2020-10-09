@@ -150,7 +150,10 @@ void MixProfile::updateProfile(const Buildables & buildables)
             },
             [&](BuildableFromDrv bfd) {
                 for (auto & output : bfd.outputs) {
-                    result.push_back(output.second);
+                    /* Output path should be known because we just tried to
+                       build it. */
+                    assert(output.second);
+                    result.push_back(*output.second);
                 }
             },
         }, buildable);

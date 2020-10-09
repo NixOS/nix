@@ -496,8 +496,8 @@ bool NixRepl::processLine(string line)
             if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPathRaw}) == 0) {
                 auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputsAndPaths(*state->store))
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.second));
+                for (auto & i : drv.outputsAndOptPaths(*state->store))
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
             }
         } else if (command == ":i") {
             runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPathRaw});
@@ -825,6 +825,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     }
 };
 
-static auto r1 = registerCommand<CmdRepl>("repl");
+static auto rCmdRepl = registerCommand<CmdRepl>("repl");
 
 }

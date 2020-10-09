@@ -2,7 +2,7 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
-  inputs.lowdown-src = { url = "github:edolstra/lowdown/no-structs-in-anonymous-unions"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
 
@@ -59,6 +59,7 @@
         configureFlags =
           lib.optionals stdenv.isLinux [
             "--with-sandbox-shell=${sh}/bin/busybox"
+            "LDFLAGS=-fuse-ld=gold"
           ];
 
 
@@ -145,7 +146,7 @@
 
           enableParallelBuilding = true;
 
-          makeFlags = "profiledir=$(out)/etc/profile.d";
+          makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
           doCheck = true;
 
@@ -349,9 +350,6 @@
             # syntax-check generated dot files, it still requires some
             # fonts.  So provide those.
             FONTCONFIG_FILE = texFunctions.fontsConf;
-
-            # To test building without precompiled headers.
-            makeFlagsArray = [ "PRECOMPILE_HEADERS=0" ];
           };
 
         # System tests.

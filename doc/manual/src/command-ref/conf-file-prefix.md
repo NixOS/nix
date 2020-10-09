@@ -1,5 +1,3 @@
-Title: nix.conf
-
 # Name
 
 `nix.conf` - Nix configuration file

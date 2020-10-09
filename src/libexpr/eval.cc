@@ -87,6 +87,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
             else if (*i == '\t') str << "\\t";
+            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
             else str << *i;
         str << "\"";
         break;
@@ -355,6 +356,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
+    , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -369,7 +371,11 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
-    addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+
+    try {
+        addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+    } catch (Error &) {
+    }
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
@@ -1348,7 +1354,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    mkAttrs(*actualArgs, std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
 
     if (fun.lambda.fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
@@ -2075,7 +2081,7 @@ Strings EvalSettings::getDefaultNixPath()
 
 EvalSettings evalSettings;
 
-static GlobalConfig::Register r1(&evalSettings);
+static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 
 }

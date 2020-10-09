@@ -152,5 +152,5 @@ struct CmdLsNar : Command, MixLs
     }
 };
 
-static auto r1 = registerCommand<CmdLsStore>("ls-store");
-static auto r2 = registerCommand<CmdLsNar>("ls-nar");
+static auto rCmdLsStore = registerCommand<CmdLsStore>("ls-store");
+static auto rCmdLsNar = registerCommand<CmdLsNar>("ls-nar");

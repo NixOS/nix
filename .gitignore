@@ -5,21 +5,11 @@ perl/Makefile.config
 /aclocal.m4
 /autom4te.cache
 /precompiled-headers.h.gch
-/precompiled-headers.h.pch
 /config.*
 /configure
 /stamp-h1
 /svn-revision
 /libtool
-
-/corepkgs/config.nix
-
-# /corepkgs/channels/
-/corepkgs/channels/unpack.sh
-
-# /corepkgs/nar/
-/corepkgs/nar/nar.sh
-/corepkgs/nar/unnar.sh
 
 # /doc/manual/
 /doc/manual/*.1
@@ -107,7 +97,7 @@ perl/Makefile.config
 
 /src/resolve-system-dependencies/resolve-system-dependencies
 
-inst/
+outputs/
 
 *.a
 *.o
@@ -125,5 +115,11 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+
+# ccls
+/.ccls-cache
+
+# auto-generated compilation database
+compile_commands.json
 
 nix-rust/target

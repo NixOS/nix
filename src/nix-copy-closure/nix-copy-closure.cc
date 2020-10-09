@@ -4,7 +4,7 @@
 
 using namespace nix;
 
-static int _main(int argc, char ** argv)
+static int main_nix_copy_closure(int argc, char ** argv)
 {
     {
         auto gzip = false;
@@ -65,4 +65,4 @@ static int _main(int argc, char ** argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-copy-closure", _main);
+static RegisterLegacyCommand r_nix_copy_closure("nix-copy-closure", main_nix_copy_closure);

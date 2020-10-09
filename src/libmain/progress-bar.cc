@@ -256,7 +256,7 @@ public:
         }
 
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
-            auto lastLine = trim(getS(fields, 0));
+            auto lastLine = chomp(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());

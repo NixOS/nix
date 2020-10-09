@@ -3,8 +3,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "url.hh"
-
-#include <regex>
+#include "url-parts.hh"
 
 namespace nix {
 
@@ -88,6 +87,6 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         state.allowedPaths->insert(tree.actualPath);
 }
 
-static RegisterPrimOp r("fetchMercurial", 1, prim_fetchMercurial);
+static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);
 
 }

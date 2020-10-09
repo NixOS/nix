@@ -49,7 +49,7 @@ void removeOldGenerations(std::string dir)
     }
 }
 
-static int _main(int argc, char * * argv)
+static int main_nix_collect_garbage(int argc, char * * argv)
 {
     {
         bool removeOld = false;
@@ -92,4 +92,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-collect-garbage", _main);
+static RegisterLegacyCommand r_nix_collect_garbage("nix-collect-garbage", main_nix_collect_garbage);

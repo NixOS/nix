@@ -27,11 +27,13 @@ struct ArchiveSettings : Config
         #endif
         "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+    Setting<bool> preallocateContents{this, true, "preallocate-contents",
+        "Whether to preallocate files when writing objects with known size."};
 };
 
 static ArchiveSettings archiveSettings;
 
-static GlobalConfig::Register r1(&archiveSettings);
+static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 const std::string narVersionMagic1 = "nix-archive-1";
 
@@ -66,9 +68,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     sink << "(";
 
@@ -325,6 +325,9 @@ struct RestoreSink : ParseSink
 
     void preallocateContents(uint64_t len)
     {
+        if (!archiveSettings.preallocateContents)
+            return;
+
 #if HAVE_POSIX_FALLOCATE
         if (len) {
             errno = posix_fallocate(fd.get(), 0, len);

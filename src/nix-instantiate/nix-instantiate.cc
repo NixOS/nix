@@ -83,7 +83,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_instantiate(int argc, char * * argv)
 {
     {
         Strings files;
@@ -192,4 +192,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-instantiate", _main);
+static RegisterLegacyCommand r_nix_instantiate("nix-instantiate", main_nix_instantiate);

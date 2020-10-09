@@ -11,7 +11,7 @@ namespace nix::eval_cache {
 
 MakeError(CachedEvalError, EvalError);
 
-class AttrDb;
+struct AttrDb;
 class AttrCursor;
 
 class EvalCache : public std::enable_shared_from_this<EvalCache>

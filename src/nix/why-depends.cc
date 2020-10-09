@@ -263,4 +263,4 @@ struct CmdWhyDepends : SourceExprCommand
     }
 };
 
-static auto r1 = registerCommand<CmdWhyDepends>("why-depends");
+static auto rCmdWhyDepends = registerCommand<CmdWhyDepends>("why-depends");

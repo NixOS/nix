@@ -44,16 +44,6 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
-
-            /* Add the output of this derivation to the allowed
-               paths. */
-            if (allowedPaths) {
-                auto drv = store->derivationFromPath(ctx);
-                DerivationOutputs::iterator i = drv.outputs.find(outputName);
-                if (i == drv.outputs.end())
-                    throw Error("derivation '%s' does not have an output named '%s'", ctxS, outputName);
-                allowedPaths->insert(store->printStorePath(i->second.path(*store, drv.name)));
-            }
         }
     }
 
@@ -69,8 +59,50 @@ void EvalState::realiseContext(const PathSet & context)
     store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(drvs);
+
+    /* Add the output of this derivations to the allowed
+       paths. */
+    if (allowedPaths) {
+        for (auto & [drvPath, outputs] : drvs) {
+            auto outputPaths = store->queryDerivationOutputMap(drvPath);
+            for (auto & outputName : outputs) {
+                if (outputPaths.count(outputName) == 0)
+                    throw Error("derivation '%s' does not have an output named '%s'",
+                            store->printStorePath(drvPath), outputName);
+                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
+            }
+        }
+    }
 }
 
+/* Add and attribute to the given attribute map from the output name to
+   the output path, or a placeholder.
+
+   Where possible the path is used, but for floating CA derivations we
+   may not know it. For sake of determinism we always assume we don't
+   and instead put in a place holder. In either case, however, the
+   string context will contain the drv path and output name, so
+   downstream derivations will have the proper dependency, and in
+   addition, before building, the placeholder will be rewritten to be
+   the actual path.
+
+   The 'drv' and 'drvPath' outputs must correspond. */
+static void mkOutputString(EvalState & state, Value & v,
+    const StorePath & drvPath, const BasicDerivation & drv,
+    std::pair<string, DerivationOutput> o)
+{
+    auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
+    mkString(
+        *state.allocAttr(v, state.symbols.create(o.first)),
+        optOutputPath
+            ? state.store->printStorePath(*optOutputPath)
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            /* FIXME: we need to depend on the basic derivation, not
+               derivation */
+            : downstreamPlaceholder(*state.store, drvPath, o.first),
+        {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
+}
 
 /* Load and evaluate an expression from path specified by the
    argument. */
@@ -114,9 +146,8 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        for (const auto & o : drv.outputsAndPaths(*state.store)) {
-            v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, state.store->printStorePath(o.second.second), {"!" + o.first + "!" + path});
+        for (const auto & o : drv.outputs) {
+            mkOutputString(state, w, storePath, drv, o);
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -1080,16 +1111,18 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later. */
-    drvHashes.insert_or_assign(drvPath,
-        hashDerivationModulo(*state.store, Derivation(drv), false));
+       read them later.
+
+       However, we don't bother doing this for floating CA derivations because
+       their "hash modulo" is indeterminate until built. */
+    if (drv.type() != DerivationType::CAFloating)
+        drvHashes.insert_or_assign(drvPath,
+            hashDerivationModulo(*state.store, Derivation(drv), false));
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
-    for (auto & i : drv.outputsAndPaths(*state.store)) {
-        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            state.store->printStorePath(i.second.second), {"!" + i.first + "!" + drvPathS});
-    }
+    for (auto & i : drv.outputs)
+        mkOutputString(state, v, drvPath, drv, i);
     v.attrs->sort();
 }
 
@@ -1671,7 +1704,7 @@ static RegisterPrimOp primop_toFile({
         ...
         cp ${configFile} $out/etc/foo.conf
       ";
-    ```
+      ```
 
       Note that `${configFile}` is an
       [antiquotation](language-values.md), so the result of the
@@ -2203,6 +2236,10 @@ static RegisterPrimOp primop_catAttrs({
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
+    if (args[0]->type == tPrimOpApp || args[0]->type == tPrimOp) {
+        state.mkAttrs(v, 0);
+        return;
+    }
     if (args[0]->type != tLambda)
         throw TypeError({
             .hint = hintfmt("'functionArgs' requires a function"),
@@ -3052,17 +3089,25 @@ static RegisterPrimOp primop_hashString({
     .fun = prim_hashString,
 });
 
-/* Match a regular expression against a string and return either
-   ‘null’ or a list containing substring matches. */
+struct RegexCache
+{
+    std::unordered_map<std::string, std::regex> cache;
+};
+
+std::shared_ptr<RegexCache> makeRegexCache()
+{
+    return std::make_shared<RegexCache>();
+}
+
 void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        auto regex = state.regexCache.find(re);
-        if (regex == state.regexCache.end())
-            regex = state.regexCache.emplace(re, std::regex(re, std::regex::extended)).first;
+        auto regex = state.regexCache->cache.find(re);
+        if (regex == state.regexCache->cache.end())
+            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
@@ -3532,9 +3577,10 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
-    sDerivationNix = symbols.create(path);
-    evalFile(path, v);
+    sDerivationNix = symbols.create("//builtin/derivation.nix");
+    eval(parse(
+        #include "primops/derivation.nix.gen.hh"
+        , foFile, sDerivationNix, "/", staticBaseEnv), v);
     addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' set,
