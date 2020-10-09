@@ -164,6 +164,7 @@ struct Common : InstallableCommand, MixProfile
         "BASHOPTS",
         "EUID",
         "HOME", // FIXME: don't ignore in pure mode?
+        "HOSTNAME",
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
         "NIX_LOG_FD",
