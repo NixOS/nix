@@ -45,7 +45,7 @@ void StoreCommand::run()
     run(getStore());
 }
 
-StorePathsCommand::StorePathsCommand(bool recursive)
+BuildablesCommand::BuildablesCommand(bool recursive)
     : recursive(recursive)
 {
     if (recursive)
@@ -65,31 +65,37 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
 
-void StorePathsCommand::run(ref<Store> store)
+void BuildablesCommand::run(ref<Store> store)
 {
-    StorePaths storePaths;
+    Buildables buildables;
 
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p);
+            buildables.push_back(BuildableOpaque{p});
     }
 
     else {
-        for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
-            storePaths.push_back(p);
-
-        if (recursive) {
-            StorePathSet closure;
-            store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, false);
-            storePaths.clear();
-            for (auto & p : closure)
-                storePaths.push_back(p);
-        }
+        for (auto & installable : installables)
+            for (auto & b : installable->toBuildables())
+                buildables.push_back(b);
     }
 
-    run(store, std::move(storePaths));
+    if (recursive) {
+        std::set<Buildable> closure = buildableClosure(store, buildables, operateOn, realiseMode);
+        buildables = Buildables(closure.begin(), closure.end());
+    } else if (operateOn == OperateOn::Output) {
+        build(store, realiseMode, buildables);
+    }
+
+    run(store, std::move(buildables));
+}
+
+void StorePathsCommand::run(ref<Store> store, Buildables buildables)
+{
+    auto storePathMap = toStorePaths(store, realiseMode, operateOn, buildables);
+    run(store, std::vector<StorePath>(storePathMap.begin(), storePathMap.end()));
 }
 
 void StorePathCommand::run(ref<Store> store)

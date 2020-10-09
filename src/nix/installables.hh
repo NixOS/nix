@@ -16,11 +16,18 @@ namespace eval_cache { class EvalCache; class AttrCursor; }
 
 struct BuildableOpaque {
     StorePath path;
+    bool operator<(const BuildableOpaque & other) const
+    { return path < other.path; }
 };
 
 struct BuildableFromDrv {
     StorePath drvPath;
     std::map<std::string, std::optional<StorePath>> outputs;
+    bool operator<(const BuildableFromDrv & other) const
+    {
+        return drvPath < other.drvPath ||
+            (drvPath == other.drvPath && outputs < other.outputs);
+    }
 };
 
 typedef std::variant<
