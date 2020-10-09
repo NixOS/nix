@@ -377,6 +377,10 @@ struct CmdDevelop : Common, MixEnvironment
             script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
 
+        else {
+            script += "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n";
+        }
+
         writeFull(rcFileFd.get(), script);
 
         stopProgressBar();
