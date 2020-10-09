@@ -44,7 +44,7 @@ MixCommonArgs::MixCommonArgs(const string & programName)
                 globalConfig.getSettings(settings);
                 for (auto & s : settings)
                     if (hasPrefix(s.first, prefix))
-                        completions->insert(s.first);
+                        completions->add(s.first, s.second.description);
             }
         }
     });
