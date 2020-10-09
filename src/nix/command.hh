@@ -138,29 +138,42 @@ private:
     std::string _installable{"."};
 };
 
-/* A command that operates on zero or more store paths. */
-struct StorePathsCommand : public InstallablesCommand
+/* A command that operates on a list of "buildables", which can be either
+ * store paths or a or derivation outputs */
+struct BuildablesCommand : public InstallablesCommand
 {
-private:
+
+protected:
 
     bool recursive = false;
     bool all = false;
-
-protected:
 
     Realise realiseMode = Realise::Derivation;
 
 public:
 
-    StorePathsCommand(bool recursive = false);
+    BuildablesCommand(bool recursive = false);
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
+    virtual void run(ref<Store> store, Buildables buildables) = 0;
 
     void run(ref<Store> store) override;
 
     bool useDefaultInstallables() override { return !all; }
+};
+
+/* A command that operates on zero or more store paths. */
+struct StorePathsCommand : public BuildablesCommand
+{
+public:
+    using BuildablesCommand::BuildablesCommand;
+
+    using BuildablesCommand::run;
+
+    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
+
+    void run(ref<Store> store, Buildables buildables) override;
 };
 
 /* A command that operates on exactly one store path. */
@@ -192,9 +205,16 @@ static RegisterCommand registerCommand(const std::string & name)
     return RegisterCommand(name, [](){ return make_ref<T>(); });
 }
 
+std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots, OperateOn operateOn, Realise mode, BuildMode bMode = bmNormal);
+
+void build(ref<Store> store, Realise mode,
+    Buildables buildables, BuildMode bMode = bmNormal);
 Buildables build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
 
+std::set<StorePath> toStorePaths(ref<Store> store,
+    Realise mode, OperateOn operateOn,
+    Buildables buildables);
 std::set<StorePath> toStorePaths(ref<Store> store,
     Realise mode, OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables);

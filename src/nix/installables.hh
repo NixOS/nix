@@ -19,12 +19,21 @@ namespace eval_cache { class EvalCache; class AttrCursor; }
 struct BuildableOpaque {
     StorePath path;
     nlohmann::json toJSON(ref<Store> store) const;
+
+    bool operator<(const BuildableOpaque & other) const
+    { return path < other.path; }
 };
 
 struct BuildableFromDrv {
     StorePath drvPath;
     std::map<std::string, std::optional<StorePath>> outputs;
     nlohmann::json toJSON(ref<Store> store) const;
+
+    bool operator<(const BuildableFromDrv & other) const
+    {
+        return drvPath < other.drvPath ||
+            (drvPath == other.drvPath && outputs < other.outputs);
+    }
 };
 
 typedef std::variant<

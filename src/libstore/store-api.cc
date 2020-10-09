@@ -811,40 +811,32 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
 }
 
 std::map<StorePath, StorePath> copyPaths(
-        ref<Store> srcStore, ref<Store> dstStore,
-        const std::set<PathOrOutputs> &storePaths,
-        RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
-{
-    // XXX: This is certainly already defined somewhere else
-    struct OutputId {
-        StorePath drv;
-        std::string outputName;
-    };
-    // TODO: Use a set rather than a list
-    // (but requires implementing `comparable` for `OutputId`)
-    std::map<StorePath, std::list<OutputId>> pathToDerivers;
+    ref<Store> srcStore,
+    ref<Store> dstStore,
+    const std::set<PathOrOutputs>& storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute) {
+    DrvOutputs outputsToRegister;
     std::set<StorePath> pathsToCopy;
     for (auto pathOrDrvOutput : storePaths) {
-        std::visit(overloaded {
-                [&](StorePath path) {
-                    pathsToCopy.insert(path);
-                    pathToDerivers.try_emplace(std::move(path), std::list<OutputId>());
-                },
+        std::visit(
+            overloaded{
+                [&](StorePath path) { pathsToCopy.insert(path); },
                 [&](StorePathWithOutputs pathWithOutputs) {
-                    auto drvOutputs = srcStore->queryDerivationOutputMap(pathWithOutputs.path);
-                    for (auto & outputName : pathWithOutputs.outputs) {
+                    for (auto& outputName : pathWithOutputs.outputs) {
+                        auto outputId = DrvOutputId{
+                            pathWithOutputs.path, outputName};
                         // TODO: Proper error checking in case the output
                         // doesn't exist or hasn't been realised
-                        std::optional<StorePath> outputPath = drvOutputs.find(outputName)->second;
-                        // Ensure that the key is in the map
-                        pathsToCopy.insert(*outputPath);
-                        pathToDerivers.insert({*outputPath, std::list<OutputId>()});
-                        pathToDerivers[*outputPath].push_front(OutputId{std::move(pathWithOutputs.path), outputName});
+                        auto outputInfo = *srcStore->queryDrvOutputInfo(outputId);
+                        pathsToCopy.insert(outputInfo.outPath);
+                        outputsToRegister.emplace(
+                            outputId, outputInfo);
                     }
                 },
             },
-            pathOrDrvOutput
-            );
+            pathOrDrvOutput);
     }
     auto valid = dstStore->queryValidPaths(pathsToCopy, substitute);
 
@@ -932,10 +924,8 @@ std::map<StorePath, StorePath> copyPaths(
             });
     }
 
-    for (auto & [path, derivers] : pathToDerivers) {
-        for (auto & deriver : derivers) {
-            dstStore->linkDeriverToPath(deriver.drv, deriver.outputName, path);
-        }
+    for (auto & [deriver, outputInfo] : outputsToRegister) {
+                dstStore->registerDrvOutput(deriver, outputInfo);
     }
 
     return pathsMap;
