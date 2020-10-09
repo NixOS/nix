@@ -326,7 +326,12 @@ void writeFile(const Path & path, const string & s, mode_t mode)
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw SysError("opening file '%1%'", path);
-    writeFull(fd.get(), s);
+    try {
+        writeFull(fd.get(), s);
+    } catch (Error & e) {
+        e.addTrace({}, "writing file '%1%'", path);
+        throw;
+    }
 }
 
 
@@ -338,11 +343,16 @@ void writeFile(const Path & path, Source & source, mode_t mode)
 
     std::vector<unsigned char> buf(64 * 1024);
 
-    while (true) {
-        try {
-            auto n = source.read(buf.data(), buf.size());
-            writeFull(fd.get(), (unsigned char *) buf.data(), n);
-        } catch (EndOfFile &) { break; }
+    try {
+        while (true) {
+            try {
+                auto n = source.read(buf.data(), buf.size());
+                writeFull(fd.get(), (unsigned char *) buf.data(), n);
+            } catch (EndOfFile &) { break; }
+        }
+    } catch (Error & e) {
+        e.addTrace({}, "writing file '%1%'", path);
+        throw;
     }
 }
 
