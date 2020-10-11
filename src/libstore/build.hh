@@ -28,7 +28,6 @@ struct HookInstance;
 
 /* A pointer to a goal. */
 struct Goal;
-class DerivationGoal;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
 
@@ -140,6 +139,8 @@ struct Child
     steady_time_point timeStarted;
 };
 
+class DerivationGoal;
+class SubstitutionGoal;
 
 /* The worker class. */
 class Worker
@@ -167,8 +168,8 @@ private:
 
     /* Maps used to prevent multiple instantiations of a goal for the
        same derivation / path. */
-    WeakGoalMap derivationGoals;
-    WeakGoalMap substitutionGoals;
+    std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+    std::map<StorePath, std::weak_ptr<SubstitutionGoal>> substitutionGoals;
 
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
@@ -242,7 +243,7 @@ public:
         const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -304,8 +305,6 @@ public:
 };
 
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
-
-class SubstitutionGoal;
 
 /* Unless we are repairing, we don't both to test validity and just assume it,
    so the choices are `Absent` or `Valid`. */
