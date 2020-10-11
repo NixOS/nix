@@ -8,6 +8,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "user-env.hh"
 #include "util.hh"
 #include "json.hh"

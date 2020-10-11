@@ -4,6 +4,7 @@
 #include <string>
 
 #include "store-api.hh"
+#include "local-fs-store.hh"
 
 
 namespace nix {
