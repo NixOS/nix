@@ -677,27 +677,53 @@ std::set<Buildable> buildableClosure(ref<Store> store, Buildable root)
 {
     // XXX: Calling this on a `BuildableFromDrv` forgets all about the builders
     // of the dependencies, which is probably not what we want
-    StorePathSet closure;
-    StorePathSet rawRoots = std::visit(
-        overloaded{
-            [&](BuildableOpaque bo) -> StorePathSet { return {bo.path}; },
-            [&](BuildableFromDrv bfd) {
-                auto outputs = store->queryDerivationOutputMap(bfd.drvPath);
-                // XXX: This assumes that the output name is valid and realised
-                StorePathSet outputPaths;
-                for (auto &output : bfd.outputs)
-                    outputPaths.insert(outputs.at(output.first));
-                return outputPaths;
-            },
+    std::set<Buildable> closure;
+    std::visit(overloaded{
+        [&](BuildableOpaque bo) {
+            StorePathSet storePathsClosure;
+            store->computeFSClosure({bo.path}, storePathsClosure, false, false);
+            for (auto & path : storePathsClosure) {
+                closure.insert(BuildableOpaque{path});
+            }
         },
-      root);
-    store->computeFSClosure(rawRoots, closure, false, false);
-    std::set<Buildable> res;
-    res.insert(root);
-    for (auto & path : closure) {
-        res.insert(BuildableOpaque{path});
-    }
-    return res;
+        [&](BuildableFromDrv bfd) {
+            std::set<StorePath> drvClosure;
+            store->computeFSClosure({bfd.drvPath}, drvClosure, false, false);
+
+            StorePathSet runtimeClosure;
+            StorePathSet outputPaths;
+            for (auto & output : bfd.outputs)
+                outputPaths.insert(*output.second);
+            store->computeFSClosure(outputPaths, runtimeClosure, false, false);
+
+            for (auto & input : drvClosure) {
+                if (input.isDerivation()) {
+                    // Take all the outputs of the derivation that are in the
+                    // runtime closure, and add them as `BuildableFromDrv` to
+                    // the closure
+                    auto drvOutputs = store->queryPartialDerivationOutputMap(input);
+                    std::map<std::string, std::optional<StorePath>> neededOutputs;
+                    for (auto & [outputName, output] : drvOutputs) {
+                        if (output && runtimeClosure.count(*output)) {
+                            neededOutputs.emplace(outputName, output);
+                        }
+                    }
+                    if (!neededOutputs.empty())
+                        closure.insert(
+                                BuildableFromDrv{
+                                    .drvPath = input,
+                                    .outputs = neededOutputs,
+                                }
+                        );
+                } else {
+                    if (runtimeClosure.count(input))
+                        closure.insert(BuildableOpaque{input});
+                }
+            }
+        },
+        },
+        root);
+    return closure;
 }
 
 std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots, OperateOn operateOn, Realise mode, BuildMode bMode)

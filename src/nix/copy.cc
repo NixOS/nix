@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : BuildablesCommand
 {
     std::string srcUri, dstUri;
 
@@ -17,7 +17,7 @@ struct CmdCopy : StorePathsCommand
     SubstituteFlag substitute = NoSubstitute;
 
     CmdCopy()
-        : StorePathsCommand(true)
+        : BuildablesCommand(true)
     {
         addFlag({
             .longName = "from",
@@ -94,15 +94,31 @@ struct CmdCopy : StorePathsCommand
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
-        StorePathsCommand::run(store);
+        BuildablesCommand::run(store);
     }
 
-    void run(ref<Store> srcStore, StorePaths storePaths) override
+    void run(ref<Store> srcStore, Buildables buildables) override
     {
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, StorePathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs, substitute);
+        std::set<PathOrOutputs> toCopy;
+        for (auto& buildable : buildables) {
+            std::visit(overloaded {
+                        [&](BuildableOpaque b) { toCopy.insert(b.path); },
+                        [&](BuildableFromDrv b) {
+                            std::set<std::string> outputNames;
+                            for (auto& output : b.outputs)
+                                outputNames.insert(output.first);
+                            toCopy.insert(
+                                StorePathWithOutputs {
+                                    .path = b.drvPath,
+                                    .outputs = outputNames
+                                });
+                        },
+                    },
+                buildable);
+        }
+        copyPaths(srcStore, dstStore, toCopy, NoRepair, checkSigs, substitute);
     }
 };
 
