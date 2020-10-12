@@ -54,4 +54,4 @@ struct CmdEdit : InstallableCommand
     }
 };
 
-static auto r1 = registerCommand<CmdEdit>("edit");
+static auto rCmdEdit = registerCommand<CmdEdit>("edit");

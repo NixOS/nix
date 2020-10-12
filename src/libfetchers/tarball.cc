@@ -248,6 +248,6 @@ struct TarballInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<TarballInputScheme>()); });
+static auto rTarballInputScheme = OnStartup([] { registerInputScheme(std::make_unique<TarballInputScheme>()); });
 
 }

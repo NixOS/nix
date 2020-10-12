@@ -30,4 +30,4 @@ struct CmdShowConfig : Command, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdShowConfig>("show-config");
+static auto rShowConfig = registerCommand<CmdShowConfig>("show-config");

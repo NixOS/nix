@@ -3,6 +3,7 @@
 #include "util.hh"
 #include "globals.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 
 #include <nlohmann/json.hpp>
 

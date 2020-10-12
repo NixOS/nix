@@ -93,7 +93,7 @@ struct CmdCopySigs : StorePathsCommand
     }
 };
 
-static auto r1 = registerCommand<CmdCopySigs>("copy-sigs");
+static auto rCmdCopySigs = registerCommand<CmdCopySigs>("copy-sigs");
 
 struct CmdSignPaths : StorePathsCommand
 {
@@ -145,4 +145,4 @@ struct CmdSignPaths : StorePathsCommand
     }
 };
 
-static auto r2 = registerCommand<CmdSignPaths>("sign-paths");
+static auto rCmdSignPaths = registerCommand<CmdSignPaths>("sign-paths");

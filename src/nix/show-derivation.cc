@@ -123,4 +123,4 @@ struct CmdShowDerivation : InstallablesCommand
     }
 };
 
-static auto r1 = registerCommand<CmdShowDerivation>("show-derivation");
+static auto rCmdShowDerivation = registerCommand<CmdShowDerivation>("show-derivation");

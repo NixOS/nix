@@ -181,6 +181,6 @@ protected:
 
 };
 
-static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regStore;
+static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
 
 }

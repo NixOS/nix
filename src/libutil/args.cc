@@ -17,8 +17,20 @@ void Args::addFlag(Flag && flag_)
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
+void Completions::add(std::string completion, std::string description)
+{
+    assert(description.find('\n') == std::string::npos);
+    insert(Completion {
+        .completion = completion,
+        .description = description
+    });
+}
+
+bool Completion::operator<(const Completion & other) const
+{ return completion < other.completion || (completion == other.completion && description < other.description); }
+
 bool pathCompletions = false;
-std::shared_ptr<std::set<std::string>> completions;
+std::shared_ptr<Completions> completions;
 
 std::string completionMarker = "___COMPLETE___";
 
@@ -148,7 +160,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
             for (auto & [name, flag] : longFlags) {
                 if (!hiddenCategories.count(flag->category)
                     && hasPrefix(name, std::string(*prefix, 2)))
-                    completions->insert("--" + name);
+                    completions->add("--" + name, flag->description);
             }
         }
         auto i = longFlags.find(string(*pos, 2));
@@ -165,9 +177,9 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 
     if (auto prefix = needsCompletion(*pos)) {
         if (prefix == "-") {
-            completions->insert("--");
-            for (auto & [flag, _] : shortFlags)
-                completions->insert(std::string("-") + flag);
+            completions->add("--");
+            for (auto & [flagName, flag] : shortFlags)
+                completions->add(std::string("-") + flagName, flag->description);
         }
     }
 
@@ -248,7 +260,7 @@ static void hashTypeCompleter(size_t index, std::string_view prefix)
 {
     for (auto & type : hashTypes)
         if (hasPrefix(type, prefix))
-            completions->insert(type);
+            completions->add(type);
 }
 
 Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
@@ -277,7 +289,7 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
     };
 }
 
-static void completePath(std::string_view prefix, bool onlyDirs)
+static void _completePath(std::string_view prefix, bool onlyDirs)
 {
     pathCompletions = true;
     glob_t globbuf;
@@ -292,7 +304,7 @@ static void completePath(std::string_view prefix, bool onlyDirs)
                 auto st = lstat(globbuf.gl_pathv[i]);
                 if (!S_ISDIR(st.st_mode)) continue;
             }
-            completions->insert(globbuf.gl_pathv[i]);
+            completions->add(globbuf.gl_pathv[i]);
         }
         globfree(&globbuf);
     }
@@ -300,12 +312,12 @@ static void completePath(std::string_view prefix, bool onlyDirs)
 
 void completePath(size_t, std::string_view prefix)
 {
-    completePath(prefix, false);
+    _completePath(prefix, false);
 }
 
 void completeDir(size_t, std::string_view prefix)
 {
-    completePath(prefix, true);
+    _completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -385,7 +397,7 @@ MultiCommand::MultiCommand(const Commands & commands)
             if (auto prefix = needsCompletion(s)) {
                 for (auto & [name, command] : commands)
                     if (hasPrefix(name, *prefix))
-                        completions->insert(name);
+                        completions->add(name);
             }
             auto i = commands.find(s);
             if (i == commands.end())

@@ -105,6 +105,6 @@ std::set<std::string> LocalBinaryCacheStore::uriSchemes()
         return {"file"};
 }
 
-static RegisterStoreImplementation<LocalBinaryCacheStore, LocalBinaryCacheStoreConfig> regStore;
+static RegisterStoreImplementation<LocalBinaryCacheStore, LocalBinaryCacheStoreConfig> regLocalBinaryCacheStore;
 
 }

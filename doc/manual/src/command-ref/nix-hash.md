@@ -1,5 +1,3 @@
-Title: nix-hash
-
 # Name
 
 `nix-hash` - compute the cryptographic hash of a path

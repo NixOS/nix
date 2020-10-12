@@ -4,6 +4,7 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "sync.hh"
 #include "util.hh"
 

@@ -208,7 +208,7 @@ void mainWrapped(int argc, char * * argv)
         if (completions) {
             std::cout << (pathCompletions ? "filenames\n" : "no-filenames\n");
             for (auto & s : *completions)
-                std::cout << s << "\n";
+                std::cout << s.completion << "\t" << s.description << "\n";
         }
     });
 

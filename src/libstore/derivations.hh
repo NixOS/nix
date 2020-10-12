@@ -61,8 +61,6 @@ typedef std::map<string, DerivationOutput> DerivationOutputs;
    also contains, for each output, the (optional) store path in which it would
    be written. To calculate values of these types, see the corresponding
    functions in BasicDerivation */
-typedef std::map<string, std::pair<DerivationOutput, StorePath>>
-  DerivationOutputsAndPaths;
 typedef std::map<string, std::pair<DerivationOutput, std::optional<StorePath>>>
   DerivationOutputsAndOptPaths;
 

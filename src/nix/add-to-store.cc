@@ -93,4 +93,4 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     }
 };
 
-static auto r1 = registerCommand<CmdAddToStore>("add-to-store");
+static auto rCmdAddToStore = registerCommand<CmdAddToStore>("add-to-store");

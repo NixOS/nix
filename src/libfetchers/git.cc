@@ -464,6 +464,6 @@ struct GitInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
+static auto rGitInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
 
 }

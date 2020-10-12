@@ -12,7 +12,7 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<Tree, FlakeRef> FetchedFlake;
+typedef std::pair<fetchers::Tree, FlakeRef> FetchedFlake;
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(

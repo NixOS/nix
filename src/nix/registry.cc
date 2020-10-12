@@ -143,4 +143,4 @@ struct CmdRegistry : virtual NixMultiCommand
     }
 };
 
-static auto r1 = registerCommand<CmdRegistry>("registry");
+static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");
