@@ -99,6 +99,8 @@ public:
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
+    void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output) override;
+
     void narFromPath(const StorePath & path, Sink & sink) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,

@@ -444,6 +444,12 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
+void BinaryCacheStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+{
+    auto filePath = "/ac/" + std::string(deriver.hashPart()) + "!" + outputName;
+    upsertFile(filePath, std::string(output.hashPart()), "text/x-nix-derivertopath");
+}
+
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), localNarCache);
