@@ -25,7 +25,7 @@ namespace nix {
 
 Settings settings;
 
-static GlobalConfig::Register r1(&settings);
+static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)

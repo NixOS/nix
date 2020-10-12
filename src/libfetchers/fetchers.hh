@@ -86,6 +86,9 @@ public:
 
 struct InputScheme
 {
+    virtual ~InputScheme()
+    { }
+
     virtual std::optional<Input> inputFromURL(const ParsedURL & url) = 0;
 
     virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) = 0;

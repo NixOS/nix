@@ -2081,7 +2081,7 @@ Strings EvalSettings::getDefaultNixPath()
 
 EvalSettings evalSettings;
 
-static GlobalConfig::Register r1(&evalSettings);
+static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 
 }

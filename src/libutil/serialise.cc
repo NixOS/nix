@@ -266,6 +266,24 @@ Sink & operator << (Sink & sink, const StringSet & s)
     return sink;
 }
 
+Sink & operator << (Sink & sink, const Error & ex)
+{
+    auto info = ex.info();
+    sink
+        << "Error"
+        << info.level
+        << info.name
+        << info.description
+        << (info.hint ? info.hint->str() : "")
+        << 0 // FIXME: info.errPos
+        << info.traces.size();
+    for (auto & trace : info.traces) {
+        sink << 0; // FIXME: trace.pos
+        sink << trace.hint.str();
+    }
+    return sink;
+}
+
 
 void readPadding(size_t len, Source & source)
 {
@@ -317,6 +335,30 @@ template<class T> T readStrings(Source & source)
 
 template Paths readStrings(Source & source);
 template PathSet readStrings(Source & source);
+
+
+Error readError(Source & source)
+{
+    auto type = readString(source);
+    assert(type == "Error");
+    ErrorInfo info;
+    info.level = (Verbosity) readInt(source);
+    info.name = readString(source);
+    info.description = readString(source);
+    auto hint = readString(source);
+    if (hint != "") info.hint = hintformat(std::move(format("%s") % hint));
+    auto havePos = readNum<size_t>(source);
+    assert(havePos == 0);
+    auto nrTraces = readNum<size_t>(source);
+    for (size_t i = 0; i < nrTraces; ++i) {
+        havePos = readNum<size_t>(source);
+        assert(havePos == 0);
+        info.traces.push_back(Trace {
+            .hint = hintformat(std::move(format("%s") % readString(source)))
+        });
+    }
+    return Error(std::move(info));
+}
 
 
 void StringSink::operator () (const unsigned char * data, size_t len)

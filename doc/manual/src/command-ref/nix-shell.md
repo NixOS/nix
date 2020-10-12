@@ -1,5 +1,3 @@
-Title: nix-shell
-
 # Name
 
 `nix-shell` - start an interactive shell based on a Nix expression

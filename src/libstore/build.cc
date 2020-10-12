@@ -831,6 +831,10 @@ private:
        paths to the sandbox as a result of recursive Nix calls. */
     AutoCloseFD sandboxMountNamespace;
 
+    /* On Linux, whether we're doing the build in its own user
+       namespace. */
+    bool usingUserNamespace = true;
+
     /* The build hook. */
     std::unique_ptr<HookInstance> hook;
 
@@ -920,8 +924,8 @@ private:
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    const uid_t sandboxUid = 1000;
-    const gid_t sandboxGid = 100;
+    uid_t sandboxUid() { return usingUserNamespace ? 1000 : buildUser->getUID(); }
+    gid_t sandboxGid() { return usingUserNamespace ?  100 : buildUser->getGID(); }
 
     const static Path homeDir;
 
@@ -2355,7 +2359,8 @@ void DerivationGoal::startBuilder()
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
-                throw Error("while processing 'sandbox-paths': %s", e.what());
+                e.addTrace({}, "while processing 'sandbox-paths'");
+                throw;
             }
         for (auto & i : closure) {
             auto p = worker.store.printStorePath(i);
@@ -2423,15 +2428,14 @@ void DerivationGoal::startBuilder()
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid, sandboxGid, settings.sandboxBuildDir));
+                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
         writeFile(chrootRootDir + "/etc/group",
-            (format(
-                "root:x:0:\n"
+            fmt("root:x:0:\n"
                 "nixbld:!:%1%:\n"
-                "nogroup:x:65534:\n") % sandboxGid).str());
+                "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
         if (!(derivationIsImpure(derivationType)))
@@ -2628,6 +2632,13 @@ void DerivationGoal::startBuilder()
 
         options.allowVfork = false;
 
+        Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
+        static bool userNamespacesEnabled =
+            pathExists(maxUserNamespaces)
+            && trim(readFile(maxUserNamespaces)) != "0";
+
+        usingUserNamespace = userNamespacesEnabled;
+
         Pid helper = startProcess([&]() {
 
             /* Drop additional groups here because we can't do it
@@ -2646,9 +2657,11 @@ void DerivationGoal::startBuilder()
                 PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
             if (stack == MAP_FAILED) throw SysError("allocating stack");
 
-            int flags = CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+            int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (privateNetwork)
                 flags |= CLONE_NEWNET;
+            if (usingUserNamespace)
+                flags |= CLONE_NEWUSER;
 
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
             if (child == -1 && errno == EINVAL) {
@@ -2657,11 +2670,12 @@ void DerivationGoal::startBuilder()
                 flags &= ~CLONE_NEWPID;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
-            if (child == -1 && (errno == EPERM || errno == EINVAL)) {
+            if (usingUserNamespace && child == -1 && (errno == EPERM || errno == EINVAL)) {
                 /* Some distros patch Linux to not allow unprivileged
                  * user namespaces. If we get EPERM or EINVAL, try
                  * without CLONE_NEWUSER and see if that works.
                  */
+                usingUserNamespace = false;
                 flags &= ~CLONE_NEWUSER;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
@@ -2672,7 +2686,8 @@ void DerivationGoal::startBuilder()
                 _exit(1);
             if (child == -1) throw SysError("cloning builder process");
 
-            writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
+            writeFull(builderOut.writeSide.get(),
+                fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
         }, options);
 
@@ -2686,23 +2701,38 @@ void DerivationGoal::startBuilder()
 
         userNamespaceSync.readSide = -1;
 
+        /* Close the write side to prevent runChild() from hanging
+           reading from this. */
+        Finally cleanup([&]() {
+            userNamespaceSync.writeSide = -1;
+        });
+
         pid_t tmp;
-        if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
+        auto ss = tokenizeString<std::vector<std::string>>(readLine(builderOut.readSide.get()));
+        assert(ss.size() == 2);
+        usingUserNamespace = ss[0] == "1";
+        if (!string2Int<pid_t>(ss[1], tmp)) abort();
         pid = tmp;
 
-        /* Set the UID/GID mapping of the builder's user namespace
-           such that the sandbox user maps to the build user, or to
-           the calling user (if build users are disabled). */
-        uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
-        uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
+        if (usingUserNamespace) {
+            /* Set the UID/GID mapping of the builder's user namespace
+               such that the sandbox user maps to the build user, or to
+               the calling user (if build users are disabled). */
+            uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
+            uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
-        writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("%d %d 1") % sandboxUid % hostUid).str());
+            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
+                fmt("%d %d 1", sandboxUid(), hostUid));
 
-        writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+            writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
-        writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("%d %d 1") % sandboxGid % hostGid).str());
+            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
+                fmt("%d %d 1", sandboxGid(), hostGid));
+        } else {
+            debug("note: not using a user namespace");
+            if (!buildUser)
+                throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
+        }
 
         /* Save the mount namespace of the child. We have to do this
            *before* the child does a chroot. */
@@ -2712,7 +2742,6 @@ void DerivationGoal::startBuilder()
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
-        userNamespaceSync.writeSide = -1;
 
     } else
 #endif
@@ -2732,11 +2761,14 @@ void DerivationGoal::startBuilder()
     /* Check if setting up the build environment failed. */
     while (true) {
         string msg = readLine(builderOut.readSide.get());
+        if (string(msg, 0, 1) == "\2") break;
         if (string(msg, 0, 1) == "\1") {
-            if (msg.size() == 1) break;
-            throw Error(string(msg, 1));
+            FdSource source(builderOut.readSide.get());
+            auto ex = readError(source);
+            ex.addTrace({}, "while setting up the build environment");
+            throw ex;
         }
-        debug(msg);
+        debug("sandbox setup: " + msg);
     }
 }
 
@@ -3560,9 +3592,9 @@ void DerivationGoal::runChild()
             /* Switch to the sandbox uid/gid in the user namespace,
                which corresponds to the build user or calling user in
                the parent namespace. */
-            if (setgid(sandboxGid) == -1)
+            if (setgid(sandboxGid()) == -1)
                 throw SysError("setgid failed");
-            if (setuid(sandboxUid) == -1)
+            if (setuid(sandboxUid()) == -1)
                 throw SysError("setuid failed");
 
             setUser = false;
@@ -3780,7 +3812,7 @@ void DerivationGoal::runChild()
             args.push_back(rewriteStrings(i, inputRewrites));
 
         /* Indicate that we managed to set up the build environment. */
-        writeFull(STDERR_FILENO, string("\1\n"));
+        writeFull(STDERR_FILENO, string("\2\n"));
 
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
@@ -3801,7 +3833,7 @@ void DerivationGoal::runChild()
                     throw Error("unsupported builtin function '%1%'", string(drv->builder, 8));
                 _exit(0);
             } catch (std::exception & e) {
-                writeFull(STDERR_FILENO, "error: " + string(e.what()) + "\n");
+                writeFull(STDERR_FILENO, e.what() + std::string("\n"));
                 _exit(1);
             }
         }
@@ -3810,8 +3842,11 @@ void DerivationGoal::runChild()
 
         throw SysError("executing '%1%'", drv->builder);
 
-    } catch (std::exception & e) {
-        writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
+    } catch (Error & e) {
+        writeFull(STDERR_FILENO, "\1\n");
+        FdSink sink(STDERR_FILENO);
+        sink << e;
+        sink.flush();
         _exit(1);
     }
 }

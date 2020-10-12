@@ -1,5 +1,3 @@
-Title: nix-copy-closure
-
 # Name
 
 `nix-copy-closure` - copy a closure to or from a remote machine via SSH

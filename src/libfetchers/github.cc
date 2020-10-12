@@ -25,7 +25,7 @@ struct GitArchiveInputScheme : InputScheme
 {
     virtual std::string type() = 0;
 
-    virtual std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const = 0;
+    virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
 
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
@@ -215,7 +215,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "github"; }
 
-    std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const
+    std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
         // Github supports PAT/OAuth2 tokens and HTTP Basic
         // Authentication.  The former simply specifies the token, the
@@ -270,7 +270,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
 {
     std::string type() override { return "gitlab"; }
 
-    std::optional<std::pair<std::string, std::string> > accessHeaderFromToken(const std::string & token) const
+    std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
         // Gitlab supports 4 kinds of authorization, two of which are
         // relevant here: OAuth2 and PAT (Private Access Token).  The
@@ -334,7 +334,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
-static auto r2 = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
+static auto rGitHubInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
+static auto rGitLabInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
 
 }

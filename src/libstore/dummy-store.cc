@@ -18,8 +18,7 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
     DummyStore(const Params & params)
         : StoreConfig(params)
         , Store(params)
-    {
-    }
+    { }
 
     string getUri() override
     {
@@ -63,6 +62,6 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
     { unsupported("buildDerivation"); }
 };
 
-static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regStore;
+static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
 
 }

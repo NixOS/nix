@@ -5,6 +5,7 @@
 #include "serve-protocol.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "util.hh"
 #include "worker-protocol.hh"
 
@@ -131,4 +132,4 @@ struct CmdDoctor : StoreCommand
     }
 };
 
-static auto r1 = registerCommand<CmdDoctor>("doctor");
+static auto rCmdDoctor = registerCommand<CmdDoctor>("doctor");

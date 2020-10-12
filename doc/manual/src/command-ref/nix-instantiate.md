@@ -1,5 +1,3 @@
-Title: nix-instantiate
-
 # Name
 
 `nix-instantiate` - instantiate store derivations from Nix expressions
