@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
