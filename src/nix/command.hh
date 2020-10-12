@@ -205,7 +205,7 @@ static RegisterCommand registerCommand(const std::string & name)
     return RegisterCommand(name, [](){ return make_ref<T>(); });
 }
 
-std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots);
+std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots, OperateOn operateOn, Realise mode, BuildMode bMode = bmNormal);
 
 void build(ref<Store> store, Realise mode,
     Buildables buildables, BuildMode bMode = bmNormal);

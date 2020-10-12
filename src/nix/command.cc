@@ -80,11 +80,13 @@ void BuildablesCommand::run(ref<Store> store)
         for (auto & installable : installables)
             for (auto & b : installable->toBuildables())
                 buildables.push_back(b);
+    }
 
-        if (recursive) {
-            std::set<Buildable> closure = buildableClosure(store, buildables);
-            buildables = Buildables(closure.begin(), closure.end());
-        }
+    if (recursive) {
+        std::set<Buildable> closure = buildableClosure(store, buildables, operateOn, realiseMode);
+        buildables = Buildables(closure.begin(), closure.end());
+    } else if (operateOn == OperateOn::Output) {
+        build(store, realiseMode, buildables);
     }
 
     run(store, std::move(buildables));

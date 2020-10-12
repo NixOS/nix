@@ -691,12 +691,23 @@ std::set<Buildable> buildableClosure(ref<Store> store, Buildable root)
     return closure;
 }
 
-std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots)
+std::set<Buildable> buildableClosure(ref<Store> store, Buildables roots, OperateOn operateOn, Realise mode, BuildMode bMode)
 {
     std::set<Buildable> res;
-    for (auto & root : roots) {
-        auto partialRes = buildableClosure(store, root);
-        res.insert(partialRes.begin(), partialRes.end());
+    if (operateOn == OperateOn::Output) {
+        build(store, mode, roots, bMode);
+        for (auto & root : roots) {
+            auto partialRes = buildableClosure(store, root);
+            res.insert(partialRes.begin(), partialRes.end());
+        }
+    } else {
+        for (auto & root : roots) {
+            if (auto bfd = std::get_if<BuildableFromDrv>(&root))
+                res.insert(BuildableOpaque{bfd->drvPath});
+            if (auto bo = std::get_if<BuildableOpaque>(&root))
+                if (bo->path.isDerivation())
+                    res.insert(*bo);
+        }
     }
     return res;
 }
