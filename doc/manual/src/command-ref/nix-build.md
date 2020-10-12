@@ -1,5 +1,3 @@
-Title: nix-build
-
 # Name
 
 `nix-build` - build a Nix expression

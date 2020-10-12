@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "sync.hh"
 
 #include <map>
 #include <variant>
@@ -60,8 +61,6 @@ typedef std::map<string, DerivationOutput> DerivationOutputs;
    also contains, for each output, the (optional) store path in which it would
    be written. To calculate values of these types, see the corresponding
    functions in BasicDerivation */
-typedef std::map<string, std::pair<DerivationOutput, StorePath>>
-  DerivationOutputsAndPaths;
 typedef std::map<string, std::pair<DerivationOutput, std::optional<StorePath>>>
   DerivationOutputsAndOptPaths;
 
@@ -100,7 +99,7 @@ struct BasicDerivation
     StringPairs env;
     std::string name;
 
-    BasicDerivation() { }
+    BasicDerivation() = default;
     virtual ~BasicDerivation() { };
 
     bool isBuiltin() const;
@@ -127,7 +126,17 @@ struct Derivation : BasicDerivation
     std::string unparse(const Store & store, bool maskOutputs,
         std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
-    Derivation() { }
+    /* Return the underlying basic derivation but with these changes:
+
+	   1. Input drvs are emptied, but the outputs of them that were used are
+	      added directly to input sources.
+
+       2. Input placeholders are replaced with realized input store paths. */
+    std::optional<BasicDerivation> tryResolve(Store & store);
+
+    Derivation() = default;
+    Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
+    Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
 };
 
 
@@ -137,7 +146,9 @@ enum RepairFlag : bool { NoRepair = false, Repair = true };
 
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(Store & store,
-    const Derivation & drv, RepairFlag repair = NoRepair);
+    const Derivation & drv,
+    RepairFlag repair = NoRepair,
+    bool readOnly = false);
 
 /* Read a derivation from a file. */
 Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
@@ -190,6 +201,16 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
 typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
 extern DrvHashes drvHashes; // FIXME: global, not thread-safe
+
+/* Memoisation of `readDerivation(..).resove()`. */
+typedef std::map<
+    StorePath,
+    std::optional<StorePath>
+> DrvPathResolutions;
+
+// FIXME: global, though at least thread-safe.
+// FIXME: arguably overlaps with hashDerivationModulo memo table.
+extern Sync<DrvPathResolutions> drvPathResolutions;
 
 bool wantOutput(const string & output, const std::set<string> & wanted);
 

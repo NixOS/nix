@@ -90,4 +90,4 @@ struct CmdEval : MixJSON, InstallableCommand
     }
 };
 
-static auto r1 = registerCommand<CmdEval>("eval");
+static auto rCmdEval = registerCommand<CmdEval>("eval");

@@ -1,6 +1,7 @@
 #include "archive.hh"
 #include "fs-accessor.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "compression.hh"
 #include "derivations.hh"

@@ -13,7 +13,7 @@ pub fn decoded_len(input_len: usize) -> usize {
     input_len * 5 / 8
 }
 
-static BASE32_CHARS: &'static [u8; 32] = &b"0123456789abcdfghijklmnpqrsvwxyz";
+static BASE32_CHARS: &[u8; 32] = &b"0123456789abcdfghijklmnpqrsvwxyz";
 
 lazy_static! {
     static ref BASE32_CHARS_REVERSE: Box<[u8; 256]> = {

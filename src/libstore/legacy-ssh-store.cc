@@ -122,7 +122,7 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
                 if (deriverS != "")
                     deriver = parseStorePath(deriverS);
             }
-            StorePathSet references = readStorePaths<StorePathSet>(*this, conn->from);
+            StorePathSet references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
             readLongLong(conn->from); // download size
 
             std::optional<HashResult> optNarHashResult;
@@ -185,7 +185,7 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << narHash.to_string(Base16, false);
-            writeStorePaths(*this, conn->to, info.references);
+            worker_proto::write(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
                 << narSize
@@ -214,7 +214,7 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            writeStorePaths(*this, conn->to, info.references);
+            worker_proto::write(*this, conn->to, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -330,10 +330,10 @@ public:
         conn->to
             << cmdQueryClosure
             << includeOutputs;
-        writeStorePaths(*this, conn->to, paths);
+        worker_proto::write(*this, conn->to, paths);
         conn->to.flush();
 
-        for (auto & i : readStorePaths<StorePathSet>(*this, conn->from))
+        for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
             out.insert(i);
     }
 
@@ -346,10 +346,10 @@ public:
             << cmdQueryValidPaths
             << false // lock
             << maybeSubstitute;
-        writeStorePaths(*this, conn->to, paths);
+        worker_proto::write(*this, conn->to, paths);
         conn->to.flush();
 
-        return readStorePaths<StorePathSet>(*this, conn->from);
+        return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
     }
 
     void connect() override
@@ -364,6 +364,6 @@ public:
     }
 };
 
-static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regStore;
+static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;
 
 }

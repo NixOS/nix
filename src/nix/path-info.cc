@@ -131,4 +131,4 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdPathInfo>("path-info");
+static auto rCmdPathInfo = registerCommand<CmdPathInfo>("path-info");

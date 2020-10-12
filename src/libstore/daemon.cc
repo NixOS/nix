@@ -101,17 +101,20 @@ struct TunnelLogger : public Logger
 
     /* stopWork() means that we're done; stop sending stderr to the
        client. */
-    void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
+    void stopWork(const Error * ex = nullptr)
     {
         auto state(state_.lock());
 
         state->canSendStderr = false;
 
-        if (success)
+        if (!ex)
             to << STDERR_LAST;
         else {
-            to << STDERR_ERROR << msg;
-            if (status != 0) to << status;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
+                to << STDERR_ERROR << *ex;
+            } else {
+                to << STDERR_ERROR << ex->what() << ex->status;
+            }
         }
     }
 
@@ -251,7 +254,7 @@ static void writeValidPathInfo(
     auto narSize = narHashResult->second;
     to << (info->deriver ? store->printStorePath(*info->deriver) : "")
        << narHash.to_string(Base16, false);
-    writeStorePaths(*store, to, info->references);
+    worker_proto::write(*store, to, info->references);
     to << info->registrationTime << narSize;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
         to << info->ultimate
@@ -276,11 +279,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQueryValidPaths: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto res = store->queryValidPaths(paths);
         logger->stopWork();
-        writeStorePaths(*store, to, res);
+        worker_proto::write(*store, to, res);
         break;
     }
 
@@ -296,11 +299,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePaths: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto res = store->querySubstitutablePaths(paths);
         logger->stopWork();
-        writeStorePaths(*store, to, res);
+        worker_proto::write(*store, to, res);
         break;
     }
 
@@ -331,7 +334,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             paths = store->queryValidDerivers(path);
         else paths = store->queryDerivationOutputs(path);
         logger->stopWork();
-        writeStorePaths(*store, to, paths);
+        worker_proto::write(*store, to, paths);
         break;
     }
 
@@ -375,7 +378,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 25) {
             auto name = readString(from);
             auto camStr = readString(from);
-            auto refs = readStorePaths<StorePathSet>(*store, from);
+            auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
             bool repairBool;
             from >> repairBool;
             auto repair = RepairFlag{repairBool};
@@ -455,7 +458,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopAddTextToStore: {
         string suffix = readString(from);
         string s = readString(from);
-        auto refs = readStorePaths<StorePathSet>(*store, from);
+        auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto path = store->addTextToStore(suffix, s, refs, NoRepair);
         logger->stopWork();
@@ -552,6 +555,20 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            are in fact content-addressed if we don't trust them. */
         assert(derivationIsCA(drv.type()) || trusted);
 
+        /* Recompute the derivation path when we cannot trust the original. */
+        if (!trusted) {
+            /* Recomputing the derivation path for input-address derivations
+               makes it harder to audit them after the fact, since we need the
+               original not-necessarily-resolved derivation to verify the drv
+               derivation as adequate claim to the input-addressed output
+               paths. */
+            assert(derivationIsCA(drv.type()));
+
+            Derivation drv2;
+            static_cast<BasicDerivation &>(drv2) = drv;
+            drvPath = writeDerivation(*store, Derivation { drv2 });
+        }
+
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
@@ -614,7 +631,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopCollectGarbage: {
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
-        options.pathsToDelete = readStorePaths<StorePathSet>(*store, from);
+        options.pathsToDelete = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(from);
@@ -683,7 +700,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             to << 1
                << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
-            writeStorePaths(*store, to, i->second.references);
+            worker_proto::write(*store, to, i->second.references);
             to << i->second.downloadSize
                << i->second.narSize;
         }
@@ -694,11 +711,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         SubstitutablePathInfos infos;
         StorePathCAMap pathsMap = {};
         if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
-            auto paths = readStorePaths<StorePathSet>(*store, from);
+            auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
             for (auto & path : paths)
                 pathsMap.emplace(path, std::nullopt);
         } else
-            pathsMap = readStorePathCAMap(*store, from);
+            pathsMap = worker_proto::read(*store, from, Phantom<StorePathCAMap> {});
         logger->startWork();
         store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
@@ -706,7 +723,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         for (auto & i : infos) {
             to << store->printStorePath(i.first)
                << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
-            writeStorePaths(*store, to, i.second.references);
+            worker_proto::write(*store, to, i.second.references);
             to << i.second.downloadSize << i.second.narSize;
         }
         break;
@@ -716,7 +733,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto paths = store->queryAllValidPaths();
         logger->stopWork();
-        writeStorePaths(*store, to, paths);
+        worker_proto::write(*store, to, paths);
         break;
     }
 
@@ -788,7 +805,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         ValidPathInfo info { path, This<HashResult> { { narHash, 0 } } };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.references = readStorePaths<StorePathSet>(*store, from);
+        info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         from >> info.registrationTime;
         {
             auto tempNarSize = readInt(from);
@@ -847,9 +864,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         uint64_t downloadSize, narSize;
         store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
         logger->stopWork();
-        writeStorePaths(*store, to, willBuild);
-        writeStorePaths(*store, to, willSubstitute);
-        writeStorePaths(*store, to, unknown);
+        worker_proto::write(*store, to, willBuild);
+        worker_proto::write(*store, to, willSubstitute);
+        worker_proto::write(*store, to, unknown);
         to << downloadSize << narSize;
         break;
     }
@@ -933,10 +950,11 @@ void processConnection(
                    during addTextToStore() / importPath().  If that
                    happens, just send the error message and exit. */
                 bool errorAllowed = tunnelLogger->state_.lock()->canSendStderr;
-                tunnelLogger->stopWork(false, e.msg(), e.status);
+                tunnelLogger->stopWork(&e);
                 if (!errorAllowed) throw;
             } catch (std::bad_alloc & e) {
-                tunnelLogger->stopWork(false, "Nix daemon out of memory", 1);
+                auto ex = Error("Nix daemon out of memory");
+                tunnelLogger->stopWork(&ex);
                 throw;
             }
 
@@ -945,8 +963,13 @@ void processConnection(
             assert(!tunnelLogger->state_.lock()->canSendStderr);
         };
 
+    } catch (Error & e) {
+        tunnelLogger->stopWork(&e);
+        to.flush();
+        return;
     } catch (std::exception & e) {
-        tunnelLogger->stopWork(false, e.what(), 1);
+        auto ex = Error(e.what());
+        tunnelLogger->stopWork(&ex);
         to.flush();
         return;
     }

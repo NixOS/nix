@@ -146,4 +146,4 @@ struct CmdDiffClosures : SourceExprCommand
     }
 };
 
-static auto r1 = registerCommand<CmdDiffClosures>("diff-closures");
+static auto rCmdDiffClosures = registerCommand<CmdDiffClosures>("diff-closures");

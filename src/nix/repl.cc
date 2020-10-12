@@ -825,6 +825,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     }
 };
 
-static auto r1 = registerCommand<CmdRepl>("repl");
+static auto rCmdRepl = registerCommand<CmdRepl>("repl");
 
 }

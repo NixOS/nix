@@ -41,4 +41,4 @@ struct CmdDescribeStores : Command, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdDescribeStores>("describe-stores");
+static auto rDescribeStore = registerCommand<CmdDescribeStores>("describe-stores");

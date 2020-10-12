@@ -106,4 +106,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
+static auto rCmdMakeContentAddressable = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
