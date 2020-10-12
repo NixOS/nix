@@ -72,5 +72,5 @@ struct CmdCatNar : StoreCommand, MixCat
     }
 };
 
-static auto r1 = registerCommand<CmdCatStore>("cat-store");
-static auto r2 = registerCommand<CmdCatNar>("cat-nar");
+static auto rCmdCatStore = registerCommand<CmdCatStore>("cat-store");
+static auto rCmdCatNar = registerCommand<CmdCatNar>("cat-nar");

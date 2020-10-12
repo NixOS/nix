@@ -265,7 +265,7 @@ static void daemonLoop(char * * argv)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_daemon(int argc, char * * argv)
 {
     {
         auto stdio = false;
@@ -345,4 +345,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-daemon", _main);
+static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);

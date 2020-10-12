@@ -164,6 +164,7 @@ struct Common : InstallableCommand, MixProfile
         "BASHOPTS",
         "EUID",
         "HOME", // FIXME: don't ignore in pure mode?
+        "HOSTNAME",
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
         "NIX_LOG_FD",
@@ -377,6 +378,10 @@ struct CmdDevelop : Common, MixEnvironment
             script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
 
+        else {
+            script += "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n";
+        }
+
         writeFull(rcFileFd.get(), script);
 
         stopProgressBar();
@@ -443,5 +448,5 @@ struct CmdPrintDevEnv : Common
     }
 };
 
-static auto r1 = registerCommand<CmdPrintDevEnv>("print-dev-env");
-static auto r2 = registerCommand<CmdDevelop>("develop");
+static auto rCmdPrintDevEnv = registerCommand<CmdPrintDevEnv>("print-dev-env");
+static auto rCmdDevelop = registerCommand<CmdDevelop>("develop");

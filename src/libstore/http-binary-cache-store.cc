@@ -73,6 +73,7 @@ public:
         if (forceHttp) ret.insert("file");
         return ret;
     }
+
 protected:
 
     void maybeDisable()
@@ -180,6 +181,6 @@ protected:
 
 };
 
-static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regStore;
+static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
 
 }

@@ -3,6 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 
 using namespace nix;
 
@@ -88,4 +89,4 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
     }
 };
 
-static auto r1 = registerCommand<CmdBuild>("build");
+static auto rCmdBuild = registerCommand<CmdBuild>("build");

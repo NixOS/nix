@@ -1,5 +1,3 @@
-Title: nix-collect-garbage
-
 # Name
 
 `nix-collect-garbage` - delete unreachable store paths

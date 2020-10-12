@@ -63,12 +63,20 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    /* Add a content-addressable store path. `dump` will be drained. */
+    ref<const ValidPathInfo> addCAToStore(
+        Source & dump,
+        const string & name,
+        ContentAddressMethod caMethod,
+        const StorePathSet & references,
+        RepairFlag repair);
+
+    /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
-
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
@@ -139,54 +147,12 @@ protected:
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 
+    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
+
 private:
 
     std::atomic_bool failed{false};
 
-};
-
-struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
-{
-    UDSRemoteStoreConfig(const Store::Params & params)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , RemoteStoreConfig(params)
-    {
-    }
-
-    UDSRemoteStoreConfig()
-        : UDSRemoteStoreConfig(Store::Params({}))
-    {
-    }
-
-    const std::string name() override { return "Local Daemon Store"; }
-};
-
-class UDSRemoteStore : public LocalFSStore, public RemoteStore, public virtual UDSRemoteStoreConfig
-{
-public:
-
-    UDSRemoteStore(const Params & params);
-    UDSRemoteStore(const std::string scheme, std::string path, const Params & params);
-
-    std::string getUri() override;
-
-    static std::set<std::string> uriSchemes()
-    { return {"unix"}; }
-
-    bool sameMachine() override
-    { return true; }
-
-    ref<FSAccessor> getFSAccessor() override
-    { return LocalFSStore::getFSAccessor(); }
-
-    void narFromPath(const StorePath & path, Sink & sink) override
-    { LocalFSStore::narFromPath(path, sink); }
-
-private:
-
-    ref<RemoteStore::Connection> openConnection() override;
-    std::optional<std::string> path;
 };
 
 

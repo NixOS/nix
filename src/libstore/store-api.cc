@@ -1028,7 +1028,7 @@ Derivation Store::readDerivation(const StorePath & drvPath)
 
 
 #include "local-store.hh"
-#include "remote-store.hh"
+#include "uds-remote-store.hh"
 
 
 namespace nix {
