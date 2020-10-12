@@ -25,3 +25,13 @@ testDerivation transitivelyDependentCA
 
 nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
 nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
+
+testOutputLinkAfterGC () {
+    # Regression test for https://github.com/NixOS/nix/issues/4138
+    # Ensure that a GC that keeps an output path around won't loose the mappings
+    # with its derivers
+    nix-build --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 1 -o $TEST_ROOT/var/nix/gcroots/caRoot
+    nix-store --gc --experimental-features ca-derivations
+    nix-build --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 1 -o $TEST_ROOT/var/nix/gcroots/caRoot -j0
+}
+testOutputLinkAfterGC

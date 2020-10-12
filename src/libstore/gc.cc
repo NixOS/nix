@@ -574,13 +574,16 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
 
     /* If keep-derivations is set and this is a derivation, then
        don't delete the derivation if any of the outputs are alive. */
-    if (state.gcKeepDerivations && path.isDerivation()) {
-        for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(path))
-            if (maybeOutPath &&
-                isValidPath(*maybeOutPath) &&
-                queryPathInfo(*maybeOutPath)->deriver == path
-                )
-                incoming.insert(*maybeOutPath);
+    if (path.isDerivation()) {
+        auto drv = readDerivation(path);
+        if (state.gcKeepDerivations || derivationIsCA(drv.type())) {
+            for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                if (maybeOutPath &&
+                    isValidPath(*maybeOutPath) &&
+                    queryPathInfo(*maybeOutPath)->deriver == path
+                    )
+                    incoming.insert(*maybeOutPath);
+        }
     }
 
     /* If keep-outputs is set, then don't delete this path if there
