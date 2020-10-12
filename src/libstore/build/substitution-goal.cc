@@ -1,4 +1,5 @@
-#include "build.hh"
+#include "worker.hh"
+#include "substitution-goal.hh"
 #include "nar-info.hh"
 #include "finally.hh"
 

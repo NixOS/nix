@@ -1,4 +1,6 @@
-#include "build.hh"
+#include "derivation-goal.hh"
+#include "hook-instance.hh"
+#include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
 #include "references.hh"
@@ -11,6 +13,9 @@
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+
+#include <regex>
+#include <queue>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -137,6 +142,16 @@ DerivationGoal::~DerivationGoal()
     try { stopDaemon(); } catch (...) { ignoreException(); }
     try { deleteTmpDir(false); } catch (...) { ignoreException(); }
     try { closeLogFile(); } catch (...) { ignoreException(); }
+}
+
+
+string DerivationGoal::key()
+{
+    /* Ensure that derivations get built in order of their name,
+       i.e. a derivation named "aardvark" always comes before
+       "baboon". And substitution goals always happen before
+       derivation goals (due to "b$"). */
+    return "b$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
 
