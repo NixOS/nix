@@ -1,3 +1,5 @@
+#pragma once
+
 #include "eval.hh"
 
 #include <tuple>

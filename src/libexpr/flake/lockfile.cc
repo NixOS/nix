@@ -13,12 +13,12 @@ FlakeRef getFlakeRef(
 {
     auto i = json.find(attr);
     if (i != json.end()) {
-        auto attrs = jsonToAttrs(*i);
+        auto attrs = fetchers::jsonToAttrs(*i);
         // FIXME: remove when we drop support for version 5.
         if (info) {
             auto j = json.find(info);
             if (j != json.end()) {
-                for (auto k : jsonToAttrs(*j))
+                for (auto k : fetchers::jsonToAttrs(*j))
                     attrs.insert_or_assign(k.first, k.second);
             }
         }

@@ -204,6 +204,8 @@ struct StoreConfig : public Config
      */
     StoreConfig() { assert(false); }
 
+    virtual ~StoreConfig() { }
+
     virtual const std::string name() = 0;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
@@ -464,9 +466,7 @@ public:
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
-    {
-        throw Error("addToStoreFromDump() is not supported by this store");
-    }
+    { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
@@ -489,8 +489,38 @@ public:
         BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
-       on-disk .drv file). Note that ‘drvPath’ is only used for
-       informational purposes. */
+       on-disk .drv file).
+
+       ‘drvPath’ is used to deduplicate worker goals so it is imperative that
+       is correct. That said, it doesn't literally need to be store path that
+       would be calculated from writing this derivation to the store: it is OK
+       if it instead is that of a Derivation which would resolve to this (by
+       taking the outputs of it's input derivations and adding them as input
+       sources) such that the build time referenceable-paths are the same.
+
+       In the input-addressed case, we usually *do* use an "original"
+       unresolved derivations's path, as that is what will be used in the
+       `buildPaths` case. Also, the input-addressed output paths are verified
+       only by that contents of that specific unresolved derivation, so it is
+       nice to keep that information around so if the original derivation is
+       ever obtained later, it can be verified whether the trusted user in fact
+       used the proper output path.
+
+       In the content-addressed case, we want to always use the
+       resolved drv path calculated from the provided derivation. This serves
+       two purposes:
+
+         - It keeps the operation trustless, by ruling out a maliciously
+           invalid drv path corresponding to a non-resolution-equivalent
+           derivation.
+
+         - For the floating case in particular, it ensures that the derivation
+           to output mapping respects the resolution equivalence relation, so
+           one cannot choose different resolution-equivalent derivations to
+           subvert dependency coherence (i.e. the property that one doesn't end
+           up with multiple different versions of dependencies without
+           explicitly choosing to allow it).
+    */
     virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) = 0;
 
@@ -527,7 +557,7 @@ public:
        - The collector isn't running, or it's just started but hasn't
          acquired the GC lock yet.  In that case we get and release
          the lock right away, then exit.  The collector scans the
-         permanent root and sees our's.
+         permanent root and sees ours.
 
        In either case the permanent root is seen by the collector. */
     virtual void syncWithGC() { };
@@ -695,48 +725,6 @@ protected:
 
 };
 
-struct LocalFSStoreConfig : virtual StoreConfig
-{
-    using StoreConfig::StoreConfig;
-    // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
-    // it to omit the call to the Setting constructor. Clang works fine
-    // either way.
-    const PathSetting rootDir{(StoreConfig*) this, true, "",
-        "root", "directory prefixed to all other paths"};
-    const PathSetting stateDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
-        "state", "directory where Nix will store state"};
-    const PathSetting logDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
-        "log", "directory where Nix will store state"};
-};
-
-class LocalFSStore : public virtual Store, public virtual LocalFSStoreConfig
-{
-public:
-
-    const static string drvsLogDir;
-
-    LocalFSStore(const Params & params);
-
-    void narFromPath(StorePathOrDesc path, Sink & sink) override;
-
-    ref<FSAccessor> getFSAccessor() override;
-
-    /* Register a permanent GC root. */
-    Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
-
-    virtual Path getRealStoreDir() { return storeDir; }
-
-    Path toRealPath(const Path & storePath) override
-    {
-        assert(isInStore(storePath));
-        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
-    }
-
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
-};
-
 
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
@@ -818,6 +806,7 @@ struct StoreFactory
     std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
+
 struct Implementations
 {
     static std::vector<StoreFactory> * registered;

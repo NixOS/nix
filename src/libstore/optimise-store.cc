@@ -276,21 +276,15 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     }
 }
 
-static string showBytes(uint64_t bytes)
-{
-    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
-}
-
 void LocalStore::optimiseStore()
 {
     OptimiseStats stats;
 
     optimiseStore(stats);
 
-    printInfo(
-        format("%1% freed by hard-linking %2% files")
-        % showBytes(stats.bytesFreed)
-        % stats.filesLinked);
+    printInfo("%s freed by hard-linking %d files",
+        showBytes(stats.bytesFreed),
+        stats.filesLinked);
 }
 
 void LocalStore::optimisePath(const Path & path)

@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
@@ -153,7 +154,7 @@ void MixProfile::updateProfile(const Buildables & buildables)
                 for (auto & output : bfd.outputs) {
                     /* Output path should be known because we just tried to
                        build it. */
-                    assert(!output.second);
+                    assert(output.second);
                     result.push_back(*output.second);
                 }
             },

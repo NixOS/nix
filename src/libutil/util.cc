@@ -1,4 +1,3 @@
-#include "lazy.hh"
 #include "util.hh"
 #include "affinity.hh"
 #include "sync.hh"
@@ -326,7 +325,12 @@ void writeFile(const Path & path, const string & s, mode_t mode)
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw SysError("opening file '%1%'", path);
-    writeFull(fd.get(), s);
+    try {
+        writeFull(fd.get(), s);
+    } catch (Error & e) {
+        e.addTrace({}, "writing file '%1%'", path);
+        throw;
+    }
 }
 
 
@@ -338,11 +342,16 @@ void writeFile(const Path & path, Source & source, mode_t mode)
 
     std::vector<unsigned char> buf(64 * 1024);
 
-    while (true) {
-        try {
-            auto n = source.read(buf.data(), buf.size());
-            writeFull(fd.get(), (unsigned char *) buf.data(), n);
-        } catch (EndOfFile &) { break; }
+    try {
+        while (true) {
+            try {
+                auto n = source.read(buf.data(), buf.size());
+                writeFull(fd.get(), (unsigned char *) buf.data(), n);
+            } catch (EndOfFile &) { break; }
+        }
+    } catch (Error & e) {
+        e.addTrace({}, "writing file '%1%'", path);
+        throw;
     }
 }
 
@@ -512,21 +521,24 @@ std::string getUserName()
 }
 
 
-static Lazy<Path> getHome2([]() {
-    auto homeDir = getEnv("HOME");
-    if (!homeDir) {
-        std::vector<char> buf(16384);
-        struct passwd pwbuf;
-        struct passwd * pw;
-        if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
-            || !pw || !pw->pw_dir || !pw->pw_dir[0])
-            throw Error("cannot determine user's home directory");
-        homeDir = pw->pw_dir;
-    }
-    return *homeDir;
-});
-
-Path getHome() { return getHome2(); }
+Path getHome()
+{
+    static Path homeDir = []()
+    {
+        auto homeDir = getEnv("HOME");
+        if (!homeDir) {
+            std::vector<char> buf(16384);
+            struct passwd pwbuf;
+            struct passwd * pw;
+            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
+                || !pw || !pw->pw_dir || !pw->pw_dir[0])
+                throw Error("cannot determine user's home directory");
+            homeDir = pw->pw_dir;
+        }
+        return *homeDir;
+    }();
+    return homeDir;
+}
 
 
 Path getCacheDir()
@@ -1640,5 +1652,12 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 
     return fdSocket;
 }
+
+
+string showBytes(uint64_t bytes)
+{
+    return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
+}
+
 
 }

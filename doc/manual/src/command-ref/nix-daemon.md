@@ -1,5 +1,3 @@
-Title: nix-daemon
-
 # Name
 
 `nix-daemon` - Nix multi-user support daemon

@@ -162,7 +162,7 @@ static void update(const StringSet & channelNames)
     replaceSymlink(profile, channelLink);
 }
 
-static int _main(int argc, char ** argv)
+static int main_nix_channel(int argc, char ** argv)
 {
     {
         // Figure out the name of the `.nix-channels' file to use
@@ -259,4 +259,4 @@ static int _main(int argc, char ** argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-channel", _main);
+static RegisterLegacyCommand r_nix_channel("nix-channel", main_nix_channel);

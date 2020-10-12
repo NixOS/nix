@@ -8,6 +8,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "user-env.hh"
 #include "util.hh"
 #include "json.hh"
@@ -1331,7 +1332,7 @@ static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_env(int argc, char * * argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1461,4 +1462,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-env", _main);
+static RegisterLegacyCommand r_nix_env("nix-env", main_nix_env);

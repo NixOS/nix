@@ -323,6 +323,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
 Sink & operator << (Sink & sink, const string & s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
+Sink & operator << (Sink & in, const Error & ex);
 
 
 MakeError(SerialisationError, Error);
@@ -383,6 +384,8 @@ Source & operator >> (Source & in, bool & b)
     b = readNum<uint64_t>(in);
     return in;
 }
+
+Error readError(Source & source);
 
 
 /* An adapter that converts a std::basic_istream into a source. */

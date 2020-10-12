@@ -185,4 +185,4 @@ struct CmdSearch : InstallableCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdSearch>("search");
+static auto rCmdSearch = registerCommand<CmdSearch>("search");

@@ -31,7 +31,7 @@ struct ArchiveSettings : Config
 
 static ArchiveSettings archiveSettings;
 
-static GlobalConfig::Register r1(&archiveSettings);
+static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 const std::string narVersionMagic1 = "nix-archive-1";
 

@@ -5,7 +5,6 @@ perl/Makefile.config
 /aclocal.m4
 /autom4te.cache
 /precompiled-headers.h.gch
-/precompiled-headers.h.pch
 /config.*
 /configure
 /stamp-h1

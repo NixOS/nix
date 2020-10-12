@@ -159,4 +159,4 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     }
 };
 
-static auto r1 = registerCommand<CmdUpgradeNix>("upgrade-nix");
+static auto rCmdUpgradeNix = registerCommand<CmdUpgradeNix>("upgrade-nix");

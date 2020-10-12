@@ -64,4 +64,4 @@ struct CmdLog : InstallableCommand
     }
 };
 
-static auto r1 = registerCommand<CmdLog>("log");
+static auto rCmdLog = registerCommand<CmdLog>("log");

@@ -12,8 +12,6 @@ class StorePath;
 
 namespace nix::flake {
 
-using namespace fetchers;
-
 typedef std::vector<FlakeId> InputPath;
 
 struct LockedNode;

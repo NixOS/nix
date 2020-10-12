@@ -69,7 +69,7 @@ bool BasicDerivation::isBuiltin() const
 
 
 StorePath writeDerivation(Store & store,
-    const Derivation & drv, RepairFlag repair)
+    const Derivation & drv, RepairFlag repair, bool readOnly)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs)
@@ -79,7 +79,7 @@ StorePath writeDerivation(Store & store,
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return settings.readOnlyMode
+    return readOnly || settings.readOnlyMode
         ? store.computeStorePathForText(suffix, contents, references)
         : store.addTextToStore(suffix, contents, references, repair);
 }
@@ -584,7 +584,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = WorkerProto<StorePathSet>::read(store, in);
+    drv.inputSrcs = worker_proto::read(store, in, Phantom<StorePathSet> {});
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -622,7 +622,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
         }, i.second.output);
     }
-    WorkerProto<StorePathSet>::write(store, out, drv.inputSrcs);
+    worker_proto::write(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
     for (auto & i : drv.env)
@@ -642,6 +642,59 @@ std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath
     auto drvName = drvNameWithExtension.substr(0, drvNameWithExtension.size() - 4);
     auto clearText = "nix-upstream-output:" + std::string { drvPath.hashPart() } + ":" + outputPathName(drvName, outputName);
     return "/" + hashString(htSHA256, clearText).to_string(Base32, false);
+}
+
+
+// N.B. Outputs are left unchanged
+static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites) {
+
+    debug("Rewriting the derivation");
+
+    for (auto &rewrite: rewrites) {
+        debug("rewriting %s as %s", rewrite.first, rewrite.second);
+    }
+
+    drv.builder = rewriteStrings(drv.builder, rewrites);
+    for (auto & arg: drv.args) {
+        arg = rewriteStrings(arg, rewrites);
+    }
+
+    StringPairs newEnv;
+    for (auto & envVar: drv.env) {
+        auto envName = rewriteStrings(envVar.first, rewrites);
+        auto envValue = rewriteStrings(envVar.second, rewrites);
+        newEnv.emplace(envName, envValue);
+    }
+    drv.env = newEnv;
+}
+
+
+Sync<DrvPathResolutions> drvPathResolutions;
+
+std::optional<BasicDerivation> Derivation::tryResolve(Store & store) {
+    BasicDerivation resolved { *this };
+
+    // Input paths that we'll want to rewrite in the derivation
+    StringMap inputRewrites;
+
+    for (auto & input : inputDrvs) {
+        auto inputDrvOutputs = store.queryPartialDerivationOutputMap(input.first);
+        StringSet newOutputNames;
+        for (auto & outputName : input.second) {
+            auto actualPathOpt = inputDrvOutputs.at(outputName);
+            if (!actualPathOpt)
+                return std::nullopt;
+            auto actualPath = *actualPathOpt;
+            inputRewrites.emplace(
+                downstreamPlaceholder(store, input.first, outputName),
+                store.printStorePath(actualPath));
+            resolved.inputSrcs.insert(std::move(actualPath));
+        }
+    }
+
+    rewriteDerivation(store, resolved, inputRewrites);
+
+    return resolved;
 }
 
 }

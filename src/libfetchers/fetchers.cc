@@ -72,6 +72,14 @@ ParsedURL Input::toURL() const
     return scheme->toURL(*this);
 }
 
+std::string Input::toURLString(const std::map<std::string, std::string> & extraQuery) const
+{
+    auto url = toURL();
+    for (auto & attr : extraQuery)
+        url.query.insert(attr);
+    return url.to_string();
+}
+
 std::string Input::to_string() const
 {
     return toURL().to_string();

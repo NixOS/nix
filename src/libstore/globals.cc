@@ -2,7 +2,6 @@
 #include "util.hh"
 #include "archive.hh"
 #include "args.hh"
-#include "sync.hh"
 #include "abstract-setting-to-json.hh"
 
 #include <algorithm>
@@ -10,9 +9,9 @@
 #include <thread>
 #include <dlfcn.h>
 #include <sys/utsname.h>
-#include <unordered_set>
 
 #include <nlohmann/json.hpp>
+
 
 namespace nix {
 
@@ -26,7 +25,7 @@ namespace nix {
 
 Settings settings;
 
-static GlobalConfig::Register r1(&settings);
+static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
@@ -134,14 +133,8 @@ bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 
 void Settings::requireExperimentalFeature(const std::string & name)
 {
-    if (!isExperimentalFeatureEnabled(name)) {
-        if (allowExperimentalFeatures) {
-            static Sync<std::unordered_set<std::string>> warned;
-            if (warned.lock()->insert(name).second)
-                warn("feature '%s' is experimental", name);
-        } else
-            throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
-    }
+    if (!isExperimentalFeatureEnabled(name))
+        throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
 }
 
 bool Settings::isWSL1()

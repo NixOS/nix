@@ -306,6 +306,6 @@ struct MercurialInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<MercurialInputScheme>()); });
+static auto rMercurialInputScheme = OnStartup([] { registerInputScheme(std::make_unique<MercurialInputScheme>()); });
 
 }

@@ -12,7 +12,7 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<Tree, FlakeRef> FetchedFlake;
+typedef std::pair<fetchers::Tree, FlakeRef> FetchedFlake;
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(
@@ -48,17 +48,17 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                 resolvedRef = originalRef.resolve(state.store);
                 auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, fetchedResolved.value()});
-                fetched.emplace(fetchedResolved.value());
+                flakeCache.push_back({resolvedRef, *fetchedResolved});
+                fetched.emplace(*fetchedResolved);
             }
             else {
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
             }
         }
-        flakeCache.push_back({originalRef, fetched.value()});
+        flakeCache.push_back({originalRef, *fetched});
     }
 
-    auto [tree, lockedRef] = fetched.value();
+    auto [tree, lockedRef] = *fetched;
 
     debug("got tree '%s' from '%s'",
         state.store->printStorePath(state.store->makeFixedOutputPathFromCA(tree.storePath)), lockedRef);
@@ -248,7 +248,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 }
 
 /* Compute an in-memory lock file for the specified top-level flake,
-   and optionally write it to file, it the flake is writable. */
+   and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & topRef,
