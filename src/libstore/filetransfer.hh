@@ -51,6 +51,7 @@ extern FileTransferSettings fileTransferSettings;
 struct FileTransferRequest
 {
     std::string uri;
+    Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;

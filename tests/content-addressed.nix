@@ -29,4 +29,26 @@ rec {
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
   };
+  dependentCA = mkDerivation {
+    name = "dependent";
+    buildCommand = ''
+      echo "building a dependent derivation"
+      mkdir -p $out
+      echo ${rootCA}/hello > $out/dep
+    '';
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+  };
+  transitivelyDependentCA = mkDerivation {
+    name = "transitively-dependent";
+    buildCommand = ''
+      echo "building transitively-dependent"
+      cat ${dependentCA}/dep
+      echo ${dependentCA} > $out
+    '';
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+  };
 }

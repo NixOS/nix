@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
 #include "affinity.hh"
@@ -67,7 +68,7 @@ std::vector<string> shellwords(const string & s)
     return res;
 }
 
-static void _main(int argc, char * * argv)
+static void main_nix_build(int argc, char * * argv)
 {
     auto dryRun = false;
     auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
@@ -542,5 +543,5 @@ static void _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-build", _main);
-static RegisterLegacyCommand s2("nix-shell", _main);
+static RegisterLegacyCommand r_nix_build("nix-build", main_nix_build);
+static RegisterLegacyCommand r_nix_shell("nix-shell", main_nix_build);

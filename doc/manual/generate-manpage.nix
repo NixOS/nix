@@ -52,5 +52,4 @@ in
 
 command:
 
-"Title: nix\n\n"
-+ showCommand { command = "nix"; section = "#"; def = command; }
+showCommand { command = "nix"; section = "#"; def = command; }

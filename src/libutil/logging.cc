@@ -10,7 +10,7 @@ namespace nix {
 
 LoggerSettings loggerSettings;
 
-static GlobalConfig::Register r1(&loggerSettings);
+static GlobalConfig::Register rLoggerSettings(&loggerSettings);
 
 static thread_local ActivityId curActivity = 0;
 

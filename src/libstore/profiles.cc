@@ -1,5 +1,6 @@
 #include "profiles.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "util.hh"
 
 #include <sys/types.h>
@@ -39,13 +40,10 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     for (auto & i : readDirectory(profileDir)) {
         if (auto n = parseName(profileName, i.name)) {
             auto path = profileDir + "/" + i.name;
-            struct stat st;
-            if (lstat(path.c_str(), &st) != 0)
-                throw SysError("statting '%1%'", path);
             gens.push_back({
                 .number = *n,
                 .path = path,
-                .creationTime = st.st_mtime
+                .creationTime = lstat(path).st_mtime
             });
         }
     }

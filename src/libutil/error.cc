@@ -11,13 +11,13 @@ const std::string nativeSystem = SYSTEM;
 
 BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
-    err.traces.push_front(Trace { .pos = e, .hint = hint});
+    err.traces.push_front(Trace { .pos = e, .hint = hint });
     return *this;
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
-const string& BaseError::calcWhat() const
+const string & BaseError::calcWhat() const
 {
     if (what_.has_value())
         return *what_;
@@ -34,12 +34,12 @@ const string& BaseError::calcWhat() const
 
 std::optional<string> ErrorInfo::programName = std::nullopt;
 
-std::ostream& operator<<(std::ostream &os, const hintformat &hf)
+std::ostream & operator<<(std::ostream & os, const hintformat & hf)
 {
     return os << hf.str();
 }
 
-string showErrPos(const ErrPos &errPos)
+string showErrPos(const ErrPos & errPos)
 {
     if (errPos.line > 0) {
         if (errPos.column > 0) {
@@ -53,7 +53,7 @@ string showErrPos(const ErrPos &errPos)
     }
 }
 
-std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
+std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 {
     if (errPos.line <= 0)
         return std::nullopt;
@@ -92,13 +92,13 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
                 return loc;
             }
         }
-        catch (EndOfFile &eof) {
+        catch (EndOfFile & eof) {
             if (loc.errLineOfCode.has_value())
                 return loc;
             else
                 return std::nullopt;
         }
-        catch (std::exception &e) {
+        catch (std::exception & e) {
             printError("error reading nix file: %s\n%s", errPos.file, e.what());
             return std::nullopt;
         }
@@ -137,10 +137,10 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos &errPos)
 }
 
 // print lines of code to the ostream, indicating the error column.
-void printCodeLines(std::ostream &out,
-    const string &prefix,
-    const ErrPos &errPos,
-    const LinesOfCode &loc)
+void printCodeLines(std::ostream & out,
+    const string & prefix,
+    const ErrPos & errPos,
+    const LinesOfCode & loc)
 {
     // previous line of code.
     if (loc.prevLineOfCode.has_value()) {
@@ -186,7 +186,7 @@ void printCodeLines(std::ostream &out,
     }
 }
 
-void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
+void printAtPos(const string & prefix, const ErrPos & pos, std::ostream & out)
 {
     if (pos)
     {
@@ -212,7 +212,7 @@ void printAtPos(const string &prefix, const ErrPos &pos, std::ostream &out)
     }
 }
 
-std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace)
+std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
     auto errwidth = std::max<size_t>(getWindowSize().second, 20);
     string prefix = "";

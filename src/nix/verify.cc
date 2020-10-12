@@ -189,4 +189,4 @@ struct CmdVerify : StorePathsCommand
     }
 };
 
-static auto r1 = registerCommand<CmdVerify>("verify");
+static auto rCmdVerify = registerCommand<CmdVerify>("verify");

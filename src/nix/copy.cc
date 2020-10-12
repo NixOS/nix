@@ -108,4 +108,4 @@ struct CmdCopy : StorePathsCommand
     }
 };
 
-static auto r1 = registerCommand<CmdCopy>("copy");
+static auto rCmdCopy = registerCommand<CmdCopy>("copy");

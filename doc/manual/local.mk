@@ -18,13 +18,22 @@ dist-files += $(man-pages)
 nix-eval = $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw --expr
 
 $(d)/%.1: $(d)/src/command-ref/%.md
-	$(trace-gen) lowdown -sT man $^ -o $@
+	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
+	@cat $^ >> $^.tmp
+	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	@rm $^.tmp
 
 $(d)/%.8: $(d)/src/command-ref/%.md
-	$(trace-gen) lowdown -sT man $^ -o $@
+	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
+	@cat $^ >> $^.tmp
+	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	@rm $^.tmp
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
-	$(trace-gen) lowdown -sT man $^ -o $@
+	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
+	@cat $^ >> $^.tmp
+	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	@rm $^.tmp
 
 $(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
 	$(trace-gen) $(nix-eval) 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))' > $@.tmp
@@ -40,7 +49,7 @@ $(d)/nix.json: $(bindir)/nix
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix

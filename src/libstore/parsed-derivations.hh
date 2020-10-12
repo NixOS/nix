@@ -1,3 +1,5 @@
+#pragma once
+
 #include "store-api.hh"
 
 #include <nlohmann/json_fwd.hpp>

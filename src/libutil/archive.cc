@@ -33,7 +33,7 @@ struct ArchiveSettings : Config
 
 static ArchiveSettings archiveSettings;
 
-static GlobalConfig::Register r1(&archiveSettings);
+static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 const std::string narVersionMagic1 = "nix-archive-1";
 
@@ -68,9 +68,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     sink << "(";
 

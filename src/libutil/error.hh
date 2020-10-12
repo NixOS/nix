@@ -107,7 +107,7 @@ struct Trace {
 struct ErrorInfo {
     Verbosity level;
     string name;
-    string description;
+    string description; // FIXME: remove? it seems to be barely used
     std::optional<hintformat> hint;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
@@ -169,7 +169,7 @@ public:
 #endif
 
     const string & msg() const { return calcWhat(); }
-    const ErrorInfo & info() { calcWhat(); return err; }
+    const ErrorInfo & info() const { calcWhat(); return err; }
 
     template<typename... Args>
     BaseError & addTrace(std::optional<ErrPos> e, const string &fs, const Args & ... args)
