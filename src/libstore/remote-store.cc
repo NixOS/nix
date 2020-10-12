@@ -457,6 +457,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
     const string & name,
     ContentAddressMethod caMethod,
+    HashType hashType,
     const StorePathSet & references,
     RepairFlag repair)
 {
@@ -468,7 +469,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << wopAddToStore
             << name
-            << renderContentAddressMethod(caMethod);
+            << renderContentAddressMethodAndHash(caMethod, hashType);
         worker_proto::write(*this, conn->to, references);
         conn->to << repair;
 
@@ -484,18 +485,21 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
         std::visit(overloaded {
             [&](TextHashMethod thm) -> void {
+                if (hashType != htSHA256)
+                    throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
+                        printHashType(hashType));
                 std::string s = dump.drain();
                 conn->to << wopAddTextToStore << name << s;
                 worker_proto::write(*this, conn->to, references);
                 conn.processStderr();
             },
-            [&](FixedOutputHashMethod fohm) -> void {
+            [&](FileIngestionMethod fim) -> void {
                 conn->to
                     << wopAddToStore
                     << name
-                    << ((fohm.hashType == htSHA256 && fohm.fileIngestionMethod == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-                    << (fohm.fileIngestionMethod == FileIngestionMethod::Recursive ? 1 : 0)
-                    << printHashType(fohm.hashType);
+                    << ((hashType == htSHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+                    << (fim == FileIngestionMethod::Recursive ? 1 : 0)
+                    << printHashType(hashType);
 
                 try {
                     conn->to.written = 0;
@@ -503,7 +507,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                     connections->incCapacity();
                     {
                         Finally cleanup([&]() { connections->decCapacity(); });
-                        if (fohm.fileIngestionMethod == FileIngestionMethod::Recursive) {
+                        if (fim == FileIngestionMethod::Recursive) {
                             dump.drainInto(conn->to);
                         } else {
                             std::string contents = dump.drain();
@@ -536,7 +540,7 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
 {
     StorePathSet references;
-    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
+    return addCAToStore(dump, name, method, hashType, references, repair)->path;
 }
 
 
@@ -597,7 +601,7 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
     StringSource source(s);
-    return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
+    return addCAToStore(source, name, TextHashMethod {}, htSHA256, references, repair)->path;
 }
 
 

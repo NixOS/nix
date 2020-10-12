@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
+#include "split.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
 
@@ -26,9 +27,10 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
 
 
 StorePath DerivationOutputCAFixed::path(const Store & store, std::string_view drvName, std::string_view outputName) const {
-    return store.makeFixedOutputPath(
-        outputPathName(drvName, outputName),
-        { hash, {} });
+    return store.makeFixedOutputPathFromCA(StorePathDescriptor {
+        .name = outputPathName(drvName, outputName),
+        .info = ca,
+    });
 }
 
 
@@ -150,23 +152,19 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 
 
 static DerivationOutput parseDerivationOutput(const Store & store,
-    std::string_view pathS, std::string_view hashAlgo, std::string_view hash)
+    std::string_view pathS, std::string_view hashAlgo, std::string_view hashS)
 {
     if (hashAlgo != "") {
-        auto method = FileIngestionMethod::Flat;
-        if (string(hashAlgo, 0, 2) == "r:") {
-            method = FileIngestionMethod::Recursive;
-            hashAlgo = hashAlgo.substr(2);
-        }
+        ContentAddressMethod method = parseContentAddressingPrefix(hashAlgo);
         const auto hashType = parseHashType(hashAlgo);
-        if (hash != "") {
+        if (hashS != "") {
             validatePath(pathS);
+            auto hash = Hash::parseNonSRIUnprefixed(hashS, hashType);
             return DerivationOutput {
                 .output = DerivationOutputCAFixed {
-                    .hash = FixedOutputHash {
-                        .method = std::move(method),
-                        .hash = Hash::parseNonSRIUnprefixed(hash, hashType),
-                    },
+                    // FIXME non-trivial fixed refs set
+                    .ca = contentAddressFromMethodHashAndRefs(
+                        method, std::move(hash), {}),
                 },
             };
         } else {
@@ -317,12 +315,12 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
             },
             [&](DerivationOutputCAFixed dof) {
                 s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(dof.path(store, name, i.first)));
-                s += ','; printUnquotedString(s, dof.hash.printMethodAlgo());
-                s += ','; printUnquotedString(s, dof.hash.hash.to_string(Base16, false));
+                s += ','; printUnquotedString(s, printMethodAlgo(dof.ca));
+                s += ','; printUnquotedString(s, getContentAddressHash(dof.ca).to_string(Base16, false));
             },
             [&](DerivationOutputCAFloating dof) {
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
+                s += ','; printUnquotedString(s, makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType));
                 s += ','; printUnquotedString(s, "");
             },
         }, i.second.output);
@@ -482,8 +480,8 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutputCAFixed>(i.second.output);
             auto hash = hashString(htSHA256, "fixed:out:"
-                + dof.hash.printMethodAlgo() + ":"
-                + dof.hash.hash.to_string(Base16, false) + ":"
+                + printMethodAlgo(dof.ca) + ":"
+                + getContentAddressHash(dof.ca).to_string(Base16, false) + ":"
                 + store.printStorePath(dof.path(store, drv.name, i.first)));
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
@@ -612,12 +610,12 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
             [&](DerivationOutputCAFixed dof) {
                 out << store.printStorePath(dof.path(store, drv.name, i.first))
-                    << dof.hash.printMethodAlgo()
-                    << dof.hash.hash.to_string(Base16, false);
+                    << printMethodAlgo(dof.ca)
+                    << getContentAddressHash(dof.ca).to_string(Base16, false);
             },
             [&](DerivationOutputCAFloating dof) {
                 out << ""
-                    << (makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType))
+                    << (makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType))
                     << "";
             },
         }, i.second.output);

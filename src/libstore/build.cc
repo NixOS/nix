@@ -4070,26 +4070,35 @@ void DerivationGoal::registerOutputs()
 
         auto newInfoFromCA = [&](const DerivationOutputCAFloating outputHash) -> ValidPathInfo {
             auto & st = outputStats.at(outputName);
-            if (outputHash.method == FileIngestionMethod::Flat) {
+            if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
+                outputHash.method == ContentAddressMethod { TextHashMethod {} })
+            {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         "output path '%1%' should be a non-executable regular file "
-                        "since recursive hashing is not enabled (outputHashMode=flat)",
+                        "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
             }
             rewriteOutput();
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath.hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
-            switch (outputHash.method) {
-            case FileIngestionMethod::Recursive:
-                dumpPath(actualPath, caSink);
-                break;
-            case FileIngestionMethod::Flat:
-                readFile(actualPath, caSink);
-                break;
-            }
+            std::visit(overloaded {
+                [&](TextHashMethod _) {
+                    readFile(actualPath, caSink);
+                },
+                [&](FileIngestionMethod m2) {
+                    switch (m2) {
+                    case FileIngestionMethod::Recursive:
+                        dumpPath(actualPath, caSink);
+                        break;
+                    case FileIngestionMethod::Flat:
+                        readFile(actualPath, caSink);
+                        break;
+                    }
+                },
+            }, outputHash.method);
             auto got = caSink.finish().first;
             HashModuloSink narSink { htSHA256, oldHashPart };
             dumpPath(actualPath, narSink);
@@ -4098,13 +4107,10 @@ void DerivationGoal::registerOutputs()
                 worker.store,
                 {
                     .name = outputPathName(drv->name, outputName),
-                    .info = FixedOutputInfo {
-                        {
-                            .method = outputHash.method,
-                            .hash = got,
-                        },
-                        rewriteRefs(),
-                    },
+                    .info = contentAddressFromMethodHashAndRefs(
+                        outputHash.method,
+                        std::move(got),
+                        rewriteRefs()),
                 },
                 narHashAndSize.first,
             };
@@ -4132,13 +4138,14 @@ void DerivationGoal::registerOutputs()
                 return newInfo0;
             },
             [&](DerivationOutputCAFixed dof) {
+                auto wanted = getContentAddressHash(dof.ca);
+
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
-                    .method = dof.hash.method,
-                    .hashType = dof.hash.hash.type,
+                    .method = getContentAddressMethod(dof.ca),
+                    .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
-                Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
                 auto got = getContentAddressHash(*newInfo0.ca);
                 if (wanted != got) {
@@ -4151,6 +4158,11 @@ void DerivationGoal::registerOutputs()
                             wanted.to_string(SRI, true),
                             got.to_string(SRI, true)));
                 }
+                if (static_cast<const PathReferences<StorePath> &>(newInfo0) != PathReferences<StorePath> {})
+                    delayedException = std::make_exception_ptr(
+                        BuildError("illegal path references in fixed-output derivation '%s'",
+                            worker.store.printStorePath(drvPath)));
+
                 return newInfo0;
             },
             [&](DerivationOutputCAFloating dof) {

@@ -68,6 +68,7 @@ public:
         Source & dump,
         const string & name,
         ContentAddressMethod caMethod,
+        HashType hashType,
         const StorePathSet & references,
         RepairFlag repair);
 

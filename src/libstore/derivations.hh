@@ -27,7 +27,7 @@ struct DerivationOutputInputAddressed
    according to that fixed output. */
 struct DerivationOutputCAFixed
 {
-    FixedOutputHash hash; /* hash used for expected hash computation */
+    ContentAddressWithReferences ca; /* hash and refs used for validating output */
     StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
@@ -37,7 +37,7 @@ struct DerivationOutputCAFixed
 struct DerivationOutputCAFloating
 {
     /* information used for expected hash computation */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
     HashType hashType;
 };
 

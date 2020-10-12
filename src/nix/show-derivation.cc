@@ -76,11 +76,12 @@ struct CmdShowDerivation : InstallablesCommand
                         },
                         [&](DerivationOutputCAFixed dof) {
                             outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
-                            outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
-                            outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
+                            outputObj.attr("hashAlgo", printMethodAlgo(dof.ca));
+                            outputObj.attr("hash", getContentAddressHash(dof.ca).to_string(Base16, false));
+                            // FIXME print refs?
                         },
                         [&](DerivationOutputCAFloating dof) {
-                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
+                            outputObj.attr("hashAlgo", makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType));
                         },
                     }, output.output);
                 }
