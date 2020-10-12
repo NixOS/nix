@@ -1,4 +1,5 @@
-#include "build.hh"
+#include "goal.hh"
+#include "worker.hh"
 
 namespace nix {
 

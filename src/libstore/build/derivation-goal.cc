@@ -1,4 +1,6 @@
-#include "build.hh"
+#include "derivation-goal.hh"
+#include "hook-instance.hh"
+#include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
 #include "references.hh"
@@ -11,6 +13,9 @@
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+
+#include <regex>
+#include <queue>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -140,6 +145,16 @@ DerivationGoal::~DerivationGoal()
 }
 
 
+string DerivationGoal::key()
+{
+    /* Ensure that derivations get built in order of their name,
+       i.e. a derivation named "aardvark" always comes before
+       "baboon". And substitution goals always happen before
+       derivation goals (due to "b$"). */
+    return "b$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
+}
+
+
 inline bool DerivationGoal::needsHashRewrite()
 {
 #if __linux__
@@ -216,7 +231,7 @@ void DerivationGoal::getDerivation()
         return;
     }
 
-    addWaitee(worker.makeSubstitutionGoal(drvPath));
+    addWaitee(upcast_goal(worker.makeSubstitutionGoal(drvPath)));
 
     state = &DerivationGoal::loadDerivation;
 }
@@ -289,10 +304,10 @@ void DerivationGoal::haveDerivation()
                 /* Nothing to wait for; tail call */
                 return DerivationGoal::gaveUpOnSubstitution();
             }
-            addWaitee(worker.makeSubstitutionGoal(
+            addWaitee(upcast_goal(worker.makeSubstitutionGoal(
                 status.known->path,
                 buildMode == bmRepair ? Repair : NoRepair,
-                getDerivationCA(*drv)));
+                getDerivationCA(*drv))));
         }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -368,7 +383,7 @@ void DerivationGoal::gaveUpOnSubstitution()
         if (!settings.useSubstitutes)
             throw Error("dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
-        addWaitee(worker.makeSubstitutionGoal(i));
+        addWaitee(upcast_goal(worker.makeSubstitutionGoal(i)));
     }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -422,7 +437,7 @@ void DerivationGoal::repairClosure()
         });
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
-            addWaitee(worker.makeSubstitutionGoal(i, Repair));
+            addWaitee(upcast_goal(worker.makeSubstitutionGoal(i, Repair)));
         else
             addWaitee(worker.makeDerivationGoal(drvPath2->second, StringSet(), bmRepair));
     }

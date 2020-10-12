@@ -1,4 +1,5 @@
-#include "build.hh"
+#include "globals.hh"
+#include "hook-instance.hh"
 
 namespace nix {
 

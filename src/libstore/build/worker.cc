@@ -1,4 +1,8 @@
-#include "build.hh"
+#include "machines.hh"
+#include "worker.hh"
+#include "substitution-goal.hh"
+#include "derivation-goal.hh"
+#include "hook-instance.hh"
 
 #include <poll.h>
 
@@ -447,6 +451,11 @@ bool Worker::pathContentsGood(const StorePath & path)
 void Worker::markContentsGood(const StorePath & path)
 {
     pathContentsGoodCache.insert_or_assign(path, true);
+}
+
+
+GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
+	return subGoal;
 }
 
 }
