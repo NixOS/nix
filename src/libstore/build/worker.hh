@@ -11,6 +11,11 @@ namespace nix {
 class DerivationGoal;
 class SubstitutionGoal;
 
+/* Workaround for not being able to declare a something like
+
+     class SubstitutionGoal : public Goal;
+
+   even when Goal is a complete type; */
 GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
