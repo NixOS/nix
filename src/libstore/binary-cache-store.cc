@@ -444,10 +444,19 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
+std::optional<StorePath> BinaryCacheStore::queryOutputPathOf(const StorePath & drvPath, const std::string & outputName)
+{
+    auto rawPath = getFile("/ac/" + std::string(drvPath.hashPart()) + "!" + outputName);
+    if (rawPath)
+        return {parseStorePath(*rawPath)};
+    else
+        return std::nullopt;
+}
+
 void BinaryCacheStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
 {
     auto filePath = "/ac/" + std::string(deriver.hashPart()) + "!" + outputName;
-    upsertFile(filePath, std::string(output.hashPart()), "text/x-nix-derivertopath");
+    upsertFile(filePath, printStorePath(output), "text/x-nix-derivertopath");
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()

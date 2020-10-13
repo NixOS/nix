@@ -101,6 +101,8 @@ public:
 
     void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output) override;
 
+    std::optional<StorePath> queryOutputPathOf(const StorePath & drvPath, const std::string & outputName) override;
+
     void narFromPath(const StorePath & path, Sink & sink) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,

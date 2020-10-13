@@ -303,10 +303,8 @@ struct InstallableStorePath : Installable
     {
         if (storePath.path.isDerivation()) {
             std::map<std::string, std::optional<StorePath>> outputs;
-            auto drv = store->readDerivation(storePath.path);
-            for (auto & [name, output] : drv.outputsAndOptPaths(*store))
-                if (storePath.outputs.empty() || storePath.outputs.count(name))
-                    outputs.emplace(name, output.second);
+            for (auto & outputName : storePath.outputs)
+                outputs.emplace(outputName, store->queryOutputPathOf(storePath.path, outputName));
             return {
                 BuildableFromDrv {
                     .drvPath = storePath.path,
@@ -666,9 +664,12 @@ std::set<Buildable> buildableClosure(ref<Store> store, Buildable root)
                     // Take all the outputs of the derivation that are in the
                     // runtime closure, and add them as `BuildableFromDrv` to
                     // the closure
-                    auto drvOutputs = store->queryPartialDerivationOutputMap(input);
+                    auto derivation = store->readDerivation(input);
+                    /* auto drvOutputs = store->queryPartialDerivationOutputMap(input); */
                     std::map<std::string, std::optional<StorePath>> neededOutputs;
-                    for (auto & [outputName, output] : drvOutputs) {
+                    /* for (auto & [outputName, output] : drvOutputs) { */
+                    for (auto & [outputName, _] : derivation.outputs) {
+                        auto output = store->queryOutputPathOf(input, outputName);
                         if (output && runtimeClosure.count(*output)) {
                             neededOutputs.emplace(outputName, output);
                         }
@@ -722,21 +723,26 @@ void build(ref<Store> store, Realise mode, Buildables buildables, BuildMode bMod
     for (auto & b : buildables) {
         std::visit(overloaded {
             [&](BuildableOpaque bo) {
-                pathsToBuild.push_back({bo.path});
+                if (!store->isValidPath(bo.path))
+                    pathsToBuild.push_back({bo.path});
             },
             [&](BuildableFromDrv bfd) {
                 StringSet outputNames;
-                for (auto & output : bfd.outputs)
-                    outputNames.insert(output.first);
-                pathsToBuild.push_back({bfd.drvPath, outputNames});
+                for (auto & output : bfd.outputs) {
+                    if (!store->queryOutputPathOf(bfd.drvPath, output.first).has_value())
+                        outputNames.insert(output.first);
+                }
+                if (!outputNames.empty())
+                    pathsToBuild.push_back({bfd.drvPath, outputNames});
             },
         }, b);
     }
 
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
-    else if (mode == Realise::Outputs)
+    else if (mode == Realise::Outputs && !pathsToBuild.empty()) {
         store->buildPaths(pathsToBuild, bMode);
+    }
 }
 
 

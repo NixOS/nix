@@ -411,6 +411,8 @@ public:
     virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path)
     { unsupported("queryPartialDerivationOutputMap"); }
 
+    virtual std::optional<StorePath> queryOutputPathOf(const StorePath & drvPath, const std::string & outputName);
+
     /* Query the mapping outputName=>outputPath for the given derivation.
        Assume every output has a mapping and throw an exception otherwise. */
     OutputPathMap queryDerivationOutputMap(const StorePath & path);
