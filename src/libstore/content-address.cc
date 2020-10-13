@@ -124,7 +124,8 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
 ContentAddress parseContentAddress(std::string_view rawCa) {
     auto rest = rawCa;
 
-    auto [caMethod, hashType] = parseContentAddressMethodPrefix(rest);
+    auto [caMethod, hashType_] = parseContentAddressMethodPrefix(rest);
+    auto hashType = hashType_; // work around clang bug
 
     return std::visit(overloaded {
         [&](TextHashMethod _) {
