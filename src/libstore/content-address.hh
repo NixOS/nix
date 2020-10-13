@@ -7,7 +7,7 @@
 namespace nix {
 
 /*
- * Mini content address
+ * Content addressing method
  */
 
 enum struct FileIngestionMethod : uint8_t {
@@ -16,6 +16,34 @@ enum struct FileIngestionMethod : uint8_t {
     Git,
 };
 
+/*
+  We only have one way to hash text with references, so this is single-value
+  type is only useful in std::variant.
+*/
+struct TextHashMethod { };
+
+struct FixedOutputHashMethod {
+  FileIngestionMethod fileIngestionMethod;
+  HashType hashType;
+};
+
+/* Compute the prefix to the hash algorithm which indicates how the files were
+   ingested. */
+std::string makeFileIngestionPrefix(const FileIngestionMethod m);
+
+
+typedef std::variant<
+    TextHashMethod,
+    FixedOutputHashMethod
+  > ContentAddressMethod;
+
+ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
+
+std::string renderContentAddressMethod(ContentAddressMethod caMethod);
+
+/*
+ * Mini content address
+ */
 
 struct TextHash {
     Hash hash;
@@ -44,10 +72,6 @@ typedef std::variant<
     FixedOutputHash // for path computed by makeFixedOutputPath
 > ContentAddress;
 
-/* Compute the prefix to the hash algorithm which indicates how the files were
-   ingested. */
-std::string makeFileIngestionPrefix(const FileIngestionMethod m);
-
 std::string renderContentAddress(ContentAddress ca);
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);
@@ -57,25 +81,6 @@ ContentAddress parseContentAddress(std::string_view rawCa);
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 
 Hash getContentAddressHash(const ContentAddress & ca);
-
-/*
-  We only have one way to hash text with references, so this is single-value
-  type is only useful in std::variant.
-*/
-struct TextHashMethod { };
-struct FixedOutputHashMethod {
-  FileIngestionMethod fileIngestionMethod;
-  HashType hashType;
-};
-
-typedef std::variant<
-    TextHashMethod,
-    FixedOutputHashMethod
-  > ContentAddressMethod;
-
-ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
-
-std::string renderContentAddressMethod(ContentAddressMethod caMethod);
 
 /*
  * References set
