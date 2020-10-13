@@ -115,16 +115,16 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
         return std::nullopt;
     if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
         return std::visit(overloaded {
-        	[&](TextInfo ti) -> std::optional<ContentAddress> {
-        		if (!ti.references.empty())
-        			return std::nullopt;
-        		return static_cast<TextHash>(ti);
-			},
-        	[&](FixedOutputInfo fi) -> std::optional<ContentAddress> {
-        		if (fi.references != PathReferences<StorePath> {})
-        			return std::nullopt;
-        		return static_cast<FixedOutputHash>(fi);
-			},
+            [&](TextInfo ti) -> std::optional<ContentAddress> {
+                if (!ti.references.empty())
+                    return std::nullopt;
+                return static_cast<TextHash>(ti);
+            },
+            [&](FixedOutputInfo fi) -> std::optional<ContentAddress> {
+                if (fi.references != PathReferences<StorePath> {})
+                    return std::nullopt;
+                return static_cast<FixedOutputHash>(fi);
+            },
         }, dof->ca);
     }
     return std::nullopt;
