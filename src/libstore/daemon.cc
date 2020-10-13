@@ -380,7 +380,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashType] = parseContentAddressMethod(camStr);
+                auto [contentAddressMethod, hashType_] = parseContentAddressMethod(camStr);
+                auto hashType = hashType_; // work around clang bug
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
