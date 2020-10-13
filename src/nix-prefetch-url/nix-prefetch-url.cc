@@ -225,6 +225,8 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         if (printPath)
             std::cout << store->printStorePath(*storePath) << std::endl;
 
+        store->sync();
+
         return 0;
     }
 }

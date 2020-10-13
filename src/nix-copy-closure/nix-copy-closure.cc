@@ -61,6 +61,9 @@ static int main_nix_copy_closure(int argc, char ** argv)
 
         copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
 
+        from->sync();
+        to->sync();
+
         return 0;
     }
 }

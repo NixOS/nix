@@ -112,6 +112,8 @@ public:
 
     unsigned int getProtocol() override;
 
+    void sync() override;
+
     void flushBadConnections();
 
     struct Connection

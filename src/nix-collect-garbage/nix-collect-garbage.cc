@@ -86,6 +86,7 @@ static int main_nix_collect_garbage(int argc, char * * argv)
             GCResults results;
             PrintFreed freed(true, results);
             store->collectGarbage(options, results);
+            store->sync();
         }
 
         return 0;

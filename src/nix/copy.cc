@@ -103,6 +103,8 @@ struct CmdCopy : StorePathsCommand
 
         copyPaths(srcStore, dstStore, StorePathSet(storePaths.begin(), storePaths.end()),
             NoRepair, checkSigs, substitute);
+
+        dstStore->sync();
     }
 };
 

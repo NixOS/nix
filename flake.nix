@@ -88,7 +88,8 @@
             (aws-sdk-cpp.override {
               apis = ["s3" "transfer"];
               customMemoryManagement = false;
-            });
+            })
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) ipfs;
 
         propagatedDeps =
           [ (boehmgc.override { enableLargeConfig = true; })

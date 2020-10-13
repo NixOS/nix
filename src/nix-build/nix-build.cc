@@ -534,6 +534,8 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
 
+        store->sync();
+
         logger->stop();
 
         for (auto & path : outPaths)

@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "args.hh"
 #include "content-address.hh"
 #include "split.hh"
@@ -132,6 +134,64 @@ std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt)
 std::string renderContentAddress(std::optional<ContentAddress> ca)
 {
     return ca ? renderContentAddress(*ca) : "";
+}
+
+void to_json(nlohmann::json& j, const ContentAddress & ca) {
+    j = std::visit(overloaded {
+        [](TextHash th) {
+            return nlohmann::json {
+                { "type", "text" },
+                { "hash", th.hash.to_string(Base32, false) },
+            };
+        },
+        [](FixedOutputHash foh) {
+            return nlohmann::json {
+                { "type", "fixed" },
+                { "method", foh.method == FileIngestionMethod::Flat ? "flat" : "recursive" },
+                { "algo", printHashType(foh.hash.type) },
+                { "hash", foh.hash.to_string(Base32, false) },
+            };
+        }
+    }, ca);
+}
+
+void from_json(const nlohmann::json& j, ContentAddress & ca) {
+    std::string_view type = j.at("type").get<std::string_view>();
+    if (type == "text") {
+        ca = TextHash {
+            .hash = Hash::parseNonSRIUnprefixed(j.at("hash").get<std::string_view>(), htSHA256),
+        };
+    } else if (type == "fixed") {
+        std::string_view methodRaw = j.at("method").get<std::string_view>();
+        auto method = methodRaw == "flat" ? FileIngestionMethod::Flat
+            : methodRaw == "recursive" ? FileIngestionMethod::Recursive
+            : throw Error("invalid file ingestion method: %s", methodRaw);
+        auto hashAlgo = parseHashType(j.at("algo").get<std::string>());
+        ca = FixedOutputHash {
+            .method = method,
+            .hash = Hash::parseNonSRIUnprefixed(j.at("hash").get<std::string_view>(), hashAlgo),
+        };
+    } else
+        throw Error("invalid type: %s", type);
+}
+
+// Needed until https://github.com/nlohmann/json/pull/2117
+
+void to_json(nlohmann::json& j, const std::optional<ContentAddress> & c) {
+    if (!c)
+        j = nullptr;
+    else
+        to_json(j, *c);
+}
+
+void from_json(const nlohmann::json& j, std::optional<ContentAddress> & c) {
+    if (j.is_null()) {
+        c = std::nullopt;
+    } else {
+        // Dummy value to set tag bit.
+        c = TextHash { .hash = Hash { htSHA256 } };
+        from_json(j, *c);
+    }
 }
 
 Hash getContentAddressHash(const ContentAddress & ca)

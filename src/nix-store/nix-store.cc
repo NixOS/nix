@@ -1118,6 +1118,9 @@ static int main_nix_store(int argc, char * * argv)
 
         op(opFlags, opArgs);
 
+        if (store)
+            store->sync();
+
         logger->stop();
 
         return 0;

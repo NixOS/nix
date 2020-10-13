@@ -33,6 +33,8 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
+MakeError(URLEncodeError, Error);
+
 std::string resolveUri(const std::string & uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)
@@ -310,12 +312,22 @@ struct curlFileTransfer : public FileTransfer
 
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
+            else if (request.post)
+                curl_easy_setopt(req, CURLOPT_POST, 1);
 
             if (request.data) {
-                curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
-                curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
-                curl_easy_setopt(req, CURLOPT_READDATA, this);
-                curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                if (request.post) {
+                    // based off of https://curl.haxx.se/libcurl/c/postit2.html
+                    curl_mime *form = curl_mime_init(req);
+                    curl_mimepart *field = curl_mime_addpart(form);
+                    curl_mime_data(field, request.data->data(), request.data->length());
+                    curl_easy_setopt(req, CURLOPT_MIMEPOST, form);
+                } else {
+                    curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                    curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
+                    curl_easy_setopt(req, CURLOPT_READDATA, this);
+                    curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                }
             }
 
             if (request.verifyTLS) {
@@ -331,6 +343,14 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
+
+            /* FIXME: We hit a weird issue when 1 second goes by
+             * without Expect: 100-continue. curl_multi_perform
+             * appears to block indefinitely. To workaround this, we
+             * just set the timeout to a really big value unlikely to
+             * be hit in any server without Expect: 100-continue. This
+             * may specifically be a bug in the IPFS API. */
+            curl_easy_setopt(req, CURLOPT_EXPECT_100_TIMEOUT_MS, 300000);
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
@@ -711,6 +731,22 @@ struct curlFileTransfer : public FileTransfer
 
         enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
     }
+
+    std::string urlEncode(const std::string & param) override {
+        //TODO reuse curl handle or move function to another class/file
+        CURL *curl = curl_easy_init();
+        char *encoded = NULL;
+        if (curl) {
+            encoded = curl_easy_escape(curl, param.c_str(), 0);
+        }
+        if ((curl == NULL) || (encoded == NULL)) {
+          throw URLEncodeError("Could not encode param");
+        }
+        std::string ret(encoded);
+        curl_free(encoded);
+        curl_easy_cleanup(curl);
+        return ret;
+    }
 };
 
 ref<FileTransfer> getFileTransfer()
@@ -842,6 +878,10 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            thread if sink() takes a long time. */
         sink((unsigned char *) chunk.data(), chunk.size());
     }
+}
+
+std::string FileTransfer::urlEncode(const std::string & param) {
+    throw URLEncodeError("not implemented");
 }
 
 template<typename... Args>

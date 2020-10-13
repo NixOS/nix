@@ -1455,6 +1455,8 @@ static int main_nix_env(int argc, char * * argv)
 
         globals.state->printStats();
 
+        store->sync();
+
         logger->stop();
 
         return 0;

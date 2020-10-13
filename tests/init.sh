@@ -2,7 +2,7 @@ source common.sh
 
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
-    chmod -R u+w "$TEST_ROOT"
+    chmod -R u+rw "$TEST_ROOT"
     rm -rf "$TEST_ROOT"
 fi
 mkdir "$TEST_ROOT"

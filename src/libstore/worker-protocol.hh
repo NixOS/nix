@@ -50,6 +50,7 @@ typedef enum {
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
     wopQueryDerivationOutputMap = 41,
+    wopSync = 42,
 } WorkerOp;
 
 

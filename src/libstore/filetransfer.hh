@@ -55,6 +55,7 @@ struct FileTransferRequest
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
+    bool post = false;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
@@ -104,6 +105,8 @@ struct FileTransfer
     /* Download a file, writing its data to a sink. The sink will be
        invoked on the thread of the caller. */
     void download(FileTransferRequest && request, Sink & sink);
+
+    virtual std::string urlEncode(const std::string & param);
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
