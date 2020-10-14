@@ -1420,12 +1420,6 @@ void DerivationGoal::startBuilder()
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
-        writeFile(chrootRootDir + "/etc/passwd", fmt(
-                "root:x:0:0:Nix build user:%3%:/noshell\n"
-                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
-
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
         writeFile(chrootRootDir + "/etc/group",
@@ -1729,6 +1723,14 @@ void DerivationGoal::startBuilder()
             if (!buildUser)
                 throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
         }
+
+        /* Now that we now the sandbox uid, we can write
+           /etc/passwd. */
+        writeFile(chrootRootDir + "/etc/passwd", fmt(
+                "root:x:0:0:Nix build user:%3%:/noshell\n"
+                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n",
+                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
         /* Save the mount namespace of the child. We have to do this
            *before* the child does a chroot. */
