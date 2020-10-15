@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
+#include "local-fs-store.hh"
 
 using namespace nix;
 using namespace nix::flake;
