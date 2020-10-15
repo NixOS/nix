@@ -1,3 +1,4 @@
+#[allow(improper_ctypes_definitions)]
 #[cfg(not(test))]
 mod c;
 mod error;

@@ -79,8 +79,8 @@ struct CmdHash : Command
     }
 };
 
-static RegisterCommand r1("hash-file", [](){ return make_ref<CmdHash>(FileIngestionMethod::Flat); });
-static RegisterCommand r2("hash-path", [](){ return make_ref<CmdHash>(FileIngestionMethod::Recursive); });
+static RegisterCommand rCmdHashFile("hash-file", [](){ return make_ref<CmdHash>(FileIngestionMethod::Flat); });
+static RegisterCommand rCmdHashPath("hash-path", [](){ return make_ref<CmdHash>(FileIngestionMethod::Recursive); });
 
 struct CmdToBase : Command
 {
@@ -112,10 +112,10 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand r3("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
-static RegisterCommand r4("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
-static RegisterCommand r5("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
-static RegisterCommand r6("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
+static RegisterCommand rCmdToBase16("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
+static RegisterCommand rCmdToBase32("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
+static RegisterCommand rCmdToBase64("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
+static RegisterCommand rCmdToSRI("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
@@ -167,4 +167,4 @@ static int compatNixHash(int argc, char * * argv)
     return 0;
 }
 
-static RegisterLegacyCommand s1("nix-hash", compatNixHash);
+static RegisterLegacyCommand r_nix_hash("nix-hash", compatNixHash);

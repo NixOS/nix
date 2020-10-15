@@ -1,3 +1,5 @@
+#pragma once
+
 #include "serialise.hh"
 #include "store-api.hh"
 

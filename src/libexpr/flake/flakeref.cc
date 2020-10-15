@@ -16,10 +16,10 @@ const static std::string subDirRegex = subDirElemRegex + "(?:/" + subDirElemRege
 
 std::string FlakeRef::to_string() const
 {
-    auto url = input.toURL();
+    std::map<std::string, std::string> extraQuery;
     if (subdir != "")
-        url.query.insert_or_assign("dir", subdir);
-    return url.to_string();
+        extraQuery.insert_or_assign("dir", subdir);
+    return input.toURLString(extraQuery);
 }
 
 fetchers::Attrs FlakeRef::toAttrs() const
@@ -157,7 +157,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         } else {
             if (!hasPrefix(path, "/"))
                 throw BadURL("flake reference '%s' is not an absolute path", url);
-            path = canonPath(path);
+            auto query = decodeQuery(match[2]);
+            path = canonPath(path + "/" + get(query, "dir").value_or(""));
         }
 
         fetchers::Attrs attrs;

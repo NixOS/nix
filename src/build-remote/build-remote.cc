@@ -44,7 +44,7 @@ static bool allSupportedLocally(Store & store, const std::set<std::string>& requ
     return true;
 }
 
-static int _main(int argc, char * * argv)
+static int main_build_remote(int argc, char * * argv)
 {
     {
         logger = makeJSONLogger(*logger);
@@ -297,4 +297,4 @@ connected:
     }
 }
 
-static RegisterLegacyCommand s1("build-remote", _main);
+static RegisterLegacyCommand r_build_remote("build-remote", main_build_remote);

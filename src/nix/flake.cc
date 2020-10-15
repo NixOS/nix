@@ -958,4 +958,4 @@ struct CmdFlake : NixMultiCommand
     }
 };
 
-static auto r1 = registerCommand<CmdFlake>("flake");
+static auto rCmdFlake = registerCommand<CmdFlake>("flake");

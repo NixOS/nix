@@ -471,4 +471,4 @@ struct CmdProfile : NixMultiCommand
     }
 };
 
-static auto r1 = registerCommand<CmdProfile>("profile");
+static auto rCmdProfile = registerCommand<CmdProfile>("profile");

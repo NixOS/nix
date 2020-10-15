@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "fs-accessor.hh"
 
 using namespace nix;

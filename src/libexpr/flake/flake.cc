@@ -12,7 +12,7 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<Tree, FlakeRef> FetchedFlake;
+typedef std::pair<fetchers::Tree, FlakeRef> FetchedFlake;
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(
@@ -274,7 +274,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 }
 
 /* Compute an in-memory lock file for the specified top-level flake,
-   and optionally write it to file, it the flake is writable. */
+   and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & topRef,

@@ -90,6 +90,6 @@ void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Value & v
     }
 }
 
-static RegisterPrimOp r("fromTOML", 1, prim_fromTOML);
+static RegisterPrimOp primop_fromTOML("fromTOML", 1, prim_fromTOML);
 
 }
