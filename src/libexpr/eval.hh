@@ -188,6 +188,9 @@ public:
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const Pos & pos = noPos);
 
+    /* Get an attribute of a value, or null if it doesn't exist */
+    inline Attr * evalValueAttr(Value & v, const Symbol & name, const Pos & pos = noPos);
+
     /* Force a value, then recursively force list elements and
        attributes. */
     void forceValueDeep(Value & v);

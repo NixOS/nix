@@ -1107,37 +1107,34 @@ unsigned long nrLookups = 0;
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
-    Value vTmp;
+    // TODO: Probably use pos2 throughout this function
     Pos * pos2 = 0;
-    Value * vAttrs = &vTmp;
 
-    e->eval(state, env, vTmp);
+    // TODO: [Why] can't this be stack allocated. Same for evalAttr
+    Value * vAttrs = e->maybeThunk(state, env);
 
     try {
 
         for (auto & i : attrPath) {
             nrLookups++;
-            Bindings::iterator j;
             Symbol name = getName(i, state, env);
-            if (def) {
-                state.forceValue(*vAttrs, pos);
-                if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                {
+            Attr * attr = state.evalValueAttr(*vAttrs, name, pos);
+            if (!attr) {
+                if (def) {
                     def->eval(state, env, v);
                     return;
-                }
-            } else {
-                state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+                } else {
+                    // Depending on the reason of j being null we throw an error
+                    // If it wasn't an attribute set, this should trigger
+                    state.forceAttrs(*vAttrs, pos);
+                    // Otherwise the attribute set will have missed the name we wanted
                     throwEvalError(pos, "attribute '%1%' missing", name);
+                }
             }
-            vAttrs = j->value;
-            pos2 = j->pos;
+            vAttrs = attr->value;
+            pos2 = attr->pos;
             if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
-
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
 
     } catch (Error & e) {
         if (pos2 && pos2->file != state.sDerivationNix)
@@ -1146,10 +1143,12 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         throw;
     }
 
+    state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ));
     v = *vAttrs;
 }
 
 
+// TODO: Use evalValueAttr to make this lazy, like ExprSelect
 void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;

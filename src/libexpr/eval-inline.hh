@@ -52,6 +52,18 @@ void EvalState::forceValue(Value & v, const Pos & pos)
         throwEvalError(pos, "infinite recursion encountered");
 }
 
+Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
+{
+    forceValue(v, pos);
+    if (v.type != tAttrs)
+        return nullptr;
+
+    Bindings::iterator j;
+    if ((j = v.attrs->find(name)) == v.attrs->end()) {
+        return nullptr;
+    }
+    return j;
+}
 
 inline void EvalState::forceAttrs(Value & v)
 {
