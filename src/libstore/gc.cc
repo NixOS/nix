@@ -1,6 +1,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
+#include "local-fs-store.hh"
 #include "finally.hh"
 
 #include <functional>
@@ -682,7 +683,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
     struct stat st;
     if (stat(linksDir.c_str(), &st) == -1)
         throw SysError("statting '%1%'", linksDir);
-    auto overhead = st.st_blocks * 512ULL;
+    int64_t overhead = st.st_blocks * 512ULL;
 
     printInfo("note: currently hard linking saves %.2f MiB",
         ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));

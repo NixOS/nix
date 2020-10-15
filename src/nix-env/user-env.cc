@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
