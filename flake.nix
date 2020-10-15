@@ -228,7 +228,7 @@
         # Binary package for various platforms.
         build = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix);
 
-        build-static = nixpkgs.lib.genAttrs linuxSystems (system: self.packages.${system}.nix-static);
+        buildStatic = nixpkgs.lib.genAttrs linuxSystems (system: self.packages.${system}.nix-static);
 
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
@@ -441,7 +441,7 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
       } // nixpkgs.lib.optionalAttrs (builtins.elem system linuxSystems) {
-        build-static = self.hydraJobs.build-static.${system};
+        buildStatic = self.hydraJobs.buildStatic.${system};
       });
 
       packages = forAllSystems (system: {
