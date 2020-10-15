@@ -24,3 +24,6 @@
 
   Selecting derivation outputs using the attribute selection syntax
   (e.g. `nixpkgs#glibc.dev`) no longer works.
+
+* `builtins.fetchTree` (and flake inputs) can now be used to fetch plain files
+  over the `http(s)` and `file` protocols in addition to directory tarballs.
