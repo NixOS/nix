@@ -1,3 +1,8 @@
+#include "content-address.hh"
+#include "crypto.hh"
+#include "local-store.hh"
+#include "local-fs-store.hh"
+#include "path-info.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
@@ -199,6 +204,101 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
+    /* When there is an expected output hash and we are allowig substitution
+     * try to find the expected path on any of the configured substituters */
+    if (expectedHash && settings.useSubstitutes) {
+        auto subs = getDefaultSubstituters();
+        for (auto sub : subs) {
+
+            // only consider substituters with the same store path (e.g.
+            // /nix/store)
+            if (state.store->storeDir != sub->storeDir) {
+                continue;
+            }
+
+            auto ingestionMethod = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            auto storePath = sub->makeFixedOutputPath(ingestionMethod, *expectedHash, name, {}, false);
+
+            // Query the substituters for the path, continue to the next one if
+            // we have a valid path info
+            std::shared_ptr<const ValidPathInfo> info;
+            try {
+                info = sub->queryPathInfo(storePath);
+            } catch (InvalidPath &) {
+                //trace("trying next substituter");
+                continue;
+            } catch (Error & e) {
+                logError(e.info());
+                continue;
+            }
+
+            // The path info must no longer be null here as all cases that
+            // could lead to that should have thrown a (previously handled)
+            // error
+            assert(info);
+
+            // Also the path in the info must be the same we asked for, if not
+            // we log an error and try the next substituer
+            if (info->path != storePath) {
+                printError("Got wrong store path from substituer %s. Asked for '%s' got '%s'.",
+                        sub->getUri(),
+                        state.store->printStorePath(storePath),
+                        state.store->printStorePath(info->path));
+                continue;
+            }
+
+            // The path isn't allowed to carry any references
+            if (info->references.size() > 0) {
+                printError("FOD '%s' from substituer '%s' has references while no references where expected.",
+                        sub->getUri(),
+                        state.store->printStorePath(storePath));
+                continue;
+            }
+
+
+            // Check for a valid signature on the path and on failure try next
+            bool requireSigs = settings.requireSigs;
+            auto publicKeys = getDefaultPublicKeys();
+
+            // If the destination store is a LocalFSStore use settings from it
+            // instead of the defaults
+            if (auto localStore = state.store.dynamic_pointer_cast<LocalStore>(); localStore) {
+                requireSigs = localStore->requireSigs;
+                publicKeys = localStore->getPublicKeys();
+            }
+            if (requireSigs
+                && !sub->isTrusted
+                && !info->checkSignatures(*state.store, publicKeys)) {
+                logWarning({
+                    .name = "Invalid path signature",
+                    .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
+                        sub->getUri(), state.store->printStorePath(storePath))
+                });
+                continue;
+            }
+
+            // Finally attempt substitution
+            // FIXME: what should the repair flag be? What if a download was
+            //        interrupted half-way, is that handled elsewhere?
+            try {
+                copyStorePath(ref<Store>(sub), state.store, storePath, RepairFlag::NoRepair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+            } catch (Error & e) {
+                logError(e.info());
+            } catch (...) {
+                printError("failed to subsitute '%s' from '%s'", state.store->printStorePath(storePath), sub->getUri());
+                continue;
+            }
+
+            auto path = state.store->toRealPath(storePath);
+
+            if (state.allowedPaths)
+                state.allowedPaths->insert(path);
+
+            mkString(v, path, PathSet({path}));
+            return;
+        }
+    }
+
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
@@ -263,7 +363,7 @@ static RegisterPrimOp primop_fetchTarball({
       The fetched tarball is cached for a certain amount of time (1 hour
       by default) in `~/.cache/nix/tarballs/`. You can change the cache
       timeout either on the command line with `--option tarball-ttl number
-      of seconds` or in the Nix configuration file with this option: ` 
+      of seconds` or in the Nix configuration file with this option: `
       number of seconds to cache `.
 
       Note that when obtaining the hash with ` nix-prefetch-url ` the
@@ -301,17 +401,17 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url  
+        - url
           The URL of the repo.
 
-        - name  
+        - name
           The name of the directory the repo should be exported to in the
           store. Defaults to the basename of the URL.
 
-        - rev  
+        - rev
           The git revision to fetch. Defaults to the tip of `ref`.
 
-        - ref  
+        - ref
           The git ref to look for the requested revision under. This is
           often a branch or tag name. Defaults to `HEAD`.
 
@@ -319,7 +419,7 @@ static RegisterPrimOp primop_fetchGit({
           of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
           with `refs/`.
 
-        - submodules  
+        - submodules
           A Boolean parameter that specifies whether submodules should be
           checked out. Defaults to `false`.
 
@@ -361,7 +461,7 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > It is nice to always specify the branch which a revision
           > belongs to. Without the branch being specified, the fetcher
           > might fail if the default branch changes. Additionally, it can
@@ -398,12 +498,12 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > Nix will refetch the branch in accordance with
           > the option `tarball-ttl`.
 
           > **Note**
-          > 
+          >
           > This behavior is disabled in *Pure evaluation mode*.
     )",
     .fun = prim_fetchGit,

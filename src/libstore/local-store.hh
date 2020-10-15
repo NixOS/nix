@@ -105,8 +105,6 @@ public:
     const Path tempRootsDir;
     const Path fnTempRoots;
 
-private:
-
     const PublicKeys & getPublicKeys();
 
 public:
@@ -297,7 +295,6 @@ private:
     void createUser(const std::string & userName, uid_t userId) override;
 
     friend class DerivationGoal;
-    friend class SubstitutionGoal;
 };
 
 
