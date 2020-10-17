@@ -36,6 +36,7 @@ let
 in
 
 {
+  name = "remote-builds";
 
   nodes =
     { builder1 = builder;

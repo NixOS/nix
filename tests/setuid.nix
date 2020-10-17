@@ -8,6 +8,7 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
 };
 
 makeTest {
+  name = "setuid";
 
   machine =
     { config, lib, pkgs, ... }:

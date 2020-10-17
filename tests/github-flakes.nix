@@ -64,6 +64,7 @@ in
 makeTest (
 
 {
+  name = "github-flakes";
 
   nodes =
     { # Impersonate github.com and api.github.com.

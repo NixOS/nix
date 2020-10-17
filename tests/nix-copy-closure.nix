@@ -8,6 +8,7 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
 };
 
 makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
+  name = "nix-copy-closure";
 
   nodes =
     { client =
