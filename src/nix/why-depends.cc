@@ -156,7 +156,7 @@ struct CmdWhyDepends : SourceExprCommand
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
-            logger->stdout("%s%s%s%s" ANSI_NORMAL,
+            logger->cout("%s%s%s%s" ANSI_NORMAL,
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
                 firstPad != "" ? "→ " : "",

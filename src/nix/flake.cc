@@ -62,17 +62,17 @@ public:
 
 static void printFlakeInfo(const Store & store, const Flake & flake)
 {
-    logger->stdout("Resolved URL:  %s", flake.resolvedRef.to_string());
-    logger->stdout("Locked URL:    %s", flake.lockedRef.to_string());
+    logger->cout("Resolved URL:  %s", flake.resolvedRef.to_string());
+    logger->cout("Locked URL:    %s", flake.lockedRef.to_string());
     if (flake.description)
-        logger->stdout("Description:   %s", *flake.description);
-    logger->stdout("Path:          %s", store.printStorePath(flake.sourceInfo->storePath));
+        logger->cout("Description:   %s", *flake.description);
+    logger->cout("Path:          %s", store.printStorePath(flake.sourceInfo->storePath));
     if (auto rev = flake.lockedRef.input.getRev())
-        logger->stdout("Revision:      %s", rev->to_string(Base16, false));
+        logger->cout("Revision:      %s", rev->to_string(Base16, false));
     if (auto revCount = flake.lockedRef.input.getRevCount())
-        logger->stdout("Revisions:     %s", *revCount);
+        logger->cout("Revisions:     %s", *revCount);
     if (auto lastModified = flake.lockedRef.input.getLastModified())
-        logger->stdout("Last modified: %s",
+        logger->cout("Last modified: %s",
             std::put_time(std::localtime(&*lastModified), "%F %T"));
 }
 
@@ -140,7 +140,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
 
         if (json) {
             auto json = flakeToJson(*store, flake);
-            logger->stdout("%s", json.dump());
+            logger->cout("%s", json.dump());
         } else
             printFlakeInfo(*store, flake);
     }
@@ -158,9 +158,9 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
         auto flake = lockFlake();
 
         if (json)
-            logger->stdout("%s", flake.lockFile.toJson());
+            logger->cout("%s", flake.lockFile.toJson());
         else {
-            logger->stdout("%s", flake.flake.lockedRef);
+            logger->cout("%s", flake.flake.lockedRef);
 
             std::unordered_set<std::shared_ptr<Node>> visited;
 
@@ -172,7 +172,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
                     bool last = i + 1 == node.inputs.size();
 
                     if (auto lockedNode = std::get_if<0>(&input.second)) {
-                        logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
+                        logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
                             prefix + (last ? treeLast : treeConn), input.first,
                             *lockedNode ? (*lockedNode)->lockedRef : flake.flake.lockedRef);
 
@@ -180,7 +180,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
 
                         if (firstVisit) recurse(**lockedNode, prefix + (last ? treeNull : treeLine));
                     } else if (auto follows = std::get_if<1>(&input.second)) {
-                        logger->stdout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
+                        logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
                             prefix + (last ? treeLast : treeConn), input.first,
                             printInputPath(*follows));
                     }
@@ -811,7 +811,7 @@ struct CmdFlakeShow : FlakeCommand
             try {
                 auto recurse = [&]()
                 {
-                    logger->stdout("%s", headerPrefix);
+                    logger->cout("%s", headerPrefix);
                     auto attrs = visitor.getAttrs();
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         bool last = i + 1 == attrs.size();
@@ -837,7 +837,7 @@ struct CmdFlakeShow : FlakeCommand
                     }
                     */
 
-                    logger->stdout("%s: %s '%s'",
+                    logger->cout("%s: %s '%s'",
                         headerPrefix,
                         attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
                         attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
@@ -885,7 +885,7 @@ struct CmdFlakeShow : FlakeCommand
                     if (attrPath.size() == 1)
                         recurse();
                     else if (!showLegacy)
-                        logger->stdout("%s: " ANSI_YELLOW "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
+                        logger->cout("%s: " ANSI_YELLOW "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
                     else {
                         if (visitor.isDerivation())
                             showDerivation();
@@ -902,7 +902,7 @@ struct CmdFlakeShow : FlakeCommand
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
                         throw EvalError("not an app definition");
-                    logger->stdout("%s: app", headerPrefix);
+                    logger->cout("%s: app", headerPrefix);
                 }
 
                 else if (
@@ -910,11 +910,11 @@ struct CmdFlakeShow : FlakeCommand
                     (attrPath.size() == 2 && attrPath[0] == "templates"))
                 {
                     auto description = visitor.getAttr("description")->getString();
-                    logger->stdout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
+                    logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
                 }
 
                 else {
-                    logger->stdout("%s: %s",
+                    logger->cout("%s: %s",
                         headerPrefix,
                         attrPath.size() == 1 && attrPath[0] == "overlay" ? "Nixpkgs overlay" :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :

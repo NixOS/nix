@@ -100,7 +100,7 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void stdout(const std::string & fs, const Args & ... args)
+    inline void cout(const std::string & fs, const Args & ... args)
     {
         boost::format f(fs);
         formatHelper(f, args...);

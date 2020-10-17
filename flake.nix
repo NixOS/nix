@@ -16,7 +16,8 @@
 
       officialRelease = false;
 
-      systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+      linuxSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
+      systems = linuxSystems ++ [ "x86_64-darwin" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
@@ -61,34 +62,41 @@
             "LDFLAGS=-fuse-ld=gold"
           ];
 
-        buildDeps =
-          [ bison
-            flex
-            mdbook
-            lowdown
-            autoconf-archive
-            autoreconfHook
 
-            curl
+        nativeBuildDeps =
+          [
+            buildPackages.bison
+            buildPackages.flex
+            (lib.getBin buildPackages.lowdown)
+            buildPackages.mdbook
+            buildPackages.autoconf-archive
+            buildPackages.autoreconfHook
+            buildPackages.pkgconfig
+
+            # Tests
+            buildPackages.git
+            buildPackages.mercurial
+            buildPackages.jq
+          ];
+
+        buildDeps =
+          [ curl
             bzip2 xz brotli zlib editline
-            openssl pkgconfig sqlite
+            openssl sqlite
             libarchive
             boost
             nlohmann_json
-
-            # Tests
-            git
-            mercurial
-            jq
+            lowdown
             gmock
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
-            (aws-sdk-cpp.override {
-              apis = ["s3" "transfer"];
-              customMemoryManagement = false;
-            });
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+
+        awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
+          (aws-sdk-cpp.override {
+            apis = ["s3" "transfer"];
+            customMemoryManagement = false;
+          });
 
         propagatedDeps =
           [ (boehmgc.override { enableLargeConfig = true; })
@@ -115,7 +123,8 @@
 
           outputs = [ "out" "dev" "doc" ];
 
-          buildInputs = buildDeps;
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ awsDeps;
 
           propagatedBuildInputs = propagatedDeps;
 
@@ -159,14 +168,17 @@
 
             src = self;
 
+            nativeBuildInputs =
+              [ buildPackages.autoconf-archive
+                buildPackages.autoreconfHook
+                buildPackages.pkgconfig
+              ];
+
             buildInputs =
-              [ autoconf-archive
-                autoreconfHook
-                nix
+              [ nix
                 curl
                 bzip2
                 xz
-                pkgconfig
                 pkgs.perl
                 boost
                 nlohmann_json
@@ -197,15 +209,15 @@
 
           src = lowdown-src;
 
-          outputs = [ "out" "dev" ];
+          outputs = [ "out" "bin" "dev" ];
 
-          buildInputs = [ which ];
+          nativeBuildInputs = [ which ];
 
           configurePhase =
             ''
               ./configure \
                 PREFIX=${placeholder "dev"} \
-                BINDIR=${placeholder "out"}/bin
+                BINDIR=${placeholder "bin"}/bin
             '';
         };
 
@@ -214,10 +226,12 @@
       hydraJobs = {
 
         # Binary package for various platforms.
-        build = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix);
+        build = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix);
+
+        buildStatic = nixpkgs.lib.genAttrs linuxSystems (system: self.packages.${system}.nix-static);
 
         # Perl bindings for various platforms.
-        perlBindings = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix.perl-bindings);
+        perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
@@ -323,7 +337,8 @@
 
             enableParallelBuilding = true;
 
-            buildInputs = buildDeps ++ propagatedDeps;
+            nativeBuildInputs = nativeBuildDeps;
+            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
 
             dontInstall = false;
 
@@ -425,10 +440,47 @@
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
+      } // nixpkgs.lib.optionalAttrs (builtins.elem system linuxSystems) {
+        buildStatic = self.hydraJobs.buildStatic.${system};
       });
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
+      } // nixpkgs.lib.optionalAttrs (builtins.elem system linuxSystems) {
+        nix-static = let
+          nixpkgs = nixpkgsFor.${system}.pkgsStatic;
+        in with commonDeps nixpkgs; nixpkgs.stdenv.mkDerivation {
+          name = "nix-${version}";
+
+          src = self;
+
+          VERSION_SUFFIX = versionSuffix;
+
+          outputs = [ "out" "dev" "doc" ];
+
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ propagatedDeps;
+
+          configureFlags = [ "--sysconfdir=/etc" ];
+
+          enableParallelBuilding = true;
+
+          makeFlags = "profiledir=$(out)/etc/profile.d";
+
+          doCheck = true;
+
+          installFlags = "sysconfdir=$(out)/etc";
+
+          postInstall = ''
+            mkdir -p $doc/nix-support
+            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+          '';
+
+          doInstallCheck = true;
+          installCheckFlags = "sysconfdir=$(out)/etc";
+
+          stripAllList = ["bin"];
+        };
       });
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
@@ -442,7 +494,8 @@
 
           outputs = [ "out" "dev" "doc" ];
 
-          buildInputs = buildDeps ++ propagatedDeps ++ perlDeps;
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ perlDeps;
 
           inherit configureFlags;
 
