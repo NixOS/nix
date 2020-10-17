@@ -15,7 +15,11 @@ class SubstitutionGoal;
 
      class SubstitutionGoal : public Goal;
 
-   even when Goal is a complete type; */
+   even when Goal is a complete type.
+
+   This is still a static cast. The purpose of exporting it is to define it in
+   a place where `SubstitutionGoal` is concrete, and use it in a place where it
+   is opaque. */
 GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
