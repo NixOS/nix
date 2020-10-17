@@ -1,6 +1,10 @@
 #include "args.hh"
 #include "hash.hh"
 
+#include <glob.h>
+
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 void Args::addFlag(Flag && flag_)
@@ -13,12 +17,34 @@ void Args::addFlag(Flag && flag_)
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
+bool pathCompletions = false;
+std::shared_ptr<std::set<std::string>> completions;
+
+std::string completionMarker = "___COMPLETE___";
+
+std::optional<std::string> needsCompletion(std::string_view s)
+{
+    if (!completions) return {};
+    auto i = s.find(completionMarker);
+    if (i != std::string::npos)
+        return std::string(s.begin(), i);
+    return {};
+}
+
 void Args::parseCmdline(const Strings & _cmdline)
 {
     Strings pendingArgs;
     bool dashDash = false;
 
     Strings cmdline(_cmdline);
+
+    if (auto s = getEnv("NIX_GET_COMPLETIONS")) {
+        size_t n = std::stoi(*s);
+        assert(n > 0 && n <= cmdline.size());
+        *std::next(cmdline.begin(), n - 1) += completionMarker;
+        completions = std::make_shared<decltype(completions)::element_type>();
+        verbosity = lvlError;
+    }
 
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
@@ -63,7 +89,7 @@ void Args::printHelp(const string & programName, std::ostream & out)
     for (auto & exp : expectedArgs) {
         std::cout << renderLabels({exp.label});
         // FIXME: handle arity > 1
-        if (exp.arity == 0) std::cout << "...";
+        if (exp.handler.arity == ArityAny) std::cout << "...";
         if (exp.optional) std::cout << "?";
     }
     std::cout << "\n";
@@ -99,18 +125,32 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
+        bool anyCompleted = false;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
+            if (flag.completer)
+                if (auto prefix = needsCompletion(*pos)) {
+                    anyCompleted = true;
+                    flag.completer(n, *prefix);
+                }
             args.push_back(*pos++);
         }
-        flag.handler.fun(std::move(args));
+        if (!anyCompleted)
+            flag.handler.fun(std::move(args));
         return true;
     };
 
     if (string(*pos, 0, 2) == "--") {
+        if (auto prefix = needsCompletion(*pos)) {
+            for (auto & [name, flag] : longFlags) {
+                if (!hiddenCategories.count(flag->category)
+                    && hasPrefix(name, std::string(*prefix, 2)))
+                    completions->insert("--" + name);
+            }
+        }
         auto i = longFlags.find(string(*pos, 2));
         if (i == longFlags.end()) return false;
         return process("--" + i->first, *i->second);
@@ -121,6 +161,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         auto i = shortFlags.find(c);
         if (i == shortFlags.end()) return false;
         return process(std::string("-") + c, *i->second);
+    }
+
+    if (auto prefix = needsCompletion(*pos)) {
+        if (prefix == "-") {
+            completions->insert("--");
+            for (auto & [flag, _] : shortFlags)
+                completions->insert(std::string("-") + flag);
+        }
     }
 
     return false;
@@ -138,12 +186,17 @@ bool Args::processArgs(const Strings & args, bool finish)
 
     bool res = false;
 
-    if ((exp.arity == 0 && finish) ||
-        (exp.arity > 0 && args.size() == exp.arity))
+    if ((exp.handler.arity == ArityAny && finish) ||
+        (exp.handler.arity != ArityAny && args.size() == exp.handler.arity))
     {
         std::vector<std::string> ss;
-        for (auto & s : args) ss.push_back(s);
-        exp.handler(std::move(ss));
+        for (const auto &[n, s] : enumerate(args)) {
+            ss.push_back(s);
+            if (exp.completer)
+                if (auto prefix = needsCompletion(s))
+                    exp.completer(n, *prefix);
+        }
+        exp.handler.fun(ss);
         expectedArgs.pop_front();
         res = true;
     }
@@ -154,6 +207,50 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
+nlohmann::json Args::toJSON()
+{
+    auto flags = nlohmann::json::object();
+
+    for (auto & [name, flag] : longFlags) {
+        auto j = nlohmann::json::object();
+        if (flag->shortName)
+            j["shortName"] = std::string(1, flag->shortName);
+        if (flag->description != "")
+            j["description"] = flag->description;
+        if (flag->category != "")
+            j["category"] = flag->category;
+        if (flag->handler.arity != ArityAny)
+            j["arity"] = flag->handler.arity;
+        if (!flag->labels.empty())
+            j["labels"] = flag->labels;
+        flags[name] = std::move(j);
+    }
+
+    auto args = nlohmann::json::array();
+
+    for (auto & arg : expectedArgs) {
+        auto j = nlohmann::json::object();
+        j["label"] = arg.label;
+        j["optional"] = arg.optional;
+        if (arg.handler.arity != ArityAny)
+            j["arity"] = arg.handler.arity;
+        args.push_back(std::move(j));
+    }
+
+    auto res = nlohmann::json::object();
+    res["description"] = description();
+    res["flags"] = std::move(flags);
+    res["args"] = std::move(args);
+    return res;
+}
+
+static void hashTypeCompleter(size_t index, std::string_view prefix) 
+{
+    for (auto & type : hashTypes)
+        if (hasPrefix(type, prefix))
+            completions->insert(type);
+}
+
 Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
 {
     return Flag {
@@ -162,7 +259,8 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
         .labels = {"hash-algo"},
         .handler = {[ht](std::string s) {
             *ht = parseHashType(s);
-        }}
+        }},
+        .completer = hashTypeCompleter
     };
 }
 
@@ -174,8 +272,40 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
         .labels = {"hash-algo"},
         .handler = {[oht](std::string s) {
             *oht = std::optional<HashType> { parseHashType(s) };
-        }}
+        }},
+        .completer = hashTypeCompleter
     };
+}
+
+static void _completePath(std::string_view prefix, bool onlyDirs)
+{
+    pathCompletions = true;
+    glob_t globbuf;
+    int flags = GLOB_NOESCAPE | GLOB_TILDE;
+    #ifdef GLOB_ONLYDIR
+    if (onlyDirs)
+        flags |= GLOB_ONLYDIR;
+    #endif
+    if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
+            if (onlyDirs) {
+                auto st = lstat(globbuf.gl_pathv[i]);
+                if (!S_ISDIR(st.st_mode)) continue;
+            }
+            completions->insert(globbuf.gl_pathv[i]);
+        }
+        globfree(&globbuf);
+    }
+}
+
+void completePath(size_t, std::string_view prefix)
+{
+    _completePath(prefix, false);
+}
+
+void completeDir(size_t, std::string_view prefix)
+{
+    _completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -222,21 +352,47 @@ void Command::printHelp(const string & programName, std::ostream & out)
     }
 }
 
+nlohmann::json Command::toJSON()
+{
+    auto exs = nlohmann::json::array();
+
+    for (auto & example : examples()) {
+        auto ex = nlohmann::json::object();
+        ex["description"] = example.description;
+        ex["command"] = chomp(stripIndentation(example.command));
+        exs.push_back(std::move(ex));
+    }
+
+    auto res = Args::toJSON();
+    res["examples"] = std::move(exs);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
+    return res;
+}
+
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
-    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
-        assert(!command);
-        auto cmd = ss[0];
-        if (auto alias = get(deprecatedAliases, cmd)) {
-            warn("'%s' is a deprecated alias for '%s'", cmd, *alias);
-            cmd = *alias;
-        }
-        auto i = commands.find(cmd);
-        if (i == commands.end())
-            throw UsageError("'%s' is not a recognised command", cmd);
-        command = {cmd, i->second()};
-    }});
+    expectArgs({
+        .label = "subcommand",
+        .optional = true,
+        .handler = {[=](std::string s) {
+            assert(!command);
+            if (auto alias = get(deprecatedAliases, s)) {
+                warn("'%s' is a deprecated alias for '%s'", s, *alias);
+                s = *alias;
+            }
+            if (auto prefix = needsCompletion(s)) {
+                for (auto & [name, command] : commands)
+                    if (hasPrefix(name, *prefix))
+                        completions->insert(name);
+            }
+            auto i = commands.find(s);
+            if (i == commands.end())
+                throw UsageError("'%s' is not a recognised command", s);
+            command = {s, i->second()};
+        }}
+    });
 
     categories[Command::catDefault] = "Available commands";
 }
@@ -286,6 +442,22 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
         return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
+}
+
+nlohmann::json MultiCommand::toJSON()
+{
+    auto cmds = nlohmann::json::object();
+
+    for (auto & [name, commandFun] : commands) {
+        auto command = commandFun();
+        auto j = command->toJSON();
+        j["category"] = categories[command->category()];
+        cmds[name] = std::move(j);
+    }
+
+    auto res = Args::toJSON();
+    res["commands"] = std::move(cmds);
+    return res;
 }
 
 }

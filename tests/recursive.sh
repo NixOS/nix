@@ -9,9 +9,8 @@ rm -f $TEST_ROOT/result
 
 export unreachable=$(nix add-to-store ./recursive.sh)
 
-nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L '(
+NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L --impure --expr '
   with import ./config.nix;
-  with import <nix/config.nix>;
   mkDerivation {
     name = "recursive";
     dummy = builtins.toFile "dummy" "bla bla";
@@ -24,8 +23,9 @@ nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/resu
 
     buildCommand = '\'\''
       mkdir $out
-      PATH=${nixBinDir}:$PATH
       opts="--experimental-features nix-command"
+
+      PATH=${builtins.getEnv "NIX_BIN_DIR"}:$PATH
 
       # Check that we can query/build paths in our input closure.
       nix $opts path-info $dummy
@@ -49,7 +49,7 @@ nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/resu
       [[ $(nix $opts path-info --all | wc -l) -eq 3 ]]
 
       # Build a derivation.
-      nix $opts build -L '\''(
+      nix $opts build -L --impure --expr '\''
         derivation {
           name = "inner1";
           builder = builtins.getEnv "SHELL";
@@ -57,13 +57,13 @@ nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/resu
           fnord = builtins.toFile "fnord" "fnord";
           args = [ "-c" "echo $fnord blaat > $out" ];
         }
-      )'\''
+      '\''
 
       [[ $(nix $opts path-info --json ./result) =~ fnord ]]
 
       ln -s $(nix $opts path-info ./result) $out/inner1
     '\'\'';
-  })
+  }
 '
 
 [[ $(cat $TEST_ROOT/result/inner1) =~ blaat ]]

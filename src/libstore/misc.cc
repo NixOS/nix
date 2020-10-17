@@ -4,7 +4,8 @@
 #include "local-store.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
-
+#include "topo-sort.hh"
+#include "callback.hh"
 
 namespace nix {
 
@@ -108,9 +109,19 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
+std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
+{
+    auto out = drv.outputs.find("out");
+    if (out != drv.outputs.end()) {
+        if (auto v = std::get_if<DerivationOutputCAFixed>(&out->second.output))
+            return v->hash;
+    }
+    return std::nullopt;
+}
+
 void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
-    unsigned long long & downloadSize_, unsigned long long & narSize_)
+    uint64_t & downloadSize_, uint64_t & narSize_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
@@ -122,8 +133,8 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     {
         std::unordered_set<std::string> done;
         StorePathSet & unknown, & willSubstitute, & willBuild;
-        unsigned long long & downloadSize;
-        unsigned long long & narSize;
+        uint64_t & downloadSize;
+        uint64_t & narSize;
     };
 
     struct DrvState
@@ -157,7 +168,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        querySubstitutablePathInfos({outPath}, infos);
+        querySubstitutablePathInfos({{outPath, getDerivationCA(*drv)}}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -192,17 +203,24 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
                 return;
             }
 
+            PathSet invalid;
+            /* true for regular derivations, and CA derivations for which we
+               have a trust mapping for all wanted outputs. */
+            auto knownOutputPaths = true;
+            for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(path.path)) {
+                if (!pathOpt) {
+                    knownOutputPaths = false;
+                    break;
+                }
+                if (wantOutput(outputName, path.outputs) && !isValidPath(*pathOpt))
+                    invalid.insert(printStorePath(*pathOpt));
+            }
+            if (knownOutputPaths && invalid.empty()) return;
+
             auto drv = make_ref<Derivation>(derivationFromPath(path.path));
             ParsedDerivation parsedDrv(StorePath(path.path), *drv);
 
-            PathSet invalid;
-            for (auto & j : drv->outputs)
-                if (wantOutput(j.first, path.outputs)
-                    && !isValidPath(j.second.path))
-                    invalid.insert(printStorePath(j.second.path));
-            if (invalid.empty()) return;
-
-            if (settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
+            if (knownOutputPaths && settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
                     pool.enqueue(std::bind(checkOutput, printStorePath(path.path), drv, output, drvState));
@@ -214,7 +232,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({path.path}, infos);
+            querySubstitutablePathInfos({{path.path, std::nullopt}}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
@@ -246,41 +264,21 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
 
 StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
-    StorePaths sorted;
-    StorePathSet visited, parents;
-
-    std::function<void(const StorePath & path, const StorePath * parent)> dfsVisit;
-
-    dfsVisit = [&](const StorePath & path, const StorePath * parent) {
-        if (parents.count(path))
-            throw BuildError("cycle detected in the references of '%s' from '%s'",
-                printStorePath(path), printStorePath(*parent));
-
-        if (!visited.insert(path).second) return;
-        parents.insert(path);
-
-        StorePathSet references;
-        try {
-            references = queryPathInfo(path)->references;
-        } catch (InvalidPath &) {
-        }
-
-        for (auto & i : references)
-            /* Don't traverse into paths that don't exist.  That can
-               happen due to substitutes for non-existent paths. */
-            if (i != path && paths.count(i))
-                dfsVisit(i, &path);
-
-        sorted.push_back(path);
-        parents.erase(path);
-    };
-
-    for (auto & i : paths)
-        dfsVisit(i, nullptr);
-
-    std::reverse(sorted.begin(), sorted.end());
-
-    return sorted;
+    return topoSort(paths,
+        {[&](const StorePath & path) {
+            StorePathSet references;
+            try {
+                references = queryPathInfo(path)->references;
+            } catch (InvalidPath &) {
+            }
+            return references;
+        }},
+        {[&](const StorePath & path, const StorePath & parent) {
+            return BuildError(
+                "cycle detected in the references of '%s' from '%s'",
+                printStorePath(path),
+                printStorePath(parent));
+        }});
 }
 
 

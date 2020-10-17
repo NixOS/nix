@@ -117,12 +117,11 @@ fi
 ])
 
 NEED_PROG(bash, bash)
-AC_PATH_PROG(xmllint, xmllint, false)
-AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(lsof, lsof, lsof)
+NEED_PROG(jq, jq)
 
 
 AC_SUBST(coreutils, [$(dirname $(type -p cat))])

@@ -48,13 +48,12 @@ static void search(const unsigned char * s, size_t len,
 
 struct RefScanSink : Sink
 {
-    HashSink hashSink;
     StringSet hashes;
     StringSet seen;
 
     string tail;
 
-    RefScanSink() : hashSink(htSHA256) { }
+    RefScanSink() { }
 
     void operator () (const unsigned char * data, size_t len);
 };
@@ -62,8 +61,6 @@ struct RefScanSink : Sink
 
 void RefScanSink::operator () (const unsigned char * data, size_t len)
 {
-    hashSink(data, len);
-
     /* It's possible that a reference spans the previous and current
        fragment, so search in the concatenation of the tail of the
        previous fragment and the start of the current fragment. */
@@ -79,10 +76,20 @@ void RefScanSink::operator () (const unsigned char * data, size_t len)
 }
 
 
-PathSet scanForReferences(const string & path,
-    const PathSet & refs, HashResult & hash)
+std::pair<PathSet, HashResult> scanForReferences(const string & path,
+    const PathSet & refs)
 {
-    RefScanSink sink;
+    HashSink hashSink { htSHA256 };
+    auto found = scanForReferences(hashSink, path, refs);
+    auto hash = hashSink.finish();
+    return std::pair<PathSet, HashResult>(found, hash);
+}
+
+PathSet scanForReferences(Sink & toTee,
+    const string & path, const PathSet & refs)
+{
+    RefScanSink refsSink;
+    TeeSink sink { refsSink, toTee };
     std::map<string, Path> backMap;
 
     /* For efficiency (and a higher hit rate), just search for the
@@ -97,7 +104,7 @@ PathSet scanForReferences(const string & path,
         assert(s.size() == refLength);
         assert(backMap.find(s) == backMap.end());
         // parseHash(htSHA256, s);
-        sink.hashes.insert(s);
+        refsSink.hashes.insert(s);
         backMap[s] = i;
     }
 
@@ -106,13 +113,11 @@ PathSet scanForReferences(const string & path,
 
     /* Map the hashes found back to their store paths. */
     PathSet found;
-    for (auto & i : sink.seen) {
+    for (auto & i : refsSink.seen) {
         std::map<string, Path>::iterator j;
         if ((j = backMap.find(i)) == backMap.end()) abort();
         found.insert(j->second);
     }
-
-    hash = sink.hashSink.finish();
 
     return found;
 }

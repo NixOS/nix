@@ -4,7 +4,10 @@
 #include "util.hh"
 
 #include <chrono>
+#include <cmath>
+#include <regex>
 #include <unordered_set>
+#include <thread>
 
 #include <dirent.h>
 

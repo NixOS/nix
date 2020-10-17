@@ -11,6 +11,7 @@ makefiles = \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
   corepkgs/local.mk \
+  misc/bash/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
@@ -25,7 +26,7 @@ OPTIMIZE = 1
 ifeq ($(OPTIMIZE), 1)
   GLOBAL_CXXFLAGS += -O3
 else
-  GLOBAL_CXXFLAGS += -O0
+  GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
 endif
 
 include mk/lib.mk

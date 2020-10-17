@@ -7,7 +7,6 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
-#include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -173,20 +172,26 @@ S3Helper::FileTransferResult S3Helper::getObject(
     return res;
 }
 
-struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
+struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
-    const Setting<std::string> profile{this, "", "profile", "The name of the AWS configuration profile to use."};
-    const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
-    const Setting<std::string> scheme{this, "", "scheme", "The scheme to use for S3 requests, https by default."};
-    const Setting<std::string> endpoint{this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
-    const Setting<std::string> narinfoCompression{this, "", "narinfo-compression", "compression method for .narinfo files"};
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
-    const Setting<std::string> logCompression{this, "", "log-compression", "compression method for log/* files"};
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    const Setting<std::string> profile{(StoreConfig*) this, "", "profile", "The name of the AWS configuration profile to use."};
+    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
+    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme", "The scheme to use for S3 requests, https by default."};
+    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
+    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression", "compression method for .narinfo files"};
+    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression", "compression method for .ls files"};
+    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression", "compression method for log/* files"};
     const Setting<bool> multipartUpload{
-        this, false, "multipart-upload", "whether to use multi-part uploads"};
+        (StoreConfig*) this, false, "multipart-upload", "whether to use multi-part uploads"};
     const Setting<uint64_t> bufferSize{
-        this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
 
+    const std::string name() override { return "S3 Binary Cache Store"; }
+};
+
+struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCacheStoreConfig
+{
     std::string bucketName;
 
     Stats stats;
@@ -194,8 +199,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const Params & params, const std::string & bucketName)
-        : S3BinaryCacheStore(params)
+        const std::string & scheme,
+        const std::string & bucketName,
+        const Params & params)
+        : StoreConfig(params)
+        , S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
@@ -262,11 +270,14 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     std::shared_ptr<TransferManager> transferManager;
     std::once_flag transferManagerCreated;
 
-    void uploadFile(const std::string & path, const std::string & data,
+    void uploadFile(const std::string & path,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
-        auto stream = std::make_shared<istringstream_nocopy>(data);
+        istream->seekg(0, istream->end);
+        auto size = istream->tellg();
+        istream->seekg(0, istream->beg);
 
         auto maxThreads = std::thread::hardware_concurrency();
 
@@ -307,7 +318,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             std::shared_ptr<TransferHandle> transferHandle =
                 transferManager->UploadFile(
-                    stream, bucketName, path, mimeType,
+                    istream, bucketName, path, mimeType,
                     Aws::Map<Aws::String, Aws::String>(),
                     nullptr /*, contentEncoding */);
 
@@ -333,9 +344,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             if (contentEncoding != "")
                 request.SetContentEncoding(contentEncoding);
 
-            auto stream = std::make_shared<istringstream_nocopy>(data);
-
-            request.SetBody(stream);
+            request.SetBody(istream);
 
             auto result = checkAws(fmt("AWS error uploading '%s'", path),
                 s3Helper.client->PutObject(request));
@@ -347,25 +356,32 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1)
                 .count();
 
-        printInfo(format("uploaded 's3://%1%/%2%' (%3% bytes) in %4% ms") %
-                  bucketName % path % data.size() % duration);
+        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms",
+            bucketName, path, size, duration);
 
         stats.putTimeMs += duration;
-        stats.putBytes += data.size();
+        stats.putBytes += std::max(size, (decltype(size)) 0);
         stats.put++;
     }
 
-    void upsertFile(const std::string & path, const std::string & data,
+    void upsertFile(const std::string & path,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
+        auto compress = [&](std::string compression)
+        {
+            auto compressed = nix::compress(compression, StreamToSourceAdapter(istream).drain());
+            return std::make_shared<std::stringstream>(std::move(*compressed));
+        };
+
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
-            uploadFile(path, *compress(narinfoCompression, data), mimeType, narinfoCompression);
+            uploadFile(path, compress(narinfoCompression), mimeType, narinfoCompression);
         else if (lsCompression != "" && hasSuffix(path, ".ls"))
-            uploadFile(path, *compress(lsCompression, data), mimeType, lsCompression);
+            uploadFile(path, compress(lsCompression), mimeType, lsCompression);
         else if (logCompression != "" && hasPrefix(path, "log/"))
-            uploadFile(path, *compress(logCompression, data), mimeType, logCompression);
+            uploadFile(path, compress(logCompression), mimeType, logCompression);
         else
-            uploadFile(path, data, mimeType, "");
+            uploadFile(path, istream, mimeType, "");
     }
 
     void getFile(const std::string & path, Sink & sink) override
@@ -410,7 +426,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             for (auto object : contents) {
                 auto & key = object.GetKey();
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
-                paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-unknown"));
+                paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-" + MissingName));
             }
 
             marker = res.GetNextMarker();
@@ -419,17 +435,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return paths;
     }
 
+    static std::set<std::string> uriSchemes() { return {"s3"}; }
+
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, 5) != "s3://") return 0;
-    auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, std::string(uri, 5));
-    store->init();
-    return store;
-});
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
 
 }
 

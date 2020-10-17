@@ -87,6 +87,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
             else if (*i == '\t') str << "\\t";
+            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
             else str << *i;
         str << "\"";
         break;
@@ -196,6 +197,18 @@ string showType(const Value & v)
     default:
         return showType(v.type);
     }
+}
+
+
+bool Value::isTrivial() const
+{
+    return
+        type != tApp
+        && type != tPrimOpApp
+        && (type != tThunk
+            || (dynamic_cast<ExprAttrs *>(thunk.expr)
+                && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
+            || dynamic_cast<ExprLambda *>(thunk.expr));
 }
 
 
@@ -333,12 +346,17 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
     , sBuilder(symbols.create("builder"))
     , sArgs(symbols.create("args"))
+    , sContentAddressed(symbols.create("__contentAddressed"))
     , sOutputHash(symbols.create("outputHash"))
     , sOutputHashAlgo(symbols.create("outputHashAlgo"))
     , sOutputHashMode(symbols.create("outputHashMode"))
     , sRecurseForDerivations(symbols.create("recurseForDerivations"))
+    , sDescription(symbols.create("description"))
+    , sSelf(symbols.create("self"))
+    , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
+    , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -353,7 +371,11 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
-    addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+
+    try {
+        addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+    } catch (Error &) {
+    }
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
@@ -365,10 +387,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
             auto path = r.second;
 
             if (store->isInStore(r.second)) {
-                StorePathSet closure;
-                store->computeFSClosure(store->parseStorePath(store->toStorePath(r.second)), closure);
-                for (auto & path : closure)
-                    allowedPaths->insert(store->printStorePath(path));
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                    for (auto & path : closure)
+                        allowedPaths->insert(store->printStorePath(path));
+                } catch (InvalidPath &) {
+                    allowedPaths->insert(r.second);
+                }
             } else
                 allowedPaths->insert(r.second);
         }
@@ -493,7 +519,7 @@ Value * EvalState::addPrimOp(const string & name,
     if (arity == 0) {
         auto vPrimOp = allocValue();
         vPrimOp->type = tPrimOp;
-        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
+        vPrimOp->primOp = new PrimOp { .fun = primOp, .arity = 1, .name = sym };
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
@@ -501,7 +527,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->type = tPrimOp;
-    v->primOp = new PrimOp(primOp, arity, sym);
+    v->primOp = new PrimOp { .fun = primOp, .arity = arity, .name = sym };
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
@@ -509,9 +535,56 @@ Value * EvalState::addPrimOp(const string & name,
 }
 
 
+Value * EvalState::addPrimOp(PrimOp && primOp)
+{
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
+    if (primOp.arity == 0) {
+        primOp.arity = 1;
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(std::move(primOp));
+        Value v;
+        mkApp(v, *vPrimOp, *vPrimOp);
+        return addConstant(primOp.name, v);
+    }
+
+    Symbol envName = primOp.name;
+    if (hasPrefix(primOp.name, "__"))
+        primOp.name = symbols.create(std::string(primOp.name, 2));
+
+    Value * v = allocValue();
+    v->type = tPrimOp;
+    v->primOp = new PrimOp(std::move(primOp));
+    staticBaseEnv.vars[envName] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
+    return v;
+}
+
+
 Value & EvalState::getBuiltin(const string & name)
 {
     return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+}
+
+
+std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
+{
+    if (v.type == tPrimOp || v.type == tPrimOpApp) {
+        auto v2 = &v;
+        while (v2->type == tPrimOpApp)
+            v2 = v2->primOpApp.left;
+        if (v2->primOp->doc)
+            return Doc {
+                .pos = noPos,
+                .name = v2->primOp->name,
+                .arity = v2->primOp->arity,
+                .args = v2->primOp->args,
+                .doc = v2->primOp->doc,
+            };
+    }
+    return {};
 }
 
 
@@ -782,7 +855,7 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path_, Value & v)
+void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
 {
     auto path = checkSourcePath(path_);
 
@@ -811,6 +884,11 @@ void EvalState::evalFile(const Path & path_, Value & v)
     fileParseCache[path2] = e;
 
     try {
+        // Enforce that 'flake.nix' is a direct attrset, not a
+        // computation.
+        if (mustBeTrivial &&
+            !(dynamic_cast<ExprAttrs *>(e)))
+            throw Error("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
         addErrorTrace(e, "while evaluating the file '%1%':", path2);
@@ -1236,10 +1314,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorTrace(e, lambda.pos, "while evaluating %s", 
-              (lambda.name.set() 
-                  ? "'" + (string) lambda.name + "'" 
-                  : "anonymous lambdaction"));
+            addErrorTrace(e, lambda.pos, "while evaluating %s",
+              (lambda.name.set()
+                  ? "'" + (string) lambda.name + "'"
+                  : "anonymous lambda"));
             addErrorTrace(e, pos, "from call site%s", "");
             throw;
         }
@@ -1276,14 +1354,25 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    mkAttrs(*actualArgs, std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
 
-    for (auto & i : fun.lambda.fun->formals->formals) {
-        Bindings::iterator j = args.find(i.name);
-        if (j != args.end())
-            actualArgs->attrs->push_back(*j);
-        else if (!i.def)
-            throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
+    if (fun.lambda.fun->formals->ellipsis) {
+        // If the formals have an ellipsis (eg the function accepts extra args) pass
+        // all available automatic arguments (which includes arguments specified on
+        // the command line via --arg/--argstr)
+        for (auto& v : args) {
+            actualArgs->attrs->push_back(v);
+        }
+    } else {
+        // Otherwise, only pass the arguments that the function accepts
+        for (auto & i : fun.lambda.fun->formals->formals) {
+            Bindings::iterator j = args.find(i.name);
+            if (j != args.end()) {
+                actualArgs->attrs->push_back(*j);
+            } else if (!i.def) {
+                throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
+            }
+        }
     }
 
     actualArgs->attrs->sort();
@@ -1586,11 +1675,34 @@ string EvalState::forceString(Value & v, const Pos & pos)
 }
 
 
+/* Decode a context string ‘!<name>!<path>’ into a pair <path,
+   name>. */
+std::pair<string, string> decodeContext(std::string_view s)
+{
+    if (s.at(0) == '!') {
+        size_t index = s.find("!", 1);
+        return {std::string(s.substr(index + 1)), std::string(s.substr(1, index - 1))};
+    } else
+        return {s.at(0) == '/' ? std::string(s) : std::string(s.substr(1)), ""};
+}
+
+
 void copyContext(const Value & v, PathSet & context)
 {
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p)
             context.insert(*p);
+}
+
+
+std::vector<std::pair<Path, std::string>> Value::getContext()
+{
+    std::vector<std::pair<Path, std::string>> res;
+    assert(type == tString);
+    if (string.context)
+        for (const char * * p = string.context; *p; ++p)
+            res.push_back(decodeContext(*p));
+    return res;
 }
 
 
@@ -1969,7 +2081,7 @@ Strings EvalSettings::getDefaultNixPath()
 
 EvalSettings evalSettings;
 
-static GlobalConfig::Register r1(&evalSettings);
+static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 
 }

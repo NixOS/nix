@@ -22,8 +22,15 @@ struct Sink
     }
 };
 
+/* Just throws away data. */
+struct NullSink : Sink
+{
+    void operator () (const unsigned char * data, size_t len) override
+    { }
+};
 
-/* A buffered abstract sink. */
+/* A buffered abstract sink. Warning: a BufferedSink should not be
+   used from multiple threads concurrently. */
 struct BufferedSink : virtual Sink
 {
     size_t bufSize, bufPos;
@@ -62,11 +69,14 @@ struct Source
 
     virtual bool good() { return true; }
 
+    void drainInto(Sink & sink);
+
     std::string drain();
 };
 
 
-/* A buffered abstract source. */
+/* A buffered abstract source. Warning: a BufferedSource should not be
+   used from multiple threads concurrently. */
 struct BufferedSource : Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
@@ -166,17 +176,30 @@ struct StringSource : Source
 };
 
 
-/* Adapter class of a Source that saves all data read to `s'. */
+/* A sink that writes all incoming data to two other sinks. */
+struct TeeSink : Sink
+{
+    Sink & sink1, & sink2;
+    TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
+    virtual void operator () (const unsigned char * data, size_t len)
+    {
+        sink1(data, len);
+        sink2(data, len);
+    }
+};
+
+
+/* Adapter class of a Source that saves all data read to a sink. */
 struct TeeSource : Source
 {
     Source & orig;
-    ref<std::string> data;
-    TeeSource(Source & orig)
-        : orig(orig), data(make_ref<std::string>()) { }
+    Sink & sink;
+    TeeSource(Source & orig, Sink & sink)
+        : orig(orig), sink(sink) { }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        this->data->append((const char *) data, n);
+        sink(data, n);
         return n;
     }
 };
@@ -212,6 +235,17 @@ struct SizedSource : Source
     }
 };
 
+/* A sink that that just counts the number of bytes given to it */
+struct LengthSink : Sink
+{
+    uint64_t length = 0;
+
+    virtual void operator () (const unsigned char * _, size_t len)
+    {
+        length += len;
+    }
+};
+
 /* Convert a function into a sink. */
 struct LambdaSink : Sink
 {
@@ -241,6 +275,19 @@ struct LambdaSource : Source
     {
         return lambda(data, len);
     }
+};
+
+/* Chain two sources together so after the first is exhausted, the second is
+   used */
+struct ChainSource : Source
+{
+    Source & source1, & source2;
+    bool useSecond = false;
+    ChainSource(Source & s1, Source & s2)
+        : source1(s1), source2(s2)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override;
 };
 
 
@@ -274,6 +321,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
 Sink & operator << (Sink & sink, const string & s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
+Sink & operator << (Sink & in, const Error & ex);
 
 
 MakeError(SerialisationError, Error);
@@ -286,16 +334,16 @@ T readNum(Source & source)
     source(buf, sizeof(buf));
 
     uint64_t n =
-        ((unsigned long long) buf[0]) |
-        ((unsigned long long) buf[1] << 8) |
-        ((unsigned long long) buf[2] << 16) |
-        ((unsigned long long) buf[3] << 24) |
-        ((unsigned long long) buf[4] << 32) |
-        ((unsigned long long) buf[5] << 40) |
-        ((unsigned long long) buf[6] << 48) |
-        ((unsigned long long) buf[7] << 56);
+        ((uint64_t) buf[0]) |
+        ((uint64_t) buf[1] << 8) |
+        ((uint64_t) buf[2] << 16) |
+        ((uint64_t) buf[3] << 24) |
+        ((uint64_t) buf[4] << 32) |
+        ((uint64_t) buf[5] << 40) |
+        ((uint64_t) buf[6] << 48) |
+        ((uint64_t) buf[7] << 56);
 
-    if (n > std::numeric_limits<T>::max())
+    if (n > (uint64_t)std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
 
     return (T) n;
@@ -334,6 +382,120 @@ Source & operator >> (Source & in, bool & b)
     b = readNum<uint64_t>(in);
     return in;
 }
+
+Error readError(Source & source);
+
+
+/* An adapter that converts a std::basic_istream into a source. */
+struct StreamToSourceAdapter : Source
+{
+    std::shared_ptr<std::basic_istream<char>> istream;
+
+    StreamToSourceAdapter(std::shared_ptr<std::basic_istream<char>> istream)
+        : istream(istream)
+    { }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        if (!istream->read((char *) data, len)) {
+            if (istream->eof()) {
+                if (istream->gcount() == 0)
+                    throw EndOfFile("end of file");
+            } else
+                throw Error("I/O error in StreamToSourceAdapter");
+        }
+        return istream->gcount();
+    }
+};
+
+
+/* A source that reads a distinct format of concatenated chunks back into its
+   logical form, in order to guarantee a known state to the original stream,
+   even in the event of errors.
+
+   Use with FramedSink, which also allows the logical stream to be terminated
+   in the event of an exception.
+*/
+struct FramedSource : Source
+{
+    Source & from;
+    bool eof = false;
+    std::vector<unsigned char> pending;
+    size_t pos = 0;
+
+    FramedSource(Source & from) : from(from)
+    { }
+
+    ~FramedSource()
+    {
+        if (!eof) {
+            while (true) {
+                auto n = readInt(from);
+                if (!n) break;
+                std::vector<unsigned char> data(n);
+                from(data.data(), n);
+            }
+        }
+    }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        if (eof) throw EndOfFile("reached end of FramedSource");
+
+        if (pos >= pending.size()) {
+            size_t len = readInt(from);
+            if (!len) {
+                eof = true;
+                return 0;
+            }
+            pending = std::vector<unsigned char>(len);
+            pos = 0;
+            from(pending.data(), len);
+        }
+
+        auto n = std::min(len, pending.size() - pos);
+        memcpy(data, pending.data() + pos, n);
+        pos += n;
+        return n;
+    }
+};
+
+/* Write as chunks in the format expected by FramedSource.
+
+   The exception_ptr reference can be used to terminate the stream when you
+   detect that an error has occurred on the remote end.
+*/
+struct FramedSink : nix::BufferedSink
+{
+    BufferedSink & to;
+    std::exception_ptr & ex;
+
+    FramedSink(BufferedSink & to, std::exception_ptr & ex) : to(to), ex(ex)
+    { }
+
+    ~FramedSink()
+    {
+        try {
+            to << 0;
+            to.flush();
+        } catch (...) {
+            ignoreException();
+        }
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        /* Don't send more data if the remote has
+            encountered an error. */
+        if (ex) {
+            auto ex2 = ex;
+            ex = nullptr;
+            std::rethrow_exception(ex2);
+        }
+        to << len;
+        to(data, len);
+    };
+};
 
 
 }

@@ -2,8 +2,6 @@
 
 namespace nix {
 
-MakeError(BadStorePath, Error);
-
 static void checkName(std::string_view path, std::string_view name)
 {
     if (name.empty())

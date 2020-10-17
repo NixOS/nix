@@ -10,7 +10,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 {
     CmdMakeContentAddressable()
     {
-        realiseMode = Build;
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override
@@ -23,7 +23,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         return {
             Example{
                 "To create a content-addressable representation of GNU Hello (but not its dependencies):",
-                "nix make-content-addressable nixpkgs.hello"
+                "nix make-content-addressable nixpkgs#hello"
             },
             Example{
                 "To compute a content-addressable representation of the current NixOS system closure:",
@@ -77,10 +77,12 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             auto narHash = hashModuloSink.finish().first;
 
-            ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference));
+            ValidPathInfo info {
+                store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference),
+                narHash,
+            };
             info.references = std::move(references);
             if (hasSelfReference) info.references.insert(info.path);
-            info.narHash = narHash;
             info.narSize = sink.s->size();
             info.ca = FixedOutputHash {
                 .method = FileIngestionMethod::Recursive,
@@ -106,4 +108,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
+static auto rCmdMakeContentAddressable = registerCommand<CmdMakeContentAddressable>("make-content-addressable");

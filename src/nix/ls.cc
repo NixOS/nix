@@ -85,7 +85,11 @@ struct CmdLsStore : StoreCommand, MixLs
 {
     CmdLsStore()
     {
-        expectArg("path", &path);
+        expectArgs({
+            .label = "path",
+            .handler = {&path},
+            .completer = completePath
+        });
     }
 
     Examples examples() override
@@ -117,7 +121,11 @@ struct CmdLsNar : Command, MixLs
 
     CmdLsNar()
     {
-        expectArg("nar", &narPath);
+        expectArgs({
+            .label = "nar",
+            .handler = {&narPath},
+            .completer = completePath
+        });
         expectArg("path", &path);
     }
 
@@ -144,5 +152,5 @@ struct CmdLsNar : Command, MixLs
     }
 };
 
-static auto r1 = registerCommand<CmdLsStore>("ls-store");
-static auto r2 = registerCommand<CmdLsNar>("ls-nar");
+static auto rCmdLsStore = registerCommand<CmdLsStore>("ls-store");
+static auto rCmdLsNar = registerCommand<CmdLsNar>("ls-nar");

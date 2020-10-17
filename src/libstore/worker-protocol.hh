@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x116
+#define PROTOCOL_VERSION 0x11a
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -18,7 +18,7 @@ typedef enum {
     wopQueryReferences = 5, // obsolete
     wopQueryReferrers = 6,
     wopAddToStore = 7,
-    wopAddTextToStore = 8,
+    wopAddTextToStore = 8, // obsolete since 1.25, Nix 3.0. Use wopAddToStore
     wopBuildPaths = 9,
     wopEnsurePath = 10,
     wopAddTempRoot = 11,
@@ -66,10 +66,89 @@ typedef enum {
 class Store;
 struct Source;
 
-template<class T> T readStorePaths(const Store & store, Source & from);
+/* To guide overloading */
+template<typename T>
+struct Phantom {};
 
-void writeStorePaths(const Store & store, Sink & out, const StorePathSet & paths);
 
-void writeOutputPathMap(const Store & store, Sink & out, const OutputPathMap & paths);
+namespace worker_proto {
+/* FIXME maybe move more stuff inside here */
+
+#define MAKE_WORKER_PROTO(TEMPLATE, T) \
+    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
+    TEMPLATE void write(const Store & store, Sink & out, const T & str)
+
+MAKE_WORKER_PROTO(, std::string);
+MAKE_WORKER_PROTO(, StorePath);
+MAKE_WORKER_PROTO(, ContentAddress);
+
+MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
+
+#define X_ template<typename K, typename V>
+#define Y_ std::map<K, V>
+MAKE_WORKER_PROTO(X_, Y_);
+#undef X_
+#undef Y_
+
+/* These use the empty string for the null case, relying on the fact
+   that the underlying types never serialize to the empty string.
+
+   We do this instead of a generic std::optional<T> instance because
+   ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
+   the same reason, we don't have a std::variant<T..> instances (ordinal
+   tags 0...n).
+
+   We could the generic instances and then these as specializations for
+   compatability, but that's proven a bit finnicky, and also makes the
+   worker protocol harder to implement in other languages where such
+   specializations may not be allowed.
+ */
+MAKE_WORKER_PROTO(, std::optional<StorePath>);
+MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
+
+template<typename T>
+std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
+{
+    std::set<T> resSet;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resSet.insert(read(store, from, Phantom<T> {}));
+    }
+    return resSet;
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::set<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
+    }
+}
+
+template<typename K, typename V>
+std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
+{
+    std::map<K, V> resMap;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        auto k = read(store, from, Phantom<K> {});
+        auto v = read(store, from, Phantom<V> {});
+        resMap.insert_or_assign(std::move(k), std::move(v));
+    }
+    return resMap;
+}
+
+template<typename K, typename V>
+void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+{
+    out << resMap.size();
+    for (auto & i : resMap) {
+        write(store, out, i.first);
+        write(store, out, i.second);
+    }
+}
+
+}
 
 }

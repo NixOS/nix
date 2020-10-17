@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
+#include "url-parts.hh"
 
 #include <sys/time.h>
 
@@ -22,80 +23,152 @@ static bool isNotDotGitDirectory(const Path & path)
     return not std::regex_match(path, gitDirRegex);
 }
 
-struct GitInput : Input
+struct GitInputScheme : InputScheme
 {
-    ParsedURL url;
-    std::optional<std::string> ref;
-    std::optional<Hash> rev;
-    bool shallow = false;
-    bool submodules = false;
-
-    GitInput(const ParsedURL & url) : url(url)
-    { }
-
-    std::string type() const override { return "git"; }
-
-    bool operator ==(const Input & other) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        auto other2 = dynamic_cast<const GitInput *>(&other);
-        return
-            other2
-            && url == other2->url
-            && rev == other2->rev
-            && ref == other2->ref;
-    }
+        if (url.scheme != "git" &&
+            url.scheme != "git+http" &&
+            url.scheme != "git+https" &&
+            url.scheme != "git+ssh" &&
+            url.scheme != "git+file") return {};
 
-    bool isImmutable() const override
-    {
-        return (bool) rev || narHash;
-    }
+        auto url2(url);
+        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
+        url2.query.clear();
 
-    std::optional<std::string> getRef() const override { return ref; }
-
-    std::optional<Hash> getRev() const override { return rev; }
-
-    ParsedURL toURL() const override
-    {
-        ParsedURL url2(url);
-        if (url2.scheme != "git") url2.scheme = "git+" + url2.scheme;
-        if (rev) url2.query.insert_or_assign("rev", rev->gitRev());
-        if (ref) url2.query.insert_or_assign("ref", *ref);
-        if (shallow) url2.query.insert_or_assign("shallow", "1");
-        return url2;
-    }
-
-    Attrs toAttrsInternal() const override
-    {
         Attrs attrs;
-        attrs.emplace("url", url.to_string());
-        if (ref)
-            attrs.emplace("ref", *ref);
-        if (rev)
-            attrs.emplace("rev", rev->gitRev());
-        if (shallow)
-            attrs.emplace("shallow", true);
-        if (submodules)
-            attrs.emplace("submodules", true);
-        return attrs;
+        attrs.emplace("type", "git");
+
+        for (auto &[name, value] : url.query) {
+            if (name == "rev" || name == "ref")
+                attrs.emplace(name, value);
+            else if (name == "shallow")
+                attrs.emplace(name, Explicit<bool> { value == "1" });
+            else
+                url2.query.emplace(name, value);
+        }
+
+        attrs.emplace("url", url2.to_string());
+
+        return inputFromAttrs(attrs);
     }
 
-    std::pair<bool, std::string> getActualUrl() const
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    {
+        if (maybeGetStrAttr(attrs, "type") != "git") return {};
+
+        for (auto & [name, value] : attrs)
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash")
+                throw Error("unsupported Git input attribute '%s'", name);
+
+        parseURL(getStrAttr(attrs, "url"));
+        maybeGetBoolAttr(attrs, "shallow");
+        maybeGetBoolAttr(attrs, "submodules");
+
+        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
+            if (std::regex_search(*ref, badGitRefRegex))
+                throw BadURL("invalid Git branch/tag name '%s'", *ref);
+        }
+
+        Input input;
+        input.attrs = attrs;
+        return input;
+    }
+
+    ParsedURL toURL(const Input & input) override
+    {
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        if (url.scheme != "git") url.scheme = "git+" + url.scheme;
+        if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
+        if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
+        if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
+            url.query.insert_or_assign("shallow", "1");
+        return url;
+    }
+
+    bool hasAllInfo(const Input & input) override
+    {
+        bool maybeDirty = !input.getRef();
+        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+        return
+            maybeGetIntAttr(input.attrs, "lastModified")
+            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
+    }
+
+    Input applyOverrides(
+        const Input & input,
+        std::optional<std::string> ref,
+        std::optional<Hash> rev) override
+    {
+        auto res(input);
+        if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref) res.attrs.insert_or_assign("ref", *ref);
+        if (!res.getRef() && res.getRev())
+            throw Error("Git input '%s' has a commit hash but no branch/tag name", res.to_string());
+        return res;
+    }
+
+    void clone(const Input & input, const Path & destDir) override
+    {
+        auto [isLocal, actualUrl] = getActualUrl(input);
+
+        Strings args = {"clone"};
+
+        args.push_back(actualUrl);
+
+        if (auto ref = input.getRef()) {
+            args.push_back("--branch");
+            args.push_back(*ref);
+        }
+
+        if (input.getRev()) throw UnimplementedError("cloning a specific revision is not implemented");
+
+        args.push_back(destDir);
+
+        runProgram("git", true, args);
+    }
+
+    std::optional<Path> getSourcePath(const Input & input) override
+    {
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        if (url.scheme == "file" && !input.getRef() && !input.getRev())
+            return url.path;
+        return {};
+    }
+
+    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    {
+        auto sourcePath = getSourcePath(input);
+        assert(sourcePath);
+
+        runProgram("git", true,
+            { "-C", *sourcePath, "add", "--force", "--intent-to-add", "--", std::string(file) });
+
+        if (commitMsg)
+            runProgram("git", true,
+                { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
+    }
+
+    std::pair<bool, std::string> getActualUrl(const Input & input) const
     {
         // Don't clone file:// URIs (but otherwise treat them the
         // same as remote URIs, i.e. don't use the working tree or
         // HEAD).
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isLocal = url.scheme == "file" && !forceHttp;
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<Tree, std::shared_ptr<const Input>> fetchTreeInternal(nix::ref<Store> store) const override
+    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
         auto name = "source";
 
-        auto input = std::make_shared<GitInput>(*this);
+        Input input(_input);
 
-        assert(!rev || rev->type == htSHA1);
+        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+        bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
@@ -106,39 +179,35 @@ struct GitInput : Input
             return Attrs({
                 {"type", cacheType},
                 {"name", name},
-                {"rev", input->rev->gitRev()},
+                {"rev", input.getRev()->gitRev()},
             });
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<Tree, std::shared_ptr<const Input>>
+            -> std::pair<Tree, Input>
         {
-            assert(input->rev);
-            assert(!rev || rev == input->rev);
+            assert(input.getRev());
+            assert(!_input.getRev() || _input.getRev() == input.getRev());
+            if (!shallow)
+                input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
+            input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
             return {
-                Tree {
-                    .actualPath = store->toRealPath(storePath),
-                    .storePath = std::move(storePath),
-                    .info = TreeInfo {
-                        .revCount = shallow ? std::nullopt : std::optional(getIntAttr(infoAttrs, "revCount")),
-                        .lastModified = getIntAttr(infoAttrs, "lastModified"),
-                    },
-                },
+                Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
             };
         };
 
-        if (rev) {
+        if (input.getRev()) {
             if (auto res = getCache()->lookup(store, getImmutableAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
 
-        auto [isLocal, actualUrl_] = getActualUrl();
+        auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
-        if (!input->ref && !input->rev && isLocal) {
+        if (!input.getRef() && !input.getRev() && isLocal) {
             bool clean = false;
 
             /* Check whether this repo has any commits. There are
@@ -197,44 +266,44 @@ struct GitInput : Input
 
                 auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
-                auto tree = Tree {
-                    .actualPath = store->printStorePath(storePath),
-                    .storePath = std::move(storePath),
-                    .info = TreeInfo {
-                        // FIXME: maybe we should use the timestamp of the last
-                        // modified dirty file?
-                        .lastModified = haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "HEAD" })) : 0,
-                    }
-                };
+                // FIXME: maybe we should use the timestamp of the last
+                // modified dirty file?
+                input.attrs.insert_or_assign(
+                    "lastModified",
+                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                return {std::move(tree), input};
+                return {
+                    Tree(store->printStorePath(storePath), std::move(storePath)),
+                    input
+                };
             }
         }
 
-        if (!input->ref) input->ref = isLocal ? readHead(actualUrl) : "master";
+        if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
 
         Attrs mutableAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
-            {"ref", *input->ref},
+            {"ref", *input.getRef()},
         });
 
         Path repoDir;
 
         if (isLocal) {
 
-            if (!input->rev)
-                input->rev = Hash(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input->ref })), htSHA1);
+            if (!input.getRev())
+                input.attrs.insert_or_assign("rev",
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
         } else {
 
             if (auto res = getCache()->lookup(store, mutableAttrs)) {
-                auto rev2 = Hash(getStrAttr(res->first, "rev"), htSHA1);
-                if (!rev || rev == rev2) {
-                    input->rev = rev2;
+                auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
+                if (!input.getRev() || input.getRev() == rev2) {
+                    input.attrs.insert_or_assign("rev", rev2.gitRev());
                     return makeResult(res->first, std::move(res->second));
                 }
             }
@@ -248,18 +317,18 @@ struct GitInput : Input
             }
 
             Path localRefFile =
-                input->ref->compare(0, 5, "refs/") == 0
-                ? cacheDir + "/" + *input->ref
-                : cacheDir + "/refs/heads/" + *input->ref;
+                input.getRef()->compare(0, 5, "refs/") == 0
+                ? cacheDir + "/" + *input.getRef()
+                : cacheDir + "/refs/heads/" + *input.getRef();
 
             bool doFetch;
             time_t now = time(0);
 
             /* If a rev was specified, we need to fetch if it's not in the
                repo. */
-            if (input->rev) {
+            if (input.getRev()) {
                 try {
-                    runProgram("git", true, { "-C", repoDir, "cat-file", "-e", input->rev->gitRev() });
+                    runProgram("git", true, { "-C", repoDir, "cat-file", "-e", input.getRev()->gitRev() });
                     doFetch = false;
                 } catch (ExecError & e) {
                     if (WIFEXITED(e.status)) {
@@ -282,9 +351,10 @@ struct GitInput : Input
                 // FIXME: git stderr messes up our progress indicator, so
                 // we're using --quiet for now. Should process its stderr.
                 try {
-                    auto fetchRef = input->ref->compare(0, 5, "refs/") == 0
-                        ? *input->ref
-                        : "refs/heads/" + *input->ref;
+                    auto ref = input.getRef();
+                    auto fetchRef = ref->compare(0, 5, "refs/") == 0
+                        ? *ref
+                        : "refs/heads/" + *ref;
                     runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
@@ -300,8 +370,8 @@ struct GitInput : Input
                 utimes(localRefFile.c_str(), times);
             }
 
-            if (!input->rev)
-                input->rev = Hash(chomp(readFile(localRefFile)), htSHA1);
+            if (!input.getRev())
+                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
@@ -311,7 +381,7 @@ struct GitInput : Input
 
         // FIXME: check whether rev is an ancestor of ref.
 
-        printTalkative("using revision %s of repo '%s'", input->rev->gitRev(), actualUrl);
+        printTalkative("using revision %s of repo '%s'", input.getRev()->gitRev(), actualUrl);
 
         /* Now that we know the ref, check again whether we have it in
            the store. */
@@ -333,7 +403,7 @@ struct GitInput : Input
             runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                                       "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
 
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input->rev->gitRev() });
+            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
             runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
             runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
@@ -342,7 +412,7 @@ struct GitInput : Input
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                RunOptions gitOptions("git", { "-C", repoDir, "archive", input->rev->gitRev() });
+                RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getRev()->gitRev() });
                 gitOptions.standardOut = &sink;
                 runProgram2(gitOptions);
             });
@@ -352,18 +422,18 @@ struct GitInput : Input
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
-        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", input->rev->gitRev() }));
+        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
 
         Attrs infoAttrs({
-            {"rev", input->rev->gitRev()},
+            {"rev", input.getRev()->gitRev()},
             {"lastModified", lastModified},
         });
 
         if (!shallow)
             infoAttrs.insert_or_assign("revCount",
-                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input->rev->gitRev() })));
+                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input.getRev()->gitRev() })));
 
-        if (!this->rev)
+        if (!_input.getRev())
             getCache()->add(
                 store,
                 mutableAttrs,
@@ -382,60 +452,6 @@ struct GitInput : Input
     }
 };
 
-struct GitInputScheme : InputScheme
-{
-    std::unique_ptr<Input> inputFromURL(const ParsedURL & url) override
-    {
-        if (url.scheme != "git" &&
-            url.scheme != "git+http" &&
-            url.scheme != "git+https" &&
-            url.scheme != "git+ssh" &&
-            url.scheme != "git+file") return nullptr;
-
-        auto url2(url);
-        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
-        url2.query.clear();
-
-        Attrs attrs;
-        attrs.emplace("type", "git");
-
-        for (auto &[name, value] : url.query) {
-            if (name == "rev" || name == "ref")
-                attrs.emplace(name, value);
-            else
-                url2.query.emplace(name, value);
-        }
-
-        attrs.emplace("url", url2.to_string());
-
-        return inputFromAttrs(attrs);
-    }
-
-    std::unique_ptr<Input> inputFromAttrs(const Attrs & attrs) override
-    {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules")
-                throw Error("unsupported Git input attribute '%s'", name);
-
-        auto input = std::make_unique<GitInput>(parseURL(getStrAttr(attrs, "url")));
-        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (std::regex_search(*ref, badGitRefRegex))
-                throw BadURL("invalid Git branch/tag name '%s'", *ref);
-            input->ref = *ref;
-        }
-        if (auto rev = maybeGetStrAttr(attrs, "rev"))
-            input->rev = Hash(*rev, htSHA1);
-
-        input->shallow = maybeGetBoolAttr(attrs, "shallow").value_or(false);
-
-        input->submodules = maybeGetBoolAttr(attrs, "submodules").value_or(false);
-
-        return input;
-    }
-};
-
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
+static auto rGitInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
 
 }

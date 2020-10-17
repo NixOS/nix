@@ -12,13 +12,9 @@
 #include <signal.h>
 
 #include <functional>
-#include <limits>
-#include <cstdio>
 #include <map>
 #include <sstream>
 #include <optional>
-#include <future>
-#include <iterator>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -49,7 +45,9 @@ void clearEnv();
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
-Path absPath(Path path, std::optional<Path> dir = {});
+Path absPath(Path path,
+    std::optional<Path> dir = {},
+    bool resolveSymlinks = false);
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink
@@ -123,7 +121,7 @@ void writeLine(int fd, string s);
    second variant returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
-void deletePath(const Path & path, unsigned long long & bytesFreed);
+void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
 
@@ -147,10 +145,12 @@ Path getDataDir();
 Paths createDirs(const Path & path);
 
 /* Create a symlink. */
-void createSymlink(const Path & target, const Path & link);
+void createSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime = {});
 
 /* Atomically create or replace a symlink. */
-void replaceSymlink(const Path & target, const Path & link);
+void replaceSymlink(const Path & target, const Path & link,
+    std::optional<time_t> mtime = {});
 
 
 /* Wrappers arount read()/write() that read/write exactly the
@@ -460,6 +460,12 @@ string base64Encode(std::string_view s);
 string base64Decode(std::string_view s);
 
 
+/* Remove common leading whitespace from the lines in the string
+   's'. For example, if every line is indented by at least 3 spaces,
+   then we remove 3 spaces from the start of every line. */
+std::string stripIndentation(std::string_view s);
+
+
 /* Get a value for the specified key from an associate container. */
 template <class T>
 std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
@@ -470,43 +476,8 @@ std::optional<typename T::mapped_type> get(const T & map, const typename T::key_
 }
 
 
-/* A callback is a wrapper around a lambda that accepts a valid of
-   type T or an exception. (We abuse std::future<T> to pass the value or
-   exception.) */
 template<typename T>
-class Callback
-{
-    std::function<void(std::future<T>)> fun;
-    std::atomic_flag done = ATOMIC_FLAG_INIT;
-
-public:
-
-    Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
-
-    Callback(Callback && callback) : fun(std::move(callback.fun))
-    {
-        auto prev = callback.done.test_and_set();
-        if (prev) done.test_and_set();
-    }
-
-    void operator()(T && t) noexcept
-    {
-        auto prev = done.test_and_set();
-        assert(!prev);
-        std::promise<T> promise;
-        promise.set_value(std::move(t));
-        fun(promise.get_future());
-    }
-
-    void rethrow(const std::exception_ptr & exc = std::current_exception()) noexcept
-    {
-        auto prev = done.test_and_set();
-        assert(!prev);
-        std::promise<T> promise;
-        promise.set_exception(exc);
-        fun(promise.get_future());
-    }
-};
+class Callback;
 
 
 /* Start a thread that handles various signals. Also block those signals
@@ -595,6 +566,14 @@ constexpr auto enumerate(T && iterable)
 
     return iterable_wrapper{ std::forward<T>(iterable) };
 }
+
+
+// C++17 std::visit boilerplate
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+
+std::string showBytes(uint64_t bytes);
 
 
 }

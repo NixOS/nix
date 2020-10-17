@@ -1,8 +1,8 @@
 #pragma once
 
-
 #include "ref.hh"
 #include "types.hh"
+#include "fmt.hh"
 
 #include <cstring>
 #include <list>
@@ -10,7 +10,9 @@
 #include <map>
 #include <optional>
 
-#include "fmt.hh"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /* Before 4.7, gcc's std::exception uses empty throw() specifiers for
  * its (virtual) destructor and what() in c++11 mode, in violation of spec
@@ -105,7 +107,7 @@ struct Trace {
 struct ErrorInfo {
     Verbosity level;
     string name;
-    string description;
+    string description; // FIXME: remove? it seems to be barely used
     std::optional<hintformat> hint;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
@@ -167,7 +169,7 @@ public:
 #endif
 
     const string & msg() const { return calcWhat(); }
-    const ErrorInfo & info() { calcWhat(); return err; }
+    const ErrorInfo & info() const { calcWhat(); return err; }
 
     template<typename... Args>
     BaseError & addTrace(std::optional<ErrPos> e, const string &fs, const Args & ... args)
@@ -189,6 +191,8 @@ public:
     }
 
 MakeError(Error, BaseError);
+MakeError(UsageError, Error);
+MakeError(UnimplementedError, Error);
 
 class SysError : public Error
 {

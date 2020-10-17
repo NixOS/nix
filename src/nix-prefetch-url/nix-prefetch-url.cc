@@ -48,7 +48,7 @@ string resolveMirrorUri(EvalState & state, string uri)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_prefetch_url(int argc, char * * argv)
 {
     {
         HashType ht = htSHA256;
@@ -57,6 +57,7 @@ static int _main(int argc, char * * argv)
         bool fromExpr = false;
         string attrPath;
         bool unpack = false;
+        bool executable = false;
         string name;
 
         struct MyArgs : LegacyArgs, MixEvalArgs
@@ -81,6 +82,8 @@ static int _main(int argc, char * * argv)
             }
             else if (*arg == "--unpack")
                 unpack = true;
+            else if (*arg == "--executable")
+                executable = true;
             else if (*arg == "--name")
                 name = getArg(*arg, arg, end);
             else if (*arg != "" && arg->at(0) == '-')
@@ -153,14 +156,15 @@ static int _main(int argc, char * * argv)
 
         /* If an expected hash is given, the file may already exist in
            the store. */
-        Hash hash, expectedHash(ht);
+        std::optional<Hash> expectedHash;
+        Hash hash(ht);
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
-            expectedHash = Hash(args[1], ht);
+            expectedHash = Hash::parseAny(args[1], ht);
             const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            storePath = store->makeFixedOutputPath(recursive, expectedHash, name);
+            storePath = store->makeFixedOutputPath(recursive, *expectedHash, name);
             if (store->isValidPath(*storePath))
-                hash = expectedHash;
+                hash = *expectedHash;
             else
                 storePath.reset();
         }
@@ -174,7 +178,11 @@ static int _main(int argc, char * * argv)
 
             /* Download the file. */
             {
-                AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+                auto mode = 0600;
+                if (executable)
+                    mode = 0700;
+
+                AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode);
                 if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
 
                 FdSink sink(fd.get());
@@ -200,22 +208,12 @@ static int _main(int argc, char * * argv)
                     tmpFile = unpacked;
             }
 
-            /* FIXME: inefficient; addToStore() will also hash
-               this. */
-            hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
+            const auto method = unpack || executable ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
-            if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error("hash mismatch for '%1%'", uri);
-
-            const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-
-            /* Copy the file to the Nix store. FIXME: if RemoteStore
-               implemented addToStoreFromDump() and downloadFile()
-               supported a sink, we could stream the download directly
-               into the Nix store. */
-            storePath = store->addToStore(name, tmpFile, recursive, ht);
-
-            assert(*storePath == store->makeFixedOutputPath(recursive, hash, name));
+            auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
+            storePath = info.path;
+            assert(info.ca);
+            hash = getContentAddressHash(*info.ca);
         }
 
         stopProgressBar();
@@ -231,4 +229,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-prefetch-url", _main);
+static RegisterLegacyCommand r_nix_prefetch_url("nix-prefetch-url", main_nix_prefetch_url);

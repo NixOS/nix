@@ -27,11 +27,13 @@ struct ArchiveSettings : Config
         #endif
         "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+    Setting<bool> preallocateContents{this, true, "preallocate-contents",
+        "Whether to preallocate files when writing objects with known size."};
 };
 
 static ArchiveSettings archiveSettings;
 
-static GlobalConfig::Register r1(&archiveSettings);
+static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 const std::string narVersionMagic1 = "nix-archive-1";
 
@@ -66,9 +68,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
     sink << "(";
 
@@ -150,17 +150,17 @@ static void skipGeneric(Source & source)
 
 static void parseContents(ParseSink & sink, Source & source, const Path & path)
 {
-    unsigned long long size = readLongLong(source);
+    uint64_t size = readLongLong(source);
 
     sink.preallocateContents(size);
 
-    unsigned long long left = size;
+    uint64_t left = size;
     std::vector<unsigned char> buf(65536);
 
     while (left) {
         checkInterrupt();
         auto n = buf.size();
-        if ((unsigned long long)n > left) n = left;
+        if ((uint64_t)n > left) n = left;
         source(buf.data(), n);
         sink.receiveContents(buf.data(), n);
         left -= n;
@@ -323,8 +323,11 @@ struct RestoreSink : ParseSink
             throw SysError("fchmod");
     }
 
-    void preallocateContents(unsigned long long len)
+    void preallocateContents(uint64_t len)
     {
+        if (!archiveSettings.preallocateContents)
+            return;
+
 #if HAVE_POSIX_FALLOCATE
         if (len) {
             errno = posix_fallocate(fd.get(), 0, len);
@@ -338,7 +341,7 @@ struct RestoreSink : ParseSink
 #endif
     }
 
-    void receiveContents(unsigned char * data, unsigned int len)
+    void receiveContents(unsigned char * data, size_t len)
     {
         writeFull(fd.get(), data, len);
     }
@@ -366,11 +369,7 @@ void copyNAR(Source & source, Sink & sink)
 
     ParseSink parseSink; /* null sink; just parse the NAR */
 
-    LambdaSource wrapper([&](unsigned char * data, size_t len) {
-        auto n = source.read(data, len);
-        sink(data, n);
-        return n;
-    });
+    TeeSource wrapper { source, sink };
 
     parseDump(parseSink, wrapper);
 }

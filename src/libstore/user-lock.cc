@@ -3,6 +3,9 @@
 #include "pathlocks.hh"
 #include "cgroup.hh"
 
+#include <pwd.h>
+#include <grp.h>
+
 namespace nix {
 
 struct SimpleUserLock : UserLock

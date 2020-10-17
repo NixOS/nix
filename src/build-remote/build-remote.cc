@@ -33,18 +33,18 @@ std::string escapeUri(std::string uri)
 
 static string currentLoad;
 
-static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
+static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-static bool allSupportedLocally(const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
     for (auto & feature : requiredFeatures)
-        if (!settings.systemFeatures.get().count(feature)) return false;
+        if (!store.systemFeatures.get().count(feature)) return false;
     return true;
 }
 
-static int _main(int argc, char * * argv)
+static int main_build_remote(int argc, char * * argv)
 {
     {
         logger = makeJSONLogger(*logger);
@@ -103,10 +103,10 @@ static int _main(int argc, char * * argv)
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-             auto canBuildLocally = amWilling
+            auto canBuildLocally = amWilling
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
-                 &&  allSupportedLocally(requiredFeatures);
+                 &&  allSupportedLocally(*store, requiredFeatures);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -119,7 +119,7 @@ static int _main(int argc, char * * argv)
                 bool rightType = false;
 
                 Machine * bestMachine = nullptr;
-                unsigned long long bestLoad = 0;
+                uint64_t bestLoad = 0;
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
@@ -130,8 +130,8 @@ static int _main(int argc, char * * argv)
                         m.mandatoryMet(requiredFeatures)) {
                         rightType = true;
                         AutoCloseFD free;
-                        unsigned long long load = 0;
-                        for (unsigned long long slot = 0; slot < m.maxJobs; ++slot) {
+                        uint64_t load = 0;
+                        for (uint64_t slot = 0; slot < m.maxJobs; ++slot) {
                             auto slotLock = openSlotLock(m, slot);
                             if (lockFile(slotLock.get(), ltWrite, false)) {
                                 if (!free) {
@@ -170,7 +170,45 @@ static int _main(int argc, char * * argv)
                     if (rightType && !canBuildLocally)
                         std::cerr << "# postpone\n";
                     else
+                    {
+                        // build the hint template.
+                        string hintstring =  "derivation: %s\nrequired (system, features): (%s, %s)";
+                        hintstring += "\n%s available machines:";
+                        hintstring += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
+
+                        for (unsigned int i = 0; i < machines.size(); ++i) {
+                          hintstring += "\n(%s, %s, %s, %s)";
+                        }
+
+                        // add the template values.
+                        string drvstr;
+                        if (drvPath.has_value())
+                            drvstr = drvPath->to_string();
+                        else
+                            drvstr = "<unknown>";
+
+                        auto hint = hintformat(hintstring);
+                        hint
+                          % drvstr
+                          % neededSystem
+                          % concatStringsSep<StringSet>(", ", requiredFeatures)
+                          % machines.size();
+
+                        for (auto & m : machines) {
+                          hint % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                            % m.maxJobs
+                            % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+                            % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+                        }
+
+                        logErrorInfo(lvlInfo, {
+                              .name = "Remote build",
+                              .description = "Failed to find a machine for remote build!",
+                              .hint = hint
+                        });
+
                         std::cerr << "# decline\n";
+                    }
                     break;
                 }
 
@@ -186,15 +224,7 @@ static int _main(int argc, char * * argv)
 
                     Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
 
-                    Store::Params storeParams;
-                    if (hasPrefix(bestMachine->storeUri, "ssh://")) {
-                        storeParams["max-connections"] = "1";
-                        storeParams["log-fd"] = "4";
-                        if (bestMachine->sshKey != "")
-                            storeParams["ssh-key"] = bestMachine->sshKey;
-                    }
-
-                    sshStore = openStore(bestMachine->storeUri, storeParams);
+                    sshStore = bestMachine->openStore();
                     sshStore->connect();
                     storeUri = bestMachine->storeUri;
 
@@ -267,4 +297,4 @@ connected:
     }
 }
 
-static RegisterLegacyCommand s1("build-remote", _main);
+static RegisterLegacyCommand r_build_remote("build-remote", main_build_remote);

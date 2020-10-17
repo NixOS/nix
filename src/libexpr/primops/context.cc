@@ -11,7 +11,7 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, 
     mkString(v, s, PathSet());
 }
 
-static RegisterPrimOp r1("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
 
 
 static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -21,7 +21,7 @@ static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, 
     mkBool(v, !context.empty());
 }
 
-static RegisterPrimOp r2("__hasContext", 1, prim_hasContext);
+static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
 
 
 /* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
@@ -42,7 +42,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
     mkString(v, s, context2);
 }
 
-static RegisterPrimOp r3("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
+static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
 
 
 /* Extract the context of a string as a structured Nix value.
@@ -127,7 +127,7 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
     v.attrs->sort();
 }
 
-static RegisterPrimOp r4("__getContext", 1, prim_getContext);
+static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
 
 
 /* Append the given context to a given string.
@@ -191,6 +191,6 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
     mkString(v, orig, context);
 }
 
-static RegisterPrimOp r5("__appendContext", 2, prim_appendContext);
+static RegisterPrimOp primop_appendContext("__appendContext", 2, prim_appendContext);
 
 }

@@ -4,7 +4,14 @@
 
 namespace nix {
 
-class LocalBinaryCacheStore : public BinaryCacheStore
+struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+{
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+
+    const std::string name() override { return "Local Binary Cache Store"; }
+};
+
+class LocalBinaryCacheStore : public BinaryCacheStore, public virtual LocalBinaryCacheStoreConfig
 {
 private:
 
@@ -13,8 +20,11 @@ private:
 public:
 
     LocalBinaryCacheStore(
-        const Params & params, const Path & binaryCacheDir)
-        : BinaryCacheStore(params)
+        const std::string scheme,
+        const Path & binaryCacheDir,
+        const Params & params)
+        : StoreConfig(params)
+        , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
     }
@@ -26,13 +36,25 @@ public:
         return "file://" + binaryCacheDir;
     }
 
+    static std::set<std::string> uriSchemes();
+
 protected:
 
     bool fileExists(const std::string & path) override;
 
     void upsertFile(const std::string & path,
-        const std::string & data,
-        const std::string & mimeType) override;
+        std::shared_ptr<std::basic_iostream<char>> istream,
+        const std::string & mimeType) override
+    {
+        auto path2 = binaryCacheDir + "/" + path;
+        Path tmp = path2 + ".tmp." + std::to_string(getpid());
+        AutoDelete del(tmp, false);
+        StreamToSourceAdapter source(istream);
+        writeFile(tmp, source);
+        if (rename(tmp.c_str(), path2.c_str()))
+            throw SysError("renaming '%1%' to '%2%'", tmp, path2);
+        del.cancel();
+    }
 
     void getFile(const std::string & path, Sink & sink) override
     {
@@ -52,7 +74,9 @@ protected:
             if (entry.name.size() != 40 ||
                 !hasSuffix(entry.name, ".narinfo"))
                 continue;
-            paths.insert(parseStorePath(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)));
+            paths.insert(parseStorePath(
+                    storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)
+                    + "-" + MissingName));
         }
 
         return paths;
@@ -68,38 +92,19 @@ void LocalBinaryCacheStore::init()
     BinaryCacheStore::init();
 }
 
-static void atomicWrite(const Path & path, const std::string & s)
-{
-    Path tmp = path + ".tmp." + std::to_string(getpid());
-    AutoDelete del(tmp, false);
-    writeFile(tmp, s);
-    if (rename(tmp.c_str(), path.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", tmp, path);
-    del.cancel();
-}
-
 bool LocalBinaryCacheStore::fileExists(const std::string & path)
 {
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-void LocalBinaryCacheStore::upsertFile(const std::string & path,
-    const std::string & data,
-    const std::string & mimeType)
+std::set<std::string> LocalBinaryCacheStore::uriSchemes()
 {
-    atomicWrite(binaryCacheDir + "/" + path, data);
+    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1")
+        return {};
+    else
+        return {"file"};
 }
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1" ||
-        std::string(uri, 0, 7) != "file://")
-        return 0;
-    auto store = std::make_shared<LocalBinaryCacheStore>(params, std::string(uri, 7));
-    store->init();
-    return store;
-});
+static RegisterStoreImplementation<LocalBinaryCacheStore, LocalBinaryCacheStoreConfig> regLocalBinaryCacheStore;
 
 }

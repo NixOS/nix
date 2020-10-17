@@ -17,15 +17,30 @@ struct FileTransferSettings : Config
     Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
         "String appended to the user agent in HTTP requests."};
 
-    Setting<size_t> httpConnections{this, 25, "http-connections",
-        "Number of parallel HTTP connections.",
+    Setting<size_t> httpConnections{
+        this, 25, "http-connections",
+        R"(
+          The maximum number of parallel TCP connections used to fetch
+          files from binary caches and by other downloads. It defaults
+          to 25. 0 means no limit.
+        )",
         {"binary-caches-parallel-connections"}};
 
-    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
-        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
+    Setting<unsigned long> connectTimeout{
+        this, 0, "connect-timeout",
+        R"(
+          The timeout (in seconds) for establishing connections in the
+          binary cache substituter. It corresponds to `curl`’s
+          `--connect-timeout` option.
+        )"};
 
-    Setting<unsigned long> stalledDownloadTimeout{this, 300, "stalled-download-timeout",
-        "Timeout (in seconds) for receiving data from servers during download. Nix cancels idle downloads after this timeout's duration."};
+    Setting<unsigned long> stalledDownloadTimeout{
+        this, 300, "stalled-download-timeout",
+        R"(
+          The timeout (in seconds) for receiving data from servers
+          during download. Nix cancels idle downloads after this
+          timeout's duration.
+        )"};
 
     Setting<unsigned int> tries{this, 5, "download-attempts",
         "How often Nix will attempt to download a file before giving up."};
@@ -36,6 +51,7 @@ extern FileTransferSettings fileTransferSettings;
 struct FileTransferRequest
 {
     std::string uri;
+    Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
@@ -103,10 +119,12 @@ class FileTransferError : public Error
 {
 public:
     FileTransfer::Error error;
+    std::shared_ptr<string> response; // intentionally optional
+
     template<typename... Args>
-    FileTransferError(FileTransfer::Error error, const Args & ... args)
-        : Error(args...), error(error)
-    { }
+    FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args);
+
+    virtual const char* sname() const override { return "FileTransferError"; }
 };
 
 bool isUri(const string & s);

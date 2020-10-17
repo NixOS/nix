@@ -93,7 +93,7 @@ void Source::operator () (unsigned char * data, size_t len)
 }
 
 
-std::string Source::drain()
+void Source::drainInto(Sink & sink)
 {
     std::string s;
     std::vector<unsigned char> buf(8192);
@@ -101,12 +101,19 @@ std::string Source::drain()
         size_t n;
         try {
             n = read(buf.data(), buf.size());
-            s.append((char *) buf.data(), n);
+            sink(buf.data(), n);
         } catch (EndOfFile &) {
             break;
         }
     }
-    return s;
+}
+
+
+std::string Source::drain()
+{
+    StringSink s;
+    drainInto(s);
+    return *s.s;
 }
 
 
@@ -259,6 +266,24 @@ Sink & operator << (Sink & sink, const StringSet & s)
     return sink;
 }
 
+Sink & operator << (Sink & sink, const Error & ex)
+{
+    auto info = ex.info();
+    sink
+        << "Error"
+        << info.level
+        << info.name
+        << info.description
+        << (info.hint ? info.hint->str() : "")
+        << 0 // FIXME: info.errPos
+        << info.traces.size();
+    for (auto & trace : info.traces) {
+        sink << 0; // FIXME: trace.pos
+        sink << trace.hint.str();
+    }
+    return sink;
+}
+
 
 void readPadding(size_t len, Source & source)
 {
@@ -312,6 +337,30 @@ template Paths readStrings(Source & source);
 template PathSet readStrings(Source & source);
 
 
+Error readError(Source & source)
+{
+    auto type = readString(source);
+    assert(type == "Error");
+    ErrorInfo info;
+    info.level = (Verbosity) readInt(source);
+    info.name = readString(source);
+    info.description = readString(source);
+    auto hint = readString(source);
+    if (hint != "") info.hint = hintformat(std::move(format("%s") % hint));
+    auto havePos = readNum<size_t>(source);
+    assert(havePos == 0);
+    auto nrTraces = readNum<size_t>(source);
+    for (size_t i = 0; i < nrTraces; ++i) {
+        havePos = readNum<size_t>(source);
+        assert(havePos == 0);
+        info.traces.push_back(Trace {
+            .hint = hintformat(std::move(format("%s") % readString(source)))
+        });
+    }
+    return Error(std::move(info));
+}
+
+
 void StringSink::operator () (const unsigned char * data, size_t len)
 {
     static bool warned = false;
@@ -322,5 +371,18 @@ void StringSink::operator () (const unsigned char * data, size_t len)
     s->append((const char *) data, len);
 }
 
+size_t ChainSource::read(unsigned char * data, size_t len)
+{
+    if (useSecond) {
+        return source2.read(data, len);
+    } else {
+        try {
+            return source1.read(data, len);
+        } catch (EndOfFile &) {
+            useSecond = true;
+            return this->read(data, len);
+        }
+    }
+}
 
 }
