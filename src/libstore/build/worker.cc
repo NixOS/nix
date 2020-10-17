@@ -455,7 +455,7 @@ void Worker::markContentsGood(const StorePath & path)
 
 
 GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
-	return subGoal;
+    return subGoal;
 }
 
 }
