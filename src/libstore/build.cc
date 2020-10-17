@@ -820,8 +820,8 @@ private:
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    uid_t sandboxUid = -1;
-    gid_t sandboxGid = -1;
+    uid_t sandboxUid() { return usingUserNamespace ? (useUidRange ? 0 : 1000) : buildUser->getUID(); }
+    gid_t sandboxGid() { return usingUserNamespace ? (useUidRange ? 0 : 100)  : buildUser->getGID(); }
 
     const static Path homeDir;
 
@@ -2323,22 +2323,18 @@ void DerivationGoal::startBuilder()
         if (useUidRange && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires '%s' to be enabled", settings.autoAllocateUids.name);
 
-        sandboxUid = useUidRange && usingUserNamespace ? 0 : 1000;
-        sandboxGid = useUidRange && usingUserNamespace ? 0 : 100;
-
         writeFile(chrootRootDir + "/etc/passwd", fmt(
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid, sandboxGid, settings.sandboxBuildDir));
+                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
         writeFile(chrootRootDir + "/etc/group",
-            (format(
-                "root:x:0:\n"
+            fmt("root:x:0:\n"
                 "nixbld:!:%1%:\n"
-                "nogroup:x:65534:\n") % sandboxGid).str());
+                "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
         if (!(derivationIsImpure(derivationType)))
@@ -2562,17 +2558,6 @@ void DerivationGoal::startBuilder()
 
         usingUserNamespace = userNamespacesEnabled;
 
-        if (usingUserNamespace) {
-            sandboxUid = 1000;
-            sandboxGid = 100;
-        } else {
-            debug("note: not using a user namespace");
-            if (!buildUser)
-                throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
-            sandboxUid = buildUser->getUID();
-            sandboxGid = buildUser->getGID();
-        }
-
         Pid helper = startProcess([&]() {
 
             /* Drop additional groups here because we can't do it
@@ -2604,11 +2589,12 @@ void DerivationGoal::startBuilder()
                 flags &= ~CLONE_NEWPID;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
-            if (child == -1 && (errno == EPERM || errno == EINVAL)) {
+            if (usingUserNamespace && child == -1 && (errno == EPERM || errno == EINVAL)) {
                 /* Some distros patch Linux to not allow unprivileged
                  * user namespaces. If we get EPERM or EINVAL, try
                  * without CLONE_NEWUSER and see if that works.
                  */
+                usingUserNamespace = false;
                 flags &= ~CLONE_NEWUSER;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
@@ -2619,7 +2605,8 @@ void DerivationGoal::startBuilder()
                 _exit(1);
             if (child == -1) throw SysError("cloning builder process");
 
-            writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
+            writeFull(builderOut.writeSide.get(),
+                fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
         }, options);
 
@@ -2640,7 +2627,10 @@ void DerivationGoal::startBuilder()
         });
 
         pid_t tmp;
-        if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
+        auto ss = tokenizeString<std::vector<std::string>>(readLine(builderOut.readSide.get()));
+        assert(ss.size() == 2);
+        usingUserNamespace = ss[0] == "1";
+        if (!string2Int<pid_t>(ss[1], tmp)) abort();
         pid = tmp;
 
         if (usingUserNamespace) {
@@ -2652,13 +2642,17 @@ void DerivationGoal::startBuilder()
             uint32_t nrIds = buildUser && useUidRange ? buildUser->getUIDCount() : 1;
 
             writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-                fmt("%d %d %d", sandboxUid, hostUid, nrIds));
+                fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
             if (!useUidRange)
                 writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
             writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-                fmt("%d %d %d", sandboxGid, hostGid, nrIds));
+                fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+        } else {
+            debug("note: not using a user namespace");
+            if (!buildUser)
+                throw Error("cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
         }
 
         /* Save the mount namespace of the child. We have to do this
@@ -3538,9 +3532,9 @@ void DerivationGoal::runChild()
             /* Switch to the sandbox uid/gid in the user namespace,
                which corresponds to the build user or calling user in
                the parent namespace. */
-            if (setgid(sandboxGid) == -1)
+            if (setgid(sandboxGid()) == -1)
                 throw SysError("setgid failed");
-            if (setuid(sandboxUid) == -1)
+            if (setuid(sandboxUid()) == -1)
                 throw SysError("setuid failed");
 
             setUser = false;
