@@ -256,7 +256,7 @@ let
     tests.binaryTarball =
       with import nixpkgs { system = "x86_64-linux"; };
       vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
-        { diskImage = vmTools.diskImages.ubuntu1204x86_64;
+        { diskImage = vmTools.diskImages.ubuntu2004x86_64;
         }
         ''
           set -x
