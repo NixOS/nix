@@ -67,7 +67,7 @@ struct PathInputScheme : InputScheme
 
     bool hasAllInfo(const Input & input) override
     {
-        return true;
+        return (bool) input.getNarHash();
     }
 
     std::optional<Path> getSourcePath(const Input & input) override
@@ -91,12 +91,20 @@ struct PathInputScheme : InputScheme
         if (storePath)
             store->addTempRoot(*storePath);
 
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
+        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
             storePath = store->addToStore("source", path);
+        }
+
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(*storePath)->fullStorePathDescriptorOpt().value();
 
         return {
-            Tree(store->toRealPath(*storePath), std::move(*storePath)),
+            Tree {
+                store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc)),
+                std::move(storePathDesc),
+            },
             input
         };
     }

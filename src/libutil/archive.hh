@@ -2,7 +2,7 @@
 
 #include "types.hh"
 #include "serialise.hh"
-
+#include "fs-sink.hh"
 
 namespace nix {
 
@@ -49,19 +49,6 @@ void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
 void dumpString(const std::string & s, Sink & sink);
-
-/* FIXME: fix this API, it sucks. */
-struct ParseSink
-{
-    virtual void createDirectory(const Path & path) { };
-
-    virtual void createRegularFile(const Path & path) { };
-    virtual void isExecutable() { };
-    virtual void preallocateContents(uint64_t size) { };
-    virtual void receiveContents(unsigned char * data, size_t len) { };
-
-    virtual void createSymlink(const Path & path, const string & target) { };
-};
 
 /* If the NAR archive contains a single file at top-level, then save
    the contents of the file to `s'.  Otherwise barf. */

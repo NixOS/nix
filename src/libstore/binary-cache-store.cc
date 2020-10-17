@@ -193,8 +193,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
        reads, but typically they'll already be cached. */
     for (auto & ref : info.references)
         try {
-            if (ref != info.path)
-                queryPathInfo(ref);
+            queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
@@ -323,7 +322,17 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & nam
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name),
+            *this,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = nar.first,
+                    },
+                    {},
+                },
+            },
             nar.first,
         };
         info.narSize = nar.second;
@@ -331,15 +340,15 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & nam
     })->path;
 }
 
-bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
+bool BinaryCacheStore::isValidPathUncached(StorePathOrDesc storePath)
 {
     // FIXME: this only checks whether a .narinfo with a matching hash
     // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
     // though they shouldn't. Not easily fixed.
-    return fileExists(narInfoFileFor(storePath));
+    return fileExists(narInfoFileFor(bakeCaIfNeeded(storePath)));
 }
 
-void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
+void BinaryCacheStore::narFromPath(StorePathOrDesc storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
@@ -361,16 +370,17 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     stats.narReadBytes += narSize.length;
 }
 
-void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
+void BinaryCacheStore::queryPathInfoUncached(StorePathOrDesc storePath,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     auto uri = getUri();
-    auto storePathS = printStorePath(storePath);
+    auto actualStorePath = bakeCaIfNeeded(storePath);
+    auto storePathS = printStorePath(actualStorePath);
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
     PushActivity pact(act->id);
 
-    auto narInfoFile = narInfoFileFor(storePath);
+    auto narInfoFile = narInfoFileFor(actualStorePath);
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
@@ -401,10 +411,15 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
        implementation of this method in terms of addToStoreFromDump. */
 
     HashSink sink { hashAlgo };
-    if (method == FileIngestionMethod::Recursive) {
+    switch (method) {
+    case FileIngestionMethod::Recursive:
         dumpPath(srcPath, sink, filter);
-    } else {
+        break;
+    case FileIngestionMethod::Flat:
         readFile(srcPath, sink);
+        break;
+    case FileIngestionMethod::Git:
+        throw Error("cannot add to binary cache store using the git file ingestion method");
     }
     auto h = sink.finish().first;
 
@@ -413,14 +428,20 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name),
+            *this,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = h,
+                    },
+                    {},
+                },
+            },
             nar.first,
         };
         info.narSize = nar.second;
-        info.ca = FixedOutputHash {
-            .method = method,
-            .hash = h,
-        };
         return info;
     })->path;
 }
@@ -429,17 +450,26 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     const StorePathSet & references, RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
-    auto path = makeTextPath(name, textHash, references);
+    auto path = makeTextPath(name, TextInfo { textHash, references });
 
     if (!repair && isValidPath(path))
         return path;
 
     auto source = StringSource { s };
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info { path, nar.first };
+        ValidPathInfo info {
+            *this,
+            {
+                .name = name,
+                .info = TextInfo {
+                    { .hash = textHash },
+                    references,
+                },
+            },
+            nar.first,
+        };
         info.narSize = nar.second;
         info.ca = TextHash { textHash };
-        info.references = references;
         return info;
     })->path;
 }

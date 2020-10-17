@@ -7,6 +7,7 @@
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
+#include "git.hh"
 
 namespace nix::daemon {
 
@@ -250,7 +251,7 @@ static void writeValidPathInfo(
 {
     to << (info->deriver ? store->printStorePath(*info->deriver) : "")
        << info->narHash.to_string(Base16, false);
-    worker_proto::write(*store, to, info->references);
+    worker_proto::write(*store, to, info->referencesPossiblyToSelf());
     to << info->registrationTime << info->narSize;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
         to << info->ultimate
@@ -320,7 +321,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         StorePathSet paths;
         if (op == wopQueryReferences)
-            for (auto & i : store->queryPathInfo(path)->references)
+            for (auto & i : store->queryPathInfo(path)->referencesPossiblyToSelf())
                 paths.insert(i);
         else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
@@ -433,8 +434,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                   addToStoreFromDump(). */
                 ParseSink sink; /* null sink; just parse the NAR */
                 parseDump(sink, savedNARSource);
-            } else
+            } else if (method == FileIngestionMethod::Flat) {
                 parseDump(savedRegular, from);
+            } else {
+                /* Should have validated above that no other file ingestion
+                   method was used. */
+                assert(false);
+            }
 
             logger->startWork();
             if (!savedRegular.regular) throw Error("regular file expected");
@@ -686,7 +692,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
+        store->querySubstitutablePathInfos({path}, {}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -694,7 +700,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             to << 1
                << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
-            worker_proto::write(*store, to, i->second.references);
+            worker_proto::write(*store, to, i->second.referencesPossiblyToSelf(path));
             to << i->second.downloadSize
                << i->second.narSize;
         }
@@ -703,21 +709,18 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopQuerySubstitutablePathInfos: {
         SubstitutablePathInfos infos;
-        StorePathCAMap pathsMap = {};
-        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
-            auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
-            for (auto & path : paths)
-                pathsMap.emplace(path, std::nullopt);
-        } else
-            pathsMap = worker_proto::read(*store, from, Phantom<StorePathCAMap> {});
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        std::set<StorePathDescriptor> caPaths;
+        if (GET_PROTOCOL_MINOR(clientVersion) > 22)
+            caPaths = worker_proto::read(*store, from, Phantom<std::set<StorePathDescriptor>> {});
         logger->startWork();
-        store->querySubstitutablePathInfos(pathsMap, infos);
+        store->querySubstitutablePathInfos(paths, caPaths, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
             to << store->printStorePath(i.first)
                << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
-            worker_proto::write(*store, to, i.second.references);
+            worker_proto::write(*store, to, i.second.referencesPossiblyToSelf(i.first));
             to << i.second.downloadSize << i.second.narSize;
         }
         break;
@@ -799,7 +802,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        info.setReferencesPossiblyToSelf(worker_proto::read(*store, from, Phantom<StorePathSet> {}));
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
         info.ca = parseContentAddressOpt(readString(from));

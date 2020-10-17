@@ -59,7 +59,8 @@ void setVerbosity(int level)
 int isValidPath(char * path)
     CODE:
         try {
-            RETVAL = store()->isValidPath(store()->parseStorePath(path));
+            auto storePath = store()->parseStorePath(path);
+            RETVAL = store()->isValidPath(storePath);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -70,7 +71,8 @@ int isValidPath(char * path)
 SV * queryReferences(char * path)
     PPCODE:
         try {
-            for (auto & i : store()->queryPathInfo(store()->parseStorePath(path))->references)
+            auto storePath = store()->parseStorePath(path);
+            for (auto & i : store()->queryPathInfo(storePath)->referencesPossiblyToSelf())
                 XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -80,7 +82,8 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string(Base32, true);
+            auto storePath = store()->parseStorePath(path);
+            auto s = store()->queryPathInfo(storePath)->narHash.to_string(Base32, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -90,7 +93,8 @@ SV * queryPathHash(char * path)
 SV * queryDeriver(char * path)
     PPCODE:
         try {
-            auto info = store()->queryPathInfo(store()->parseStorePath(path));
+            auto storePath = store()->parseStorePath(path);
+            auto info = store()->queryPathInfo(storePath);
             if (!info->deriver) XSRETURN_UNDEF;
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
         } catch (Error & e) {
@@ -101,7 +105,8 @@ SV * queryDeriver(char * path)
 SV * queryPathInfo(char * path, int base32)
     PPCODE:
         try {
-            auto info = store()->queryPathInfo(store()->parseStorePath(path));
+            auto storePath = store()->parseStorePath(path);
+            auto info = store()->queryPathInfo(storePath);
             if (!info->deriver)
                 XPUSHs(&PL_sv_undef);
             else
@@ -111,7 +116,7 @@ SV * queryPathInfo(char * path, int base32)
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
             AV * arr = newAV();
-            for (auto & i : info->references)
+            for (auto & i : info->referencesPossiblyToSelf())
                 av_push(arr, newSVpv(store()->printStorePath(i).c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) arr)));
         } catch (Error & e) {
@@ -287,7 +292,13 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
         try {
             auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->makeFixedOutputPath(method, h, name);
+            auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
+                {
+                    .method = method,
+                    .hash = h,
+                },
+                {},
+            });
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());

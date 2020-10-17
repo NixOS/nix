@@ -77,12 +77,18 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+GoalPtr Worker::makeSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
 {
-    WeakGoalPtr & goal_weak = substitutionGoals[path];
+    auto p = store.bakeCaIfNeeded(path);
+    WeakGoalPtr & goal_weak = substitutionGoals[p];
     GoalPtr goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
+        auto optCA = std::get_if<1>(&path);
+        goal = std::make_shared<SubstitutionGoal>(
+            p,
+            *this,
+            repair,
+            optCA ? std::optional { *optCA } : std::nullopt);
         goal_weak = goal;
         wakeUp(goal);
     }

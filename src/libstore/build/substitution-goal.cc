@@ -5,7 +5,7 @@
 
 namespace nix {
 
-SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
+SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<StorePathDescriptor> ca)
     : Goal(worker)
     , storePath(storePath)
     , repair(repair)
@@ -85,7 +85,7 @@ void SubstitutionGoal::tryNext()
     subs.pop_front();
 
     if (ca) {
-        subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+        auto subPath = sub->makeFixedOutputPathFromCA(*ca);
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {
@@ -95,7 +95,8 @@ void SubstitutionGoal::tryNext()
 
     try {
         // FIXME: make async
-        info = sub->queryPathInfo(subPath ? *subPath : storePath);
+        auto p = ca ? StorePathOrDesc { std::cref(*ca) } : std::cref(storePath);
+        info = sub->queryPathInfo(p);
     } catch (InvalidPath &) {
         tryNext();
         return;
@@ -115,7 +116,7 @@ void SubstitutionGoal::tryNext()
     }
 
     if (info->path != storePath) {
-        if (info->isContentAddressed(*sub) && info->references.empty()) {
+        if (info->isContentAddressed(*sub) && info->references.empty() && !info->hasSelfReference) {
             auto info2 = std::make_shared<ValidPathInfo>(*info);
             info2->path = storePath;
             info = info2;
@@ -158,8 +159,7 @@ void SubstitutionGoal::tryNext()
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            addWaitee(worker.makeSubstitutionGoal(i));
+        addWaitee(worker.makeSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
@@ -179,8 +179,7 @@ void SubstitutionGoal::referencesValid()
     }
 
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            assert(worker.store.isValidPath(i));
+        assert(worker.store.isValidPath(i));
 
     state = &SubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());
@@ -215,8 +214,10 @@ void SubstitutionGoal::tryToRun()
             Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
+            auto p = ca ? StorePathOrDesc { std::cref(*ca) } : std::cref(storePath);
+
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
-                subPath ? *subPath : storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+                p, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {

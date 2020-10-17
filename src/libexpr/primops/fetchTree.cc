@@ -19,18 +19,24 @@ void emitTreeAttrs(
 {
     assert(input.isImmutable());
 
-    state.mkAttrs(v, 8);
+    state.mkAttrs(v, 10);
 
-    auto storePath = state.store->printStorePath(tree.storePath);
+    auto storePath = state.store->printStorePath(
+        state.store->makeFixedOutputPathFromCA(tree.storePath));
 
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        narHash->to_string(SRI, true));
+    if (auto narHash = input.getNarHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("narHash")),
+            narHash->to_string(SRI, true));
+    } else if (auto treeHash = input.getTreeHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("treeHash")),
+            treeHash->to_string(SRI, true));
+    } else
+        /* Must have either tree hash or NAR hash */
+        assert(false);
 
     if (auto rev = input.getRev()) {
         mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
@@ -40,6 +46,11 @@ void emitTreeAttrs(
         auto emptyHash = Hash(htSHA1);
         mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
         mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
+    }
+
+    if (auto treeHash = input.getTreeHash()) {
+        mkString(*state.allocAttr(v, state.symbols.create("treeHash")), treeHash->gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortTreeHash")), treeHash->gitShortRev());
     }
 
     if (input.getType() == "git")
@@ -199,12 +210,26 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
+    // try to substitute if we can
+    if (settings.useSubstitutes && expectedHash) {
+        auto substitutableStorePath = fetchers::trySubstitute(state.store,
+            unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat, *expectedHash, name);
+        if (substitutableStorePath) {
+            auto substitutablePath = state.store->toRealPath(*substitutableStorePath);
+            if (state.allowedPaths)
+                state.allowedPaths->insert(substitutablePath);
+
+            mkString(v, substitutablePath, PathSet({substitutablePath}));
+            return;
+        }
+    }
+
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(storePath);
+    auto path = state.store->toRealPath(state.store->makeFixedOutputPathFromCA(storePath));
 
     if (expectedHash) {
         auto hash = unpack

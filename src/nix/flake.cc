@@ -66,7 +66,8 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
     logger->stdout("Locked URL:    %s", flake.lockedRef.to_string());
     if (flake.description)
         logger->stdout("Description:   %s", *flake.description);
-    logger->stdout("Path:          %s", store.printStorePath(flake.sourceInfo->storePath));
+    logger->stdout("Path:          %s", store.printStorePath(
+        store.makeFixedOutputPathFromCA(flake.sourceInfo->storePath)));
     if (auto rev = flake.lockedRef.input.getRev())
         logger->stdout("Revision:      %s", rev->to_string(Base16, false));
     if (auto revCount = flake.lockedRef.input.getRevCount())
@@ -93,7 +94,8 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
         j["revCount"] = *revCount;
     if (auto lastModified = flake.lockedRef.input.getLastModified())
         j["lastModified"] = *lastModified;
-    j["path"] = store.printStorePath(flake.sourceInfo->storePath);
+    j["path"] = store.printStorePath(
+        store.makeFixedOutputPathFromCA(flake.sourceInfo->storePath));
     return j;
 }
 
@@ -746,9 +748,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        sources.insert(flake.flake.sourceInfo->storePath);
+        auto storePath0 =
+            store->makeFixedOutputPathFromCA(flake.flake.sourceInfo->storePath);
+        sources.insert(storePath0);
         if (jsonRoot)
-            jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
+            jsonRoot->attr("path", store->printStorePath(storePath0));
 
         // FIXME: use graph output, handle cycles.
         std::function<void(const Node & node, std::optional<JSONObject> & jsonObj)> traverse;
@@ -758,10 +762,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
                     auto jsonObj3 = jsonObj2 ? jsonObj2->object(inputName) : std::optional<JSONObject>();
-                    auto storePath =
+                    auto storePathDesc =
                         dryRun
                         ? (*inputNode)->lockedRef.input.computeStorePath(*store)
                         : (*inputNode)->lockedRef.input.fetch(store).first.storePath;
+                    auto storePath = store->makeFixedOutputPathFromCA(storePathDesc);
                     if (jsonObj3)
                         jsonObj3->attr("path", store->printStorePath(storePath));
                     sources.insert(std::move(storePath));

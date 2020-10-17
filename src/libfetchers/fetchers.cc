@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -24,6 +25,8 @@ static void fixupInput(Input & input)
     input.getType();
     input.getRef();
     if (input.getRev())
+        input.immutable = true;
+    if (input.getTreeHash())
         input.immutable = true;
     input.getRevCount();
     input.getLastModified();
@@ -89,7 +92,7 @@ Attrs Input::toAttrs() const
 
 bool Input::hasAllInfo() const
 {
-    return getNarHash() && scheme && scheme->hasAllInfo(*this);
+    return scheme && scheme->hasAllInfo(*this);
 }
 
 bool Input::operator ==(const Input & other) const
@@ -117,16 +120,18 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
        original source). So check that. */
     if (hasAllInfo()) {
         try {
-            auto storePath = computeStorePath(*store);
+            auto storePathDesc = computeStorePath(*store);
 
-            store->ensurePath(storePath);
+            store->ensurePath(std::cref(storePathDesc));
+
+            auto storePath = store->makeFixedOutputPathFromCA(storePathDesc);
 
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
             auto actualPath = store->toRealPath(storePath);
 
-            return {fetchers::Tree(std::move(actualPath), std::move(storePath)), *this};
+            return {fetchers::Tree(std::move(actualPath), std::move(storePathDesc)), *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
@@ -135,7 +140,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     auto [tree, input] = scheme->fetch(store, *this);
 
     if (tree.actualPath == "")
-        tree.actualPath = store->toRealPath(tree.storePath);
+        tree.actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(tree.storePath));
 
     auto narHash = store->queryPathInfo(tree.storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
@@ -193,12 +198,31 @@ void Input::markChangedFile(
     return scheme->markChangedFile(*this, file, commitMsg);
 }
 
-StorePath Input::computeStorePath(Store & store) const
+StorePathDescriptor Input::computeStorePath(Store & store) const
 {
-    auto narHash = getNarHash();
-    if (!narHash)
-        throw Error("cannot compute store path for mutable input '%s'", to_string());
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, "source");
+    if (auto treeHash = getTreeHash())
+        return StorePathDescriptor {
+            "source",
+            FixedOutputInfo {
+                {
+                    .method = FileIngestionMethod::Git,
+                    .hash = *treeHash,
+                },
+                {},
+            },
+        };
+    if (auto narHash = getNarHash())
+        return StorePathDescriptor {
+            "source",
+            FixedOutputInfo {
+                {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = *narHash,
+                },
+                {},
+            },
+        };
+    throw Error("cannot compute store path for mutable input '%s'", to_string());
 }
 
 std::string Input::getType() const
@@ -227,6 +251,13 @@ std::optional<std::string> Input::getRef() const
 std::optional<Hash> Input::getRev() const
 {
     if (auto s = maybeGetStrAttr(attrs, "rev"))
+        return Hash::parseAny(*s, htSHA1);
+    return {};
+}
+
+std::optional<Hash> Input::getTreeHash() const
+{
+    if (auto s = maybeGetStrAttr(attrs, "treeHash"))
         return Hash::parseAny(*s, htSHA1);
     return {};
 }
@@ -275,6 +306,32 @@ void InputScheme::markChangedFile(const Input & input, std::string_view file, st
 void InputScheme::clone(const Input & input, const Path & destDir)
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
+    Hash hash, std::string_view name)
+{
+    auto ca = StorePathDescriptor {
+        .name = std::string { name },
+        .info = FixedOutputInfo {
+            ingestionMethod,
+            hash,
+            {}
+        },
+    };
+    auto substitutablePath = store->makeFixedOutputPathFromCA(ca);
+
+    try {
+        store->ensurePath(ca);
+
+        debug("using substituted path '%s'", store->printStorePath(substitutablePath));
+
+        return substitutablePath;
+    } catch (Error & e) {
+        debug("substitution of path '%s' failed: %s", store->printStorePath(substitutablePath), e.what());
+    }
+
+    return std::nullopt;
 }
 
 }

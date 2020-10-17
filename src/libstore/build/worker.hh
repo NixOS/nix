@@ -131,7 +131,7 @@ public:
         const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    GoalPtr makeSubstitutionGoal(StorePathOrDesc storePath, RepairFlag repair = NoRepair);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);

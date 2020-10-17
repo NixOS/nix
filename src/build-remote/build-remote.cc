@@ -283,8 +283,11 @@ connected:
             throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
 
         StorePathSet missing;
-        for (auto & path : outputs)
-            if (!store->isValidPath(store->parseStorePath(path))) missing.insert(store->parseStorePath(path));
+        for (auto & path : outputs) {
+            auto storePath = store->parseStorePath(path);
+            if (!store->isValidPath(storePath))
+                missing.insert(store->parseStorePath(path));
+        }
 
         if (!missing.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));

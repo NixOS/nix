@@ -370,7 +370,7 @@ namespace nix {
 
       // constructing without access violation.
       ErrPos ep(invalid);
-    
+
       // assignment without access violation.
       ep = invalid;
 

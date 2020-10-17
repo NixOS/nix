@@ -70,7 +70,8 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     auto [tree, input2] = input.fetch(state.store);
 
     state.mkAttrs(v, 8);
-    auto storePath = state.store->printStorePath(tree.storePath);
+    auto storePath = state.store->printStorePath(
+        state.store->makeFixedOutputPathFromCA(tree.storePath));
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
     if (input2.getRef())
         mkString(*state.allocAttr(v, state.symbols.create("branch")), *input2.getRef());
