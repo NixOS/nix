@@ -179,6 +179,10 @@ AC_CHECK_HEADERS([bzlib.h], [true],
   [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
+# Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
+if test "$shared" != yes; then
+    LIBARCHIVE_LIBS+=' -lz'
+fi
 
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])

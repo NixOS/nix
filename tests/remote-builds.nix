@@ -2,7 +2,7 @@
 
 { nixpkgs, system, overlay }:
 
-with import (nixpkgs + "/nixos/lib/testing.nix") {
+with import (nixpkgs + "/nixos/lib/testing-python.nix") {
   inherit system;
   extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
 };
@@ -36,6 +36,7 @@ let
 in
 
 {
+  name = "remote-builds";
 
   nodes =
     { builder1 = builder;
@@ -66,44 +67,46 @@ in
         };
     };
 
-  testScript = { nodes }:
-    ''
-      startAll;
+  testScript = { nodes }: ''
+    # fmt: off
+    import subprocess
 
-      # Create an SSH key on the client.
-      my $key = `${pkgs.openssh}/bin/ssh-keygen -t ed25519 -f key -N ""`;
-      $client->succeed("mkdir -p -m 700 /root/.ssh");
-      $client->copyFileFromHost("key", "/root/.ssh/id_ed25519");
-      $client->succeed("chmod 600 /root/.ssh/id_ed25519");
+    start_all()
 
-      # Install the SSH key on the builders.
-      $client->waitForUnit("network.target");
-      foreach my $builder ($builder1, $builder2) {
-          $builder->succeed("mkdir -p -m 700 /root/.ssh");
-          $builder->copyFileFromHost("key.pub", "/root/.ssh/authorized_keys");
-          $builder->waitForUnit("sshd");
-          $client->succeed("ssh -o StrictHostKeyChecking=no " . $builder->name() . " 'echo hello world'");
-      }
+    # Create an SSH key on the client.
+    subprocess.run([
+      "${pkgs.openssh}/bin/ssh-keygen", "-t", "ed25519", "-f", "key", "-N", ""
+    ], capture_output=True, check=True)
+    client.succeed("mkdir -p -m 700 /root/.ssh")
+    client.copy_from_host("key", "/root/.ssh/id_ed25519")
+    client.succeed("chmod 600 /root/.ssh/id_ed25519")
 
-      # Perform a build and check that it was performed on the builder.
-      my $out = $client->succeed(
-        "nix-build ${expr nodes.client.config 1} 2> build-output",
-        "grep -q Hello build-output"
-      );
-      $builder1->succeed("test -e $out");
+    # Install the SSH key on the builders.
+    client.wait_for_unit("network.target")
+    for builder in [builder1, builder2]:
+      builder.succeed("mkdir -p -m 700 /root/.ssh")
+      builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
+      builder.wait_for_unit("sshd")
+      client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
 
-      # And a parallel build.
-      my ($out1, $out2) = split /\s/,
-          $client->succeed('nix-store -r $(nix-instantiate ${expr nodes.client.config 2})\!out $(nix-instantiate ${expr nodes.client.config 3})\!out');
-      $builder1->succeed("test -e $out1 -o -e $out2");
-      $builder2->succeed("test -e $out1 -o -e $out2");
+    # Perform a build and check that it was performed on the builder.
+    out = client.succeed(
+      "nix-build ${expr nodes.client.config 1} 2> build-output",
+      "grep -q Hello build-output"
+    )
+    builder1.succeed(f"test -e {out}")
 
-      # And a failing build.
-      $client->fail("nix-build ${expr nodes.client.config 5}");
+    # And a parallel build.
+    paths = client.succeed(r'nix-store -r $(nix-instantiate ${expr nodes.client.config 2})\!out $(nix-instantiate ${expr nodes.client.config 3})\!out')
+    out1, out2 = paths.split()
+    builder1.succeed(f"test -e {out1} -o -e {out2}")
+    builder2.succeed(f"test -e {out1} -o -e {out2}")
 
-      # Test whether the build hook automatically skips unavailable builders.
-      $builder1->block;
-      $client->succeed("nix-build ${expr nodes.client.config 4}");
-    '';
+    # And a failing build.
+    client.fail("nix-build ${expr nodes.client.config 5}")
 
+    # Test whether the build hook automatically skips unavailable builders.
+    builder1.block()
+    client.succeed("nix-build ${expr nodes.client.config 4}")
+  '';
 })
