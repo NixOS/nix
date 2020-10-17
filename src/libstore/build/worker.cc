@@ -90,10 +90,10 @@ template<typename G>
 static void removeGoal(std::shared_ptr<G> goal, std::map<StorePath, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
-    for (typename std::map<StorePath, std::weak_ptr<G>>::iterator i = goalMap.begin();
+    for (auto i = goalMap.begin();
          i != goalMap.end(); )
         if (i->second.lock() == goal) {
-            typename std::map<StorePath, std::weak_ptr<G>>::iterator j = i; ++j;
+            auto j = i; ++j;
             goalMap.erase(i);
             i = j;
         }
