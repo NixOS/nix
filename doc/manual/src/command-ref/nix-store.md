@@ -1,5 +1,3 @@
-Title: nix-store
-
 # Name
 
 `nix-store` - manipulate or query the Nix store

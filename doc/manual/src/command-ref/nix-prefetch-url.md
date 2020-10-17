@@ -1,5 +1,3 @@
-Title: nix-prefetch-url
-
 # Name
 
 `nix-prefetch-url` - copy a file from a URL into the store and print its hash
