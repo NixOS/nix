@@ -440,8 +440,6 @@
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
-      } // nixpkgs.lib.optionalAttrs (builtins.elem system linuxSystems) {
-        buildStatic = self.hydraJobs.buildStatic.${system};
       });
 
       packages = forAllSystems (system: {
