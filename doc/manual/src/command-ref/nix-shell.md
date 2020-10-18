@@ -76,8 +76,8 @@ All options not listed here are passed to `nix-store
     cleared before the interactive shell is started, so you get an
     environment that more closely corresponds to the “real” Nix build. A
     few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained. Note that `~/.bashrc` and (depending on your Bash
-    installation) `/etc/bashrc` are still sourced, so any variables set
+    retained. Note that (depending on your Bash
+    installation) `/etc/bashrc` is still sourced, so any variables set
     there will affect the interactive shell.
 
   - `--packages` / `-p` *packages*…  
