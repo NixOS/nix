@@ -185,7 +185,22 @@ struct Common : InstallableCommand, MixProfile
         "UID",
     };
 
+    std::vector<std::pair<std::string, std::string>> redirects;
+
+    Common()
+    {
+        addFlag({
+            .longName = "redirect",
+            .description = "redirect a store path to a mutable location",
+            .labels = {"installable", "outputs-dir"},
+            .handler = {[&](std::string installable, std::string outputsDir) {
+                redirects.push_back({installable, outputsDir});
+            }}
+        });
+    }
+
     std::string makeRcScript(
+        ref<Store> store,
         const BuildEnvironment & buildEnvironment,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
@@ -217,6 +232,8 @@ struct Common : InstallableCommand, MixProfile
 
         out << "eval \"$shellHook\"\n";
 
+        auto script = out.str();
+
         /* Substitute occurrences of output paths. */
         auto outputs = buildEnvironment.env.find("outputs");
         assert(outputs != buildEnvironment.env.end());
@@ -230,7 +247,33 @@ struct Common : InstallableCommand, MixProfile
             rewrites.insert({from->second.quoted, outputsDir + "/" + outputName});
         }
 
-        return rewriteStrings(out.str(), rewrites);
+        /* Substitute redirects. */
+        for (auto & [installableS, dir] : redirects) {
+            dir = absPath(dir);
+            auto installable = parseInstallable(store, installableS);
+            auto buildable = installable->toBuildable();
+            auto doRedirect = [&](const StorePath & path)
+            {
+                auto from = store->printStorePath(path);
+                if (script.find(from) == std::string::npos)
+                    warn("'%s' (path '%s') is not used by this build environment", installable->what(), from);
+                else {
+                    printInfo("redirecting '%s' to '%s'", from, dir);
+                    rewrites.insert({from, dir});
+                }
+            };
+            std::visit(overloaded {
+                [&](const BuildableOpaque & bo) {
+                    doRedirect(bo.path);
+                },
+                [&](const BuildableFromDrv & bfd) {
+                    for (auto & [outputName, path] : bfd.outputs)
+                        if (path) doRedirect(*path);
+                },
+            }, buildable);
+        }
+
+        return rewriteStrings(script, rewrites);
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -348,6 +391,10 @@ struct CmdDevelop : Common, MixEnvironment
                 "To use a build environment previously recorded in a profile:",
                 "nix develop /tmp/my-shell"
             },
+            Example{
+                "To replace all occurences of a store path with a writable directory:",
+                "nix develop --redirect nixpkgs#glibc.dev ~/my-glibc/outputs/dev"
+            },
         };
     }
 
@@ -357,7 +404,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
-        auto script = makeRcScript(buildEnvironment);
+        auto script = makeRcScript(store, buildEnvironment);
 
         if (verbosity >= lvlDebug)
             script += "set -x\n";
@@ -449,7 +496,7 @@ struct CmdPrintDevEnv : Common
 
         stopProgressBar();
 
-        std::cout << makeRcScript(buildEnvironment);
+        std::cout << makeRcScript(store, buildEnvironment);
     }
 };
 
