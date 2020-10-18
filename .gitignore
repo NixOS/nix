@@ -24,7 +24,6 @@ perl/Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
-/scripts/nix-copy-closure
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
 /scripts/nix-profile-daemon.sh
