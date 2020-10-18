@@ -908,7 +908,7 @@ public:
           value.
           )"};
 
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<Strings> experimentalFeatures{this, tokenizeString<Strings>(getEnv("NIX_EXPERIMENTAL_FEATURES").value_or("")), "experimental-features",
         "Experimental Nix features to enable."};
 
     bool isExperimentalFeatureEnabled(const std::string & name);
