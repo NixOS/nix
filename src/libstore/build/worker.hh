@@ -9,6 +9,18 @@ namespace nix {
 
 /* Forward definition. */
 class DerivationGoal;
+class SubstitutionGoal;
+
+/* Workaround for not being able to declare a something like
+
+     class SubstitutionGoal : public Goal;
+
+   even when Goal is a complete type.
+
+   This is still a static cast. The purpose of exporting it is to define it in
+   a place where `SubstitutionGoal` is concrete, and use it in a place where it
+   is opaque. */
+GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -56,8 +68,8 @@ private:
 
     /* Maps used to prevent multiple instantiations of a goal for the
        same derivation / path. */
-    WeakGoalMap derivationGoals;
-    WeakGoalMap substitutionGoals;
+    std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+    std::map<StorePath, std::weak_ptr<SubstitutionGoal>> substitutionGoals;
 
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
@@ -131,7 +143,7 @@ public:
         const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);

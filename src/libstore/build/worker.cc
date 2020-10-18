@@ -43,16 +43,13 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StringSet & wantedOutputs,
     std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
-    WeakGoalPtr & abstract_goal_weak = derivationGoals[drvPath];
-    GoalPtr abstract_goal = abstract_goal_weak.lock(); // FIXME
-    std::shared_ptr<DerivationGoal> goal;
-    if (!abstract_goal) {
+    std::weak_ptr<DerivationGoal> & goal_weak = derivationGoals[drvPath];
+    std::shared_ptr<DerivationGoal> goal = goal_weak.lock();
+    if (!goal) {
         goal = mkDrvGoal();
-        abstract_goal_weak = goal;
+        goal_weak = goal;
         wakeUp(goal);
     } else {
-        goal = std::dynamic_pointer_cast<DerivationGoal>(abstract_goal);
-        assert(goal);
         goal->addWantedOutputs(wantedOutputs);
     }
     return goal;
@@ -77,10 +74,10 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    WeakGoalPtr & goal_weak = substitutionGoals[path];
-    GoalPtr goal = goal_weak.lock(); // FIXME
+    std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[path];
+    auto goal = goal_weak.lock(); // FIXME
     if (!goal) {
         goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
         goal_weak = goal;
@@ -89,14 +86,14 @@ GoalPtr Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, 
     return goal;
 }
 
-
-static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
+template<typename G>
+static void removeGoal(std::shared_ptr<G> goal, std::map<StorePath, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
-    for (WeakGoalMap::iterator i = goalMap.begin();
+    for (auto i = goalMap.begin();
          i != goalMap.end(); )
         if (i->second.lock() == goal) {
-            WeakGoalMap::iterator j = i; ++j;
+            auto j = i; ++j;
             goalMap.erase(i);
             i = j;
         }
@@ -106,8 +103,12 @@ static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    nix::removeGoal(goal, derivationGoals);
-    nix::removeGoal(goal, substitutionGoals);
+    if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
+        nix::removeGoal(drvGoal, derivationGoals);
+    else if (auto subGoal = std::dynamic_pointer_cast<SubstitutionGoal>(goal))
+        nix::removeGoal(subGoal, substitutionGoals);
+    else
+        assert(false);
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
@@ -450,6 +451,11 @@ bool Worker::pathContentsGood(const StorePath & path)
 void Worker::markContentsGood(const StorePath & path)
 {
     pathContentsGoodCache.insert_or_assign(path, true);
+}
+
+
+GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
+    return subGoal;
 }
 
 }
