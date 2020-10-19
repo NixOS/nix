@@ -792,20 +792,12 @@ std::map<StorePath, StorePath> copyPaths(
         const std::set<PathOrOutputs> &storePaths,
         RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
-    // XXX: This is certainly already defined somewhere else
-    struct OutputId {
-        StorePath drv;
-        std::string outputName;
-    };
-    // TODO: Use a set rather than a list
-    // (but requires implementing `comparable` for `OutputId`)
-    std::map<StorePath, std::list<OutputId>> pathToDerivers;
+    DrvOutputs outputsToRegister;
     std::set<StorePath> pathsToCopy;
     for (auto pathOrDrvOutput : storePaths) {
         std::visit(overloaded {
                 [&](StorePath path) {
                     pathsToCopy.insert(path);
-                    pathToDerivers.try_emplace(std::move(path), std::list<OutputId>());
                 },
                 [&](StorePathWithOutputs pathWithOutputs) {
                     auto drvOutputs = srcStore->queryDerivationOutputMap(pathWithOutputs.path);
@@ -815,8 +807,11 @@ std::map<StorePath, StorePath> copyPaths(
                         std::optional<StorePath> outputPath = drvOutputs.find(outputName)->second;
                         // Ensure that the key is in the map
                         pathsToCopy.insert(*outputPath);
-                        pathToDerivers.insert({*outputPath, std::list<OutputId>()});
-                        pathToDerivers[*outputPath].push_front(OutputId{std::move(pathWithOutputs.path), outputName});
+                        auto outputId = DrvOutputId{std::move(pathWithOutputs.path), outputName};
+                        outputsToRegister.emplace(
+                            outputId,
+                            *srcStore->queryDrvOutputInfo(outputId)
+                        );
                     }
                 },
             },
@@ -909,10 +904,8 @@ std::map<StorePath, StorePath> copyPaths(
             });
     }
 
-    for (auto & [path, derivers] : pathToDerivers) {
-        for (auto & deriver : derivers) {
-            dstStore->linkDeriverToPath(deriver.drv, deriver.outputName, path);
-        }
+    for (auto & [deriver, outputInfo] : outputsToRegister) {
+        dstStore->registerDrvOutput(deriver, outputInfo);
     }
 
     return pathsMap;

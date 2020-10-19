@@ -444,19 +444,36 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
-std::optional<StorePath> BinaryCacheStore::queryOutputPathOf(const StorePath & drvPath, const std::string & outputName)
+MakeError(UnknownDrvOutput, Error);
+
+ref<const DrvOutputInfo> BinaryCacheStore::queryDrvOutputInfo(const DrvOutputId & id)
 {
-    auto rawPath = getFile("/ac/" + std::string(drvPath.hashPart()) + "!" + outputName);
-    if (rawPath)
-        return {parseStorePath(*rawPath)};
-    else
-        return std::nullopt;
+    auto outputInfoFilePath =
+        "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName;
+    auto rawOutputInfo = getFile(outputInfoFilePath);
+
+    if (rawOutputInfo) {
+        return make_ref<const DrvOutputInfo>(DrvOutputInfo::parse(*rawOutputInfo, outputInfoFilePath));
+    } else {
+        throw UnknownDrvOutput("Unknown derivation output %s", id.to_string());
+    }
 }
 
-void BinaryCacheStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+std::optional<StorePath> BinaryCacheStore::queryOutputPathOf(
+    const StorePath& drvPath,
+    const std::string& outputName) {
+    try {
+        auto outputInfo = queryDrvOutputInfo(DrvOutputId{drvPath, outputName});
+        return {outputInfo->outPath};
+    } catch (UnknownDrvOutput&) {
+        return std::nullopt;
+    }
+}
+
+void BinaryCacheStore::registerDrvOutput(const DrvOutputId & id, const DrvOutputInfo & info)
 {
-    auto filePath = "/ac/" + std::string(deriver.hashPart()) + "!" + outputName;
-    upsertFile(filePath, printStorePath(output), "text/x-nix-derivertopath");
+    auto filePath = "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName + ".doi";
+    upsertFile(filePath, info.to_string(), "text/x-nix-derivertopath");
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()

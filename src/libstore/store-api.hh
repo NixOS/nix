@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drv-output-info.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -391,6 +392,8 @@ protected:
 
 public:
 
+    virtual ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) = 0;
+
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const StorePath & path, StorePathSet & referrers)
@@ -474,8 +477,10 @@ public:
      * floating-ca derivations and their dependencies as there's no way to
      * retrieve this information otherwise.
      */
-    virtual void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
-    { unsupported("linkDeriverToPath"); }
+    virtual void registerDrvOutput(const StorePath & deriver, const string & outputName, const DrvOutputInfo & output)
+    { registerDrvOutput(DrvOutputId{ deriver, outputName }, output); }
+    virtual void registerDrvOutput(const DrvOutputId &, const DrvOutputInfo & output)
+    { unsupported("registerDrvOutput"); }
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;

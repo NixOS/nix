@@ -859,14 +859,25 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
-    case wopLinkDeriverToPath: {
+    case wopRegisterDrvOutput: {
         logger->startWork();
-        auto drvPath = store->parseStorePath(readString(from));
-        auto outputName = readString(from);
-        auto outputPath = store->parseStorePath(readString(from));
-        store->linkDeriverToPath(drvPath, outputName, outputPath);
+        auto outputId = DrvOutputId::parse(readString(from));
+        auto outputPath = StorePath(readString(from));
+        std::set<DrvInput> references;
+        for (auto & ref : readStrings<Strings>(from)) {
+            references.insert(DrvInput::parse(ref));
+        }
+        store->registerDrvOutput(outputId, DrvOutputInfo{outputPath, references});
         logger->stopWork();
         break;
+    }
+
+    case wopQueryDrvOutputInfo: {
+        logger->startWork();
+        auto outputId = DrvOutputId::parse(readString(from));
+        auto info = store->queryDrvOutputInfo(outputId);
+        to << std::string(info->outPath.to_string());
+        to << stringify_refs(info->references);
     }
 
     default:

@@ -53,7 +53,8 @@ typedef enum {
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
     wopQueryDerivationOutputMap = 41,
-    wopLinkDeriverToPath = 42,
+    wopRegisterDrvOutput = 42,
+    wopQueryDrvOutputInfo = 43,
 } WorkerOp;
 
 

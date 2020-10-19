@@ -87,7 +87,7 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
-    createDirs(binaryCacheDir + "/ac");
+    createDirs(binaryCacheDir + "/drvOutputs");
     if (writeDebugInfo)
         createDirs(binaryCacheDir + "/debuginfo");
     BinaryCacheStore::init();
