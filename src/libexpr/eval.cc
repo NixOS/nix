@@ -1802,13 +1802,8 @@ Attr * ExprOpImpl::evalAttr(EvalState & state, Env & env, Value & v, const Symbo
     return nullptr;
 }
 
-
-void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
+void ExprOpUpdate::updateAttrs(EvalState & state, const Value & v1, const Value & v2, Value & v)
 {
-    Value v1, v2;
-    state.evalAttrs(env, e1, v1);
-    state.evalAttrs(env, e2, v2);
-
     state.nrOpUpdates++;
 
     if (v1.attrs->size() == 0) { v = v2; return; }
@@ -1838,11 +1833,92 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 
-Attr * ExprOpUpdate::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
+void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value & v)
 {
-    eval(state, env, v);
-    return state.evalValueAttr(v, name, pos);
+    Value v1;
+    if (v.type == tLazyBinOp && v.lazyBinOp.left) {
+        state.forceAttrs(*v.lazyBinOp.left);
+        v1 = *v.lazyBinOp.left;
+    } else {
+        state.evalAttrs(env, e1, v1);
+    }
+
+    Value v2;
+    if (v.type == tLazyBinOp && v.lazyBinOp.right) {
+        state.forceAttrs(*v.lazyBinOp.right);
+        v2 = *v.lazyBinOp.right;
+    } else {
+        state.evalAttrs(env, e2, v2);
+    }
+
+    updateAttrs(state, v1, v2, v);
 }
+
+// This function is called with a v that may have a tLazyBinOp in it, meaning
+// that a previous invocation of this function returned a tLazyBinOp, and this
+// function should reuse the previously computed values
+Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
+{
+    if (v.type != tLazyBinOp) {
+        Value v2;
+        Attr * onRight = e2->evalAttr(state, env, v2, name);
+        if (onRight) {
+            v.type = tLazyBinOp;
+            v.lazyBinOp.expr = this;
+            v.lazyBinOp.env = &env;
+            v.lazyBinOp.left = nullptr;
+            v.lazyBinOp.right = state.allocValue();
+            *v.lazyBinOp.right = v2;
+            return onRight;
+        } else {
+            Value v1;
+            Attr * onLeft = e1->evalAttr(state, env, v1, name);
+            if (v1.type == tAttrs && v2.type == tAttrs) {
+                updateAttrs(state, v1, v2, v);
+                return onLeft;
+            } else {
+                v.type = tLazyBinOp;
+                v.lazyBinOp.expr = this;
+                v.lazyBinOp.env = &env;
+                v.lazyBinOp.left = state.allocValue();
+                *v.lazyBinOp.left = v1;
+                v.lazyBinOp.right = state.allocValue();
+                *v.lazyBinOp.right = v2;
+                return onLeft;
+            }
+        }
+    } else {
+        // We know that v.type == tLazyBinOp and that v.lazyBinOp.right != nullptr because that's all the above case can return
+
+        Attr * onRight = state.evalValueAttr(*v.lazyBinOp.right, name, pos);
+        if (onRight) {
+            if (v.lazyBinOp.right->type == tAttrs && v.lazyBinOp.left && v.lazyBinOp.left->type == tAttrs) {
+                updateAttrs(state, *v.lazyBinOp.left, *v.lazyBinOp.right, v);
+            }
+            return onRight;
+        } else {
+            if (v.lazyBinOp.left) {
+                Attr * onLeft = state.evalValueAttr(*v.lazyBinOp.left, name, pos);
+                if (v.lazyBinOp.right->type == tAttrs && v.lazyBinOp.left->type == tAttrs) {
+                    updateAttrs(state, *v.lazyBinOp.left, *v.lazyBinOp.right, v);
+                }
+                return onLeft;
+            } else {
+                Value v1;
+                Attr * onLeft = e1->evalAttr(state, env, v1, name);
+                if (v1.type == tAttrs && v.lazyBinOp.right->type == tAttrs) {
+                    updateAttrs(state, v1, *v.lazyBinOp.right, v);
+                } else {
+                    v.lazyBinOp.left = state.allocValue();
+                    *v.lazyBinOp.left = v1;
+                }
+                return onLeft;
+            }
+        }
+    }
+}
+
+
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {

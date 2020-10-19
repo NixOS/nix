@@ -331,8 +331,33 @@ MakeBinOp(ExprOpNEq, "!=")
 MakeBinOp(ExprOpAnd, "&&")
 MakeBinOp(ExprOpOr, "||")
 MakeBinOp(ExprOpImpl, "->")
-MakeBinOp(ExprOpUpdate, "//")
+//MakeBinOp(ExprOpUpdate, "//")
 MakeBinOp(ExprOpConcatLists, "++")
+
+
+// TODO: Make the #define above support this
+struct ExprOpUpdate : ExprLazyBinOp
+{
+    Pos pos;
+    Expr * e1, * e2;
+    ExprOpUpdate(Expr * e1, Expr * e2) : e1(e1), e2(e2) { };
+    ExprOpUpdate(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { };
+    void show(std::ostream & str) const
+    {
+        str << "(" << *e1 << " // " << *e2 << ")";
+    }
+    void bindVars(const StaticEnv & env)
+    {
+        e1->bindVars(env); e2->bindVars(env);
+    }
+    //void eval(EvalState & state, Env & env, Value & v);
+
+    Attr * evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+
+    void evalLazyBinOp(EvalState & state, Env & env, Value & v);
+
+    void updateAttrs(EvalState & state, const Value & v1, const Value & v2, Value & v);
+};
 
 struct ExprConcatStrings : Expr
 {
