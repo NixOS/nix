@@ -285,6 +285,7 @@ public:
 
     bool isFunctor(Value & fun);
 
+    Attr * callFunctionAttr(Value & fun, Value & arg, Value & v, const Symbol & name, const Pos & pos);
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
     void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 

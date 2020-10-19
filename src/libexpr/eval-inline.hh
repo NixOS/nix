@@ -54,15 +54,23 @@ void EvalState::forceValue(Value & v, const Pos & pos)
 
 Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
 {
-    forceValue(v, pos);
-    if (v.type != tAttrs)
-        return nullptr;
 
-    Bindings::iterator j;
-    if ((j = v.attrs->find(name)) == v.attrs->end()) {
+    // TODO: Handle inf rec
+    if (v.type == tThunk) {
+        return v.thunk.expr->evalAttr(*this, *v.thunk.env, v, name);
+    }
+    else if (v.type == tApp) {
+        return callFunctionAttr(*v.app.left, *v.app.right, v, name, pos);
+    }
+    else if (v.type == tAttrs) {
+        Bindings::iterator j;
+        if ((j = v.attrs->find(name)) == v.attrs->end()) {
+            return nullptr;
+        }
+        return j;
+    } else {
         return nullptr;
     }
-    return j;
 }
 
 inline void EvalState::forceAttrs(Value & v)

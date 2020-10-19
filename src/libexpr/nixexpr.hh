@@ -56,6 +56,7 @@ struct Env;
 struct Value;
 class EvalState;
 struct StaticEnv;
+struct Attr;
 
 
 /* An attribute path is a sequence of attribute names. */
@@ -80,6 +81,11 @@ struct Expr
     virtual void show(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
+    /* Get an attribute of an expression, or nullptr if it doesn't exist, while
+     * evaluating the expression into v. This is an alternative to eval that
+     * doesn't have to evaluate the expression into a non-thunk value
+     */
+    virtual Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
 };
@@ -89,6 +95,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
+    Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name); \
     void bindVars(const StaticEnv & env);
 
 struct ExprInt : Expr
@@ -303,6 +310,7 @@ struct ExprOpNot : Expr
             e1->bindVars(env); e2->bindVars(env); \
         } \
         void eval(EvalState & state, Env & env, Value & v); \
+        Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name); \
     };
 
 MakeBinOp(ExprApp, "")
