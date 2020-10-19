@@ -10,57 +10,41 @@
 
 namespace nix {
 
-
-/* template<typename T> */
-std::set<DrvInput> closureOf(const DrvInput & initial, std::function<std::set<DrvInput>(const DrvInput&)> successors)
-{
-    std::set<DrvInput> ret;
-
-    std::function<void(const DrvInput & current)> aux;
-    aux = [&](const DrvInput& current) {
-        auto succs = successors(initial);
-        for (auto & succ: successors(initial)) {
-            auto [_, isNewNode] = ret.insert(succ);
-            if (isNewNode)
-                aux(succ);
-        }
-    };
-    aux(initial);
-    return ret;
-}
-
 std::set<DrvInput> Store::drvInputClosure(const DrvInput& input) {
-    auto computeDep = [&](const DrvInput& input) -> std::set<DrvInput> {
-        std::set<DrvInput> res;
-        std::visit(
-            overloaded{
-                [&](StorePath opaque) {
-                    auto pathInfo = queryPathInfo(opaque);
-                    for (auto& ref : pathInfo->references)
-                        res.emplace(ref);
-                },
-                [&](DrvOutputId id) {
-                    auto outputInfo = queryDrvOutputInfo(id);
-                    auto outputPathInfo = queryPathInfo(outputInfo->outPath);
-                    auto derivation = readDerivation(id.drvPath);
-                    auto runtimeDeps = outputPathInfo->references;
-                    for (auto& [inputDrv, neededOutputs] :
-                         derivation.inputDrvs) {
-                        for (auto& inputOutputName : neededOutputs) {
-                            auto inputOutputInfo = queryDrvOutputInfo(
-                                DrvOutputId{inputDrv, inputOutputName});
-                            if (inputOutputInfo && runtimeDeps.count(inputOutputInfo->outPath))
-                                res.emplace(
-                                    DrvOutputId{inputDrv, inputOutputName});
+    StorePathSet pathClosure;
+    return std::visit(
+        overloaded {
+            [&](StorePath opaque) -> std::set<DrvInput> {
+                StorePathSet pathClosure;
+                computeFSClosure(opaque, pathClosure);
+                std::set<DrvInput> ret;
+                for (auto & inputPath : pathClosure)
+                    ret.insert(inputPath);
+                return ret;
+            },
+            [&](DrvOutputId id) -> std::set<DrvInput> {
+                std::set<DrvInput> res;
+                auto outputInfo = queryDrvOutputInfo(id);
+                computeFSClosure(outputInfo->outPath, pathClosure);
+                StorePathSet drvClosure;
+                computeFSClosure(id.drvPath, drvClosure);
+                for (auto & inputPath: drvClosure) {
+                    if (pathClosure.count(inputPath))
+                        res.insert(inputPath);
+                    if (inputPath.isDerivation()) {
+                        auto inputDrv = readDerivation(inputPath);
+                        for (auto & [outputName, _] : inputDrv.outputs) {
+                            auto outputInfo = queryDrvOutputInfo(DrvOutputId{inputPath, outputName});
+                            if (outputInfo && pathClosure.count(outputInfo->outPath)) {
+                                res.insert(DrvOutputId{inputPath, outputName});
+                            }
                         }
                     }
-                },
+                }
+                return res;
             },
-            static_cast<RawDrvInput>(input));
-        return res;
-    };
-
-    return closureOf(input, computeDep);
+        },
+        static_cast<RawDrvInput>(input));
 }
 
 void Store::computeFSClosure(const StorePathSet & startPaths,
