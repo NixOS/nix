@@ -6,9 +6,36 @@
 #include "thread-pool.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+#include "drv-output-info.hh"
 
 namespace nix {
 
+std::set<DrvInput> Store::drvInputClosure(const DrvInput& input) {
+    StorePathSet pathClosure;
+    return std::visit(
+        overloaded {
+            [&](StorePath opaque) -> std::set<DrvInput> {
+                StorePathSet pathClosure;
+                computeFSClosure(opaque, pathClosure);
+                std::set<DrvInput> ret;
+                for (auto & inputPath : pathClosure)
+                    ret.insert(inputPath);
+                return ret;
+            },
+            [&](DrvOutputId id) -> std::set<DrvInput> {
+                std::set<DrvInput> res;
+                auto outputInfo = queryDrvOutputInfo(id);
+                auto directChildren = outputInfo->references;
+                res.insert(id);
+                for (auto child : directChildren) {
+                    auto childClosure = drvInputClosure(child);
+                    res.insert(childClosure.begin(), childClosure.end());
+                }
+                return res;
+            },
+        },
+        static_cast<RawDrvInput>(input));
+}
 
 void Store::computeFSClosure(const StorePathSet & startPaths,
     StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
