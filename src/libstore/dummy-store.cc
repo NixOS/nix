@@ -61,7 +61,7 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
         BuildMode buildMode) override
     { unsupported("buildDerivation"); }
 
-    ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override
     { unsupported("queryDrvOutputInfo"); }
 };
 

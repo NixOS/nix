@@ -334,7 +334,7 @@ public:
         return conn->remoteVersion;
     }
 
-    ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override
     // TODO: Implement
     { unsupported("queryDrvOutputInfo"); }
 };

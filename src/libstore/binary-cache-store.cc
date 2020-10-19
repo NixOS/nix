@@ -444,30 +444,25 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
-MakeError(UnknownDrvOutput, Error);
-
-ref<const DrvOutputInfo> BinaryCacheStore::queryDrvOutputInfo(const DrvOutputId & id)
+std::optional<const DrvOutputInfo> BinaryCacheStore::queryDrvOutputInfo(const DrvOutputId & id)
 {
     auto outputInfoFilePath =
         "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName;
     auto rawOutputInfo = getFile(outputInfoFilePath);
 
     if (rawOutputInfo) {
-        return make_ref<const DrvOutputInfo>(DrvOutputInfo::parse(*rawOutputInfo, outputInfoFilePath));
+        return { DrvOutputInfo::parse(*rawOutputInfo, outputInfoFilePath) };
     } else {
-        throw UnknownDrvOutput("Unknown derivation output %s", id.to_string());
+        return std::nullopt;
     }
 }
 
 std::optional<StorePath> BinaryCacheStore::queryOutputPathOf(
     const StorePath& drvPath,
     const std::string& outputName) {
-    try {
-        auto outputInfo = queryDrvOutputInfo(DrvOutputId{drvPath, outputName});
+    if(auto outputInfo = queryDrvOutputInfo(DrvOutputId{drvPath, outputName}))
         return {outputInfo->outPath};
-    } catch (UnknownDrvOutput&) {
-        return std::nullopt;
-    }
+    return std::nullopt;
 }
 
 void BinaryCacheStore::registerDrvOutput(const DrvOutputId & id, const DrvOutputInfo & info)

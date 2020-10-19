@@ -103,7 +103,7 @@ public:
 
     std::optional<StorePath> queryOutputPathOf(const StorePath & drvPath, const std::string & outputName) override;
 
-    ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) override;
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

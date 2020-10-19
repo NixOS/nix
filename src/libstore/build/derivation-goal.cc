@@ -2098,9 +2098,10 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
         next->registerDrvOutput(id, output);
     }
 
-    ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId & id) override {
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId & id) override
+    {
         if (!goal.isAllowed(id.drvPath))
-            throw InvalidPath("cannot query for unknown drv output '%s' in recursive Nix", printStorePath(id.drvPath));
+            throw InvalidPath("cannot query the output info for unknown derivation '%s' in recursive Nix", printStorePath(id.drvPath));
         return next->queryDrvOutputInfo(id);
     }
 

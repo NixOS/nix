@@ -1587,11 +1587,10 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
-ref<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutputId& id) {
+std::optional<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutputId& id) {
     auto outputPath = queryOutputPathOf(id.drvPath, id.outputName);
-    if (!outputPath)
-        throw Error("Querying for informations for the non-built output %s",
-                    id.to_string());
+    if (!(outputPath && isValidPath(*outputPath)))
+        return std::nullopt;
     auto derivation = readDerivation(id.drvPath);
     auto outputPathInfo = queryPathInfo(*outputPath);
     std::set<DrvInput> references;
@@ -1609,9 +1608,9 @@ ref<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutputId& id) {
         if (outputPathInfo->references.count(inputPath))
             references.emplace(inputPath);
     }
-    return make_ref<const DrvOutputInfo>(DrvOutputInfo{
+    return {DrvOutputInfo{
         .outPath = *outputPath,
         .references = references,
-    });
+    }};
 }
 }  // namespace nix

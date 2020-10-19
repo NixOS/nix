@@ -392,7 +392,7 @@ protected:
 
 public:
 
-    virtual ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) = 0;
+    virtual std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId &) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */

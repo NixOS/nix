@@ -609,18 +609,22 @@ void RemoteStore::registerDrvOutput(const DrvOutputId & outputId, const DrvOutpu
     conn.processStderr();
 }
 
-ref<const DrvOutputInfo> RemoteStore::queryDrvOutputInfo(const DrvOutputId & id)
+std::optional<const DrvOutputInfo> RemoteStore::queryDrvOutputInfo(const DrvOutputId & id)
 {
     auto conn(getConnection());
     conn->to << wopQueryDrvOutputInfo;
     conn->to << id.to_string();
     conn.processStderr();
-    auto outputPath = StorePath(readString(conn->from));
+    auto rawOutputPath = readString(conn->from);
+    if (rawOutputPath == "") {
+        return std::nullopt;
+    }
+    auto outputPath = StorePath(rawOutputPath);
     std::set<DrvInput> references;
     for (auto & ref : readStrings<Strings>(conn->from)) {
         references.insert(DrvInput::parse(ref));
     }
-    return make_ref<const DrvOutputInfo>(DrvOutputInfo{outputPath, references});
+    return {DrvOutputInfo{outputPath, references}};
 }
 
 

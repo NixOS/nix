@@ -224,7 +224,7 @@ public:
     void registerDrvOutput(const DrvOutputId & outputId, const DrvOutputInfo & info) override;
     void registerDrvOutput_(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
 
-    ref<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override;
+    std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override;
 
 private:
 

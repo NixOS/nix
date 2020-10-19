@@ -876,8 +876,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto outputId = DrvOutputId::parse(readString(from));
         auto info = store->queryDrvOutputInfo(outputId);
-        to << std::string(info->outPath.to_string());
-        to << stringify_refs(info->references);
+        if (info) {
+            to << std::string(info->outPath.to_string());
+            to << stringify_refs(info->references);
+        }
+        else {
+            to << "";
+        }
     }
 
     default:
