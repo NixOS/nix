@@ -17,20 +17,43 @@ struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 
+/* FlakeInput is the 'Flake'-level parsed form of the "input" entries
+ * in the flake file.
+ *
+ * A FlakeInput is normally constructed by the 'parseFlakeInput'
+ * function which parses the input specification in the '.flake' file
+ * to create a 'FlakeRef' (a fetcher, the fetcher-specific
+ * representation of the input specification, and possibly the fetched
+ * local store path result) and then creating this FlakeInput to hold
+ * that FlakeRef, along with anything that might override that
+ * FlakeRef (like command-line overrides or "follows" specifications).
+ *
+ * A FlakeInput is also sometimes constructed directly from a FlakeRef
+ * instead of starting at the flake-file input specification
+ * (e.g. overrides, follows, and implicit inputs).
+ *
+ * A FlakeInput will usually have one of either "ref" or "follows"
+ * set.  If not otherwise specified, a "ref" will be generated to a
+ * 'type="indirect"' flake, which is treated as simply the name of a
+ * flake to be resolved in the registry.
+ */
+
 struct FlakeInput
 {
     std::optional<FlakeRef> ref;
-    bool isFlake = true;
+    bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
     bool absolute = false; // whether 'follows' is relative to the flake root
     FlakeInputs overrides;
 };
 
+// The Flake structure is the main internal representation of a flake.nix file.
+
 struct Flake
 {
-    FlakeRef originalRef;
-    FlakeRef resolvedRef;
-    FlakeRef lockedRef;
+    FlakeRef originalRef;   // the original flake specification (by the user)
+    FlakeRef resolvedRef;   // registry references and caching resolved to the specific underlying flake
+    FlakeRef lockedRef;     // the specific local store result of invoking the fetcher
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
