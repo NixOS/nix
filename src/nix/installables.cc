@@ -638,8 +638,6 @@ Buildables toBuildables(std::vector<std::shared_ptr<Installable>> installables)
 
 std::set<Buildable> buildableClosure(ref<Store> store, Buildable root)
 {
-    // XXX: Calling this on a `BuildableFromDrv` forgets all about the builders
-    // of the dependencies, which is probably not what we want
     std::set<Buildable> closure;
     std::visit(overloaded{
         [&](BuildableOpaque bo) {
@@ -660,6 +658,9 @@ std::set<Buildable> buildableClosure(ref<Store> store, Buildable root)
             store->computeFSClosure(outputPaths, runtimeClosure, false, false);
 
             for (auto & input : drvClosure) {
+                // This shouldn't be needed, except that `registerDrvOutput`
+                // currently requires the drv to be present
+                closure.insert(BuildableOpaque { input });
                 if (input.isDerivation()) {
                     // Take all the outputs of the derivation that are in the
                     // runtime closure, and add them as `BuildableFromDrv` to
@@ -729,7 +730,8 @@ void build(ref<Store> store, Realise mode, Buildables buildables, BuildMode bMod
             [&](BuildableFromDrv bfd) {
                 StringSet outputNames;
                 for (auto & output : bfd.outputs) {
-                    if (!store->queryOutputPathOf(bfd.drvPath, output.first).has_value())
+                    auto maybeOutputPath = store->queryOutputPathOf(bfd.drvPath, output.first);
+                    if (!(maybeOutputPath.has_value() && store->isValidPath(*maybeOutputPath)))
                         outputNames.insert(output.first);
                 }
                 if (!outputNames.empty())
