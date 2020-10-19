@@ -46,6 +46,24 @@ void EvalState::forceValue(Value & v, const Pos & pos)
             throw;
         }
     }
+    else if (v.type == tLazyBinOp) {
+        Env * env = v.lazyBinOp.env;
+        ExprLazyBinOp * expr = v.lazyBinOp.expr;
+        Value * left = v.lazyBinOp.left;
+        Value * right = v.lazyBinOp.right;
+        try {
+            v.type = tBlackhole;
+            //checkInterrupt();
+            expr->evalLazyBinOp(*this, *env, v);
+        } catch (...) {
+            v.type = tLazyBinOp;
+            v.lazyBinOp.env = env;
+            v.lazyBinOp.expr = expr;
+            v.lazyBinOp.left = left;
+            v.lazyBinOp.right = right;
+            throw;
+        }
+    }
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.type == tBlackhole)
@@ -58,6 +76,9 @@ Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
     // TODO: Handle inf rec
     if (v.type == tThunk) {
         return v.thunk.expr->evalAttr(*this, *v.thunk.env, v, name);
+    }
+    else if (v.type == tLazyBinOp) {
+        return v.lazyBinOp.expr->evalLazyBinOpAttr(*this, *v.lazyBinOp.env, v, name);
     }
     else if (v.type == tApp) {
         return callFunctionAttr(*v.app.left, *v.app.right, v, name, pos);

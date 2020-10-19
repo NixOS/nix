@@ -26,13 +26,15 @@ typedef enum {
     tPrimOp,
     tPrimOpApp,
     tExternal,
-    tFloat
+    tFloat,
+    tLazyBinOp
 } ValueType;
 
 
 class Bindings;
 struct Env;
 struct Expr;
+struct ExprLazyBinOp;
 struct ExprLambda;
 struct PrimOp;
 class Symbol;
@@ -132,6 +134,12 @@ struct Value
             Env * env;
             Expr * expr;
         } thunk;
+        struct {
+            Env * env;
+            ExprLazyBinOp * expr;
+            Value * left;
+            Value * right;
+        } lazyBinOp;
         struct {
             Value * left, * right;
         } app;

@@ -90,6 +90,18 @@ struct Expr
     virtual void setName(Symbol & name);
 };
 
+struct ExprLazyBinOp : Expr
+{
+
+    void eval(EvalState & state, Env & env, Value & v);
+
+    Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+
+    virtual Attr * evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+
+    virtual void evalLazyBinOp(EvalState & state, Env & env, Value & v);
+};
+
 std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \

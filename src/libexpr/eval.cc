@@ -136,6 +136,9 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     case tFloat:
         str << v.fpoint;
         break;
+    case tLazyBinOp:
+        str << "<LAZY BINOP>";
+        break;
     default:
         throw Error("invalid value");
     }
@@ -180,6 +183,7 @@ string showType(ValueType type)
         case tPrimOpApp: return "a partially applied built-in function";
         case tExternal: return "an external value";
         case tFloat: return "a float";
+        case tLazyBinOp: return "a lazy binop";
     }
     abort();
 }
@@ -949,6 +953,29 @@ void Expr::eval(EvalState & state, Env & env, Value & v)
 
 Attr * Expr::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
 {
+    abort();
+}
+
+
+void ExprLazyBinOp::eval(EvalState & state, Env & env, Value & v)
+{
+    evalLazyBinOp(state, env, v);
+}
+
+Attr * ExprLazyBinOp::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
+{
+    return evalLazyBinOpAttr(state, env, v, name);
+}
+
+Attr * ExprLazyBinOp::evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
+{
+    printError("ExprLazyBinOp::evalLazyBinOpAttr called!");
+    abort();
+}
+
+void ExprLazyBinOp::evalLazyBinOp(EvalState & state, Env & env, Value & v)
+{
+    printError("ExprLazyBinOp::evalLazyBinOp called!");
     abort();
 }
 
