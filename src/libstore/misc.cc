@@ -6,9 +6,62 @@
 #include "thread-pool.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+#include "drv-output-info.hh"
 
 namespace nix {
 
+
+/* template<typename T> */
+std::set<DrvInput> closureOf(const DrvInput & initial, std::function<std::set<DrvInput>(const DrvInput&)> successors)
+{
+    std::set<DrvInput> ret;
+
+    std::function<void(const DrvInput & current)> aux;
+    aux = [&](const DrvInput& current) {
+        auto succs = successors(initial);
+        for (auto & succ: successors(initial)) {
+            auto [_, isNewNode] = ret.insert(succ);
+            if (isNewNode)
+                aux(succ);
+        }
+    };
+    aux(initial);
+    return ret;
+}
+
+std::set<DrvInput> Store::drvInputClosure(const DrvInput& input) {
+    auto computeDep = [&](const DrvInput& input) -> std::set<DrvInput> {
+        std::set<DrvInput> res;
+        std::visit(
+            overloaded{
+                [&](StorePath opaque) {
+                    auto pathInfo = queryPathInfo(opaque);
+                    for (auto& ref : pathInfo->references)
+                        res.emplace(ref);
+                },
+                [&](DrvOutputId id) {
+                    auto outputInfo = queryDrvOutputInfo(id);
+                    auto outputPathInfo = queryPathInfo(outputInfo->outPath);
+                    auto derivation = readDerivation(id.drvPath);
+                    auto runtimeDeps = outputPathInfo->references;
+                    for (auto& [inputDrv, neededOutputs] :
+                         derivation.inputDrvs) {
+                        for (auto& inputOutputName : neededOutputs) {
+                            auto inputOutputInfo = queryDrvOutputInfo(
+                                DrvOutputId{inputDrv, inputOutputName});
+                            if (inputOutputInfo && runtimeDeps.count(inputOutputInfo->outPath))
+                                res.emplace(
+                                    DrvOutputId{inputDrv, inputOutputName});
+                        }
+                    }
+                },
+            },
+            static_cast<RawDrvInput>(input));
+        return res;
+    };
+
+    return closureOf(input, computeDep);
+}
 
 void Store::computeFSClosure(const StorePathSet & startPaths,
     StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
