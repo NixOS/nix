@@ -248,9 +248,9 @@ struct Common : InstallableCommand, MixProfile
         }
 
         /* Substitute redirects. */
-        for (auto & [installableS, dir] : redirects) {
-            dir = absPath(dir);
-            auto installable = parseInstallable(store, installableS);
+        for (auto & [installable_, dir_] : redirects) {
+            auto dir = absPath(dir_);
+            auto installable = parseInstallable(store, installable_);
             auto buildable = installable->toBuildable();
             auto doRedirect = [&](const StorePath & path)
             {
