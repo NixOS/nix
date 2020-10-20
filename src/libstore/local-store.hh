@@ -21,7 +21,7 @@ namespace nix {
    0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10.
    Version 4 is Nix 0.11.  Version 5 is Nix 0.12-0.16.  Version 6 is
    Nix 1.0.  Version 7 is Nix 1.3. Version 10 is 2.0. */
-const int nixSchemaVersion = 10;
+const int nixSchemaVersion = 11;
 
 
 struct OptimiseStats
@@ -64,8 +64,10 @@ private:
         SQLiteStmt stmtQueryReferrers;
         SQLiteStmt stmtInvalidatePath;
         SQLiteStmt stmtAddDerivationOutput;
+        SQLiteStmt stmtRegisterRealisedOutput;
         SQLiteStmt stmtQueryValidDerivers;
         SQLiteStmt stmtQueryDerivationOutputs;
+        SQLiteStmt stmtQueryRealisedOutput;
         SQLiteStmt stmtQueryPathFromHashPart;
         SQLiteStmt stmtQueryValidPaths;
 
@@ -222,7 +224,7 @@ public:
     /* Register the store path 'output' as the output named 'outputName' of
        derivation 'deriver'. */
     void registerDrvOutput(const DrvOutputId & outputId, const DrvOutputInfo & info) override;
-    void registerDrvOutput_(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
+    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
 
     std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override;
 

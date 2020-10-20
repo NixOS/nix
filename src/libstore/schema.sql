@@ -40,3 +40,13 @@ create table if not exists DerivationOutputs (
 );
 
 create index if not exists IndexDerivationOutputs on DerivationOutputs(path);
+
+create table if not exists OutputMappings (
+    id integer primary key autoincrement not null,
+    drvPath text not null,
+    outputName text not null, -- symbolic output id, usually "out"
+    outputPath integer not null,
+    foreign key (outputPath) references ValidPaths(id) on delete cascade
+);
+
+create index if not exists IndexOutputMappings on OutputMappings(outputPath);

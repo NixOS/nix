@@ -215,6 +215,26 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
+        if (curSchema < 11) {
+            SQLiteTxn txn(state->db);
+            state->db.exec(R"sql(
+                create table if not exists OutputMappings (
+                    id integer primary key autoincrement not null,
+                    drvPath text not null,
+                    outputName text not null,
+                    outputPath integer not null,
+                    foreign key (outputPath) references ValidPaths(id) on delete cascade
+                )
+            )sql");
+            state->db.exec(R"sql(
+                insert into OutputMappings(drvPath, outputName, outputPath)
+                    select DrvPath.path, DerivationOutputs.id, OutputPath.id from DerivationOutputs
+                    inner join ValidPaths as DrvPath on DerivationOutputs.drv = DrvPath.id
+                    inner join ValidPaths as OutputPath on DerivationOutputs.path = OutputPath.path
+            )sql");
+            txn.commit();
+        }
+
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
         lockFile(globalLock.get(), ltRead, true);
@@ -239,6 +259,19 @@ LocalStore::LocalStore(const Params & params)
         "delete from ValidPaths where path = ?;");
     state->stmtAddDerivationOutput.create(state->db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
+    state->stmtRegisterRealisedOutput.create(state->db,
+        R"(
+            insert or replace into OutputMappings (drvPath, outputName, outputPath)
+            values (?, ?, (select id from ValidPaths where path = ?))
+            ;
+        )");
+    state->stmtQueryRealisedOutput.create(state->db,
+        R"(
+            select outputName, Output.path from OutputMappings
+                inner join ValidPaths as Output on Output.id = OutputMappings.outputPath
+                where drvPath = ?
+                ;
+        )");
     state->stmtQueryValidDerivers.create(state->db,
         "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
     state->stmtQueryDerivationOutputs.create(state->db,
@@ -584,13 +617,16 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 void LocalStore::registerDrvOutput(const DrvOutputId& id, const DrvOutputInfo & info)
 {
     auto state(_state.lock());
-    // XXX: This ignores the references of the output because we can
-    // recompute them later from the drv and the references of the associated
-    // store path, but doing so is both inefficient and fragile.
-    return registerDrvOutput_(*state, queryValidPathId(*state, id.drvPath), id.outputName, info.outPath);
+    retrySQLite<void>([&]() {
+        state->stmtRegisterRealisedOutput.use()
+            (printStorePath(id.drvPath))
+            (id.outputName)
+            (printStorePath(info.outPath))
+            .exec();
+    });
 }
 
-void LocalStore::registerDrvOutput_(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
+void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output)
 {
     retrySQLite<void>([&]() {
         state.stmtAddDerivationOutput.use()
@@ -640,7 +676,7 @@ uint64_t LocalStore::addValidPath(State & state,
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
             if (i.second.second)
-                registerDrvOutput_(state, id, i.first, *i.second.second);
+                cacheDrvOutputMapping(state, id, i.first, *i.second.second);
         }
     }
 
@@ -841,18 +877,9 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
-        uint64_t drvId;
-        try {
-            drvId = queryValidPathId(*state, path);
-        } catch (InvalidPath &) {
-            /* FIXME? if the derivation doesn't exist, we cannot have a mapping
-               for it. */
-            return outputs;
-        }
-
         auto useQueryDerivationOutputs {
-            state->stmtQueryDerivationOutputs.use()
-            (drvId)
+            state->stmtQueryRealisedOutput.use()
+            (printStorePath(path))
         };
 
         while (useQueryDerivationOutputs.next())
