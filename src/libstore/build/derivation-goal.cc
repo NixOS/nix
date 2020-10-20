@@ -493,8 +493,9 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
-            || fullDrv.type() == DerivationType::DeferredInputAddressed) {
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") &&
+            ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
+            || fullDrv.type() == DerivationType::DeferredInputAddressed)) {
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
                aliasing that resolved derivation goal */
@@ -3405,12 +3406,12 @@ void DerivationGoal::registerOutputs()
         drvPathResolved = writeDerivation(worker.store, drv2);
     }
 
-    if (useDerivation || isCaFloating)
-        for (auto & [outputName, newInfo] : infos)
-            worker.store.registerDrvOutput(
-                DrvOutputId{drvPathResolved, outputName},
-                DrvOutputInfo{.outPath = newInfo.path,
-                              .resolvedDrv = drvPathResolved});
+    if (settings.isExperimentalFeatureEnabled("ca-derivations") &&
+        (useDerivation || isCaFloating))
+        for (auto& [outputName, newInfo] : infos)
+            worker.store.registerDrvOutput(Realisation{
+                .id = DrvOutput{drvPathResolved, outputName},
+                .outPath = newInfo.path});
 }
 
 
