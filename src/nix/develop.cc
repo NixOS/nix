@@ -368,7 +368,6 @@ struct CmdDevelop : Common, MixEnvironment
             // rid of that.
             script += fmt("foundMakefile=1\n");
             script += fmt("runHook %1%Phase\n", *phase);
-            script += fmt("exit 0\n", *phase);
         }
 
         else if (!command.empty()) {
@@ -408,7 +407,10 @@ struct CmdDevelop : Common, MixEnvironment
             ignoreException();
         }
 
-        auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
+        // If running a phase, don't want an interactive shell running after
+        // Ctrl-C, so don't pass --rcfile
+        auto args = phase ? Strings{std::string(baseNameOf(shell)), rcFilePath}
+            : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
         restoreAffinity();
         restoreSignals();
