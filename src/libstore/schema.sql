@@ -32,11 +32,10 @@ create trigger if not exists DeleteSelfRefs before delete on ValidPaths
   end;
 
 create table if not exists DerivationOutputs (
-    drv  integer not null,
-    id   text not null, -- symbolic output id, usually "out"
-    path text not null,
-    primary key (drv, id),
-    foreign key (drv) references ValidPaths(id) on delete cascade
+    drvPath text not null,
+    outputName text not null, -- symbolic output id, usually "out"
+    outputPath text not null,
+    primary key (drvPath, outputName)
 );
 
-create index if not exists IndexDerivationOutputs on DerivationOutputs(path);
+create index if not exists IndexDerivationOutputs on DerivationOutputs(outputPath);
