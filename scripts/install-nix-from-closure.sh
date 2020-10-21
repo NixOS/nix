@@ -29,15 +29,6 @@ if [ "$(uname -s)" = "Darwin" ]; then
     IFS='.' read macos_major macos_minor macos_patch << EOF
 $(sw_vers -productVersion)
 EOF
-    # TODO: this is a temporary speed-bump to keep people from naively installing Nix
-    # on macOS Big Sur (11.0+, 10.16+) until nixpkgs updates are ready for them.
-    # *Ideally* this is gone before next Nix release. If you're intentionally working on
-    # Nix + Big Sur, just comment out this block and be on your way :)
-    if [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 15 ]; }; then
-        echo "$0: nixpkgs isn't quite ready to support macOS $(sw_vers -productVersion) yet"
-        exit 1
-    fi
-
     if [ "$macos_major" -lt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -lt 12 ]; } || { [ "$macos_minor" -eq 12 ] && [ "$macos_patch" -lt 6 ]; }; then
         # patch may not be present; command substitution for simplicity
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
@@ -53,7 +44,7 @@ elif [ "$(uname -s)" = "Linux" ]; then
 fi
 
 INSTALL_MODE=no-daemon
-CREATE_DARWIN_VOLUME=0
+CREATE_DARWIN_VOLUME=${CREATE_DARWIN_VOLUME:-1} # now default
 # handle the command line flags
 while [ $# -gt 0 ]; do
     case $1 in
@@ -69,13 +60,17 @@ while [ $# -gt 0 ]; do
         --no-modify-profile)
             NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
-            CREATE_DARWIN_VOLUME=1;;
+            (
+                echo "Warning: the flag --darwin-use-unencrypted-nix-store-volume"
+                echo "         is no longer needed and will be removed in the future."
+                echo ""
+            ) >&2;;
         --nix-extra-conf-file)
             export NIX_EXTRA_CONF="$(cat $2)"
             shift;;
         *)
             (
-                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--darwin-use-unencrypted-nix-store-volume] [--nix-extra-conf-file FILE]"
+                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--nix-extra-conf-file FILE]"
 
                 echo "Choose installation method."
                 echo ""
@@ -100,37 +95,16 @@ while [ $# -gt 0 ]; do
                 echo ""
             ) >&2
 
-            # darwin and Catalina+
-            if [ "$(uname -s)" = "Darwin" ] && { [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 14 ]; }; }; then
-                (
-                    echo " --darwin-use-unencrypted-nix-store-volume: Create an APFS volume for the Nix"
-                    echo "              store and mount it at /nix. This is the recommended way to create"
-                    echo "              /nix with a read-only / on macOS >=10.15."
-                    echo "              See: https://nixos.org/nix/manual/#sect-macos-installation"
-                    echo ""
-                ) >&2
-            fi
             exit;;
     esac
     shift
 done
 
 if [ "$(uname -s)" = "Darwin" ]; then
-    if [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
-        printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
-        "$self/create-darwin-volume.sh"
-    fi
-
     writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
-    if ! [ -e $dest ] && [ "$writable" = "false" ]; then
-        (
-            echo ""
-            echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
-            echo "Use sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume or run the preparation steps manually."
-            echo "See https://nixos.org/nix/manual/#sect-macos-installation"
-            echo ""
-        ) >&2
-        exit 1
+    if ! [ -e $dest ] && [ "$writable" = "false" ] && [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
+        printf '\e[1;31mCreating volume and mountpoint /nix if needed.\e[0m\n'
+        "$self/create-darwin-volume.sh"
     fi
 fi
 

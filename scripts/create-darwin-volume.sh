@@ -44,33 +44,8 @@ test_nix() {
     test -d "/nix"
 }
 
-test_t2_chip_present(){
-    # Use xartutil to see if system has a t2 chip.
-    #
-    # This isn't well-documented on its own; until it is,
-    # let's keep track of knowledge/assumptions.
-    #
-    # Warnings:
-    # - Don't search "xart" if porn will cause you trouble :)
-    # - Other xartutil flags do dangerous things. Don't run them
-    #   naively. If you must, search "xartutil" first.
-    #
-    # Assumptions:
-    # - the "xART session seeds recovery utility"
-    #   appears to interact with xartstorageremoted
-    # - `sudo xartutil --list` lists xART sessions
-    #   and their seeds and exits 0 if successful. If
-    #   not, it exits 1 and prints an error such as:
-    #   xartutil: ERROR: No supported link to the SEP present
-    # - xART sessions/seeds are present when a T2 chip is
-    #   (and not, otherwise)
-    # - the presence of a T2 chip means a newly-created
-    #   volume on the primary drive will be
-    #   encrypted at rest
-    # - all together: `sudo xartutil --list`
-    #   should exit 0 if a new Nix Store volume will
-    #   be encrypted at rest, and exit 1 if not.
-    sudo xartutil --list >/dev/null 2>/dev/null
+test_voldaemon() {
+    test -f "/Library/LaunchDaemons/org.nixos.darwin-store.plist"
 }
 
 test_filevault_in_use() {
@@ -83,6 +58,62 @@ suggest_report_error(){
     echo "       please report this @ https://github.com/nixos/nix/issues" >&2
 }
 
+generate_mount_command(){
+    if test_filevault_in_use; then
+        printf "    <string>%s</string>\n" /bin/sh -c '/usr/bin/security find-generic-password -l "Nix Volume" -a "Nix Volume" -s "Nix Volume" -w | /usr/sbin/diskutil apfs unlockVolume "Nix Volume" -mountpoint /nix -stdinpassphrase'
+    else
+        printf "    <string>%s</string>\n" /usr/sbin/diskutil mount nobrowse -mountPoint /nix "Nix Volume"
+    fi
+}
+
+generate_mount_daemon(){
+    cat << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>PathState</key>
+    <dict>
+      <key>/nix/var/nix</key>
+      <false/>
+    </dict>
+  </dict>
+  <key>Label</key>
+  <string>org.nixos.darwin-store</string>
+  <key>ProgramArguments</key>
+  <array>
+    $(generate_mount_command)
+  </array>
+</dict>
+</plist>
+EOF
+}
+
+prepare_darwin_volume_password(){
+    sudo /usr/bin/expect << 'EOF'
+log_user 0
+set PASSPHRASE [exec /usr/bin/ruby -rsecurerandom -e "puts SecureRandom.hex(32)"]
+
+# Cargo culting: people recommend this; not sure how necessary
+set send_slow {1 .1}
+spawn /usr/bin/sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" -U -w
+expect {
+    "password data for new item: " {
+        send -s -- "$PASSPHRASE\r"
+        expect "retype password for new item: " {
+            send -s -- "$PASSPHRASE\r"
+        }
+    }
+}
+expect eof
+send_user "$PASSPHRASE"
+EOF
+}
+
 main() {
     (
         echo ""
@@ -91,7 +122,7 @@ main() {
         echo "    | configure it to mount at /nix.  Follow these steps to uninstall. |"
         echo "     ------------------------------------------------------------------ "
         echo ""
-        echo "  1. Remove the entry from fstab using 'sudo vifs'"
+        echo "  1. Remove /Library/LaunchDaemons/org.nixos.darwin-store.plist"
         echo "  2. Destroy the data volume using 'diskutil apfs deleteVolume'"
         echo "  3. Remove the 'nix' line from /etc/synthetic.conf or the file"
         echo ""
@@ -129,40 +160,35 @@ main() {
     disk="$(root_disk_identifier)"
     volume=$(find_nix_volume "$disk")
     if [ -z "$volume" ]; then
-        echo "Creating a Nix Store volume..." >&2
+        echo "Creating a Nix volume..." >&2
 
         if test_filevault_in_use; then
-            # TODO: Not sure if it's in-scope now, but `diskutil apfs list`
-            # shows both filevault and encrypted at rest status, and it
-            # may be the more semantic way to test for this? It'll show
-            # `FileVault:                 No (Encrypted at rest)`
-            # `FileVault:                 No`
-            # `FileVault:                 Yes (Unlocked)`
-            # and so on.
-            if test_t2_chip_present; then
-                echo "warning: boot volume is FileVault-encrypted, but the Nix store volume" >&2
-                echo "         is only encrypted at rest." >&2
-                echo "         See https://nixos.org/nix/manual/#sect-macos-installation" >&2
-            else
-                echo "error: refusing to create Nix store volume because the boot volume is" >&2
-                echo "       FileVault encrypted, but encryption-at-rest is not available." >&2
-                echo "       Manually create a volume for the store and re-run this script." >&2
-                echo "       See https://nixos.org/nix/manual/#sect-macos-installation" >&2
-                exit 1
-            fi
+            # security program's flags won't let us both specify a keychain
+            # and be prompted for a pw to add; two step workaround:
+            # 1. add a blank pw to a keychain
+            #    - system if daemon
+            sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" "/Library/Keychains/System.keychain"
+            #    - login if single-user
+            # TODO: pass something in to discriminate this case?
+            # sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password"
+            # 2. add a password with the -U (update) flag and -w (prompt if last)
+            #    flags, but specify no keychain; security will use the first it finds
+            prepare_darwin_volume_password | sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix -stdinpassphrase
+        else
+            sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix
         fi
-
-        sudo diskutil apfs addVolume "$disk" APFS 'Nix Store' -mountpoint /nix
-        volume="Nix Store"
+        volume="Nix Volume"
     else
         echo "Using existing '$volume' volume" >&2
     fi
 
-    if ! test_fstab; then
-        echo "Configuring /etc/fstab..." >&2
-        label=$(echo "$volume" | sed 's/ /\\040/g')
-        # shellcheck disable=SC2209
-        printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
+    if ! test_voldaemon; then
+        echo "Configuring LaunchDaemon to mount '$volume'..." >&2
+        generate_mount_daemon | sudo tee /Library/LaunchDaemons/org.nixos.darwin-store.plist
+
+        sudo launchctl load /Library/LaunchDaemons/org.nixos.darwin-store.plist
+
+        sudo launchctl start org.nixos.darwin-store
     fi
 }
 
