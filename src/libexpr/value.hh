@@ -92,6 +92,15 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
 struct Value
 {
+
+    // Stored separately from Value as to not increase sizeof(Value)
+    struct LazyBinOp {
+        Env * env;
+        ExprLazyBinOp * expr;
+        Value * left;
+        Value * right;
+    };
+
     ValueType type;
     union
     {
@@ -134,12 +143,7 @@ struct Value
             Env * env;
             Expr * expr;
         } thunk;
-        struct {
-            Env * env;
-            ExprLazyBinOp * expr;
-            Value * left;
-            Value * right;
-        } lazyBinOp;
+        LazyBinOp * lazyBinOp;
         struct {
             Value * left, * right;
         } app;
