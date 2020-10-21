@@ -360,6 +360,11 @@ protected:
 
 public:
 
+    /* If requested, substitute missing paths. This
+       implements nix-copy-closure's --use-substitutes
+       flag. */
+    void substitutePaths(const StorePathSet & paths);
+
     /* Query which of the given paths is valid. Optionally, try to
        substitute missing paths. */
     virtual StorePathSet queryValidPaths(const StorePathSet & paths,

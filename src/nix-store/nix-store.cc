@@ -830,29 +830,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                     for (auto & path : paths)
                         store->addTempRoot(path);
 
-                /* If requested, substitute missing paths. This
-                   implements nix-copy-closure's --use-substitutes
-                   flag. */
                 if (substitute && writeAllowed) {
-                    /* Filter out .drv files (we don't want to build anything). */
-                    std::vector<StorePathWithOutputs> paths2;
-                    for (auto & path : paths)
-                        if (!path.isDerivation())
-                            paths2.push_back({path});
-                    uint64_t downloadSize, narSize;
-                    StorePathSet willBuild, willSubstitute, unknown;
-                    store->queryMissing(paths2,
-                        willBuild, willSubstitute, unknown, downloadSize, narSize);
-                    /* FIXME: should use ensurePath(), but it only
-                       does one path at a time. */
-                    if (!willSubstitute.empty())
-                        try {
-                            std::vector<StorePathWithOutputs> subs;
-                            for (auto & p : willSubstitute) subs.push_back({p});
-                            store->buildPaths(subs);
-                        } catch (Error & e) {
-                            logWarning(e.info());
-                        }
+                    store->substitutePaths(paths);
                 }
 
                 worker_proto::write(*store, out, store->queryValidPaths(paths));

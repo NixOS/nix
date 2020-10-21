@@ -12,7 +12,7 @@
       versionSuffix =
         if officialRelease
         then ""
-        else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified)}_${self.shortRev or "dirty"}";
+        else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
       officialRelease = false;
 
@@ -117,6 +117,7 @@
 
         nix = with final; with commonDeps pkgs; (stdenv.mkDerivation {
           name = "nix-${version}";
+          inherit version;
 
           src = self;
 
