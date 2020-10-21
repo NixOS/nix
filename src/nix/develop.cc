@@ -39,21 +39,24 @@ BuildEnvironment readEnvironment(const Path & path)
     static std::string varNameRegex =
         R"re((?:[a-zA-Z_][a-zA-Z0-9_]*))re";
 
-    static std::regex declareRegex(
-        "^declare -x (" + varNameRegex + ")" +
-        R"re((?:="((?:[^"\\]|\\.)*)")?\n)re");
-
     static std::string simpleStringRegex =
         R"re((?:[a-zA-Z0-9_/:\.\-\+=]*))re";
 
-    static std::string quotedStringRegex =
+    static std::string dquotedStringRegex =
+        R"re((?:\$?"(?:[^"\\]|\\[$`"\\\n])*"))re";
+
+    static std::string squotedStringRegex =
         R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
 
     static std::string indexedArrayRegex =
         R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
 
+    static std::regex declareRegex(
+        "^declare -a?x (" + varNameRegex + ")(=(" +
+        dquotedStringRegex + "|" + indexedArrayRegex + "))?\n");
+
     static std::regex varRegex(
-        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + indexedArrayRegex + ")\n");
+        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + squotedStringRegex + "|" + indexedArrayRegex + ")\n");
 
     /* Note: we distinguish between an indexed and associative array
        using the space before the closing parenthesis. Will
