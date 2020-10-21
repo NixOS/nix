@@ -292,22 +292,26 @@ void DerivationGoal::haveDerivation()
 
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
-
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
     if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
-        for (auto & [_, status] : initialOutputs) {
-            if (!status.wanted) continue;
-            if (!status.known) {
-                warn("do not know how to query for unknown floating content-addressed derivation output yet");
-                /* Nothing to wait for; tail call */
-                return DerivationGoal::gaveUpOnSubstitution();
-            }
+        for (auto& [outputName, status] : initialOutputs) {
+            if (!status.wanted)
+                continue;
             addWaitee(upcast_goal(worker.makeSubstitutionGoal(
-                status.known->path,
+                DrvOutputId{drvPath, outputName},
                 buildMode == bmRepair ? Repair : NoRepair,
                 getDerivationCA(*drv))));
+            if (status.known) {
+                // If we know the output path, also depend on directly fetching
+                // it as the remote cache might have the output path but not
+                // know of the output id
+                addWaitee(upcast_goal(worker.makeSubstitutionGoal(
+                    status.known->path,
+                    buildMode == bmRepair ? Repair : NoRepair,
+                    getDerivationCA(*drv))));
+            }
         }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */

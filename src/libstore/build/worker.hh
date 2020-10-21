@@ -68,8 +68,8 @@ private:
 
     /* Maps used to prevent multiple instantiations of a goal for the
        same derivation / path. */
-    std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
-    std::map<StorePath, std::weak_ptr<SubstitutionGoal>> substitutionGoals;
+    std::map<DrvInput, std::weak_ptr<DerivationGoal>> derivationGoals;
+    std::map<DrvInput, std::weak_ptr<SubstitutionGoal>> substitutionGoals;
 
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
@@ -143,7 +143,7 @@ public:
         const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(const DrvInput & target, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);

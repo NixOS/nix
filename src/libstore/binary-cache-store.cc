@@ -449,7 +449,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
 std::optional<const DrvOutputInfo> BinaryCacheStore::queryDrvOutputInfo(const DrvOutputId & id)
 {
     auto outputInfoFilePath =
-        "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName;
+        "drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName + ".doi";
     auto rawOutputInfo = getFile(outputInfoFilePath);
 
     if (rawOutputInfo) {
@@ -469,7 +469,7 @@ std::optional<StorePath> BinaryCacheStore::queryOutputPathOf(
 
 void BinaryCacheStore::registerDrvOutput(const DrvOutputId & id, const DrvOutputInfo & info)
 {
-    auto filePath = "/drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName + ".doi";
+    auto filePath = "drvOutputs/" + std::string(id.drvPath.hashPart()) + "!" + id.outputName + ".doi";
     upsertFile(filePath, info.to_string(), "text/x-nix-derivertopath");
 }
 

@@ -74,12 +74,12 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const DrvInput & target, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[path];
+    std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[target];
     auto goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = nix::makeSubstitutionGoal(path, *this, repair, ca);
+        goal = nix::makeSubstitutionGoal(target, *this, repair, ca);
         goal_weak = goal;
         wakeUp(goal);
     }
@@ -87,7 +87,7 @@ std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const StorePath &
 }
 
 template<typename G>
-static void removeGoal(std::shared_ptr<G> goal, std::map<StorePath, std::weak_ptr<G>> & goalMap)
+static void removeGoal(std::shared_ptr<G> goal, std::map<DrvInput, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
     for (auto i = goalMap.begin();
@@ -225,6 +225,7 @@ void Worker::run(const Goals & _topGoals)
                 GoalPtr goal = i.lock();
                 if (goal) awake2.insert(goal);
             }
+            debug("Awake before cleaning: %d, after: %d", awake.size(), awake2.size());
             awake.clear();
             for (auto & goal : awake2) {
                 checkInterrupt();

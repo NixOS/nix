@@ -122,4 +122,57 @@ void SubstitutionGoal::handleEOF(int fd)
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
 
+void SubstitutionGoal::tryNext()
+{
+    trace("trying next substituter");
+
+    if (subs.size() == 0) {
+        /* None left.  Terminate this goal and let someone else deal
+           with it. */
+        debug("path '%s' is required, but there is no substituter that can build it", getTarget().to_string());
+
+        /* Hack: don't indicate failure if there were no substituters.
+           In that case the calling derivation should just do a
+           build. */
+        amDone(substituterFailed ? ecFailed : ecNoSubstituters);
+
+        if (substituterFailed) {
+            worker.failedSubstitutions++;
+            worker.updateProgress();
+        }
+
+        return;
+    }
+
+    sub = subs.front();
+    subs.pop_front();
+
+    if (auto nextState = tryCurrent()) {
+        state = *nextState;
+        if (waitees.empty()) {
+            work();
+        }
+    } else {
+        tryNext();
+    }
+}
+
+std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(
+    const DrvInput& target,
+    Worker& worker,
+    RepairFlag repair,
+    std::optional<ContentAddress> ca) {
+    std::shared_ptr<SubstitutionGoal> res;
+    std::visit(
+        overloaded{
+            [&](StorePath p) {
+                res = makeSubstitutionGoal(p, worker, repair, ca);
+            },
+            [&](DrvOutputId id) {
+                res = makeSubstitutionGoal(id, worker, repair);
+            },
+        },
+        static_cast<RawDrvInput>(target));
+    return res;
+}
 }

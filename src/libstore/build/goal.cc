@@ -60,7 +60,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
 void Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
-    trace("done");
+    debug("%1%: done with exit code %2%", name, result);
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
     exitCode = result;

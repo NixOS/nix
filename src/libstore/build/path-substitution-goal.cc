@@ -22,17 +22,8 @@ private:
 public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
-    void timedOut(Error && ex) override { abort(); };
-
-    string key() override
-    {
-        /* "a$" ensures substitution goals happen before derivation
-           goals. */
-        return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
-    }
-
     /* The states. */
-    void tryNext() override;
+    std::optional<GoalState> tryCurrent() override;
     void referencesValid() override;
     void tryToRun() override;
 
@@ -49,57 +40,30 @@ PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker &
     trace("created");
 }
 
-void PathSubstitutionGoal::tryNext()
+std::optional<PathSubstitutionGoal::GoalState> PathSubstitutionGoal::tryCurrent()
 {
-    trace("trying next substituter");
-
-    if (subs.size() == 0) {
-        /* None left.  Terminate this goal and let someone else deal
-           with it. */
-        debug("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath));
-
-        /* Hack: don't indicate failure if there were no substituters.
-           In that case the calling derivation should just do a
-           build. */
-        amDone(substituterFailed ? ecFailed : ecNoSubstituters);
-
-        if (substituterFailed) {
-            worker.failedSubstitutions++;
-            worker.updateProgress();
-        }
-
-        return;
-    }
-
-    sub = subs.front();
-    subs.pop_front();
-
     if (ca) {
         remotelyKnownPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
         if (sub->storeDir == worker.store.storeDir)
             assert(remotelyKnownPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {
-        tryNext();
-        return;
+        return std::nullopt;
     }
 
     try {
         // FIXME: make async
         info = sub->queryPathInfo(remotelyKnownPath ? *remotelyKnownPath : storePath);
     } catch (InvalidPath &) {
-        tryNext();
-        return;
+        return std::nullopt;
     } catch (SubstituterDisabled &) {
         if (settings.tryFallback) {
-            tryNext();
-            return;
+            return std::nullopt;
         }
         throw;
     } catch (Error & e) {
         if (settings.tryFallback) {
             logError(e.info());
-            tryNext();
-            return;
+            return std::nullopt;
         }
         throw;
     }
@@ -112,8 +76,7 @@ void PathSubstitutionGoal::tryNext()
         } else {
             printError("asked '%s' for '%s' but got '%s'",
                 sub->getUri(), worker.store.printStorePath(storePath), sub->printStorePath(info->path));
-            tryNext();
-            return;
+            return std::nullopt;
         }
     }
 
@@ -141,8 +104,7 @@ void PathSubstitutionGoal::tryNext()
             .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
                 sub->getUri(), worker.store.printStorePath(storePath))
         });
-        tryNext();
-        return;
+        return std::nullopt;
     }
 
     /* To maintain the closure invariant, we first have to realise the
@@ -151,10 +113,7 @@ void PathSubstitutionGoal::tryNext()
         if (i != storePath) /* ignore self-references */
             addWaitee(worker.makeSubstitutionGoal(i));
 
-    if (waitees.empty()) /* to prevent hang (no wake-up event) */
-        referencesValid();
-    else
-        state = &SubstitutionGoal::referencesValid;
+    return {&SubstitutionGoal::referencesValid};
 }
 
 void PathSubstitutionGoal::referencesValid()

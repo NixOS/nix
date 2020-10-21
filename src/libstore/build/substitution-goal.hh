@@ -16,15 +16,28 @@ public:
     SubstitutionGoal(Worker&, RepairFlag);
     ~SubstitutionGoal();
 
+    typedef void (SubstitutionGoal::*GoalState)();
+    GoalState state;
+
     /* The states. */
     void init();
-    virtual void tryNext() = 0;
+    void tryNext();
+    /* Try the current substituter. Return `true` iff we got what we
+     * wanted from it
+     */
+    virtual std::optional<GoalState> tryCurrent() = 0;
     virtual void referencesValid() = 0;
     virtual void tryToRun() = 0;
     void finished();
 
-    typedef void (SubstitutionGoal::*GoalState)();
-    GoalState state;
+    string key() override
+    {
+        /* "a$" ensures substitution goals happen before derivation
+           goals. */
+        return "a$" + getTarget().to_string();
+    }
+
+    void timedOut(Error && ex) override { abort(); };
 
     void work() override;
 
@@ -68,7 +81,17 @@ protected:
 };
 
 std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(
-    const StorePath& storePath,
+    const StorePath&,
+    Worker& worker,
+    RepairFlag repair = NoRepair,
+    std::optional<ContentAddress> ca = std::nullopt);
+std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(
+    const DrvOutputId& target,
+    Worker& worker,
+    RepairFlag repair = NoRepair,
+    std::optional<ContentAddress> ca = std::nullopt);
+std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(
+    const DrvInput& target,
     Worker& worker,
     RepairFlag repair = NoRepair,
     std::optional<ContentAddress> ca = std::nullopt);

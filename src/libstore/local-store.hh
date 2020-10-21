@@ -301,6 +301,7 @@ private:
     friend class DerivationGoal;
     friend class SubstitutionGoal;
     friend class PathSubstitutionGoal;
+    friend class DrvOutputSubstitutionGoal;
 };
 
 

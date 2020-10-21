@@ -5,8 +5,9 @@ clearCache
 
 # Create the binary cache.
 outPath=$(nix-build dependencies.nix --no-out-link)
+drvOutputId="$(nix-instantiate dependencies.nix)!out"
 
-nix copy --to file://$cacheDir $outPath
+nix copy --to file://$cacheDir $drvOutputId
 
 
 basicTests() {

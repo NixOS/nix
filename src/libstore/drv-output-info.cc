@@ -7,7 +7,7 @@ MakeError(InvalidDerivationOutputId, Error);
 
 DrvOutputId DrvOutputId::parse(const std::string &strRep) {
     const auto &[rawPath, outputs] = parsePathWithOutputs(strRep);
-    if (outputs.size() == 1)
+    if (outputs.size() != 1)
         throw InvalidDerivationOutputId("Invalid derivation output id %s", strRep);
 
     return DrvOutputId{
