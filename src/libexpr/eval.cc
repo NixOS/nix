@@ -1172,14 +1172,40 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     // TODO: Probably use pos2 throughout this function
     Pos * pos2 = 0;
 
-    // TODO: [Why] can't this be stack allocated. Same for evalAttr
-    Value * vAttrs = e->maybeThunk(state, env);
+    Value vTmp;
+    Value * vAttrs = &vTmp;
 
     try {
 
-        for (auto & i : attrPath) {
+        auto i = attrPath.begin();
+
+        // In the first loop iteration, we evaluate an attribute of an Expr, and not a Value
+        // So by unrolling this, we can avoid a thunk allocation by using e->evalAttr instead of evalValueAttr
+        nrLookups++;
+        Symbol name = getName(*i, state, env);
+        Attr * attr = e->evalAttr(state, env, *vAttrs, name);
+        if (!attr) {
+            if (def) {
+                def->eval(state, env, v);
+                return;
+            } else {
+                // Depending on the reason of j being null we throw an error
+                // If it wasn't an attribute set, this should trigger
+                state.forceAttrs(*vAttrs, pos);
+                // Otherwise the attribute set will have missed the name we wanted
+                throwEvalError(pos, "attribute '%1%' missing", name);
+            }
+        }
+        vAttrs = attr->value;
+        pos2 = attr->pos;
+        if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+
+        ++i;
+
+
+        for (;i < attrPath.end(); ++i) {
             nrLookups++;
-            Symbol name = getName(i, state, env);
+            Symbol name = getName(*i, state, env);
             Attr * attr = state.evalValueAttr(*vAttrs, name, pos);
             if (!attr) {
                 if (def) {
@@ -1213,13 +1239,38 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 Attr * ExprSelect::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
 {
     Pos * pos2 = 0;
-    Value * vAttrs = e->maybeThunk(state, env);
+    Value vTmp;
+    Value * vAttrs = &vTmp;
 
     try {
 
-        for (auto & i : attrPath) {
+        auto i = attrPath.begin();
+
+        // In the first loop iteration, we evaluate an attribute of an Expr, and not a Value
+        // So by unrolling this, we can avoid a thunk allocation by using e->evalAttr instead of evalValueAttr
+        nrLookups++;
+        Symbol name2 = getName(*i, state, env);
+        Attr * attr = e->evalAttr(state, env, *vAttrs, name2);
+        if (!attr) {
+            if (def) {
+                return def->evalAttr(state, env, v, name);
+            } else {
+                // Depending on the reason of j being null we throw an error
+                // If it wasn't an attribute set, this should trigger
+                state.forceAttrs(*vAttrs, pos);
+                // Otherwise the attribute set will have missed the name we wanted
+                throwEvalError(pos, "attribute '%1%' missing", name);
+            }
+        }
+        vAttrs = attr->value;
+        pos2 = attr->pos;
+        if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+
+        ++i;
+
+        for (;i < attrPath.end(); ++i) {
             nrLookups++;
-            Symbol name2 = getName(i, state, env);
+            Symbol name2 = getName(*i, state, env);
             Attr * attr = state.evalValueAttr(*vAttrs, name2, pos);
             if (!attr) {
                 if (def) {
