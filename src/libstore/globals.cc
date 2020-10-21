@@ -86,6 +86,12 @@ void loadConfFile()
     for (auto file = files.rbegin(); file != files.rend(); file++) {
         globalConfig.applyConfigFile(*file);
     }
+
+    auto nixConfEnv = getEnv("NIX_CONFIG");
+    if (nixConfEnv.has_value()) {
+        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+    }
+
 }
 
 std::vector<Path> getUserConfigFiles()

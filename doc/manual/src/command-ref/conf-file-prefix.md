@@ -19,6 +19,9 @@ By default Nix reads settings from the following places:
     and `XDG_CONFIG_HOME`. If these are unset, it will look in
     `$HOME/.config/nix.conf`.
 
+  - If `NIX_OPTIONS` is set, its contents is treated as the contents of
+    a configuration file.
+
 The configuration files consist of `name =
 value` pairs, one per line. Other files can be included with a line like
 `include
