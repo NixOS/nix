@@ -79,7 +79,7 @@ std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const StorePath &
     std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[path];
     auto goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
+        goal = nix::makeSubstitutionGoal(path, *this, repair, ca);
         goal_weak = goal;
         wakeUp(goal);
     }

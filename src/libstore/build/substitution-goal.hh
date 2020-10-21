@@ -1,8 +1,10 @@
 #pragma once
 
+#include "worker.hh"
 #include "lock.hh"
 #include "store-api.hh"
 #include "goal.hh"
+#include "drv-output-info.hh"
 
 namespace nix {
 
@@ -10,15 +12,36 @@ class Worker;
 
 class SubstitutionGoal : public Goal
 {
+public:
+    SubstitutionGoal(Worker&, RepairFlag);
+    ~SubstitutionGoal();
+
+    /* The states. */
+    void init();
+    virtual void tryNext() = 0;
+    virtual void referencesValid() = 0;
+    virtual void tryToRun() = 0;
+    void finished();
+
+    typedef void (SubstitutionGoal::*GoalState)();
+    GoalState state;
+
+    void work() override;
+
+    /* Callback used by the worker to write to the log. */
+    void handleChildOutput(int fd, const string & data) override;
+    void handleEOF(int fd) override;
+
+    virtual DrvInput getTarget() const = 0;
+
+protected:
     friend class Worker;
 
-private:
-    /* The store path that should be realised through a substitute. */
-    StorePath storePath;
+    /* Pipe for the substituter's standard output. */
+    Pipe outPipe;
 
-    /* The path the substituter refers to the path as. This will be
-     * different when the stores have different names. */
-    std::optional<StorePath> subPath;
+    /* The substituter thread. */
+    std::thread thr;
 
     /* The remaining substituters. */
     std::list<ref<Store>> subs;
@@ -29,61 +52,25 @@ private:
     /* Whether a substituter failed. */
     bool substituterFailed = false;
 
-    /* Path info returned by the substituter's query info operation. */
-    std::shared_ptr<const ValidPathInfo> info;
-
-    /* Pipe for the substituter's standard output. */
-    Pipe outPipe;
-
-    /* The substituter thread. */
-    std::thread thr;
-
-    std::promise<void> promise;
+    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
+        maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
     /* Whether to try to repair a valid path. */
     RepairFlag repair;
 
-    /* Location where we're downloading the substitute.  Differs from
-       storePath when doing a repair. */
-    Path destPath;
+    /* The final store path as it is known by the local and the remote path */
+    std::optional<StorePath> locallyKnownPath, remotelyKnownPath;
 
-    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
-        maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
+    std::promise<void> promise;
 
-    typedef void (SubstitutionGoal::*GoalState)();
-    GoalState state;
-
-    /* Content address for recomputing store path */
-    std::optional<ContentAddress> ca;
-
-public:
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    ~SubstitutionGoal();
-
-    void timedOut(Error && ex) override { abort(); };
-
-    string key() override
-    {
-        /* "a$" ensures substitution goals happen before derivation
-           goals. */
-        return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
-    }
-
-    void work() override;
-
-    /* The states. */
-    void init();
-    void tryNext();
-    void gotInfo();
-    void referencesValid();
-    void tryToRun();
-    void finished();
-
-    /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data) override;
-    void handleEOF(int fd) override;
-
-    StorePath getStorePath() { return storePath; }
+    /* Path info returned by the substituter's query info operation. */
+    std::shared_ptr<const ValidPathInfo> info;
 };
+
+std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(
+    const StorePath& storePath,
+    Worker& worker,
+    RepairFlag repair = NoRepair,
+    std::optional<ContentAddress> ca = std::nullopt);
 
 }

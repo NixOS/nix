@@ -34,7 +34,7 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
 
     worker.run(goals);
 
-    StorePathSet failed;
+    std::set<DrvInput> failed;
     std::optional<Error> ex;
     for (auto & i : goals) {
         if (i->ex) {
@@ -45,8 +45,8 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
         }
         if (i->exitCode != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
-            if (i2) failed.insert(i2->getDrvPath());
-            else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
+            if (i2) failed.insert(DrvOutputId{i2->getDrvPath(), {}});
+            else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getTarget());
         }
     }
 
@@ -55,7 +55,7 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
         throw *ex;
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
-        throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
+        throw Error(worker.exitStatus(), "build of %s failed", concatStringsSep(" ", stringify_refs(failed)));
     }
 }
 
