@@ -204,6 +204,11 @@ main() {
         else
             sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix
         fi
+
+        if [ "$INSTALL_MODE" = "no-daemon" ]; then
+            # TODO: is there a better way to do this?
+            sudo chown $USER:admin /nix
+        fi
     else
         echo "Using existing '$volume' volume" >&2
     fi
