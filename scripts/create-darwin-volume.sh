@@ -187,17 +187,16 @@ main() {
         if test_filevault_in_use; then
             # security program's flags won't let us both specify a keychain
             # and be prompted for a pw to add; two step workaround:
-            # 1. add a blank pw to a keychain
-            #    - system if daemon
-            if [ "$INSTALL_MODE" = "daemon" ]; then # exported by caller
-                # system is technically less secure than user... in theory we
-                # could install the password in each user keychain, but we'd
-                # need some ergonomic way to add users after install...
-                sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" "/Library/Keychains/System.keychain"
-            #    - login (default) if single-user
-            else
-                sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password"
-            fi
+            # 1. add a blank pw to system keychain
+
+            # system is in some sense less secure than user keychain... (it's
+            # possible to read the password for decrypting the keychain) but
+            # the user keychain appears to be available too late. As far as I
+            # can tell, the file with this password (/var/db/SystemKey) is
+            # inside the FileVault envelope. If that isn't true, it may make
+            # sense to store the password inside the envelope?
+            sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" "/Library/Keychains/System.keychain"
+
             # 2. add a password with the -U (update) flag and -w (prompt if last)
             #    flags, but specify no keychain; security will use the first it finds
             prepare_darwin_volume_password | sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix -stdinpassphrase
@@ -205,7 +204,7 @@ main() {
             sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix
         fi
 
-        if [ "$INSTALL_MODE" = "no-daemon" ]; then
+        if [ "$INSTALL_MODE" = "no-daemon" ]; then # exported by caller
             # TODO: is there a better way to do this?
             sudo chown $USER:admin /nix
         fi
