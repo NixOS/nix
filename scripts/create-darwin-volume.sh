@@ -158,7 +158,27 @@ main() {
     fi
 
     disk="$(root_disk_identifier)"
-    volume=$(find_nix_volume "$disk")
+    volume=$(find_nix_volume "$disk") # existing volname starting w/ "nix"?
+    volume="${volume:-Nix Volume}"    # otherwise use default
+
+    # fstab used to be responsible for mounting the volume. Now the last
+    # step adds a LaunchDaemon responsible for mounting. This is technically
+    # redundant for mounting, but diskutil appears to pick up mount options
+    # from fstab (and diskutil's support for specifying them directly is not
+    # consistent across versions/subcommands), enabling us to specify mount
+    # options by *label*.
+    #
+    # Being able to do all of this by label is helpful because it's a stable
+    # identifier that we can know at code-time, letting us skirt some logistic
+    # complexity that comes with doing this by UUID (which is stable, but not
+    # known ahead of time) or special device name/path (which is not stable).
+    if ! test_fstab; then
+        echo "Configuring /etc/fstab..." >&2
+        label=$(echo "$volume" | sed 's/ /\\040/g')
+        # shellcheck disable=SC2209
+        printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
+    fi
+
     if [ -z "$volume" ]; then
         echo "Creating a Nix volume..." >&2
 
@@ -177,7 +197,6 @@ main() {
         else
             sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix
         fi
-        volume="Nix Volume"
     else
         echo "Using existing '$volume' volume" >&2
     fi
