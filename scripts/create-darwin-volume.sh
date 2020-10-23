@@ -86,7 +86,7 @@ generate_mount_daemon(){
   <string>org.nixos.darwin-store</string>
   <key>ProgramArguments</key>
   <array>
-    $(generate_mount_command)
+$(generate_mount_command)
   </array>
 </dict>
 </plist>
