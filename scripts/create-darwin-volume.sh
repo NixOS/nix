@@ -62,7 +62,7 @@ generate_mount_command(){
     if test_filevault_in_use; then
         printf "    <string>%s</string>\n" /bin/sh -c '/usr/bin/security find-generic-password -l "Nix Volume" -a "Nix Volume" -s "Nix Volume" -w | /usr/sbin/diskutil apfs unlockVolume "Nix Volume" -mountpoint /nix -stdinpassphrase'
     else
-        printf "    <string>%s</string>\n" /usr/sbin/diskutil mount nobrowse -mountPoint /nix "Nix Volume"
+        printf "    <string>%s</string>\n" /usr/sbin/diskutil mount -mountPoint /nix "Nix Volume"
     fi
 }
 
