@@ -187,10 +187,15 @@ main() {
             # and be prompted for a pw to add; two step workaround:
             # 1. add a blank pw to a keychain
             #    - system if daemon
-            sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" "/Library/Keychains/System.keychain"
-            #    - login if single-user
-            # TODO: pass something in to discriminate this case?
-            # sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password"
+            if [ "$INSTALL_MODE" = "daemon" ]; then # exported by caller
+                # system is technically less secure than user... in theory we
+                # could install the password in each user keychain, but we'd
+                # need some ergonomic way to add users after install...
+                sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" "/Library/Keychains/System.keychain"
+            #    - login (default) if single-user
+            else
+                sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password"
+            fi
             # 2. add a password with the -U (update) flag and -w (prompt if last)
             #    flags, but specify no keychain; security will use the first it finds
             prepare_darwin_volume_password | sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix -stdinpassphrase

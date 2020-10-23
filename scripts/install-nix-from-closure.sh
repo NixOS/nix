@@ -43,7 +43,7 @@ elif [ "$(uname -s)" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
 
-INSTALL_MODE=no-daemon
+export INSTALL_MODE=no-daemon
 CREATE_DARWIN_VOLUME=${CREATE_DARWIN_VOLUME:-1} # now default
 # handle the command line flags
 while [ $# -gt 0 ]; do
