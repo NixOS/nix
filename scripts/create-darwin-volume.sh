@@ -159,8 +159,10 @@ main() {
 
     disk="$(root_disk_identifier)"
     volume=$(find_nix_volume "$disk") # existing volname starting w/ "nix"?
-    volume="${volume:-Nix Volume}"    # otherwise use default
-
+    if [ -z "$volume" ]; then
+        volume="Nix Volume"    # otherwise use default
+        create_volume=1
+    fi
     # fstab used to be responsible for mounting the volume. Now the last
     # step adds a LaunchDaemon responsible for mounting. This is technically
     # redundant for mounting, but diskutil appears to pick up mount options
@@ -179,7 +181,7 @@ main() {
         printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
     fi
 
-    if [ -z "$volume" ]; then
+    if [ -n "$create_volume" ]; then
         echo "Creating a Nix volume..." >&2
 
         if test_filevault_in_use; then
