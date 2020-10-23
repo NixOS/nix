@@ -965,21 +965,22 @@ Attr * Expr::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & na
 
 void ExprLazyBinOp::eval(EvalState & state, Env & env, Value & v)
 {
-    evalLazyBinOp(state, env, v);
+    evalLazyBinOp(state, env, nullptr, nullptr, v);
 }
 
 Attr * ExprLazyBinOp::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
 {
-    return evalLazyBinOpAttr(state, env, v, name);
+    return evalLazyBinOpAttr(state, env, nullptr, nullptr, name, v);
 }
 
-Attr * ExprLazyBinOp::evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
+
+Attr * ExprLazyBinOp::evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v)
 {
     printError("ExprLazyBinOp::evalLazyBinOpAttr called!");
     abort();
 }
 
-void ExprLazyBinOp::evalLazyBinOp(EvalState & state, Env & env, Value & v)
+void ExprLazyBinOp::evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v)
 {
     printError("ExprLazyBinOp::evalLazyBinOp called!");
     abort();
@@ -1839,20 +1840,20 @@ void ExprOpUpdate::updateAttrs(EvalState & state, const Value & v1, const Value 
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 
-void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value & v)
+void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v)
 {
     Value v1;
-    if (v.type == tLazyBinOp && v.lazyBinOp->left) {
-        state.forceAttrs(*v.lazyBinOp->left);
-        v1 = *v.lazyBinOp->left;
+    if (left) {
+        state.forceAttrs(*left);
+        v1 = *left;
     } else {
         state.evalAttrs(env, e1, v1);
     }
 
     Value v2;
-    if (v.type == tLazyBinOp && v.lazyBinOp->right) {
-        state.forceAttrs(*v.lazyBinOp->right);
-        v2 = *v.lazyBinOp->right;
+    if (right) {
+        state.forceAttrs(*right);
+        v2 = *right;
     } else {
         state.evalAttrs(env, e2, v2);
     }
@@ -1863,9 +1864,9 @@ void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value & v)
 // This function is called with a v that may have a tLazyBinOp in it, meaning
 // that a previous invocation of this function returned a tLazyBinOp, and this
 // function should reuse the previously computed values
-Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
+Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v)
 {
-    if (v.type != tLazyBinOp) {
+    if (!right) {
         Value * v2 = e2->maybeThunk(state, env);
         Attr * onRight = state.evalValueAttr(*v2, name, pos);
         if (onRight) {
@@ -1895,24 +1896,24 @@ Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value & v, 
     } else {
         // We know that v.type == tLazyBinOp and that v.lazyBinOp.right != nullptr because that's all the above case can return
 
-        Attr * onRight = state.evalValueAttr(*v.lazyBinOp->right, name, pos);
+        Attr * onRight = state.evalValueAttr(*right, name, pos);
         if (onRight) {
-            if (v.lazyBinOp->right->type == tAttrs && v.lazyBinOp->left && v.lazyBinOp->left->type == tAttrs) {
-                updateAttrs(state, *v.lazyBinOp->left, *v.lazyBinOp->right, v);
+            if (right->type == tAttrs && left && left->type == tAttrs) {
+                updateAttrs(state, *left, *right, v);
             }
             return onRight;
         } else {
-            if (v.lazyBinOp->left) {
-                Attr * onLeft = state.evalValueAttr(*v.lazyBinOp->left, name, pos);
-                if (v.lazyBinOp->right->type == tAttrs && v.lazyBinOp->left->type == tAttrs) {
-                    updateAttrs(state, *v.lazyBinOp->left, *v.lazyBinOp->right, v);
+            if (left) {
+                Attr * onLeft = state.evalValueAttr(*left, name, pos);
+                if (right->type == tAttrs && left->type == tAttrs) {
+                    updateAttrs(state, *left, *right, v);
                 }
                 return onLeft;
             } else {
                 Value * v1 = e1->maybeThunk(state, env);
                 Attr * onLeft = state.evalValueAttr(*v1, name, pos);
-                if (v1->type == tAttrs && v.lazyBinOp->right->type == tAttrs) {
-                    updateAttrs(state, *v1, *v.lazyBinOp->right, v);
+                if (v1->type == tAttrs && right->type == tAttrs) {
+                    updateAttrs(state, *v1, *right, v);
                 } else {
                     v.lazyBinOp->left = v1;
                 }
