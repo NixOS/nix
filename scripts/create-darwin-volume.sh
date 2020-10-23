@@ -184,7 +184,7 @@ main() {
 
     if ! test_voldaemon; then
         echo "Configuring LaunchDaemon to mount '$volume'..." >&2
-        generate_mount_daemon | sudo tee /Library/LaunchDaemons/org.nixos.darwin-store.plist
+        generate_mount_daemon | sudo tee /Library/LaunchDaemons/org.nixos.darwin-store.plist >/dev/null
 
         sudo launchctl load /Library/LaunchDaemons/org.nixos.darwin-store.plist
 
