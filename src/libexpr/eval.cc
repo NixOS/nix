@@ -815,6 +815,7 @@ void EvalState::mkPos(Value & v, Pos * pos)
         mkNull(v);
 }
 
+unsigned long nrAvoided = 0;
 
 /* Create a thunk for the delayed computation of the given expression
    in the given environment.  But if the expression is a variable,
@@ -822,45 +823,46 @@ void EvalState::mkPos(Value & v, Pos * pos)
    of thunks allocated. */
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
-    Value * v = state.allocValue();
-    mkThunk(*v, env, this);
+    Value * v = noAllocationValue(state, env);
+    if (!v) {
+        v = state.allocValue();
+        mkThunk(*v, env, this);
+    } else {
+        nrAvoided++;
+    }
     return v;
 }
 
 
-unsigned long nrAvoided = 0;
-
-Value * ExprVar::maybeThunk(EvalState & state, Env & env)
+Value * Expr::noAllocationValue(EvalState & state, Env & env)
 {
-    Value * v = state.lookupVar(&env, *this, true);
+    return nullptr;
+}
+
+Value * ExprVar::noAllocationValue(EvalState & state, Env & env)
+{
     /* The value might not be initialised in the environment yet.
        In that case, ignore it. */
-    if (v) { nrAvoided++; return v; }
-    return Expr::maybeThunk(state, env);
+    return state.lookupVar(&env, *this, true);
 }
 
-
-Value * ExprString::maybeThunk(EvalState & state, Env & env)
+Value * ExprString::noAllocationValue(EvalState & state, Env & env)
 {
-    nrAvoided++;
     return &v;
 }
 
-Value * ExprInt::maybeThunk(EvalState & state, Env & env)
+Value * ExprInt::noAllocationValue(EvalState & state, Env & env)
 {
-    nrAvoided++;
     return &v;
 }
 
-Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
+Value * ExprFloat::noAllocationValue(EvalState & state, Env & env)
 {
-    nrAvoided++;
     return &v;
 }
 
-Value * ExprPath::maybeThunk(EvalState & state, Env & env)
+Value * ExprPath::noAllocationValue(EvalState & state, Env & env)
 {
-    nrAvoided++;
     return &v;
 }
 
@@ -1867,29 +1869,57 @@ void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value * left, Val
 Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v)
 {
     if (!right) {
-        Value * v2 = e2->maybeThunk(state, env);
-        Attr * onRight = state.evalValueAttr(*v2, name, pos);
+        right = e2->noAllocationValue(state, env);
+        bool rightAllocated = true;
+        Value vRight;
+        if (!right) {
+            mkThunk(vRight, env, e2);
+            right = &vRight;
+            rightAllocated = false;
+        }
+
+        Attr * onRight = state.evalValueAttr(*right, name, pos);
         if (onRight) {
             v.type = tLazyBinOp;
             v.lazyBinOp = state.allocLazyBinOpValue();
             v.lazyBinOp->expr = this;
             v.lazyBinOp->env = &env;
             v.lazyBinOp->left = nullptr;
-            v.lazyBinOp->right = v2;
+            if (!rightAllocated) {
+                right = state.allocValue();
+                *right = vRight;
+            }
+            v.lazyBinOp->right = right;
             return onRight;
         } else {
-            Value * v1 = e1->maybeThunk(state, env);
-            Attr * onLeft = state.evalValueAttr(*v1, name, pos);
-            if (v1->type == tAttrs && v2->type == tAttrs) {
-                updateAttrs(state, *v1, *v2, v);
+            left = e1->noAllocationValue(state, env);
+            bool leftAllocated = true;
+            Value vLeft;
+            if (!left) {
+                mkThunk(vLeft, env, e1);
+                left = &vLeft;
+                leftAllocated = false;
+            }
+
+            Attr * onLeft = state.evalValueAttr(*left, name, pos);
+            if (left->type == tAttrs && right->type == tAttrs) {
+                updateAttrs(state, *left, *right, v);
                 return onLeft;
             } else {
                 v.type = tLazyBinOp;
                 v.lazyBinOp = state.allocLazyBinOpValue();
                 v.lazyBinOp->expr = this;
                 v.lazyBinOp->env = &env;
-                v.lazyBinOp->left = v1;
-                v.lazyBinOp->right = v2;
+                if (!leftAllocated) {
+                    left = state.allocValue();
+                    *left = vLeft;
+                }
+                v.lazyBinOp->left = left;
+                if (!rightAllocated) {
+                    right = state.allocValue();
+                    *right = vRight;
+                }
+                v.lazyBinOp->right = right;
                 return onLeft;
             }
         }
@@ -1910,12 +1940,24 @@ Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value * lef
                 }
                 return onLeft;
             } else {
-                Value * v1 = e1->maybeThunk(state, env);
-                Attr * onLeft = state.evalValueAttr(*v1, name, pos);
-                if (v1->type == tAttrs && right->type == tAttrs) {
-                    updateAttrs(state, *v1, *right, v);
+                left = e1->noAllocationValue(state, env);
+                bool leftAllocated = true;
+                Value vLeft;
+                if (!left) {
+                    mkThunk(vLeft, env, e1);
+                    left = &vLeft;
+                    leftAllocated = false;
+                }
+
+                Attr * onLeft = state.evalValueAttr(*left, name, pos);
+                if (left->type == tAttrs && right->type == tAttrs) {
+                    updateAttrs(state, *left, *right, v);
                 } else {
-                    v.lazyBinOp->left = v1;
+                    if (!leftAllocated) {
+                        left = state.allocValue();
+                        *left = vLeft;
+                    }
+                    v.lazyBinOp->left = left;
                 }
                 return onLeft;
             }
