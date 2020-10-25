@@ -124,9 +124,10 @@ main() {
         echo "    | configure it to mount at /nix.  Follow these steps to uninstall. |"
         echo "     ------------------------------------------------------------------ "
         echo ""
-        echo "  1. Remove /Library/LaunchDaemons/org.nixos.darwin-store.plist"
-        echo "  2. Destroy the data volume using 'diskutil apfs deleteVolume'"
-        echo "  3. Remove the 'nix' line from /etc/synthetic.conf or the file"
+        echo "  1. Remove the entry from fstab using 'sudo vifs'"
+        echo "  2. Remove /Library/LaunchDaemons/org.nixos.darwin-store.plist"
+        echo "  3. Destroy the data volume using 'diskutil apfs deleteVolume'"
+        echo "  4. Remove the 'nix' line from /etc/synthetic.conf (or the file)"
         echo ""
     ) >&2
 
