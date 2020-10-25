@@ -1,10 +1,6 @@
 #!/bin/sh
 set -e
 
-root_disk() {
-    diskutil info -plist /
-}
-
 # i.e., "disk1"
 root_disk_identifier() {
     diskutil info -plist / | xmllint --xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" -
