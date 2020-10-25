@@ -195,7 +195,7 @@ main() {
 
         if [ "$INSTALL_MODE" = "no-daemon" ]; then # exported by caller
             # TODO: is there a better way to do this?
-            sudo chown $USER:admin /nix
+            sudo chown "$USER:admin" /nix
         fi
 
         if test_filevault_in_use; then
