@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# make it easy to play w/ 'Case-sensitive APFS'
+readonly NIX_VOLUME_FS="${NIX_VOLUME_FS:-APFS}"
+
 # i.e., "disk1"
 root_disk_identifier() {
     diskutil info -plist / | xmllint --xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" -
@@ -187,7 +190,7 @@ main() {
     if [ -n "$create_volume" ]; then
         echo "Creating a Nix volume..." >&2
 
-        sudo diskutil apfs addVolume "$disk" APFS "$volume" -mountpoint /nix
+        sudo diskutil apfs addVolume "$disk" "$NIX_VOLUME_FS" "$volume" -mountpoint /nix
         new_uuid="$(volume_uuid "$volume")"
 
         if [ "$INSTALL_MODE" = "no-daemon" ]; then # exported by caller
