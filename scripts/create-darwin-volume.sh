@@ -60,7 +60,7 @@ suggest_report_error(){
 
 generate_mount_command(){
     if test_filevault_in_use; then
-        printf "    <string>%s</string>\n" /bin/sh -c '/usr/bin/security find-generic-password -l "Nix Volume" -a "Nix Volume" -s "Nix Volume" -w | /usr/sbin/diskutil apfs unlockVolume "Nix Volume" -mountpoint /nix -stdinpassphrase'
+        printf "    <string>%s</string>\n" /bin/sh -c '/usr/bin/security find-generic-password -a "Nix Volume" -w | /usr/sbin/diskutil apfs unlockVolume "Nix Volume" -mountpoint /nix -stdinpassphrase'
     else
         printf "    <string>%s</string>\n" /usr/sbin/diskutil mount -mountPoint /nix "Nix Volume"
     fi
@@ -96,11 +96,12 @@ EOF
 prepare_darwin_volume_password(){
     sudo /usr/bin/expect << 'EOF'
 log_user 0
+set VOLUME [lindex $argv 0];
 set PASSPHRASE [exec /usr/bin/ruby -rsecurerandom -e "puts SecureRandom.hex(32)"]
 
 # Cargo culting: people recommend this; not sure how necessary
 set send_slow {1 .1}
-spawn /usr/bin/sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" -U -w
+spawn /usr/bin/sudo /usr/bin/security add-generic-password -a "$VOLUME" -D "$VOLUME encryption password" -U -w
 expect {
     "password data for new item: " {
         send -s -- "$PASSPHRASE\r"
@@ -213,7 +214,7 @@ main() {
 
             # 2. add a password with the -U (update) flag and -w (prompt if last)
             #    flags, but specify no keychain; security will use the first it finds
-            prepare_darwin_volume_password | sudo diskutil apfs encryptVolume "$volume" -user disk -stdinpassphrase
+            prepare_darwin_volume_password "$volume" | sudo diskutil apfs encryptVolume "$volume" -user disk -stdinpassphrase
         fi
     else
         echo "Using existing '$volume' volume" >&2
