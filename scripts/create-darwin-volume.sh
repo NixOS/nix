@@ -6,6 +6,10 @@ root_disk_identifier() {
     diskutil info -plist / | xmllint --xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" -
 }
 
+volume_uuid(){
+    diskutil info -plist "$1" | xmllint --xpath "(/plist/dict/key[text()='VolumeUUID']/following-sibling::string/text())" -
+}
+
 find_nix_volume() {
     diskutil apfs list -plist "$1" | xmllint --xpath "(/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='Name']/following-sibling::string[starts-with(translate(text(),'N','n'),'nix')]/text())[1]" - 2>/dev/null || true
 }
@@ -180,6 +184,13 @@ main() {
     if [ -n "$create_volume" ]; then
         echo "Creating a Nix volume..." >&2
 
+        sudo diskutil apfs addVolume "$disk" APFS "$volume" -mountpoint /nix
+
+        if [ "$INSTALL_MODE" = "no-daemon" ]; then # exported by caller
+            # TODO: is there a better way to do this?
+            sudo chown $USER:admin /nix
+        fi
+
         if test_filevault_in_use; then
             # security program's flags won't let us both specify a keychain
             # and be prompted for a pw to add; two step workaround:
@@ -191,18 +202,18 @@ main() {
             # can tell, the file with this password (/var/db/SystemKey) is
             # inside the FileVault envelope. If that isn't true, it may make
             # sense to store the password inside the envelope?
-            sudo /usr/bin/security add-generic-password -a "Nix Volume" -s "Nix Volume" -D "Nix Volume password" "/Library/Keychains/System.keychain"
+            sudo /usr/bin/security add-generic-password -a "$volume" -s "$(volume_uuid "$volume")" -D "$volume encryption password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" "/Library/Keychains/System.keychain"
+            # TODO: decide if we should add `-T /System/Library/CoreServices/APFSUserAgent`
+            # This should let the system seamlessly supply the password for this volume
+            # which in turn means the fstab entry is enough for the system to (eventually)
+            # decrypt and mount the volume we're adding, but I hesitate because I'm not
+            # certain the system _should_ transparently failover if the LaunchDaemon is
+            # broken for some reason? Without supplying this flag, the system will instead
+            # start prompting them to allow APFSUserAgent to access this credential.
 
             # 2. add a password with the -U (update) flag and -w (prompt if last)
             #    flags, but specify no keychain; security will use the first it finds
-            prepare_darwin_volume_password | sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix -stdinpassphrase
-        else
-            sudo diskutil apfs addVolume "$disk" APFS 'Nix Volume' -mountpoint /nix
-        fi
-
-        if [ "$INSTALL_MODE" = "no-daemon" ]; then # exported by caller
-            # TODO: is there a better way to do this?
-            sudo chown $USER:admin /nix
+            prepare_darwin_volume_password | sudo diskutil apfs encryptVolume "$volume" -user disk -stdinpassphrase
         fi
     else
         echo "Using existing '$volume' volume" >&2
