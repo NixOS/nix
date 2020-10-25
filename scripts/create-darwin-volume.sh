@@ -94,7 +94,7 @@ EOF
 }
 
 prepare_darwin_volume_password(){
-    sudo /usr/bin/expect << 'EOF'
+    sudo /usr/bin/expect -f - "$1" << 'EOF'
 log_user 0
 set VOLUME [lindex $argv 0];
 set PASSPHRASE [exec /usr/bin/ruby -rsecurerandom -e "puts SecureRandom.hex(32)"]
