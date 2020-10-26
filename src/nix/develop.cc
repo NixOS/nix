@@ -11,6 +11,19 @@
 
 using namespace nix;
 
+struct DevelopSettings : Config
+{
+    Setting<std::string> bashPrompt{this, "", "bash-prompt",
+        "The bash prompt (`PS1`) in `nix develop` shells."};
+
+    Setting<std::string> bashPromptSuffix{this, "", "bash-prompt-suffix",
+        "Suffix appended to the `PS1` environment variable in `nix develop` shells."};
+};
+
+static DevelopSettings developSettings;
+
+static GlobalConfig::Register rDevelopSettings(&developSettings);
+
 struct Var
 {
     bool exported = true;
@@ -429,6 +442,10 @@ struct CmdDevelop : Common, MixEnvironment
 
         else {
             script += "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n";
+            if (developSettings.bashPrompt != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", shellEscape(developSettings.bashPrompt));
+            if (developSettings.bashPromptSuffix != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", shellEscape(developSettings.bashPromptSuffix));
         }
 
         writeFull(rcFileFd.get(), script);
