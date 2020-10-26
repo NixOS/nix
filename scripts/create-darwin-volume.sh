@@ -93,7 +93,7 @@ prepare_darwin_volume_password(){
 log_user 0
 set VOLUME [lindex $argv 0];
 set UUID [lindex $argv 1];
-set PASSPHRASE [exec /usr/bin/ruby -rsecurerandom -e "puts SecureRandom.hex(32)"]
+set PASSPHRASE [exec /usr/bin/xxd -l 32 -p -c 256 /dev/random]
 
 # Cargo culting: people recommend this; not sure how necessary
 set send_slow {1 .1}
