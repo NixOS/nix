@@ -8,18 +8,6 @@
 
 namespace nix::fetchers {
 
-/* Wrap bools to prevent string literals (i.e. 'char *') from being
-   cast to a bool in Attr. */
-template<typename T>
-struct Explicit {
-    T t;
-
-    bool operator ==(const Explicit<T> & other) const
-    {
-        return t == other.t;
-    }
-};
-
 typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;
 typedef std::map<std::string, Attr> Attrs;
 

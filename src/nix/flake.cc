@@ -82,11 +82,11 @@ static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
     if (flake.description)
         j["description"] = *flake.description;
     j["originalUrl"] = flake.originalRef.to_string();
-    j["original"] = attrsToJson(flake.originalRef.toAttrs());
+    j["original"] = fetchers::attrsToJson(flake.originalRef.toAttrs());
     j["resolvedUrl"] = flake.resolvedRef.to_string();
-    j["resolved"] = attrsToJson(flake.resolvedRef.toAttrs());
+    j["resolved"] = fetchers::attrsToJson(flake.resolvedRef.toAttrs());
     j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
-    j["locked"] = attrsToJson(flake.lockedRef.toAttrs());
+    j["locked"] = fetchers::attrsToJson(flake.lockedRef.toAttrs());
     if (auto rev = flake.lockedRef.input.getRev())
         j["revision"] = rev->to_string(Base16, false);
     if (auto revCount = flake.lockedRef.input.getRevCount())

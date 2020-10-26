@@ -43,7 +43,8 @@ void emitTreeAttrs(
     }
 
     if (input.getType() == "git")
-        mkBool(*state.allocAttr(v, state.symbols.create("submodules")), maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
+            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (auto revCount = input.getRevCount())
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
@@ -101,7 +102,7 @@ static void fetchTree(
             else if (attr.value->type == tString)
                 addURI(state, attrs, attr.name, attr.value->string.s);
             else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, fetchers::Explicit<bool>{attr.value->boolean});
+                attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type == tInt)
                 attrs.emplace(attr.name, attr.value->integer);
             else
