@@ -196,11 +196,6 @@ static Flake getFlake(
 
     expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 
-    auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
-
-    if (vInfo.attrs->get(sEdition))
-        warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
-
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);
         flake.description = description->value->string.s;
@@ -229,8 +224,7 @@ static Flake getFlake(
         throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
 
     for (auto & attr : *vInfo.attrs) {
-        if (attr.name != sEdition &&
-            attr.name != state.sDescription &&
+        if (attr.name != state.sDescription &&
             attr.name != sInputs &&
             attr.name != sOutputs)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
