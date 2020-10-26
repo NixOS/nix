@@ -270,6 +270,7 @@ template<> std::string BaseSetting<StringSet>::to_string() const
 
 template<> void BaseSetting<StringMap>::set(const std::string & str)
 {
+    value.clear();
     auto kvpairs = tokenizeString<Strings>(str);
     for (auto & s : kvpairs)
     {
