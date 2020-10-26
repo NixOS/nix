@@ -208,7 +208,8 @@ bool Value::isTrivial() const
         && (type != tThunk
             || (dynamic_cast<ExprAttrs *>(thunk.expr)
                 && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(thunk.expr));
+            || dynamic_cast<ExprLambda *>(thunk.expr)
+            || dynamic_cast<ExprList *>(thunk.expr));
 }
 
 
