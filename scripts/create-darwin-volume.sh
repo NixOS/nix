@@ -63,9 +63,9 @@ suggest_report_error(){
 
 generate_mount_command(){
     if test_filevault_in_use; then
-        printf "    <string>%s</string>\n" /bin/sh -c '/usr/bin/security find-generic-password -a "Nix Volume" -w | /usr/sbin/diskutil apfs unlockVolume "Nix Volume" -mountpoint /nix -stdinpassphrase'
+        printf "    <string>%s</string>\n" /bin/sh -c '/usr/bin/security find-generic-password -a "Nix" -w | /usr/sbin/diskutil apfs unlockVolume "Nix" -mountpoint /nix -stdinpassphrase'
     else
-        printf "    <string>%s</string>\n" /usr/sbin/diskutil mount -mountPoint /nix "Nix Volume"
+        printf "    <string>%s</string>\n" /usr/sbin/diskutil mount -mountPoint /nix "Nix"
     fi
 }
 
@@ -158,7 +158,7 @@ main() {
     disk="$(root_disk_identifier)"
     volume=$(find_nix_volume "$disk") # existing volname starting w/ "nix"?
     if [ -z "$volume" ]; then
-        volume="Nix Volume"    # otherwise use default
+        volume="Nix"    # otherwise use default
         create_volume=1
     fi
     # fstab used to be responsible for mounting the volume. Now the last
