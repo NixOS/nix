@@ -77,14 +77,6 @@ generate_mount_daemon(){
 <dict>
   <key>RunAtLoad</key>
   <true/>
-  <key>KeepAlive</key>
-  <dict>
-    <key>PathState</key>
-    <dict>
-      <key>/nix/var/nix</key>
-      <false/>
-    </dict>
-  </dict>
   <key>Label</key>
   <string>org.nixos.darwin-store</string>
   <key>ProgramArguments</key>
