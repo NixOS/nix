@@ -35,6 +35,7 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
+  content-addressed-remote-cache.sh \
   content-addressed.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh \
