@@ -271,5 +271,5 @@ rm $cacheDir/$(hashpart $docPath).narinfo
 
 nix-store --delete $outPath $docPath
 # -vvv is the level that logs during the loop
-timeout 60 nix-build -E "$expr" --option substituters "file://$cacheDir" \
+timeout 60 nix-build --no-out-link -E "$expr" --option substituters "file://$cacheDir" \
   --option trusted-binary-caches "file://$cacheDir"  --no-require-sigs
