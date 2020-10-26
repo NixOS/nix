@@ -47,8 +47,16 @@ struct FlakeInput
     FlakeInputs overrides;
 };
 
-// The Flake structure is the main internal representation of a flake.nix file.
+struct ConfigFile
+{
+    using ConfigValue = std::variant<std::string, int64_t, Explicit<bool>, std::vector<std::string>>;
 
+    std::map<std::string, ConfigValue> options;
+
+    void apply();
+};
+
+/* The contents of a flake.nix file. */
 struct Flake
 {
     FlakeRef originalRef;   // the original flake specification (by the user)
@@ -57,6 +65,7 @@ struct Flake
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
+    ConfigFile config; // 'nixConfig' attribute
     ~Flake();
 };
 

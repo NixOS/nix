@@ -71,11 +71,17 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     return {std::move(tree), resolvedRef, lockedRef};
 }
 
-static void expectType(EvalState & state, ValueType type,
-    Value & value, const Pos & pos)
+static void forceTrivialValue(EvalState & state, Value & value, const Pos & pos)
 {
     if (value.type == tThunk && value.isTrivial())
         state.forceValue(value, pos);
+}
+
+
+static void expectType(EvalState & state, ValueType type,
+    Value & value, const Pos & pos)
+{
+    forceTrivialValue(state, value, pos);
     if (value.type != type)
         throw Error("expected %s but got %s at %s",
             showType(type), showType(value.type), pos);
@@ -114,7 +120,6 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, tString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
             } else {
-                state.forceValue(*attr.value);
                 if (attr.value->type == tString)
                     attrs.emplace(attr.name, attr.value->string.s);
                 else
@@ -223,10 +228,41 @@ static Flake getFlake(
     } else
         throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
 
+    auto sNixConfig = state.symbols.create("nixConfig");
+
+    if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
+        expectType(state, tAttrs, *nixConfig->value, *nixConfig->pos);
+
+        for (auto & option : *nixConfig->value->attrs) {
+            forceTrivialValue(state, *option.value, *option.pos);
+            if (option.value->type == tString)
+                flake.config.options.insert({option.name, state.forceStringNoCtx(*option.value, *option.pos)});
+            else if (option.value->type == tInt)
+                flake.config.options.insert({option.name, state.forceInt(*option.value, *option.pos)});
+            else if (option.value->type == tBool)
+                flake.config.options.insert({option.name, state.forceBool(*option.value, *option.pos)});
+            else if (option.value->isList()) {
+                std::vector<std::string> ss;
+                for (unsigned int n = 0; n < option.value->listSize(); ++n) {
+                    auto elem = option.value->listElems()[n];
+                    if (elem->type != tString)
+                        throw TypeError("list element in flake configuration option '%s' is %s while a string is expected",
+                            option.name, showType(*option.value));
+                    ss.push_back(state.forceStringNoCtx(*elem, *option.pos));
+                }
+                flake.config.options.insert({option.name, ss});
+            }
+            else
+                throw TypeError("flake configuration option '%s' is %s",
+                    option.name, showType(*option.value));
+        }
+    }
+
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != state.sDescription &&
             attr.name != sInputs &&
-            attr.name != sOutputs)
+            attr.name != sOutputs &&
+            attr.name != sNixConfig)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
                 lockedRef, attr.name, *attr.pos);
     }
@@ -598,5 +634,31 @@ Fingerprint LockedFlake::getFingerprint() const
 }
 
 Flake::~Flake() { }
+
+void ConfigFile::apply()
+{
+    for (auto & [name, value] : options) {
+        // FIXME: support 'trusted-public-keys' (and other options), but make it TOFU.
+        if (name != "bash-prompt-suffix" &&
+            name != "bash-prompt" &&
+            name != "substituters" &&
+            name != "extra-substituters")
+        {
+            warn("ignoring untrusted flake configuration option '%s'", name);
+            continue;
+        }
+        // FIXME: Move into libutil/config.cc.
+        if (auto s = std::get_if<std::string>(&value))
+            globalConfig.set(name, *s);
+        else if (auto n = std::get_if<int64_t>(&value))
+            globalConfig.set(name, fmt("%d", n));
+        else if (auto b = std::get_if<Explicit<bool>>(&value))
+            globalConfig.set(name, b->t ? "true" : "false");
+        else if (auto ss = std::get_if<std::vector<std::string>>(&value))
+            globalConfig.set(name, concatStringsSep(" ", *ss)); // FIXME: evil
+        else
+            assert(false);
+    }
+}
 
 }
