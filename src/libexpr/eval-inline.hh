@@ -35,16 +35,16 @@ void EvalState::forceValue(Value & v, const Pos & pos)
     if (v.type == tThunk) {
         Env * env = v.thunk.env;
         Expr * expr = v.thunk.expr;
-        try {
-            v.type = tBlackhole;
+        //try {
+        //    v.type = tBlackhole;
             //checkInterrupt();
             expr->eval(*this, *env, v);
-        } catch (...) {
-            v.type = tThunk;
-            v.thunk.env = env;
-            v.thunk.expr = expr;
-            throw;
-        }
+        //} catch (...) {
+        //    v.type = tThunk;
+        //    v.thunk.env = env;
+        //    v.thunk.expr = expr;
+        //    throw;
+        //}
     }
     else if (v.type == tLazyBinOp) {
         Value::LazyBinOp * lazyBinOp = v.lazyBinOp;
@@ -60,8 +60,8 @@ void EvalState::forceValue(Value & v, const Pos & pos)
     }
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v, noPos);
-    else if (v.type == tBlackhole)
-        throwEvalError(pos, "infinite recursion encountered");
+    //else if (v.type == tBlackhole)
+    //    throwEvalError(pos, "infinite recursion encountered");
 }
 
 Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
