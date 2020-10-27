@@ -97,7 +97,7 @@ set PASSPHRASE [exec /usr/bin/xxd -l 32 -p -c 256 /dev/random]
 
 # Cargo culting: people recommend this; not sure how necessary
 set send_slow {1 .1}
-spawn /usr/bin/sudo /usr/bin/security add-generic-password -a "$VOLUME" -l "$volume encryption password" -s "$UUID" -D "Encrypted volume password" -U -w
+spawn /usr/bin/sudo /usr/bin/security add-generic-password -a "$VOLUME" -l "$VOLUME encryption password" -s "$UUID" -D "Encrypted volume password" -U -w
 expect {
     "password data for new item: " {
         send -s -- "$PASSPHRASE\r"
