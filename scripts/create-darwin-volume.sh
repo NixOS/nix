@@ -201,7 +201,7 @@ main() {
             # can tell, the file with this password (/var/db/SystemKey) is
             # inside the FileVault envelope. If that isn't true, it may make
             # sense to store the password inside the envelope?
-            sudo /usr/bin/security add-generic-password -a "$volume" -s "$new_uuid" -D "$volume encryption password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" "/Library/Keychains/System.keychain"
+            sudo /usr/bin/security add-generic-password -a "$volume" -s "$new_uuid" -l "$volume encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" "/Library/Keychains/System.keychain"
             # TODO: decide if we should add `-T /System/Library/CoreServices/APFSUserAgent`
             # This should let the system seamlessly supply the password for this volume
             # which in turn means the fstab entry is enough for the system to (eventually)
