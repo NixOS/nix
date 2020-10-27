@@ -1089,18 +1089,35 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         // Regular, non-CA derivation should always return a single hash and not
         // hash per output.
-        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
+        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        std::visit(overloaded {
+            [&](Hash h) {
+                for (auto & i : outputs) {
+                    auto outPath = state.store->makeOutputPath(i, h, drvName);
+                    drv.env[i] = state.store->printStorePath(outPath);
+                    drv.outputs.insert_or_assign(i,
+                        DerivationOutput {
+                            .output = DerivationOutputInputAddressed {
+                                .path = std::move(outPath),
+                            },
+                        });
+                }
+            },
+            [&](CaOutputHashes) {
+                // Shouldn't happen as the toplevel derivation is not CA.
+                assert(false);
+            },
+            [&](UnknownHashes) {
+                for (auto & i : outputs) {
+                    drv.outputs.insert_or_assign(i,
+                        DerivationOutput {
+                            .output = DerivationOutputDeferred{},
+                        });
+                }
+            },
+        },
+        hashModulo);
 
-        for (auto & i : outputs) {
-            auto outPath = state.store->makeOutputPath(i, h, drvName);
-            drv.env[i] = state.store->printStorePath(outPath);
-            drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = std::move(outPath),
-                    },
-                });
-        }
     }
 
     /* Write the resulting term into the Nix store directory. */

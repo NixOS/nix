@@ -573,6 +573,8 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             [&](DerivationOutputCAFloating _) {
                 /* Nothing to check */
             },
+            [&](DerivationOutputDeferred) {
+            },
         }, i.second.output);
     }
 }
@@ -817,7 +819,7 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
     }
     /* can't just use else-if instead of `!haveCached` because we need to unlock
        `drvPathResolutions` before it is locked in `Derivation::resolve`. */
-    if (!haveCached && drv.type() == DerivationType::CAFloating) {
+    if (!haveCached && (drv.type() == DerivationType::CAFloating || drv.type() == DerivationType::DeferredInputAddressed)) {
         /* Try resolve drv and use that path instead. */
         auto attempt = drv.tryResolve(*this);
         if (!attempt)

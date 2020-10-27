@@ -15,7 +15,7 @@ rec {
     '';
   };
   rootCA = mkDerivation {
-    name = "dependent";
+    name = "rootCA";
     outputs = [ "out" "dev" ];
     buildCommand = ''
       echo "building a CA derivation"
@@ -50,5 +50,14 @@ rec {
     __contentAddressed = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
+  };
+  dependentNonCA = mkDerivation {
+    name = "dependent-non-ca";
+    buildCommand = ''
+      echo "Didn't cut-off"
+      echo "building dependent-non-ca"
+      mkdir -p $out
+      echo ${rootCA}/non-ca-hello > $out/dep
+    '';
   };
 }
