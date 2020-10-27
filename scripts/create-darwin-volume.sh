@@ -120,7 +120,7 @@ main() {
         echo "     ------------------------------------------------------------------ "
         echo ""
         echo "  1. Remove the entry from fstab using 'sudo vifs'"
-        echo "  2. Run `sudo launchctl bootout system/org.nixos.darwin-store`
+        echo "  2. Run `sudo launchctl bootout system/org.nixos.darwin-store`"
         echo "  3. Remove /Library/LaunchDaemons/org.nixos.darwin-store.plist"
         echo "  4. Destroy the data volume using 'diskutil apfs deleteVolume'"
         echo "  5. Remove the 'nix' line from /etc/synthetic.conf (or the file)"
