@@ -222,9 +222,9 @@ main() {
         echo "Configuring LaunchDaemon to mount '$volume'..." >&2
         generate_mount_daemon | sudo tee /Library/LaunchDaemons/org.nixos.darwin-store.plist >/dev/null
 
-        sudo launchctl load /Library/LaunchDaemons/org.nixos.darwin-store.plist
+        sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.darwin-store.plist
 
-        sudo launchctl start org.nixos.darwin-store
+        # sudo launchctl start org.nixos.darwin-store
     fi
 }
 
