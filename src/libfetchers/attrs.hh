@@ -13,7 +13,7 @@ typedef std::map<std::string, Attr> Attrs;
 
 Attrs jsonToAttrs(const nlohmann::json & json);
 
-nlohmann::json attrsToJson(const Attrs & attrs);
+nlohmann::json attrsToJSON(const Attrs & attrs);
 
 std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::string & name);
 

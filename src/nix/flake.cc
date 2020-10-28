@@ -76,17 +76,17 @@ static void printFlakeInfo(const Store & store, const Flake & flake)
             std::put_time(std::localtime(&*lastModified), "%F %T"));
 }
 
-static nlohmann::json flakeToJson(const Store & store, const Flake & flake)
+static nlohmann::json flakeToJSON(const Store & store, const Flake & flake)
 {
     nlohmann::json j;
     if (flake.description)
         j["description"] = *flake.description;
     j["originalUrl"] = flake.originalRef.to_string();
-    j["original"] = fetchers::attrsToJson(flake.originalRef.toAttrs());
+    j["original"] = fetchers::attrsToJSON(flake.originalRef.toAttrs());
     j["resolvedUrl"] = flake.resolvedRef.to_string();
-    j["resolved"] = fetchers::attrsToJson(flake.resolvedRef.toAttrs());
+    j["resolved"] = fetchers::attrsToJSON(flake.resolvedRef.toAttrs());
     j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
-    j["locked"] = fetchers::attrsToJson(flake.lockedRef.toAttrs());
+    j["locked"] = fetchers::attrsToJSON(flake.lockedRef.toAttrs());
     if (auto rev = flake.lockedRef.input.getRev())
         j["revision"] = rev->to_string(Base16, false);
     if (auto revCount = flake.lockedRef.input.getRevCount())
@@ -139,7 +139,7 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         auto flake = getFlake();
 
         if (json) {
-            auto json = flakeToJson(*store, flake);
+            auto json = flakeToJSON(*store, flake);
             logger->cout("%s", json.dump());
         } else
             printFlakeInfo(*store, flake);
@@ -158,7 +158,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
         auto flake = lockFlake();
 
         if (json)
-            logger->cout("%s", flake.lockFile.toJson());
+            logger->cout("%s", flake.lockFile.toJSON());
         else {
             logger->cout("%s", flake.flake.lockedRef);
 
