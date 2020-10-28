@@ -88,29 +88,32 @@ struct CmdVerify : StorePathsCommand
                 Activity act2(*logger, lvlInfo, actUnknown, fmt("checking '%s'", store->printStorePath(info->path)));
 
                 if (!noContents) {
+                    if (std::optional optWantedHash = info->optNarHash()) {
+                        auto wantedHash = *optWantedHash;
+                        std::unique_ptr<AbstractHashSink> hashSink;
+                        if (!info->optCA())
+                            hashSink = std::make_unique<HashSink>(wantedHash.type);
+                        else
+                            hashSink = std::make_unique<HashModuloSink>(wantedHash.type, std::string(info->path.hashPart()));
 
-                    std::unique_ptr<AbstractHashSink> hashSink;
-                    if (!info->ca)
-                        hashSink = std::make_unique<HashSink>(info->narHash.type);
-                    else
-                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                        store->narFromPath(info->path, *hashSink);
 
-                    store->narFromPath(info->path, *hashSink);
+                        auto [gottenHash, _] = hashSink->finish();
 
-                    auto hash = hashSink->finish();
-
-                    if (hash.first != info->narHash) {
-                        corrupted++;
-                        act2.result(resCorruptedPath, store->printStorePath(info->path));
-                        logError({
-                            .name = "Hash error - path modified",
-                            .hint = hintfmt(
-                                "path '%s' was modified! expected hash '%s', got '%s'",
-                                store->printStorePath(info->path),
-                                info->narHash.to_string(Base32, true),
-                                hash.first.to_string(Base32, true))
-                        });
+                        if (gottenHash != wantedHash) {
+                            corrupted++;
+                            act2.result(resCorruptedPath, store->printStorePath(info->path));
+                            logError({
+                                .name = "Hash error - path modified",
+                                .hint = hintfmt(
+                                    "path '%s' was modified! expected hash '%s', got '%s'",
+                                    store->printStorePath(info->path),
+                                    wantedHash.to_string(Base32, true),
+                                    gottenHash.to_string(Base32, true))
+                            });
+                        }
                     }
+                    // FIXME verify CA too
                 }
 
                 if (!noTrust) {

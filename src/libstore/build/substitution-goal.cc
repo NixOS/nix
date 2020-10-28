@@ -130,7 +130,11 @@ void SubstitutionGoal::tryNext()
     /* Update the total expected download size. */
     auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
 
-    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, info->narSize);
+    auto narSizeOpt = info->optNarSize();
+    maintainExpectedNar =
+        narSizeOpt
+        ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, *narSizeOpt)
+        : nullptr;
 
     maintainExpectedDownload =
         narInfo && narInfo->fileSize
@@ -274,7 +278,8 @@ void SubstitutionGoal::finished()
         worker.doneDownloadSize += fileSize;
     }
 
-    worker.doneNarSize += maintainExpectedNar->delta;
+    if (maintainExpectedNar)
+        worker.doneNarSize += maintainExpectedNar->delta;
     maintainExpectedNar.reset();
 
     worker.updateProgress();

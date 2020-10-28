@@ -4,6 +4,24 @@
 
 namespace nix {
 
+bool TextHash::operator ==(const TextHash & otherHash) const noexcept {
+    return hash == otherHash.hash;
+};
+
+bool TextHash::operator !=(const TextHash & otherHash) const noexcept {
+    return hash != otherHash.hash;
+};
+
+
+bool FixedOutputHash::operator ==(const FixedOutputHash & otherHash) const noexcept {
+    return method == otherHash.method && hash == otherHash.hash;
+};
+
+bool FixedOutputHash::operator !=(const FixedOutputHash & otherHash) const noexcept {
+    return method != otherHash.method || hash != otherHash.hash;
+};
+
+
 std::string FixedOutputHash::printMethodAlgo() const
 {
     return makeFileIngestionPrefix(method) + printHashType(hash.type);

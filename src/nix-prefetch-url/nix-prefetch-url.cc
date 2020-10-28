@@ -212,8 +212,9 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
             auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
             storePath = info.path;
-            assert(info.ca);
-            hash = getContentAddressHash(*info.ca);
+            auto ca = *info.viewCAConst();
+            assert(ca);
+            hash = getContentAddressHash(*ca);
         }
 
         stopProgressBar();

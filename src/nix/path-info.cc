@@ -105,8 +105,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 if (showSize || showClosureSize || showSigs)
                     std::cout << std::string(std::max(0, (int) pathLen - (int) storePathS.size()), ' ');
 
-                if (showSize)
-                    printSize(info->narSize);
+                if (showSize) {
+                    auto narHashResult = *info->viewHashResultConst();
+                    auto narSize = narHashResult ? narHashResult->second : 0;
+                    printSize(narSize);
+                }
 
                 if (showClosureSize)
                     printSize(store->getClosureSize(info->path).first);
@@ -115,7 +118,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                     std::cout << '\t';
                     Strings ss;
                     if (info->ultimate) ss.push_back("ultimate");
-                    if (info->ca) ss.push_back("ca:" + renderContentAddress(*info->ca));
+                    auto ca = *info->viewCAConst();
+                    if (ca) ss.push_back("ca:" + renderContentAddress(*ca));
                     for (auto & sig : info->sigs) ss.push_back(sig);
                     std::cout << concatStringsSep(" ", ss);
                 }

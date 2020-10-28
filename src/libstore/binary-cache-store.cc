@@ -183,10 +183,11 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
            compression == "br" ? ".br" :
            "");
 
+    auto narSize = *narInfo->optNarSize();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(lvlTalkative, "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
-        printStorePath(narInfo->path), info.narSize,
-        ((1.0 - (double) fileSize / info.narSize) * 100.0),
+        printStorePath(narInfo->path), narSize,
+        ((1.0 - (double) fileSize / narSize) * 100.0),
         duration);
 
     /* Verify that all references are valid. This may do some .narinfo
@@ -284,7 +285,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += info.narSize;
+    stats.narWriteBytes += narSize;
     stats.narWriteCompressedBytes += fileSize;
     stats.narWriteCompressionTimeMs += duration;
 
@@ -324,9 +325,14 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & nam
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             makeFixedOutputPath(method, nar.first, name),
-            nar.first,
+            (ContentAddresses) std::pair {
+                nar,
+                (ContentAddress) FixedOutputHash {
+                    .method = method,
+                    .hash = nar.first,
+                },
+            },
         };
-        info.narSize = nar.second;
         return info;
     })->path;
 }
@@ -414,12 +420,13 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             makeFixedOutputPath(method, h, name),
-            nar.first,
-        };
-        info.narSize = nar.second;
-        info.ca = FixedOutputHash {
-            .method = method,
-            .hash = h,
+            (ContentAddresses) std::pair {
+                nar,
+                (ContentAddress) FixedOutputHash {
+                    .method = method,
+                    .hash = h,
+                },
+            },
         };
         return info;
     })->path;
@@ -436,9 +443,13 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
 
     auto source = StringSource { s };
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info { path, nar.first };
-        info.narSize = nar.second;
-        info.ca = TextHash { textHash };
+        ValidPathInfo info {
+            path,
+            (ContentAddresses) std::pair {
+                nar,
+                (ContentAddress) TextHash { textHash },
+            },
+        };
         info.references = references;
         return info;
     })->path;

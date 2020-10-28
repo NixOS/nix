@@ -248,14 +248,18 @@ static void writeValidPathInfo(
     Sink & to,
     std::shared_ptr<const ValidPathInfo> info)
 {
+    auto narHashResult = *info->viewHashResultConst();
+    assert(narHashResult);
+    auto narHash = narHashResult->first;
+    auto narSize = narHashResult->second;
     to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-       << info->narHash.to_string(Base16, false);
+       << narHash.to_string(Base16, false);
     worker_proto::write(*store, to, info->references);
-    to << info->registrationTime << info->narSize;
+    to << info->registrationTime << narSize;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
         to << info->ultimate
            << info->sigs
-           << renderContentAddress(info->ca);
+           << renderContentAddress(*info->viewCAConst());
     }
 }
 
@@ -306,9 +310,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryPathHash: {
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
-        auto hash = store->queryPathInfo(path)->narHash;
+        auto narHashResult = *store->queryPathInfo(path)->viewHashResultConst();
+        assert(narHashResult);
+        auto narHash = narHashResult->first;
         logger->stopWork();
-        to << hash.to_string(Base16, false);
+        to << narHash.to_string(Base16, false);
         break;
     }
 
@@ -796,13 +802,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
         auto narHash = Hash::parseAny(readString(from), htSHA256);
-        ValidPathInfo info { path, narHash };
+        ValidPathInfo info { path, This<HashResult> { { narHash, 0 } } };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
         info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
-        from >> info.registrationTime >> info.narSize >> info.ultimate;
+        from >> info.registrationTime;
+        {
+            auto tempNarSize = readInt(from);
+            auto tempHashResult = **info.viewHashResult();
+            info.viewHashResult() = { tempHashResult.first, tempNarSize };
+        }
+        from >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        info.ca = parseContentAddressOpt(readString(from));
+        info.viewCA().add(parseContentAddressOpt(readString(from)));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;

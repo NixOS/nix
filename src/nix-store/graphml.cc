@@ -34,6 +34,9 @@ static string makeEdge(std::string_view src, std::string_view dst)
 
 static string makeNode(const ValidPathInfo & info)
 {
+    auto narHashResult = *info.viewHashResultConst();
+    assert(narHashResult);
+    auto narSize = narHashResult->second;
     return fmt(
         "  <node id=\"%1%\">\n"
         "    <data key=\"narSize\">%2%</data>\n"
@@ -41,7 +44,7 @@ static string makeNode(const ValidPathInfo & info)
         "    <data key=\"type\">%4%</data>\n"
         "  </node>\n",
         info.path.to_string(),
-        info.narSize,
+        narSize,
         symbolicName(std::string(info.path.name())),
         (info.path.isDerivation() ? "derivation" : "output-path"));
 }

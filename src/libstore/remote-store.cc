@@ -345,14 +345,19 @@ ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn,
 {
     auto deriver = readString(conn->from);
     auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
-    auto info = make_ref<ValidPathInfo>(path, narHash);
+    auto info = make_ref<ValidPathInfo>(path, This<HashResult> { { narHash, 0 } });
     if (deriver != "") info->deriver = parseStorePath(deriver);
     info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-    conn->from >> info->registrationTime >> info->narSize;
+    conn->from >> info->registrationTime;
+    {
+        auto tempNarSize = readInt(conn->from);
+        auto tempHashResult = **info->viewHashResult();
+        info->viewHashResult() = { tempHashResult.first, tempNarSize };
+    }
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
         conn->from >> info->ultimate;
         info->sigs = readStrings<StringSet>(conn->from);
-        info->ca = parseContentAddressOpt(readString(conn->from));
+        info->viewCA() = parseContentAddressOpt(readString(conn->from));
     }
     return info;
 }
@@ -569,13 +574,17 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     }
 
     else {
+        std::optional optNarHashSize = *info.viewHashResultConst();
+        if (!optNarHashSize)
+            throw Error("The NAR hash and size must be known up front to add data to a remote store");
+        auto & [narHash, narSize] = *optNarHashSize;
         conn->to << wopAddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << narHash.to_string(Base16, false);
         worker_proto::write(*this, conn->to, info.references);
-        conn->to << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << renderContentAddress(info.ca)
+        conn->to << info.registrationTime << narSize
+                 << info.ultimate << info.sigs << renderContentAddress(info.optCA())
                  << repair << !checkSigs;
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
