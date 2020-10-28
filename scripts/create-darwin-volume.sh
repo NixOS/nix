@@ -177,7 +177,7 @@ main() {
         echo "Configuring /etc/fstab..." >&2
         label=$(echo "$volume" | sed 's/ /\\040/g')
         # shellcheck disable=SC2209
-        printf "\$a\nLABEL=%s /nix apfs rw,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
+        printf "\$a\nLABEL=%s /nix apfs rw,noauto,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
     fi
 
     if [ -n "$create_volume" ]; then
