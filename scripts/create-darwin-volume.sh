@@ -88,7 +88,29 @@ $(generate_mount_command)
 EOF
 }
 
+# $1=<volume name> $2=<volume uuid>
 prepare_darwin_volume_password(){
+    # security program's flags won't let us both specify a keychain
+    # and be prompted for a pw to add; two step workaround:
+    # 1. add a blank pw to system keychain
+
+    # system is in some sense less secure than user keychain... (it's
+    # possible to read the password for decrypting the keychain) but
+    # the user keychain appears to be available too late. As far as I
+    # can tell, the file with this password (/var/db/SystemKey) is
+    # inside the FileVault envelope. If that isn't true, it may make
+    # sense to store the password inside the envelope?
+    sudo /usr/bin/security add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent "/Library/Keychains/System.keychain" &>/dev/null
+    # TODO: decide if we should add `-T /System/Library/CoreServices/APFSUserAgent`
+    # This should let the system seamlessly supply the password for this volume
+    # which in turn means the fstab entry is enough for the system to (eventually)
+    # decrypt and mount the volume we're adding, but I hesitate because I'm not
+    # certain the system _should_ transparently failover if the LaunchDaemon is
+    # broken for some reason? Without supplying this flag, the system will instead
+    # start prompting them to allow APFSUserAgent to access this credential.
+
+    # 2. add a password with the -U (update) flag and -w (prompt if last)
+    #    flags, but specify no keychain; security will use the first it finds
     sudo /usr/bin/expect -f - "$1" "$2" << 'EOF'
 log_user 0
 set VOLUME [lindex $argv 0];
@@ -192,27 +214,6 @@ main() {
         fi
 
         if test_filevault_in_use; then
-            # security program's flags won't let us both specify a keychain
-            # and be prompted for a pw to add; two step workaround:
-            # 1. add a blank pw to system keychain
-
-            # system is in some sense less secure than user keychain... (it's
-            # possible to read the password for decrypting the keychain) but
-            # the user keychain appears to be available too late. As far as I
-            # can tell, the file with this password (/var/db/SystemKey) is
-            # inside the FileVault envelope. If that isn't true, it may make
-            # sense to store the password inside the envelope?
-            sudo /usr/bin/security add-generic-password -a "$volume" -s "$new_uuid" -l "$volume encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" "/Library/Keychains/System.keychain"
-            # TODO: decide if we should add `-T /System/Library/CoreServices/APFSUserAgent`
-            # This should let the system seamlessly supply the password for this volume
-            # which in turn means the fstab entry is enough for the system to (eventually)
-            # decrypt and mount the volume we're adding, but I hesitate because I'm not
-            # certain the system _should_ transparently failover if the LaunchDaemon is
-            # broken for some reason? Without supplying this flag, the system will instead
-            # start prompting them to allow APFSUserAgent to access this credential.
-
-            # 2. add a password with the -U (update) flag and -w (prompt if last)
-            #    flags, but specify no keychain; security will use the first it finds
             prepare_darwin_volume_password "$volume" "$new_uuid" | sudo diskutil apfs encryptVolume "$volume" -user disk -stdinpassphrase
         fi
     else
