@@ -68,6 +68,8 @@ private:
         SQLiteStmt stmtQueryDerivationOutputs;
         SQLiteStmt stmtQueryPathFromHashPart;
         SQLiteStmt stmtQueryValidPaths;
+        SQLiteStmt stmtQueryPathStorableId;
+        SQLiteStmt stmtQueryDrvOutputStorableId;
 
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
@@ -222,7 +224,7 @@ public:
     /* Register the store path 'output' as the output named 'outputName' of
        derivation 'deriver'. */
     void registerDrvOutput(const DrvOutputId & outputId, const DrvOutputInfo & info) override;
-    void registerDrvOutput_(State & state, const StorePath & deriver, const string & outputName, const StorePath & output);
+    void registerDrvOutput_(State & state, const DrvOutputId & outputId, const DrvOutputInfo & info);
 
     std::optional<const DrvOutputInfo> queryDrvOutputInfo(const DrvOutputId&) override;
 
@@ -234,7 +236,7 @@ private:
 
     void makeStoreWritable();
 
-    uint64_t queryValidPathId(State & state, const StorePath & path);
+    uint64_t queryStorableId(State & state, const DrvInput & input);
 
     uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
 

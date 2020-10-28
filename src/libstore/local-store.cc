@@ -244,22 +244,36 @@ LocalStore::LocalStore(const Params & params)
     state->stmtQueryPathInfo.create(state->db,
         "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
     state->stmtQueryReferences.create(state->db,
-        "select path from Refs join ValidPaths on reference = id where referrer = ?;");
+        R"foobar(
+            select ValidPaths.path from Refs
+                join Storables on Storables.id = reference
+                join ValidPaths on Storables.path = ValidPaths.id
+                where referrer = ?;
+        )foobar");
     state->stmtQueryReferrers.create(state->db,
-        "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
+        R"foobar(
+            select ValidPaths.path from Refs
+                join Storables on Storables.id = referrer
+                join ValidPaths on Storables.path = ValidPaths.id
+                where reference = ?;
+        )foobar");
     state->stmtInvalidatePath.create(state->db,
         "delete from ValidPaths where path = ?;");
     state->stmtAddDerivationOutput.create(state->db,
-        "insert or replace into DerivationOutputs (drvPath, outputName, outputPath) values (?, ?, ?);");
+        "insert or replace into DerivationOutputs (drvPath, outputName, outputPath) values (?, ?, (select id from ValidPaths where path = ?));");
     state->stmtQueryValidDerivers.create(state->db,
         "select drvPath from DerivationOutputs where outputPath = ?;");
     state->stmtQueryDerivationOutputs.create(state->db,
-        "select outputName, outputPath from DerivationOutputs where drvPath = ?;");
+        "select outputName, path.path from DerivationOutputs join ValidPaths as path on path.id = outputPath where drvPath = ?;");
     // Use "path >= ?" with limit 1 rather than "path like '?%'" to
     // ensure efficient lookup.
     state->stmtQueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
     state->stmtQueryValidPaths.create(state->db, "select path from ValidPaths");
+    state->stmtQueryPathStorableId.create(state->db,
+        "select Storables.id from Storables inner join ValidPaths on ValidPaths.id = Storables.path where ValidPaths.path = ?;");
+    state->stmtQueryDrvOutputStorableId.create(state->db,
+        "select Storables.id from Storables inner join DerivationOutputs as output on output.id = Storables.drvOutput where output.drvPath = ? and output.outputName = ?;");
 }
 
 
@@ -596,21 +610,22 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 void LocalStore::registerDrvOutput(const DrvOutputId& id, const DrvOutputInfo & info)
 {
     auto state(_state.lock());
-    // XXX: This ignores the references of the output because we can
-    // recompute them later from the drv and the references of the associated
-    // store path, but doing so is both inefficient and fragile.
-    return registerDrvOutput_(*state, id.drvPath, id.outputName, info.outPath);
+    return registerDrvOutput_(*state, id, info);
 }
 
-void LocalStore::registerDrvOutput_(State & state, const StorePath & deriver, const string & outputName, const StorePath & output)
+void LocalStore::registerDrvOutput_(State & state, const DrvOutputId& id, const DrvOutputInfo& info)
 {
     retrySQLite<void>([&]() {
         state.stmtAddDerivationOutput.use()
-            (printStorePath(deriver))
-            (outputName)
-            (printStorePath(output))
+            (printStorePath(id.drvPath))
+            (id.outputName)
+            (printStorePath(info.outPath))
             .exec();
     });
+    auto referrer = queryStorableId(state, id);
+    for (auto & dep : info.references) {
+        state.stmtAddReference.use()(referrer)(queryStorableId(state, dep)).exec();
+    }
 
 }
 
@@ -650,13 +665,6 @@ uint64_t LocalStore::addValidPath(State & state,
            DB transaction is rolled back, so the path validity
            registration above is undone. */
         if (checkOutputs) checkDerivationOutputs(info.path, drv);
-
-        for (auto & i : drv.outputsAndOptPaths(*this)) {
-            /* Floating CA derivations have indeterminate output paths until
-               they are built, so don't register anything in that case */
-            if (i.second.second)
-                registerDrvOutput_(state, info.path, i.first, *i.second.second);
-        }
     }
 
     {
@@ -712,7 +720,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->ca = parseContentAddressOpt(s);
 
             /* Get the references. */
-            auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
+            auto useQueryReferences(state->stmtQueryReferences.use()(queryStorableId(*state, path)));
 
             while (useQueryReferences.next())
                 info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
@@ -738,11 +746,19 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 }
 
 
-uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
+uint64_t LocalStore::queryStorableId(State & state, const DrvInput & storable)
 {
-    auto use(state.stmtQueryPathInfo.use()(printStorePath(path)));
+    SQLiteStmt::Use use =  std::visit (overloaded {
+        [&](StorePath path) -> SQLiteStmt::Use {
+            return state.stmtQueryPathStorableId.use()(printStorePath(path));
+        },
+        [&](DrvOutputId id) -> SQLiteStmt::Use {
+            return state.stmtQueryDrvOutputStorableId.use()(printStorePath(id.drvPath))( id.outputName);
+        },
+    }, static_cast<RawDrvInput>(storable));
+
     if (!use.next())
-        throw InvalidPath("path '%s' is not valid", printStorePath(path));
+        throw InvalidPath("storable '%s' is not valid", storable.to_string());
     return use.getInt(0);
 }
 
@@ -785,7 +801,7 @@ StorePathSet LocalStore::queryAllValidPaths()
 
 void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers)
 {
-    auto useQueryReferrers(state.stmtQueryReferrers.use()(printStorePath(path)));
+    auto useQueryReferrers(state.stmtQueryReferrers.use()(queryStorableId(state, path)));
 
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
@@ -853,6 +869,15 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
         drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
         path = std::move(pathResolved);
     }
+
+    for (auto & output : drv.outputsAndOptPaths(*this)) {
+        if (output.second.second)
+            outputs.insert_or_assign(
+                output.first,
+                *output.second.second
+            );
+    }
+
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
@@ -997,9 +1022,9 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         }
 
         for (auto & [_, i] : infos) {
-            auto referrer = queryValidPathId(*state, i.path);
+            auto referrer = queryStorableId(*state, i.path);
             for (auto & j : i.references)
-                state->stmtAddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
+                state->stmtAddReference.use()(referrer)(queryStorableId(*state, j)).exec();
         }
 
         /* Check that the derivation outputs are correct.  We can't do
