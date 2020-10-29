@@ -200,7 +200,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
-        .description = description,
+        .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
         .handler = {[=](std::string s) { overriden = true; set(s); }},
@@ -209,7 +209,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
     if (isAppendable())
         args.addFlag({
             .longName = "extra-" + name,
-            .description = description,
+            .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},
             .handler = {[=](std::string s) { overriden = true; set(s, true); }},
@@ -260,13 +260,13 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
-        .description = description,
+        .description = fmt("Enable the `%s` setting.", name),
         .category = category,
         .handler = {[=]() { override(true); }}
     });
     args.addFlag({
         .longName = "no-" + name,
-        .description = description,
+        .description = fmt("Disable the `%s` setting.", name),
         .category = category,
         .handler = {[=]() { override(false); }}
     });
