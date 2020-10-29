@@ -100,14 +100,12 @@ prepare_darwin_volume_password(){
     # can tell, the file with this password (/var/db/SystemKey) is
     # inside the FileVault envelope. If that isn't true, it may make
     # sense to store the password inside the envelope?
-    sudo /usr/bin/security add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent "/Library/Keychains/System.keychain" &>/dev/null
-    # TODO: decide if we should add `-T /System/Library/CoreServices/APFSUserAgent`
-    # This should let the system seamlessly supply the password for this volume
-    # which in turn means the fstab entry is enough for the system to (eventually)
-    # decrypt and mount the volume we're adding, but I hesitate because I'm not
-    # certain the system _should_ transparently failover if the LaunchDaemon is
-    # broken for some reason? Without supplying this flag, the system will instead
-    # start prompting them to allow APFSUserAgent to access this credential.
+    sudo /usr/bin/security add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent -T /usr/bin/security "/Library/Keychains/System.keychain" &>/dev/null
+    # TODO: /usr/bin/security could be replaced with our own binary at some point?
+    # *UserAgent exemptions should let the system seamlessly supply the password
+    # if noauto is removed from the fstab entry. This is intentional, so that
+    # the user will hopefully look for help if the volume stops mounting,
+    # rather than failing over into subtle race-condition problems.
 
     # 2. add a password with the -U (update) flag and -w (prompt if last)
     #    flags, but specify no keychain; security will use the first it finds
