@@ -623,7 +623,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(storePathToHash(info.path), std::make_shared<ValidPathInfo>(info));
+        state_->pathInfoCache.upsert(storePathToHash(info.path), PathInfoCacheValue(info));
     }
 
     return id;

@@ -261,6 +261,15 @@ std::string Store::getUri()
     return "";
 }
 
+bool Store::PathInfoCacheValue::isKnownNow()
+{
+    std::chrono::duration ttl = didExist()
+        ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
+        : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
+
+    return std::chrono::steady_clock::now() < time_point + ttl;
+}
+
 
 bool Store::isValidPath(const Path & storePath)
 {
@@ -271,9 +280,9 @@ bool Store::isValidPath(const Path & storePath)
     {
         auto state_(state.lock());
         auto res = state_->pathInfoCache.get(hashPart);
-        if (res) {
+        if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
-            return *res != 0;
+            return res->didExist();
         }
     }
 
@@ -283,7 +292,7 @@ bool Store::isValidPath(const Path & storePath)
             stats.narInfoReadAverted++;
             auto state_(state.lock());
             state_->pathInfoCache.upsert(hashPart,
-                res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
+                res.first == NarInfoDiskCache::oInvalid ? 0 : PathInfoCacheValue(res.second));
             return res.first == NarInfoDiskCache::oValid;
         }
     }
@@ -340,11 +349,11 @@ void Store::queryPathInfo(const Path & storePath,
 
         {
             auto res = state.lock()->pathInfoCache.get(hashPart);
-            if (res) {
+            if (res && res->isKnownNow()) {
                 stats.narInfoReadAverted++;
-                if (!*res)
+                if (!res->didExist())
                     throw InvalidPath(format("path '%s' is not valid") % storePath);
-                return callback(ref<ValidPathInfo>(*res));
+                return callback(ref<ValidPathInfo>(res->value));
             }
         }
 
@@ -355,7 +364,7 @@ void Store::queryPathInfo(const Path & storePath,
                 {
                     auto state_(state.lock());
                     state_->pathInfoCache.upsert(hashPart,
-                        res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
+                        res.first == NarInfoDiskCache::oInvalid ? 0 : PathInfoCacheValue(res.second));
                     if (res.first == NarInfoDiskCache::oInvalid ||
                         (res.second->path != storePath && storePathToName(storePath) != ""))
                         throw InvalidPath(format("path '%s' is not valid") % storePath);

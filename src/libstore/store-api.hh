@@ -15,6 +15,7 @@
 #include <unordered_set>
 #include <memory>
 #include <string>
+#include <chrono>
 
 
 namespace nix {
@@ -256,9 +257,39 @@ public:
 
 protected:
 
+    struct PathInfoCacheValue {
+
+        PathInfoCacheValue(std::shared_ptr<ValidPathInfo> value) :
+            time_point(std::chrono::steady_clock::now()),
+            value(value) {}
+
+        // Convenience constructor copying from reference
+        PathInfoCacheValue(const ValidPathInfo& value) :
+            PathInfoCacheValue(std::make_shared<ValidPathInfo>(value)) {}
+
+        // Record a missing path
+        PathInfoCacheValue(std::nullptr_t nil) :
+            PathInfoCacheValue(std::shared_ptr<ValidPathInfo>()) {}
+
+        // Time of cache entry creation or update(?)
+        std::chrono::time_point<std::chrono::steady_clock> time_point;
+
+        // Null if missing
+        std::shared_ptr<ValidPathInfo> value;
+
+        // Whether the value is valid as a cache entry. The path may not exist.
+        bool isKnownNow();
+
+        // Past tense, because a path can only be assumed to exists when
+        // isKnownNow() && didExist()
+        inline bool didExist() {
+          return value != 0;
+        }
+    };
+
     struct State
     {
-        LRUCache<std::string, std::shared_ptr<ValidPathInfo>> pathInfoCache;
+        LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
     Sync<State> state;
