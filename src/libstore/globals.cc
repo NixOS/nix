@@ -160,12 +160,17 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smDisabled, false},
 });
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str)
+template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
 {
     if (str == "true") value = smEnabled;
     else if (str == "relaxed") value = smRelaxed;
     else if (str == "false") value = smDisabled;
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<> bool BaseSetting<SandboxMode>::isAppendable()
+{
+    return false;
 }
 
 template<> std::string BaseSetting<SandboxMode>::to_string() const
@@ -198,7 +203,7 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
-void MaxBuildJobsSetting::set(const std::string & str)
+void MaxBuildJobsSetting::set(const std::string & str, bool append)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
     else if (!string2Int(str, value))

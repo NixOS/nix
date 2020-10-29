@@ -1332,13 +1332,9 @@ void DerivationGoal::startBuilder()
 
         /* Allow a user-configurable set of directories from the
            host file system. */
-        PathSet dirs = settings.sandboxPaths;
-        PathSet dirs2 = settings.extraSandboxPaths;
-        dirs.insert(dirs2.begin(), dirs2.end());
-
         dirsInChroot.clear();
 
-        for (auto i : dirs) {
+        for (auto i : settings.sandboxPaths.get()) {
             if (i.empty()) continue;
             bool optional = false;
             if (i[i.size() - 1] == '?') {
