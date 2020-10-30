@@ -28,6 +28,9 @@ struct DrvInput : RawDrvInput {
 
     std::string to_string() const;
     static DrvInput parse(const std::string & strRep);
+
+    const RawDrvInput variant() const
+    { return static_cast<RawDrvInput>(*this); }
 };
 
 std::list<std::string> stringify_refs(const std::set<DrvInput> & refs);

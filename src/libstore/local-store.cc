@@ -841,34 +841,34 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
     for (auto & [outName, _] : drv.outputs) {
         outputs.insert_or_assign(outName, std::nullopt);
     }
-    bool haveCached = false;
-    {
-        auto resolutions = drvPathResolutions.lock();
-        auto resolvedPathOptIter = resolutions->find(path);
-        if (resolvedPathOptIter != resolutions->end()) {
-            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
-            if (resolvedPathOpt)
-                path = *resolvedPathOpt;
-            haveCached = true;
-        }
-    }
-    /* can't just use else-if instead of `!haveCached` because we need to unlock
-       `drvPathResolutions` before it is locked in `Derivation::resolve`. */
-    if (!haveCached && (drv.type() == DerivationType::CAFloating || drv.type() == DerivationType::DeferredInputAddressed)) {
-        /* Try resolve drv and use that path instead. */
-        auto attempt = drv.tryResolve(*this);
-        if (!attempt)
-            /* If we cannot resolve the derivation, we cannot have any path
-               assigned so we return the map of all std::nullopts. */
-            return outputs;
-        /* Just compute store path */
-        auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true);
-        /* Store in memo table. */
-        /* FIXME: memo logic should not be local-store specific, should have
-           wrapper-method instead. */
-        drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
-        path = std::move(pathResolved);
-    }
+    /* bool haveCached = false; */
+    /* { */
+    /*     auto resolutions = drvPathResolutions.lock(); */
+    /*     auto resolvedPathOptIter = resolutions->find(path); */
+    /*     if (resolvedPathOptIter != resolutions->end()) { */
+    /*         auto & [_, resolvedPathOpt] = *resolvedPathOptIter; */
+    /*         if (resolvedPathOpt) */
+    /*             path = *resolvedPathOpt; */
+    /*         haveCached = true; */
+    /*     } */
+    /* } */
+    /* /1* can't just use else-if instead of `!haveCached` because we need to unlock */
+    /*    `drvPathResolutions` before it is locked in `Derivation::resolve`. *1/ */
+    /* if (!haveCached && (drv.type() == DerivationType::CAFloating || drv.type() == DerivationType::DeferredInputAddressed)) { */
+    /*     /1* Try resolve drv and use that path instead. *1/ */
+    /*     auto attempt = drv.tryResolve(*this); */
+    /*     if (!attempt) */
+    /*         /1* If we cannot resolve the derivation, we cannot have any path */
+    /*            assigned so we return the map of all std::nullopts. *1/ */
+    /*         return outputs; */
+    /*     /1* Just compute store path *1/ */
+    /*     auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true); */
+    /*     /1* Store in memo table. *1/ */
+    /*     /1* FIXME: memo logic should not be local-store specific, should have */
+    /*        wrapper-method instead. *1/ */
+    /*     drvPathResolutions.lock()->insert_or_assign(path, pathResolved); */
+    /*     path = std::move(pathResolved); */
+    /* } */
 
     for (auto & output : drv.outputsAndOptPaths(*this)) {
         if (output.second.second)
@@ -1637,26 +1637,21 @@ std::optional<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutpu
     auto outputPath = queryOutputPathOf(id.drvPath, id.outputName);
     if (!(outputPath && isValidPath(*outputPath)))
         return std::nullopt;
-    auto derivation = readDerivation(id.drvPath);
     auto outputPathInfo = queryPathInfo(*outputPath);
-    std::set<DrvInput> references;
-    for (auto& [inputDrv, inputOutputs] : derivation.inputDrvs) {
-        auto outputsOfInput = queryPartialDerivationOutputMap(inputDrv);
-        for (auto& outputName : inputOutputs) {
-            if (outputsOfInput.count(outputName)) {
-                auto& thisPath = outputsOfInput.at(outputName);
-                if (thisPath && outputPathInfo->references.count(*thisPath))
-                    references.emplace(DrvOutputId{inputDrv, outputName});
-            }
-        }
-    }
-    for (auto& inputPath : derivation.inputSrcs) {
-        if (outputPathInfo->references.count(inputPath))
-            references.emplace(inputPath);
-    }
-    return {DrvOutputInfo{
-        .outPath = *outputPath,
-        .references = references,
-    }};
+    return retrySQLite<std::optional<const DrvOutputInfo>>([&]() -> std::optional<const DrvOutputInfo> {
+        auto state(_state.lock());
+        std::set<DrvInput> references;
+
+        auto useQueryReferences(state->stmtQueryReferences.use()(queryStorableId(*state, id)));
+
+        while (useQueryReferences.next())
+            references.insert(DrvInput::parse(useQueryReferences.getStr(0)));
+
+        return {DrvOutputInfo{
+            .outPath = *outputPath,
+            .references = references,
+        }};
+    });
 }
+
 }  // namespace nix

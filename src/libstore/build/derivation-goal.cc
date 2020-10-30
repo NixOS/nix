@@ -1004,6 +1004,55 @@ void DerivationGoal::buildDone()
 }
 
 void DerivationGoal::resolvedFinished() {
+    warn("Resolving the original derivation");
+    // Should always succeed, because we can only resolve if we have a derivation
+    auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+    std::optional attempt = fullDrv.tryResolve(worker.store);
+    assert(attempt);
+    Derivation drvResolved { *std::move(attempt) };
+    auto pathResolved = writeDerivation(worker.store, drvResolved);
+
+    std::set<DrvInput> allDrvInputs;
+    for (auto & [depDrvPath, wantedDepOutputs] : fullDrv.inputDrvs) {
+        for (auto wantedOutput: wantedDepOutputs) {
+            auto inputClosure = worker.store.drvInputClosure(DrvOutputId{depDrvPath, wantedOutput});
+            allDrvInputs.insert(inputClosure.begin(), inputClosure.end());
+        }
+    }
+    for (auto & inputPath : fullDrv.inputSrcs) {
+        auto inputClosure = worker.store.drvInputClosure(inputPath);
+        allDrvInputs.insert(inputClosure.begin(), inputClosure.end());
+    }
+
+    auto shrinkDrvInputs = ([&](StorePathSet& references) -> std::set<DrvInput> {
+        std::set<DrvInput> res;
+        for (auto potentialInput : allDrvInputs) {
+            auto shouldBeKept = std::visit(overloaded {
+                [&](StorePath opaque) -> bool { return references.count(opaque); },
+                [&](DrvOutputId id) -> bool {
+                    return references.count(*worker.store.queryOutputPathOf(id.drvPath, id.outputName));
+                },
+            }, static_cast<RawDrvInput>(potentialInput)
+            );
+            if (shouldBeKept)
+                res.insert(potentialInput);
+        }
+        return res;
+    });
+
+    for (auto & [outputName, _] : fullDrv.outputs) {
+        StorePathSet outputPathDeps;
+        auto outputPath = worker.store.queryOutputPathOf(pathResolved, outputName);
+        assert(outputPath); // We've just built it
+        worker.store.computeFSClosure({*outputPath}, outputPathDeps);
+        worker.store.registerDrvOutput(
+            DrvOutputId{drvPath, outputName},
+            DrvOutputInfo{
+                .outPath = *outputPath,
+                .references = shrinkDrvInputs(outputPathDeps),
+            });
+    }
+
     done(BuildResult::Built);
 }
 

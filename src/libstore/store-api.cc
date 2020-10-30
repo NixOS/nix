@@ -380,7 +380,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw Error("output '%s' has no store path mapped to it", outName);
+            throw Error("The derivation output '%s!%s' has no store path mapped to it", path.to_string(), outName);
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
@@ -795,7 +795,7 @@ std::map<StorePath, StorePath> copyPaths(
     RepairFlag repair,
     CheckSigsFlag checkSigs,
     SubstituteFlag substitute) {
-    DrvOutputs outputsToRegister;
+    std::set<DrvOutputId> outputsToRegister;
     std::set<StorePath> pathsToCopy;
     for (auto pathOrDrvOutput : storePaths) {
         std::visit(
@@ -809,8 +809,7 @@ std::map<StorePath, StorePath> copyPaths(
                         // doesn't exist or hasn't been realised
                         auto outputInfo = *srcStore->queryDrvOutputInfo(outputId);
                         pathsToCopy.insert(outputInfo.outPath);
-                        outputsToRegister.emplace(
-                            outputId, outputInfo);
+                        outputsToRegister.emplace(outputId);
                     }
                 },
             },
@@ -902,9 +901,30 @@ std::map<StorePath, StorePath> copyPaths(
             });
     }
 
-    for (auto & [deriver, outputInfo] : outputsToRegister) {
-                dstStore->registerDrvOutput(deriver, outputInfo);
-    }
+    ThreadPool pool;
+    processGraph<DrvOutputId>(
+        pool,
+        outputsToRegister,
+        [&](const DrvOutputId id) -> std::set<DrvOutputId> {
+            if (auto outputInfo = srcStore->queryDrvOutputInfo(id)) {
+                std::set<DrvOutputId> ret;
+                for (auto & dep : outputInfo->references)
+                    if (auto depId = std::get_if<DrvOutputId>(&dep))
+                        ret.insert(*depId);
+                return ret;
+            } else {
+                return {};
+            }
+        },
+        [&](const DrvOutputId id) {
+            auto outputInfo = srcStore->queryDrvOutputInfo(id);
+            assert(outputInfo);
+            dstStore->registerDrvOutput(id, *outputInfo);
+        }
+    );
+    // for (auto & [deriver, outputInfo] : outputsToRegister) {
+    //             dstStore->registerDrvOutput(deriver, outputInfo);
+    // }
 
     return pathsMap;
 }
