@@ -90,45 +90,27 @@ EOF
 
 # $1=<volume name> $2=<volume uuid>
 prepare_darwin_volume_password(){
-    # security program's flags won't let us both specify a keychain
-    # and be prompted for a pw to add; two step workaround:
-    # 1. add a blank pw to system keychain
-
-    # system is in some sense less secure than user keychain... (it's
+    password="$(/usr/bin/xxd -l 32 -p -c 256 /dev/random)"
+    sudo /usr/bin/security -i <<EOF
+add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" -w "$password" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent -T /usr/bin/security "/Library/Keychains/System.keychain"
+EOF
+    # Notes:
+    # 1) system is in some sense less secure than user keychain... (it's
     # possible to read the password for decrypting the keychain) but
     # the user keychain appears to be available too late. As far as I
     # can tell, the file with this password (/var/db/SystemKey) is
     # inside the FileVault envelope. If that isn't true, it may make
     # sense to store the password inside the envelope?
-    sudo /usr/bin/security add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent -T /usr/bin/security "/Library/Keychains/System.keychain" &>/dev/null
-    # TODO: /usr/bin/security could be replaced with our own binary at some point?
-    # *UserAgent exemptions should let the system seamlessly supply the password
-    # if noauto is removed from the fstab entry. This is intentional, so that
+    #
+    # 2) At some point it would be ideal to have a small binary to serve
+    # as the daemon itself, and for it to replace /usr/bin/security here.
+    #
+    # 3) *UserAgent exemptions should let the system seamlessly supply the
+    # password if noauto is removed from fstab entry. This is intentional;
     # the user will hopefully look for help if the volume stops mounting,
     # rather than failing over into subtle race-condition problems.
 
-    # 2. add a password with the -U (update) flag and -w (prompt if last)
-    #    flags, but specify no keychain; security will use the first it finds
-    sudo /usr/bin/expect -f - "$1" "$2" << 'EOF'
-log_user 0
-set VOLUME [lindex $argv 0];
-set UUID [lindex $argv 1];
-set PASSPHRASE [exec /usr/bin/xxd -l 32 -p -c 256 /dev/random]
-
-# Cargo culting: people recommend this; not sure how necessary
-set send_slow {1 .1}
-spawn /usr/bin/sudo /usr/bin/security add-generic-password -a "$VOLUME" -l "$VOLUME encryption password" -s "$UUID" -D "Encrypted volume password" -U -w
-expect {
-    "password data for new item: " {
-        send -s -- "$PASSPHRASE\r"
-        expect "retype password for new item: " {
-            send -s -- "$PASSPHRASE\r"
-        }
-    }
-}
-expect eof
-send_user "$PASSPHRASE"
-EOF
+    builtin printf "$password"
 }
 
 main() {
