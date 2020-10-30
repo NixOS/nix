@@ -41,10 +41,12 @@ to `nix-shell`. For example, the derivation attribute
 shellHook =
   ''
     echo "Hello shell"
+    export SOME_API_TOKEN="$(cat ~/.config/some-app/api-token)"
   '';
 ```
 
-will cause `nix-shell` to print `Hello shell`.
+will cause `nix-shell` to print `Hello shell` and set the `SOME_API_TOKEN`
+environment variable to a user-configured value.
 
 # Options
 
