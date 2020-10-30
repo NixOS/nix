@@ -32,7 +32,7 @@ URL of a tarball that will be downloaded and unpacked to a temporary
 location. The tarball must include a single top-level directory
 containing at least a file named `default.nix`.
 
-If the derivation defines the variable `shellHook`, it will be evaluated
+If the derivation defines the variable `shellHook`, it will be run
 after `$stdenv/setup` has been sourced. Since this hook is not executed
 by regular Nix builds, it allows you to perform initialisation specific
 to `nix-shell`. For example, the derivation attribute
