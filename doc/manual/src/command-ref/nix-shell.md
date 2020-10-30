@@ -32,7 +32,7 @@ URL of a tarball that will be downloaded and unpacked to a temporary
 location. The tarball must include a single top-level directory
 containing at least a file named `default.nix`.
 
-If the derivation defines the variable `shellHook`, it will be evaluated
+If the derivation defines the variable `shellHook`, it will be run
 after `$stdenv/setup` has been sourced. Since this hook is not executed
 by regular Nix builds, it allows you to perform initialisation specific
 to `nix-shell`. For example, the derivation attribute
@@ -41,10 +41,12 @@ to `nix-shell`. For example, the derivation attribute
 shellHook =
   ''
     echo "Hello shell"
+    export SOME_API_TOKEN="$(cat ~/.config/some-app/api-token)"
   '';
 ```
 
-will cause `nix-shell` to print `Hello shell`.
+will cause `nix-shell` to print `Hello shell` and set the `SOME_API_TOKEN`
+environment variable to a user-configured value.
 
 # Options
 
