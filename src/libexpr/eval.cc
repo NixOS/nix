@@ -226,7 +226,12 @@ static void * oomHandler(size_t requested)
 }
 
 class BoehmGCStackAllocator : public StackAllocator {
-  boost::coroutines2::protected_fixedsize_stack stack;
+  boost::coroutines2::protected_fixedsize_stack stack {
+    // We allocate 8 MB, the default max stack size on NixOS.
+    // A smaller stack might be quicker to allocate but reduces the stack
+    // depth available for source filter expressions etc.
+    std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
+    };
 
   public:
     boost::context::stack_context allocate() override {
