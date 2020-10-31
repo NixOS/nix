@@ -4,29 +4,31 @@ set -e
 # make it easy to play w/ 'Case-sensitive APFS'
 readonly NIX_VOLUME_FS="${NIX_VOLUME_FS:-APFS}"
 
+readonly NIX_VOLUME_MOUNTD="${NIX_VOLUME_MOUNTD:-/Library/LaunchDaemons/org.nixos.darwin-store.plist}"
+
 # i.e., "disk1"
 root_disk_identifier() {
-    diskutil info -plist / | xmllint --xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" -
+    /usr/sbin/diskutil info -plist / | xmllint --xpath "/plist/dict/key[text()='ParentWholeDisk']/following-sibling::string[1]/text()" -
 }
 
 volume_uuid(){
-    diskutil info -plist "$1" | xmllint --xpath "(/plist/dict/key[text()='VolumeUUID']/following-sibling::string/text())" -
+    /usr/sbin/diskutil info -plist "$1" | xmllint --xpath "(/plist/dict/key[text()='VolumeUUID']/following-sibling::string/text())" -
 }
 
 find_nix_volume() {
-    diskutil apfs list -plist "$1" | xmllint --xpath "(/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='Name']/following-sibling::string[starts-with(translate(text(),'N','n'),'nix')]/text())[1]" - 2>/dev/null || true
+    /usr/sbin/diskutil apfs list -plist "$1" | xmllint --xpath "(/plist/dict/array/dict/key[text()='Volumes']/following-sibling::array/dict/key[text()='Name']/following-sibling::string[starts-with(translate(text(),'N','n'),'nix')]/text())[1]" - 2>/dev/null || true
 }
 
 test_fstab() {
-    grep -q "/nix apfs rw" /etc/fstab 2>/dev/null
+    /usr/bin/grep -q "/nix apfs rw" /etc/fstab 2>/dev/null
 }
 
 test_nix_symlink() {
-    [ -L "/nix" ] || grep -q "^nix." /etc/synthetic.conf 2>/dev/null
+    [ -L "/nix" ] || /usr/bin/grep -q "^nix." /etc/synthetic.conf 2>/dev/null
 }
 
 test_synthetic_conf() {
-    grep -q "^nix$" /etc/synthetic.conf 2>/dev/null
+    /usr/bin/grep -q "^nix$" /etc/synthetic.conf 2>/dev/null
 }
 
 # Create the paths defined in synthetic.conf, saving us a reboot.
@@ -48,11 +50,11 @@ test_nix() {
 }
 
 test_voldaemon() {
-    test -f "/Library/LaunchDaemons/org.nixos.darwin-store.plist"
+    test -f "$NIX_VOLUME_MOUNTD"
 }
 
 test_filevault_in_use() {
-    fdesetup isactive >/dev/null
+    /usr/bin/fdesetup isactive >/dev/null
 }
 
 # use after error msg for conditions we don't understand
@@ -92,7 +94,7 @@ EOF
 prepare_darwin_volume_password(){
     password="$(/usr/bin/xxd -l 32 -p -c 256 /dev/random)"
     sudo /usr/bin/security -i <<EOF
-add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by /Library/LaunchDaemons/org.nixos.darwin-store.plist" -w "$password" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent -T /usr/bin/security "/Library/Keychains/System.keychain"
+add-generic-password -a "$1" -s "$2" -l "$1 encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by $NIX_VOLUME_MOUNTD" -w "$password" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent -T /usr/bin/security "/Library/Keychains/System.keychain"
 EOF
     # Notes:
     # 1) system is in some sense less secure than user keychain... (it's
@@ -123,7 +125,7 @@ main() {
         echo ""
         echo "  1. Remove the entry from fstab using 'sudo vifs'"
         echo "  2. Run 'sudo launchctl bootout system/org.nixos.darwin-store'"
-        echo "  3. Remove /Library/LaunchDaemons/org.nixos.darwin-store.plist"
+        echo "  3. Remove $NIX_VOLUME_MOUNTD"
         echo "  4. Destroy the data volume using 'diskutil apfs deleteVolume'"
         echo "  5. Remove the 'nix' line from /etc/synthetic.conf (or the file)"
         echo ""
@@ -137,7 +139,9 @@ main() {
 
     if ! test_synthetic_conf; then
         echo "Configuring /etc/synthetic.conf..." >&2
-        echo nix | sudo tee -a /etc/synthetic.conf
+        # TODO: technically /etc/synthetic.d/nix is supported in Big Sur+
+        # but handling both takes even more code...
+        echo nix | /usr/bin/sudo /usr/bin/tee -a /etc/synthetic.conf
         if ! test_synthetic_conf; then
             echo "error: failed to configure synthetic.conf;" >&2
             suggest_report_error
@@ -149,7 +153,7 @@ main() {
         echo "Creating mountpoint for /nix..." >&2
         create_synthetic_objects # the ones we defined in synthetic.conf
         if ! test_nix; then
-            sudo mkdir -p /nix 2>/dev/null || true
+            /usr/bin/sudo /bin/mkdir -p /nix 2>/dev/null || true
         fi
         if ! test_nix; then
             echo "error: failed to bootstrap /nix; if a reboot doesn't help," >&2
@@ -179,22 +183,22 @@ main() {
         echo "Configuring /etc/fstab..." >&2
         label=$(echo "$volume" | sed 's/ /\\040/g')
         # shellcheck disable=SC2209
-        printf "\$a\nLABEL=%s /nix apfs rw,noauto,nobrowse\n.\nwq\n" "$label" | EDITOR=ed sudo vifs
+        printf "\$a\nLABEL=%s /nix apfs rw,noauto,nobrowse\n.\nwq\n" "$label" | EDITOR=/bin/ed /usr/bin/sudo /usr/sbin/vifs
     fi
 
     if [ -n "$create_volume" ]; then
         echo "Creating a Nix volume..." >&2
 
-        sudo diskutil apfs addVolume "$disk" "$NIX_VOLUME_FS" "$volume" -mountpoint /nix
+        /usr/bin/sudo /usr/sbin/diskutil apfs addVolume "$disk" "$NIX_VOLUME_FS" "$volume" -mountpoint /nix
         new_uuid="$(volume_uuid "$volume")"
 
         if [ "$INSTALL_MODE" = "no-daemon" ]; then # exported by caller
             # TODO: is there a better way to do this?
-            sudo chown "$USER:admin" /nix
+            /usr/bin/sudo /usr/sbin/chown "$USER:admin" /nix
         fi
 
         if test_filevault_in_use; then
-            prepare_darwin_volume_password "$volume" "$new_uuid" | sudo diskutil apfs encryptVolume "$volume" -user disk -stdinpassphrase
+            prepare_darwin_volume_password "$volume" "$new_uuid" | /usr/bin/sudo /usr/sbin/diskutil apfs encryptVolume "$volume" -user disk -stdinpassphrase
         fi
     else
         echo "Using existing '$volume' volume" >&2
@@ -202,11 +206,9 @@ main() {
 
     if ! test_voldaemon; then
         echo "Configuring LaunchDaemon to mount '$volume'..." >&2
-        generate_mount_daemon | sudo tee /Library/LaunchDaemons/org.nixos.darwin-store.plist >/dev/null
+        generate_mount_daemon | /usr/bin/sudo /usr/bin/tee "$NIX_VOLUME_MOUNTD" >/dev/null
 
-        sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.darwin-store.plist
-
-        # sudo launchctl start org.nixos.darwin-store
+        /usr/bin/sudo /bin/launchctl bootstrap system "$NIX_VOLUME_MOUNTD"
     fi
 }
 

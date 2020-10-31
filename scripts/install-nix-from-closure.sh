@@ -103,7 +103,7 @@ done
 if [ "$(uname -s)" = "Darwin" ]; then
     writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
     if ! [ -e $dest ] && [ "$writable" = "false" ] && [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
-        printf '\e[1;31mCreating volume and mountpoint /nix if needed.\e[0m\n'
+        printf "\e[1;31mCreating volume and mountpoint $dest if needed.\e[0m\n"
         "$self/create-darwin-volume.sh"
     fi
 fi
