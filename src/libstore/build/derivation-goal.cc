@@ -2074,6 +2074,14 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
         return path;
     }
 
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+    {
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
+        goal.addDependency(path);
+        return path;
+    }
+
     void narFromPath(const StorePath & path, Sink & sink) override
     {
         if (!goal.isAllowed(path))
