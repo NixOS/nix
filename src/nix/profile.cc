@@ -208,7 +208,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     ProfileElement element;
                     if (!drv.outPath)
                         throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                    element.storePaths = {drv.outPath}; // FIXME
+                    element.storePaths = {*drv.outPath}; // FIXME
                     element.source = ProfileElementSource{
                         installable2->flakeRef,
                         resolvedRef,
