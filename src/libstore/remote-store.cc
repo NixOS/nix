@@ -473,9 +473,14 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         worker_proto::write(*this, conn->to, references);
         conn->to << repair;
 
-        conn.withFramedSink([&](Sink & sink) {
-            dump.drainInto(sink);
-        });
+        // The dump source may invoke the store, so we need to make some room.
+        connections->incCapacity();
+        {
+            Finally cleanup([&]() { connections->decCapacity(); });
+            conn.withFramedSink([&](Sink & sink) {
+                dump.drainInto(sink);
+            });
+        }
 
         auto path = parseStorePath(readString(conn->from));
         return readValidPathInfo(conn, path);
