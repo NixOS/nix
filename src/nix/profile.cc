@@ -193,7 +193,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                         printInfo("found '%s' in profile, replacing", installable2->what());
 
-                        element.storePaths = {drv.outPath}; // FIXME
+                        element.storePaths = {*drv.outPath}; // FIXME
                         element.source = ProfileElementSource {
                             installable2->flakeRef,
                             resolvedRef,
