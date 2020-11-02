@@ -212,7 +212,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
-            if (e.msg().find("unexpected $end") != std::string::npos) {
+            if (e.msg().find("unexpected end of file") != std::string::npos) {
                 // For parse errors on incomplete input, we continue waiting for the next line of
                 // input without clearing the input so far.
                 continue;
@@ -220,9 +220,9 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
               printMsg(lvlError, e.msg());
             }
         } catch (Error & e) {
-          printMsg(lvlError, e.msg());
+            printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
-          printMsg(lvlError, e.msg());
+            printMsg(lvlError, e.msg());
         }
 
         // We handled the current input fully, so we should clear it
