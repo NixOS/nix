@@ -195,7 +195,7 @@ If you are comfortable navigating these tradeoffs, you can encrypt the
 volume with something along the lines of:
 
 ```console
-alice$ diskutil apfs enableFileVault /nix -user disk
+$ diskutil apfs enableFileVault /nix -user disk
 ```
 
 ## Symlink the Nix store to a custom location
@@ -234,13 +234,13 @@ as a helpful reference if you run into trouble.
     without a reboot:
     
     ```console
-    alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
+    $ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
     ```
 
 3.  Create the new APFS volume with diskutil:
     
     ```console
-    alice$ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
+    $ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
     ```
 
 4.  Using `vifs`, add the new mount to `/etc/fstab`. If it doesn't
@@ -280,10 +280,10 @@ it somewhere (e.g. in `/tmp`), and then run the script named `install`
 inside the binary tarball:
 
 ```console
-alice$ cd /tmp
-alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
-alice$ cd nix-1.8-x86_64-darwin
-alice$ ./install
+$ cd /tmp
+$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
+$ cd nix-1.8-x86_64-darwin
+$ ./install
 ```
 
 If you need to edit the multi-user installation script to use different
