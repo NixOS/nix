@@ -48,7 +48,7 @@ string resolveMirrorUri(EvalState & state, string uri)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_prefetch_url(int argc, char * * argv)
 {
     {
         HashType ht = htSHA256;
@@ -57,6 +57,7 @@ static int _main(int argc, char * * argv)
         bool fromExpr = false;
         string attrPath;
         bool unpack = false;
+        bool executable = false;
         string name;
 
         struct MyArgs : LegacyArgs, MixEvalArgs
@@ -81,6 +82,8 @@ static int _main(int argc, char * * argv)
             }
             else if (*arg == "--unpack")
                 unpack = true;
+            else if (*arg == "--executable")
+                executable = true;
             else if (*arg == "--name")
                 name = getArg(*arg, arg, end);
             else if (*arg != "" && arg->at(0) == '-')
@@ -157,7 +160,7 @@ static int _main(int argc, char * * argv)
         Hash hash(ht);
         std::optional<StorePath> storePath;
         if (args.size() == 2) {
-            expectedHash = Hash(args[1], ht);
+            expectedHash = Hash::parseAny(args[1], ht);
             const auto recursive = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             storePath = store->makeFixedOutputPath(recursive, *expectedHash, name);
             if (store->isValidPath(*storePath))
@@ -175,7 +178,11 @@ static int _main(int argc, char * * argv)
 
             /* Download the file. */
             {
-                AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+                auto mode = 0600;
+                if (executable)
+                    mode = 0700;
+
+                AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode);
                 if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
 
                 FdSink sink(fd.get());
@@ -201,7 +208,7 @@ static int _main(int argc, char * * argv)
                     tmpFile = unpacked;
             }
 
-            const auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            const auto method = unpack || executable ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
             auto info = store->addToStoreSlow(name, tmpFile, method, ht, expectedHash);
             storePath = info.path;
@@ -222,4 +229,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-prefetch-url", _main);
+static RegisterLegacyCommand r_nix_prefetch_url("nix-prefetch-url", main_nix_prefetch_url);

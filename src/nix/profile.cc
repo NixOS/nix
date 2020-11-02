@@ -129,11 +129,13 @@ struct ProfileManifest
 
         auto narHash = hashString(htSHA256, *sink.s);
 
-        ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references));
+        ValidPathInfo info {
+            store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
+            narHash,
+        };
         info.references = std::move(references);
-        info.narHash = narHash;
         info.narSize = sink.s->size();
-        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = *info.narHash };
+        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
         auto source = StringSource { *sink.s };
         store->addToStore(info, source);
@@ -204,6 +206,8 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                 if (!alreadyInstalled) {
                     ProfileElement element;
+                    if (!drv.outPath)
+                        throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
                     element.storePaths = {drv.outPath}; // FIXME
                     element.source = ProfileElementSource{
                         installable2->flakeRef,
@@ -214,7 +218,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     manifest.elements.emplace_back(std::move(element));
                 }
             } else
-                throw Error("'nix profile install' does not support argument '%s'", installable->what());
+                throw UnimplementedError("'nix profile install' does not support argument '%s'", installable->what());
         }
 
         store->buildPaths(pathsToBuild);
@@ -372,7 +376,9 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                element.storePaths = {drv.outPath}; // FIXME
+                if (!drv.outPath)
+                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
+                element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
                     installable.flakeRef,
                     resolvedRef,
@@ -412,7 +418,7 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
-            logger->stdout("%d %s %s %s", i,
+            logger->cout("%d %s %s %s", i,
                 element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
                 element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
@@ -460,7 +466,7 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
     }
 };
 
-struct CmdProfile : virtual MultiCommand, virtual Command
+struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
         : MultiCommand({
@@ -484,11 +490,6 @@ struct CmdProfile : virtual MultiCommand, virtual Command
         command->second->prepare();
         command->second->run();
     }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
-    }
 };
 
-static auto r1 = registerCommand<CmdProfile>("profile");
+static auto rCmdProfile = registerCommand<CmdProfile>("profile");

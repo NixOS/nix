@@ -1,5 +1,5 @@
 nix_tests = \
-  init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
+  hash.sh lang.sh add.sh simple.sh dependencies.sh \
   config.sh \
   gc.sh \
   gc-concurrent.sh \
@@ -14,7 +14,8 @@ nix_tests = \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-dry.sh \
-  build-remote.sh \
+  build-remote-input-addressed.sh \
+  ssh-relay.sh \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
@@ -32,8 +33,11 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   recursive.sh \
-  flakes.sh
+  describe-stores.sh \
+  flakes.sh \
+  content-addressed.sh
   # parallel.sh
+  # build-remote-content-addressed-fixed.sh \
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 

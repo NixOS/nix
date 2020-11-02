@@ -1,6 +1,7 @@
 #include "util.hh"
 #include "types.hh"
 
+#include <limits.h>
 #include <gtest/gtest.h>
 
 namespace nix {

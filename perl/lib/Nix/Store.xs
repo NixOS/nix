@@ -80,7 +80,7 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash->to_string(Base32, true);
+            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string(Base32, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -106,7 +106,7 @@ SV * queryPathInfo(char * path, int base32)
                 XPUSHs(&PL_sv_undef);
             else
                 XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
-            auto s = info->narHash->to_string(base32 ? Base32 : Base16, true);
+            auto s = info->narHash.to_string(base32 ? Base32 : Base16, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
@@ -224,7 +224,7 @@ SV * hashString(char * algo, int base32, char * s)
 SV * convertHash(char * algo, char * s, int toBase32)
     PPCODE:
         try {
-            Hash h(s, parseHashType(algo));
+            auto h = Hash::parseAny(s, parseHashType(algo));
             string s = h.to_string(toBase32 ? Base32 : Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -285,7 +285,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
 SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
-            Hash h(hash, parseHashType(algo));
+            auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             auto path = store()->makeFixedOutputPath(method, h, name);
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
@@ -303,11 +303,14 @@ SV * derivationFromPath(char * drvPath)
             hash = newHV();
 
             HV * outputs = newHV();
-            for (auto & i : drv.outputs)
+            for (auto & i : drv.outputsAndOptPaths(*store())) {
                 hv_store(
                     outputs, i.first.c_str(), i.first.size(),
-                    newSVpv(store()->printStorePath(i.second.path(*store(), drv.name)).c_str(), 0),
+                    !i.second.second
+                        ? newSV(0) /* null value */
+                        : newSVpv(store()->printStorePath(*i.second.second).c_str(), 0),
                     0);
+            }
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
@@ -348,3 +351,13 @@ void addTempRoot(char * storePath)
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+
+SV * getBinDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixBinDir.c_str(), 0)));
+
+
+SV * getStoreDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixStore.c_str(), 0)));

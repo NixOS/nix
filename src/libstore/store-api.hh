@@ -4,12 +4,12 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"
-#include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
 #include "derivations.hh"
+#include "path-info.hh"
 
 #include <atomic>
 #include <limits>
@@ -24,6 +24,31 @@
 
 namespace nix {
 
+/**
+ * About the class hierarchy of the store implementations:
+ *
+ * Each store type `Foo` consists of two classes:
+ *
+ * 1. A class `FooConfig : virtual StoreConfig` that contains the configuration
+ *   for the store
+ *
+ *   It should only contain members of type `const Setting<T>` (or subclasses
+ *   of it) and inherit the constructors of `StoreConfig`
+ *   (`using StoreConfig::StoreConfig`).
+ *
+ * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
+ *   implementation of the store.
+ *
+ *   This class is expected to have a constructor `Foo(const Params & params)`
+ *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
+ *   `assertion failure` when trying to instantiate it).
+ *
+ * You can then register the new store using:
+ *
+ * ```
+ * cpp static RegisterStoreImplementation<Foo, FooConfig> regStore;
+ * ```
+ */
 
 MakeError(SubstError, Error);
 MakeError(BuildError, Error); // denotes a permanent build failure
@@ -33,6 +58,7 @@ MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
 MakeError(BadStorePath, Error);
 
+MakeError(InvalidStoreURI, Error);
 
 class FSAccessor;
 class NarInfoDiskCache;
@@ -101,95 +127,6 @@ struct GCResults
 };
 
 
-struct SubstitutablePathInfo
-{
-    std::optional<StorePath> deriver;
-    StorePathSet references;
-    uint64_t downloadSize; /* 0 = unknown or inapplicable */
-    uint64_t narSize; /* 0 = unknown */
-};
-
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
-
-struct ValidPathInfo
-{
-    StorePath path;
-    std::optional<StorePath> deriver;
-    // TODO document this
-    std::optional<Hash> narHash;
-    StorePathSet references;
-    time_t registrationTime = 0;
-    uint64_t narSize = 0; // 0 = unknown
-    uint64_t id; // internal use only
-
-    /* Whether the path is ultimately trusted, that is, it's a
-       derivation output that was built locally. */
-    bool ultimate = false;
-
-    StringSet sigs; // note: not necessarily verified
-
-    /* If non-empty, an assertion that the path is content-addressed,
-       i.e., that the store path is computed from a cryptographic hash
-       of the contents of the path, plus some other bits of data like
-       the "name" part of the path. Such a path doesn't need
-       signatures, since we don't have to trust anybody's claim that
-       the path is the output of a particular derivation. (In the
-       extensional store model, we have to trust that the *contents*
-       of an output path of a derivation were actually produced by
-       that derivation. In the intensional model, we have to trust
-       that a particular output path was produced by a derivation; the
-       path then implies the contents.)
-
-       Ideally, the content-addressability assertion would just be a Boolean,
-       and the store path would be computed from the name component, ‘narHash’
-       and ‘references’. However, we support many types of content addresses.
-    */
-    std::optional<ContentAddress> ca;
-
-    bool operator == (const ValidPathInfo & i) const
-    {
-        return
-            path == i.path
-            && narHash == i.narHash
-            && references == i.references;
-    }
-
-    /* Return a fingerprint of the store path to be used in binary
-       cache signatures. It contains the store path, the base-32
-       SHA-256 hash of the NAR serialisation of the path, the size of
-       the NAR, and the sorted references. The size field is strictly
-       speaking superfluous, but might prevent endless/excessive data
-       attacks. */
-    std::string fingerprint(const Store & store) const;
-
-    void sign(const Store & store, const SecretKey & secretKey);
-
-    /* Return true iff the path is verifiably content-addressed. */
-    bool isContentAddressed(const Store & store) const;
-
-    static const size_t maxSigs = std::numeric_limits<size_t>::max();
-
-    /* Return the number of signatures on this .narinfo that were
-       produced by one of the specified keys, or maxSigs if the path
-       is content-addressed. */
-    size_t checkSignatures(const Store & store, const PublicKeys & publicKeys) const;
-
-    /* Verify a single signature. */
-    bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
-
-    Strings shortRefs() const;
-
-    ValidPathInfo(const ValidPathInfo & other) = default;
-
-    ValidPathInfo(StorePath && path) : path(std::move(path)) { };
-    ValidPathInfo(const StorePath & path) : path(path) { };
-
-    virtual ~ValidPathInfo() { }
-};
-
-typedef list<ValidPathInfo> ValidPathInfos;
-
-
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
 
@@ -233,12 +170,33 @@ struct BuildResult
     }
 };
 
-
-class Store : public std::enable_shared_from_this<Store>, public Config
+struct StoreConfig : public Config
 {
-public:
+    using Config::Config;
 
-    typedef std::map<std::string, std::string> Params;
+    /**
+     * When constructing a store implementation, we pass in a map `params` of
+     * parameters that's supposed to initialize the associated config.
+     * To do that, we must use the `StoreConfig(StringMap & params)`
+     * constructor, so we'd like to `delete` its default constructor to enforce
+     * it.
+     *
+     * However, actually deleting it means that all the subclasses of
+     * `StoreConfig` will have their default constructor deleted (because it's
+     * supposed to call the deleted default constructor of `StoreConfig`). But
+     * because we're always using virtual inheritance, the constructors of
+     * child classes will never implicitely call this one, so deleting it will
+     * be more painful than anything else.
+     *
+     * So we `assert(false)` here to ensure at runtime that the right
+     * constructor is always called without having to redefine a custom
+     * constructor for each `*Config` class.
+     */
+    StoreConfig() { assert(false); }
+
+    virtual ~StoreConfig() { }
+
+    virtual const std::string name() = 0;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
         "store", "path to the Nix store"};
@@ -251,6 +209,18 @@ public:
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
+
+    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+        "system-features",
+        "Optional features that the system this store builds on implements (like \"kvm\")."};
+
+};
+
+class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
+{
+public:
+
+    typedef std::map<std::string, std::string> Params;
 
 protected:
 
@@ -285,6 +255,11 @@ protected:
     Store(const Params & params);
 
 public:
+    /**
+     * Perform any necessary effectful operation to make the store up and
+     * running
+     */
+    virtual void init() {};
 
     virtual ~Store() { }
 
@@ -332,10 +307,12 @@ public:
     StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
-    StorePath makeStorePath(const string & type,
+    StorePath makeStorePath(std::string_view type,
+        std::string_view hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(const string & id,
+    StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(FileIngestionMethod method,
@@ -428,9 +405,15 @@ public:
     /* Query the outputs of the derivation denoted by `path'. */
     virtual StorePathSet queryDerivationOutputs(const StorePath & path);
 
-    /* Query the mapping outputName=>outputPath for the given derivation */
-    virtual OutputPathMap queryDerivationOutputMap(const StorePath & path)
-    { unsupported("queryDerivationOutputMap"); }
+    /* Query the mapping outputName => outputPath for the given derivation. All
+       outputs are mentioned so ones mising the mapping are mapped to
+       `std::nullopt`.  */
+    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path)
+    { unsupported("queryPartialDerivationOutputMap"); }
+
+    /* Query the mapping outputName=>outputPath for the given derivation.
+       Assume every output has a mapping and throw an exception otherwise. */
+    OutputPathMap queryDerivationOutputMap(const StorePath & path);
 
     /* Query the full store path given the hash part of a valid store
        path, or empty if the path doesn't exist. */
@@ -468,13 +451,12 @@ public:
     /* Like addToStore(), but the contents of the path are contained
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
-       false). */
+       false).
+       `dump` may be drained */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
-    {
-        throw Error("addToStoreFromDump() is not supported by this store");
-    }
+    { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
@@ -497,8 +479,38 @@ public:
         BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
-       on-disk .drv file). Note that ‘drvPath’ is only used for
-       informational purposes. */
+       on-disk .drv file).
+
+       ‘drvPath’ is used to deduplicate worker goals so it is imperative that
+       is correct. That said, it doesn't literally need to be store path that
+       would be calculated from writing this derivation to the store: it is OK
+       if it instead is that of a Derivation which would resolve to this (by
+       taking the outputs of it's input derivations and adding them as input
+       sources) such that the build time referenceable-paths are the same.
+
+       In the input-addressed case, we usually *do* use an "original"
+       unresolved derivations's path, as that is what will be used in the
+       `buildPaths` case. Also, the input-addressed output paths are verified
+       only by that contents of that specific unresolved derivation, so it is
+       nice to keep that information around so if the original derivation is
+       ever obtained later, it can be verified whether the trusted user in fact
+       used the proper output path.
+
+       In the content-addressed case, we want to always use the
+       resolved drv path calculated from the provided derivation. This serves
+       two purposes:
+
+         - It keeps the operation trustless, by ruling out a maliciously
+           invalid drv path corresponding to a non-resolution-equivalent
+           derivation.
+
+         - For the floating case in particular, it ensures that the derivation
+           to output mapping respects the resolution equivalence relation, so
+           one cannot choose different resolution-equivalent derivations to
+           subvert dependency coherence (i.e. the property that one doesn't end
+           up with multiple different versions of dependencies without
+           explicitly choosing to allow it).
+    */
     virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) = 0;
 
@@ -535,7 +547,7 @@ public:
        - The collector isn't running, or it's just started but hasn't
          acquired the GC lock yet.  In that case we get and release
          the lock right away, then exit.  The collector scans the
-         permanent root and sees our's.
+         permanent root and sees ours.
 
        In either case the permanent root is seen by the collector. */
     virtual void syncWithGC() { };
@@ -704,45 +716,6 @@ protected:
 };
 
 
-class LocalFSStore : public virtual Store
-{
-public:
-
-    // FIXME: the (Store*) cast works around a bug in gcc that causes
-    // it to omit the call to the Setting constructor. Clang works fine
-    // either way.
-    const PathSetting rootDir{(Store*) this, true, "",
-        "root", "directory prefixed to all other paths"};
-    const PathSetting stateDir{(Store*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
-        "state", "directory where Nix will store state"};
-    const PathSetting logDir{(Store*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
-        "log", "directory where Nix will store state"};
-
-    const static string drvsLogDir;
-
-    LocalFSStore(const Params & params);
-
-    void narFromPath(const StorePath & path, Sink & sink) override;
-    ref<FSAccessor> getFSAccessor() override;
-
-    /* Register a permanent GC root. */
-    Path addPermRoot(const StorePath & storePath,
-        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
-
-    virtual Path getRealStoreDir() { return storeDir; }
-
-    Path toRealPath(const Path & storePath) override
-    {
-        assert(isInStore(storePath));
-        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
-    }
-
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
-};
-
-
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
@@ -808,37 +781,48 @@ ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
 
 
-enum StoreType {
-    tDaemon,
-    tLocal,
-    tOther
-};
-
-
-StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
-    const std::string & stateDir = settings.nixStateDir);
-
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options. */
 std::list<ref<Store>> getDefaultSubstituters();
 
-
-/* Store implementation registration. */
-typedef std::function<std::shared_ptr<Store>(
-    const std::string & uri, const Store::Params & params)> OpenStore;
-
-struct RegisterStoreImplementation
+struct StoreFactory
 {
-    typedef std::vector<OpenStore> Implementations;
-    static Implementations * implementations;
+    std::set<std::string> uriSchemes;
+    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
+    std::function<std::shared_ptr<StoreConfig> ()> getConfig;
+};
 
-    RegisterStoreImplementation(OpenStore fun)
+struct Implementations
+{
+    static std::vector<StoreFactory> * registered;
+
+    template<typename T, typename TConfig>
+    static void add()
     {
-        if (!implementations) implementations = new Implementations;
-        implementations->push_back(fun);
+        if (!registered) registered = new std::vector<StoreFactory>();
+        StoreFactory factory{
+            .uriSchemes = T::uriSchemes(),
+            .create =
+                ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
+                 -> std::shared_ptr<Store>
+                 { return std::make_shared<T>(scheme, uri, params); }),
+            .getConfig =
+                ([]()
+                 -> std::shared_ptr<StoreConfig>
+                 { return std::make_shared<TConfig>(StringMap({})); })
+        };
+        registered->push_back(factory);
     }
 };
 
+template<typename T, typename TConfig>
+struct RegisterStoreImplementation
+{
+    RegisterStoreImplementation()
+    {
+        Implementations::add<T, TConfig>();
+    }
+};
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes
@@ -849,7 +833,7 @@ string showPaths(const PathSet & paths);
 std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
-    bool hashGiven = false);
+    std::optional<HashResult> hashGiven = std::nullopt);
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);

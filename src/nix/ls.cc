@@ -37,11 +37,11 @@ struct MixLs : virtual Args, MixJSON
                 auto line = fmt("%s %20d %s", tp, st.fileSize, relPath);
                 if (st.type == FSAccessor::Type::tSymlink)
                     line += " -> " + accessor->readLink(curPath);
-                logger->stdout(line);
+                logger->cout(line);
                 if (recursive && st.type == FSAccessor::Type::tDirectory)
                     doPath(st, curPath, relPath, false);
             } else {
-                logger->stdout(relPath);
+                logger->cout(relPath);
                 if (recursive) {
                     auto st = accessor->stat(curPath);
                     if (st.type == FSAccessor::Type::tDirectory)
@@ -152,5 +152,5 @@ struct CmdLsNar : Command, MixLs
     }
 };
 
-static auto r1 = registerCommand<CmdLsStore>("ls-store");
-static auto r2 = registerCommand<CmdLsNar>("ls-nar");
+static auto rCmdLsStore = registerCommand<CmdLsStore>("ls-store");
+static auto rCmdLsNar = registerCommand<CmdLsNar>("ls-nar");

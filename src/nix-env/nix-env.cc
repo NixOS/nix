@@ -8,6 +8,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "user-env.hh"
 #include "util.hh"
 #include "json.hh"
@@ -230,7 +231,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
-        selectors.push_back(DrvName("*"));
+        selectors.emplace_back("*");
 
     DrvInfos elems;
     set<unsigned int> done;
@@ -708,7 +709,9 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(ref<LocalFSStore>(store2), globals.profile, drv.queryOutPath());
+    Path generation = createGeneration(
+        ref<LocalFSStore>(store2), globals.profile,
+        store2->parseStorePath(drv.queryOutPath()));
     switchLink(globals.profile, generation);
 }
 
@@ -1328,7 +1331,7 @@ static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_env(int argc, char * * argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1458,4 +1461,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-env", _main);
+static RegisterLegacyCommand r_nix_env("nix-env", main_nix_env);

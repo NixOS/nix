@@ -28,7 +28,7 @@ MixCommonArgs::MixCommonArgs(const string & programName)
 
     addFlag({
         .longName = "option",
-        .description = "set a Nix configuration option (overriding nix.conf)",
+        .description = "set a Nix configuration option (overriding `nix.conf`)",
         .labels = {"name", "value"},
         .handler = {[](std::string name, std::string value) {
             try {
@@ -44,15 +44,15 @@ MixCommonArgs::MixCommonArgs(const string & programName)
                 globalConfig.getSettings(settings);
                 for (auto & s : settings)
                     if (hasPrefix(s.first, prefix))
-                        completions->insert(s.first);
+                        completions->add(s.first, fmt("Set the `%s` setting.", s.first));
             }
         }
     });
 
     addFlag({
         .longName = "log-format",
-        .description = "format of log output; \"raw\", \"internal-json\", \"bar\" "
-                        "or \"bar-with-logs\"",
+        .description = "format of log output; `raw`, `internal-json`, `bar` "
+                        "or `bar-with-logs`",
         .labels = {"format"},
         .handler = {[](std::string format) { setLogFormat(format); }},
     });

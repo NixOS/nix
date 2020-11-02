@@ -31,4 +31,4 @@ struct CmdOptimiseStore : StoreCommand
     }
 };
 
-static auto r1 = registerCommand<CmdOptimiseStore>("optimise-store");
+static auto rCmdOptimiseStore = registerCommand<CmdOptimiseStore>("optimise-store");

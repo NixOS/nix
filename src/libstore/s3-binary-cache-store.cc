@@ -172,20 +172,26 @@ S3Helper::FileTransferResult S3Helper::getObject(
     return res;
 }
 
-struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
+struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
-    const Setting<std::string> profile{this, "", "profile", "The name of the AWS configuration profile to use."};
-    const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
-    const Setting<std::string> scheme{this, "", "scheme", "The scheme to use for S3 requests, https by default."};
-    const Setting<std::string> endpoint{this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
-    const Setting<std::string> narinfoCompression{this, "", "narinfo-compression", "compression method for .narinfo files"};
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
-    const Setting<std::string> logCompression{this, "", "log-compression", "compression method for log/* files"};
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    const Setting<std::string> profile{(StoreConfig*) this, "", "profile", "The name of the AWS configuration profile to use."};
+    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
+    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme", "The scheme to use for S3 requests, https by default."};
+    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
+    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression", "compression method for .narinfo files"};
+    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression", "compression method for .ls files"};
+    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression", "compression method for log/* files"};
     const Setting<bool> multipartUpload{
-        this, false, "multipart-upload", "whether to use multi-part uploads"};
+        (StoreConfig*) this, false, "multipart-upload", "whether to use multi-part uploads"};
     const Setting<uint64_t> bufferSize{
-        this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
 
+    const std::string name() override { return "S3 Binary Cache Store"; }
+};
+
+struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCacheStoreConfig
+{
     std::string bucketName;
 
     Stats stats;
@@ -193,8 +199,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const Params & params, const std::string & bucketName)
-        : S3BinaryCacheStore(params)
+        const std::string & scheme,
+        const std::string & bucketName,
+        const Params & params)
+        : StoreConfig(params)
+        , S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
@@ -266,6 +275,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         const std::string & mimeType,
         const std::string & contentEncoding)
     {
+        istream->seekg(0, istream->end);
+        auto size = istream->tellg();
+        istream->seekg(0, istream->beg);
+
         auto maxThreads = std::thread::hardware_concurrency();
 
         static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
@@ -343,10 +356,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1)
                 .count();
 
-        printInfo("uploaded 's3://%s/%s' in %d ms",
-            bucketName, path, duration);
+        printInfo("uploaded 's3://%s/%s' (%d bytes) in %d ms",
+            bucketName, path, size, duration);
 
         stats.putTimeMs += duration;
+        stats.putBytes += std::max(size, (decltype(size)) 0);
         stats.put++;
     }
 
@@ -421,17 +435,11 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return paths;
     }
 
+    static std::set<std::string> uriSchemes() { return {"s3"}; }
+
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, 5) != "s3://") return 0;
-    auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, std::string(uri, 5));
-    store->init();
-    return store;
-});
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
 
 }
 

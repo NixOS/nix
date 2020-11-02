@@ -37,10 +37,12 @@ typedef uint64_t ActivityId;
 
 struct LoggerSettings : Config
 {
-    Setting<bool> showTrace{this,
-        false,
-        "show-trace",
-        "Whether to show a stack trace on evaluation errors."};
+    Setting<bool> showTrace{
+        this, false, "show-trace",
+        R"(
+          Where Nix should print out a stack trace in case of Nix
+          expression evaluation errors.
+        )"};
 };
 
 extern LoggerSettings loggerSettings;
@@ -98,7 +100,7 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void stdout(const std::string & fs, const Args & ... args)
+    inline void cout(const std::string & fs, const Args & ... args)
     {
         boost::format f(fs);
         formatHelper(f, args...);

@@ -5,6 +5,7 @@
 #include "s3.hh"
 #include "compression.hh"
 #include "finally.hh"
+#include "callback.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -30,7 +31,7 @@ namespace nix {
 
 FileTransferSettings fileTransferSettings;
 
-static GlobalConfig::Register r1(&fileTransferSettings);
+static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
 std::string resolveUri(const std::string & uri)
 {
@@ -112,6 +113,9 @@ struct curlFileTransfer : public FileTransfer
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
+            for (auto it = request.headers.begin(); it != request.headers.end(); ++it){
+                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
+            }
         }
 
         ~TransferItem()

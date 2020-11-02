@@ -277,6 +277,8 @@ void printVersion(const string & programName)
 #if HAVE_SODIUM
         cfg.push_back("signed-caches");
 #endif
+        std::cout << "System type: " << settings.thisSystem << "\n";
+        std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
         std::cout << "System configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
         std::cout << "User configuration files: " <<
@@ -384,18 +386,12 @@ RunPager::~RunPager()
 }
 
 
-string showBytes(uint64_t bytes)
-{
-    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
-}
-
-
 PrintFreed::~PrintFreed()
 {
     if (show)
-        std::cout << format("%1% store paths deleted, %2% freed\n")
-            % results.paths.size()
-            % showBytes(results.bytesFreed);
+        std::cout << fmt("%d store paths deleted, %s freed\n",
+            results.paths.size(),
+            showBytes(results.bytesFreed));
 }
 
 Exit::~Exit() { }

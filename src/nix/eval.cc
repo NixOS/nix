@@ -85,9 +85,9 @@ struct CmdEval : MixJSON, InstallableCommand
             printValueAsJSON(*state, true, *v, jsonOut, context);
         } else {
             state->forceValueDeep(*v);
-            logger->stdout("%s", *v);
+            logger->cout("%s", *v);
         }
     }
 };
 
-static auto r1 = registerCommand<CmdEval>("eval");
+static auto rCmdEval = registerCommand<CmdEval>("eval");

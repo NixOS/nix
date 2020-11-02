@@ -26,13 +26,13 @@ struct CmdRegistryList : StoreCommand
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
-                logger->stdout("%s %s %s",
+                logger->cout("%s %s %s",
                     registry->type == Registry::Flag   ? "flags " :
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
                     "global",
-                    entry.from.to_string(),
-                    entry.to.to_string());
+                    entry.from.toURLString(),
+                    entry.to.toURLString(attrsToQuery(entry.extraAttrs)));
             }
         }
     }
@@ -115,7 +115,7 @@ struct CmdRegistryPin : virtual Args, EvalCommand
     }
 };
 
-struct CmdRegistry : virtual MultiCommand, virtual Command
+struct CmdRegistry : virtual NixMultiCommand
 {
     CmdRegistry()
         : MultiCommand({
@@ -141,11 +141,6 @@ struct CmdRegistry : virtual MultiCommand, virtual Command
         command->second->prepare();
         command->second->run();
     }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
-    }
 };
 
-static auto r1 = registerCommand<CmdRegistry>("registry");
+static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");

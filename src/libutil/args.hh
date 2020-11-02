@@ -4,6 +4,8 @@
 #include <map>
 #include <memory>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include "util.hh"
 
 namespace nix {
@@ -20,6 +22,7 @@ public:
 
     virtual void printHelp(const string & programName, std::ostream & out);
 
+    /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
 protected:
@@ -189,7 +192,7 @@ public:
     {
         expectArgs({
             .label = label,
-            .optional = true,
+            .optional = optional,
             .handler = {dest}
         });
     }
@@ -202,6 +205,8 @@ public:
             .handler = {dest}
         });
     }
+
+    virtual nlohmann::json toJSON();
 
     friend class MultiCommand;
 };
@@ -216,6 +221,9 @@ struct Command : virtual Args
 
     virtual void prepare() { };
     virtual void run() = 0;
+
+    /* Return documentation about this command, in Markdown format. */
+    virtual std::string doc() { return ""; }
 
     struct Example
     {
@@ -234,6 +242,8 @@ struct Command : virtual Args
     virtual Category category() { return catDefault; }
 
     void printHelp(const string & programName, std::ostream & out) override;
+
+    nlohmann::json toJSON() override;
 };
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;
@@ -259,6 +269,8 @@ public:
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
+
+    nlohmann::json toJSON() override;
 };
 
 Strings argvToStrings(int argc, char * * argv);
@@ -271,7 +283,17 @@ typedef std::vector<std::pair<std::string, std::string>> Table2;
 
 void printTable(std::ostream & out, const Table2 & table);
 
-extern std::shared_ptr<std::set<std::string>> completions;
+struct Completion {
+    std::string completion;
+    std::string description;
+
+    bool operator<(const Completion & other) const;
+};
+class Completions : public std::set<Completion> {
+public:
+    void add(std::string completion, std::string description = "");
+};
+extern std::shared_ptr<Completions> completions;
 extern bool pathCompletions;
 
 std::optional<std::string> needsCompletion(std::string_view s);

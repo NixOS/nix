@@ -1,14 +1,28 @@
 #include "command.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
+
+#include <nlohmann/json.hpp>
 
 extern char * * environ __attribute__((weak));
 
 namespace nix {
 
 Commands * RegisterCommand::commands = nullptr;
+
+void NixMultiCommand::printHelp(const string & programName, std::ostream & out)
+{
+    MultiCommand::printHelp(programName, out);
+}
+
+nlohmann::json NixMultiCommand::toJSON()
+{
+    // FIXME: use Command::toJSON() as well.
+    return MultiCommand::toJSON();
+}
 
 StoreCommand::StoreCommand()
 {
@@ -121,27 +135,35 @@ void MixProfile::updateProfile(const StorePath & storePath)
     switchLink(profile2,
         createGeneration(
             ref<LocalFSStore>(store),
-            profile2, store->printStorePath(storePath)));
+            profile2, storePath));
 }
 
 void MixProfile::updateProfile(const Buildables & buildables)
 {
     if (!profile) return;
 
-    std::optional<StorePath> result;
+    std::vector<StorePath> result;
 
     for (auto & buildable : buildables) {
-        for (auto & output : buildable.outputs) {
-            if (result)
-                throw Error("'--profile' requires that the arguments produce a single store path, but there are multiple");
-            result = output.second;
-        }
+        std::visit(overloaded {
+            [&](BuildableOpaque bo) {
+                result.push_back(bo.path);
+            },
+            [&](BuildableFromDrv bfd) {
+                for (auto & output : bfd.outputs) {
+                    /* Output path should be known because we just tried to
+                       build it. */
+                    assert(output.second);
+                    result.push_back(*output.second);
+                }
+            },
+        }, buildable);
     }
 
-    if (!result)
-        throw Error("'--profile' requires that the arguments produce a single store path, but there are none");
+    if (result.size() != 1)
+        throw Error("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
-    updateProfile(*result);
+    updateProfile(result[0]);
 }
 
 MixDefaultProfile::MixDefaultProfile()

@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
@@ -151,7 +152,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         debug(format("switching to new user environment"));
-        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
+        Path generation = createGeneration(ref<LocalFSStore>(store2), profile,
+            store2->parseStorePath(topLevelOut));
         switchLink(profile, generation);
     }
 

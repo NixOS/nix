@@ -67,13 +67,23 @@ struct CmdShowDerivation : InstallablesCommand
 
             {
                 auto outputsObj(drvObj.object("outputs"));
-                for (auto & output : drv.outputs) {
-                    auto outputObj(outputsObj.object(output.first));
-                    outputObj.attr("path", store->printStorePath(output.second.path(*store, drv.name)));
-                    if (auto hash = std::get_if<DerivationOutputFixed>(&output.second.output)) {
-                        outputObj.attr("hashAlgo", hash->hash.printMethodAlgo());
-                        outputObj.attr("hash", hash->hash.hash.to_string(Base16, false));
-                    }
+                for (auto & [_outputName, output] : drv.outputs) {
+                    auto & outputName = _outputName; // work around clang bug
+                    auto outputObj { outputsObj.object(outputName) };
+                    std::visit(overloaded {
+                        [&](DerivationOutputInputAddressed doi) {
+                            outputObj.attr("path", store->printStorePath(doi.path));
+                        },
+                        [&](DerivationOutputCAFixed dof) {
+                            outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
+                            outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
+                            outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
+                        },
+                        [&](DerivationOutputCAFloating dof) {
+                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
+                        },
+                        [&](DerivationOutputDeferred) {},
+                    }, output.output);
                 }
             }
 
@@ -114,4 +124,4 @@ struct CmdShowDerivation : InstallablesCommand
     }
 };
 
-static auto r1 = registerCommand<CmdShowDerivation>("show-derivation");
+static auto rCmdShowDerivation = registerCommand<CmdShowDerivation>("show-derivation");

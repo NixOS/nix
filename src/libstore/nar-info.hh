@@ -2,9 +2,11 @@
 
 #include "types.hh"
 #include "hash.hh"
-#include "store-api.hh"
+#include "path-info.hh"
 
 namespace nix {
+
+class Store;
 
 struct NarInfo : ValidPathInfo
 {
@@ -15,7 +17,7 @@ struct NarInfo : ValidPathInfo
     std::string system;
 
     NarInfo() = delete;
-    NarInfo(StorePath && path) : ValidPathInfo(std::move(path)) { }
+    NarInfo(StorePath && path, Hash narHash) : ValidPathInfo(std::move(path), narHash) { }
     NarInfo(const ValidPathInfo & info) : ValidPathInfo(info) { }
     NarInfo(const Store & store, const std::string & s, const std::string & whence);
 

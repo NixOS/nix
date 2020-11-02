@@ -3,6 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 
 using namespace nix;
 
@@ -64,20 +65,28 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
         if (dryRun) return;
 
-        if (outLink != "") {
-            for (size_t i = 0; i < buildables.size(); ++i) {
-                for (auto & output : buildables[i].outputs)
-                    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-                        std::string symlink = outLink;
-                        if (i) symlink += fmt("-%d", i);
-                        if (output.first != "out") symlink += fmt("-%s", output.first);
-                        store2->addPermRoot(output.second, absPath(symlink), true);
-                    }
-            }
-        }
+        if (outLink != "")
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                for (size_t i = 0; i < buildables.size(); ++i)
+                    std::visit(overloaded {
+                        [&](BuildableOpaque bo) {
+                            std::string symlink = outLink;
+                            if (i) symlink += fmt("-%d", i);
+                            store2->addPermRoot(bo.path, absPath(symlink));
+                        },
+                        [&](BuildableFromDrv bfd) {
+                            auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
+                            for (auto & output : builtOutputs) {
+                                std::string symlink = outLink;
+                                if (i) symlink += fmt("-%d", i);
+                                if (output.first != "out") symlink += fmt("-%s", output.first);
+                                store2->addPermRoot(output.second, absPath(symlink));
+                            }
+                        },
+                    }, buildables[i]);
 
         updateProfile(buildables);
     }
 };
 
-static auto r1 = registerCommand<CmdBuild>("build");
+static auto rCmdBuild = registerCommand<CmdBuild>("build");

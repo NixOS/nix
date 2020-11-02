@@ -76,6 +76,13 @@ static void update(const StringSet & channelNames)
 
     auto store = openStore();
 
+    auto [fd, unpackChannelPath] = createTempFile();
+    writeFull(fd.get(),
+        #include "unpack-channel.nix.gen.hh"
+        );
+    fd = -1;
+    AutoDelete del(unpackChannelPath, false);
+
     // Download each channel.
     Strings exprs;
     for (const auto & channel : channels) {
@@ -104,7 +111,7 @@ static void update(const StringSet & channelNames)
 
         bool unpacked = false;
         if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-            runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import <nix/unpack-channel.nix> "
+            runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
                         "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
             unpacked = true;
         }
@@ -125,7 +132,7 @@ static void update(const StringSet & channelNames)
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
     std::cerr << "unpacking channels...\n";
-    Strings envArgs{ "--profile", profile, "--file", "<nix/unpack-channel.nix>", "--install", "--from-expression" };
+    Strings envArgs{ "--profile", profile, "--file", unpackChannelPath, "--install", "--from-expression" };
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));
     envArgs.push_back("--quiet");
@@ -146,7 +153,7 @@ static void update(const StringSet & channelNames)
     replaceSymlink(profile, channelLink);
 }
 
-static int _main(int argc, char ** argv)
+static int main_nix_channel(int argc, char ** argv)
 {
     {
         // Figure out the name of the `.nix-channels' file to use
@@ -243,4 +250,4 @@ static int _main(int argc, char ** argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-channel", _main);
+static RegisterLegacyCommand r_nix_channel("nix-channel", main_nix_channel);

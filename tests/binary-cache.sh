@@ -218,7 +218,9 @@ outPath=$(nix-build --no-out-link -E '
 
 nix copy --to file://$cacheDir?write-nar-listing=1 $outPath
 
-[[ $(cat $cacheDir/$(basename $outPath).ls) = '{"version":1,"root":{"type":"directory","entries":{"bar":{"type":"regular","size":4,"narOffset":232},"link":{"type":"symlink","target":"xyzzy"}}}}' ]]
+diff -u \
+    <(jq -S < $cacheDir/$(basename $outPath | cut -c1-32).ls) \
+    <(echo '{"version":1,"root":{"type":"directory","entries":{"bar":{"type":"regular","size":4,"narOffset":232},"link":{"type":"symlink","target":"xyzzy"}}}}' | jq -S)
 
 
 # Test debug info index generation.
@@ -234,4 +236,40 @@ outPath=$(nix-build --no-out-link -E '
 
 nix copy --to "file://$cacheDir?index-debug-info=1&compression=none" $outPath
 
-[[ $(cat $cacheDir/debuginfo/02623eda209c26a59b1a8638ff7752f6b945c26b.debug) = '{"archive":"../nar/100vxs724qr46phz8m24iswmg9p3785hsyagz0kchf6q6gf06sw6.nar","member":"lib/debug/.build-id/02/623eda209c26a59b1a8638ff7752f6b945c26b.debug"}' ]]
+diff -u \
+    <(cat $cacheDir/debuginfo/02623eda209c26a59b1a8638ff7752f6b945c26b.debug | jq -S) \
+    <(echo '{"archive":"../nar/100vxs724qr46phz8m24iswmg9p3785hsyagz0kchf6q6gf06sw6.nar","member":"lib/debug/.build-id/02/623eda209c26a59b1a8638ff7752f6b945c26b.debug"}' | jq -S)
+
+# Test against issue https://github.com/NixOS/nix/issues/3964
+#
+expr='
+  with import ./config.nix;
+  mkDerivation {
+    name = "multi-output";
+    buildCommand = "mkdir -p $out; echo foo > $doc; echo $doc > $out/docref";
+    outputs = ["out" "doc"];
+  }
+'
+outPath=$(nix-build --no-out-link -E "$expr")
+docPath=$(nix-store -q --references $outPath)
+
+# $ nix-store -q --tree $outPath
+# ...-multi-output
+# +---...-multi-output-doc
+
+nix copy --to "file://$cacheDir" $outPath
+( echo $outPath $docPath
+  find $cacheDir
+) >/tmp/blurb
+
+hashpart() {
+  basename "$1" | cut -c1-32
+}
+
+# break the closure of out by removing doc
+rm $cacheDir/$(hashpart $docPath).narinfo
+
+nix-store --delete $outPath $docPath
+# -vvv is the level that logs during the loop
+timeout 60 nix-build --no-out-link -E "$expr" --option substituters "file://$cacheDir" \
+  --option trusted-binary-caches "file://$cacheDir"  --no-require-sigs

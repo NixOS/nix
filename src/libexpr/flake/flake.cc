@@ -12,7 +12,7 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<Tree, FlakeRef> FetchedFlake;
+typedef std::pair<fetchers::Tree, FlakeRef> FetchedFlake;
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(
@@ -48,17 +48,17 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
                 resolvedRef = originalRef.resolve(state.store);
                 auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
                 if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, fetchedResolved.value()});
-                fetched.emplace(fetchedResolved.value());
+                flakeCache.push_back({resolvedRef, *fetchedResolved});
+                fetched.emplace(*fetchedResolved);
             }
             else {
                 throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
             }
         }
-        flakeCache.push_back({originalRef, fetched.value()});
+        flakeCache.push_back({originalRef, *fetched});
     }
 
-    auto [tree, lockedRef] = fetched.value();
+    auto [tree, lockedRef] = *fetched;
 
     debug("got tree '%s' from '%s'",
         state.store->printStorePath(tree.storePath), lockedRef);
@@ -196,11 +196,6 @@ static Flake getFlake(
 
     expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 
-    auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
-
-    if (vInfo.attrs->get(sEdition))
-        warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
-
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);
         flake.description = description->value->string.s;
@@ -215,10 +210,9 @@ static Flake getFlake(
 
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         expectType(state, tLambda, *outputs->value, *outputs->pos);
-        flake.vOutputs = allocRootValue(outputs->value);
 
-        if ((*flake.vOutputs)->lambda.fun->matchAttrs) {
-            for (auto & formal : (*flake.vOutputs)->lambda.fun->formals->formals) {
+        if (outputs->value->lambda.fun->matchAttrs) {
+            for (auto & formal : outputs->value->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {
                         .ref = parseFlakeRef(formal.name)
@@ -230,8 +224,7 @@ static Flake getFlake(
         throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
 
     for (auto & attr : *vInfo.attrs) {
-        if (attr.name != sEdition &&
-            attr.name != state.sDescription &&
+        if (attr.name != state.sDescription &&
             attr.name != sInputs &&
             attr.name != sOutputs)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
@@ -248,7 +241,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 }
 
 /* Compute an in-memory lock file for the specified top-level flake,
-   and optionally write it to file, it the flake is writable. */
+   and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & topRef,
@@ -367,7 +360,7 @@ LockedFlake lockFlake(
 
                 /* If we have an --update-input flag for an input
                    of this input, then we must fetch the flake to
-                   to update it. */
+                   update it. */
                 auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
 
                 auto hasChildUpdate =

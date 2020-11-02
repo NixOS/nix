@@ -9,7 +9,9 @@
 
 namespace nix::eval_cache {
 
-class AttrDb;
+MakeError(CachedEvalError, EvalError);
+
+struct AttrDb;
 class AttrCursor;
 
 class EvalCache : public std::enable_shared_from_this<EvalCache>
@@ -92,11 +94,11 @@ public:
 
     std::string getAttrPathStr(Symbol name) const;
 
-    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name);
+    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
 
     std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> getAttr(Symbol name);
+    std::shared_ptr<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
 
     std::shared_ptr<AttrCursor> getAttr(std::string_view name);
 
