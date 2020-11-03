@@ -7,14 +7,14 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
   extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
 };
 
-makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
+makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; pkgD = pkgs.tmux; in {
   name = "nix-copy-closure";
 
   nodes =
     { client =
         { config, lib, pkgs, ... }:
         { virtualisation.writableStore = true;
-          virtualisation.pathsInNixDB = [ pkgA ];
+          virtualisation.pathsInNixDB = [ pkgA pkgD.drvPath ];
           nix.binaryCaches = lib.mkForce [ ];
         };
 
@@ -60,6 +60,12 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 
     # Copy the closure of package C via the SSH substituter.
     client.fail("nix-store -r ${pkgC}")
+
+    # Copy the derivation of package D's derivation from the client to the server.
+    server.fail("nix-store --check-validity ${pkgD.drvPath}")
+    client.succeed("nix-copy-closure --to server --gzip ${pkgD.drvPath} >&2")
+    server.succeed("nix-store --check-validity ${pkgD.drvPath}")
+
     # FIXME
     # client.succeed(
     #   "nix-store --option use-ssh-substituter true"
