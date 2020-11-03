@@ -90,9 +90,7 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    // FIXME: get rid of recursive_mutex, it hides recursive SQLite
-    // queries.
-    Sync<State, std::recursive_mutex> _state;
+    Sync<State> _state;
 
 public:
 

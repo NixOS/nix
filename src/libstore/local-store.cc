@@ -7,6 +7,7 @@
 #include "nar-info.hh"
 #include "references.hh"
 #include "callback.hh"
+#include "topo-sort.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -962,9 +963,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
 
 void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
-    ValidPathInfos infos;
-    infos.push_back(info);
-    registerValidPaths(infos);
+    registerValidPaths({{info.path, info}});
 }
 
 
@@ -982,7 +981,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         SQLiteTxn txn(state->db);
         StorePathSet paths;
 
-        for (auto & i : infos) {
+        for (auto & [_, i] : infos) {
             assert(i.narHash.type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
@@ -991,7 +990,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             paths.insert(i.path);
         }
 
-        for (auto & i : infos) {
+        for (auto & [_, i] : infos) {
             auto referrer = queryValidPathId(*state, i.path);
             for (auto & j : i.references)
                 state->stmtAddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
@@ -1000,7 +999,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         /* Check that the derivation outputs are correct.  We can't do
            this in addValidPath() above, because the references might
            not be valid yet. */
-        for (auto & i : infos)
+        for (auto & [_, i] : infos)
             if (i.path.isDerivation()) {
                 // FIXME: inefficient; we already loaded the derivation in addValidPath().
                 checkDerivationOutputs(i.path,
@@ -1014,7 +1013,17 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSortPaths(paths);
+        topoSort(paths,
+            {[&](const StorePath & path) {
+                auto i = infos.find(path);
+                return i == infos.end() ? StorePathSet() : i->second.references;
+            }},
+            {[&](const StorePath & path, const StorePath & parent) {
+                return BuildError(
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(path),
+                    printStorePath(parent));
+            }});
 
         txn.commit();
     });

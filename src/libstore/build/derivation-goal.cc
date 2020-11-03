@@ -3245,7 +3245,7 @@ void DerivationGoal::registerOutputs()
             if (!oldInfo.ultimate) {
                 oldInfo.ultimate = true;
                 worker.store.signPathInfo(oldInfo);
-                worker.store.registerValidPaths({ std::move(oldInfo) });
+                worker.store.registerValidPaths({{oldInfo.path, oldInfo}});
             }
 
             continue;
@@ -3275,7 +3275,7 @@ void DerivationGoal::registerOutputs()
            isn't statically known so that we can safely unlock the path before
            the next iteration */
         if (newInfo.ca)
-            worker.store.registerValidPaths({newInfo});
+            worker.store.registerValidPaths({{newInfo.path, newInfo}});
 
         infos.emplace(outputName, std::move(newInfo));
     }
@@ -3350,7 +3350,7 @@ void DerivationGoal::registerOutputs()
     {
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
-            infos2.push_back(newInfo);
+            infos2.insert_or_assign(newInfo.path, newInfo);
         }
         worker.store.registerValidPaths(infos2);
     }
