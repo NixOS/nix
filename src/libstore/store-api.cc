@@ -922,10 +922,6 @@ std::map<StorePath, StorePath> copyPaths(
             dstStore->registerDrvOutput(id, *outputInfo);
         }
     );
-    // for (auto & [deriver, outputInfo] : outputsToRegister) {
-    //             dstStore->registerDrvOutput(deriver, outputInfo);
-    // }
-
     return pathsMap;
 }
 

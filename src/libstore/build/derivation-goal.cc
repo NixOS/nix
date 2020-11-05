@@ -1003,6 +1003,50 @@ void DerivationGoal::buildDone()
     done(BuildResult::Built);
 }
 
+std::set<DrvInput> computeDrvInputs(Store& store, Derivation& drv) {
+     std::set<DrvInput> res;
+     for (auto & [depDrvPath, wantedDepOutputs] : drv.inputDrvs) {
+        for (auto wantedOutput: wantedDepOutputs) {
+            auto inputClosure = store.drvInputClosure(DrvOutputId{depDrvPath, wantedOutput});
+            res.insert(inputClosure.begin(), inputClosure.end());
+        }
+    }
+    for (auto & inputPath : drv.inputSrcs) {
+        auto inputClosure = store.drvInputClosure(inputPath);
+        res.insert(inputClosure.begin(), inputClosure.end());
+    }
+    return res;
+}
+
+std::set<DrvInput> shrinkDrvInputs(Store& store, std::set<DrvInput> allDrvInputs, StorePathSet& references) {
+    std::set<DrvInput> res;
+    for (auto potentialInput : allDrvInputs) {
+        auto shouldBeKept = std::visit(overloaded {
+            [&](StorePath opaque) -> bool { return references.count(opaque); },
+            [&](DrvOutputId id) -> bool {
+                return references.count(*store.queryOutputPathOf(id.drvPath, id.outputName));
+            },
+        }, static_cast<RawDrvInput>(potentialInput)
+        );
+        if (shouldBeKept)
+            res.insert(potentialInput);
+    }
+    return res;
+}
+
+void registerOneOutput(Store& store, StorePath drvPath, StorePath resolvedDrvPath, std::set<DrvInput> buildTimeInputs, std::string outputName) {
+    StorePathSet outputPathDeps;
+    auto outputPath = store.queryOutputPathOf(resolvedDrvPath, outputName);
+    assert(outputPath); // We've just built it
+    store.computeFSClosure({*outputPath}, outputPathDeps);
+    store.registerDrvOutput(
+        DrvOutputId{drvPath, outputName},
+        DrvOutputInfo{
+            .outPath = *outputPath,
+            .references = shrinkDrvInputs(store, buildTimeInputs, outputPathDeps),
+        });
+}
+
 void DerivationGoal::resolvedFinished() {
     warn("Resolving the original derivation");
     // Should always succeed, because we can only resolve if we have a derivation
@@ -1012,45 +1056,10 @@ void DerivationGoal::resolvedFinished() {
     Derivation drvResolved { *std::move(attempt) };
     auto pathResolved = writeDerivation(worker.store, drvResolved);
 
-    std::set<DrvInput> allDrvInputs;
-    for (auto & [depDrvPath, wantedDepOutputs] : fullDrv.inputDrvs) {
-        for (auto wantedOutput: wantedDepOutputs) {
-            auto inputClosure = worker.store.drvInputClosure(DrvOutputId{depDrvPath, wantedOutput});
-            allDrvInputs.insert(inputClosure.begin(), inputClosure.end());
-        }
-    }
-    for (auto & inputPath : fullDrv.inputSrcs) {
-        auto inputClosure = worker.store.drvInputClosure(inputPath);
-        allDrvInputs.insert(inputClosure.begin(), inputClosure.end());
-    }
-
-    auto shrinkDrvInputs = ([&](StorePathSet& references) -> std::set<DrvInput> {
-        std::set<DrvInput> res;
-        for (auto potentialInput : allDrvInputs) {
-            auto shouldBeKept = std::visit(overloaded {
-                [&](StorePath opaque) -> bool { return references.count(opaque); },
-                [&](DrvOutputId id) -> bool {
-                    return references.count(*worker.store.queryOutputPathOf(id.drvPath, id.outputName));
-                },
-            }, static_cast<RawDrvInput>(potentialInput)
-            );
-            if (shouldBeKept)
-                res.insert(potentialInput);
-        }
-        return res;
-    });
+    std::set<DrvInput> allDrvInputs = computeDrvInputs(worker.store, fullDrv);
 
     for (auto & [outputName, _] : fullDrv.outputs) {
-        StorePathSet outputPathDeps;
-        auto outputPath = worker.store.queryOutputPathOf(pathResolved, outputName);
-        assert(outputPath); // We've just built it
-        worker.store.computeFSClosure({*outputPath}, outputPathDeps);
-        worker.store.registerDrvOutput(
-            DrvOutputId{drvPath, outputName},
-            DrvOutputInfo{
-                .outPath = *outputPath,
-                .references = shrinkDrvInputs(outputPathDeps),
-            });
+        registerOneOutput(worker.store, drvPath, pathResolved, allDrvInputs, outputName);
     }
 
     done(BuildResult::Built);
@@ -3440,9 +3449,18 @@ void DerivationGoal::registerOutputs()
         drvPathResolved = writeDerivation(worker.store, drv2);
     }
 
-    if (useDerivation || isCaFloating)
+    if (useDerivation || isCaFloating) {
+        auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+        auto allDrvInputs = computeDrvInputs(worker.store, fullDrv);
         for (auto & [outputName, newInfo] : infos)
-            worker.store.registerDrvOutput(DrvOutputId{drvPathResolved, outputName}, DrvOutputInfo{newInfo.path, {}});
+            registerOneOutput(
+                worker.store,
+                drvPath,
+                drvPathResolved,
+                allDrvInputs,
+                outputName
+             );
+    }
 }
 
 
