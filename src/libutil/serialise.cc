@@ -171,6 +171,39 @@ size_t StringSource::read(unsigned char * data, size_t len)
 #error Coroutines are broken in this version of Boost!
 #endif
 
+/* A concrete datatype allow virtual dispatch of stack allocation methods. */
+struct VirtualStackAllocator {
+    StackAllocator *allocator = StackAllocator::defaultAllocator;
+
+    boost::context::stack_context allocate() {
+        return allocator->allocate();
+    }
+
+    void deallocate(boost::context::stack_context sctx) {
+        allocator->deallocate(sctx);
+    }
+};
+
+
+/* This class reifies the default boost coroutine stack allocation strategy with
+   a virtual interface. */
+class DefaultStackAllocator : public StackAllocator {
+    boost::coroutines2::default_stack stack;
+
+    boost::context::stack_context allocate() {
+        return stack.allocate();
+    }
+
+    void deallocate(boost::context::stack_context sctx) {
+        deallocate(sctx);
+    }
+};
+
+static DefaultStackAllocator defaultAllocatorSingleton;
+
+StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
+
+
 std::unique_ptr<Source> sinkToSource(
     std::function<void(Sink &)> fun,
     std::function<void()> eof)
@@ -195,7 +228,7 @@ std::unique_ptr<Source> sinkToSource(
         size_t read(unsigned char * data, size_t len) override
         {
             if (!coro)
-                coro = coro_t::pull_type([&](coro_t::push_type & yield) {
+                coro = coro_t::pull_type(VirtualStackAllocator{}, [&](coro_t::push_type & yield) {
                     LambdaSink sink([&](const unsigned char * data, size_t len) {
                             if (len) yield(std::string((const char *) data, len));
                         });
