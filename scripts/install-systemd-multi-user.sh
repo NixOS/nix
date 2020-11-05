@@ -207,3 +207,7 @@ poly_create_build_user() {
           --password "!" \
           "$username"
 }
+
+poly_prepare_to_install() {
+    :
+}

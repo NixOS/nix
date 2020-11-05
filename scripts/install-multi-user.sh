@@ -684,6 +684,8 @@ main() {
         exit 1
     fi
 
+    poly_prepare_to_install
+
     create_build_group
     create_build_users
     create_directories
