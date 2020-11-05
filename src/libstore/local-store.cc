@@ -243,11 +243,18 @@ LocalStore::LocalStore(const Params & params)
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmtQueryPathInfo.create(state->db,
         "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
-    state->stmtQueryReferences.create(state->db,
+    state->stmtQueryPathReferences.create(state->db,
         R"foobar(
             select ValidPaths.path from Refs
                 join Storables on Storables.id = reference
                 join ValidPaths on Storables.path = ValidPaths.id
+                where referrer = ?;
+        )foobar");
+    state->stmtQueryDrvOutputReferences.create(state->db,
+        R"foobar(
+            select DerivationOutputs.drvPath, DerivationOutputs.outputName from Refs
+                join Storables on Storables.id = reference
+                join DerivationOutputs on Storables.drvOutput = DerivationOutputs.id
                 where referrer = ?;
         )foobar");
     state->stmtQueryReferrers.create(state->db,
@@ -720,7 +727,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             if (s) info->ca = parseContentAddressOpt(s);
 
             /* Get the references. */
-            auto useQueryReferences(state->stmtQueryReferences.use()(queryStorableId(*state, path)));
+            auto useQueryReferences(state->stmtQueryPathReferences.use()(queryStorableId(*state, path)));
 
             while (useQueryReferences.next())
                 info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
@@ -1642,10 +1649,15 @@ std::optional<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutpu
         auto state(_state.lock());
         std::set<DrvInput> references;
 
-        auto useQueryReferences(state->stmtQueryReferences.use()(queryStorableId(*state, id)));
-
+        auto useQueryDrvOutputReferences(state->stmtQueryDrvOutputReferences.use()(queryStorableId(*state, id)));
+        while (useQueryDrvOutputReferences.next())
+            references.insert(DrvInput(DrvOutputId{
+                .drvPath = parseStorePath(useQueryDrvOutputReferences.getStr(0)),
+                .outputName = useQueryDrvOutputReferences.getStr(1),
+            }));
+        auto useQueryReferences(state->stmtQueryPathReferences.use()(queryStorableId(*state, id)));
         while (useQueryReferences.next())
-            references.insert(DrvInput::parse(useQueryReferences.getStr(0)));
+            references.insert(DrvInput(parseStorePath(useQueryReferences.getStr(0))));
 
         return {DrvOutputInfo{
             .outPath = *outputPath,

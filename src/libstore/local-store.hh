@@ -60,7 +60,8 @@ private:
         SQLiteStmt stmtUpdatePathInfo;
         SQLiteStmt stmtAddReference;
         SQLiteStmt stmtQueryPathInfo;
-        SQLiteStmt stmtQueryReferences;
+        SQLiteStmt stmtQueryPathReferences;
+        SQLiteStmt stmtQueryDrvOutputReferences;
         SQLiteStmt stmtQueryReferrers;
         SQLiteStmt stmtInvalidatePath;
         SQLiteStmt stmtAddDerivationOutput;
