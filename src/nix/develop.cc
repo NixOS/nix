@@ -7,6 +7,7 @@
 #include "affinity.hh"
 #include "progress-bar.hh"
 
+#include <memory>
 #include <regex>
 
 using namespace nix;
@@ -475,9 +476,34 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         // If running a phase, don't want an interactive shell running after
-        // Ctrl-C, so don't pass --rcfile
-        auto args = phase ? Strings{std::string(baseNameOf(shell)), rcFilePath}
-            : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
+        // Ctrl-C, so don't pass --rcfile. Also need to chdir since phases
+        // assume in flake directory
+        Strings args;
+        if (phase) {
+            args = Strings{std::string(baseNameOf(shell)), rcFilePath};
+            // chdir if installable is a flake of type git+file or path
+            auto installableFlake = std::dynamic_pointer_cast<InstallableFlake>(installable);
+            if (installableFlake) {
+                auto & attrs = installableFlake->flakeRef.input.attrs;
+                auto type = getStrAttr(attrs, "type");
+                std::string flakeDir;
+                if (type == "git") {
+                    auto url = parseURL(getStrAttr(attrs, "url"));
+                    if (url.scheme == "file") {
+                        flakeDir = url.path;
+                    }
+                } else if (type == "path") {
+                    flakeDir = getStrAttr(attrs, "path");
+                }
+                if (!flakeDir.empty()) {
+                    if (chdir(flakeDir.c_str()) == -1) {
+                        throw SysError("chdir to '%s' failed", flakeDir);
+                    }
+                }
+            }
+        } else {
+            args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
+        }
 
         restoreAffinity();
         restoreSignals();
