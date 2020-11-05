@@ -904,8 +904,14 @@ void DerivationGoal::buildDone()
             }
             std::map<std::string, std::string> hookEnvironment = getEnv();
 
+            std::set<std::string> rawDrvOutputs;
+            for (auto [outputName, _] : drv->outputs) {
+                rawDrvOutputs.insert((worker.store.storeDir + "/").append(DrvOutputId{ drvPath, outputName}.to_string()));
+            }
+
             hookEnvironment.emplace("DRV_PATH", worker.store.printStorePath(drvPath));
             hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", worker.store.printStorePathSet(outputPaths))));
+            hookEnvironment.emplace("DRV_OUTPUTS", chomp(concatStringsSep(" ", rawDrvOutputs)));
 
             RunOptions opts(settings.postBuildHook, {});
             opts.environment = hookEnvironment;
