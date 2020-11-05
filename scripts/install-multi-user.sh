@@ -41,7 +41,7 @@ readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
 readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
-readonly ROOT_HOME=$(echo ~root)
+readonly ROOT_HOME=$(echo ~root) # TODO: VAR=~root works; no substitution needed
 
 if [ -t 0 ]; then
     readonly IS_HEADLESS='no'
@@ -57,14 +57,18 @@ headless() {
     fi
 }
 
-contactme() {
+contact_us() {
+    echo "You can open an issue at https://github.com/nixos/nix/issues"
+    echo ""
+    echo "Or feel free to contact the team:"
+    echo " - IRC: in #nixos on irc.freenode.net"
+    echo " - twitter: @nixos_org"
+    echo " - forum: https://discourse.nixos.org"
+}
+get_help() {
     echo "We'd love to help if you need it."
     echo ""
-    echo "If you can, open an issue at https://github.com/nixos/nix/issues"
-    echo ""
-    echo "Or feel free to contact the team,"
-    echo " - on IRC #nixos on irc.freenode.net"
-    echo " - on twitter @nixos_org"
+    contact_us
 }
 
 uninstall_directions() {
@@ -168,7 +172,7 @@ failure() {
     header "oh no!"
     _textout "$RED" "$@"
     echo ""
-    _textout "$RED" "$(contactme)"
+    _textout "$RED" "$(get_help)"
     trap finish_cleanup EXIT
     exit 1
 }
@@ -199,6 +203,38 @@ ui_confirm() {
     return 1
 }
 
+# TODO: maybe "remind" isn't the right idiom since we don't print them initially
+# next steps? followup?
+remind() {
+    if [ -e "$SCRATCH/reminders" ]; then
+        header "Reminders"
+        if headless; then
+            cat "$SCRATCH/reminders"
+        else
+            exec 11<"$SCRATCH/reminders"
+            while read -r -u 11 line; do
+                echo $line
+                if [ "${#line}" = 0 ]; then
+                    if read -r -p "Press enter/return to acknowledge."; then
+                        printf $'\033[A\33[2K\r'
+                    fi
+                fi
+            done
+        fi
+    fi
+}
+((remind_num=1))
+reminder() {
+    printf "$BLUE[ %d ]$ESC\n" "$remind_num"
+    if [ "$*" = "" ]; then
+        cat
+    else
+        echo "$@"
+    fi
+    echo ""
+    ((remind_num++))
+} >> "$SCRATCH/reminders"
+
 __sudo() {
     local expl="$1"
     local cmd="$2"
@@ -225,7 +261,7 @@ _sudo() {
 }
 
 
-readonly SCRATCH=$(mktemp -d -t tmp.XXXXXXXXXX)
+readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
 function finish_cleanup {
     rm -rf "$SCRATCH"
 }
@@ -244,30 +280,33 @@ trap finish_fail EXIT
 
 channel_update_failed=0
 function finish_success {
-    finish_cleanup
-
     ok "Alright! We're done!"
-    if [ "x$channel_update_failed" = x1 ]; then
-        echo ""
-        echo "But fetching the nixpkgs channel failed. (Are you offline?)"
-        echo "To try again later, run \"sudo -i nix-channel --update nixpkgs\"."
-    fi
 
     cat <<EOF
-
-Before Nix will work in your existing shells, you'll need to close
-them and open them again. Other than that, you should be ready to go.
-
 Try it! Open a new terminal, and type:
 $(poly_extra_try_me_commands)
   $ nix-shell -p nix-info --run "nix-info -m"
-$(poly_extra_setup_instructions)
-Thank you for using this installer. If you have any feedback, don't
-hesitate:
 
-$(contactme)
+Thank you for using this installer. If you have any feedback or need
+help, don't hesitate:
+
+$(contact_us)
 EOF
+    remind
+    finish_cleanup
+}
 
+function finish_uninstall_success {
+    ok "Alright! Nix should be removed!"
+
+    cat <<EOF
+If you spot anything this uninstaller missed or have feedback,
+don't hesitate:
+
+$(contact_us)
+EOF
+    remind
+    finish_cleanup
 }
 
 
@@ -442,7 +481,7 @@ create_build_users() {
 
 create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
-
+    task "Setting up the basic directory structure"
     _sudo "to make the basic directory structure of Nix (part 1)" \
           mkdir -pv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
 
@@ -464,6 +503,7 @@ place_channel_configuration() {
     fi
 }
 
+# TODO: figure out how to work new darwin step in here :(
 welcome_to_nix() {
     ok "Welcome to the Multi-User Nix Installation"
 
@@ -473,7 +513,7 @@ This installation tool will set up your computer with the Nix package
 manager. This will happen in a few stages:
 
 1. Make sure your computer doesn't already have Nix. If it does, I
-   will show you instructions on how to clean up your old one.
+   will show you instructions on how to clean up your old install.
 
 2. Show you what we are going to install and where. Then we will ask
    if you are ready to continue.
@@ -572,6 +612,7 @@ EOF
 }
 
 install_from_extracted_nix() {
+    task "Installing Nix"
     (
         cd "$EXTRACTED_NIX_PATH"
 
@@ -608,6 +649,7 @@ EOF
 }
 
 configure_shell_profile() {
+    task "Setting up shell profiles: ${PROFILE_TARGETS[@]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
             _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
@@ -627,14 +669,19 @@ configure_shell_profile() {
                         tee -a "$profile_target"
         fi
     done
+    # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
+    # their way less disruptively, but a counter-argument is that they won't
+    # immediately notice if something didn't get set up right?
+    reminder "Nix won't work in active shell sessions until you restart them."
 }
 
 setup_default_profile() {
-    _sudo "to installing a bootstrapping Nix in to the default Profile" \
+    task "Setting up the default profile"
+    _sudo "to install a bootstrapping Nix in to the default profile" \
           HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
 
     if [ -z "${NIX_SSL_CERT_FILE:-}" ] || ! [ -f "${NIX_SSL_CERT_FILE:-}" ]; then
-        _sudo "to installing a bootstrapping SSL certificate just for Nix in to the default Profile" \
+        _sudo "to install a bootstrapping SSL certificate just for Nix in to the default profile" \
               HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
         export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
     fi
@@ -643,9 +690,13 @@ setup_default_profile() {
         # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
         # otherwise it will be lost in environments where sudo doesn't pass
         # all the environment variables by default.
-        _sudo "to update the default channel in the default profile" \
-            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
-            || channel_update_failed=1
+        if ! _sudo "to update the default channel in the default profile" \
+            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs; then
+            reminder <<EOF
+I had trouble fetching the nixpkgs channel (are you offline?)
+To try again later, run: sudo -i nix-channel --update nixpkgs
+EOF
+        fi
     fi
 }
 
@@ -679,7 +730,7 @@ main() {
 
     if ! ui_confirm "Ready to continue?"; then
         ok "Alright, no changes have been made :)"
-        contactme
+        get_help
         trap finish_cleanup EXIT
         exit 1
     fi
@@ -706,5 +757,49 @@ main() {
     trap finish_success EXIT
 }
 
+uninstall() {
+    # TODO: de-duplicate if the install/uninstall logic stays together
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # shellcheck source=./install-darwin-multi-user.sh
+        . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
+    elif [ "$(uname -s)" = "Linux" ]; then
+        # shellcheck source=./install-systemd-multi-user.sh
+        . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
+    else
+        failure "Sorry, I don't know what to do on $(uname)"
+    fi
 
-main
+    cat <<EOF
+I'll need to invoke 'sudo' a lot to uninstall Nix. As with the installer, I
+will not prompt you each time--but I will show you the sudo commands as I run
+them.
+
+I'll prompt you before I clean up each component:
+- If something exists just for Nix, I'll ask you if I can remove it.
+- Otherwise, I'll show you a diff of the edit I'd like to make.
+EOF
+    # uninstall report?
+    if ! ui_confirm "Are you sure you want to uninstall Nix?"; then
+        ok "Alright, no changes have been made :)"
+        get_help
+        trap finish_cleanup EXIT
+        exit 1
+    fi
+
+    poly_service_uninstall_prompts
+
+    trap finish_uninstall_success EXIT
+}
+
+# ACTION for override
+case "${1-}" in
+    uninstall)
+        shift
+        uninstall "$@";;
+    ""|install|*)
+        if ! [ "${#@}" = 0 ]; then
+            shift
+        fi
+        # same as the no-arg condition for now (but, explicit)
+        main "$@";;
+esac

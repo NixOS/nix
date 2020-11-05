@@ -37,12 +37,9 @@ EOF
 fi
 
 # Determine if we could use the multi-user installer or not
-if [ "$(uname -s)" = "Darwin" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-elif [ "$(uname -s)" = "Linux" ]; then
+if [ "$(uname -s)" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
-
 
 case "$(uname -s)" in
     "Darwin")
@@ -50,6 +47,7 @@ case "$(uname -s)" in
     *)
         INSTALL_MODE=no-daemon;;
 esac
+ACTION="install"
 # CREATE_DARWIN_VOLUME=${CREATE_DARWIN_VOLUME:-1} # now default
 # handle the command line flags
 while [ $# -gt 0 ]; do
@@ -75,6 +73,8 @@ while [ $# -gt 0 ]; do
                 echo "         is no longer needed and will be removed in the future."
                 echo ""
             } >&2;;
+        --uninstall)
+            ACTION="uninstall";;
         --nix-extra-conf-file)
             export NIX_EXTRA_CONF="$(cat $2)"
             shift;;
@@ -112,7 +112,7 @@ done
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
-    exec "$self/install-multi-user"
+    exec "$self/install-multi-user" "$ACTION"
     exit 0
 fi
 

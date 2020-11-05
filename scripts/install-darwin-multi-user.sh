@@ -6,13 +6,19 @@ set -o pipefail
 readonly NIX_DAEMON_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
 # create by default; set 0 to DIY, use a symlink, etc.
 readonly NIX_VOLUME_CREATE=${NIX_VOLUME_CREATE:-1} # now default
+readonly root_writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
 
-# TODO: I'm trying to decide between how well-contained the darwin-volume
-# stuff should stay here. Current goal is to source create-darwin-volume.sh
-# and leave most of the code there, which accomplishes my main goals:
-# 1. take advantage of the UI/X affordances here
-# 2. retain some degree of invokability (a kindness to anyone who has a script
-#    set up to download and run it)?
+if [ "$root_writable" = "false" ] && [ "$NIX_VOLUME_CREATE" = 1 ]; then
+    should_create_volume() { return 0; }
+else
+    should_create_volume() { return 1; }
+fi
+
+
+# TODO: I'm trying to decide how well-contained the darwin-volume
+# stuff should stay here. It could merge here, in theory, but I'm reluctant
+# to make that jump yet because I'm not certain that single-user macOS will
+# actually go away :)
 . "$EXTRACTED_NIX_PATH/create-darwin-volume.sh" "no-main"
 
 dsclattr() {
@@ -28,35 +34,57 @@ poly_validate_assumptions() {
     if [ "$(uname -s)" != "Darwin" ]; then
         failure "This script is for use with macOS!"
     fi
-    writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
 
-    if ! [ -e $NIX_ROOT ] && [ "$writable" = "false" ] && [ "$NIX_VOLUME_CREATE" = 1 ]; then
-        # we need to create a Nix volume
-        darwin_volume_validate_assumptions
+    if should_create_volume; then
+        # TODO: tentatively trying out a "curing" approach
+        darwin_volume_uninstall_prompts
+        # darwin_volume_validate_assumptions
     fi
 }
 
 poly_service_installed_check() {
-    test_nix_daemon_installed || test_nix_volume_mountd_installed
+    if should_create_volume; then
+        test_nix_daemon_installed || test_nix_volume_mountd_installed
+    else
+        test_nix_daemon_installed
+    fi
 }
 
 poly_service_uninstall_directions() {
     echo "$1. Remove macOS-specific components:"
-    darwin_volume_uninstall_directions
+    if should_create_volume && test_nix_volume_mountd_installed; then
+        darwin_volume_uninstall_directions
+    fi
     if test_nix_daemon_installed; then
         nix_daemon_uninstall_directions
     fi
 }
 
 poly_service_uninstall_prompts() {
-    echo "$1. Remove macOS-specific components:"
-    darwin_volume_uninstall_prompts
+    # TODO:
+    # nixbld users
+    # ~/.cache/nix
+    # /var/log/nix-daemon.log
+    # /var/root/
+    #   .{nix-channels,nix-profile,nix-defexpr}
+    #   .cache/nix
+    # /etc/
+    #   nix/nix.conf
+    #   bashrc
+    #   bashrc.backup-before-nix
+    #   zshenv
+    #   zshenv.backup-before-nix
+    if should_create_volume && test_nix_volume_mountd_installed; then
+        darwin_volume_uninstall_prompts
+    fi
+
     if test_nix_daemon_installed; then
         nix_daemon_uninstall_prompt
     fi
 }
 
 poly_service_setup_note() {
+    # TODO: add create volume (but like, conditionally)
     cat <<EOF
  - load and start a LaunchDaemon (at $NIX_DAEMON_DEST) for nix-daemon
 
@@ -64,13 +92,11 @@ EOF
 }
 
 poly_extra_try_me_commands(){
-  :
-}
-poly_extra_setup_instructions(){
-  :
+    :
 }
 
 poly_configure_nix_daemon_service() {
+    task "Setting up the nix-daemon LaunchDaemon"
     _sudo "to set up the nix-daemon as a LaunchDaemon" \
           cp -f "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
 
@@ -79,7 +105,6 @@ poly_configure_nix_daemon_service() {
 
     _sudo "to start the nix-daemon" \
           launchctl start org.nixos.nix-daemon
-
 }
 
 poly_group_exists() {
@@ -177,5 +202,15 @@ poly_create_build_user() {
 }
 
 poly_prepare_to_install() {
-    setup_darwin_volume
+    if should_create_volume; then
+        task "Creating a Nix volume"
+        # intentional indent below to match task indent
+        cat <<EOF
+    Nix traditionally stores its data in the root directory $NIX_ROOT, but
+    macOS now (starting in 10.15 Catalina) has a read-only root directory.
+    To support Nix, I will create a volume and configure macOS to mount it
+    at $NIX_ROOT.
+EOF
+        setup_darwin_volume
+    fi
 }
