@@ -43,14 +43,24 @@ elif [ "$(uname -s)" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
 
-export INSTALL_MODE=no-daemon
-CREATE_DARWIN_VOLUME=${CREATE_DARWIN_VOLUME:-1} # now default
+
+case "$(uname -s)" in
+    "Darwin")
+        INSTALL_MODE=daemon;;
+    *)
+        INSTALL_MODE=no-daemon;;
+esac
+# CREATE_DARWIN_VOLUME=${CREATE_DARWIN_VOLUME:-1} # now default
 # handle the command line flags
 while [ $# -gt 0 ]; do
     case $1 in
         --daemon)
             INSTALL_MODE=daemon;;
         --no-daemon)
+            if [ "$(uname -s)" = "Darwin" ]; then
+                printf '\e[1;31mError: --no-daemon installs are no-longer supported on Darwin/macOS!\e[0m\n'
+                exit 1
+            fi
             INSTALL_MODE=no-daemon;;
         --no-channel-add)
             export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
@@ -99,14 +109,6 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-
-if [ "$(uname -s)" = "Darwin" ]; then
-    writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
-    if ! [ -e $dest ] && [ "$writable" = "false" ] && [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
-        printf "\e[1;31mCreating volume and mountpoint $dest if needed.\e[0m\n"
-        "$self/create-darwin-volume.sh"
-    fi
-fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
