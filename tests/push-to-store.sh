@@ -1,4 +1,6 @@
 #!/bin/sh
 
+set -x
+
 echo Pushing "$@" to "$REMOTE_STORE"
-printf "%s" "$OUT_PATHS" | xargs -d: nix copy --to "$REMOTE_STORE" --no-require-sigs
+printf "%s" "$DRV_OUTPUTS" | xargs nix copy --to "$REMOTE_STORE" --no-require-sigs
