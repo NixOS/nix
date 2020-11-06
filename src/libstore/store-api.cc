@@ -738,9 +738,13 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMod
     StorePathSet paths2;
 
     for (auto & path : paths) {
-        if (path.path.isDerivation())
-            unsupported("buildPaths");
-        paths2.insert(path.path);
+        if (path.path.isDerivation()) {
+            for (auto & outputName : path.outputs) {
+                if (!queryDrvOutputInfo({path.path, outputName}))
+                    unsupported("buildPaths");
+            }
+        } else
+            paths2.insert(path.path);
     }
 
     if (queryValidPaths(paths2).size() != paths2.size())
