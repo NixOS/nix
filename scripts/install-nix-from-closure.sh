@@ -98,6 +98,9 @@ while [ $# -gt 0 ]; do
                 echo ""
                 echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix.conf"
                 echo ""
+                if [ -n "${INVOKED_FROM_INSTALL_IN:-}" ]; then
+                    echo " --tarball-url-prefix URL: Base URL to download the Nix tarball from."
+                fi
             ) >&2
 
             # darwin and Catalina+
