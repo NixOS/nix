@@ -502,22 +502,22 @@ void DerivationGoal::inputsRealised()
             assert(attempt);
             Derivation drvResolved { *std::move(attempt) };
 
-            auto pathResolved = writeDerivation(worker.store, drvResolved);
+            resolvedDrvPath = writeDerivation(worker.store, drvResolved);
             /* Add to memotable to speed up downstream goal's queries with the
                original derivation. */
-            drvPathResolutions.lock()->insert_or_assign(drvPath, pathResolved);
+            drvPathResolutions.lock()->insert_or_assign(drvPath, resolvedDrvPath);
 
             auto msg = fmt("Resolved derivation: '%s' -> '%s'",
                 worker.store.printStorePath(drvPath),
-                worker.store.printStorePath(pathResolved));
+                worker.store.printStorePath(*resolvedDrvPath));
             act = std::make_unique<Activity>(*logger, lvlInfo, actBuildWaiting, msg,
                 Logger::Fields {
                        worker.store.printStorePath(drvPath),
-                       worker.store.printStorePath(pathResolved),
+                       worker.store.printStorePath(*resolvedDrvPath),
                    });
 
             auto resolvedGoal = worker.makeDerivationGoal(
-                pathResolved, wantedOutputs, buildMode);
+                *resolvedDrvPath, wantedOutputs, buildMode);
             addWaitee(resolvedGoal);
 
             state = &DerivationGoal::resolvedFinished;
@@ -1004,6 +1004,15 @@ void DerivationGoal::buildDone()
 }
 
 void DerivationGoal::resolvedFinished() {
+    debug("Resolving the original derivation");
+    assert(resolvedDrvPath);
+
+    for (auto & [outputName, _] : drv->outputs) {
+        auto outputPath = worker.store.queryOutputPathOf(*resolvedDrvPath, outputName);
+        assert(outputPath); // We've just built it so it should still be there
+        worker.store.registerDrvOutput(DrvOutputId{drvPath, outputName}, {*outputPath});
+    }
+
     done(BuildResult::Built);
 }
 

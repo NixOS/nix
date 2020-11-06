@@ -64,6 +64,11 @@ struct DerivationGoal : public Goal
 
     std::unique_ptr<ParsedDerivation> parsedDrv;
 
+    /* Path to the corresponding resolved derivation,
+     *  if we're not already resolved
+     */
+    std::optional<StorePath> resolvedDrvPath;
+
     /* The remainder is state held during the build. */
 
     /* Locks on (fixed) output paths. */

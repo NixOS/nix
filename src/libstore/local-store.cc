@@ -846,34 +846,15 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
     for (auto & [outName, _] : drv.outputs) {
         outputs.insert_or_assign(outName, std::nullopt);
     }
-    bool haveCached = false;
-    {
-        auto resolutions = drvPathResolutions.lock();
-        auto resolvedPathOptIter = resolutions->find(path);
-        if (resolvedPathOptIter != resolutions->end()) {
-            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
-            if (resolvedPathOpt)
-                path = *resolvedPathOpt;
-            haveCached = true;
-        }
+
+    for (auto & output : drv.outputsAndOptPaths(*this)) {
+        if (output.second.second)
+            outputs.insert_or_assign(
+                output.first,
+                *output.second.second
+            );
     }
-    /* can't just use else-if instead of `!haveCached` because we need to unlock
-       `drvPathResolutions` before it is locked in `Derivation::resolve`. */
-    if (!haveCached && (drv.type() == DerivationType::CAFloating || drv.type() == DerivationType::DeferredInputAddressed)) {
-        /* Try resolve drv and use that path instead. */
-        auto attempt = drv.tryResolve(*this);
-        if (!attempt)
-            /* If we cannot resolve the derivation, we cannot have any path
-               assigned so we return the map of all std::nullopts. */
-            return outputs;
-        /* Just compute store path */
-        auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true);
-        /* Store in memo table. */
-        /* FIXME: memo logic should not be local-store specific, should have
-           wrapper-method instead. */
-        drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
-        path = std::move(pathResolved);
-    }
+
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
@@ -1635,4 +1616,5 @@ std::optional<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutpu
             .outPath = *outputPath,
         }};
 }
+
 }  // namespace nix
