@@ -78,12 +78,12 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[path];
+    std::weak_ptr<PathSubstitutionGoal> & goal_weak = substitutionGoals[path];
     auto goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
+        goal = std::make_shared<PathSubstitutionGoal>(path, *this, repair, ca);
         goal_weak = goal;
         wakeUp(goal);
     }
@@ -109,7 +109,7 @@ void Worker::removeGoal(GoalPtr goal)
 {
     if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<SubstitutionGoal>(goal))
+    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, substitutionGoals);
     else
         assert(false);
@@ -217,7 +217,7 @@ void Worker::run(const Goals & _topGoals)
         topGoals.insert(i);
         if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
             topPaths.push_back({goal->drvPath, goal->wantedOutputs});
-        } else if (auto goal = dynamic_cast<SubstitutionGoal *>(i.get())) {
+        } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back({goal->storePath});
         }
     }
@@ -471,7 +471,7 @@ void Worker::markContentsGood(const StorePath & path)
 }
 
 
-GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
     return subGoal;
 }
 
