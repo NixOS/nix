@@ -231,7 +231,7 @@ void DerivationGoal::getDerivation()
         return;
     }
 
-    addWaitee(upcast_goal(worker.makeSubstitutionGoal(drvPath)));
+    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
 
     state = &DerivationGoal::loadDerivation;
 }
@@ -304,7 +304,7 @@ void DerivationGoal::haveDerivation()
                 /* Nothing to wait for; tail call */
                 return DerivationGoal::gaveUpOnSubstitution();
             }
-            addWaitee(upcast_goal(worker.makeSubstitutionGoal(
+            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
                 status.known->path,
                 buildMode == bmRepair ? Repair : NoRepair,
                 getDerivationCA(*drv))));
@@ -388,7 +388,7 @@ void DerivationGoal::gaveUpOnSubstitution()
         if (!settings.useSubstitutes)
             throw Error("dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
-        addWaitee(upcast_goal(worker.makeSubstitutionGoal(i)));
+        addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i)));
     }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -442,7 +442,7 @@ void DerivationGoal::repairClosure()
         });
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
-            addWaitee(upcast_goal(worker.makeSubstitutionGoal(i, Repair)));
+            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
             addWaitee(worker.makeDerivationGoal(drvPath2->second, StringSet(), bmRepair));
     }

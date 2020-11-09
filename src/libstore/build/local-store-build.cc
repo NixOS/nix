@@ -14,7 +14,7 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
         if (path.path.isDerivation())
             goals.insert(worker.makeDerivationGoal(path.path, path.outputs, buildMode));
         else
-            goals.insert(worker.makeSubstitutionGoal(path.path, buildMode == bmRepair ? Repair : NoRepair));
+            goals.insert(worker.makePathSubstitutionGoal(path.path, buildMode == bmRepair ? Repair : NoRepair));
     }
 
     worker.run(goals);
@@ -30,7 +30,7 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationGoal *>(i.get())) failed.insert(i2->drvPath);
-            else if (auto i2 = dynamic_cast<SubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
+            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
         }
     }
 
@@ -69,7 +69,7 @@ void LocalStore::ensurePath(const StorePath & path)
     if (isValidPath(path)) return;
 
     Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path);
+    GoalPtr goal = worker.makePathSubstitutionGoal(path);
     Goals goals = {goal};
 
     worker.run(goals);
@@ -87,7 +87,7 @@ void LocalStore::ensurePath(const StorePath & path)
 void LocalStore::repairPath(const StorePath & path)
 {
     Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path, Repair);
+    GoalPtr goal = worker.makePathSubstitutionGoal(path, Repair);
     Goals goals = {goal};
 
     worker.run(goals);

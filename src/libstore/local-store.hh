@@ -301,7 +301,7 @@ private:
     void createUser(const std::string & userName, uid_t userId) override;
 
     friend struct DerivationGoal;
-    friend struct SubstitutionGoal;
+    friend struct PathSubstitutionGoal;
 };
 
 
