@@ -41,7 +41,8 @@ nix_tests = \
   build.sh \
   compute-levels.sh \
   ca/build.sh \
-  ca/nix-copy.sh
+  ca/nix-copy.sh \
+  ca/substitute.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
