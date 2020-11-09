@@ -178,8 +178,8 @@ extern Verbosity verbosity; /* suppress msgs > this */
    lightweight status messages. */
 #define logErrorInfo(level, errorInfo...) \
     do { \
-        if (level <= nix::verbosity) { \
-            logger->logEI(level, errorInfo); \
+        if ((level) <= nix::verbosity) {     \
+            logger->logEI((level), errorInfo);  \
         } \
     } while (0)
 
