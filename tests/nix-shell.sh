@@ -58,7 +58,8 @@ output=$($TEST_ROOT/shell.shebang.rb abc ruby)
 
 # Test 'nix develop'.
 nix develop -f shell.nix shellDrv -c bash -c '[[ -n $stdenv ]]'
-echo foo | nix develop -f shell.nix shellDrv -c cat  # preserve stdin with `-c`
+# Preserve stdin with `-c`
+echo foo | nix develop -f shell.nix shellDrv -c cat | grep -q foo
 
 # Test 'nix print-dev-env'.
 source <(nix print-dev-env -f shell.nix shellDrv)
