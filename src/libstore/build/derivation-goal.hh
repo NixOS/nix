@@ -37,6 +37,7 @@ struct InitialOutputStatus {
 
 struct InitialOutput {
     bool wanted;
+    Hash staticHash;
     std::optional<InitialOutputStatus> known;
 };
 

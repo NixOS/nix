@@ -302,17 +302,22 @@ void DerivationGoal::haveDerivation()
        through substitutes.  If that doesn't work, we'll build
        them. */
     if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
-        for (auto & [_, status] : initialOutputs) {
+        for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
-            if (!status.known) {
-                warn("do not know how to query for unknown floating content-addressed derivation output yet");
-                /* Nothing to wait for; tail call */
-                return DerivationGoal::gaveUpOnSubstitution();
-            }
-            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
-                status.known->path,
-                buildMode == bmRepair ? Repair : NoRepair,
-                getDerivationCA(*drv))));
+            if (!status.known)
+                addWaitee(
+                    upcast_goal(
+                        worker.makeDrvOutputSubstitutionGoal(
+                            DrvOutput{status.staticHash, outputName},
+                            buildMode == bmRepair ? Repair : NoRepair
+                        )
+                    )
+                );
+            else
+                addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
+                    status.known->path,
+                    buildMode == bmRepair ? Repair : NoRepair,
+                    getDerivationCA(*drv))));
         }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -3806,9 +3811,14 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
 void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
+    Derivation fullDrv = *drv;
+    if (auto upcasted = dynamic_cast<Derivation *>(drv.get()))
+        fullDrv = *upcasted;
+    auto outputHashes = staticOutputHashes(worker.store, fullDrv);
     for (auto & i : queryPartialDerivationOutputMap()) {
         InitialOutput info {
             .wanted = wantOutput(i.first, wantedOutputs),
+            .staticHash = outputHashes.at(i.first),
         };
         if (i.second) {
             auto outputPath = *i.second;
@@ -3822,10 +3832,6 @@ void DerivationGoal::checkPathValidity()
             };
         }
         if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-            Derivation fullDrv = *drv;
-            if (auto upcasted = dynamic_cast<Derivation *>(drv.get()))
-                fullDrv = *upcasted;
-            auto outputHashes = staticOutputHashes(worker.store, fullDrv);
             if (auto real = worker.store.queryRealisation(
                     DrvOutput{outputHashes.at(i.first), i.first})) {
                 info.known = {
