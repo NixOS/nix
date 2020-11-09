@@ -48,6 +48,8 @@ testGC () {
 }
 
 testRemoteCache
+clearStore
 testDeterministicCA
+clearStore
 testCutoff
 testGC
