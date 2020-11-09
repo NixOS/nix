@@ -281,7 +281,9 @@ private:
     void createUser(const std::string & userName, uid_t userId) override;
 
     friend struct LocalDerivationGoal;
+    friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;
+    friend struct DerivationGoal;
 };
 
 
