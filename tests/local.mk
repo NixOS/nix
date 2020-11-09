@@ -38,7 +38,8 @@ nix_tests = \
   flakes.sh \
   build.sh \
   ca/build.sh \
-  ca/nix-copy.sh
+  ca/nix-copy.sh \
+  ca/substitute.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh \
 
