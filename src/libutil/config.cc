@@ -291,7 +291,14 @@ template<> std::string BaseSetting<Strings>::to_string() const
 
 template<> void BaseSetting<StringSet>::set(const std::string & str, bool append)
 {
-    value = tokenizeString<StringSet>(str);
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<StringSet>(str))
+        value.insert(s);
+}
+
+template<> bool BaseSetting<StringSet>::isAppendable()
+{
+    return true;
 }
 
 template<> std::string BaseSetting<StringSet>::to_string() const
@@ -302,9 +309,7 @@ template<> std::string BaseSetting<StringSet>::to_string() const
 template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
 {
     if (!append) value.clear();
-    auto kvpairs = tokenizeString<Strings>(str);
-    for (auto & s : kvpairs)
-    {
+    for (auto & s : tokenizeString<Strings>(str)) {
         auto eq = s.find_first_of('=');
         if (std::string::npos != eq)
             value.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
