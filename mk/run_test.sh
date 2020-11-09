@@ -14,7 +14,7 @@ if [ -t 1 ]; then
     yellow="[33;1m"
     normal="[m"
 fi
-(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
+(cd tests && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
 log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)"
 status=$?
 if [ $status -eq 0 ]; then
