@@ -4,6 +4,7 @@
 #include "lock.hh"
 #include "store-api.hh"
 #include "goal.hh"
+#include "realisation.hh"
 
 #include <future>
 #include <thread>
@@ -13,6 +14,7 @@ namespace nix {
 /* Forward definition. */
 struct DerivationGoal;
 struct PathSubstitutionGoal;
+class DrvOutputSubstitutionGoal;
 
 /* Workaround for not being able to declare a something like
 
@@ -24,6 +26,7 @@ struct PathSubstitutionGoal;
    a place where `PathSubstitutionGoal` is concrete, and use it in a place where it
    is opaque. */
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -73,6 +76,7 @@ private:
        same derivation / path. */
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
+    std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
@@ -147,6 +151,7 @@ public:
 
     /* substitution goal */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
