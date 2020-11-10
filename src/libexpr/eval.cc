@@ -1370,11 +1370,11 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             if (j != args.end()) {
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
-                throwUndefinedVarError(R"(cannot auto-call a function that has an argument without a default value ('%1%')
+                throwUndefinedVarError(i.pos, R"(cannot auto-call a function that has an argument without a default value ('%1%')
   An 'auto-call' is when a nix expression is evaluated without any external arguments.  If that
   nix expression is a function, and that function's arguments all have default values, then all is well.
 
-  But if the function arguments don't have default values, then evaluation fails.
+  But if the function arguments don't have default values, evaluation fails.
 
   The classic case for this error is evaluating a nix file with nix-build that expects to be evaluated by callPackage.
     # in 'callPackage' format: expression is a function that takes an argument 'stdenv'.
