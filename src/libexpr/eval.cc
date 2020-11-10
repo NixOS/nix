@@ -1366,29 +1366,30 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
                 throwUndefinedVarError(i.pos, R"(cannot auto-call a function that has an argument without a default value ('%1%')
-  An 'auto-call' is when a nix expression is evaluated without any external arguments.
-  If that nix expression is a function, and that function's arguments all have default
-  values, then all is well.
 
-  But if the function arguments don't have default values, evaluation fails.
+An 'auto-call' is when a nix expression is evaluated without any external arguments.
+If that nix expression is a function, and that function's arguments all have default
+values, then all is well.
 
-  The classic case for this error is evaluating a nix file with nix-build that expects
-  to be evaluated by callPackage.
-    # in 'callPackage' format: expression is a function that takes an argument 'stdenv'.
-    # callPackage would implicitly pull 'stdenv' from nixpkgs, then call this function.
-    { stdenv }:
-    stdenv.mkDerivation  {
-    ...
+But if the function arguments don't have default values, evaluation fails.
 
-    # in 'auto-call' format: nixpkgs is imported explicitly, and used directly.
-    let
-      nixpkgs = import <nixpkgs> {};
-    in
-      nixpkgs.stdenv.mkDerivation {
-    ...
+The classic case for this error is evaluating a nix file with nix-build that expects
+to be evaluated by callPackage.
+  # in 'callPackage' format: expression is a function that takes an argument 'stdenv'.
+  # callPackage would implicitly pull 'stdenv' from nixpkgs, then call this function.
+  { stdenv }:
+  stdenv.mkDerivation  {
+  ...
 
-  See this nix pill for more information re callPackage format:
-  https://nixos.org/guides/nix-pills/callpackage-design-pattern.html)", i.name);
+  # in 'auto-call' format: nixpkgs is imported explicitly, and used directly.
+  let
+    nixpkgs = import <nixpkgs> {};
+  in
+    nixpkgs.stdenv.mkDerivation {
+  ...
+
+More about callPackage: 
+https://nixos.org/guides/nix-pills/callpackage-design-pattern.html)", i.name);
             }
         }
     }
