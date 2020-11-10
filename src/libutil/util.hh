@@ -383,7 +383,7 @@ string trim(const string & s, const string & whitespace = " \n\r\t");
 
 
 /* Replace all occurrences of a string inside another string. */
-string replaceStrings(const std::string & s,
+string replaceStrings(std::string_view s,
     const std::string & from, const std::string & to);
 
 

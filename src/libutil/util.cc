@@ -1273,11 +1273,11 @@ string trim(const string & s, const string & whitespace)
 }
 
 
-string replaceStrings(const std::string & s,
+string replaceStrings(std::string_view s,
     const std::string & from, const std::string & to)
 {
-    if (from.empty()) return s;
-    string res = s;
+    string res(s);
+    if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
         res.replace(pos, from.size(), to);
