@@ -552,10 +552,10 @@ public:
 
         if (copyPath.done || copyPath.expected) {
             state.statusLines.insert_or_assign(50,
-                fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB %d",
+                fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB",
                     renderBar(copyPath.done, copyPath.left, copyPath.expected),
                     copyPaths.done, copyPaths.expected,
-                    copyPath.done / MiB, copyPath.expected / MiB, copyPath.left));
+                    copyPath.done / MiB, copyPath.expected / MiB));
             state.statusLines.insert_or_assign(51, "");
         }
 
