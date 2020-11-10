@@ -150,6 +150,11 @@
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
 
+        # An older version of Nix to test against when using the daemon.
+        # Currently using `nixUnstable` as the stable one doesn't respect
+        # `NIX_DAEMON_SOCKET_PATH` which is needed for the tests.
+        mainstream-nix = prev.nixUnstable;
+
         nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
           name = "nix-${version}";
           inherit version;
@@ -157,6 +162,8 @@
           src = self;
 
           VERSION_SUFFIX = versionSuffix;
+
+          OUTER_NIX = mainstream-nix;
 
           outputs = [ "out" "dev" "doc" ];
 
@@ -485,6 +492,8 @@
 
         stdenv.mkDerivation {
           name = "nix";
+
+          OUTER_NIX = mainstream-nix;
 
           outputs = [ "out" "dev" "doc" ];
 
