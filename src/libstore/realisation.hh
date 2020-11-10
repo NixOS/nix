@@ -28,6 +28,8 @@ struct Realisation {
 
     StringSet signatures;
 
+    std::set<DrvOutput> drvOutputDeps;
+
     nlohmann::json toJSON() const;
     static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
 

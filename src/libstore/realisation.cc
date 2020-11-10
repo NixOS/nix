@@ -22,10 +22,14 @@ std::string DrvOutput::to_string() const {
 }
 
 nlohmann::json Realisation::toJSON() const {
+    nlohmann::json jsonDrvOutputDeps;
+    for (auto & dep : drvOutputDeps)
+        jsonDrvOutputDeps.push_back(dep.to_string());
     return nlohmann::json{
         {"id", id.to_string()},
         {"outPath", outPath.to_string()},
         {"signatures", signatures},
+        {"drvOutputDeps", jsonDrvOutputDeps},
     };
 }
 
@@ -51,10 +55,16 @@ Realisation Realisation::fromJSON(
     if (auto signaturesIterator = json.find("signatures"); signaturesIterator != json.end())
         signatures.insert(signaturesIterator->begin(), signaturesIterator->end());
 
+    std::set <DrvOutput> drvOutputDeps;
+    if (auto jsonDependencies = json.find("drvOutputDeps"); jsonDependencies != json.end())
+        for (auto & jsonDep : *jsonDependencies)
+            drvOutputDeps.insert(DrvOutput::parse(jsonDep.get<std::string>()));
+
     return Realisation{
         .id = DrvOutput::parse(getField("id")),
         .outPath = StorePath(getField("outPath")),
         .signatures = signatures,
+        .drvOutputDeps = drvOutputDeps,
     };
 }
 
