@@ -166,7 +166,7 @@ struct MercurialInputScheme : InputScheme
                 auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 return {
-                    Tree(store->printStorePath(storePath), std::move(storePath)),
+                    Tree(store->toRealPath(storePath), std::move(storePath)),
                     input
                 };
             }
