@@ -61,6 +61,8 @@ private:
         uint64_t failed = 0;
     };
 
+    typedef unsigned int LineId;
+
     struct State
     {
         std::list<ActInfo> activities;
@@ -76,6 +78,11 @@ private:
         bool haveUpdate = true;
 
         bool printBuildLogs;
+
+        std::map<LineId, std::string> statusLines;
+
+        /* How many lines need to be erased when redrawing. */
+        size_t prevStatusLines = 0;
     };
 
     bool isTTY;
@@ -104,6 +111,7 @@ public:
             while (state->active) {
                 if (!state->haveUpdate)
                     state.wait(updateCV);
+                updateStatusLine(*state);
                 draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
@@ -115,6 +123,8 @@ public:
         });
 
         if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO) && isatty(STDERR_FILENO)) {
+
+            static auto helpLine = ANSI_BOLD "Type 'h' for help.";
 
             struct termios term;
             if (tcgetattr(STDIN_FILENO, &term))
@@ -161,12 +171,12 @@ public:
                     }
                     if (c == 'l') {
                         auto state(state_.lock());
-                        log(*state, lvlError,
-                            state->printBuildLogs
-                            ? ANSI_BOLD "Disabling build logs."
-                            : ANSI_BOLD "Enabling build logs.");
                         state->printBuildLogs = !state->printBuildLogs;
-                        draw(*state);
+                        updateStatusLine(*state);
+                        draw(*state,
+                            state->printBuildLogs
+                            ? ANSI_BOLD "Enabling build logs."
+                            : ANSI_BOLD "Disabling build logs.");
                     }
                     if (c == '+' || c == '=' || c == 'v') {
                         auto state(state_.lock());
@@ -179,17 +189,24 @@ public:
                         log(*state, lvlError, ANSI_BOLD "Decreasing verbosity...");
                     }
                     if (c == 'h' || c == '?') {
-                        printError(
-                            ANSI_BOLD "The following keys are available:\n"
-                            "  'v' to increase verbosity.\n"
-                            "  '-' to decrease verbosity.\n"
-                            "  'l' to show build log output.\n"
-                            "  'q' to quit." ANSI_NORMAL);
+                        auto state(state_.lock());
+                        if (state->statusLines.count(1)) {
+                            for (LineId i = 0; i <= 4; i++)
+                                state->statusLines.erase(i);
+                            state->statusLines.insert_or_assign(0, helpLine);
+                        } else {
+                            state->statusLines.insert_or_assign(0, ANSI_BOLD "The following keys are available:");
+                            state->statusLines.insert_or_assign(1, ANSI_BOLD "  'v' to increase verbosity.");
+                            state->statusLines.insert_or_assign(2, ANSI_BOLD "  '-' to decrease verbosity.");
+                            state->statusLines.insert_or_assign(3, ANSI_BOLD "  'l' to show build log output.");
+                            state->statusLines.insert_or_assign(4, ANSI_BOLD "  'q' to quit.");
+                        }
+                        draw(*state);
                     }
                 }
             });
 
-            log(lvlError, "Type 'h' for help.");
+            state_.lock()->statusLines.insert_or_assign(0, helpLine);
         }
     }
 
@@ -209,8 +226,9 @@ public:
         {
             auto state(state_.lock());
             if (!state->active) return;
+            state->statusLines.clear();
+            draw(*state);
             state->active = false;
-            writeToStderr("\r\e[K");
             updateCV.notify_one();
             quitCV.notify_one();
         }
@@ -242,8 +260,7 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + replaceStrings(filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n", "\n", "\r\n"));
-            draw(state);
+            draw(state, filterANSIEscapes(s, !isTTY));
         } else {
             auto s2 = s + ANSI_NORMAL "\n";
             if (!isTTY) s2 = filterANSIEscapes(s2, true);
@@ -375,7 +392,7 @@ public:
                 info.lastLine = lastLine;
                 state->activities.emplace_back(info);
                 i->second = std::prev(state->activities.end());
-                if (state->printBuildLogs)
+                if (!state->printBuildLogs)
                     update(*state);
             }
         }
@@ -427,11 +444,8 @@ public:
         updateCV.notify_one();
     }
 
-    void draw(State & state)
+    void updateStatusLine(State & state)
     {
-        state.haveUpdate = false;
-        if (!state.active) return;
-
         std::string line;
 
         std::string status = getStatus(state);
@@ -462,10 +476,40 @@ public:
             }
         }
 
+        if (line.empty())
+            state.statusLines.erase(100);
+        else
+            state.statusLines.insert_or_assign(100, line);
+    }
+
+    void draw(State & state, std::optional<std::string_view> msg = {})
+    {
+        state.haveUpdate = false;
+        if (!state.active) return;
+
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+        std::string s;
+
+        for (size_t i = 1; i < state.prevStatusLines; ++i)
+            s += "\r\e[K\e[A";
+
+        s += "\r";
+
+        if (msg) {
+            s += replaceStrings(*msg, "\n", "\r\n");
+            s += ANSI_NORMAL "\e[K\n\r";
+        }
+
+        for (const auto & [n, i] : enumerate(state.statusLines)) {
+            s += filterANSIEscapes(i.second, false, width) + ANSI_NORMAL + "\e[K";
+            if (n + 1 < state.statusLines.size()) s += "\r\n";
+        }
+
+        writeToStderr(s);
+
+        state.prevStatusLines = state.statusLines.size();
     }
 
     std::string getStatus(State & state)
@@ -562,9 +606,7 @@ public:
     {
         auto state(state_.lock());
         if (state->active) {
-            std::cerr << "\r\e[K";
-            Logger::writeToStdout(s);
-            draw(*state);
+            draw(*state, s);
         } else {
             Logger::writeToStdout(s);
         }
