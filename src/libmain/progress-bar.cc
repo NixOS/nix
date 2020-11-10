@@ -35,6 +35,16 @@ static std::string_view storePathToName(std::string_view path)
     return i == std::string::npos ? base.substr(0, 0) : base.substr(i + 1);
 }
 
+std::string repeat(std::string_view s, size_t n)
+{
+    std::string res;
+    for (size_t i = 0; i < n; ++i)
+        res += s;
+    return res;
+}
+
+auto MiB = 1024.0 * 1024.0;
+
 class ProgressBar : public Logger
 {
 private:
@@ -61,6 +71,37 @@ private:
         uint64_t failed = 0;
     };
 
+    struct ActivityStats
+    {
+        uint64_t done = 0;
+        uint64_t expected = 0;
+        uint64_t running = 0;
+        uint64_t failed = 0;
+        uint64_t left = 0;
+    };
+
+    ActivityStats getActivityStats(ActivitiesByType & act)
+    {
+        ActivityStats stats {
+            .done = act.done,
+            .expected = act.done,
+            .running = 0,
+            .failed = act.failed
+        };
+
+        for (auto & j : act.its) {
+            stats.done += j.second->done;
+            stats.expected += j.second->expected;
+            stats.running += j.second->running;
+            stats.failed += j.second->failed;
+            stats.left += j.second->expected - j.second->done;
+        }
+
+        stats.expected = std::max(stats.expected, act.expected);
+
+        return stats;
+    }
+
     typedef unsigned int LineId;
 
     struct State
@@ -83,6 +124,8 @@ private:
 
         /* How many lines need to be erased when redrawing. */
         size_t prevStatusLines = 0;
+
+        bool helpShown = false;
     };
 
     bool isTTY;
@@ -99,6 +142,15 @@ private:
     Pipe inputPipe;
 
 public:
+
+    void resetHelp(State & state)
+    {
+        for (LineId i = 0; i <= 6; i++)
+            state.statusLines.erase(i);
+        state.statusLines.insert_or_assign(0, "");
+        state.statusLines.insert_or_assign(1, ANSI_BOLD "Type 'h' for help.");
+        state.statusLines.insert_or_assign(2, "");
+    }
 
     ProgressBar(bool printBuildLogs, bool isTTY)
         : isTTY(isTTY)
@@ -123,8 +175,6 @@ public:
         });
 
         if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO) && isatty(STDERR_FILENO)) {
-
-            static auto helpLine = ANSI_BOLD "Type 'h' for help.";
 
             struct termios term;
             if (tcgetattr(STDIN_FILENO, &term))
@@ -190,23 +240,25 @@ public:
                     }
                     if (c == 'h' || c == '?') {
                         auto state(state_.lock());
-                        if (state->statusLines.count(1)) {
-                            for (LineId i = 0; i <= 4; i++)
-                                state->statusLines.erase(i);
-                            state->statusLines.insert_or_assign(0, helpLine);
+                        if (state->helpShown) {
+                            state->helpShown = false;
+                            resetHelp(*state);
                         } else {
-                            state->statusLines.insert_or_assign(0, ANSI_BOLD "The following keys are available:");
-                            state->statusLines.insert_or_assign(1, ANSI_BOLD "  'v' to increase verbosity.");
-                            state->statusLines.insert_or_assign(2, ANSI_BOLD "  '-' to decrease verbosity.");
-                            state->statusLines.insert_or_assign(3, ANSI_BOLD "  'l' to show build log output.");
-                            state->statusLines.insert_or_assign(4, ANSI_BOLD "  'q' to quit.");
+                            state->helpShown = true;
+                            state->statusLines.insert_or_assign(0, "");
+                            state->statusLines.insert_or_assign(1, ANSI_BOLD "The following keys are available:");
+                            state->statusLines.insert_or_assign(2, ANSI_BOLD "  'v' to increase verbosity.");
+                            state->statusLines.insert_or_assign(3, ANSI_BOLD "  '-' to decrease verbosity.");
+                            state->statusLines.insert_or_assign(4, ANSI_BOLD "  'l' to show build log output.");
+                            state->statusLines.insert_or_assign(5, ANSI_BOLD "  'q' to quit.");
+                            state->statusLines.insert_or_assign(6, "");
                         }
                         draw(*state);
                     }
                 }
             });
 
-            state_.lock()->statusLines.insert_or_assign(0, helpLine);
+            resetHelp(*state_.lock());
         }
     }
 
@@ -480,6 +532,43 @@ public:
             state.statusLines.erase(100);
         else
             state.statusLines.insert_or_assign(100, line);
+
+        auto renderBar = [](uint64_t done, uint64_t running, uint64_t expected)
+        {
+            expected = std::max(expected, (uint64_t) 1);
+            auto pct1 = std::min((double) done / expected, 1.0);
+            auto pct2 = std::min((double) (done + running) / expected, 1.0);
+            auto barLength = 60;
+            size_t chars1 = barLength * pct1;
+            size_t chars2 = barLength * pct2;
+            return
+                ANSI_GREEN + repeat("█", chars1) +
+                ANSI_YELLOW + repeat("▓", chars2 - chars1) +
+                ANSI_NORMAL + repeat("▒", barLength - chars2);
+        };
+
+        auto copyPath = getActivityStats(state.activitiesByType[actCopyPath]);
+        auto copyPaths = getActivityStats(state.activitiesByType[actCopyPaths]);
+
+        if (copyPath.done || copyPath.expected) {
+            state.statusLines.insert_or_assign(50,
+                fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB %d",
+                    renderBar(copyPath.done, copyPath.left, copyPath.expected),
+                    copyPaths.done, copyPaths.expected,
+                    copyPath.done / MiB, copyPath.expected / MiB, copyPath.left));
+            state.statusLines.insert_or_assign(51, "");
+        }
+
+        auto builds = getActivityStats(state.activitiesByType[actBuilds]);
+
+        if (builds.done || builds.expected) {
+            state.statusLines.insert_or_assign(50,
+                fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Built" ANSI_NORMAL " %d / %d derivations",
+                    renderBar(builds.done, builds.running, builds.expected),
+                    builds.done, builds.expected));
+            state.statusLines.insert_or_assign(51, "");
+        }
+
     }
 
     void draw(State & state, std::optional<std::string_view> msg = {})
@@ -495,7 +584,7 @@ public:
         for (size_t i = 1; i < state.prevStatusLines; ++i)
             s += "\r\e[K\e[A";
 
-        s += "\r";
+        s += "\r\e[K";
 
         if (msg) {
             s += replaceStrings(*msg, "\n", "\r\n");
@@ -514,44 +603,33 @@ public:
 
     std::string getStatus(State & state)
     {
-        auto MiB = 1024.0 * 1024.0;
-
         std::string res;
 
         auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto & act = state.activitiesByType[type];
-            uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
-            for (auto & j : act.its) {
-                done += j.second->done;
-                expected += j.second->expected;
-                running += j.second->running;
-                failed += j.second->failed;
-            }
-
-            expected = std::max(expected, act.expected);
+            auto stats = getActivityStats(state.activitiesByType[type]);
 
             std::string s;
 
-            if (running || done || expected || failed) {
-                if (running)
-                    if (expected != 0)
+            if (stats.running || stats.done || stats.expected || stats.failed) {
+                if (stats.running)
+                    if (stats.expected != 0)
                         s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            running / unit, done / unit, expected / unit);
+                            stats.running / unit, stats.done / unit, stats.expected / unit);
                     else
                         s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
-                            running / unit, done / unit);
-                else if (expected != done)
-                    if (expected != 0)
+                            stats.running / unit, stats.done / unit);
+                else if (stats.expected != stats.done)
+                    if (stats.expected != 0)
                         s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            done / unit, expected / unit);
+                            stats.done / unit, stats.expected / unit);
                     else
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
+                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, stats.done / unit);
                 else
-                    s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
+                    s = fmt(stats.done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, stats.done / unit);
                 s = fmt(itemFmt, s);
 
-                if (failed)
-                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
+                if (stats.failed)
+                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", stats.failed / unit);
             }
 
             return s;
@@ -564,6 +642,7 @@ public:
             res += s;
         };
 
+        #if 0
         showActivity(actBuilds, "%s built");
 
         auto s1 = renderActivity(actCopyPaths, "%s copied");
@@ -576,6 +655,7 @@ public:
         }
 
         showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
+        #endif
 
         {
             auto s = renderActivity(actOptimiseStore, "%s paths optimised");
