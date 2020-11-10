@@ -195,7 +195,7 @@ class DefaultStackAllocator : public StackAllocator {
     }
 
     void deallocate(boost::context::stack_context sctx) {
-        deallocate(sctx);
+        stack.deallocate(sctx);
     }
 };
 
