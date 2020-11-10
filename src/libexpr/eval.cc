@@ -636,11 +636,6 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
-{
-    throw TypeError(s, s1);
-}
-
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
     throw TypeError({
@@ -1371,12 +1366,14 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
                 throwUndefinedVarError(i.pos, R"(cannot auto-call a function that has an argument without a default value ('%1%')
-  An 'auto-call' is when a nix expression is evaluated without any external arguments.  If that
-  nix expression is a function, and that function's arguments all have default values, then all is well.
+  An 'auto-call' is when a nix expression is evaluated without any external arguments.
+  If that nix expression is a function, and that function's arguments all have default
+  values, then all is well.
 
   But if the function arguments don't have default values, evaluation fails.
 
-  The classic case for this error is evaluating a nix file with nix-build that expects to be evaluated by callPackage.
+  The classic case for this error is evaluating a nix file with nix-build that expects
+  to be evaluated by callPackage.
     # in 'callPackage' format: expression is a function that takes an argument 'stdenv'.
     # callPackage would implicitly pull 'stdenv' from nixpkgs, then call this function.
     { stdenv }:
