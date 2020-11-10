@@ -9,6 +9,9 @@
 #include <thread>
 #include <iostream>
 
+#include <termios.h>
+#include <poll.h>
+
 namespace nix {
 
 static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
@@ -71,24 +74,31 @@ private:
 
         bool active = true;
         bool haveUpdate = true;
+
+        bool printBuildLogs;
     };
+
+    bool isTTY;
 
     Sync<State> state_;
 
     std::thread updateThread;
+    std::thread inputThread;
 
     std::condition_variable quitCV, updateCV;
 
-    bool printBuildLogs;
-    bool isTTY;
+    std::optional<struct termios> savedTermAttrs;
+
+    Pipe inputPipe;
 
 public:
 
     ProgressBar(bool printBuildLogs, bool isTTY)
-        : printBuildLogs(printBuildLogs)
-        , isTTY(isTTY)
+        : isTTY(isTTY)
+        , state_({ .active = isTTY, .printBuildLogs = printBuildLogs })
     {
         state_.lock()->active = isTTY;
+
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             while (state->active) {
@@ -97,27 +107,120 @@ public:
                 draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
+
+            if (savedTermAttrs) {
+                tcsetattr(STDIN_FILENO, TCSANOW, &*savedTermAttrs);
+                savedTermAttrs.reset();
+            }
         });
+
+        if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO) && isatty(STDERR_FILENO)) {
+
+            struct termios term;
+            if (tcgetattr(STDIN_FILENO, &term))
+                throw SysError("getting terminal attributes");
+
+            savedTermAttrs = term;
+
+            cfmakeraw(&term);
+
+            if (tcsetattr(STDIN_FILENO, TCSANOW, &term))
+                throw SysError("putting terminal into raw mode");
+
+            inputPipe.create();
+
+            inputThread = std::thread([this]() {
+                // FIXME: exceptions
+
+                struct pollfd fds[2];
+                fds[0] = { .fd = STDIN_FILENO, .events = POLLIN, .revents = 0 };
+                fds[1] = { .fd = inputPipe.readSide.get(), .events = POLLIN, .revents = 0 };
+
+                while (true) {
+                    if (poll(fds, 2, -1) != 1) {
+                        if (errno == EINTR) continue;
+                        assert(false);
+                    }
+
+                    if (fds[1].revents & POLLIN) break;
+
+                    assert(fds[0].revents & POLLIN);
+
+                    char c;
+                    auto n = read(STDIN_FILENO, &c, 1);
+                    if (n == 0) break;
+                    if (n == -1) {
+                        if (errno == EINTR) continue;
+                        break;
+                    }
+                    c = std::tolower(c);
+
+                    if (c == 3 || c == 'q') {
+                        triggerInterrupt();
+                        break;
+                    }
+                    if (c == 'l') {
+                        auto state(state_.lock());
+                        log(*state, lvlError,
+                            state->printBuildLogs
+                            ? ANSI_BOLD "Disabling build logs."
+                            : ANSI_BOLD "Enabling build logs.");
+                        state->printBuildLogs = !state->printBuildLogs;
+                        draw(*state);
+                    }
+                    if (c == '+' || c == '=' || c == 'v') {
+                        auto state(state_.lock());
+                        verbosity = (Verbosity) (verbosity + 1);;
+                        log(*state, lvlError, ANSI_BOLD "Increasing verbosity...");
+                    }
+                    if (c == '-') {
+                        auto state(state_.lock());
+                        verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError;
+                        log(*state, lvlError, ANSI_BOLD "Decreasing verbosity...");
+                    }
+                    if (c == 'h' || c == '?') {
+                        printError(
+                            ANSI_BOLD "The following keys are available:\n"
+                            "  'v' to increase verbosity.\n"
+                            "  '-' to decrease verbosity.\n"
+                            "  'l' to show build log output.\n"
+                            "  'q' to quit." ANSI_NORMAL);
+                    }
+                }
+            });
+
+            log(lvlError, "Type 'h' for help.");
+        }
     }
 
     ~ProgressBar()
     {
         stop();
-        updateThread.join();
     }
 
     void stop() override
     {
-        auto state(state_.lock());
-        if (!state->active) return;
-        state->active = false;
-        writeToStderr("\r\e[K");
-        updateCV.notify_one();
-        quitCV.notify_one();
+        if (inputThread.joinable()) {
+            assert(inputPipe.writeSide);
+            writeFull(inputPipe.writeSide.get(), "x", false);
+            inputThread.join();
+        }
+
+        {
+            auto state(state_.lock());
+            if (!state->active) return;
+            state->active = false;
+            writeToStderr("\r\e[K");
+            updateCV.notify_one();
+            quitCV.notify_one();
+        }
+
+        updateThread.join();
     }
 
-    bool isVerbose() override {
-        return printBuildLogs;
+    bool isVerbose() override
+    {
+        return state_.lock()->printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -139,7 +242,7 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
+            writeToStderr("\r\e[K" + replaceStrings(filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n", "\n", "\r\n"));
             draw(state);
         } else {
             auto s2 = s + ANSI_NORMAL "\n";
@@ -261,19 +364,19 @@ public:
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 ActInfo info = *i->second;
-                if (printBuildLogs) {
+                if (state->printBuildLogs) {
                     auto suffix = "> ";
                     if (type == resPostBuildLogLine) {
                         suffix = " (post)> ";
                     }
                     log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
-                } else {
-                    state->activities.erase(i->second);
-                    info.lastLine = lastLine;
-                    state->activities.emplace_back(info);
-                    i->second = std::prev(state->activities.end());
-                    update(*state);
                 }
+                state->activities.erase(i->second);
+                info.lastLine = lastLine;
+                state->activities.emplace_back(info);
+                i->second = std::prev(state->activities.end());
+                if (state->printBuildLogs)
+                    update(*state);
             }
         }
 
@@ -352,7 +455,7 @@ public:
                     line += i->phase;
                     line += ")";
                 }
-                if (!i->lastLine.empty()) {
+                if (!state.printBuildLogs && !i->lastLine.empty()) {
                     if (!i->s.empty()) line += ": ";
                     line += i->lastLine;
                 }
