@@ -2,6 +2,7 @@
 
 #include "store-api.hh"
 #include "serialise.hh"
+#include "drv-output-info.hh"
 
 namespace nix {
 
@@ -86,6 +87,8 @@ namespace worker_proto {
 MAKE_WORKER_PROTO(, std::string);
 MAKE_WORKER_PROTO(, StorePath);
 MAKE_WORKER_PROTO(, ContentAddress);
+MAKE_WORKER_PROTO(, DrvOutputId);
+MAKE_WORKER_PROTO(, DrvInput);
 
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
 

@@ -39,4 +39,3 @@ create table if not exists DerivationOutputs (
     foreign key (drv) references ValidPaths(id) on delete cascade
 );
 
-create index if not exists IndexDerivationOutputs on DerivationOutputs(path);

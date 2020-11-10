@@ -38,6 +38,18 @@ void write(const Store & store, Sink & out, const StorePath & storePath)
     out << store.printStorePath(storePath);
 }
 
+DrvOutputId read(const Store & store, Source & from, Phantom<DrvOutputId> _)
+{ return DrvOutputId::parse(readString(from)); }
+
+void write(const Store & store, Sink & out, const DrvOutputId & id)
+{ out << id.to_string(); }
+
+DrvInput read(const Store & store, Source & from, Phantom<DrvInput> _)
+{ return DrvInput::parse(readString(from)); }
+
+void write(const Store & store, Sink & out, const DrvInput & id)
+{ out << id.to_string(); }
+
 
 ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _)
 {
@@ -615,6 +627,7 @@ void RemoteStore::registerDrvOutput(const DrvOutputId & outputId, const DrvOutpu
     conn->to << wopRegisterDrvOutput;
     conn->to << outputId.to_string();
     conn->to << std::string(info.outPath.to_string());
+    worker_proto::write(*this, conn->to, info.dependencies);
     conn.processStderr();
 }
 
@@ -628,8 +641,9 @@ std::optional<const DrvOutputInfo> RemoteStore::queryDrvOutputInfo(const DrvOutp
     if (rawOutputPath == "") {
         return std::nullopt;
     }
+    auto dependencies = worker_proto::read(*this, conn->from, Phantom<std::set<DrvInput>>{});
     auto outputPath = StorePath(rawOutputPath);
-    return {DrvOutputInfo{outputPath}};
+    return {DrvOutputInfo{outputPath, dependencies}};
 }
 
 

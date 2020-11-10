@@ -55,7 +55,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 1;
+    const int nixCASchemaVersion = 2;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -69,11 +69,11 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
         }
 
         if (curCASchema == 0) {
+            SQLiteTxn txn(db);
             static const char schema[] =
     #include "ca-specific-schema.sql.gen.hh"
                 ;
             db.exec(schema);
-            SQLiteTxn txn(db);
             db.exec(R"sql(
                 insert into OutputMappings(drvPath, outputName, outputPath)
                     select DrvPath.path, DerivationOutputs.id, OutputPath.id from DerivationOutputs
@@ -81,6 +81,21 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
                     inner join ValidPaths as OutputPath on DerivationOutputs.path = OutputPath.path
             )sql");
             txn.commit();
+        }
+
+        else if (curCASchema < 2) {
+            db.exec(R"(
+                create table if not exists DerivationOutputRefs (
+                    referrer integer not null,
+                    drvOutputReference integer,
+                    opaquePathReference integer,
+                    foreign key (referrer) references OutputMappings(id) on delete cascade,
+                    foreign key (drvOutputReference) references DerivationOutputs(id) on delete restrict,
+                    foreign key (opaquePathReference) references ValidPaths(id) on delete restrict,
+                    CHECK ((drvOutputReference is null AND opaquePathReference is not null)
+                      OR (opaquePathReference is null AND drvOutputReference is not null))
+                )
+            )");
         }
         writeFile(schemaPath, (format("%1%") % nixCASchemaVersion).str());
         lockFile(lockFd.get(), ltRead, true);
@@ -258,7 +273,6 @@ LocalStore::LocalStore(const Params & params)
             state->db.exec("alter table ValidPaths add column ca text");
             txn.commit();
         }
-
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
         lockFile(globalLock.get(), ltRead, true);
@@ -309,6 +323,24 @@ LocalStore::LocalStore(const Params & params)
                     inner join ValidPaths as Output on Output.id = OutputMappings.outputPath
                     where drvPath = ?
                     ;
+            )");
+        state->stmtQueryDrvOutputDrvOutputReferences.create(state->db,
+            R"(
+                select drvPath, outputName from OutputMappings
+                    join DerivationOutputRefs on drvOutputReference = OutputMappings.id
+                    where referrer =
+                        (select id from OutputMappings
+                             where drvPath = ?
+                             and outputName = ?);
+            )");
+        state->stmtQueryDrvOutputPathReferences.create(state->db,
+            R"(
+                select path from ValidPaths
+                    join DerivationOutputRefs on opaquePathReference = id
+                    where referrer =
+                        (select id from OutputMappings
+                             where drvPath = ?
+                             and outputName = ?);
             )");
     }
 }
@@ -1635,10 +1667,26 @@ std::optional<const DrvOutputInfo> LocalStore::queryDrvOutputInfo(const DrvOutpu
     auto outputPath = queryOutputPathOf(id.drvPath, id.outputName);
     if (!(outputPath && isValidPath(*outputPath)))
         return std::nullopt;
-    else
-        return {DrvOutputInfo{
+    return retrySQLite<std::optional<const DrvOutputInfo>>([&]() {
+        auto state(_state.lock());
+
+        std::set<DrvInput> dependencies;
+        auto useQueryDrvOutputReferences(state->stmtQueryDrvOutputDrvOutputReferences.use()
+            (printStorePath(id.drvPath))(id.outputName));
+        while(useQueryDrvOutputReferences.next())
+            dependencies.insert(DrvOutputId{
+                .drvPath = parseStorePath(useQueryDrvOutputReferences.getStr(0)),
+                .outputName = useQueryDrvOutputReferences.getStr(1),
+            });
+        auto useQueryPathReferences(state->stmtQueryDrvOutputPathReferences.use()
+            (printStorePath(id.drvPath))(id.outputName));
+        while(useQueryPathReferences.next())
+            dependencies.insert(parseStorePath(useQueryPathReferences.getStr(0)));
+        return std::optional{DrvOutputInfo{
             .outPath = *outputPath,
+            .dependencies = dependencies
         }};
+    });
 }
 
 }  // namespace nix

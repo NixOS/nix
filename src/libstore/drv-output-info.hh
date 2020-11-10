@@ -35,6 +35,7 @@ struct DrvInput : RawDrvInput {
 
 struct DrvOutputInfo {
     StorePath outPath;
+    std::set<DrvInput> dependencies;
 
     std::string to_string() const;
     static DrvOutputInfo parse(const std::string & s, const std::string & whence);

@@ -42,6 +42,12 @@ std::string DrvOutputInfo::to_string() const {
     std::string res;
 
     res += "OutPath: " + std::string(outPath.to_string()) + '\n';
+    std::set<std::string> rawDependencies;
+    if (!dependencies.empty()) {
+        for (auto & dep : dependencies)
+            rawDependencies.insert(dep.to_string());
+        res += "Dependencies: " + concatStringsSep(" ", rawDependencies) + '\n';
+    }
 
     return res;
 }
@@ -54,7 +60,7 @@ DrvOutputInfo DrvOutputInfo::parse(const std::string & s, const std::string & wh
     };
 
     std::optional<StorePath> outPath;
-    std::set<DrvInput> references;
+    std::set<DrvInput> dependencies;
 
     size_t pos = 0;
     while (pos < s.size()) {
@@ -72,11 +78,15 @@ DrvOutputInfo DrvOutputInfo::parse(const std::string & s, const std::string & wh
         if (name == "OutPath")
             outPath = StorePath(value);
 
+        if (name == "Dependencies")
+            for (auto& rawDep : tokenizeString<Strings>(value, " "))
+                dependencies.insert(DrvInput::parse(rawDep));
+
         pos = eol + 1;
     }
 
     if (!outPath) corrupt();
-    return DrvOutputInfo { .outPath = *outPath };
+    return DrvOutputInfo { .outPath = *outPath, .dependencies = dependencies };
 }
 
 } // namespace nix

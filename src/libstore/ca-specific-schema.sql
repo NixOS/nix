@@ -11,3 +11,14 @@ create table if not exists OutputMappings (
 );
 
 create index if not exists IndexOutputMappings on OutputMappings(outputPath);
+
+create table if not exists DerivationOutputRefs (
+    referrer integer not null,
+    drvOutputReference integer,
+    opaquePathReference integer,
+    foreign key (referrer) references OutputMappings(id) on delete cascade,
+    foreign key (drvOutputReference) references OutputMappings(id) on delete restrict,
+    foreign key (opaquePathReference) references ValidPaths(id) on delete restrict,
+    CHECK ((drvOutputReference is null AND opaquePathReference is not null)
+      OR (opaquePathReference is null AND drvOutputReference is not null))
+)
