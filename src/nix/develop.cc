@@ -474,9 +474,9 @@ struct CmdDevelop : Common, MixEnvironment
             ignoreException();
         }
 
-        // If running a phase, don't want an interactive shell running after
+        // If running a phase or single command, don't want an interactive shell running after
         // Ctrl-C, so don't pass --rcfile
-        auto args = phase ? Strings{std::string(baseNameOf(shell)), rcFilePath}
+        auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
             : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
         restoreAffinity();
