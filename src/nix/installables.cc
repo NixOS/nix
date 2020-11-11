@@ -356,6 +356,8 @@ struct InstallableStorePath : Installable
 
 Buildables InstallableValue::toBuildables()
 {
+    Activity act(*logger, lvlInfo, actEvaluate);
+
     Buildables res;
 
     std::map<StorePath, std::map<std::string, std::optional<StorePath>>> drvsToOutputs;
