@@ -104,6 +104,7 @@ private:
 
     enum StatusLineGroup {
         idHelp,
+        idEvaluate,
         idCopyPaths,
         idBuilds,
         idStatus
@@ -544,30 +545,50 @@ public:
         removeStatusLines(state, idStatus);
         state.statusLines.insert_or_assign({idStatus, 0}, line);
 
-        auto renderBar = [](uint64_t done, uint64_t running, uint64_t expected)
+        if (state.activitiesByType.count(actEvaluate)) {
+            if (!state.activitiesByType[actEvaluate].its.empty()) {
+                state.statusLines.insert_or_assign({idEvaluate, 0},
+                    fmt(ANSI_BOLD "• Evaluating"));
+                state.statusLines.insert_or_assign({idEvaluate, 1}, "");
+            } else {
+                // FIXME: evaluation could fail...
+                state.statusLines.insert_or_assign({idEvaluate, 0},
+                    fmt(ANSI_GREEN "✓ Evaluated"));
+                state.statusLines.insert_or_assign({idEvaluate, 1}, "");
+            }
+        }
+
+        auto renderBar = [](uint64_t done, uint64_t failed, uint64_t running, uint64_t expected)
         {
             expected = std::max(expected, (uint64_t) 1);
-            auto pct1 = std::min((double) done / expected, 1.0);
-            auto pct2 = std::min((double) (done + running) / expected, 1.0);
+            auto pct1 = std::min((double) failed / expected, 1.0);
+            auto pct2 = std::min((double) (failed + done) / expected, 1.0);
+            auto pct3 = std::min((double) (failed + done + running) / expected, 1.0);
             auto barLength = 60;
             size_t chars1 = barLength * pct1;
             size_t chars2 = barLength * pct2;
+            size_t chars3 = barLength * pct3;
             return
-                ANSI_GREEN + repeat("█", chars1) +
-                ANSI_YELLOW + repeat("▓", chars2 - chars1) +
-                ANSI_NORMAL + repeat("▒", barLength - chars2);
+                ANSI_RED + repeat("█", chars1) +
+                ANSI_GREEN + repeat("█", chars2 - chars1) +
+                ANSI_YELLOW + repeat("▓", chars3 - chars2) +
+                ANSI_NORMAL + repeat("▒", barLength - chars3);
         };
 
         auto copyPath = getActivityStats(state.activitiesByType[actCopyPath]);
         auto copyPaths = getActivityStats(state.activitiesByType[actCopyPaths]);
 
         if (copyPath.done || copyPath.expected) {
+            // FIXME: handle failures
             state.statusLines.insert_or_assign({idCopyPaths, 0},
-                fmt(ANSI_BOLD "• Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB",
+                fmt("%s Fetched %d / %d paths, %.1f / %.1f MiB",
+                    copyPaths.running || copyPaths.done < copyPaths.expected
+                    ? ANSI_BOLD "•"
+                    : ANSI_GREEN "✓",
                     copyPaths.done, copyPaths.expected,
                     copyPath.done / MiB, copyPath.expected / MiB));
             state.statusLines.insert_or_assign({idCopyPaths, 1},
-                fmt("  %s", renderBar(copyPath.done, copyPath.left, copyPath.expected)));
+                fmt("  %s", renderBar(copyPath.done, 0, copyPath.left, copyPath.expected)));
             state.statusLines.insert_or_assign({idCopyPaths, 2}, "");
         }
 
@@ -576,13 +597,18 @@ public:
         if (builds.done || builds.expected) {
             state.statusLines.insert_or_assign(
                 {idBuilds, 0},
-                fmt(ANSI_BOLD "• Built %d / %d derivations",
+                fmt("%s Built %d / %d derivations",
+                    builds.failed
+                    ? ANSI_RED "✗"
+                    : builds.running || builds.done < builds.expected
+                    ? ANSI_BOLD "•"
+                    : ANSI_GREEN "✓",
                     builds.done, builds.expected)
                 + (builds.running ? fmt(", %d running", builds.running) : "")
-                + (builds.failed ? fmt(", " ANSI_RED " %d failed" ANSI_NORMAL, builds.running) : ""));
+                + (builds.failed ? fmt(", %d failed", builds.failed) : ""));
             state.statusLines.insert_or_assign({idBuilds, 1},
                 fmt("  %s",
-                    renderBar(builds.done, builds.running, builds.expected)));
+                    renderBar(builds.done, builds.failed, builds.running, builds.expected)));
             state.statusLines.insert_or_assign({idBuilds, 2}, "");
         }
     }
