@@ -51,7 +51,8 @@ private:
 
     struct ActInfo
     {
-        std::string s, lastLine, phase;
+        std::string s, lastLine;
+        std::optional<std::string> phase;
         ActivityType type = actUnknown;
         uint64_t done = 0;
         uint64_t expected = 0;
@@ -354,7 +355,7 @@ public:
             std::string name(storePathToName(getS(fields, 0)));
             if (hasSuffix(name, ".drv"))
                 name = name.substr(0, name.size() - 4);
-            i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            i->s = fmt(ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
@@ -370,8 +371,8 @@ public:
             auto sub = getS(fields, 1);
             i->s = fmt(
                 hasPrefix(sub, "local")
-                ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
-                : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                ? ANSI_BOLD "%s" ANSI_NORMAL " from %s"
+                : ANSI_BOLD "%s" ANSI_NORMAL " from %s",
                 name, sub);
         }
 
@@ -390,7 +391,9 @@ public:
 
         if ((type == actFileTransfer && hasAncestor(*state, actCopyPath, parent))
             || (type == actFileTransfer && hasAncestor(*state, actQueryPathInfo, parent))
-            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
+            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent))
+            || type == actBuild
+            || type == actSubstitute)
             i->visible = false;
 
         update(*state);
@@ -446,19 +449,14 @@ public:
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
-                ActInfo info = *i->second;
+                i->second->lastLine = lastLine;
                 if (state->printBuildLogs) {
                     auto suffix = "> ";
                     if (type == resPostBuildLogLine) {
                         suffix = " (post)> ";
                     }
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
-                }
-                state->activities.erase(i->second);
-                info.lastLine = lastLine;
-                state->activities.emplace_back(info);
-                i->second = std::prev(state->activities.end());
-                if (!state->printBuildLogs)
+                    log(*state, lvlInfo, ANSI_FAINT + i->second->name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                } else
                     update(*state);
             }
         }
@@ -514,32 +512,14 @@ public:
     {
         std::string line;
 
-        std::string status = getStatus(state);
-        if (!status.empty()) {
-            line += '[';
-            line += status;
-            line += "]";
-        }
-
         if (!state.activities.empty()) {
-            if (!status.empty()) line += " ";
             auto i = state.activities.rbegin();
 
             while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->lastLine.empty())))
                 ++i;
 
-            if (i != state.activities.rend()) {
+            if (i != state.activities.rend())
                 line += i->s;
-                if (!i->phase.empty()) {
-                    line += " (";
-                    line += i->phase;
-                    line += ")";
-                }
-                if (!state.printBuildLogs && !i->lastLine.empty()) {
-                    if (!i->s.empty()) line += ": ";
-                    line += i->lastLine;
-                }
-            }
         }
 
         removeStatusLines(state, idStatus);
@@ -580,23 +560,36 @@ public:
 
         if (copyPath.done || copyPath.expected) {
             // FIXME: handle failures
-            state.statusLines.insert_or_assign({idCopyPaths, 0},
+
+            removeStatusLines(state, idCopyPaths);
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign({idCopyPaths, n++},
                 fmt("%s Fetched %d / %d paths, %.1f / %.1f MiB",
                     copyPaths.running || copyPaths.done < copyPaths.expected
                     ? ANSI_BOLD "•"
                     : ANSI_GREEN "✓",
                     copyPaths.done, copyPaths.expected,
                     copyPath.done / MiB, copyPath.expected / MiB));
-            state.statusLines.insert_or_assign({idCopyPaths, 1},
+            state.statusLines.insert_or_assign({idCopyPaths, n++},
                 fmt("  %s", renderBar(copyPath.done, 0, copyPath.left, copyPath.expected)));
-            state.statusLines.insert_or_assign({idCopyPaths, 2}, "");
+
+            for (auto & build : state.activitiesByType[actSubstitute].its) {
+                state.statusLines.insert_or_assign({idCopyPaths, n++},
+                    fmt(ANSI_BOLD "  ‣ %s", build.second->s));
+            }
+
+            state.statusLines.insert_or_assign({idCopyPaths, n++}, "");
         }
 
         auto builds = getActivityStats(state.activitiesByType[actBuilds]);
 
         if (builds.done || builds.expected) {
+            removeStatusLines(state, idBuilds);
+
+            size_t n = 0;
             state.statusLines.insert_or_assign(
-                {idBuilds, 0},
+                {idBuilds, n++},
                 fmt("%s Built %d / %d derivations",
                     builds.failed
                     ? ANSI_RED "✗"
@@ -606,10 +599,19 @@ public:
                     builds.done, builds.expected)
                 + (builds.running ? fmt(", %d running", builds.running) : "")
                 + (builds.failed ? fmt(", %d failed", builds.failed) : ""));
-            state.statusLines.insert_or_assign({idBuilds, 1},
+            state.statusLines.insert_or_assign({idBuilds, n++},
                 fmt("  %s",
                     renderBar(builds.done, builds.failed, builds.running, builds.expected)));
-            state.statusLines.insert_or_assign({idBuilds, 2}, "");
+
+            for (auto & build : state.activitiesByType[actBuild].its) {
+                state.statusLines.insert_or_assign({idBuilds, n++},
+                    fmt(ANSI_BOLD "  ‣ %s%s: %s",
+                        build.second->s,
+                        build.second->phase ? fmt(" (%s)", *build.second->phase) : "",
+                        build.second->lastLine));
+            }
+
+            state.statusLines.insert_or_assign({idBuilds, n++}, "");
         }
     }
 
@@ -641,87 +643,6 @@ public:
         writeToStderr(s);
 
         state.prevStatusLines = state.statusLines.size();
-    }
-
-    std::string getStatus(State & state)
-    {
-        std::string res;
-
-        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto stats = getActivityStats(state.activitiesByType[type]);
-
-            std::string s;
-
-            if (stats.running || stats.done || stats.expected || stats.failed) {
-                if (stats.running)
-                    if (stats.expected != 0)
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            stats.running / unit, stats.done / unit, stats.expected / unit);
-                    else
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
-                            stats.running / unit, stats.done / unit);
-                else if (stats.expected != stats.done)
-                    if (stats.expected != 0)
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            stats.done / unit, stats.expected / unit);
-                    else
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, stats.done / unit);
-                else
-                    s = fmt(stats.done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, stats.done / unit);
-                s = fmt(itemFmt, s);
-
-                if (stats.failed)
-                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", stats.failed / unit);
-            }
-
-            return s;
-        };
-
-        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-            auto s = renderActivity(type, itemFmt, numberFmt, unit);
-            if (s.empty()) return;
-            if (!res.empty()) res += ", ";
-            res += s;
-        };
-
-        #if 0
-        showActivity(actBuilds, "%s built");
-
-        auto s1 = renderActivity(actCopyPaths, "%s copied");
-        auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
-
-        if (!s1.empty() || !s2.empty()) {
-            if (!res.empty()) res += ", ";
-            if (s1.empty()) res += "0 copied"; else res += s1;
-            if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
-        }
-
-        showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
-        #endif
-
-        {
-            auto s = renderActivity(actOptimiseStore, "%s paths optimised");
-            if (s != "") {
-                s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
-                if (!res.empty()) res += ", ";
-                res += s;
-            }
-        }
-
-        // FIXME: don't show "done" paths in green.
-        showActivity(actVerifyPaths, "%s paths verified");
-
-        if (state.corruptedPaths) {
-            if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d corrupted" ANSI_NORMAL, state.corruptedPaths);
-        }
-
-        if (state.untrustedPaths) {
-            if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d untrusted" ANSI_NORMAL, state.untrustedPaths);
-        }
-
-        return res;
     }
 
     void writeToStdout(std::string_view s) override
