@@ -17,6 +17,7 @@ MakeError(ThrownError, AssertionError);
 MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
+MakeError(MissingArgumentError, Error);
 MakeError(RestrictedPathError, Error);
 
 
