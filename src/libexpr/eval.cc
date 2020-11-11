@@ -1375,7 +1375,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             } else if (!i.def) {
                 throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
 
-Nix attempted to evaluate a function as a top level expression; in this case it must have all its 
+nix attempted to evaluate a function as a top level expression; in this case it must have its
 arguments supplied either by default values, or passed explicitly with --arg or --argstr.
 
 https://nixos.org/manual/nix/stable/#ss-functions)", i.name);
