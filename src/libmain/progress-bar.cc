@@ -102,7 +102,14 @@ private:
         return stats;
     }
 
-    typedef unsigned int LineId;
+    enum StatusLineGroup {
+        idHelp,
+        idCopyPaths,
+        idBuilds,
+        idStatus
+    };
+
+    typedef std::pair<StatusLineGroup, uint16_t> LineId;
 
     struct State
     {
@@ -142,15 +149,6 @@ private:
     Pipe inputPipe;
 
 public:
-
-    void resetHelp(State & state)
-    {
-        for (LineId i = 0; i <= 6; i++)
-            state.statusLines.erase(i);
-        state.statusLines.insert_or_assign(0, "");
-        state.statusLines.insert_or_assign(1, ANSI_BOLD "Type 'h' for help.");
-        state.statusLines.insert_or_assign(2, "");
-    }
 
     ProgressBar(bool printBuildLogs, bool isTTY)
         : isTTY(isTTY)
@@ -245,13 +243,13 @@ public:
                             resetHelp(*state);
                         } else {
                             state->helpShown = true;
-                            state->statusLines.insert_or_assign(0, "");
-                            state->statusLines.insert_or_assign(1, ANSI_BOLD "The following keys are available:");
-                            state->statusLines.insert_or_assign(2, ANSI_BOLD "  'v' to increase verbosity.");
-                            state->statusLines.insert_or_assign(3, ANSI_BOLD "  '-' to decrease verbosity.");
-                            state->statusLines.insert_or_assign(4, ANSI_BOLD "  'l' to show build log output.");
-                            state->statusLines.insert_or_assign(5, ANSI_BOLD "  'q' to quit.");
-                            state->statusLines.insert_or_assign(6, "");
+                            state->statusLines.insert_or_assign({idHelp, 0}, "");
+                            state->statusLines.insert_or_assign({idHelp, 1}, ANSI_BOLD "The following keys are available:");
+                            state->statusLines.insert_or_assign({idHelp, 2}, ANSI_BOLD "  'v' to increase verbosity.");
+                            state->statusLines.insert_or_assign({idHelp, 3}, ANSI_BOLD "  '-' to decrease verbosity.");
+                            state->statusLines.insert_or_assign({idHelp, 4}, ANSI_BOLD "  'l' to show build log output.");
+                            state->statusLines.insert_or_assign({idHelp, 5}, ANSI_BOLD "  'q' to quit.");
+                            state->statusLines.insert_or_assign({idHelp, 6}, "");
                         }
                         draw(*state);
                     }
@@ -318,6 +316,21 @@ public:
             if (!isTTY) s2 = filterANSIEscapes(s2, true);
             writeToStderr(s2);
         }
+    }
+
+    void removeStatusLines(State & state, StatusLineGroup id)
+    {
+        for (auto i = state.statusLines.lower_bound({id, 0});
+             i != state.statusLines.end() && i->first.first == id; )
+            i = state.statusLines.erase(i);
+    }
+
+    void resetHelp(State & state)
+    {
+        removeStatusLines(state, idHelp);
+        state.statusLines.insert_or_assign({idHelp, 0}, "");
+        state.statusLines.insert_or_assign({idHelp, 1}, ANSI_BOLD "Type 'h' for help.");
+        state.statusLines.insert_or_assign({idHelp, 2}, "");
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -528,10 +541,8 @@ public:
             }
         }
 
-        if (line.empty())
-            state.statusLines.erase(100);
-        else
-            state.statusLines.insert_or_assign(100, line);
+        removeStatusLines(state, idStatus);
+        state.statusLines.insert_or_assign({idStatus, 0}, line);
 
         auto renderBar = [](uint64_t done, uint64_t running, uint64_t expected)
         {
@@ -551,22 +562,22 @@ public:
         auto copyPaths = getActivityStats(state.activitiesByType[actCopyPaths]);
 
         if (copyPath.done || copyPath.expected) {
-            state.statusLines.insert_or_assign(50,
+            state.statusLines.insert_or_assign({idCopyPaths, 0},
                 fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB",
                     renderBar(copyPath.done, copyPath.left, copyPath.expected),
                     copyPaths.done, copyPaths.expected,
                     copyPath.done / MiB, copyPath.expected / MiB));
-            state.statusLines.insert_or_assign(51, "");
+            state.statusLines.insert_or_assign({idCopyPaths, 1}, "");
         }
 
         auto builds = getActivityStats(state.activitiesByType[actBuilds]);
 
         if (builds.done || builds.expected) {
-            state.statusLines.insert_or_assign(50,
+            state.statusLines.insert_or_assign({idBuilds, 0},
                 fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Built" ANSI_NORMAL " %d / %d derivations",
                     renderBar(builds.done, builds.running, builds.expected),
                     builds.done, builds.expected));
-            state.statusLines.insert_or_assign(51, "");
+            state.statusLines.insert_or_assign({idBuilds, 1}, "");
         }
 
     }
