@@ -563,23 +563,28 @@ public:
 
         if (copyPath.done || copyPath.expected) {
             state.statusLines.insert_or_assign({idCopyPaths, 0},
-                fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB",
-                    renderBar(copyPath.done, copyPath.left, copyPath.expected),
+                fmt(ANSI_BOLD "• Fetched" ANSI_NORMAL " %d / %d paths, %.1f / %.1f MiB",
                     copyPaths.done, copyPaths.expected,
                     copyPath.done / MiB, copyPath.expected / MiB));
-            state.statusLines.insert_or_assign({idCopyPaths, 1}, "");
+            state.statusLines.insert_or_assign({idCopyPaths, 1},
+                fmt("  %s", renderBar(copyPath.done, copyPath.left, copyPath.expected)));
+            state.statusLines.insert_or_assign({idCopyPaths, 2}, "");
         }
 
         auto builds = getActivityStats(state.activitiesByType[actBuilds]);
 
         if (builds.done || builds.expected) {
-            state.statusLines.insert_or_assign({idBuilds, 0},
-                fmt(ANSI_BOLD "•" ANSI_NORMAL " %s " ANSI_BOLD "Built" ANSI_NORMAL " %d / %d derivations",
-                    renderBar(builds.done, builds.running, builds.expected),
-                    builds.done, builds.expected));
-            state.statusLines.insert_or_assign({idBuilds, 1}, "");
+            state.statusLines.insert_or_assign(
+                {idBuilds, 0},
+                fmt(ANSI_BOLD "• Built %d / %d derivations",
+                    builds.done, builds.expected)
+                + (builds.running ? fmt(", %d running", builds.running) : "")
+                + (builds.failed ? fmt(", " ANSI_RED " %d failed" ANSI_NORMAL, builds.running) : ""));
+            state.statusLines.insert_or_assign({idBuilds, 1},
+                fmt("  %s",
+                    renderBar(builds.done, builds.running, builds.expected)));
+            state.statusLines.insert_or_assign({idBuilds, 2}, "");
         }
-
     }
 
     void draw(State & state, std::optional<std::string_view> msg = {})
