@@ -1373,31 +1373,13 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             if (j != args.end()) {
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
-                throwMissingArgumentError(i.pos, R"(cannot auto-call a function that has an argument without a default value ('%1%')
+                throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
 
-An 'auto-call' is when a nix expression is evaluated without any external arguments.
-If that nix expression is a function, and that function's arguments all have default
-values, then all is well.
+Nix attempted to evaluate a function as a top level expression; in this case it must have all its 
+arguments supplied either by default values, or passed explicitly with --arg or --argstr.
 
-But if the function arguments don't have default values, evaluation fails.
+https://nixos.org/manual/nix/stable/#ss-functions)", i.name);
 
-The classic case for this error is evaluating a nix file that expects
-to be evaluated by callPackage.
-  # in 'callPackage' format: expression is a function that takes an argument 'stdenv'.
-  # callPackage would implicitly pull 'stdenv' from nixpkgs, then call this function.
-  { stdenv }:
-  stdenv.mkDerivation  {
-  ...
-
-  # in 'auto-call' format: nixpkgs is imported explicitly, and used directly.
-  let
-    nixpkgs = import <nixpkgs> {};
-  in
-    nixpkgs.stdenv.mkDerivation {
-  ...
-
-More about callPackage: 
-https://nixos.org/guides/nix-pills/callpackage-design-pattern.html)", i.name);
             }
         }
     }
