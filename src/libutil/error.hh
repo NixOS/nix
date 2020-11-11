@@ -38,7 +38,7 @@ namespace nix {
    ErrorInfo structs are sent to the logger as part of an exception, or directly with the
    logError or logWarning macros.
 
-   See the error-demo.cc program for usage examples.
+   See libutil/tests/logging.cc for usage examples.
 
  */
 
