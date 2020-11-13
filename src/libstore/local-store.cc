@@ -328,8 +328,8 @@ LocalStore::LocalStore(const Params & params)
                     join DerivationOutputRefs on drvOutputReference = OutputMappings.id
                     where referrer =
                         (select id from OutputMappings
-                             where drvPath = ?
-                             and outputName = ?);
+                            where drvPath = ?
+                            and outputName = ?);
             )");
         state->stmtQueryDrvOutputPathReferences.create(state->db,
             R"(
@@ -337,8 +337,8 @@ LocalStore::LocalStore(const Params & params)
                     join DerivationOutputRefs on opaquePathReference = id
                     where referrer =
                         (select id from OutputMappings
-                             where drvPath = ?
-                             and outputName = ?);
+                            where drvPath = ?
+                            and outputName = ?);
             )");
         state->stmtQueryDrvOutputInfo.create(state->db,
             R"(
@@ -346,6 +346,20 @@ LocalStore::LocalStore(const Params & params)
                     inner join ValidPaths as Output on Output.id = OutputMappings.outputPath
                     where drvPath = ? and outputName = ?
                     ;
+            )");
+        state->stmtAddDrvOutputPathReference.create(state->db,
+            R"(
+                insert or replace into DerivationOutputRefs (referrer, opaquePathReference)
+                values (
+                    ?,
+                    (select id from ValidPaths where path = ?));
+            )");
+        state->stmtAddDrvOutputDrvOutputReference.create(state->db,
+            R"(
+                insert or replace into DerivationOutputRefs (referrer, drvOutputReference)
+                values (
+                    ?,
+                    (select id from OutputMappings where drvPath = ? and outputName = ?));
             )");
     }
 }
@@ -682,6 +696,24 @@ void LocalStore::registerDrvOutput(const DrvOutputId& id, const DrvOutputInfo & 
             (printStorePath(info.outPath))
             .exec();
     });
+    auto referrer = queryDrvOutputId(*state, id);
+    for (auto & dep : info.dependencies) {
+        std::visit(overloaded{
+            [&](StorePath path) {
+                state->stmtAddDrvOutputPathReference.use()
+                    (referrer)
+                    (printStorePath(path))
+                    .exec();
+            },
+            [&](DrvOutputId id) {
+                state->stmtAddDrvOutputDrvOutputReference.use()
+                    (referrer)
+                    (printStorePath(id.drvPath))
+                    (id.outputName)
+                    .exec();
+            }
+        }, dep.variant());
+    }
 }
 
 void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output)

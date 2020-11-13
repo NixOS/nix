@@ -63,7 +63,9 @@ private:
         SQLiteStmt stmtQueryDrvOutputInfo;
         SQLiteStmt stmtQueryReferences;
         SQLiteStmt stmtQueryDrvOutputDrvOutputReferences;
+        SQLiteStmt stmtAddDrvOutputDrvOutputReference;
         SQLiteStmt stmtQueryDrvOutputPathReferences;
+        SQLiteStmt stmtAddDrvOutputPathReference;
         SQLiteStmt stmtQueryReferrers;
         SQLiteStmt stmtInvalidatePath;
         SQLiteStmt stmtAddDerivationOutput;
