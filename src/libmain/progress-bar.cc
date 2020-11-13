@@ -61,6 +61,7 @@ private:
         uint64_t failed = 0;
         std::map<ActivityType, uint64_t> expectedByType;
         bool visible = true;
+        bool ignored = false;
         ActivityId parent;
         std::optional<std::string> name;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> startTime;
@@ -93,6 +94,7 @@ private:
         };
 
         for (auto & j : act.its) {
+            if (j.second->ignored) continue;
             stats.done += j.second->done;
             stats.expected += j.second->expected;
             stats.running += j.second->running;
@@ -108,6 +110,7 @@ private:
     enum StatusLineGroup {
         idHelp,
         idEvaluate,
+        idDownload,
         idCopyPaths,
         idBuilds,
         idStatus
@@ -391,9 +394,15 @@ public:
             i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
-        if ((type == actFileTransfer && hasAncestor(*state, actCopyPath, parent))
-            || (type == actFileTransfer && hasAncestor(*state, actQueryPathInfo, parent))
-            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent))
+        if (type == actFileTransfer) {
+            i->s = getS(fields, 0);
+            if (hasAncestor(*state, actCopyPath, parent)
+                || hasAncestor(*state, actQueryPathInfo, parent))
+                i->ignored = true;
+        }
+
+        if (type == actFileTransfer
+            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)) // FIXME?
             || type == actBuild
             || type == actSubstitute)
             i->visible = false;
@@ -425,11 +434,14 @@ public:
         if (i != state->its.end()) {
 
             auto & actByType = state->activitiesByType[i->second->type];
-            actByType.done += i->second->done;
-            actByType.failed += i->second->failed;
 
-            for (auto & j : i->second->expectedByType)
-                state->activitiesByType[j.first].expected -= j.second;
+            if (!i->second->ignored) {
+                actByType.done += i->second->done;
+                actByType.failed += i->second->failed;
+
+                for (auto & j : i->second->expectedByType)
+                    state->activitiesByType[j.first].expected -= j.second;
+            }
 
             actByType.its.erase(act);
             state->activities.erase(i->second);
@@ -487,23 +499,27 @@ public:
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
-            actInfo.done = getI(fields, 0);
-            actInfo.expected = getI(fields, 1);
-            actInfo.running = getI(fields, 2);
-            actInfo.failed = getI(fields, 3);
-            update(*state);
+            if (!actInfo.ignored) {
+                actInfo.done = getI(fields, 0);
+                actInfo.expected = getI(fields, 1);
+                actInfo.running = getI(fields, 2);
+                actInfo.failed = getI(fields, 3);
+                update(*state);
+            }
         }
 
         else if (type == resSetExpected) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
-            auto type = (ActivityType) getI(fields, 0);
-            auto & j = actInfo.expectedByType[type];
-            state->activitiesByType[type].expected -= j;
-            j = getI(fields, 1);
-            state->activitiesByType[type].expected += j;
-            update(*state);
+            if (!actInfo.ignored) {
+                auto type = (ActivityType) getI(fields, 0);
+                auto & j = actInfo.expectedByType[type];
+                state->activitiesByType[type].expected -= j;
+                j = getI(fields, 1);
+                state->activitiesByType[type].expected += j;
+                update(*state);
+            }
         }
     }
 
@@ -538,7 +554,7 @@ public:
             } else {
                 // FIXME: evaluation could fail...
                 state.statusLines.insert_or_assign({idEvaluate, 0},
-                    fmt(ANSI_GREEN "✓ Evaluated"));
+                    fmt(ANSI_GREEN "✓ Evaluating"));
                 state.statusLines.insert_or_assign({idEvaluate, 1}, "");
             }
         }
@@ -560,6 +576,32 @@ public:
                 ANSI_NORMAL + repeat("▒", barLength - chars3);
         };
 
+        auto fileTransfer = getActivityStats(state.activitiesByType[actFileTransfer]);
+
+        if (fileTransfer.done || fileTransfer.expected) {
+            removeStatusLines(state, idDownload);
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign({idDownload, n++},
+                fmt("%s Downloaded %.1f / %.1f MiB",
+                    fileTransfer.running || fileTransfer.done < fileTransfer.expected
+                    ? ANSI_BOLD "•"
+                    : ANSI_GREEN "✓",
+                    //copyPaths.done, copyPaths.expected,
+                    fileTransfer.done / MiB, fileTransfer.expected / MiB));
+
+            state.statusLines.insert_or_assign({idDownload, n++},
+                fmt("  %s", renderBar(fileTransfer.done, 0, fileTransfer.left, fileTransfer.expected)));
+
+            for (auto & build : state.activitiesByType[actFileTransfer].its) {
+                if (build.second->ignored) continue;
+                state.statusLines.insert_or_assign({idDownload, n++},
+                    fmt(ANSI_BOLD "  ‣ %s", build.second->s));
+            }
+
+            state.statusLines.insert_or_assign({idDownload, n++}, "");
+        }
+
         auto copyPath = getActivityStats(state.activitiesByType[actCopyPath]);
         auto copyPaths = getActivityStats(state.activitiesByType[actCopyPaths]);
 
@@ -570,12 +612,13 @@ public:
 
             size_t n = 0;
             state.statusLines.insert_or_assign({idCopyPaths, n++},
-                fmt("%s Fetched %d / %d paths, %.1f / %.1f MiB",
+                fmt("%s Fetched %d / %d store paths, %.1f / %.1f MiB",
                     copyPaths.running || copyPaths.done < copyPaths.expected
                     ? ANSI_BOLD "•"
                     : ANSI_GREEN "✓",
                     copyPaths.done, copyPaths.expected,
                     copyPath.done / MiB, copyPath.expected / MiB));
+
             state.statusLines.insert_or_assign({idCopyPaths, n++},
                 fmt("  %s", renderBar(copyPath.done, 0, copyPath.left, copyPath.expected)));
 
@@ -604,6 +647,7 @@ public:
                     builds.done, builds.expected)
                 + (builds.running ? fmt(", %d running", builds.running) : "")
                 + (builds.failed ? fmt(", %d failed", builds.failed) : ""));
+
             state.statusLines.insert_or_assign({idBuilds, n++},
                 fmt("  %s",
                     renderBar(builds.done, builds.failed, builds.running, builds.expected)));
