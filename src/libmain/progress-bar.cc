@@ -99,7 +99,7 @@ private:
             stats.expected += j.second->expected;
             stats.running += j.second->running;
             stats.failed += j.second->failed;
-            stats.left += j.second->expected - j.second->done;
+            stats.left += j.second->expected > j.second->done ? j.second->expected - j.second->done : 0;
         }
 
         stats.expected = std::max(stats.expected, act.expected);
@@ -113,7 +113,8 @@ private:
         idDownload,
         idCopyPaths,
         idBuilds,
-        idStatus
+        idStatus,
+        idQuit
     };
 
     typedef std::pair<StatusLineGroup, uint16_t> LineId;
@@ -221,8 +222,10 @@ public:
                     c = std::tolower(c);
 
                     if (c == 3 || c == 'q') {
+                        auto state(state_.lock());
+                        state->statusLines.insert_or_assign({idQuit, 0}, ANSI_RED "Exiting...");
+                        draw(*state);
                         triggerInterrupt();
-                        break;
                     }
                     if (c == 'l') {
                         auto state(state_.lock());
@@ -544,7 +547,8 @@ public:
         }
 
         removeStatusLines(state, idStatus);
-        state.statusLines.insert_or_assign({idStatus, 0}, line);
+        if (line != "")
+            state.statusLines.insert_or_assign({idStatus, 0}, line);
 
         if (state.activitiesByType.count(actEvaluate)) {
             if (!state.activitiesByType[actEvaluate].its.empty()) {
@@ -565,10 +569,12 @@ public:
             auto pct1 = std::min((double) failed / expected, 1.0);
             auto pct2 = std::min((double) (failed + done) / expected, 1.0);
             auto pct3 = std::min((double) (failed + done + running) / expected, 1.0);
-            auto barLength = 60;
+            auto barLength = 70;
             size_t chars1 = barLength * pct1;
             size_t chars2 = barLength * pct2;
             size_t chars3 = barLength * pct3;
+            assert(chars1 <= chars2);
+            assert(chars2 <= chars3);
             return
                 ANSI_RED + repeat("█", chars1) +
                 ANSI_GREEN + repeat("█", chars2 - chars1) +
