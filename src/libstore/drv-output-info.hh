@@ -1,6 +1,7 @@
 #pragma once
 
 #include "path.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -43,4 +44,17 @@ struct DrvOutputInfo {
 
 typedef std::map<DrvOutputId, DrvOutputInfo> DrvOutputs;
 
+
+void registerOneOutput(Store& store,
+                       DrvOutputId id,
+                       StorePath& resolvedDrvPath,
+                       std::set<DrvInput> buildTimeInputs,
+                       StorePath& outputPath);
+
+std::set<DrvInput> computeDrvInputs(Store& store, Derivation& drv);
+
+void registerOutputs(Store& store,
+                     StorePath& drvPath,
+                     Derivation& deriver,
+                     std::map<std::string, StorePath> outputPaths);
 }

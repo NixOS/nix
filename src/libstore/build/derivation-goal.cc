@@ -13,6 +13,7 @@
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+#include "drv-output-info.hh"
 
 #include <regex>
 #include <queue>
@@ -1018,12 +1019,15 @@ void DerivationGoal::buildDone()
 void DerivationGoal::resolvedFinished() {
     debug("Resolving the original derivation");
     assert(resolvedDrvPath);
+    auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-    for (auto & [outputName, _] : drv->outputs) {
-        auto outputPath = worker.store.queryOutputPathOf(*resolvedDrvPath, outputName);
-        assert(outputPath); // We've just built it so it should still be there
-        worker.store.registerDrvOutput(DrvOutputId{drvPath, outputName}, {*outputPath});
-    }
+    std::map<std::string, StorePath> outputPaths;
+    auto partialOutputMap = worker.store.queryPartialDerivationOutputMap(*resolvedDrvPath);
+    for (auto& [name, maybeOutPath]: partialOutputMap)
+        if (maybeOutPath)
+            outputPaths.insert({name, *maybeOutPath});
+
+    nix::registerOutputs(worker.store, drvPath, fullDrv, outputPaths);
 
     done(BuildResult::Built);
 }
@@ -2894,7 +2898,6 @@ void DerivationGoal::runChild()
     }
 }
 
-
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3427,9 +3430,18 @@ void DerivationGoal::registerOutputs()
     }
 
     if (settings.isExperimentalFeatureEnabled("ca-derivations") &&
-        (useDerivation || isCaFloating))
-        for (auto & [outputName, newInfo] : infos)
-            worker.store.registerDrvOutput(DrvOutputId{drvPathResolved, outputName}, DrvOutputInfo{newInfo.path});
+        useDerivation) {
+        auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+        std::map<std::string, StorePath> outputPaths;
+        for (auto& [outputName, info] : infos)
+            outputPaths.insert({outputName, info.path});
+        nix::registerOutputs(
+            worker.store,
+            drvPath,
+            fullDrv,
+            outputPaths
+        );
+    }
 }
 
 
