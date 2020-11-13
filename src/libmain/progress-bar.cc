@@ -8,6 +8,7 @@
 #include <map>
 #include <thread>
 #include <iostream>
+#include <chrono>
 
 #include <termios.h>
 #include <poll.h>
@@ -62,6 +63,7 @@ private:
         bool visible = true;
         ActivityId parent;
         std::optional<std::string> name;
+        std::optional<std::chrono::time_point<std::chrono::steady_clock>> startTime;
     };
 
     struct ActivitiesByType
@@ -396,6 +398,9 @@ public:
             || type == actSubstitute)
             i->visible = false;
 
+        if (type == actBuild)
+            i->startTime = std::chrono::steady_clock::now();
+
         update(*state);
     }
 
@@ -603,10 +608,13 @@ public:
                 fmt("  %s",
                     renderBar(builds.done, builds.failed, builds.running, builds.expected)));
 
+            auto now = std::chrono::steady_clock::now();
+
             for (auto & build : state.activitiesByType[actBuild].its) {
                 state.statusLines.insert_or_assign({idBuilds, n++},
-                    fmt(ANSI_BOLD "  ‣ %s%s: %s",
+                    fmt(ANSI_BOLD "  ‣ %s (%d s)%s: %s",
                         build.second->s,
+                        std::chrono::duration_cast<std::chrono::seconds>(now - *build.second->startTime).count(),
                         build.second->phase ? fmt(" (%s)", *build.second->phase) : "",
                         build.second->lastLine));
             }
