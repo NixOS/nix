@@ -12,18 +12,25 @@ namespace nix {
 
 std::set<DrvInput> Store::drvInputClosure(const DrvInput& input) {
     std::set<DrvInput> res;
-    StorePath rootPath = std::visit (overloaded {
-        [&](StorePath opaque) -> StorePath { return opaque; },
-        [&](DrvOutputId id) -> StorePath {
-            res.insert(id);
-            auto outPath = queryDrvOutputInfo(id)->outPath;
-            return outPath;
-        },
-    }, input.variant());
-    StorePathSet pathClosure;
-    computeFSClosure(rootPath, pathClosure);
-    for (auto & inputPath : pathClosure)
-        res.insert(inputPath);
+    std::function<void(const DrvInput&)> addToClosure;
+    addToClosure = [&](const DrvInput& input_) {
+        std::visit(overloaded {
+            [&](StorePath path) {
+                StorePathSet pathClosure;
+                computeFSClosure(path, pathClosure);
+                for (auto & inputPath : pathClosure)
+                    res.insert(inputPath);
+            },
+            [&](DrvOutputId id) {
+                auto outputInfo = queryDrvOutputInfo(id);
+                assert(outputInfo);
+                res.insert(id);
+                for (auto& dep: outputInfo->dependencies)
+                    addToClosure(dep);
+            }
+        }, input_.variant());
+    };
+    addToClosure(input);
     return res;
 }
 
