@@ -60,6 +60,7 @@ private:
         SQLiteStmt stmtUpdatePathInfo;
         SQLiteStmt stmtAddReference;
         SQLiteStmt stmtQueryPathInfo;
+        SQLiteStmt stmtQueryDrvOutputInfo;
         SQLiteStmt stmtQueryReferences;
         SQLiteStmt stmtQueryDrvOutputDrvOutputReferences;
         SQLiteStmt stmtQueryDrvOutputPathReferences;
@@ -143,6 +144,8 @@ public:
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
     std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+
+    uint64_t queryDrvOutputId(State & state, const DrvOutputId&);
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 

@@ -303,8 +303,6 @@ LocalStore::LocalStore(const Params & params)
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     state->stmtQueryValidDerivers.create(state->db,
         "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
-    state->stmtQueryDerivationOutputs.create(state->db,
-        "select id, path from DerivationOutputs where drv = ?;");
     // Use "path >= ?" with limit 1 rather than "path like '?%'" to
     // ensure efficient lookup.
     state->stmtQueryPathFromHashPart.create(state->db,
@@ -341,6 +339,13 @@ LocalStore::LocalStore(const Params & params)
                         (select id from OutputMappings
                              where drvPath = ?
                              and outputName = ?);
+            )");
+        state->stmtQueryDrvOutputInfo.create(state->db,
+            R"(
+                select OutputMappings.id, Output.path from OutputMappings
+                    inner join ValidPaths as Output on Output.id = OutputMappings.outputPath
+                    where drvPath = ? and outputName = ?
+                    ;
             )");
     }
 }
@@ -817,6 +822,14 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
     auto use(state.stmtQueryPathInfo.use()(printStorePath(path)));
     if (!use.next())
         throw InvalidPath("path '%s' is not valid", printStorePath(path));
+    return use.getInt(0);
+}
+
+uint64_t LocalStore::queryDrvOutputId(State & state, const DrvOutputId& id)
+{
+    auto use(state.stmtQueryDrvOutputInfo.use()(printStorePath(id.drvPath))(id.outputName));
+    if (!use.next())
+        throw InvalidPath("drv output '%s' is not valid", id.to_string());
     return use.getInt(0);
 }
 
