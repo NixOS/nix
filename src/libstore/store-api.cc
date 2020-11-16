@@ -1042,9 +1042,7 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
 {
     if (uri == "" || uri == "auto") {
         auto stateDir = get(params, "state").value_or(settings.nixStateDir);
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            return std::make_shared<LocalStore>(params);
-        else if (pathExists(settings.nixDaemonSocketFile))
+        if (pathExists(settings.nixDaemonSocketFile))
             return std::make_shared<UDSRemoteStore>(params);
         else
             return std::make_shared<LocalStore>(params);
