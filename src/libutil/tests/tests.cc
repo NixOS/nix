@@ -587,4 +587,14 @@ namespace nix {
 
         ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz" );
     }
+
+    TEST(filterANSIEscapes, utf8) {
+        ASSERT_EQ(filterANSIEscapes("foobar", true, 5), "fooba");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 6), "fóóbär");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 5), "fóóbä");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 3), "fóó");
+        ASSERT_EQ(filterANSIEscapes("f€€bär", true, 4), "f€€b");
+        ASSERT_EQ(filterANSIEscapes("f𐍈𐍈bär", true, 4), "f𐍈𐍈b");
+    }
+
 }
