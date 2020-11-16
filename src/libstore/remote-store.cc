@@ -409,10 +409,10 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
-    auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0x16) {
+    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
         return Store::queryDerivationOutputs(path);
     }
+    auto conn(getConnection());
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
