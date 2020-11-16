@@ -233,15 +233,25 @@ class BoehmGCStackAllocator : public StackAllocator {
     std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
     };
 
+    // This is specific to boost::coroutines2::protected_fixedsize_stack.
+    // The stack protection page is included in sctx.size, so we have to
+    // subtract one page size from the stack size.
+    std::size_t pfss_usable_stack_size(boost::context::stack_context &sctx) {
+      return sctx.size - boost::context::stack_traits::page_size();
+    }
+
   public:
     boost::context::stack_context allocate() override {
         auto sctx = stack.allocate();
-        GC_add_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+
+        // Despite what the docs warn, the only *implemented* stack direction
+        // is "down". This is why we subtract the stack size.
+        GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         return sctx;
     }
 
     void deallocate(boost::context::stack_context sctx) override {
-        GC_remove_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+        GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         stack.deallocate(sctx);
     }
 
