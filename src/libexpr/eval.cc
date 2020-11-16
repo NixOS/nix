@@ -233,22 +233,34 @@ static void * oomHandler(size_t requested)
 }
 
 class BoehmGCStackAllocator : public StackAllocator {
-  boost::coroutines2::protected_fixedsize_stack stack {
-    // We allocate 8 MB, the default max stack size on NixOS.
-    // A smaller stack might be quicker to allocate but reduces the stack
-    // depth available for source filter expressions etc.
-    std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
+    boost::coroutines2::protected_fixedsize_stack stack {
+        // We allocate 8 MB, the default max stack size on NixOS.
+        // A smaller stack might be quicker to allocate but reduces the stack
+        // depth available for source filter expressions etc.
+        std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
     };
+
+    // This is specific to boost::coroutines2::protected_fixedsize_stack.
+    // The stack protection page is included in sctx.size, so we have to
+    // subtract one page size from the stack size.
+    std::size_t pfss_usable_stack_size(boost::context::stack_context &sctx) {
+        return sctx.size - boost::context::stack_traits::page_size();
+    }
 
   public:
     boost::context::stack_context allocate() override {
         auto sctx = stack.allocate();
-        GC_add_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+
+        // Stacks generally start at a high address and grow to lower addresses.
+        // Architectures that do the opposite are rare; in fact so rare that
+        // boost_routine does not implement it.
+        // So we subtract the stack size.
+        GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         return sctx;
     }
 
     void deallocate(boost::context::stack_context sctx) override {
-        GC_remove_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+        GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         stack.deallocate(sctx);
     }
 
