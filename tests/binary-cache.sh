@@ -258,9 +258,6 @@ docPath=$(nix-store -q --references $outPath)
 # +---...-multi-output-doc
 
 nix copy --to "file://$cacheDir" $outPath
-( echo $outPath $docPath
-  find $cacheDir
-) >/tmp/blurb
 
 hashpart() {
   basename "$1" | cut -c1-32
