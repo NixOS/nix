@@ -274,8 +274,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopQueryValidPaths: {
         auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+
+        SubstituteFlag substitute = NoSubstitute;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 27) {
+            substitute = readInt(from) ? Substitute : NoSubstitute;
+        }
+
         logger->startWork();
-        auto res = store->queryValidPaths(paths);
+        if (substitute) {
+            store->substitutePaths(paths);
+        }
+        auto res = store->queryValidPaths(paths, substitute);
         logger->stopWork();
         worker_proto::write(*store, to, res);
         break;

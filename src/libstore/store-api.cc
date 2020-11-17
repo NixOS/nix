@@ -522,6 +522,28 @@ void Store::queryPathInfo(const StorePath & storePath,
 }
 
 
+void Store::substitutePaths(const StorePathSet & paths)
+{
+    std::vector<StorePathWithOutputs> paths2;
+    for (auto & path : paths)
+        if (!path.isDerivation())
+            paths2.push_back({path});
+    uint64_t downloadSize, narSize;
+    StorePathSet willBuild, willSubstitute, unknown;
+    queryMissing(paths2,
+        willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (!willSubstitute.empty())
+        try {
+            std::vector<StorePathWithOutputs> subs;
+            for (auto & p : willSubstitute) subs.push_back({p});
+            buildPaths(subs);
+        } catch (Error & e) {
+            logWarning(e.info());
+        }
+}
+
+
 StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
     struct State

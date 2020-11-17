@@ -259,6 +259,9 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
     } else {
         conn->to << wopQueryValidPaths;
         worker_proto::write(*this, conn->to, paths);
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
+            conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
+        }
         conn.processStderr();
         return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
     }
