@@ -463,13 +463,15 @@ static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath
 {
     auto h = drvHashes.find(drvPath);
     if (h == drvHashes.end()) {
-        assert(store.isValidPath(drvPath));
         // Cache it
         h = drvHashes.insert_or_assign(
             drvPath,
             hashDerivationModulo(
                 store,
-                store.readDerivation(drvPath),
+                parseDerivation(
+                    store,
+                    readFile(store.toRealPath(drvPath)),
+                    Derivation::nameFromPath(drvPath)),
                 false)).first;
     }
     return h->second;
