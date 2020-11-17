@@ -1007,6 +1007,14 @@ Derivation Store::readDerivation(const StorePath & drvPath)
     }
 }
 
+Derivation Store::readInvalidDerivation(const StorePath & drvPath)
+{
+    return parseDerivation(
+        *this,
+        readFile(Store::toRealPath(drvPath)),
+        Derivation::nameFromPath(drvPath));
+}
+
 }
 
 

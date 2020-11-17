@@ -611,6 +611,9 @@ public:
     /* Read a derivation (which must already be valid). */
     Derivation readDerivation(const StorePath & drvPath);
 
+    /* Read a derivation from a potentially invalid path. */
+    Derivation readInvalidDerivation(const StorePath & drvPath);
+
     /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
        or indirectly reached from it.  `out' is not cleared.  If

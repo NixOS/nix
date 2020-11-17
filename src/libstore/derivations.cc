@@ -468,10 +468,7 @@ static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath
             drvPath,
             hashDerivationModulo(
                 store,
-                parseDerivation(
-                    store,
-                    readFile(store.toRealPath(drvPath)),
-                    Derivation::nameFromPath(drvPath)),
+                store.readInvalidDerivation(drvPath),
                 false)).first;
     }
     return h->second;
