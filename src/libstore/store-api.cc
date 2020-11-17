@@ -927,11 +927,24 @@ std::map<StorePath, StorePath> copyPaths(
             });
     }
 
-    for (auto & id: outputsToRegister) {
-        auto outputInfo = srcStore->queryDrvOutputInfo(id);
-        assert(outputInfo);
-        dstStore->registerDrvOutput(id, *outputInfo);
-    }
+    ThreadPool pool;
+    processGraph<DrvOutputId>(pool,
+        std::set<DrvOutputId>(outputsToRegister.begin(), outputsToRegister.end()),
+        [&](const DrvOutputId& id) {
+            auto outputInfo = srcStore->queryDrvOutputInfo(id);
+            assert(outputInfo);
+            std::set<DrvOutputId> drvOutputDependencies;
+            for (auto& dep: outputInfo->dependencies) {
+                if (auto outputDep = std::get_if<DrvOutputId>(&dep))
+                    drvOutputDependencies.insert(*outputDep);
+            }
+            return drvOutputDependencies;
+        },
+        [&](const DrvOutputId& id) {
+            auto outputInfo = srcStore->queryDrvOutputInfo(id);
+            dstStore->registerDrvOutput(id, *outputInfo);
+        }
+    );
     return pathsMap;
 }
 
