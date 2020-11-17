@@ -560,8 +560,11 @@ InstallableFlake::getCursors(EvalState & state)
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
-    if (!_lockedFlake)
+    if (!_lockedFlake) {
         _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+        _lockedFlake->flake.config.apply();
+        // FIXME: send new config to the daemon.
+    }
     return _lockedFlake;
 }
 
