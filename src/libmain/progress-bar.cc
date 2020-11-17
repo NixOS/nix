@@ -705,12 +705,7 @@ public:
 
     void writeToStdout(std::string_view s) override
     {
-        auto state(state_.lock());
-        if (state->active) {
-            draw(*state, s);
-        } else {
-            Logger::writeToStdout(s);
-        }
+        Logger::writeToStdout(s);
     }
 
     std::optional<char> ask(std::string_view msg) override
@@ -729,7 +724,10 @@ Logger * makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+        isatty(STDIN_FILENO)
+        && isatty(STDOUT_FILENO)
+        && isatty(STDERR_FILENO)
+        && getEnv("TERM").value_or("dumb") != "dumb"
     );
 }
 
