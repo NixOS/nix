@@ -244,14 +244,41 @@ class BoehmGCStackAllocator : public StackAllocator {
     boost::context::stack_context allocate() override {
         auto sctx = stack.allocate();
 
-        // Despite what the docs warn, the only *implemented* stack direction
-        // is "down". This is why we subtract the stack size.
-        GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
+        // Ideally we'd like the collector to scan this stack, but this doesn't seem to
+        // be possible (yet?).
+        //   - Segfault while GC is pushing all stacks for marking.
+        //     This suggests that Boehm GC can't process the normal thread stack
+        //     after moving control to the coroutine.
+        //       - https://github.com/NixOS/nix/issues/3931
+        //         This issue predates evaluation of source filter function 
+        //         invocations in coroutines.
+        //       - https://github.com/NixOS/nix/issues/4178#issuecomment-728705868
+        //         Whereas this one doesn't.
+        //   - This comment is somewhat concerning.
+        //      "[Traversing stacks] must be done last, since they can
+        //       legitimately overflow the mark stack.  This is usually
+        //       done by saving the current context on the stack, and then
+        //       just tracing from the stack."
+        //     See https://github.com/ivmai/bdwgc/blob/802e47d5e8dcbddd2e80cd4587eacc5f4ffbc745/mark_rts.c#L923-L927
+        //
+        // Original implementation:
+        // // Despite what the docs warn, the only *implemented* stack direction
+        // // is "down". This is why we subtract the stack size.
+        // GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
+
+        // GC_disable/enable maintain a counter to support nesting.
+        GC_disable();
+
         return sctx;
     }
 
     void deallocate(boost::context::stack_context sctx) override {
-        GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
+        // // See above
+        // GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
+
+        // GC_disable/enable maintain a counter to support nesting.
+        GC_enable();
+
         stack.deallocate(sctx);
     }
 
