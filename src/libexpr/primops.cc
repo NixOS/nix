@@ -772,6 +772,30 @@ static RegisterPrimOp primop_deepSeq({
     .fun = prim_deepSeq,
 });
 
+/* Evaluate the argument, then run memory garbage collection. */
+static void prim_gcAfter(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    v = *args[0];
+    if (GC_is_disabled()) {
+        warn("gc is disabled; ignoring __gcAfter request");
+    }
+    else {
+        printInfo("__gcAfter: forcing gc");
+        GC_gcollect();
+    }
+}
+
+static RegisterPrimOp primop_gcAfter({
+    .name = "__gcAfter",
+    .args = {"e"},
+    .doc = R"(
+      Evaluate *e*, run memory garbage collection and return the value of *e*.
+      This is only useful for testing, because garbage collection is automatic.
+    )",
+    .fun = prim_gcAfter,
+});
+
 /* Evaluate the first expression and print it on standard error.  Then
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
