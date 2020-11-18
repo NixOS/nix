@@ -356,8 +356,6 @@ struct InstallableStorePath : Installable
 
 Buildables InstallableValue::toBuildables()
 {
-    Activity act(*logger, lvlInfo, actEvaluate);
-
     Buildables res;
 
     std::map<StorePath, std::map<std::string, std::optional<StorePath>>> drvsToOutputs;
@@ -488,6 +486,8 @@ static std::string showAttrPaths(const std::vector<std::string> & paths)
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
     auto lockedFlake = getLockedFlake();
+
+    Activity act(*logger, lvlInfo, actEvaluate);
 
     auto cache = openEvalCache(*state, lockedFlake);
     auto root = cache->getRoot();
