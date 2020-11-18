@@ -10,19 +10,29 @@ commonArgs=( \
 )
 
 remoteRoot=$TEST_ROOT/store2
-chmod -R u+w "$remoteRoot" || true
-rm -rf "$remoteRoot"
 
-# Fill the remote cache (by copy-ing only the toplevel derivation outputs to
-# make sure that the dependencies are properly registered)
-nix copy --to $cacheDir transitivelyDependentCA dependentNonCA dependentFixedOutput "${commonArgs[@]}"
-clearStore
+clearRemote() {
+    chmod -R u+w "$remoteRoot" || true
+    rm -rf "$remoteRoot"
+}
 
-# Fetch the otput from the cache
-# First one derivation randomly choosen in dependency graph
-nix copy --from $cacheDir --no-require-sigs "${commonArgs[@]}" dependentCA
-# Then everything
-nix copy --from $cacheDir --no-require-sigs "${commonArgs[@]}"
+backAndForth () {
+    # Fill the remote cache (by copy-ing only the toplevel derivation outputs to
+    # make sure that the dependencies are properly registered)
+    nix copy --to $remoteRoot --no-require-sigs transitivelyDependentCA dependentNonCA dependentFixedOutput "${commonArgs[@]}"
+    clearStore
 
-# Ensure that everything is locally present
-nix build "${commonArgs[@]}" -j0 --no-link
+    # Fetch the otput from the cache
+    # First one derivation randomly choosen in dependency graph
+    nix copy --from $remoteRoot --no-require-sigs "${commonArgs[@]}" dependentCA
+    # Then everything
+    nix copy --from $remoteRoot --no-require-sigs "${commonArgs[@]}"
+
+    # Ensure that everything is locally present
+    nix build "${commonArgs[@]}" -j0 --no-link
+}
+
+clearRemote
+backAndForth
+clearRemote
+backAndForth

@@ -39,7 +39,8 @@ nix_tests = \
   build.sh \
   ca/build.sh \
   ca/nix-copy.sh \
-  ca/substitute.sh
+  ca/substitute.sh \
+  ca/daemon.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh \
 
