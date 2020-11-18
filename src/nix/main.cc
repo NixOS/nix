@@ -88,11 +88,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             }},
         });
 
+        // FIXME: make this a setting, remove LogFormat::barWithLogs.
         addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
             .description = "print full build logs on stderr",
-            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
+            .handler = {[&]() { printBuildLogs = true; }},
         });
 
         addFlag({
@@ -254,10 +255,6 @@ void mainWrapped(int argc, char * * argv)
     settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
-    setLogFormat("bar");
-
-    Finally f([] { logger->stop(); });
-
     NixArgs args;
 
     if (argc == 2 && std::string(argv[1]) == "__dump-args") {
@@ -300,6 +297,10 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (completions) return;
+
+    setLogFormat(args.printBuildLogs ? LogFormat::bar : LogFormat::barWithLogs);
+
+    Finally f([] { logger->stop(); });
 
     initPlugins();
 

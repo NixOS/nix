@@ -143,7 +143,7 @@ private:
         bool helpShown = false;
     };
 
-    bool isTTY;
+    const bool isTTY;
 
     Sync<State> state_;
 
@@ -173,14 +173,9 @@ public:
                 draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
-
-            if (savedTermAttrs) {
-                tcsetattr(STDIN_FILENO, TCSANOW, &*savedTermAttrs);
-                savedTermAttrs.reset();
-            }
         });
 
-        if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO) && isatty(STDERR_FILENO)) {
+        if (isTTY) {
 
             struct termios term;
             if (tcgetattr(STDIN_FILENO, &term))
@@ -291,6 +286,11 @@ public:
             state->active = false;
             updateCV.notify_one();
             quitCV.notify_one();
+
+            if (savedTermAttrs) {
+                tcsetattr(STDIN_FILENO, TCSANOW, &*savedTermAttrs);
+                savedTermAttrs.reset();
+            }
         }
 
         updateThread.join();
