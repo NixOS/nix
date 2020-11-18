@@ -160,6 +160,8 @@ private:
 
     Pipe inputPipe;
 
+    const std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
 public:
 
     ProgressBar(bool isTTY)
@@ -171,8 +173,10 @@ public:
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             while (state->active) {
+                #if 0
                 if (!state->haveUpdate)
                     state.wait(updateCV);
+                #endif
                 updateStatusLine(*state);
                 draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
@@ -594,11 +598,22 @@ public:
         if (line != "")
             state.statusLines.insert_or_assign({idStatus, 0}, line);
 
+        std::vector<std::string> spinner =
+            //{"←", "↖", "↑", "↗", "→", "↘", "↓", "↙"};
+            //{"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▁"};
+            {"⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"};
+
+        auto now = std::chrono::steady_clock::now();
+
+        auto busyMark = ANSI_BOLD + spinner[(std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count() / 200) % spinner.size()];
+
+        auto doneMark = ANSI_GREEN "✓";
+
         if (state.activitiesByType.count(actEvaluate)) {
             state.statusLines.insert_or_assign({idEvaluate, 0},
                 fmt("%s Evaluating",
                     state.activitiesByType[actEvaluate].its.empty()
-                    ? ANSI_GREEN "✓" : ANSI_BOLD "•"));
+                    ? doneMark : busyMark));
             state.statusLines.insert_or_assign({idEvaluate, 1}, "");
         }
 
@@ -606,7 +621,7 @@ public:
             state.statusLines.insert_or_assign({idLockFlake, 0},
                 fmt("%s Locking flake inputs",
                     state.activitiesByType[actLockFlake].its.empty()
-                    ? ANSI_GREEN "✓" : ANSI_BOLD "•"));
+                    ? doneMark : busyMark));
             state.statusLines.insert_or_assign({idLockFlake, 1}, "");
         }
 
@@ -667,8 +682,8 @@ public:
             state.statusLines.insert_or_assign({idCopyPaths, n++},
                 fmt("%s Fetched %d / %d store paths, %.1f / %.1f MiB",
                     copyPaths.running || copyPaths.done < copyPaths.expected
-                    ? ANSI_BOLD "•"
-                    : ANSI_GREEN "✓",
+                    ? busyMark
+                    : doneMark,
                     copyPaths.done, copyPaths.expected,
                     copyPath.done / MiB, copyPath.expected / MiB));
 
@@ -695,8 +710,8 @@ public:
                     builds.failed
                     ? ANSI_RED "✗"
                     : builds.running || builds.done < builds.expected
-                    ? ANSI_BOLD "•"
-                    : ANSI_GREEN "✓",
+                    ? busyMark
+                    : doneMark,
                     builds.done, builds.expected)
                 + (builds.running ? fmt(", %d running", builds.running) : "")
                 + (builds.failed ? fmt(", %d failed", builds.failed) : ""));
@@ -704,8 +719,6 @@ public:
             state.statusLines.insert_or_assign({idBuilds, n++},
                 fmt("  %s",
                     renderBar(builds.done, builds.failed, builds.running, builds.expected)));
-
-            auto now = std::chrono::steady_clock::now();
 
             for (auto & build : state.activitiesByType[actBuild].its) {
                 state.statusLines.insert_or_assign({idBuilds, n++},
