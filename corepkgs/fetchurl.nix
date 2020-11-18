@@ -1,6 +1,6 @@
 { system ? "" # obsolete
 , url
-, hash ? "" # an SRI ash
+, hash ? "" # an SRI hash
 
 # Legacy hash specification
 , md5 ? "", sha1 ? "", sha256 ? "", sha512 ? ""
