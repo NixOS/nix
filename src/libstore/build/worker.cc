@@ -472,4 +472,11 @@ GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
     return subGoal;
 }
 
+void Worker::updateProgress()
+{
+    actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
+    actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
+    act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
+}
+
 }

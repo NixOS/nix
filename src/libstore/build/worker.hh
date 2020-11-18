@@ -195,12 +195,7 @@ public:
 
     void markContentsGood(const StorePath & path);
 
-    void updateProgress()
-    {
-        actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
-        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
-    }
+    void updateProgress();
 };
 
 }
