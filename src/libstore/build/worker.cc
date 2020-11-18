@@ -207,7 +207,26 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    for (auto & i : _topGoals) topGoals.insert(i);
+    std::vector<nix::StorePathWithOutputs> topPaths;
+
+    for (auto & i : _topGoals) {
+        topGoals.insert(i);
+        if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
+            topPaths.push_back({goal->drvPath, goal->wantedOutputs});
+        } else if (auto goal = dynamic_cast<SubstitutionGoal *>(i.get())) {
+            topPaths.push_back({goal->storePath});
+        }
+    }
+
+    /* Call queryMissing() efficiently query substitutes. */
+    StorePathSet willBuild, willSubstitute, unknown;
+    uint64_t downloadSize, narSize;
+    store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())
+        throw Error(
+            "%d derivations need to be built, but neither local builds ('--max-jobs') "
+            "nor remote builds ('--builders') are enabled", willBuild.size());
 
     debug("entered goal loop");
 

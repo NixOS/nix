@@ -5,24 +5,9 @@
 
 namespace nix {
 
-static void primeCache(Store & store, const std::vector<StorePathWithOutputs> & paths)
-{
-    StorePathSet willBuild, willSubstitute, unknown;
-    uint64_t downloadSize, narSize;
-    store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
-
-    if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())
-        throw Error(
-            "%d derivations need to be built, but neither local builds ('--max-jobs') "
-            "nor remote builds ('--builders') are enabled", willBuild.size());
-}
-
-
 void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
     Worker worker(*this);
-
-    primeCache(*this, drvPaths);
 
     Goals goals;
     for (auto & path : drvPaths) {
@@ -44,9 +29,8 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
                 ex = i->ex;
         }
         if (i->exitCode != Goal::ecSuccess) {
-            DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
-            if (i2) failed.insert(i2->getDrvPath());
-            else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
+            if (auto i2 = dynamic_cast<DerivationGoal *>(i.get())) failed.insert(i2->drvPath);
+            else if (auto i2 = dynamic_cast<SubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
         }
     }
 
@@ -83,8 +67,6 @@ void LocalStore::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
-
-    primeCache(*this, {{path}});
 
     Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path);
