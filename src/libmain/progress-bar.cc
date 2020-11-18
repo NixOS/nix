@@ -114,6 +114,7 @@ private:
 
     enum StatusLineGroup {
         idHelp,
+        idLockFlake,
         idEvaluate,
         idDownload,
         idCopyPaths,
@@ -443,7 +444,8 @@ public:
         if (type == actFileTransfer
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)) // FIXME?
             || type == actBuild
-            || type == actSubstitute)
+            || type == actSubstitute
+            || type == actLockFlake)
             i->visible = false;
 
         if (type == actBuild)
@@ -593,16 +595,19 @@ public:
             state.statusLines.insert_or_assign({idStatus, 0}, line);
 
         if (state.activitiesByType.count(actEvaluate)) {
-            if (!state.activitiesByType[actEvaluate].its.empty()) {
-                state.statusLines.insert_or_assign({idEvaluate, 0},
-                    fmt(ANSI_BOLD "• Evaluating"));
-                state.statusLines.insert_or_assign({idEvaluate, 1}, "");
-            } else {
-                // FIXME: evaluation could fail...
-                state.statusLines.insert_or_assign({idEvaluate, 0},
-                    fmt(ANSI_GREEN "✓ Evaluating"));
-                state.statusLines.insert_or_assign({idEvaluate, 1}, "");
-            }
+            state.statusLines.insert_or_assign({idEvaluate, 0},
+                fmt("%s Evaluating",
+                    state.activitiesByType[actEvaluate].its.empty()
+                    ? ANSI_GREEN "✓" : ANSI_BOLD "•"));
+            state.statusLines.insert_or_assign({idEvaluate, 1}, "");
+        }
+
+        if (state.activitiesByType.count(actLockFlake)) {
+            state.statusLines.insert_or_assign({idLockFlake, 0},
+                fmt("%s Locking flake inputs",
+                    state.activitiesByType[actLockFlake].its.empty()
+                    ? ANSI_GREEN "✓" : ANSI_BOLD "•"));
+            state.statusLines.insert_or_assign({idLockFlake, 1}, "");
         }
 
         auto renderBar = [](uint64_t done, uint64_t failed, uint64_t running, uint64_t expected)
