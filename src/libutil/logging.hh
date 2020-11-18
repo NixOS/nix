@@ -22,6 +22,7 @@ typedef enum {
     actBuildWaiting = 111,
     actEvaluate = 112,
     actLockFlake = 113,
+    actQueryMissing = 114,
 } ActivityType;
 
 typedef enum {

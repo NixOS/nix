@@ -87,6 +87,7 @@ private:
         uint64_t running = 0;
         uint64_t failed = 0;
         uint64_t left = 0;
+        uint64_t active = 0;
     };
 
     ActivityStats getActivityStats(ActivitiesByType & act)
@@ -105,6 +106,7 @@ private:
             stats.running += j.second->running;
             stats.failed += j.second->failed;
             stats.left += j.second->expected > j.second->done ? j.second->expected - j.second->done : 0;
+            stats.active++;
         }
 
         stats.expected = std::max(stats.expected, act.expected);
@@ -115,8 +117,9 @@ private:
     enum StatusLineGroup {
         idHelp,
         idLockFlake,
-        idEvaluate,
         idDownload,
+        idEvaluate,
+        idQueryMissing,
         idCopyPaths,
         idBuilds,
         idStatus,
@@ -449,7 +452,8 @@ public:
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)) // FIXME?
             || type == actBuild
             || type == actSubstitute
-            || type == actLockFlake)
+            || type == actLockFlake
+            || type == actQueryMissing)
             i->visible = false;
 
         if (type == actBuild)
@@ -611,7 +615,7 @@ public:
 
         if (state.activitiesByType.count(actEvaluate)) {
             state.statusLines.insert_or_assign({idEvaluate, 0},
-                fmt("%s Evaluating",
+                fmt("%s Evaluate",
                     state.activitiesByType[actEvaluate].its.empty()
                     ? doneMark : busyMark));
             state.statusLines.insert_or_assign({idEvaluate, 1}, "");
@@ -619,10 +623,18 @@ public:
 
         if (state.activitiesByType.count(actLockFlake)) {
             state.statusLines.insert_or_assign({idLockFlake, 0},
-                fmt("%s Locking flake inputs",
+                fmt("%s Lock flake inputs",
                     state.activitiesByType[actLockFlake].its.empty()
                     ? doneMark : busyMark));
             state.statusLines.insert_or_assign({idLockFlake, 1}, "");
+        }
+
+        if (state.activitiesByType.count(actQueryMissing)) {
+            state.statusLines.insert_or_assign({idQueryMissing, 0},
+                fmt("%s Query missing paths",
+                    state.activitiesByType[actQueryMissing].its.empty()
+                    ? doneMark : busyMark));
+            state.statusLines.insert_or_assign({idQueryMissing, 1}, "");
         }
 
         auto renderBar = [](uint64_t done, uint64_t failed, uint64_t running, uint64_t expected)
@@ -651,11 +663,10 @@ public:
 
             size_t n = 0;
             state.statusLines.insert_or_assign({idDownload, n++},
-                fmt("%s Downloaded %.1f / %.1f MiB",
-                    fileTransfer.running || fileTransfer.done < fileTransfer.expected
-                    ? ANSI_BOLD "•"
-                    : ANSI_GREEN "✓",
-                    //copyPaths.done, copyPaths.expected,
+                fmt("%s Download %.1f / %.1f MiB",
+                    fileTransfer.active || fileTransfer.done < fileTransfer.expected
+                    ? busyMark
+                    : doneMark,
                     fileTransfer.done / MiB, fileTransfer.expected / MiB));
 
             state.statusLines.insert_or_assign({idDownload, n++},
@@ -680,7 +691,7 @@ public:
 
             size_t n = 0;
             state.statusLines.insert_or_assign({idCopyPaths, n++},
-                fmt("%s Fetched %d / %d store paths, %.1f / %.1f MiB",
+                fmt("%s Fetch %d / %d store paths, %.1f / %.1f MiB",
                     copyPaths.running || copyPaths.done < copyPaths.expected
                     ? busyMark
                     : doneMark,
@@ -706,7 +717,7 @@ public:
             size_t n = 0;
             state.statusLines.insert_or_assign(
                 {idBuilds, n++},
-                fmt("%s Built %d / %d derivations",
+                fmt("%s Build %d / %d derivations",
                     builds.failed
                     ? ANSI_RED "✗"
                     : builds.running || builds.done < builds.expected
