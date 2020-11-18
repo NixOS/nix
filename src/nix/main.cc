@@ -10,6 +10,7 @@
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
+#include "progress-bar.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -55,7 +56,6 @@ std::string programPath;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
 
@@ -88,12 +88,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             }},
         });
 
-        // FIXME: make this a setting, remove LogFormat::barWithLogs.
         addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
             .description = "print full build logs on stderr",
-            .handler = {[&]() { printBuildLogs = true; }},
+            .handler = {[&]() { progressBarSettings.printBuildLogs = true; }},
         });
 
         addFlag({
@@ -298,7 +297,7 @@ void mainWrapped(int argc, char * * argv)
 
     if (completions) return;
 
-    setLogFormat(args.printBuildLogs ? LogFormat::bar : LogFormat::barWithLogs);
+    setLogFormat(LogFormat::bar);
 
     Finally f([] { logger->stop(); });
 

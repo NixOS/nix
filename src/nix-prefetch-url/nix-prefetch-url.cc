@@ -10,6 +10,7 @@
 #include "../nix/legacy.hh"
 #include "progress-bar.hh"
 #include "tarfile.hh"
+#include "loggers.hh"
 
 #include <iostream>
 
@@ -103,7 +104,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         Finally f([]() { stopProgressBar(); });
 
         if (isatty(STDERR_FILENO))
-          startProgressBar();
+            setLogFormat(LogFormat::bar);
 
         auto store = openStore();
         auto state = std::make_unique<EvalState>(myArgs.searchPath, store);

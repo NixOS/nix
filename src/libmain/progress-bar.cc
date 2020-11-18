@@ -15,6 +15,10 @@
 
 namespace nix {
 
+ProgressBarSettings progressBarSettings;
+
+static GlobalConfig::Register rProgressBarSettings(&progressBarSettings);
+
 static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
 {
     assert(n < fields.size());
@@ -133,8 +137,6 @@ private:
         bool active = true;
         bool haveUpdate = true;
 
-        bool printBuildLogs;
-
         std::map<LineId, std::string> statusLines;
 
         /* How many lines need to be erased when redrawing. */
@@ -158,9 +160,9 @@ private:
 
 public:
 
-    ProgressBar(bool printBuildLogs, bool isTTY)
+    ProgressBar(bool isTTY)
         : isTTY(isTTY)
-        , state_({ .active = isTTY, .printBuildLogs = printBuildLogs })
+        , state_({ .active = isTTY })
     {
         state_.lock()->active = isTTY;
 
@@ -224,10 +226,10 @@ public:
                     }
                     if (c == 'l') {
                         auto state(state_.lock());
-                        state->printBuildLogs = !state->printBuildLogs;
+                        progressBarSettings.printBuildLogs = !progressBarSettings.printBuildLogs;
                         updateStatusLine(*state);
                         draw(*state,
-                            state->printBuildLogs
+                            progressBarSettings.printBuildLogs
                             ? ANSI_BOLD "Enabling build logs."
                             : ANSI_BOLD "Disabling build logs.");
                     }
@@ -298,7 +300,7 @@ public:
 
     bool isVerbose() override
     {
-        return state_.lock()->printBuildLogs;
+        return progressBarSettings.printBuildLogs;
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -470,7 +472,7 @@ public:
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 i->second->lastLine = lastLine;
-                if (state->printBuildLogs) {
+                if (progressBarSettings.printBuildLogs) {
                     auto suffix = "> ";
                     if (type == resPostBuildLogLine) {
                         suffix = " (post)> ";
@@ -720,20 +722,14 @@ public:
     }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+Logger * makeProgressBar()
 {
     return new ProgressBar(
-        printBuildLogs,
         isatty(STDIN_FILENO)
         && isatty(STDOUT_FILENO)
         && isatty(STDERR_FILENO)
         && getEnv("TERM").value_or("dumb") != "dumb"
     );
-}
-
-void startProgressBar(bool printBuildLogs)
-{
-    logger = makeProgressBar(printBuildLogs);
 }
 
 void stopProgressBar()
