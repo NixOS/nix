@@ -210,7 +210,8 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
-extern DrvHashes drvHashes; // FIXME: global, not thread-safe
+// FIXME: global, though at least thread-safe.
+extern Sync<DrvHashes> drvHashes;
 
 /* Memoisation of `readDerivation(..).resove()`. */
 typedef std::map<

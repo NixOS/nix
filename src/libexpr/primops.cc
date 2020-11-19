@@ -1132,9 +1132,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
        However, we don't bother doing this for floating CA derivations because
        their "hash modulo" is indeterminate until built. */
-    if (drv.type() != DerivationType::CAFloating)
-        drvHashes.insert_or_assign(drvPath,
-            hashDerivationModulo(*state.store, Derivation(drv), false));
+    if (drv.type() != DerivationType::CAFloating) {
+        auto h = hashDerivationModulo(*state.store, Derivation(drv), false);
+        drvHashes.lock()->insert_or_assign(drvPath, h);
+    }
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
