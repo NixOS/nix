@@ -122,6 +122,7 @@ private:
         idQueryMissing,
         idCopyPaths,
         idBuilds,
+        idVerifyPaths,
         idStatus,
         idQuit
     };
@@ -448,12 +449,16 @@ public:
                 i->ignored = true;
         }
 
+        if (type == actVerifyPath)
+            i->s = getS(fields, 0);
+
         if (type == actFileTransfer
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)) // FIXME?
             || type == actBuild
             || type == actSubstitute
             || type == actLockFlake
-            || type == actQueryMissing)
+            || type == actQueryMissing
+            || type == actVerifyPath)
             i->visible = false;
 
         if (type == actBuild)
@@ -613,6 +618,8 @@ public:
 
         auto doneMark = ANSI_GREEN "✓";
 
+        auto failMark = ANSI_RED "✗";
+
         if (state.activitiesByType.count(actEvaluate)) {
             state.statusLines.insert_or_assign({idEvaluate, 0},
                 fmt("%s Evaluate",
@@ -719,7 +726,7 @@ public:
                 {idBuilds, n++},
                 fmt("%s Build %d / %d derivations",
                     builds.failed
-                    ? ANSI_RED "✗"
+                    ? failMark
                     : builds.running || builds.done < builds.expected
                     ? busyMark
                     : doneMark,
@@ -741,6 +748,39 @@ public:
             }
 
             state.statusLines.insert_or_assign({idBuilds, n++}, "");
+        }
+
+        auto verify = getActivityStats(state.activitiesByType[actVerifyPaths]);
+
+        if (verify.done || verify.expected) {
+            removeStatusLines(state, idVerifyPaths);
+
+            auto bad = state.corruptedPaths + state.untrustedPaths + verify.failed;
+
+            size_t n = 0;
+            state.statusLines.insert_or_assign(
+                {idVerifyPaths, n++},
+                fmt("%s Verify %d / %d paths",
+                    verify.done < verify.expected
+                    ? busyMark
+                    : bad
+                    ? failMark
+                    : doneMark,
+                    verify.done, verify.expected)
+                + (state.corruptedPaths ? fmt(", %d corrupted", state.corruptedPaths) : "")
+                + (state.untrustedPaths ? fmt(", %d untrusted", state.untrustedPaths) : "")
+                + (verify.failed ? fmt(", %d failed", verify.failed) : "")
+                );
+
+            state.statusLines.insert_or_assign({idVerifyPaths, n++},
+                fmt("  %s", renderBar(verify.done - bad, bad, verify.running, verify.expected)));
+
+            for (auto & build : state.activitiesByType[actVerifyPath].its) {
+                state.statusLines.insert_or_assign({idVerifyPaths, n++},
+                    fmt(ANSI_BOLD "  ‣ %s", build.second->s));
+            }
+
+            state.statusLines.insert_or_assign({idVerifyPaths, n++}, "");
         }
     }
 
