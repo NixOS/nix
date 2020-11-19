@@ -78,7 +78,7 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
     {
         if (jsonNode.find("inputs") == jsonNode.end()) return;
         for (auto & i : jsonNode["inputs"].items()) {
-            if (i.value().is_array()) {
+            if (i.value().is_array()) { // FIXME: remove, obsolete
                 InputPath path;
                 for (auto & j : i.value())
                     path.push_back(j);
@@ -87,10 +87,13 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
                 std::string inputKey = i.value();
                 auto k = nodeMap.find(inputKey);
                 if (k == nodeMap.end()) {
-                    auto jsonNode2 = json["nodes"][inputKey];
-                    auto input = std::make_shared<LockedNode>(jsonNode2);
+                    auto nodes = json["nodes"];
+                    auto jsonNode2 = nodes.find(inputKey);
+                    if (jsonNode2 == nodes.end())
+                        throw Error("lock file references missing node '%s'", inputKey);
+                    auto input = std::make_shared<LockedNode>(*jsonNode2);
                     k = nodeMap.insert_or_assign(inputKey, input).first;
-                    getInputs(*input, jsonNode2);
+                    getInputs(*input, *jsonNode2);
                 }
                 if (auto child = std::dynamic_pointer_cast<LockedNode>(k->second))
                     node.inputs.insert_or_assign(i.key(), child);
