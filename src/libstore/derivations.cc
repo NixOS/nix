@@ -451,7 +451,7 @@ DerivationType BasicDerivation::type() const
 }
 
 
-DrvHashes drvHashes;
+Sync<DrvHashes> drvHashes;
 
 /* pathDerivationModulo and hashDerivationModulo are mutually recursive
  */
@@ -459,19 +459,22 @@ DrvHashes drvHashes;
 /* Look up the derivation by value and memoize the
    `hashDerivationModulo` call.
  */
-static const DrvHashModulo & pathDerivationModulo(Store & store, const StorePath & drvPath)
+static const DrvHashModulo pathDerivationModulo(Store & store, const StorePath & drvPath)
 {
-    auto h = drvHashes.find(drvPath);
-    if (h == drvHashes.end()) {
-        // Cache it
-        h = drvHashes.insert_or_assign(
-            drvPath,
-            hashDerivationModulo(
-                store,
-                store.readInvalidDerivation(drvPath),
-                false)).first;
+    {
+        auto hashes = drvHashes.lock();
+        auto h = hashes->find(drvPath);
+        if (h != hashes->end()) {
+            return h->second;
+        }
     }
-    return h->second;
+    auto h = hashDerivationModulo(
+        store,
+        store.readInvalidDerivation(drvPath),
+        false);
+    // Cache it
+    drvHashes.lock()->insert_or_assign(drvPath, h);
+    return h;
 }
 
 /* See the header for interface details. These are the implementation details.
