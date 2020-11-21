@@ -11,6 +11,7 @@ struct CmdBundle : InstallableCommand
 {
     std::string bundler = "github:matthewbauer/nix-bundle";
     std::optional<Path> outLink;
+    bool skipReferenceCheck = false;
 
     CmdBundle()
     {
@@ -32,6 +33,12 @@ struct CmdBundle : InstallableCommand
             .handler = {&outLink},
             .completer = completePath
         });
+
+        addFlag({
+            .longName = "skip-refcheck",
+            .description = "Skip checking of references in bundle.",
+            .handler = {&skipReferenceCheck, true},
+            });
     }
 
     std::string description() override
@@ -117,7 +124,7 @@ struct CmdBundle : InstallableCommand
         auto outPathS = store->printStorePath(outPath);
 
         auto info = store->queryPathInfo(outPath);
-        if (!info->references.empty())
+        if (!info->references.empty() && !skipReferenceCheck)
             throw Error("'%s' has references; a bundler must not leave any references", outPathS);
 
         if (!outLink)
