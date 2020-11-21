@@ -110,10 +110,14 @@ SV * queryPathInfo(char * path, int base32)
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
-            AV * arr = newAV();
+            AV * refs = newAV();
             for (auto & i : info->references)
-                av_push(arr, newSVpv(store()->printStorePath(i).c_str(), 0));
-            XPUSHs(sv_2mortal(newRV((SV *) arr)));
+                av_push(refs, newSVpv(store()->printStorePath(i).c_str(), 0));
+            XPUSHs(sv_2mortal(newRV((SV *) refs)));
+            AV * sigs = newAV();
+            for (auto & i : info->sigs)
+                av_push(sigs, newSVpv(i.c_str(), 0));
+            XPUSHs(sv_2mortal(newRV((SV *) sigs)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
