@@ -15,7 +15,14 @@ clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 dist-files += $(man-pages)
 
-nix-eval = $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw --expr
+# Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
+dummy-env = env -i \
+	HOME=/dummy \
+	NIX_CONF_DIR=/dummy \
+	NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt \
+	NIX_STATE_DIR=/dummy
+
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw --expr
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
@@ -45,11 +52,11 @@ $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
-	$(trace-gen) $(bindir)/nix __dump-args > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-args > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
@@ -58,7 +65,7 @@ $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix 
 	@mv $@.tmp $@
 
 $(d)/builtins.json: $(bindir)/nix
-	$(trace-gen) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
+	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
 	mv $@.tmp $@
 
 # Generate the HTML manual.
