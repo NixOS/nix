@@ -32,6 +32,7 @@ struct CmdBundle : InstallableCommand
             .handler = {&outLink},
             .completer = completePath
         });
+
     }
 
     std::string description() override
@@ -115,10 +116,6 @@ struct CmdBundle : InstallableCommand
         store->buildPaths({{drvPath}});
 
         auto outPathS = store->printStorePath(outPath);
-
-        auto info = store->queryPathInfo(outPath);
-        if (!info->references.empty())
-            throw Error("'%s' has references; a bundler must not leave any references", outPathS);
 
         if (!outLink)
             outLink = baseNameOf(app.program);
