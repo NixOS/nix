@@ -179,19 +179,44 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
 
-                ProfileElement element;
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
-                element.source = ProfileElementSource{
-                    installable2->flakeRef,
-                    resolvedRef,
-                    attrPath,
-                };
-
                 pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
 
-                manifest.elements.emplace_back(std::move(element));
+                bool alreadyInstalled = false;
+                for (size_t i = 0; i < manifest.elements.size(); ++i) {
+                    auto & element(manifest.elements[i]);
+                    if (element.source
+                        && !element.source->originalRef.input.isImmutable()
+                        && element.source->originalRef == installable2->flakeRef
+                        && element.source->attrPath == attrPath)
+                    {
+                        alreadyInstalled = true;
+
+                        printInfo("found '%s' in profile, replacing", installable2->what());
+
+                        element.storePaths = {*drv.outPath}; // FIXME
+                        element.source = ProfileElementSource {
+                            installable2->flakeRef,
+                            resolvedRef,
+                            attrPath,
+                        };
+
+                        break;
+                    }
+                }
+
+                if (!alreadyInstalled) {
+                    ProfileElement element;
+                    if (!drv.outPath)
+                        throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
+                    element.storePaths = {*drv.outPath}; // FIXME
+                    element.source = ProfileElementSource{
+                        installable2->flakeRef,
+                        resolvedRef,
+                        attrPath,
+                    };
+
+                    manifest.elements.emplace_back(std::move(element));
+                }
             } else
                 throw UnimplementedError("'nix profile install' does not support argument '%s'", installable->what());
         }
