@@ -28,3 +28,24 @@ This parses like so:
     /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1/
     ^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^
     store dir  digest                           name
+
+## The digest
+
+The calculation of the digest is quite complicated for historical reasons.
+Some of the details will be saved for later.
+
+> Historical note. The 20 byte restriction is because originally a digests were SHA-1 hashes.
+> This is no longer true, but longer hashes and other information is still boiled down to 20 bytes.
+
+Store paths are either content-addressed or "input-addressed".
+
+Content addressing means that the digest ultimately derives from referred store entry's file system data and references, and thus can be verified (if one knows how it was calculated).
+
+Input addressing means that the digest derives from how the store path was produced -- the "inputs" and plan that it was built from.
+Store paths of this sort can not be validated from the content of the store entry.
+Rather, the store entry might come with the store path it expects to be referred to by, and a signature of that path, the contents of the store path, and other metadata.
+The signature indicates that someone is vouching for the store entry really being the results of a plan with that digest.
+
+While metadata is included in the digest calculation explaining which method it was calculated by, this only serves to thwart pre-image attacks.
+That metadata is scrambled with everything else so that it is difficult to tell how a given store path was produced short of a brute-force search.
+In the parlance of referencing schemes, this means that store paths are not "self-describing".
