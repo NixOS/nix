@@ -1,5 +1,9 @@
 ifeq ($(doc_generate),yes)
 
+MANUAL_SRCS := \
+  $(call rwildcard, $(d)/src, *.md) \
+  $(call rwildcard, $(d)/src, */*.md)
+
 # Generate man pages.
 man-pages := $(foreach n, \
   nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
@@ -97,7 +101,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	done
 	@touch $@
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md $(call rwildcard, $(d)/src, *.md)
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
 	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual
 
 endif
