@@ -16,14 +16,16 @@ rec {
   };
   rootCA = mkDerivation {
     name = "rootCA";
-    outputs = [ "out" "dev" ];
+    outputs = [ "out" "dev" "foo"];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"
       mkdir -p $out
       echo ${rootLegacy}/hello > $out/dep
-      # test symlink at root
+      ln -s $out $out/self
+      # test symlinks at root
       ln -s $out $dev
+      ln -s $out $foo
     '';
     __contentAddressed = true;
     outputHashMode = "recursive";
@@ -34,7 +36,8 @@ rec {
     buildCommand = ''
       echo "building a dependent derivation"
       mkdir -p $out
-      echo ${rootCA}/hello > $out/dep
+      cat ${rootCA}/self/dep
+      echo ${rootCA}/self/dep > $out/dep
     '';
     __contentAddressed = true;
     outputHashMode = "recursive";

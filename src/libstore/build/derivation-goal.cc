@@ -3121,6 +3121,20 @@ void DerivationGoal::registerOutputs()
             newInfo0.references = refs.second;
             if (refs.first)
                 newInfo0.references.insert(newInfo0.path);
+            if (scratchPath != newInfo0.path) {
+                // Also rewrite the output path
+                auto source = sinkToSource([&](Sink & nextSink) {
+                    StringSink sink;
+                    dumpPath(actualPath, sink);
+                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
+                    rsink2((unsigned char *) sink.s->data(), sink.s->size());
+                    rsink2.flush();
+                });
+                Path tmpPath = actualPath + ".tmp";
+                restorePath(tmpPath, *source);
+                deletePath(actualPath);
+                movePath(tmpPath, actualPath);
+            }
 
             assert(newInfo0.ca);
             return newInfo0;
