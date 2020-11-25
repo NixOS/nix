@@ -493,8 +493,8 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if ((!fullDrv.inputDrvs.empty() &&
-             fullDrv.type() == DerivationType::CAFloating) || fullDrv.type() == DerivationType::DeferredInputAddressed) {
+        if ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
+            || fullDrv.type() == DerivationType::DeferredInputAddressed) {
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
                aliasing that resolved derivation goal */
