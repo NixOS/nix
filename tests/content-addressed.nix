@@ -63,4 +63,15 @@ rec {
       echo ${rootCA}/non-ca-hello > $out/dep
     '';
   };
+  dependentFixedOutput = mkDerivation {
+    name = "dependent-fixed-output";
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+    outputHash = "sha256-QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA=";
+    buildCommand = ''
+      cat ${dependentCA}/dep
+      echo foo > $out
+    '';
+
+  };
 }
