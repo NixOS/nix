@@ -39,7 +39,7 @@ void emitTreeAttrs(
         // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
         auto emptyHash = Hash(htSHA1);
         mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
     }
 
     if (input.getType() == "git")

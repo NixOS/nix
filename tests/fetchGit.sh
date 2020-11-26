@@ -59,6 +59,7 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 
 [[ $(nix eval --impure --expr "(builtins.fetchGit file://$repo).revCount") = 2 ]]
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).shortRev") = ${rev2:0:7} ]]
 
 # Fetching with a explicit hash should succeed.
 path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
@@ -132,6 +133,7 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 # (check dirty-tree handling was used)
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).shortRev") = 0000000 ]]
 
 # Committing shouldn't change store path, or switch to using 'master'
 git -C $repo commit -m 'Bla5' -a
