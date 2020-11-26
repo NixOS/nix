@@ -27,7 +27,7 @@ struct ArchiveSettings : Config
         #endif
         "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
-    Setting<bool> preallocateContents{this, true, "preallocate-contents",
+    Setting<bool> preallocateContents{this, false, "preallocate-contents",
         "Whether to preallocate files when writing objects with known size."};
 };
 
