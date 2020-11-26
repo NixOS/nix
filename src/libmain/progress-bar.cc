@@ -9,6 +9,7 @@
 #include <thread>
 #include <iostream>
 #include <chrono>
+#include <future>
 
 #include <termios.h>
 #include <poll.h>
@@ -124,7 +125,8 @@ private:
         idBuilds,
         idVerifyPaths,
         idStatus,
-        idQuit
+        idQuit,
+        idPrompt,
     };
 
     typedef std::pair<StatusLineGroup, uint16_t> LineId;
@@ -149,6 +151,8 @@ private:
         size_t prevStatusLines = 0;
 
         bool helpShown = false;
+
+        std::optional<std::promise<std::optional<char>>> prompt;
     };
 
     const bool isTTY;
@@ -228,12 +232,22 @@ public:
                     }
                     c = std::tolower(c);
 
-                    if (c == 3 || c == 'q') {
+                    if (c == 3 || c == 4 || c == 'q') {
                         auto state(state_.lock());
                         state->statusLines.insert_or_assign({idQuit, 0}, ANSI_RED "Exiting...");
                         draw(*state);
                         triggerInterrupt();
                     }
+
+                    {
+                        auto state(state_.lock());
+                        if (state->prompt) {
+                            state->prompt->set_value(c != '\n' ? c : std::optional<char>());
+                            state->prompt.reset();
+                            continue;
+                        }
+                    }
+
                     if (c == 'l') {
                         auto state(state_.lock());
                         progressBarSettings.printBuildLogs = !progressBarSettings.printBuildLogs;
@@ -821,13 +835,28 @@ public:
 
     std::optional<char> ask(std::string_view msg) override
     {
-        auto state(state_.lock());
-        if (!state->active || !isatty(STDIN_FILENO)) return {};
-        std::cerr << fmt("\r\e[K%s ", msg);
-        auto s = trim(readLine(STDIN_FILENO));
-        if (s.size() != 1) return {};
-        draw(*state);
-        return s[0];
+        checkInterrupt();
+
+        std::future<std::optional<char>> fut;
+
+        {
+            auto state(state_.lock());
+            if (!inputThread.joinable()) return {};
+            state->statusLines.insert_or_assign({idPrompt, 0}, fmt(ANSI_BOLD "%s " ANSI_NORMAL, msg));
+            draw(*state);
+            state->prompt = std::promise<std::optional<char>>();
+            fut = state->prompt->get_future();
+        }
+
+        auto res = fut.get();
+
+        {
+            auto state(state_.lock());
+            removeStatusLines(*state, idPrompt);
+            draw(*state);
+        }
+
+        return res;
     }
 };
 
