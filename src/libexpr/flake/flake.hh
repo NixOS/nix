@@ -51,7 +51,7 @@ struct ConfigFile
 {
     using ConfigValue = std::variant<std::string, int64_t, Explicit<bool>, std::vector<std::string>>;
 
-    std::map<std::string, ConfigValue> options;
+    std::map<std::string, ConfigValue> settings;
 
     void apply();
 };

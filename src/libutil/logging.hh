@@ -106,6 +106,9 @@ public:
         formatHelper(f, args...);
         writeToStdout(f.str());
     }
+
+    virtual std::optional<char> ask(std::string_view s)
+    { return {}; }
 };
 
 ActivityId getCurActivity();
