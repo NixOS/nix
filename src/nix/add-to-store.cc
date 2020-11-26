@@ -83,8 +83,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             store->addToStore(info, source);
         }
 
-        logger->stdout("%s", store->printStorePath(info.path));
+        logger->cout("%s", store->printStorePath(info.path));
     }
 };
 
-static auto r1 = registerCommand<CmdAddToStore>("add-to-store");
+static auto rCmdAddToStore = registerCommand<CmdAddToStore>("add-to-store");

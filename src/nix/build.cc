@@ -3,10 +3,13 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
-struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
+struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
     BuildMode buildMode = bmNormal;
@@ -85,7 +88,9 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
                     }, buildables[i]);
 
         updateProfile(buildables);
+
+        if (json) logger->cout("%s", buildablesToJSON(buildables, store).dump());
     }
 };
 
-static auto r1 = registerCommand<CmdBuild>("build");
+static auto rCmdBuild = registerCommand<CmdBuild>("build");

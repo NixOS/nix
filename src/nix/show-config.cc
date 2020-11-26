@@ -20,14 +20,14 @@ struct CmdShowConfig : Command, MixJSON
     {
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
-            logger->stdout("%s", globalConfig.toJSON().dump());
+            logger->cout("%s", globalConfig.toJSON().dump());
         } else {
             std::map<std::string, Config::SettingInfo> settings;
             globalConfig.getSettings(settings);
             for (auto & s : settings)
-                logger->stdout("%s = %s", s.first, s.second.value);
+                logger->cout("%s = %s", s.first, s.second.value);
         }
     }
 };
 
-static auto r1 = registerCommand<CmdShowConfig>("show-config");
+static auto rShowConfig = registerCommand<CmdShowConfig>("show-config");

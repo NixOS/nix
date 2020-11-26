@@ -5,6 +5,7 @@
 #include "types.hh"
 #include "util.hh"
 
+namespace boost::context { struct stack_context; }
 
 namespace nix {
 
@@ -321,6 +322,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
 Sink & operator << (Sink & sink, const string & s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
+Sink & operator << (Sink & in, const Error & ex);
 
 
 MakeError(SerialisationError, Error);
@@ -381,6 +383,8 @@ Source & operator >> (Source & in, bool & b)
     b = readNum<uint64_t>(in);
     return in;
 }
+
+Error readError(Source & source);
 
 
 /* An adapter that converts a std::basic_istream into a source. */
@@ -494,5 +498,18 @@ struct FramedSink : nix::BufferedSink
     };
 };
 
+/* Stack allocation strategy for sinkToSource.
+   Mutable to avoid a boehm gc dependency in libutil.
+
+   boost::context doesn't provide a virtual class, so we define our own.
+ */
+struct StackAllocator {
+    virtual boost::context::stack_context allocate() = 0;
+    virtual void deallocate(boost::context::stack_context sctx) = 0;
+
+    /* The stack allocator to use in sinkToSource and potentially elsewhere.
+       It is reassigned by the initGC() method in libexpr. */
+    static StackAllocator *defaultAllocator;
+};
 
 }

@@ -273,7 +273,7 @@ struct GitInputScheme : InputScheme
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {
-                    Tree(store->printStorePath(storePath), std::move(storePath)),
+                    Tree(store->toRealPath(storePath), std::move(storePath)),
                     input
                 };
             }
@@ -452,6 +452,6 @@ struct GitInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
+static auto rGitInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
 
 }

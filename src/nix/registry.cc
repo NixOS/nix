@@ -26,13 +26,13 @@ struct CmdRegistryList : StoreCommand
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
-                logger->stdout("%s %s %s",
+                logger->cout("%s %s %s",
                     registry->type == Registry::Flag   ? "flags " :
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
                     "global",
-                    entry.from.to_string(),
-                    entry.to.to_string());
+                    entry.from.toURLString(),
+                    entry.to.toURLString(attrsToQuery(entry.extraAttrs)));
             }
         }
     }
@@ -143,4 +143,4 @@ struct CmdRegistry : virtual NixMultiCommand
     }
 };
 
-static auto r1 = registerCommand<CmdRegistry>("registry");
+static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");

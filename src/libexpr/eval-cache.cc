@@ -525,8 +525,17 @@ string_t AttrCursor::getStringWithContext()
             cachedValue = root->db->getAttr(getKey(), root->state.symbols);
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
-                debug("using cached string attribute '%s'", getAttrPathStr());
-                return *s;
+                bool valid = true;
+                for (auto & c : s->second) {
+                    if (!root->state.store->isValidPath(root->state.store->parseStorePath(c.first))) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) {
+                    debug("using cached string attribute '%s'", getAttrPathStr());
+                    return *s;
+                }
             } else
                 throw TypeError("'%s' is not a string", getAttrPathStr());
         }

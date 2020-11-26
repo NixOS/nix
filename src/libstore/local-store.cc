@@ -7,6 +7,7 @@
 #include "nar-info.hh"
 #include "references.hh"
 #include "callback.hh"
+#include "topo-sort.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -573,6 +574,8 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             [&](DerivationOutputCAFloating _) {
                 /* Nothing to check */
             },
+            [&](DerivationOutputDeferred) {
+            },
         }, i.second.output);
     }
 }
@@ -621,7 +624,7 @@ uint64_t LocalStore::addValidPath(State & state,
        efficiently query whether a path is an output of some
        derivation. */
     if (info.path.isDerivation()) {
-        auto drv = readDerivation(info.path);
+        auto drv = readInvalidDerivation(info.path);
 
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
@@ -721,7 +724,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 {
     auto use(state.stmtQueryPathInfo.use()(printStorePath(path)));
     if (!use.next())
-        throw Error("path '%s' is not valid", printStorePath(path));
+        throw InvalidPath("path '%s' is not valid", printStorePath(path));
     return use.getInt(0);
 }
 
@@ -796,18 +799,58 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
 {
+    auto path = path_;
     std::map<std::string, std::optional<StorePath>> outputs;
-    BasicDerivation drv = readDerivation(path);
+    Derivation drv = readDerivation(path);
     for (auto & [outName, _] : drv.outputs) {
         outputs.insert_or_assign(outName, std::nullopt);
+    }
+    bool haveCached = false;
+    {
+        auto resolutions = drvPathResolutions.lock();
+        auto resolvedPathOptIter = resolutions->find(path);
+        if (resolvedPathOptIter != resolutions->end()) {
+            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
+            if (resolvedPathOpt)
+                path = *resolvedPathOpt;
+            haveCached = true;
+        }
+    }
+    /* can't just use else-if instead of `!haveCached` because we need to unlock
+       `drvPathResolutions` before it is locked in `Derivation::resolve`. */
+    if (!haveCached && (drv.type() == DerivationType::CAFloating || drv.type() == DerivationType::DeferredInputAddressed)) {
+        /* Try resolve drv and use that path instead. */
+        auto attempt = drv.tryResolve(*this);
+        if (!attempt)
+            /* If we cannot resolve the derivation, we cannot have any path
+               assigned so we return the map of all std::nullopts. */
+            return outputs;
+        /* Just compute store path */
+        auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true);
+        /* Store in memo table. */
+        /* FIXME: memo logic should not be local-store specific, should have
+           wrapper-method instead. */
+        drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
+        path = std::move(pathResolved);
     }
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
 
-        auto useQueryDerivationOutputs(state->stmtQueryDerivationOutputs.use()
-            (queryValidPathId(*state, path)));
+        uint64_t drvId;
+        try {
+            drvId = queryValidPathId(*state, path);
+        } catch (InvalidPath &) {
+            /* FIXME? if the derivation doesn't exist, we cannot have a mapping
+               for it. */
+            return outputs;
+        }
+
+        auto useQueryDerivationOutputs {
+            state->stmtQueryDerivationOutputs.use()
+            (drvId)
+        };
 
         while (useQueryDerivationOutputs.next())
             outputs.insert_or_assign(
@@ -917,9 +960,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
 
 void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
-    ValidPathInfos infos;
-    infos.push_back(info);
-    registerValidPaths(infos);
+    registerValidPaths({{info.path, info}});
 }
 
 
@@ -937,7 +978,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         SQLiteTxn txn(state->db);
         StorePathSet paths;
 
-        for (auto & i : infos) {
+        for (auto & [_, i] : infos) {
             assert(i.narHash.type == htSHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
@@ -946,7 +987,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             paths.insert(i.path);
         }
 
-        for (auto & i : infos) {
+        for (auto & [_, i] : infos) {
             auto referrer = queryValidPathId(*state, i.path);
             for (auto & j : i.references)
                 state->stmtAddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
@@ -955,17 +996,28 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         /* Check that the derivation outputs are correct.  We can't do
            this in addValidPath() above, because the references might
            not be valid yet. */
-        for (auto & i : infos)
+        for (auto & [_, i] : infos)
             if (i.path.isDerivation()) {
                 // FIXME: inefficient; we already loaded the derivation in addValidPath().
-                checkDerivationOutputs(i.path, readDerivation(i.path));
+                checkDerivationOutputs(i.path,
+                    readInvalidDerivation(i.path));
             }
 
         /* Do a topological sort of the paths.  This will throw an
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSortPaths(paths);
+        topoSort(paths,
+            {[&](const StorePath & path) {
+                auto i = infos.find(path);
+                return i == infos.end() ? StorePathSet() : i->second.references;
+            }},
+            {[&](const StorePath & path, const StorePath & parent) {
+                return BuildError(
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(path),
+                    printStorePath(parent));
+            }});
 
         txn.commit();
     });
@@ -1043,11 +1095,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             auto hashResult = hashSink->finish();
 
             if (hashResult.first != info.narHash)
-                throw Error("hash mismatch importing path '%s';\n  wanted: %s\n  got:    %s",
+                throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
 
             if (hashResult.second != info.narSize)
-                throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
+                throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             autoGC();

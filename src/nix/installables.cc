@@ -16,7 +16,34 @@
 #include <regex>
 #include <queue>
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
+
+nlohmann::json BuildableOpaque::toJSON(ref<Store> store) const {
+    nlohmann::json res;
+    res["path"] = store->printStorePath(path);
+    return res;
+}
+
+nlohmann::json BuildableFromDrv::toJSON(ref<Store> store) const {
+    nlohmann::json res;
+    res["drvPath"] = store->printStorePath(drvPath);
+    for (const auto& [output, path] : outputs) {
+        res["outputs"][output] = path ? store->printStorePath(*path) : "";
+    }
+    return res;
+}
+
+nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store) {
+    auto res = nlohmann::json::array();
+    for (const Buildable & buildable : buildables) {
+        std::visit([&res, store](const auto & buildable) {
+            res.push_back(buildable.toJSON(store));
+        }, buildable);
+    }
+    return res;
+}
 
 void completeFlakeInputPath(
     ref<EvalState> evalState,
@@ -26,7 +53,7 @@ void completeFlakeInputPath(
     auto flake = flake::getFlake(*evalState, flakeRef, true);
     for (auto & input : flake.inputs)
         if (hasPrefix(input.first, prefix))
-            completions->insert(input.first);
+            completions->add(input.first);
 }
 
 MixFlakeOptions::MixFlakeOptions()
@@ -211,7 +238,7 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = attr->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
-                        completions->insert(flakeRefS + "#" + concatStringsSep(".", attrPath2));
+                        completions->add(flakeRefS + "#" + concatStringsSep(".", attrPath2));
                     }
                 }
             }
@@ -222,7 +249,7 @@ void completeFlakeRefWithFragment(
                 for (auto & attrPath : defaultFlakeAttrPaths) {
                     auto attr = root->findAlongAttrPath(parseAttrPath(*evalState, attrPath));
                     if (!attr) continue;
-                    completions->insert(flakeRefS + "#");
+                    completions->add(flakeRefS + "#");
                 }
             }
         }
@@ -243,7 +270,7 @@ ref<EvalState> EvalCommand::getEvalState()
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
     if (prefix == "")
-        completions->insert(".");
+        completions->add(".");
 
     completeDir(0, prefix);
 
@@ -254,10 +281,10 @@ void completeFlakeRef(ref<Store> store, std::string_view prefix)
             if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
                 std::string from2(from, 6);
                 if (hasPrefix(from2, prefix))
-                    completions->insert(from2);
+                    completions->add(from2);
             } else {
                 if (hasPrefix(from, prefix))
-                    completions->insert(from);
+                    completions->add(from);
             }
         }
     }
@@ -533,8 +560,11 @@ InstallableFlake::getCursors(EvalState & state)
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
-    if (!_lockedFlake)
+    if (!_lockedFlake) {
         _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+        _lockedFlake->flake.config.apply();
+        // FIXME: send new config to the daemon.
+    }
     return _lockedFlake;
 }
 

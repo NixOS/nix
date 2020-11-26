@@ -48,7 +48,7 @@ string resolveMirrorUri(EvalState & state, string uri)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_prefetch_url(int argc, char * * argv)
 {
     {
         HashType ht = htSHA256;
@@ -229,4 +229,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-prefetch-url", _main);
+static RegisterLegacyCommand r_nix_prefetch_url("nix-prefetch-url", main_nix_prefetch_url);

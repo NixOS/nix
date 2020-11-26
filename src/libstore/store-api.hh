@@ -194,6 +194,8 @@ struct StoreConfig : public Config
      */
     StoreConfig() { assert(false); }
 
+    virtual ~StoreConfig() { }
+
     virtual const std::string name() = 0;
 
     const PathSetting storeDir_{this, false, settings.nixStore,
@@ -358,6 +360,11 @@ protected:
 
 public:
 
+    /* If requested, substitute missing paths. This
+       implements nix-copy-closure's --use-substitutes
+       flag. */
+    void substitutePaths(const StorePathSet & paths);
+
     /* Query which of the given paths is valid. Optionally, try to
        substitute missing paths. */
     virtual StorePathSet queryValidPaths(const StorePathSet & paths,
@@ -454,9 +461,7 @@ public:
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
-    {
-        throw Error("addToStoreFromDump() is not supported by this store");
-    }
+    { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
@@ -611,6 +616,9 @@ public:
     /* Read a derivation (which must already be valid). */
     Derivation readDerivation(const StorePath & drvPath);
 
+    /* Read a derivation from a potentially invalid path. */
+    Derivation readInvalidDerivation(const StorePath & drvPath);
+
     /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
        or indirectly reached from it.  `out' is not cleared.  If
@@ -715,47 +723,6 @@ protected:
 
 };
 
-struct LocalFSStoreConfig : virtual StoreConfig
-{
-    using StoreConfig::StoreConfig;
-    // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
-    // it to omit the call to the Setting constructor. Clang works fine
-    // either way.
-    const PathSetting rootDir{(StoreConfig*) this, true, "",
-        "root", "directory prefixed to all other paths"};
-    const PathSetting stateDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
-        "state", "directory where Nix will store state"};
-    const PathSetting logDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
-        "log", "directory where Nix will store state"};
-};
-
-class LocalFSStore : public virtual Store, public virtual LocalFSStoreConfig
-{
-public:
-
-    const static string drvsLogDir;
-
-    LocalFSStore(const Params & params);
-
-    void narFromPath(const StorePath & path, Sink & sink) override;
-    ref<FSAccessor> getFSAccessor() override;
-
-    /* Register a permanent GC root. */
-    Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
-
-    virtual Path getRealStoreDir() { return storeDir; }
-
-    Path toRealPath(const Path & storePath) override
-    {
-        assert(isInStore(storePath));
-        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
-    }
-
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
-};
-
 
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
@@ -832,6 +799,7 @@ struct StoreFactory
     std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
+
 struct Implementations
 {
     static std::vector<StoreFactory> * registered;

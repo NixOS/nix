@@ -536,6 +536,8 @@ typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 
+/* Common initialisation performed in child processes. */
+void commonChildInit(Pipe & logPipe);
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
@@ -571,6 +573,9 @@ constexpr auto enumerate(T && iterable)
 // C++17 std::visit boilerplate
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+
+std::string showBytes(uint64_t bytes);
 
 
 }

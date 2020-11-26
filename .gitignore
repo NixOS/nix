@@ -5,7 +5,6 @@ perl/Makefile.config
 /aclocal.m4
 /autom4te.cache
 /precompiled-headers.h.gch
-/precompiled-headers.h.pch
 /config.*
 /configure
 /stamp-h1
@@ -25,7 +24,6 @@ perl/Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
-/scripts/nix-copy-closure
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
 /scripts/nix-profile-daemon.sh

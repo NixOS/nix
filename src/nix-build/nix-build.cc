@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
 #include "affinity.hh"
@@ -67,7 +68,7 @@ std::vector<string> shellwords(const string & s)
     return res;
 }
 
-static void _main(int argc, char * * argv)
+static void main_nix_build(int argc, char * * argv)
 {
     auto dryRun = false;
     auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
@@ -486,6 +487,7 @@ static void _main(int argc, char * * argv)
     else {
 
         std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
@@ -497,6 +499,7 @@ static void _main(int argc, char * * argv)
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
             pathsToBuild.push_back({drvPath, {outputName}});
+            pathsToBuildOrdered.push_back({drvPath, {outputName}});
 
             auto i = drvMap.find(drvPath);
             if (i != drvMap.end())
@@ -512,25 +515,23 @@ static void _main(int argc, char * * argv)
 
         std::vector<StorePath> outPaths;
 
-        for (auto & [drvPath, info] : drvMap) {
-            auto & [counter, wantedOutputs] = info;
+        for (auto & [drvPath, outputName] : pathsToBuildOrdered) {
+            auto & [counter, _wantedOutputs] = drvMap.at({drvPath});
             std::string drvPrefix = outLink;
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
             auto builtOutputs = store->queryDerivationOutputMap(drvPath);
 
-            for (auto & outputName : wantedOutputs) {
-                auto outputPath = builtOutputs.at(outputName);
+            auto outputPath = builtOutputs.at(outputName);
 
-                if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-                    std::string symlink = drvPrefix;
-                    if (outputName != "out") symlink += "-" + outputName;
-                    store2->addPermRoot(outputPath, absPath(symlink));
-                }
-
-                outPaths.push_back(outputPath);
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+                std::string symlink = drvPrefix;
+                if (outputName != "out") symlink += "-" + outputName;
+                store2->addPermRoot(outputPath, absPath(symlink));
             }
+
+            outPaths.push_back(outputPath);
         }
 
         logger->stop();
@@ -540,5 +541,5 @@ static void _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-build", _main);
-static RegisterLegacyCommand s2("nix-shell", _main);
+static RegisterLegacyCommand r_nix_build("nix-build", main_nix_build);
+static RegisterLegacyCommand r_nix_shell("nix-shell", main_nix_build);

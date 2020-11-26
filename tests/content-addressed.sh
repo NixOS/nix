@@ -2,19 +2,52 @@
 
 source common.sh
 
-clearStore
-clearCache
-
-export REMOTE_STORE=file://$cacheDir
-
 drv=$(nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 1)
 nix --experimental-features 'nix-command ca-derivations' show-derivation --derivation "$drv" --arg seed 1
 
-commonArgs=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "rootCA" "--no-out-link")
-out1=$(nix-build "${commonArgs[@]}" ./content-addressed.nix --arg seed 1)
-out2=$(nix-build "${commonArgs[@]}" ./content-addressed.nix --arg seed 2)
+buildAttr () {
+    local derivationPath=$1
+    shift
+    local args=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "$derivationPath" "--no-out-link")
+    args+=("$@")
+    nix-build "${args[@]}"
+}
 
-test $out1 == $out2
+testRemoteCache () {
+    clearCache
+    local outPath=$(buildAttr dependentNonCA)
+    nix copy --to file://$cacheDir $outPath
+    clearStore
+    buildAttr dependentNonCA --option substituters file://$cacheDir --no-require-sigs |& (! grep "building dependent-non-ca")
+}
 
-nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
-nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
+testDeterministicCA () {
+    [[ $(buildAttr rootCA) = $(buildAttr rootCA) ]]
+}
+
+testCutoffFor () {
+    local out1 out2
+    out1=$(buildAttr $1)
+    # The seed only changes the root derivation, and not it's output, so the
+    # dependent derivations should only need to be built once.
+    out2=$(buildAttr $1 -j0)
+    test "$out1" == "$out2"
+}
+
+testCutoff () {
+    # Don't directly build depenentCA, that way we'll make sure we dodn't rely on
+    # dependent derivations always being already built.
+    #testDerivation dependentCA
+    testCutoffFor transitivelyDependentCA
+    testCutoffFor dependentNonCA
+}
+
+testGC () {
+    nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
+    nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
+}
+
+testRemoteCache
+testDeterministicCA
+testCutoff
+testGC

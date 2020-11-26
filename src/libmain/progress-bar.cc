@@ -256,7 +256,7 @@ public:
         }
 
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
-            auto lastLine = trim(getS(fields, 0));
+            auto lastLine = chomp(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
@@ -465,6 +465,17 @@ public:
         } else {
             Logger::writeToStdout(s);
         }
+    }
+
+    std::optional<char> ask(std::string_view msg) override
+    {
+        auto state(state_.lock());
+        if (!state->active || !isatty(STDIN_FILENO)) return {};
+        std::cerr << fmt("\r\e[K%s ", msg);
+        auto s = trim(readLine(STDIN_FILENO));
+        if (s.size() != 1) return {};
+        draw(*state);
+        return s[0];
     }
 };
 

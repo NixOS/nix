@@ -80,8 +80,8 @@ namespace nix {
         class TestSetting : public AbstractSetting {
             public:
             TestSetting() : AbstractSetting("test", "test", {}) {}
-            void set(const std::string & value) {}
-            std::string to_string() const { return {}; }
+            void set(const std::string & value, bool append) override {}
+            std::string to_string() const override { return {}; }
         };
 
         Config config;

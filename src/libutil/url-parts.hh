@@ -7,7 +7,7 @@ namespace nix {
 
 // URI stuff.
 const static std::string pctEncoded = "(?:%[0-9a-fA-F][0-9a-fA-F])";
-const static std::string schemeRegex = "(?:[a-z+.-]+)";
+const static std::string schemeRegex = "(?:[a-z][a-z0-9+.-]*)";
 const static std::string ipv6AddressRegex = "(?:\\[[0-9a-fA-F:]+\\])";
 const static std::string unreservedRegex = "(?:[a-zA-Z0-9-._~])";
 const static std::string subdelimsRegex = "(?:[!$&'\"()*+,;=])";

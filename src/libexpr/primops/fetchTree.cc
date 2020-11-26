@@ -43,7 +43,8 @@ void emitTreeAttrs(
     }
 
     if (input.getType() == "git")
-        mkBool(*state.allocAttr(v, state.symbols.create("submodules")), maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
+            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (auto revCount = input.getRevCount())
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
@@ -101,7 +102,7 @@ static void fetchTree(
             else if (attr.value->type == tString)
                 addURI(state, attrs, attr.name, attr.value->string.s);
             else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, fetchers::Explicit<bool>{attr.value->boolean});
+                attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type == tInt)
                 attrs.emplace(attr.name, attr.value->integer);
             else
@@ -152,7 +153,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
     fetchTree(state, pos, args, v, std::nullopt);
 }
 
-static RegisterPrimOp r("fetchTree", 1, prim_fetchTree);
+static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     const string & who, bool unpack, std::string name)
@@ -211,7 +212,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(htSHA256, path);
         if (hash != *expectedHash)
-            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
+            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 

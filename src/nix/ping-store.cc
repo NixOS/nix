@@ -29,4 +29,4 @@ struct CmdPingStore : StoreCommand
     }
 };
 
-static auto r1 = registerCommand<CmdPingStore>("ping-store");
+static auto rCmdPingStore = registerCommand<CmdPingStore>("ping-store");

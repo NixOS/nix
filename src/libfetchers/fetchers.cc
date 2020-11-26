@@ -65,8 +65,16 @@ Input Input::fromAttrs(Attrs && attrs)
 ParsedURL Input::toURL() const
 {
     if (!scheme)
-        throw Error("cannot show unsupported input '%s'", attrsToJson(attrs));
+        throw Error("cannot show unsupported input '%s'", attrsToJSON(attrs));
     return scheme->toURL(*this);
+}
+
+std::string Input::toURLString(const std::map<std::string, std::string> & extraQuery) const
+{
+    auto url = toURL();
+    for (auto & attr : extraQuery)
+        url.query.insert(attr);
+    return url.to_string();
 }
 
 std::string Input::to_string() const
@@ -102,7 +110,7 @@ bool Input::contains(const Input & other) const
 std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 {
     if (!scheme)
-        throw Error("cannot fetch unsupported input '%s'", attrsToJson(toAttrs()));
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     /* The tree may already be in the Nix store, or it could be
        substituted (which is often faster than fetching from the
@@ -239,7 +247,7 @@ std::optional<time_t> Input::getLastModified() const
 
 ParsedURL InputScheme::toURL(const Input & input)
 {
-    throw Error("don't know how to convert input '%s' to a URL", attrsToJson(input.attrs));
+    throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
 }
 
 Input InputScheme::applyOverrides(

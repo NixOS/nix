@@ -439,7 +439,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCache
 
 };
 
-static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regStore;
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
 
 }
 

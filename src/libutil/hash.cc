@@ -192,7 +192,7 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
     // Either the string or user must provide the type, if they both do they
     // must agree.
     if (!optParsedType && !optType)
-        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", rest);
+        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", rest);
     else if (optParsedType && optType && *optParsedType != *optType)
         throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
 
