@@ -191,8 +191,9 @@ extern Verbosity verbosity; /* suppress msgs > this */
    arguments are evaluated lazily. */
 #define printMsg(level, args...) \
     do { \
-        if (level <= nix::verbosity) { \
-            logger->log(level, fmt(args)); \
+        auto __lvl = level; \
+        if (__lvl <= nix::verbosity) { \
+            logger->log(__lvl, fmt(args)); \
         } \
     } while (0)
 
