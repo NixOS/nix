@@ -198,6 +198,7 @@ extern Verbosity verbosity; /* suppress msgs > this */
     } while (0)
 
 #define printError(args...) printMsg(lvlError, args)
+#define notice(args...) printMsg(lvlNotice, args)
 #define printInfo(args...) printMsg(lvlInfo, args)
 #define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)
