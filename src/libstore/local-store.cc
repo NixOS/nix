@@ -42,6 +42,50 @@
 
 namespace nix {
 
+int getSchema(Path schemaPath)
+{
+    int curSchema = 0;
+    if (pathExists(schemaPath)) {
+        string s = readFile(schemaPath);
+        if (!string2Int(s, curSchema))
+            throw Error("'%1%' is corrupt", schemaPath);
+    }
+    return curSchema;
+}
+
+void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
+{
+    const int nixCASchemaVersion = 1;
+    int curCASchema = getSchema(schemaPath);
+    if (curCASchema != nixCASchemaVersion) {
+        if (curCASchema > nixCASchemaVersion) {
+            throw Error("current Nix store ca-schema is version %1%, but I only support %2%",
+                 curCASchema, nixCASchemaVersion);
+        }
+
+        if (!lockFile(lockFd.get(), ltWrite, false)) {
+            printInfo("waiting for exclusive access to the Nix store for ca drvs...");
+            lockFile(lockFd.get(), ltWrite, true);
+        }
+
+        if (curCASchema == 0) {
+            static const char schema[] =
+    #include "ca-specific-schema.sql.gen.hh"
+                ;
+            db.exec(schema);
+            SQLiteTxn txn(db);
+            db.exec(R"sql(
+                insert into OutputMappings(drvPath, outputName, outputPath)
+                    select DrvPath.path, DerivationOutputs.id, OutputPath.id from DerivationOutputs
+                    inner join ValidPaths as DrvPath on DerivationOutputs.drv = DrvPath.id
+                    inner join ValidPaths as OutputPath on DerivationOutputs.path = OutputPath.path
+            )sql");
+            txn.commit();
+        }
+        writeFile(schemaPath, (format("%1%") % nixCASchemaVersion).str());
+        lockFile(lockFd.get(), ltRead, true);
+    }
+}
 
 LocalStore::LocalStore(const Params & params)
     : StoreConfig(params)
@@ -215,32 +259,16 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        if (curSchema < 11) {
-            SQLiteTxn txn(state->db);
-            state->db.exec(R"sql(
-                create table if not exists OutputMappings (
-                    id integer primary key autoincrement not null,
-                    drvPath text not null,
-                    outputName text not null,
-                    outputPath integer not null,
-                    foreign key (outputPath) references ValidPaths(id) on delete cascade
-                )
-            )sql");
-            state->db.exec(R"sql(
-                insert into OutputMappings(drvPath, outputName, outputPath)
-                    select DrvPath.path, DerivationOutputs.id, OutputPath.id from DerivationOutputs
-                    inner join ValidPaths as DrvPath on DerivationOutputs.drv = DrvPath.id
-                    inner join ValidPaths as OutputPath on DerivationOutputs.path = OutputPath.path
-            )sql");
-            txn.commit();
-        }
-
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
         lockFile(globalLock.get(), ltRead, true);
     }
 
     else openDB(*state, false);
+
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+    }
 
     /* Prepare SQL statements. */
     state->stmtRegisterValidPath.create(state->db,
@@ -259,19 +287,6 @@ LocalStore::LocalStore(const Params & params)
         "delete from ValidPaths where path = ?;");
     state->stmtAddDerivationOutput.create(state->db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
-    state->stmtRegisterRealisedOutput.create(state->db,
-        R"(
-            insert or replace into OutputMappings (drvPath, outputName, outputPath)
-            values (?, ?, (select id from ValidPaths where path = ?))
-            ;
-        )");
-    state->stmtQueryRealisedOutput.create(state->db,
-        R"(
-            select outputName, Output.path from OutputMappings
-                inner join ValidPaths as Output on Output.id = OutputMappings.outputPath
-                where drvPath = ?
-                ;
-        )");
     state->stmtQueryValidDerivers.create(state->db,
         "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
     state->stmtQueryDerivationOutputs.create(state->db,
@@ -281,6 +296,21 @@ LocalStore::LocalStore(const Params & params)
     state->stmtQueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
     state->stmtQueryValidPaths.create(state->db, "select path from ValidPaths");
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        state->stmtRegisterRealisedOutput.create(state->db,
+            R"(
+                insert or replace into OutputMappings (drvPath, outputName, outputPath)
+                values (?, ?, (select id from ValidPaths where path = ?))
+                ;
+            )");
+        state->stmtQueryRealisedOutput.create(state->db,
+            R"(
+                select outputName, Output.path from OutputMappings
+                    inner join ValidPaths as Output on Output.id = OutputMappings.outputPath
+                    where drvPath = ?
+                    ;
+            )");
+    }
 }
 
 
@@ -318,16 +348,7 @@ std::string LocalStore::getUri()
 
 
 int LocalStore::getSchema()
-{
-    int curSchema = 0;
-    if (pathExists(schemaPath)) {
-        string s = readFile(schemaPath);
-        if (!string2Int(s, curSchema))
-            throw Error("'%1%' is corrupt", schemaPath);
-    }
-    return curSchema;
-}
-
+{ return nix::getSchema(schemaPath); }
 
 void LocalStore::openDB(State & state, bool create)
 {
@@ -854,6 +875,9 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
                 *output.second.second
             );
     }
+
+    if (!settings.isExperimentalFeatureEnabled("ca-derivations"))
+        return outputs;
 
     return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
