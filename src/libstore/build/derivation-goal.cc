@@ -1004,9 +1004,9 @@ void DerivationGoal::buildDone()
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stopTime - startTime).count() / 1000.0;
 
     // FIXME: associate with activity 'act'.
-    notice(ANSI_BOLD ANSI_GREEN "Built" ANSI_NORMAL " '%s' in %s%.1f s" ANSI_NORMAL ".",
+    printMsg(duration > 0.2 ? lvlNotice : lvlInfo,
+        ANSI_BOLD ANSI_GREEN "Built" ANSI_NORMAL " '%s' in %.1f s.",
         worker.store.printStorePath(drvPath),
-        duration > 0.5 ? ANSI_BOLD : ANSI_NORMAL,
         duration);
 }
 
