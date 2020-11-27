@@ -205,6 +205,8 @@ void SubstitutionGoal::tryToRun()
 
     outPipe.create();
 
+    startTime = std::chrono::steady_clock::now();
+
     promise = std::promise<void>();
 
     thr = std::thread([this]() {
@@ -280,6 +282,16 @@ void SubstitutionGoal::finished()
     worker.updateProgress();
 
     amDone(ecSuccess);
+
+    auto stopTime = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stopTime - startTime).count() / 1000.0;
+
+    // FIXME: associate with activity 'act'.
+    notice(ANSI_BOLD ANSI_GREEN "Substituted" ANSI_NORMAL " '%s' in %s%.1f s" ANSI_NORMAL ".",
+        worker.store.printStorePath(storePath),
+        duration > 0.5 ? ANSI_BOLD : ANSI_NORMAL,
+        duration);
 }
 
 

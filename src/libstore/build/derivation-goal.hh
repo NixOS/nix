@@ -194,6 +194,11 @@ struct DerivationGoal : public Goal
 
     BuildResult result;
 
+    /* Time the build started. 'result' also has a 'startTime' field,
+       but that's wall clock time, so we can't use it to compute the
+       build duration... */
+    std::chrono::time_point<std::chrono::steady_clock> startTime;
+
     /* The current round, if we're building multiple times. */
     size_t curRound = 1;
 
