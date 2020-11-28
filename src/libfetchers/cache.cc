@@ -28,6 +28,7 @@ struct CacheImpl : Cache
     };
 
     Sync<State> _state;
+    bool _lookup_enabled;
 
     CacheImpl()
     {
@@ -45,6 +46,8 @@ struct CacheImpl : Cache
 
         state->lookup.create(state->db,
             "select info, path, immutable, timestamp from Cache where input = ?");
+
+        _lookup_enabled = true;
     }
 
     void add(
@@ -79,6 +82,11 @@ struct CacheImpl : Cache
         ref<Store> store,
         const Attrs & inAttrs) override
     {
+        if (!_lookup_enabled) {
+            debug("cache lookup disabled");
+            return {};
+        }
+
         auto state(_state.lock());
 
         auto inAttrsJSON = attrsToJSON(inAttrs).dump();
@@ -110,12 +118,31 @@ struct CacheImpl : Cache
             .storePath = std::move(storePath)
         };
     }
+
+    void cacheLookupsEnabled(const bool & enabled) override
+    {
+        _lookup_enabled = enabled;
+    }
+
 };
 
 ref<Cache> getCache()
 {
     static auto cache = std::make_shared<CacheImpl>();
     return ref<Cache>(cache);
+}
+
+struct disabler {
+    disabler() {
+        getCache()->cacheLookupsEnabled(false);
+    }
+    ~disabler() {
+        getCache()->cacheLookupsEnabled(true);
+    }
+};
+
+std::shared_ptr<disabler> disableCacheLookups(void) {
+    return std::shared_ptr<disabler>(new disabler());
 }
 
 }

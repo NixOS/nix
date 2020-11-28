@@ -1,3 +1,4 @@
+#include "cache.hh"
 #include "flake.hh"
 #include "lockfile.hh"
 #include "primops.hh"
@@ -276,6 +277,16 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
     return getFlake(state, originalRef, allowLookup, flakeCache);
 }
 
+static Flake nocacheGetFlake(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    bool allowLookup,
+    FlakeCache & flakeCache)
+{
+    auto d = nix::fetchers::disableCacheLookups();
+    return getFlake(state, originalRef, allowLookup, flakeCache);
+}
+
 /* Compute an in-memory lock file for the specified top-level flake,
    and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
@@ -441,7 +452,16 @@ LockedFlake lockFlake(
                     throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                 if (input.isFlake) {
-                    auto inputFlake = getFlake(state, *input.ref, lockFlags.useRegistries, flakeCache);
+
+                    /* If this input is due to a user --update-input
+                       request, ensure that caching is disabled.
+                       Normally URL fetches are cached for a period of
+                       time (see 'nix show-config | grep tarball-ttl')
+                       but if this was an explicit user request for an
+                       update, ignore any recently cached fetch. */
+                    auto inputFlake = lockFlags.inputUpdates.count(inputPath)
+                        ? nocacheGetFlake(state, *input.ref, lockFlags.useRegistries, flakeCache)
+                        : getFlake       (state, *input.ref, lockFlags.useRegistries, flakeCache);
 
                     /* Note: in case of an --override-input, we use
                        the *original* ref (input2.ref) for the

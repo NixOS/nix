@@ -29,8 +29,13 @@ struct Cache
     virtual std::optional<Result> lookupExpired(
         ref<Store> store,
         const Attrs & inAttrs) = 0;
+
+    virtual void cacheLookupsEnabled(const bool & enabled) = 0;
 };
 
 ref<Cache> getCache();
+
+struct disabler;
+struct std::shared_ptr<disabler> disableCacheLookups(void);
 
 }
