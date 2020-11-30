@@ -3143,7 +3143,7 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
             if (!match[i+1].matched)
                 mkNull(*(v.listElems()[i] = state.allocValue()));
             else
-                mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
+                mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str(), context);
         }
 
     } catch (std::regex_error &e) {
@@ -3231,7 +3231,7 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
 
             // Add a string for non-matched characters.
             elem = v.listElems()[idx++] = state.allocValue();
-            mkString(*elem, match.prefix().str().c_str());
+            mkString(*elem, match.prefix().str().c_str(), context);
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
@@ -3243,13 +3243,13 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
                 if (!match[si + 1].matched)
                     mkNull(*(elem->listElems()[si] = state.allocValue()));
                 else
-                    mkString(*(elem->listElems()[si] = state.allocValue()), match[si + 1].str().c_str());
+                    mkString(*(elem->listElems()[si] = state.allocValue()), match[si + 1].str().c_str(), context);
             }
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len) {
                 elem = v.listElems()[idx++] = state.allocValue();
-                mkString(*elem, match.suffix().str().c_str());
+                mkString(*elem, match.suffix().str().c_str(), context);
             }
         }
         assert(idx == 2 * len + 1);
