@@ -12,6 +12,8 @@
 
 
 %{
+#pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
+
 #include <boost/lexical_cast.hpp>
 
 #include "nixexpr.hh"
