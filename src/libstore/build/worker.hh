@@ -8,8 +8,8 @@
 namespace nix {
 
 /* Forward definition. */
-class DerivationGoal;
-class SubstitutionGoal;
+struct DerivationGoal;
+struct SubstitutionGoal;
 
 /* Workaround for not being able to declare a something like
 

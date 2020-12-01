@@ -7,7 +7,7 @@ namespace nix {
 
 /* Forward definition. */
 struct Goal;
-struct Worker;
+class Worker;
 
 /* A pointer to a goal. */
 typedef std::shared_ptr<Goal> GoalPtr;
