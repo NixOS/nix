@@ -40,6 +40,7 @@ testCutoff () {
     #testDerivation dependentCA
     testCutoffFor transitivelyDependentCA
     testCutoffFor dependentNonCA
+    testCutoffFor dependentFixedOutput
 }
 
 testGC () {

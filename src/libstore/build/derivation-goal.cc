@@ -493,8 +493,8 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if ((!fullDrv.inputDrvs.empty() &&
-             fullDrv.type() == DerivationType::CAFloating) || fullDrv.type() == DerivationType::DeferredInputAddressed) {
+        if ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
+            || fullDrv.type() == DerivationType::DeferredInputAddressed) {
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
                aliasing that resolved derivation goal */
@@ -3121,6 +3121,20 @@ void DerivationGoal::registerOutputs()
             newInfo0.references = refs.second;
             if (refs.first)
                 newInfo0.references.insert(newInfo0.path);
+            if (scratchPath != newInfo0.path) {
+                // Also rewrite the output path
+                auto source = sinkToSource([&](Sink & nextSink) {
+                    StringSink sink;
+                    dumpPath(actualPath, sink);
+                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
+                    rsink2((unsigned char *) sink.s->data(), sink.s->size());
+                    rsink2.flush();
+                });
+                Path tmpPath = actualPath + ".tmp";
+                restorePath(tmpPath, *source);
+                deletePath(actualPath);
+                movePath(tmpPath, actualPath);
+            }
 
             assert(newInfo0.ca);
             return newInfo0;
