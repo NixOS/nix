@@ -81,6 +81,7 @@ struct Expr
     virtual void show(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
+
     /* Get an attribute of an expression, or nullptr if it doesn't exist, while
      * evaluating the expression into v. This is an alternative to eval that
      * doesn't have to evaluate the expression into a non-thunk value

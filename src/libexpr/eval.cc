@@ -833,7 +833,6 @@ Value * Expr::maybeThunk(EvalState & state, Env & env)
     return v;
 }
 
-
 Value * Expr::noAllocationValue(EvalState & state, Env & env)
 {
     return nullptr;
@@ -1844,23 +1843,34 @@ void ExprOpUpdate::updateAttrs(EvalState & state, const Value & v1, const Value 
 
 void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v)
 {
-    Value v1;
-    if (left) {
-        state.forceAttrs(*left);
-        v1 = *left;
-    } else {
-        state.evalAttrs(env, e1, v1);
+    if (!right) {
+        v.type = tLazyBinOp;
+        // TODO Try to remove this allocation if not necessary
+        v.lazyBinOp = state.allocLazyBinOpValue();
+        v.lazyBinOp->expr = this;
+        v.lazyBinOp->env = &env;
+        v.lazyBinOp->left = e1->maybeThunk(state, env);
+        v.lazyBinOp->leftBlackhole = false;
+        v.lazyBinOp->right = e2->maybeThunk(state, env);
+        v.lazyBinOp->rightBlackhole = false;
     }
 
-    Value v2;
-    if (right) {
-        state.forceAttrs(*right);
-        v2 = *right;
-    } else {
-        state.evalAttrs(env, e2, v2);
+    if (v.lazyBinOp->rightBlackhole) {
+        throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop (evalLazyBinOp)");
     }
+    v.lazyBinOp->rightBlackhole = true;
+    state.forceAttrs(*v.lazyBinOp->right);
+    v.lazyBinOp->rightBlackhole = false;
 
-    updateAttrs(state, v1, v2, v);
+
+    if (v.lazyBinOp->leftBlackhole) {
+        throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop (evalLazyBinOp)");
+    }
+    v.lazyBinOp->leftBlackhole = true;
+    state.forceAttrs(*v.lazyBinOp->left);
+    v.lazyBinOp->leftBlackhole = false;
+
+    updateAttrs(state, *v.lazyBinOp->left, *v.lazyBinOp->right, v);
 }
 
 // This function is called with a v that may have a tLazyBinOp in it, meaning
@@ -1868,101 +1878,42 @@ void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value * left, Val
 // function should reuse the previously computed values
 Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v)
 {
+    /*
+     * Ensure that v is a tLazyBinOp first, so that when we evaluate left/right, we can mark the evaluating size as a blackhole
+     */
+
     if (!right) {
-        right = e2->noAllocationValue(state, env);
-        bool rightAllocated = true;
-        Value vRight;
-        if (!right) {
-            mkThunk(vRight, env, e2);
-            right = &vRight;
-            rightAllocated = false;
-        }
-
-        Attr * onRight = state.evalValueAttr(*right, name, pos);
-        if (onRight) {
-            v.type = tLazyBinOp;
-            v.lazyBinOp = state.allocLazyBinOpValue();
-            v.lazyBinOp->expr = this;
-            v.lazyBinOp->env = &env;
-            v.lazyBinOp->left = nullptr;
-            if (!rightAllocated) {
-                right = state.allocValue();
-                *right = vRight;
-            }
-            v.lazyBinOp->right = right;
-            return onRight;
-        } else {
-            left = e1->noAllocationValue(state, env);
-            bool leftAllocated = true;
-            Value vLeft;
-            if (!left) {
-                mkThunk(vLeft, env, e1);
-                left = &vLeft;
-                leftAllocated = false;
-            }
-
-            Attr * onLeft = state.evalValueAttr(*left, name, pos);
-            if (left->type == tAttrs && right->type == tAttrs) {
-                updateAttrs(state, *left, *right, v);
-                return onLeft;
-            } else {
-                v.type = tLazyBinOp;
-                v.lazyBinOp = state.allocLazyBinOpValue();
-                v.lazyBinOp->expr = this;
-                v.lazyBinOp->env = &env;
-                if (!leftAllocated) {
-                    left = state.allocValue();
-                    *left = vLeft;
-                }
-                v.lazyBinOp->left = left;
-                if (!rightAllocated) {
-                    right = state.allocValue();
-                    *right = vRight;
-                }
-                v.lazyBinOp->right = right;
-                return onLeft;
-            }
-        }
-    } else {
-        // We know that v.type == tLazyBinOp and that v.lazyBinOp.right != nullptr because that's all the above case can return
-
-        Attr * onRight = state.evalValueAttr(*right, name, pos);
-        if (onRight) {
-            if (right->type == tAttrs && left && left->type == tAttrs) {
-                updateAttrs(state, *left, *right, v);
-            }
-            return onRight;
-        } else {
-            if (left) {
-                Attr * onLeft = state.evalValueAttr(*left, name, pos);
-                if (right->type == tAttrs && left->type == tAttrs) {
-                    updateAttrs(state, *left, *right, v);
-                }
-                return onLeft;
-            } else {
-                left = e1->noAllocationValue(state, env);
-                bool leftAllocated = true;
-                Value vLeft;
-                if (!left) {
-                    mkThunk(vLeft, env, e1);
-                    left = &vLeft;
-                    leftAllocated = false;
-                }
-
-                Attr * onLeft = state.evalValueAttr(*left, name, pos);
-                if (left->type == tAttrs && right->type == tAttrs) {
-                    updateAttrs(state, *left, *right, v);
-                } else {
-                    if (!leftAllocated) {
-                        left = state.allocValue();
-                        *left = vLeft;
-                    }
-                    v.lazyBinOp->left = left;
-                }
-                return onLeft;
-            }
-        }
+        v.type = tLazyBinOp;
+        // TODO Try to remove this allocation if not necessary
+        v.lazyBinOp = state.allocLazyBinOpValue();
+        v.lazyBinOp->expr = this;
+        v.lazyBinOp->env = &env;
+        v.lazyBinOp->left = e1->maybeThunk(state, env);
+        v.lazyBinOp->leftBlackhole = false;
+        v.lazyBinOp->right = e2->maybeThunk(state, env);
+        v.lazyBinOp->rightBlackhole = false;
     }
+
+    if (v.lazyBinOp->rightBlackhole) {
+        throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop");
+    }
+    v.lazyBinOp->rightBlackhole = true;
+    Attr * onRight = state.evalValueAttr(*v.lazyBinOp->right, name, pos);
+    v.lazyBinOp->rightBlackhole = false;
+    if (onRight) {
+        return onRight;
+    };
+
+    if (v.lazyBinOp->leftBlackhole) {
+        throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop");
+    }
+    v.lazyBinOp->leftBlackhole = true;
+    Attr * onLeft = state.evalValueAttr(*v.lazyBinOp->left, name, pos);
+    v.lazyBinOp->leftBlackhole = false;
+    if (v.lazyBinOp->left->type == tAttrs && v.lazyBinOp->right->type == tAttrs) {
+        updateAttrs(state, *v.lazyBinOp->left, *v.lazyBinOp->right, v);
+    }
+    return onLeft;
 }
 
 
