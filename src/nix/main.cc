@@ -149,6 +149,50 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     }
 };
 
+static void showHelp(std::vector<std::string> subcommand)
+{
+    showManPage(subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand)));
+}
+
+struct CmdHelp : Command
+{
+    std::vector<std::string> subcommand;
+
+    CmdHelp()
+    {
+        expectArgs({
+            .label = "subcommand",
+            .handler = {&subcommand},
+        });
+    }
+
+    std::string description() override
+    {
+        return "show help about 'nix' or a particular subcommand";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To show help about 'nix' in general:",
+                "nix help"
+            },
+            Example{
+                "To show help about a particular subcommand:",
+                "nix help run"
+            },
+        };
+    }
+
+    void run() override
+    {
+        showHelp(subcommand);
+    }
+};
+
+static auto rCmdHelp = registerCommand<CmdHelp>("help");
+
 void mainWrapped(int argc, char * * argv)
 {
     /* The chroot helper needs to be run before any threads have been
