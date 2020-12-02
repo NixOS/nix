@@ -57,8 +57,7 @@ void EvalState::forceValue(Value & v, const Pos & pos)
         // Not needed because the only things a lazy bin op evaluates is its
         // left and right side, which are already detected for infinite
         // recursion separately
-        Value::LazyBinOp * lazyBinOp = v.lazyBinOp;
-        lazyBinOp->expr->evalLazyBinOp(*this, *lazyBinOp->env, lazyBinOp->left, lazyBinOp->right, v);
+        v.lazyBinOp->expr->evalLazyBinOp(*this, *v.lazyBinOp->env, v);
     }
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v, noPos);
@@ -75,7 +74,7 @@ Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
         case tThunk:
             return v.thunk.expr->evalAttr(*this, *v.thunk.env, v, name);
         case tLazyBinOp:
-            return v.lazyBinOp->expr->evalLazyBinOpAttr(*this, *v.lazyBinOp->env, v.lazyBinOp->left, v.lazyBinOp->right, name, v);
+            return v.lazyBinOp->expr->evalLazyBinOpAttr(*this, *v.lazyBinOp->env, name, v);
         case tApp:
             return callFunctionAttr(*v.app.left, *v.app.right, v, name, pos);
         case tAttrs:

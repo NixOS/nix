@@ -964,24 +964,32 @@ Attr * Expr::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & na
 }
 
 
+
 void ExprLazyBinOp::eval(EvalState & state, Env & env, Value & v)
 {
-    evalLazyBinOp(state, env, nullptr, nullptr, v);
+    initLazyBinOp(state, env, v);
+    evalLazyBinOp(state, env, v);
 }
 
 Attr * ExprLazyBinOp::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
 {
-    return evalLazyBinOpAttr(state, env, nullptr, nullptr, name, v);
+    initLazyBinOp(state, env, v);
+    return evalLazyBinOpAttr(state, env, name, v);
 }
 
+void ExprLazyBinOp::initLazyBinOp(EvalState & state, Env & env, Value & v)
+{
+    printError("ExprLazyBinOp::initLazyBinOp called!");
+    abort();
+}
 
-Attr * ExprLazyBinOp::evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v)
+Attr * ExprLazyBinOp::evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v)
 {
     printError("ExprLazyBinOp::evalLazyBinOpAttr called!");
     abort();
 }
 
-void ExprLazyBinOp::evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v)
+void ExprLazyBinOp::evalLazyBinOp(EvalState & state, Env & env, Value & v)
 {
     printError("ExprLazyBinOp::evalLazyBinOp called!");
     abort();
@@ -1841,20 +1849,22 @@ void ExprOpUpdate::updateAttrs(EvalState & state, const Value & v1, const Value 
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 
-void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v)
-{
-    if (!right) {
-        v.type = tLazyBinOp;
-        // TODO Try to remove this allocation if not necessary
-        v.lazyBinOp = state.allocLazyBinOpValue();
-        v.lazyBinOp->expr = this;
-        v.lazyBinOp->env = &env;
-        v.lazyBinOp->left = e1->maybeThunk(state, env);
-        v.lazyBinOp->leftBlackhole = false;
-        v.lazyBinOp->right = e2->maybeThunk(state, env);
-        v.lazyBinOp->rightBlackhole = false;
-    }
 
+void ExprOpUpdate::initLazyBinOp(EvalState & state, Env & env, Value & v)
+{
+    v.type = tLazyBinOp;
+    // TODO Try to remove this allocation if not necessary
+    v.lazyBinOp = state.allocLazyBinOpValue();
+    v.lazyBinOp->expr = this;
+    v.lazyBinOp->env = &env;
+    v.lazyBinOp->left = e1->maybeThunk(state, env);
+    v.lazyBinOp->leftBlackhole = false;
+    v.lazyBinOp->right = e2->maybeThunk(state, env);
+    v.lazyBinOp->rightBlackhole = false;
+}
+
+void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value & v)
+{
     if (v.lazyBinOp->rightBlackhole) {
         throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop (evalLazyBinOp)");
     }
@@ -1876,23 +1886,11 @@ void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value * left, Val
 // This function is called with a v that may have a tLazyBinOp in it, meaning
 // that a previous invocation of this function returned a tLazyBinOp, and this
 // function should reuse the previously computed values
-Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v)
+Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v)
 {
     /*
      * Ensure that v is a tLazyBinOp first, so that when we evaluate left/right, we can mark the evaluating size as a blackhole
      */
-
-    if (!right) {
-        v.type = tLazyBinOp;
-        // TODO Try to remove this allocation if not necessary
-        v.lazyBinOp = state.allocLazyBinOpValue();
-        v.lazyBinOp->expr = this;
-        v.lazyBinOp->env = &env;
-        v.lazyBinOp->left = e1->maybeThunk(state, env);
-        v.lazyBinOp->leftBlackhole = false;
-        v.lazyBinOp->right = e2->maybeThunk(state, env);
-        v.lazyBinOp->rightBlackhole = false;
-    }
 
     if (v.lazyBinOp->rightBlackhole) {
         throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop");

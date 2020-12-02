@@ -99,8 +99,11 @@ struct ExprLazyBinOp : Expr
     void eval(EvalState & state, Env & env, Value & v);
     Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
 
-    virtual void evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v);
-    virtual Attr * evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v);
+    virtual void initLazyBinOp(EvalState & state, Env & env, Value & v);
+
+    // v needs to be a tLazyBinOp for these to be callable
+    virtual void evalLazyBinOp(EvalState & state, Env & env, Value & v);
+    virtual Attr * evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v);
 };
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
@@ -351,10 +354,10 @@ struct ExprOpUpdate : ExprLazyBinOp
     {
         e1->bindVars(env); e2->bindVars(env);
     }
-    //void eval(EvalState & state, Env & env, Value & v);
+    void initLazyBinOp(EvalState & state, Env & env, Value & v);
 
-    void evalLazyBinOp(EvalState & state, Env & env, Value * left, Value * right, Value & v);
-    Attr * evalLazyBinOpAttr(EvalState & state, Env & env, Value * left, Value * right, const Symbol & name, Value & v);
+    void evalLazyBinOp(EvalState & state, Env & env, Value & v);
+    Attr * evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v);
 
     void updateAttrs(EvalState & state, const Value & v1, const Value & v2, Value & v);
 };
