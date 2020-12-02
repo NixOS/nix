@@ -155,7 +155,7 @@ void replaceSymlink(const Path & target, const Path & link,
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
-void readFull(int fd, unsigned char * buf, size_t count);
+void readFull(int fd, char * buf, size_t count);
 void writeFull(int fd, std::string_view s, bool allowInterrupts = true);
 
 MakeError(EndOfFile, Error);

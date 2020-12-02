@@ -96,7 +96,7 @@ struct NarAccessor : public FSAccessor
                 NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
         }
 
-        size_t read(unsigned char * data, size_t len) override
+        size_t read(char * data, size_t len) override
         {
             auto n = source.read(data, len);
             pos += n;

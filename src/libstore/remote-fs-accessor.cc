@@ -75,7 +75,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
                         throw SysError("seeking in '%s'", cacheFile);
 
                     std::string buf(length, 0);
-                    readFull(fd.get(), (unsigned char *) buf.data(), length);
+                    readFull(fd.get(), buf.data(), length);
 
                     return buf;
                 });

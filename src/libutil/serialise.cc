@@ -84,7 +84,7 @@ bool FdSink::good()
 }
 
 
-void Source::operator () (unsigned char * data, size_t len)
+void Source::operator () (char * data, size_t len)
 {
     while (len) {
         size_t n = read(data, len);
@@ -96,12 +96,12 @@ void Source::operator () (unsigned char * data, size_t len)
 void Source::drainInto(Sink & sink)
 {
     std::string s;
-    std::vector<unsigned char> buf(8192);
+    std::vector<char> buf(8192);
     while (true) {
         size_t n;
         try {
             n = read(buf.data(), buf.size());
-            sink({(char *) buf.data(), n});
+            sink({buf.data(), n});
         } catch (EndOfFile &) {
             break;
         }
@@ -117,9 +117,9 @@ std::string Source::drain()
 }
 
 
-size_t BufferedSource::read(unsigned char * data, size_t len)
+size_t BufferedSource::read(char * data, size_t len)
 {
-    if (!buffer) buffer = decltype(buffer)(new unsigned char[bufSize]);
+    if (!buffer) buffer = decltype(buffer)(new char[bufSize]);
 
     if (!bufPosIn) bufPosIn = readUnbuffered(buffer.get(), bufSize);
 
@@ -138,12 +138,12 @@ bool BufferedSource::hasData()
 }
 
 
-size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
+size_t FdSource::readUnbuffered(char * data, size_t len)
 {
     ssize_t n;
     do {
         checkInterrupt();
-        n = ::read(fd, (char *) data, len);
+        n = ::read(fd, data, len);
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
     if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
@@ -158,10 +158,10 @@ bool FdSource::good()
 }
 
 
-size_t StringSource::read(unsigned char * data, size_t len)
+size_t StringSource::read(char * data, size_t len)
 {
     if (pos == s.size()) throw EndOfFile("end of string reached");
-    size_t n = s.copy((char *) data, len, pos);
+    size_t n = s.copy(data, len, pos);
     pos += n;
     return n;
 }
@@ -225,7 +225,7 @@ std::unique_ptr<Source> sinkToSource(
         std::string cur;
         size_t pos = 0;
 
-        size_t read(unsigned char * data, size_t len) override
+        size_t read(char * data, size_t len) override
         {
             if (!coro)
                 coro = coro_t::pull_type(VirtualStackAllocator{}, [&](coro_t::push_type & yield) {
@@ -244,7 +244,7 @@ std::unique_ptr<Source> sinkToSource(
             }
 
             auto n = std::min(cur.size() - pos, len);
-            memcpy(data, (unsigned char *) cur.data() + pos, n);
+            memcpy(data, cur.data() + pos, n);
             pos += n;
 
             return n;
@@ -258,9 +258,9 @@ std::unique_ptr<Source> sinkToSource(
 void writePadding(size_t len, Sink & sink)
 {
     if (len % 8) {
-        unsigned char zero[8];
+        char zero[8];
         memset(zero, 0, sizeof(zero));
-        sink({(char *) zero, 8 - (len % 8)});
+        sink({zero, 8 - (len % 8)});
     }
 }
 
@@ -321,7 +321,7 @@ Sink & operator << (Sink & sink, const Error & ex)
 void readPadding(size_t len, Source & source)
 {
     if (len % 8) {
-        unsigned char zero[8];
+        char zero[8];
         size_t n = 8 - (len % 8);
         source(zero, n);
         for (unsigned int i = 0; i < n; i++)
@@ -330,7 +330,7 @@ void readPadding(size_t len, Source & source)
 }
 
 
-size_t readString(unsigned char * buf, size_t max, Source & source)
+size_t readString(char * buf, size_t max, Source & source)
 {
     auto len = readNum<size_t>(source);
     if (len > max) throw SerialisationError("string is too long");
@@ -345,7 +345,7 @@ string readString(Source & source, size_t max)
     auto len = readNum<size_t>(source);
     if (len > max) throw SerialisationError("string is too long");
     std::string res(len, 0);
-    source((unsigned char*) res.data(), len);
+    source(res.data(), len);
     readPadding(len, source);
     return res;
 }
@@ -404,7 +404,7 @@ void StringSink::operator () (std::string_view data)
     s->append(data);
 }
 
-size_t ChainSource::read(unsigned char * data, size_t len)
+size_t ChainSource::read(char * data, size_t len)
 {
     if (useSecond) {
         return source2.read(data, len);

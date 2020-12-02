@@ -340,13 +340,13 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::vector<unsigned char> buf(64 * 1024);
+    std::vector<char> buf(64 * 1024);
 
     try {
         while (true) {
             try {
                 auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), {(char *) buf.data(), n});
+                writeFull(fd.get(), {buf.data(), n});
             } catch (EndOfFile &) { break; }
         }
     } catch (Error & e) {
@@ -632,11 +632,11 @@ void replaceSymlink(const Path & target, const Path & link,
 }
 
 
-void readFull(int fd, unsigned char * buf, size_t count)
+void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
-        ssize_t res = read(fd, (char *) buf, count);
+        ssize_t res = read(fd, buf, count);
         if (res == -1) {
             if (errno == EINTR) continue;
             throw SysError("reading from file");
@@ -1137,7 +1137,7 @@ void runProgram2(const RunOptions & options)
         in.readSide = -1;
         writerThread = std::thread([&]() {
             try {
-                std::vector<unsigned char> buf(8 * 1024);
+                std::vector<char> buf(8 * 1024);
                 while (true) {
                     size_t n;
                     try {
@@ -1145,7 +1145,7 @@ void runProgram2(const RunOptions & options)
                     } catch (EndOfFile &) {
                         break;
                     }
-                    writeFull(in.writeSide.get(), {(char *) buf.data(), n});
+                    writeFull(in.writeSide.get(), {buf.data(), n});
                 }
                 promise.set_value();
             } catch (...) {
