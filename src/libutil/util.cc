@@ -346,7 +346,7 @@ void writeFile(const Path & path, Source & source, mode_t mode)
         while (true) {
             try {
                 auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), (unsigned char *) buf.data(), n);
+                writeFull(fd.get(), {(char *) buf.data(), n});
             } catch (EndOfFile &) { break; }
         }
     } catch (Error & e) {
@@ -648,24 +648,16 @@ void readFull(int fd, unsigned char * buf, size_t count)
 }
 
 
-void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
-{
-    while (count) {
-        if (allowInterrupts) checkInterrupt();
-        ssize_t res = write(fd, (char *) buf, count);
-        if (res == -1 && errno != EINTR)
-            throw SysError("writing to file");
-        if (res > 0) {
-            count -= res;
-            buf += res;
-        }
-    }
-}
-
-
 void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
-    writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
+    while (!s.empty()) {
+        if (allowInterrupts) checkInterrupt();
+        ssize_t res = write(fd, s.data(), s.size());
+        if (res == -1 && errno != EINTR)
+            throw SysError("writing to file");
+        if (res > 0)
+            s.remove_prefix(res);
+    }
 }
 
 
@@ -705,7 +697,7 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else sink(buf.data(), rd);
+        else sink({(char *) buf.data(), (size_t) rd});
     }
 }
 
@@ -1153,7 +1145,7 @@ void runProgram2(const RunOptions & options)
                     } catch (EndOfFile &) {
                         break;
                     }
-                    writeFull(in.writeSide.get(), buf.data(), n);
+                    writeFull(in.writeSide.get(), {(char *) buf.data(), n});
                 }
                 promise.set_value();
             } catch (...) {

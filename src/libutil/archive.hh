@@ -58,7 +58,7 @@ struct ParseSink
     virtual void createRegularFile(const Path & path) { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
-    virtual void receiveContents(unsigned char * data, size_t len) { };
+    virtual void receiveContents(std::string_view data) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
 };
@@ -72,14 +72,14 @@ struct RetrieveRegularNARSink : ParseSink
 
     RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
 
-    void createDirectory(const Path & path)
+    void createDirectory(const Path & path) override
     {
         regular = false;
     }
 
-    void receiveContents(unsigned char * data, size_t len)
+    void receiveContents(std::string_view data) override
     {
-        sink(data, len);
+        sink(data);
     }
 
     void createSymlink(const Path & path, const string & target)

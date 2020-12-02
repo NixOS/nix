@@ -11,23 +11,23 @@
 namespace nix {
 
 
-void BufferedSink::operator () (const unsigned char * data, size_t len)
+void BufferedSink::operator () (std::string_view data)
 {
-    if (!buffer) buffer = decltype(buffer)(new unsigned char[bufSize]);
+    if (!buffer) buffer = decltype(buffer)(new char[bufSize]);
 
-    while (len) {
+    while (!data.empty()) {
         /* Optimisation: bypass the buffer if the data exceeds the
            buffer size. */
-        if (bufPos + len >= bufSize) {
+        if (bufPos + data.size() >= bufSize) {
             flush();
-            write(data, len);
+            write(data);
             break;
         }
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
            when it's full. */
-        size_t n = bufPos + len > bufSize ? bufSize - bufPos : len;
-        memcpy(buffer.get() + bufPos, data, n);
-        data += n; bufPos += n; len -= n;
+        size_t n = bufPos + data.size() > bufSize ? bufSize - bufPos : data.size();
+        memcpy(buffer.get() + bufPos, data.data(), n);
+        data.remove_prefix(n); bufPos += n;
         if (bufPos == bufSize) flush();
     }
 }
@@ -38,7 +38,7 @@ void BufferedSink::flush()
     if (bufPos == 0) return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
-    write(buffer.get(), n);
+    write({buffer.get(), n});
 }
 
 
@@ -59,9 +59,9 @@ static void warnLargeDump()
 }
 
 
-void FdSink::write(const unsigned char * data, size_t len)
+void FdSink::write(std::string_view data)
 {
-    written += len;
+    written += data.size();
     static bool warned = false;
     if (warn && !warned) {
         if (written > threshold) {
@@ -70,7 +70,7 @@ void FdSink::write(const unsigned char * data, size_t len)
         }
     }
     try {
-        writeFull(fd, data, len);
+        writeFull(fd, data);
     } catch (SysError & e) {
         _good = false;
         throw;
@@ -101,7 +101,7 @@ void Source::drainInto(Sink & sink)
         size_t n;
         try {
             n = read(buf.data(), buf.size());
-            sink(buf.data(), n);
+            sink({(char *) buf.data(), n});
         } catch (EndOfFile &) {
             break;
         }
@@ -229,9 +229,9 @@ std::unique_ptr<Source> sinkToSource(
         {
             if (!coro)
                 coro = coro_t::pull_type(VirtualStackAllocator{}, [&](coro_t::push_type & yield) {
-                    LambdaSink sink([&](const unsigned char * data, size_t len) {
-                            if (len) yield(std::string((const char *) data, len));
-                        });
+                    LambdaSink sink([&](std::string_view data) {
+                        if (!data.empty()) yield(std::string(data));
+                    });
                     fun(sink);
                 });
 
@@ -260,22 +260,22 @@ void writePadding(size_t len, Sink & sink)
     if (len % 8) {
         unsigned char zero[8];
         memset(zero, 0, sizeof(zero));
-        sink(zero, 8 - (len % 8));
+        sink({(char *) zero, 8 - (len % 8)});
     }
 }
 
 
-void writeString(const unsigned char * buf, size_t len, Sink & sink)
+void writeString(std::string_view data, Sink & sink)
 {
-    sink << len;
-    sink(buf, len);
-    writePadding(len, sink);
+    sink << data.size();
+    sink(data);
+    writePadding(data.size(), sink);
 }
 
 
 Sink & operator << (Sink & sink, const string & s)
 {
-    writeString((const unsigned char *) s.data(), s.size(), sink);
+    writeString(s, sink);
     return sink;
 }
 
@@ -394,14 +394,14 @@ Error readError(Source & source)
 }
 
 
-void StringSink::operator () (const unsigned char * data, size_t len)
+void StringSink::operator () (std::string_view data)
 {
     static bool warned = false;
     if (!warned && s->size() > threshold) {
         warnLargeDump();
         warned = true;
     }
-    s->append((const char *) data, len);
+    s->append(data);
 }
 
 size_t ChainSource::read(unsigned char * data, size_t len)

@@ -95,18 +95,18 @@ struct curlFileTransfer : public FileTransfer
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
-            , finalSink([this](const unsigned char * data, size_t len) {
+            , finalSink([this](std::string_view data) {
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
                     /* Only write data to the sink if this is a
                        successful response. */
                     if (successfulStatuses.count(httpStatus)) {
-                        writtenToSink += len;
-                        this->request.dataCallback((char *) data, len);
+                        writtenToSink += data.size();
+                        this->request.dataCallback(data);
                     }
                 } else
-                    this->result.data->append((char *) data, len);
+                    this->result.data->append(data);
               })
         {
             if (!request.expectedETag.empty())
@@ -171,8 +171,8 @@ struct curlFileTransfer : public FileTransfer
                 }
 
                 if (errorSink)
-                    (*errorSink)((unsigned char *) contents, realSize);
-                (*decompressionSink)((unsigned char *) contents, realSize);
+                    (*errorSink)({(char *) contents, realSize});
+                (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
             } catch (...) {
@@ -776,7 +776,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         state->request.notify_one();
     });
 
-    request.dataCallback = [_state](char * buf, size_t len) {
+    request.dataCallback = [_state](std::string_view data) {
 
         auto state(_state->lock());
 
@@ -794,7 +794,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
 
         /* Append data to the buffer and wake up the calling
            thread. */
-        state->data.append(buf, len);
+        state->data.append(data);
         state->avail.notify_one();
     };
 
@@ -840,7 +840,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            if it's blocked on a full buffer. We don't hold the state
            lock while doing this to prevent blocking the download
            thread if sink() takes a long time. */
-        sink((unsigned char *) chunk.data(), chunk.size());
+        sink(chunk);
     }
 }
 

@@ -87,7 +87,7 @@ struct NarAccessor : public FSAccessor
             parents.top()->start = pos;
         }
 
-        void receiveContents(unsigned char * data, size_t len) override
+        void receiveContents(std::string_view data) override
         { }
 
         void createSymlink(const Path & path, const string & target) override

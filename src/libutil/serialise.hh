@@ -14,19 +14,14 @@ namespace nix {
 struct Sink
 {
     virtual ~Sink() { }
-    virtual void operator () (const unsigned char * data, size_t len) = 0;
+    virtual void operator () (std::string_view data) = 0;
     virtual bool good() { return true; }
-
-    void operator () (const std::string & s)
-    {
-        (*this)((const unsigned char *) s.data(), s.size());
-    }
 };
 
 /* Just throws away data. */
 struct NullSink : Sink
 {
-    void operator () (const unsigned char * data, size_t len) override
+    void operator () (std::string_view data) override
     { }
 };
 
@@ -35,21 +30,16 @@ struct NullSink : Sink
 struct BufferedSink : virtual Sink
 {
     size_t bufSize, bufPos;
-    std::unique_ptr<unsigned char[]> buffer;
+    std::unique_ptr<char[]> buffer;
 
     BufferedSink(size_t bufSize = 32 * 1024)
         : bufSize(bufSize), bufPos(0), buffer(nullptr) { }
 
-    void operator () (const unsigned char * data, size_t len) override;
-
-    void operator () (const std::string & s)
-    {
-        Sink::operator()(s);
-    }
+    void operator () (std::string_view data) override;
 
     void flush();
 
-    virtual void write(const unsigned char * data, size_t len) = 0;
+    virtual void write(std::string_view data) = 0;
 };
 
 
@@ -119,7 +109,7 @@ struct FdSink : BufferedSink
 
     ~FdSink();
 
-    void write(const unsigned char * data, size_t len) override;
+    void write(std::string_view data) override;
 
     bool good() override;
 
@@ -163,7 +153,7 @@ struct StringSink : Sink
       s->reserve(reservedSize);
     };
     StringSink(ref<std::string> s) : s(s) { };
-    void operator () (const unsigned char * data, size_t len) override;
+    void operator () (std::string_view data) override;
 };
 
 
@@ -182,10 +172,10 @@ struct TeeSink : Sink
 {
     Sink & sink1, & sink2;
     TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
-    virtual void operator () (const unsigned char * data, size_t len)
+    virtual void operator () (std::string_view data)
     {
-        sink1(data, len);
-        sink2(data, len);
+        sink1(data);
+        sink2(data);
     }
 };
 
@@ -200,7 +190,7 @@ struct TeeSource : Source
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        sink(data, n);
+        sink({(char *) data, n});
         return n;
     }
 };
@@ -241,24 +231,24 @@ struct LengthSink : Sink
 {
     uint64_t length = 0;
 
-    virtual void operator () (const unsigned char * _, size_t len)
+    void operator () (std::string_view data) override
     {
-        length += len;
+        length += data.size();
     }
 };
 
 /* Convert a function into a sink. */
 struct LambdaSink : Sink
 {
-    typedef std::function<void(const unsigned char *, size_t)> lambda_t;
+    typedef std::function<void(std::string_view data)> lambda_t;
 
     lambda_t lambda;
 
     LambdaSink(const lambda_t & lambda) : lambda(lambda) { }
 
-    virtual void operator () (const unsigned char * data, size_t len)
+    void operator () (std::string_view data) override
     {
-        lambda(data, len);
+        lambda(data);
     }
 };
 
@@ -302,7 +292,7 @@ std::unique_ptr<Source> sinkToSource(
 
 
 void writePadding(size_t len, Sink & sink);
-void writeString(const unsigned char * buf, size_t len, Sink & sink);
+void writeString(std::string_view s, Sink & sink);
 
 inline Sink & operator << (Sink & sink, uint64_t n)
 {
@@ -315,7 +305,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     buf[5] = (n >> 40) & 0xff;
     buf[6] = (n >> 48) & 0xff;
     buf[7] = (unsigned char) (n >> 56) & 0xff;
-    sink(buf, sizeof(buf));
+    sink({(char *) buf, sizeof(buf)});
     return sink;
 }
 
@@ -484,7 +474,7 @@ struct FramedSink : nix::BufferedSink
         }
     }
 
-    void write(const unsigned char * data, size_t len) override
+    void write(std::string_view data) override
     {
         /* Don't send more data if the remote has
             encountered an error. */
@@ -493,8 +483,8 @@ struct FramedSink : nix::BufferedSink
             ex = nullptr;
             std::rethrow_exception(ex2);
         }
-        to << len;
-        to(data, len);
+        to << data.size();
+        to(data);
     };
 };
 

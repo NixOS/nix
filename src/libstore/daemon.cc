@@ -153,10 +153,10 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    virtual void operator () (const unsigned char * data, size_t len)
+    void operator () (std::string_view data)
     {
         to << STDERR_WRITE;
-        writeString(data, len, to);
+        writeString(data, to);
     }
 };
 
