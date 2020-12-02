@@ -63,6 +63,7 @@
     - [nix-prefetch-url](command-ref/nix-prefetch-url.md)
   - [Experimental Commands](command-ref/experimental-commands.md)
     - [nix](command-ref/nix.md)
+    - [CLI guideline](command-ref/cli-guideline.md)
   - [Files](command-ref/files.md)
     - [nix.conf](command-ref/conf-file.md)
 - [Glossary](glossary.md)
