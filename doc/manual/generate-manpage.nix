@@ -20,6 +20,11 @@ let
            (attrNames def.commands))
          + "\n"
        else "")
+    + (if def.examples or [] != []
+       then
+         "# Examples\n\n"
+         + concatStrings (map ({ description, command }: "${description}\n\n```console\n${command}\n```\n\n") def.examples)
+       else "")
     + (if def ? doc
        then "# Description\n\n" + def.doc + "\n\n"
        else "")
@@ -27,11 +32,7 @@ let
        if s != ""
        then "# Flags\n\n${s}"
        else "")
-    + (if def.examples or [] != []
-       then
-         "# Examples\n\n"
-         + concatStrings (map ({ description, command }: "${description}\n\n```console\n${command}\n```\n\n") def.examples)
-       else "");
+  ;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
 
