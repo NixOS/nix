@@ -82,7 +82,7 @@ struct RetrieveRegularNARSink : ParseSink
         sink(data);
     }
 
-    void createSymlink(const Path & path, const string & target)
+    void createSymlink(const Path & path, const string & target) override
     {
         regular = false;
     }
