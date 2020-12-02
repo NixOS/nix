@@ -46,6 +46,11 @@ case "$(uname -s).$(uname -m)" in
         system=x86_64-darwin
         ;;
     Darwin.arm64)
+        # check for Rosetta 2 support
+        if ! [ -d /Library/Apple/usr/libexec/oah ]; then
+          oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
+        fi
+
         hash=@binaryTarball_x86_64-darwin@
         path=@tarballPath_x86_64-darwin@
         # eventually maybe: arm64-darwin
