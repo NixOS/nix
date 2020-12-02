@@ -1858,9 +1858,10 @@ void ExprOpUpdate::initLazyBinOp(EvalState & state, Env & env, Value & v)
     v.lazyBinOp->expr = this;
     v.lazyBinOp->env = &env;
     v.lazyBinOp->left = e1->maybeThunk(state, env);
-    v.lazyBinOp->leftBlackhole = false;
     v.lazyBinOp->right = e2->maybeThunk(state, env);
-    v.lazyBinOp->rightBlackhole = false;
+    // Memory will be initialized with 0 already
+    //v.lazyBinOp->leftBlackhole = false;
+    //v.lazyBinOp->rightBlackhole = false;
 }
 
 void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value & v)

@@ -98,9 +98,9 @@ struct Value
         Env * env;
         ExprLazyBinOp * expr;
         Value * left;
-        bool leftBlackhole;
         Value * right;
-        bool rightBlackhole;
+        bool leftBlackhole: 1;
+        bool rightBlackhole: 1;
     };
 
     ValueType type;
