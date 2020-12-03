@@ -40,16 +40,14 @@ struct CmdVerify : StorePathsCommand
         return {
             Example{
                 "To verify the entire Nix store:",
-                "nix verify --all"
+                "nix store verify --all"
             },
             Example{
                 "To check whether each path in the closure of Firefox has at least 2 signatures:",
-                "nix verify -r -n2 --no-contents $(type -p firefox)"
+                "nix store verify -r -n2 --no-contents $(type -p firefox)"
             },
         };
     }
-
-    Category category() override { return catSecondary; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
@@ -189,4 +187,4 @@ struct CmdVerify : StorePathsCommand
     }
 };
 
-static auto rCmdVerify = registerCommand<CmdVerify>("verify");
+static auto rCmdVerify = registerCommand2<CmdVerify>({"store", "verify"});

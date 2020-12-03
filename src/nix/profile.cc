@@ -413,7 +413,7 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
         return {
             Example{
                 "To show what changed between each generation of the NixOS system profile:",
-                "nix profile diff-closure --profile /nix/var/nix/profiles/system"
+                "nix profile diff-closures --profile /nix/var/nix/profiles/system"
             },
         };
     }

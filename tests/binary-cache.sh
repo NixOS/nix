@@ -188,7 +188,7 @@ unset _NIX_FORCE_HTTP
 
 
 # Test 'nix verify --all' on a binary cache.
-nix verify -vvvvv --all --store file://$cacheDir --no-trust
+nix store verify -vvvvv --all --store file://$cacheDir --no-trust
 
 
 # Test local NAR caching.
@@ -196,13 +196,13 @@ narCache=$TEST_ROOT/nar-cache
 rm -rf $narCache
 mkdir $narCache
 
-[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+[[ $(nix store cat --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
 
 rm -rfv "$cacheDir/nar"
 
-[[ $(nix cat-store --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
+[[ $(nix store cat --store "file://$cacheDir?local-nar-cache=$narCache" $outPath/foobar) = FOOBAR ]]
 
-(! nix cat-store --store file://$cacheDir $outPath/foobar)
+(! nix store cat --store file://$cacheDir $outPath/foobar)
 
 
 # Test NAR listing generation.

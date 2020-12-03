@@ -27,8 +27,6 @@ struct CmdCopySigs : StorePathsCommand
         return "copy path signatures from substituters (like binary caches)";
     }
 
-    Category category() override { return catUtility; }
-
     void run(ref<Store> store, StorePaths storePaths) override
     {
         if (substituterUris.empty())
@@ -92,7 +90,7 @@ struct CmdCopySigs : StorePathsCommand
     }
 };
 
-static auto rCmdCopySigs = registerCommand<CmdCopySigs>("copy-sigs");
+static auto rCmdCopySigs = registerCommand2<CmdCopySigs>({"store", "copy-sigs"});
 
 struct CmdSignPaths : StorePathsCommand
 {
@@ -114,8 +112,6 @@ struct CmdSignPaths : StorePathsCommand
     {
         return "sign the specified paths";
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
@@ -144,4 +140,4 @@ struct CmdSignPaths : StorePathsCommand
     }
 };
 
-static auto rCmdSignPaths = registerCommand<CmdSignPaths>("sign-paths");
+static auto rCmdSignPaths = registerCommand2<CmdSignPaths>({"store", "sign-paths"});
