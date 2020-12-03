@@ -90,7 +90,7 @@
             lowdown
             gmock
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+          ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
