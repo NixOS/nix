@@ -583,7 +583,7 @@ public:
 
     Setting<Strings> substituters{
         this,
-        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. The default
@@ -592,7 +592,7 @@ public:
         {"binary-caches"}};
 
     Setting<StringSet> trustedSubstituters{
-        this, nixStore == "/nix/store" ? StringSet{"https://cache.nixos.org/"} : {}, "trusted-substituters",
+        this, {"https://cache.nixos.org/"}, "trusted-substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. These are
           not used by default, but can be enabled by users of the Nix daemon
