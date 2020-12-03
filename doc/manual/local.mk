@@ -13,8 +13,6 @@ man-pages := $(foreach n, \
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
-dist-files += $(man-pages)
-
 # Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
 dummy-env = env -i \
 	HOME=/dummy \
