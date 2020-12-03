@@ -9,10 +9,11 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
+    FileIngestionMethod ingestionMethod;
 
     CmdAddToStore()
     {
+        // FIXME: completion
         expectArg("path", &path);
 
         addFlag({
@@ -22,25 +23,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .labels = {"name"},
             .handler = {&namePart},
         });
-
-        addFlag({
-            .longName = "flat",
-            .shortName = 0,
-            .description = "add flat file to the Nix store",
-            .handler = {&ingestionMethod, FileIngestionMethod::Flat},
-        });
-    }
-
-    std::string description() override
-    {
-        return "add a path to the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "add-to-store.md"
-          ;
     }
 
     void run(ref<Store> store) override
@@ -78,4 +60,45 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     }
 };
 
-static auto rCmdAddToStore = registerCommand2<CmdAddToStore>({"store", "add-path"});
+struct CmdAddFile : CmdAddToStore
+{
+    CmdAddFile()
+    {
+        ingestionMethod = FileIngestionMethod::Flat;
+    }
+
+    std::string description() override
+    {
+        return "add a regular file to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add-file.md"
+          ;
+    }
+};
+
+struct CmdAddPath : CmdAddToStore
+{
+    CmdAddPath()
+    {
+        ingestionMethod = FileIngestionMethod::Recursive;
+    }
+
+    std::string description() override
+    {
+        return "add a path to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add-path.md"
+          ;
+    }
+};
+
+static auto rCmdAddFile = registerCommand2<CmdAddFile>({"store", "add-file"});
+static auto rCmdAddPath = registerCommand2<CmdAddPath>({"store", "add-path"});

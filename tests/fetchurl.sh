@@ -36,7 +36,7 @@ other_store=file://$TEST_ROOT/other_store?store=/fnord/store
 
 hash=$(nix hash file --type sha256 --base16 ./fetchurl.sh)
 
-storePath=$(nix --store $other_store store add-path --flat ./fetchurl.sh)
+storePath=$(nix --store $other_store store add-file ./fetchurl.sh)
 
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
 

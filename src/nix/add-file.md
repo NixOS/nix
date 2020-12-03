@@ -2,8 +2,8 @@ R""(
 
 # Description
 
-Copy the file or directory *path* to the Nix store, and
-print the resulting store path on standard output.
+Copy the regular file *path* to the Nix store, and print the resulting
+store path on standard output.
 
 > **Warning**
 >
@@ -18,7 +18,7 @@ Add a regular file to the store:
 ```console
 # echo foo > bar
 
-# nix add-to-store --flat ./bar
+# nix store add-file ./bar
 /nix/store/cbv2s4bsvzjri77s2gb8g8bpcb6dpa8w-bar
 
 # cat /nix/store/cbv2s4bsvzjri77s2gb8g8bpcb6dpa8w-bar
