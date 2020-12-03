@@ -26,7 +26,7 @@ let
          + concatStrings (map ({ description, command }: "${description}\n\n```console\n${command}\n```\n\n") def.examples)
        else "")
     + (if def ? doc
-       then "# Description\n\n" + def.doc + "\n\n"
+       then def.doc + "\n\n"
        else "")
     + (let s = showFlags def.flags; in
        if s != ""
