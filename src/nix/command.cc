@@ -11,7 +11,21 @@ extern char * * environ __attribute__((weak));
 
 namespace nix {
 
-Commands * RegisterCommand::commands = nullptr;
+RegisterCommand::Commands * RegisterCommand::commands = nullptr;
+
+nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & prefix)
+{
+    nix::Commands res;
+    for (auto & [name, command] : *RegisterCommand::commands)
+        if (name.size() == prefix.size() + 1) {
+            bool equal = true;
+            for (size_t i = 0; i < prefix.size(); ++i)
+                if (name[i] != prefix[i]) equal = false;
+            if (equal)
+                res.insert_or_assign(name[prefix.size()], command);
+        }
+    return res;
+}
 
 void NixMultiCommand::printHelp(const string & programName, std::ostream & out)
 {

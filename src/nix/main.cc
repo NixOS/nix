@@ -59,7 +59,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     bool useNet = true;
     bool refresh = false;
 
-    NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
+    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
         categories[Command::catDefault] = "Main commands";
