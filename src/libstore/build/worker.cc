@@ -223,11 +223,6 @@ void Worker::run(const Goals & _topGoals)
     uint64_t downloadSize, narSize;
     store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
-    if (!willBuild.empty() && 0 == settings.maxBuildJobs && getMachines().empty())
-        throw Error(
-            "%d derivations need to be built, but neither local builds ('--max-jobs') "
-            "nor remote builds ('--builders') are enabled", willBuild.size());
-
     debug("entered goal loop");
 
     while (1) {
