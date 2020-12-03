@@ -112,8 +112,36 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "consider all previously downloaded files out-of-date",
             .handler = {[&]() { refresh = true; }},
         });
+    }
 
-        deprecatedAliases.insert({"dev-shell", "develop"});
+    std::map<std::string, std::vector<std::string>> aliases = {
+        {"dev-shell", {"develop"}},
+        {"hash-file", {"hash", "file"}},
+        {"hash-path", {"hash", "path"}},
+        {"to-base16", {"hash", "to-base16"}},
+        {"to-base32", {"hash", "to-base32"}},
+        {"to-base64", {"hash", "to-base64"}},
+        {"ls-nar", {"nar", "ls"}},
+        {"ls-store", {"store", "ls"}},
+        {"cat-nar", {"nar", "cat"}},
+        {"cat-store", {"store", "cat"}},
+    };
+
+    bool aliasUsed = false;
+
+    Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override
+    {
+        if (aliasUsed || command || pos == args.end()) return pos;
+        auto arg = *pos;
+        auto i = aliases.find(arg);
+        if (i == aliases.end()) return pos;
+        warn("'%s' is a deprecated alias for '%s'",
+            arg, concatStringsSep(" ", i->second));
+        pos = args.erase(pos);
+        for (auto j = i->second.rbegin(); j != i->second.rend(); ++j)
+            pos = args.insert(pos, *j);
+        aliasUsed = true;
+        return pos;
     }
 
     void printFlags(std::ostream & out) override
