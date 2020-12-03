@@ -7,30 +7,32 @@ nix --experimental-features 'nix-command ca-derivations' show-derivation --deriv
 
 buildAttr () {
     local derivationPath=$1
-    shift
-    local args=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "$derivationPath" "--no-out-link")
+    local seedValue=$2
+    shift; shift
+    local args=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "$derivationPath" --arg seed "$seedValue" "--no-out-link")
     args+=("$@")
     nix-build "${args[@]}"
 }
 
 testRemoteCache () {
     clearCache
-    local outPath=$(buildAttr dependentNonCA)
+    local outPath=$(buildAttr dependentNonCA 1)
     nix copy --to file://$cacheDir $outPath
     clearStore
-    buildAttr dependentNonCA --option substituters file://$cacheDir --no-require-sigs |& (! grep "building dependent-non-ca")
+    buildAttr dependentNonCA 1 --option substituters file://$cacheDir --no-require-sigs |& (! grep "building dependent-non-ca")
 }
 
 testDeterministicCA () {
-    [[ $(buildAttr rootCA) = $(buildAttr rootCA) ]]
+    [[ $(buildAttr rootCA 1) = $(buildAttr rootCA 2) ]]
 }
 
 testCutoffFor () {
     local out1 out2
-    out1=$(buildAttr $1)
+    out1=$(buildAttr $1 1)
     # The seed only changes the root derivation, and not it's output, so the
     # dependent derivations should only need to be built once.
-    out2=$(buildAttr $1 -j0)
+    buildAttr rootCA 2
+    out2=$(buildAttr $1 2 -j0)
     test "$out1" == "$out2"
 }
 
