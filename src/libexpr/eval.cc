@@ -1156,11 +1156,36 @@ bool ExprSelect::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalS
     // TODO: Probably use pos2 throughout this function
     Pos * pos2 = 0;
 
-    Value * vAttrs = e->maybeThunk(state, env);
+    Value vTmp;
+    Value * vAttrs = &vTmp;
 
     try {
 
         auto i = attrPath.begin();
+
+        // In the first loop iteration, we evaluate an attribute of an Expr, and not a Value
+        // So by unrolling this, we can avoid a thunk allocation by using e->evalAttr instead of evalValueAttr
+        nrLookups++;
+        Symbol name = getName(*i, state, env);
+        Attr * attr = e->evalAttr(state, env, vTmp, name);
+        if (!attr) {
+            if (def) {
+                return def->evalWithStrategy(state, env, v, strat);
+            } else {
+                // Depending on the reason of j being null we throw an error
+                // If it wasn't an attribute set, this should trigger
+                state.forceAttrs(*vAttrs, pos);
+                // Otherwise the attribute set will have missed the name we wanted
+                throwEvalError(pos, "attribute '%1%' missing", name);
+            }
+        }
+        vAttrs = attr->value;
+        pos2 = attr->pos;
+        if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+
+        ++i;
+
+
 
         for (;i < attrPath.end(); ++i) {
             nrLookups++;
