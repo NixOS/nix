@@ -187,6 +187,7 @@ public:
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const Pos & pos = noPos);
+    inline void evalValueHandler(Value & v, EvalHandler & handler, const Pos & pos = noPos);
 
     /* Get an attribute of a value, or null if it doesn't exist */
     inline Attr * evalValueAttr(Value & v, const Symbol & name, const Pos & pos = noPos);
@@ -285,7 +286,7 @@ public:
 
     bool isFunctor(Value & fun);
 
-    Attr * callFunctionAttr(Value & fun, Value & arg, Value & v, const Symbol & name, const Pos & pos);
+    void callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHandler & handler, const Pos & pos);
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
     void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 

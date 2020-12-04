@@ -75,18 +75,51 @@ string showAttrPath(const AttrPath & attrPath);
 
 /* Abstract syntax of Nix expressions. */
 
+struct EvalHandler
+{
+    /*
+     * Takes a Value in either WHNF or lazyBinOp and does the necessary evaluation with it
+     */
+    virtual void fromValue(EvalState & state, Value & v)
+    {
+        abort();
+    }
+};
+
+
+struct WHNFEvalHandler : EvalHandler
+{
+    static WHNFEvalHandler * instance;
+    void fromValue(EvalState & state, Value & v);
+    static WHNFEvalHandler * getInstance();
+};
+
+struct AttrEvalHandler : EvalHandler
+{
+    const Symbol & name;
+    Attr * attr = nullptr;
+    AttrEvalHandler(const Symbol & name) : name(name) { };
+    void fromValue(EvalState & state, Value & v);
+};
+
 struct Expr
 {
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
-    virtual void eval(EvalState & state, Env & env, Value & v);
+    /*
+     * Calling handler is only necessary if the result is either a tLazyBinOp or a tAttrs
+     */
+    virtual void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler);
+    void eval(EvalState & state, Env & env, Value & v);
 
     /* Get an attribute of an expression, or nullptr if it doesn't exist, while
      * evaluating the expression into v. This is an alternative to eval that
      * doesn't have to evaluate the expression into a non-thunk value
      */
-    virtual Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+    Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+
+
     virtual Value * maybeThunk(EvalState & state, Env & env);
     // Return a Value if it can be obtained without doing any allocations
     virtual Value * noAllocationValue(EvalState & state, Env & env);
@@ -96,8 +129,7 @@ struct Expr
 struct ExprLazyBinOp : Expr
 {
 
-    void eval(EvalState & state, Env & env, Value & v);
-    Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+    void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler);
 
     virtual void initLazyBinOp(EvalState & state, Env & env, Value & v);
 
@@ -110,8 +142,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
-    void eval(EvalState & state, Env & env, Value & v); \
-    Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name); \
+    void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler); \
     void bindVars(const StaticEnv & env);
 
 struct ExprInt : Expr
@@ -325,8 +356,7 @@ struct ExprOpNot : Expr
         { \
             e1->bindVars(env); e2->bindVars(env); \
         } \
-        void eval(EvalState & state, Env & env, Value & v); \
-        Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name); \
+        void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler); \
     };
 
 MakeBinOp(ExprApp, "")
