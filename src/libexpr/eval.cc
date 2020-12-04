@@ -735,37 +735,25 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-void WHNFEvalHandler::handleAttrs(EvalState & state, Value & v)
+bool ForceEvalStrategy::handleAttrs(EvalState & state, Value & v)
 {
-    // Attrs are already in WHNF
+    // The force eval strategy is never "done" early, since it needs
+    // to fully evaluate the Value
+    return false;
 }
 
-void WHNFEvalHandler::handleLazyBinOp(EvalState & state, Value & v)
-{
-    v.lazyBinOp->expr->evalLazyBinOp(state, *v.lazyBinOp->env, v);
-}
-
-WHNFEvalHandler & WHNFEvalHandler::getInstance() {
-  static WHNFEvalHandler instance;
-  return instance;
-}
-
-void AttrEvalHandler::handleAttrs(EvalState & state, Value & v)
+bool AttrEvalStrategy::handleAttrs(EvalState & state, Value & v)
 {
     attr = v.attrs->find(name);
     if (attr == v.attrs->end()) {
         attr = nullptr;
+        // We haven't found the attribute value yet, so this evaluation strategy
+        // isn't "done" yet
+        return false;
+    } else {
+        // We did find the attribute value, exit early
+        return true;
     }
-}
-
-void AttrEvalHandler::handleLazyBinOp(EvalState & state, Value & v)
-{
-    attr = v.lazyBinOp->expr->evalLazyBinOpAttr(state, *v.lazyBinOp->env, name, v);
-}
-
-Attr * AttrEvalHandler::getAttr()
-{
-    return attr;
 }
 
 std::atomic<uint64_t> nrValuesFreed{0};
@@ -985,71 +973,49 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 }
 
 
-void Expr::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool Expr::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     abort();
 }
 
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
-    evalHandler(state, env, v, WHNFEvalHandler::getInstance());
+    evalWithStrategy(state, env, v, ForceEvalStrategy::getInstance());
 }
 
 
 Attr * Expr::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name)
 {
-    auto handler = AttrEvalHandler(name);
-    evalHandler(state, env, v, handler);
-    return handler.getAttr();
+    auto strat = AttrEvalStrategy(name);
+    evalWithStrategy(state, env, v, strat);
+    return strat.getAttr();
 }
 
-
-
-void ExprLazyBinOp::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
-{
-    initLazyBinOp(state, env, v);
-    handler.handleLazyBinOp(state, v);
-}
-
-void ExprLazyBinOp::initLazyBinOp(EvalState & state, Env & env, Value & v)
-{
-    printError("ExprLazyBinOp::initLazyBinOp called!");
-    abort();
-}
-
-Attr * ExprLazyBinOp::evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v)
-{
-    printError("ExprLazyBinOp::evalLazyBinOpAttr called!");
-    abort();
-}
-
-void ExprLazyBinOp::evalLazyBinOp(EvalState & state, Env & env, Value & v)
-{
-    printError("ExprLazyBinOp::evalLazyBinOp called!");
-    abort();
-}
-
-void ExprInt::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprInt::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     v = this->v;
+    return false;
 }
 
-void ExprFloat::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprFloat::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     v = this->v;
+    return false;
 }
 
-void ExprString::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprString::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     v = this->v;
+    return false;
 }
 
-void ExprPath::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprPath::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     v = this->v;
+    return false;
 }
 
-void ExprAttrs::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprAttrs::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
     Env *dynamicEnv = &env;
@@ -1128,11 +1094,11 @@ void ExprAttrs::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler
         v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
         v.attrs->sort(); // FIXME: inefficient
     }
-    handler.handleAttrs(state, v);
+    return strat.handleAttrs(state, v);
 }
 
 
-void ExprLet::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprLet::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
@@ -1146,22 +1112,24 @@ void ExprLet::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler &
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
-    body->evalHandler(state, env2, v, handler);
+    return body->evalWithStrategy(state, env2, v, strat);
 }
 
-void ExprList::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprList::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     state.mkList(v, elems.size());
     for (size_t n = 0; n < elems.size(); ++n)
         v.listElems()[n] = elems[n]->maybeThunk(state, env);
+    return false;
 }
 
-void ExprVar::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprVar::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     Value * v2 = state.lookupVar(&env, *this, false);
     // TODO: Pass pos
-    state.evalValueHandler(*v2, handler);
+    bool cont = state.evalValueWithStrategy(*v2, strat);
     v = *v2;
+    return cont;
 }
 
 static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPath)
@@ -1183,7 +1151,7 @@ static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPa
 
 unsigned long nrLookups = 0;
 
-void ExprSelect::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprSelect::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     // TODO: Probably use pos2 throughout this function
     Pos * pos2 = 0;
@@ -1200,8 +1168,7 @@ void ExprSelect::evalHandler(EvalState & state, Env & env, Value & v, EvalHandle
             Attr * attr = state.evalValueAttr(*vAttrs, name, pos);
             if (!attr) {
                 if (def) {
-                    def->evalHandler(state, env, v, handler);
-                    return;
+                    return def->evalWithStrategy(state, env, v, strat);
                 } else {
                     // Depending on the reason of j being null we throw an error
                     // If it wasn't an attribute set, this should trigger
@@ -1223,12 +1190,13 @@ void ExprSelect::evalHandler(EvalState & state, Env & env, Value & v, EvalHandle
     }
 
     // TODO: Pass pos
-    state.evalValueHandler(*vAttrs, handler);
+    bool cont = state.evalValueWithStrategy(*vAttrs, strat);
     v = *vAttrs;
+    return cont;
 }
 
 // TODO: Use evalValueAttr to make this lazy, like ExprSelect
-void ExprOpHasAttr::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpHasAttr::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     Value vTmp;
     Value * vAttrs = &vTmp;
@@ -1243,28 +1211,30 @@ void ExprOpHasAttr::evalHandler(EvalState & state, Env & env, Value & v, EvalHan
             (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
-            return;
+            return true;
         } else {
             vAttrs = j->value;
         }
     }
 
     mkBool(v, true);
+    return false;
 }
 
-void ExprLambda::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprLambda::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     v.type = tLambda;
     v.lambda.env = &env;
     v.lambda.fun = this;
+    return false;
 }
 
-void ExprApp::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprApp::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     /* FIXME: vFun prevents GCC from doing tail call optimisation. */
     Value vFun;
     e1->eval(state, env, vFun);
-    state.callFunctionHandler(vFun, *(e2->maybeThunk(state, env)), v, handler, pos);
+    return state.callFunctionWithStrategy(vFun, *(e2->maybeThunk(state, env)), v, strat, pos);
 }
 
 void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
@@ -1305,24 +1275,19 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
-    callFunctionHandler(fun, arg, v, WHNFEvalHandler::getInstance(), pos);
+    callFunctionWithStrategy(fun, arg, v, ForceEvalStrategy::getInstance(), pos);
 }
 
-void EvalState::callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHandler & handler, const Pos & pos)
+bool EvalState::callFunctionWithStrategy(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos)
 {
     auto trace = evalSettings.traceFunctionCalls ? std::make_unique<FunctionCallTrace>(pos) : nullptr;
 
     forceValue(fun, pos);
 
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-        // TODO: Pass handler
+        // TODO: Pass strat
         callPrimOp(fun, arg, v, pos);
-        if (v.type == tAttrs) {
-            handler.handleAttrs(*this, v);
-        } else if (v.type == tLazyBinOp) {
-            handler.handleLazyBinOp(*this, v);
-        }
-        return;
+        return evalValueWithStrategy(v, strat);
     }
 
     if (fun.type == tAttrs) {
@@ -1337,7 +1302,7 @@ void EvalState::callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHan
         /* !!! Should we use the attr pos here? */
         Value v2;
         callFunction(*found->value, fun2, v2, pos);
-        return callFunctionHandler(v2, arg, v, handler, pos);
+        return callFunctionWithStrategy(v2, arg, v, strat, pos);
       }
     }
 
@@ -1398,7 +1363,7 @@ void EvalState::callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHan
        catching exceptions makes this function not tail-recursive. */
     if (loggerSettings.showTrace.get())
         try {
-            lambda.body->evalHandler(*this, env2, v, handler);
+            return lambda.body->evalWithStrategy(*this, env2, v, strat);
         } catch (Error & e) {
             addErrorTrace(e, lambda.pos, "while evaluating %s",
               (lambda.name.set()
@@ -1408,7 +1373,7 @@ void EvalState::callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHan
             throw;
         }
     else
-        fun.lambda.fun->body->evalHandler(*this, env2, v, handler);
+        return fun.lambda.fun->body->evalWithStrategy(*this, env2, v, strat);
 }
 
 
@@ -1467,7 +1432,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 }
 
 
-void ExprWith::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprWith::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     Env & env2(state.allocEnv(1));
     env2.up = &env;
@@ -1475,66 +1440,72 @@ void ExprWith::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler 
     env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
 
-    body->evalHandler(state, env2, v, handler);
+    return body->evalWithStrategy(state, env2, v, strat);
 }
 
-void ExprIf::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprIf::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
-    (state.evalBool(env, cond, pos) ? then : else_)->evalHandler(state, env, v, handler);
+    return (state.evalBool(env, cond, pos) ? then : else_)->evalWithStrategy(state, env, v, strat);
 }
 
-void ExprAssert::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprAssert::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
         throwAssertionError(pos, "assertion '%1%' failed at %2%", out.str());
     }
-    body->evalHandler(state, env, v, handler);
+    return body->evalWithStrategy(state, env, v, strat);
 }
 
-void ExprOpNot::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpNot::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     mkBool(v, !state.evalBool(env, e));
+    return false;
 }
 
-void ExprOpEq::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpEq::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     mkBool(v, state.eqValues(v1, v2));
+    return false;
 }
 
-void ExprOpNEq::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpNEq::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     mkBool(v, !state.eqValues(v1, v2));
+    return false;
 }
 
-void ExprOpAnd::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpAnd::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     mkBool(v, state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
+    return false;
 }
 
-void ExprOpOr::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpOr::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     mkBool(v, state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    return false;
 }
 
-void ExprOpImpl::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpImpl::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     mkBool(v, !state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    return false;
 }
 
-void ExprOpUpdate::updateAttrs(EvalState & state, const Value & v1, const Value & v2, Value & v)
+void EvalState::updateAttrs(const Value & v1, const Value & v2, Value & v)
 {
-    state.nrOpUpdates++;
+    nrOpUpdates++;
 
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
+    mkAttrs(v, v1.attrs->size() + v2.attrs->size());
 
     /* Merge the sets, preferring values from the second set.  Make
        sure to keep the resulting vector in sorted order. */
@@ -1555,83 +1526,63 @@ void ExprOpUpdate::updateAttrs(EvalState & state, const Value & v1, const Value 
     while (i != v1.attrs->end()) v.attrs->push_back(*i++);
     while (j != v2.attrs->end()) v.attrs->push_back(*j++);
 
-    state.nrOpUpdateValuesCopied += v.attrs->size();
+    nrOpUpdateValuesCopied += v.attrs->size();
 }
 
+bool ExprLazy::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
+{
+    create(state, env, v);
+    return reevalWithStrategy(state, env, v, strat);
+}
 
-void ExprOpUpdate::initLazyBinOp(EvalState & state, Env & env, Value & v)
+void ExprOpUpdate::create(EvalState & state, Env & env, Value & v)
 {
     v.type = tLazyBinOp;
     // TODO Try to remove this allocation if not necessary
     v.lazyBinOp = state.allocLazyBinOpValue();
     v.lazyBinOp->expr = this;
     v.lazyBinOp->env = &env;
+
+    // TODO: Try to avoid these potential allocation
     v.lazyBinOp->left = e1->maybeThunk(state, env);
     v.lazyBinOp->right = e2->maybeThunk(state, env);
-    // Memory will be initialized with 0 already
-    //v.lazyBinOp->leftBlackhole = false;
-    //v.lazyBinOp->rightBlackhole = false;
 }
 
-void ExprOpUpdate::evalLazyBinOp(EvalState & state, Env & env, Value & v)
+bool ExprOpUpdate::reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
-    if (v.lazyBinOp->rightBlackhole) {
-        throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop (evalLazyBinOp)");
-    }
-    v.lazyBinOp->rightBlackhole = true;
-    state.forceAttrs(*v.lazyBinOp->right);
-    v.lazyBinOp->rightBlackhole = false;
-
-
-    if (v.lazyBinOp->leftBlackhole) {
-        throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop (evalLazyBinOp)");
-    }
-    v.lazyBinOp->leftBlackhole = true;
-    state.forceAttrs(*v.lazyBinOp->left);
-    v.lazyBinOp->leftBlackhole = false;
-
-    updateAttrs(state, *v.lazyBinOp->left, *v.lazyBinOp->right, v);
-}
-
-// This function is called with a v that may have a tLazyBinOp in it, meaning
-// that a previous invocation of this function returned a tLazyBinOp, and this
-// function should reuse the previously computed values
-Attr * ExprOpUpdate::evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v)
-{
-    /*
-     * Ensure that v is a tLazyBinOp first, so that when we evaluate left/right, we can mark the evaluating size as a blackhole
-     */
 
     if (v.lazyBinOp->rightBlackhole) {
         throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop");
     }
     v.lazyBinOp->rightBlackhole = true;
-    Attr * onRight = state.evalValueAttr(*v.lazyBinOp->right, name, pos);
+    bool done = state.evalValueWithStrategy(*v.lazyBinOp->right, strat);
     v.lazyBinOp->rightBlackhole = false;
-    if (onRight) {
-        return onRight;
-    };
 
-    if (v.lazyBinOp->leftBlackhole) {
-        throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop");
+    if (!done) {
+
+        if (v.lazyBinOp->leftBlackhole) {
+            throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop");
+        }
+        v.lazyBinOp->leftBlackhole = true;
+        done = state.evalValueWithStrategy(*v.lazyBinOp->left, strat);
+        v.lazyBinOp->leftBlackhole = false;
     }
-    v.lazyBinOp->leftBlackhole = true;
-    Attr * onLeft = state.evalValueAttr(*v.lazyBinOp->left, name, pos);
-    v.lazyBinOp->leftBlackhole = false;
+
     if (v.lazyBinOp->left->type == tAttrs && v.lazyBinOp->right->type == tAttrs) {
-        updateAttrs(state, *v.lazyBinOp->left, *v.lazyBinOp->right, v);
+        state.updateAttrs(*v.lazyBinOp->left, *v.lazyBinOp->right, v);
     }
-    return onLeft;
+
+    return done;
 }
 
 
-
-void ExprOpConcatLists::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprOpConcatLists::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     Value * lists[2] = { &v1, &v2 };
     state.concatLists(v, 2, lists, pos);
+    return false;
 }
 
 void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos)
@@ -1663,7 +1614,7 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
 }
 
 
-void ExprConcatStrings::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprConcatStrings::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     PathSet context;
     std::ostringstream s;
@@ -1718,11 +1669,14 @@ void ExprConcatStrings::evalHandler(EvalState & state, Env & env, Value & v, Eva
         mkPath(v, path.c_str());
     } else
         mkString(v, s.str(), context);
+
+    return false;
 }
 
-void ExprPos::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
+bool ExprPos::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     state.mkPos(v, &pos);
+    return false;
 }
 
 void EvalState::forceValueDeep(Value & v)

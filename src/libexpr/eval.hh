@@ -187,7 +187,7 @@ public:
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const Pos & pos = noPos);
-    inline void evalValueHandler(Value & v, EvalHandler & handler, const Pos & pos = noPos);
+    inline bool evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos = noPos);
 
     /* Get an attribute of a value, or null if it doesn't exist */
     inline Attr * evalValueAttr(Value & v, const Symbol & name, const Pos & pos = noPos);
@@ -286,7 +286,7 @@ public:
 
     bool isFunctor(Value & fun);
 
-    void callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHandler & handler, const Pos & pos);
+    bool callFunctionWithStrategy(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
     void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 
@@ -310,6 +310,9 @@ public:
     void mkPos(Value & v, Pos * pos);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
+
+
+    void updateAttrs(const Value & v1, const Value & v2, Value & v);
 
     /* Print statistics. */
     void printStats();
@@ -344,42 +347,52 @@ private:
     typedef std::map<Pos, size_t> AttrSelects;
     AttrSelects attrSelects;
 
-    friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
-class EvalHandler
+// An evaluation strategy, used to implement lazy attribute names
+// For lazy expressions, evaluation will run the strategy sequentially
+// on all its parts, and exit as soon as true is returned
+class EvalStrategy
 {
 public:
-    virtual void handleAttrs(EvalState & state, Value & v) = 0;
-    virtual void handleLazyBinOp(EvalState & state, Value & v) = 0;
+    // How this evaluation strategy handles attribute sets
+    // The passed v is a tAttrs and can be modified by this function
+    // Returns whether the value caused the evaluation strategy to be "done"
+    virtual bool handleAttrs(EvalState & state, Value & v) = 0;
 };
 
-class WHNFEvalHandler : public EvalHandler
+// An evaluation strategy that forces values into weak head normal form, so no
+// thunks or unapplied applications
+class ForceEvalStrategy : public EvalStrategy
 {
 private:
-    WHNFEvalHandler() { };
+    ForceEvalStrategy() { };
 
 public:
-    static WHNFEvalHandler & getInstance();
-    void handleAttrs(EvalState & state, Value & v) override;
-    void handleLazyBinOp(EvalState & state, Value & v) override;
+    static ForceEvalStrategy & getInstance() {
+        static ForceEvalStrategy instance;
+        return instance;
+    };
+    bool handleAttrs(EvalState & state, Value & v) override;
 };
 
-class AttrEvalHandler : public EvalHandler
+// An evaluation strategy that tries to only evaluate a specific attribute
+// and gives access to the result
+class AttrEvalStrategy : public EvalStrategy
 {
 private:
     const Symbol & name;
     Attr * attr = nullptr;
 
 public:
-    AttrEvalHandler(const Symbol & name) : name(name) { };
-    void handleAttrs(EvalState & state, Value & v) override;
-    void handleLazyBinOp(EvalState & state, Value & v) override;
-    Attr * getAttr();
+    AttrEvalStrategy(const Symbol & name) : name(name) { };
+    bool handleAttrs(EvalState & state, Value & v) override;
+    // Returns the attribute value if found, otherwise nullptr
+    Attr * getAttr() { return attr; };
 };
 
 /* Return a string representing the type of the value `v'. */

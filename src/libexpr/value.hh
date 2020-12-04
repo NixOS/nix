@@ -34,7 +34,7 @@ typedef enum {
 class Bindings;
 struct Env;
 struct Expr;
-struct ExprLazyBinOp;
+struct ExprLazy;
 struct ExprLambda;
 struct PrimOp;
 class Symbol;
@@ -96,7 +96,7 @@ struct Value
     // Stored separately from Value as to not increase sizeof(Value)
     struct LazyBinOp {
         Env * env;
-        ExprLazyBinOp * expr;
+        ExprLazy * expr;
         Value * left;
         Value * right;
         bool leftBlackhole: 1;

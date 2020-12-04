@@ -55,7 +55,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 struct Env;
 struct Value;
 class EvalState;
-class EvalHandler;
+class EvalStrategy;
 struct StaticEnv;
 struct Attr;
 
@@ -82,16 +82,19 @@ struct Expr
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
-    /*
-     * Calling handler is only necessary if the result is either a tLazyBinOp or a tAttrs
-     */
-    virtual void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler);
+
+    // Evaluates an expression with a given evaluation strategy
+    // The result should be put into v, which is uninitialized at first
+    // See EvalStrategy for what the return value indicates
+    virtual bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
+
+    // Evaluates an expression with the ForceEvalStrategy evaluation strategy
+    // TODO: Inline?
     void eval(EvalState & state, Env & env, Value & v);
 
-    /* Get an attribute of an expression, or nullptr if it doesn't exist, while
-     * evaluating the expression into v. This is an alternative to eval that
-     * doesn't have to evaluate the expression into a non-thunk value
-     */
+    // Evaluates an expression with the AttrEvalStrategy evaluation strategy,
+    // returning the resulting attribute value
+    // TODO: Inline?
     Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
 
 
@@ -101,23 +104,24 @@ struct Expr
     virtual void setName(Symbol & name);
 };
 
-struct ExprLazyBinOp : Expr
+// An expression that's lazy: Evaluating it doesn't necessarily fully evaluate
+// it, allowing further evaluations to get more information about the result
+struct ExprLazy : Expr
 {
-
-    void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler);
-
-    virtual void initLazyBinOp(EvalState & state, Env & env, Value & v);
-
-    // v needs to be a tLazyBinOp for these to be callable
-    virtual void evalLazyBinOp(EvalState & state, Env & env, Value & v);
-    virtual Attr * evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v);
+    bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
+    // A function to initialize v with a Value representing this expression,
+    // without doing any evaluations. This function is only called once
+    virtual void create(EvalState & state, Env & env, Value & v) = 0;
+    // A function that takes a previously initialized v and evaluates it with a
+    // specific strategy. This function may be called multiple times
+    virtual bool reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat) = 0;
 };
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
-    void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler); \
+    bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
     void bindVars(const StaticEnv & env);
 
 struct ExprInt : Expr
@@ -331,7 +335,7 @@ struct ExprOpNot : Expr
         { \
             e1->bindVars(env); e2->bindVars(env); \
         } \
-        void evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler); \
+        bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
     };
 
 MakeBinOp(ExprApp, "")
@@ -345,7 +349,7 @@ MakeBinOp(ExprOpConcatLists, "++")
 
 
 // TODO: Make the #define above support this
-struct ExprOpUpdate : ExprLazyBinOp
+struct ExprOpUpdate : ExprLazy
 {
     Pos pos;
     Expr * e1, * e2;
@@ -359,12 +363,8 @@ struct ExprOpUpdate : ExprLazyBinOp
     {
         e1->bindVars(env); e2->bindVars(env);
     }
-    void initLazyBinOp(EvalState & state, Env & env, Value & v);
-
-    void evalLazyBinOp(EvalState & state, Env & env, Value & v);
-    Attr * evalLazyBinOpAttr(EvalState & state, Env & env, const Symbol & name, Value & v);
-
-    void updateAttrs(EvalState & state, const Value & v1, const Value & v2, Value & v);
+    void create(EvalState & state, Env & env, Value & v);
+    bool reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
 };
 
 struct ExprConcatStrings : Expr
