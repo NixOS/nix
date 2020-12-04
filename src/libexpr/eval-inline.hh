@@ -52,13 +52,12 @@ void EvalState::evalValueHandler(Value & v, EvalHandler & handler, const Pos & p
         }
     }
     else if (v.type == tAttrs)
-        handler.fromValue(*this, v);
+        handler.handleAttrs(*this, v);
     else if (v.type == tLazyBinOp)
-        handler.fromValue(*this, v);
+        handler.handleLazyBinOp(*this, v);
     else if (v.type == tApp)
         callFunctionHandler(*v.app.left, *v.app.right, v, handler, pos);
     else if (v.type == tBlackhole)
-        // TODO: Is this necessary?
         throwEvalError(pos, "infinite recursion encountered (tBlackhole in forceValue)");
 }
 

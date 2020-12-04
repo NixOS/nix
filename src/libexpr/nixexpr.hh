@@ -80,7 +80,12 @@ struct EvalHandler
     /*
      * Takes a Value in either WHNF or lazyBinOp and does the necessary evaluation with it
      */
-    virtual void fromValue(EvalState & state, Value & v)
+    virtual void handleAttrs(EvalState & state, Value & v)
+    {
+        abort();
+    }
+
+    virtual void handleLazyBinOp(EvalState & state, Value & v)
     {
         abort();
     }
@@ -90,7 +95,8 @@ struct EvalHandler
 struct WHNFEvalHandler : EvalHandler
 {
     static WHNFEvalHandler * instance;
-    void fromValue(EvalState & state, Value & v);
+    void handleAttrs(EvalState & state, Value & v);
+    void handleLazyBinOp(EvalState & state, Value & v);
     static WHNFEvalHandler * getInstance();
 };
 
@@ -99,7 +105,8 @@ struct AttrEvalHandler : EvalHandler
     const Symbol & name;
     Attr * attr = nullptr;
     AttrEvalHandler(const Symbol & name) : name(name) { };
-    void fromValue(EvalState & state, Value & v);
+    void handleAttrs(EvalState & state, Value & v);
+    void handleLazyBinOp(EvalState & state, Value & v);
 };
 
 struct Expr

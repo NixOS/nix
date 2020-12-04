@@ -735,18 +735,14 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-void WHNFEvalHandler::fromValue(EvalState & state, Value & v)
+void WHNFEvalHandler::handleAttrs(EvalState & state, Value & v)
 {
-    if (v.type == tLazyBinOp) {
-        // TODO: Inf rec detection here?
-        // Not needed because the only things a lazy bin op evaluates is its
-        // left and right side, which are already detected for infinite
-        // recursion separately
-        v.lazyBinOp->expr->evalLazyBinOp(state, *v.lazyBinOp->env, v);
-    } else if (v.type == tBlackhole) {
-        // TODO: Is this necessary?
-        throwEvalError(noPos, "infinite recursion encountered (tBlackhole in WHNFEvalHandler::fromValue)");
-    }
+    // Attrs are already in WHNF
+}
+
+void WHNFEvalHandler::handleLazyBinOp(EvalState & state, Value & v)
+{
+    v.lazyBinOp->expr->evalLazyBinOp(state, *v.lazyBinOp->env, v);
 }
 
 WHNFEvalHandler * WHNFEvalHandler::instance = 0;
@@ -757,20 +753,17 @@ WHNFEvalHandler * WHNFEvalHandler::getInstance() {
   return instance;
 }
 
-void AttrEvalHandler::fromValue(EvalState & state, Value & v)
+void AttrEvalHandler::handleAttrs(EvalState & state, Value & v)
 {
-    if (v.type == tAttrs) {
-        attr = v.attrs->find(name);
-        if (attr == v.attrs->end()) {
-            attr = nullptr;
-        }
-    } else if (v.type == tLazyBinOp) {
-        attr = v.lazyBinOp->expr->evalLazyBinOpAttr(state, *v.lazyBinOp->env, name, v);
-    } else if (v.type == tBlackhole) {
-        // TODO: Is this needed?
-        // TODO: Pass correct pos
-        throwEvalError(noPos, "infinite recursion encountered (tBlackhole in evalValueAttr)");
+    attr = v.attrs->find(name);
+    if (attr == v.attrs->end()) {
+        attr = nullptr;
     }
+}
+
+void AttrEvalHandler::handleLazyBinOp(EvalState & state, Value & v)
+{
+    attr = v.lazyBinOp->expr->evalLazyBinOpAttr(state, *v.lazyBinOp->env, name, v);
 }
 
 std::atomic<uint64_t> nrValuesFreed{0};
@@ -1013,7 +1006,7 @@ Attr * Expr::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & na
 void ExprLazyBinOp::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
 {
     initLazyBinOp(state, env, v);
-    handler.fromValue(state, v);
+    handler.handleLazyBinOp(state, v);
 }
 
 void ExprLazyBinOp::initLazyBinOp(EvalState & state, Env & env, Value & v)
@@ -1133,8 +1126,7 @@ void ExprAttrs::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler
         v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
         v.attrs->sort(); // FIXME: inefficient
     }
-    // TODO: Have a method .fromValueAttrs that directly does the attr thing
-    handler.fromValue(state, v);
+    handler.handleAttrs(state, v);
 }
 
 
@@ -1165,10 +1157,8 @@ void ExprList::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler 
 void ExprVar::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & handler)
 {
     Value * v2 = state.lookupVar(&env, *this, false);
-    // TODO: Pass pos to fromValue
+    // TODO: Pass pos
     state.evalValueHandler(*v2, handler);
-    //handler.fromValue(state, *v2);
-    // state.forceValue(*v2, pos);
     v = *v2;
 }
 
@@ -1230,10 +1220,8 @@ void ExprSelect::evalHandler(EvalState & state, Env & env, Value & v, EvalHandle
         throw;
     }
 
-    // TODO: Pass pos to fromValue
+    // TODO: Pass pos
     state.evalValueHandler(*vAttrs, handler);
-    //handler.fromValue(state, *vAttrs);
-    // state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ));
     v = *vAttrs;
 }
 
@@ -1327,7 +1315,11 @@ void EvalState::callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHan
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         // TODO: Pass handler
         callPrimOp(fun, arg, v, pos);
-        handler.fromValue(*this, v);
+        if (v.type == tAttrs) {
+            handler.handleAttrs(*this, v);
+        } else if (v.type == tLazyBinOp) {
+            handler.handleLazyBinOp(*this, v);
+        }
         return;
     }
 
