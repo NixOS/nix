@@ -99,8 +99,6 @@ struct Value
         ExprLazy * expr;
         Value * left;
         Value * right;
-        bool leftBlackhole: 1;
-        bool rightBlackhole: 1;
     };
 
     ValueType type;
@@ -145,7 +143,11 @@ struct Value
             Env * env;
             Expr * expr;
         } thunk;
-        LazyBinOp * lazyBinOp;
+        struct {
+            LazyBinOp * contents;
+            bool leftBlackhole;
+            bool rightBlackhole;
+        } lazyBinOp;
         struct {
             Value * left, * right;
         } app;

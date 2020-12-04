@@ -1562,39 +1562,41 @@ bool ExprLazy::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStr
 
 void ExprOpUpdate::create(EvalState & state, Env & env, Value & v)
 {
+    // TODO: Try to avoid the allocations here
     v.type = tLazyBinOp;
-    // TODO Try to remove this allocation if not necessary
-    v.lazyBinOp = state.allocLazyBinOpValue();
-    v.lazyBinOp->expr = this;
-    v.lazyBinOp->env = &env;
-
-    // TODO: Try to avoid these potential allocation
-    v.lazyBinOp->left = e1->maybeThunk(state, env);
-    v.lazyBinOp->right = e2->maybeThunk(state, env);
+    v.lazyBinOp.contents = state.allocLazyBinOpValue();
+    v.lazyBinOp.contents->expr = this;
+    v.lazyBinOp.contents->env = &env;
+    v.lazyBinOp.contents->left = e1->maybeThunk(state, env);
+    v.lazyBinOp.contents->right = e2->maybeThunk(state, env);
+    v.lazyBinOp.leftBlackhole = false;
+    v.lazyBinOp.rightBlackhole = false;
 }
 
 bool ExprOpUpdate::reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
 
-    if (v.lazyBinOp->rightBlackhole) {
+    if (v.lazyBinOp.rightBlackhole) {
         throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop");
     }
-    v.lazyBinOp->rightBlackhole = true;
-    bool done = state.evalValueWithStrategy(*v.lazyBinOp->right, strat);
-    v.lazyBinOp->rightBlackhole = false;
+    v.lazyBinOp.rightBlackhole = true;
+    bool done = state.evalValueWithStrategy(*v.lazyBinOp.contents->right, strat);
+    // TODO: Do we need to reset this to false?
+    v.lazyBinOp.rightBlackhole = false;
 
     if (!done) {
 
-        if (v.lazyBinOp->leftBlackhole) {
+        if (v.lazyBinOp.leftBlackhole) {
             throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop");
         }
-        v.lazyBinOp->leftBlackhole = true;
-        done = state.evalValueWithStrategy(*v.lazyBinOp->left, strat);
-        v.lazyBinOp->leftBlackhole = false;
+        v.lazyBinOp.leftBlackhole = true;
+        done = state.evalValueWithStrategy(*v.lazyBinOp.contents->left, strat);
+        // TODO: Do we need to reset this to false?
+        v.lazyBinOp.leftBlackhole = false;
     }
 
-    if (v.lazyBinOp->left->type == tAttrs && v.lazyBinOp->right->type == tAttrs) {
-        state.updateAttrs(*v.lazyBinOp->left, *v.lazyBinOp->right, v);
+    if (v.lazyBinOp.contents->left->type == tAttrs && v.lazyBinOp.contents->right->type == tAttrs) {
+        state.updateAttrs(*v.lazyBinOp.contents->left, *v.lazyBinOp.contents->right, v);
     }
 
     return done;
