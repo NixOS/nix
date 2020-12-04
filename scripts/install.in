@@ -47,7 +47,7 @@ case "$(uname -s).$(uname -m)" in
         ;;
     Darwin.arm64|Darwin.aarch64)
         # check for Rosetta 2 support
-        if ! [ -d /Library/Apple/usr/libexec/oah ]; then
+        if ! [ -f /Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist ]; then
           oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
         fi
 
