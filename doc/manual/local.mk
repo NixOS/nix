@@ -68,14 +68,14 @@ $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix 
 
 $(d)/builtins.json: $(bindir)/nix
 	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
-	mv $@.tmp $@
+	@mv $@.tmp $@
 
 # Generate the HTML manual.
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
 install: $(d)/src/command-ref/new-cli
-	for i in doc/manual/src/command-ref/new-cli/*.md; do \
+	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
 	  name=$$(basename $$i .md); \
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
@@ -84,7 +84,7 @@ install: $(d)/src/command-ref/new-cli
 	done
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
-	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
+	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
 	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
 endif
