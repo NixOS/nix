@@ -3193,6 +3193,26 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, con
 }
 
 
+/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
+   it's a directory and we're not root (to be able to update the
+   directory's parent link ".."). */
+static void movePath(const Path & src, const Path & dst)
+{
+    auto st = lstat(src);
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod_(src, st.st_mode | S_IWUSR);
+
+    if (rename(src.c_str(), dst.c_str()))
+        throw SysError("renaming '%1%' to '%2%'", src, dst);
+
+    if (changePerm)
+        chmod_(dst, st.st_mode);
+}
+
+
 void DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
@@ -3233,9 +3253,8 @@ void DerivationGoal::registerOutputs()
                 /* Move output paths from the chroot to the Nix store. */
                 if (buildMode == bmRepair)
                     replaceValidPath(path, actualPath);
-                else
-                    if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
-                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
+                else if (buildMode != bmCheck)
+                    movePath(actualPath, worker.store.toRealPath(path));
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         }
