@@ -63,7 +63,7 @@ void EvalState::evalValueHandler(Value & v, EvalHandler & handler, const Pos & p
 
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
-    evalValueHandler(v, *WHNFEvalHandler::getInstance());
+    evalValueHandler(v, WHNFEvalHandler::getInstance());
 }
 
 Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
@@ -72,7 +72,7 @@ Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
 
     auto handler = AttrEvalHandler(name);
     evalValueHandler(v, handler);
-    return handler.attr;
+    return handler.getAttr();
 }
 
 inline void EvalState::forceAttrs(Value & v)

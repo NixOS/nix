@@ -55,6 +55,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 struct Env;
 struct Value;
 class EvalState;
+class EvalHandler;
 struct StaticEnv;
 struct Attr;
 
@@ -75,39 +76,6 @@ string showAttrPath(const AttrPath & attrPath);
 
 /* Abstract syntax of Nix expressions. */
 
-struct EvalHandler
-{
-    /*
-     * Takes a Value in either WHNF or lazyBinOp and does the necessary evaluation with it
-     */
-    virtual void handleAttrs(EvalState & state, Value & v)
-    {
-        abort();
-    }
-
-    virtual void handleLazyBinOp(EvalState & state, Value & v)
-    {
-        abort();
-    }
-};
-
-
-struct WHNFEvalHandler : EvalHandler
-{
-    static WHNFEvalHandler * instance;
-    void handleAttrs(EvalState & state, Value & v);
-    void handleLazyBinOp(EvalState & state, Value & v);
-    static WHNFEvalHandler * getInstance();
-};
-
-struct AttrEvalHandler : EvalHandler
-{
-    const Symbol & name;
-    Attr * attr = nullptr;
-    AttrEvalHandler(const Symbol & name) : name(name) { };
-    void handleAttrs(EvalState & state, Value & v);
-    void handleLazyBinOp(EvalState & state, Value & v);
-};
 
 struct Expr
 {

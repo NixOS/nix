@@ -351,6 +351,36 @@ private:
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
+class EvalHandler
+{
+public:
+    virtual void handleAttrs(EvalState & state, Value & v) = 0;
+    virtual void handleLazyBinOp(EvalState & state, Value & v) = 0;
+};
+
+class WHNFEvalHandler : public EvalHandler
+{
+private:
+    WHNFEvalHandler() { };
+
+public:
+    static WHNFEvalHandler & getInstance();
+    void handleAttrs(EvalState & state, Value & v) override;
+    void handleLazyBinOp(EvalState & state, Value & v) override;
+};
+
+class AttrEvalHandler : public EvalHandler
+{
+private:
+    const Symbol & name;
+    Attr * attr = nullptr;
+
+public:
+    AttrEvalHandler(const Symbol & name) : name(name) { };
+    void handleAttrs(EvalState & state, Value & v) override;
+    void handleLazyBinOp(EvalState & state, Value & v) override;
+    Attr * getAttr();
+};
 
 /* Return a string representing the type of the value `v'. */
 string showType(ValueType type);

@@ -745,11 +745,8 @@ void WHNFEvalHandler::handleLazyBinOp(EvalState & state, Value & v)
     v.lazyBinOp->expr->evalLazyBinOp(state, *v.lazyBinOp->env, v);
 }
 
-WHNFEvalHandler * WHNFEvalHandler::instance = 0;
-
-WHNFEvalHandler * WHNFEvalHandler::getInstance() {
-  if (!instance)
-  instance = new WHNFEvalHandler;
+WHNFEvalHandler & WHNFEvalHandler::getInstance() {
+  static WHNFEvalHandler instance;
   return instance;
 }
 
@@ -764,6 +761,11 @@ void AttrEvalHandler::handleAttrs(EvalState & state, Value & v)
 void AttrEvalHandler::handleLazyBinOp(EvalState & state, Value & v)
 {
     attr = v.lazyBinOp->expr->evalLazyBinOpAttr(state, *v.lazyBinOp->env, name, v);
+}
+
+Attr * AttrEvalHandler::getAttr()
+{
+    return attr;
 }
 
 std::atomic<uint64_t> nrValuesFreed{0};
@@ -990,7 +992,7 @@ void Expr::evalHandler(EvalState & state, Env & env, Value & v, EvalHandler & ha
 
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
-    evalHandler(state, env, v, *WHNFEvalHandler::getInstance());
+    evalHandler(state, env, v, WHNFEvalHandler::getInstance());
 }
 
 
@@ -998,7 +1000,7 @@ Attr * Expr::evalAttr(EvalState & state, Env & env, Value & v, const Symbol & na
 {
     auto handler = AttrEvalHandler(name);
     evalHandler(state, env, v, handler);
-    return handler.attr;
+    return handler.getAttr();
 }
 
 
@@ -1303,7 +1305,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
-    callFunctionHandler(fun, arg, v, *WHNFEvalHandler::getInstance(), pos);
+    callFunctionHandler(fun, arg, v, WHNFEvalHandler::getInstance(), pos);
 }
 
 void EvalState::callFunctionHandler(Value & fun, Value & arg, Value & v, EvalHandler & handler, const Pos & pos)
