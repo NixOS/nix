@@ -10,7 +10,11 @@ pub fn encoded_len(input_len: usize) -> usize {
 }
 
 pub fn decoded_len(input_len: usize) -> usize {
-    input_len * 5 / 8
+    if input_len == 0 {
+        0
+    } else {
+        (input_len * 5) / 8
+    }
 }
 
 static BASE32_CHARS: &[u8; 32] = &b"0123456789abcdfghijklmnpqrsvwxyz";
