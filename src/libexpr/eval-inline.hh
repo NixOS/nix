@@ -65,7 +65,7 @@ bool EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos
 
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
-    evalValueWithStrategy(v, ForceEvalStrategy::getInstance());
+    evalValueWithStrategy(v, ForceEvalStrategy::getInstance(), pos);
 }
 
 Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
@@ -73,7 +73,7 @@ Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
     // No need to set tBlackhole's here, because evaluating attributes of values doesn't require evaluation, and inf rec within lazyBinOps is handled by them directly
 
     auto strat = AttrEvalStrategy(name);
-    evalValueWithStrategy(v, strat);
+    evalValueWithStrategy(v, strat, pos);
     return strat.getAttr();
 }
 

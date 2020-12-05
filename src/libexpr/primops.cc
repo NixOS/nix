@@ -1990,7 +1990,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Attr * i = state.evalValueAttr(*args[1], state.symbols.create(attr));
+    Attr * i = state.evalValueAttr(*args[1], state.symbols.create(attr), pos);
     if (!i)
         throw EvalError({
             .hint = hintfmt("attribute '%1%' missing", attr),

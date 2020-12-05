@@ -102,6 +102,7 @@ struct Expr
     // Return a Value if it can be obtained without doing any allocations
     virtual Value * noAllocationValue(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
+    virtual Pos getPos() { return noPos; };
 };
 
 // An expression that's lazy: Evaluating it doesn't necessarily fully evaluate
@@ -189,6 +190,7 @@ struct ExprVar : Expr
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * noAllocationValue(EvalState & state, Env & env);
+    Pos getPos() { return pos; };
 };
 
 struct ExprSelect : Expr
@@ -199,6 +201,7 @@ struct ExprSelect : Expr
     ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
     ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 struct ExprOpHasAttr : Expr
@@ -248,6 +251,7 @@ struct Formal
     Symbol name;
     Expr * def;
     Formal(const Pos & pos, const Symbol & name, Expr * def) : pos(pos), name(name), def(def) { };
+    Pos getPos() { return pos; };
 };
 
 struct Formals
@@ -278,6 +282,7 @@ struct ExprLambda : Expr
     void setName(Symbol & name);
     string showNamePos() const;
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 struct ExprLet : Expr
@@ -295,6 +300,7 @@ struct ExprWith : Expr
     size_t prevWith;
     ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 struct ExprIf : Expr
@@ -303,6 +309,7 @@ struct ExprIf : Expr
     Expr * cond, * then, * else_;
     ExprIf(const Pos & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 struct ExprAssert : Expr
@@ -311,6 +318,7 @@ struct ExprAssert : Expr
     Expr * cond, * body;
     ExprAssert(const Pos & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 struct ExprOpNot : Expr
@@ -336,6 +344,7 @@ struct ExprOpNot : Expr
             e1->bindVars(env); e2->bindVars(env); \
         } \
         bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
+        Pos getPos() { return pos; }; \
     };
 
 MakeBinOp(ExprApp, "")
@@ -365,6 +374,7 @@ struct ExprOpUpdate : ExprLazy
     }
     void create(EvalState & state, Env & env, Value & v);
     bool reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
+    Pos getPos() { return pos; };
 };
 
 struct ExprConcatStrings : Expr
@@ -375,6 +385,7 @@ struct ExprConcatStrings : Expr
     ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
         : pos(pos), forceString(forceString), es(es) { };
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 struct ExprPos : Expr
@@ -382,6 +393,7 @@ struct ExprPos : Expr
     Pos pos;
     ExprPos(const Pos & pos) : pos(pos) { };
     COMMON_METHODS
+    Pos getPos() { return pos; };
 };
 
 

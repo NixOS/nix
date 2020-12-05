@@ -1127,7 +1127,7 @@ bool ExprVar::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStra
 {
     Value * v2 = state.lookupVar(&env, *this, false);
     // TODO: Pass pos
-    bool cont = state.evalValueWithStrategy(*v2, strat);
+    bool cont = state.evalValueWithStrategy(*v2, strat, pos);
     v = *v2;
     return cont;
 }
@@ -1215,7 +1215,7 @@ bool ExprSelect::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalS
     }
 
     // TODO: Pass pos
-    bool cont = state.evalValueWithStrategy(*vAttrs, strat);
+    bool cont = state.evalValueWithStrategy(*vAttrs, strat, pos2 != NULL ? *pos2 : pos);
     v = *vAttrs;
     return cont;
 }
@@ -1312,7 +1312,7 @@ bool EvalState::callFunctionWithStrategy(Value & fun, Value & arg, Value & v, Ev
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         // TODO: Pass strat
         callPrimOp(fun, arg, v, pos);
-        return evalValueWithStrategy(v, strat);
+        return evalValueWithStrategy(v, strat, pos);
     }
 
     if (fun.type == tAttrs) {
@@ -1577,20 +1577,20 @@ bool ExprOpUpdate::reevalWithStrategy(EvalState & state, Env & env, Value & v, E
 {
 
     if (v.lazyBinOp.rightBlackhole) {
-        throwEvalError(pos, "infinite recursion encountered while recursing into the right side of a lazy binop");
+        throwEvalError(e2->getPos(), "infinite recursion encountered while recursing into the right side of a lazy binop");
     }
     v.lazyBinOp.rightBlackhole = true;
-    bool done = state.evalValueWithStrategy(*v.lazyBinOp.contents->right, strat);
+    bool done = state.evalValueWithStrategy(*v.lazyBinOp.contents->right, strat, e2->getPos());
     // TODO: Do we need to reset this to false?
     v.lazyBinOp.rightBlackhole = false;
 
     if (!done) {
 
         if (v.lazyBinOp.leftBlackhole) {
-            throwEvalError(pos, "infinite recursion encountered while recursing into the left side of a lazy binop");
+            throwEvalError(e1->getPos(), "infinite recursion encountered while recursing into the left side of a lazy binop");
         }
         v.lazyBinOp.leftBlackhole = true;
-        done = state.evalValueWithStrategy(*v.lazyBinOp.contents->left, strat);
+        done = state.evalValueWithStrategy(*v.lazyBinOp.contents->left, strat, e1->getPos());
         // TODO: Do we need to reset this to false?
         v.lazyBinOp.leftBlackhole = false;
     }
