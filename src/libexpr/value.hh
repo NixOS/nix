@@ -34,7 +34,6 @@ typedef enum {
 class Bindings;
 struct Env;
 struct Expr;
-struct ExprLazy;
 struct ExprLambda;
 struct PrimOp;
 class Symbol;
@@ -93,13 +92,12 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 struct Value
 {
 
-    // Stored separately from Value as to not increase sizeof(Value)
-    struct LazyBinOp {
-        Value * left;
-        Value * right;
-    };
+    // Used for tLazyUpdate
+    bool binopLeftBlackhole : 1;
+    bool binopRightBlackhole : 1;
 
-    ValueType type;
+    ValueType type : 6;
+
     union
     {
         NixInt integer;
@@ -142,10 +140,9 @@ struct Value
             Expr * expr;
         } thunk;
         struct {
-            LazyBinOp * contents;
-            bool leftBlackhole;
-            bool rightBlackhole;
-        } lazyBinOp;
+            Value * left;
+            Value * right;
+        } lazyUpdate;
         struct {
             Value * left, * right;
         } app;

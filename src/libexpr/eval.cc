@@ -769,13 +769,6 @@ Value * EvalState::allocValue()
     return v;
 }
 
-Value::LazyBinOp * EvalState::allocLazyBinOpValue()
-{
-    nrLazyBinOpValues++;
-    auto v = (Value::LazyBinOp *) allocBytes(sizeof(Value::LazyBinOp));
-    return v;
-}
-
 Env & EvalState::allocEnv(size_t size)
 {
     nrEnvs++;
@@ -1562,37 +1555,36 @@ void EvalState::createLazyUpdate(Env & env, Value & v1, Value & v2, Value & v)
 {
     // TODO: Try to avoid the allocations here
     v.type = tLazyUpdate;
-    v.lazyBinOp.contents = allocLazyBinOpValue();
-    v.lazyBinOp.contents->left = &v1;
-    v.lazyBinOp.contents->right = &v2;
-    v.lazyBinOp.leftBlackhole = false;
-    v.lazyBinOp.rightBlackhole = false;
+    v.lazyUpdate.left = &v1;
+    v.lazyUpdate.right = &v2;
+    v.binopLeftBlackhole = false;
+    v.binopRightBlackhole = false;
 }
 
 bool EvalState::reevalLazyUpdateWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos1, const Pos & pos2)
 {
 
-    if (v.lazyBinOp.rightBlackhole) {
+    if (v.binopRightBlackhole) {
         throwEvalError(pos2, "infinite recursion encountered while recursing into the right side of a lazy binop");
     }
-    v.lazyBinOp.rightBlackhole = true;
-    bool done = evalValueWithStrategy(*v.lazyBinOp.contents->right, strat, pos2);
+    v.binopRightBlackhole = true;
+    bool done = evalValueWithStrategy(*v.lazyUpdate.right, strat, pos2);
     // TODO: Do we need to reset this to false?
-    v.lazyBinOp.rightBlackhole = false;
+    v.binopRightBlackhole = false;
 
     if (!done) {
 
-        if (v.lazyBinOp.leftBlackhole) {
+        if (v.binopLeftBlackhole) {
             throwEvalError(pos1, "infinite recursion encountered while recursing into the left side of a lazy binop");
         }
-        v.lazyBinOp.leftBlackhole = true;
-        done = evalValueWithStrategy(*v.lazyBinOp.contents->left, strat, pos1);
+        v.binopLeftBlackhole = true;
+        done = evalValueWithStrategy(*v.lazyUpdate.left, strat, pos1);
         // TODO: Do we need to reset this to false?
-        v.lazyBinOp.leftBlackhole = false;
+        v.binopLeftBlackhole = false;
     }
 
-    if (v.lazyBinOp.contents->left->type == tAttrs && v.lazyBinOp.contents->right->type == tAttrs) {
-        updateAttrs(*v.lazyBinOp.contents->left, *v.lazyBinOp.contents->right, v);
+    if (v.lazyUpdate.left->type == tAttrs && v.lazyUpdate.right->type == tAttrs) {
+        updateAttrs(*v.lazyUpdate.left, *v.lazyUpdate.right, v);
     }
 
     return done;
@@ -2050,7 +2042,6 @@ void EvalState::printStats()
     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
     uint64_t bLists = nrListElems * sizeof(Value *);
     uint64_t bValues = nrValues * sizeof(Value);
-    uint64_t bLazyBinOpValues = nrLazyBinOpValues * sizeof(Value::LazyBinOp);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
 #if HAVE_BOEHMGC
@@ -2082,11 +2073,6 @@ void EvalState::printStats()
             values.attr("bytes", bValues);
         }
         {
-            auto lazyBinOpValues = topObj.object("lazyBinOpValues");
-            lazyBinOpValues.attr("number", nrLazyBinOpValues);
-            lazyBinOpValues.attr("bytes", bLazyBinOpValues);
-        }
-        {
             auto syms = topObj.object("symbols");
             syms.attr("number", symbols.size());
             syms.attr("bytes", symbols.totalSize());
@@ -2101,7 +2087,6 @@ void EvalState::printStats()
             auto sizes = topObj.object("sizes");
             sizes.attr("Env", sizeof(Env));
             sizes.attr("Value", sizeof(Value));
-            sizes.attr("Value::LazyBinOp", sizeof(Value::LazyBinOp));
             sizes.attr("Bindings", sizeof(Bindings));
             sizes.attr("Attr", sizeof(Attr));
         }

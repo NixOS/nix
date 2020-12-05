@@ -296,7 +296,6 @@ public:
 
     /* Allocation primitives. */
     Value * allocValue();
-    Value::LazyBinOp * allocLazyBinOpValue();
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
@@ -326,7 +325,6 @@ private:
     unsigned long nrEnvs = 0;
     unsigned long nrValuesInEnvs = 0;
     unsigned long nrValues = 0;
-    unsigned long nrLazyBinOpValues = 0;
     unsigned long nrListElems = 0;
     unsigned long nrAttrsets = 0;
     unsigned long nrAttrsInAttrsets = 0;
