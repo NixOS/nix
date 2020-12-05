@@ -16,7 +16,8 @@ struct RegisterPrimOp
         size_t arity = 0;
         const char * doc;
         std::optional<std::string> requiredFeature;
-        PrimOpFun fun;
+        PrimOpForceFun fun;
+        PrimOpFun funStrat;
     };
 
     typedef std::vector<Info> PrimOps;
@@ -28,7 +29,7 @@ struct RegisterPrimOp
     RegisterPrimOp(
         std::string name,
         size_t arity,
-        PrimOpFun fun,
+        PrimOpForceFun fun,
         std::optional<std::string> requiredFeature = {});
 
     RegisterPrimOp(Info && info);

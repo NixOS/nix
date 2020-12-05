@@ -512,7 +512,7 @@ Value * EvalState::addConstant(const string & name, Value & v)
 
 
 Value * EvalState::addPrimOp(const string & name,
-    size_t arity, PrimOpFun primOp)
+    size_t arity, PrimOpForceFun primOp)
 {
     auto name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name2);
@@ -1253,7 +1253,7 @@ void ExprApp::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStra
     state.callFunctionWithStrategy(vFun, *(e2->maybeThunk(state, env)), v, strat, pos);
 }
 
-void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
+void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos)
 {
     /* Figure out the number of arguments still needed. */
     size_t argsDone = 0;
@@ -1279,7 +1279,14 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         /* And call the primop. */
         nrPrimOpCalls++;
         if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, pos, vArgs, v);
+        if (primOp->primOp->fun) {
+            primOp->primOp->fun(*this, pos, vArgs, v);
+            if (v.type == tAttrs) {
+                strat.handleAttrs(*this, v);
+            }
+        } else {
+            primOp->primOp->funStrat(*this, pos, vArgs, v, strat);
+        }
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
@@ -1301,9 +1308,7 @@ void EvalState::callFunctionWithStrategy(Value & fun, Value & arg, Value & v, Ev
     forceValue(fun, pos);
 
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-        // TODO: Pass strat
-        callPrimOp(fun, arg, v, pos);
-        return evalValueWithStrategy(v, strat, pos);
+        return callPrimOp(fun, arg, v, strat, pos);
     }
 
     if (fun.type == tAttrs) {
@@ -1541,8 +1546,15 @@ void EvalState::updateAttrs(const Value & v1, const Value & v2, Value & v)
 
 void ExprOpUpdate::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
-    state.createLazyUpdate(*e1->maybeThunk(state, env), *e2->maybeThunk(state, env), v);
-    state.reevalLazyUpdateWithStrategy(v, strat, e1->getPos(), e2->getPos());
+    Value v1, v2;
+    state.evalAttrs(env, e1, v1);
+    state.evalAttrs(env, e2, v2);
+    state.updateAttrs(v1, v2, v);
+    strat.handleAttrs(state, v);
+
+    // Lazy version
+    //state.createLazyUpdate(*e1->maybeThunk(state, env), *e2->maybeThunk(state, env), v);
+    //state.reevalLazyUpdateWithStrategy(v, strat, e1->getPos(), e2->getPos());
 }
 
 void EvalState::createLazyUpdate(Value & v1, Value & v2, Value & v)

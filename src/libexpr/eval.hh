@@ -21,12 +21,15 @@ class StorePath;
 enum RepairFlag : bool;
 
 
-typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
+typedef void (* PrimOpForceFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v, EvalStrategy & strat);
 
 
 struct PrimOp
 {
-    PrimOpFun fun;
+    PrimOpForceFun fun;
+    PrimOpFun funStrat;
     size_t arity;
     Symbol name;
     std::vector<std::string> args;
@@ -250,7 +253,7 @@ private:
     Value * addConstant(const string & name, Value & v);
 
     Value * addPrimOp(const string & name,
-        size_t arity, PrimOpFun primOp);
+        size_t arity, PrimOpForceFun primOp);
 
     Value * addPrimOp(PrimOp && primOp);
 
@@ -290,7 +293,7 @@ public:
 
     void callFunctionWithStrategy(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
-    void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
+    void callPrimOp(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
