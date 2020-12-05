@@ -161,6 +161,7 @@ public:
     /* Evaluate an expression read from the given file to normal
        form. Optionally enforce that the top-level expression is
        trivial (i.e. doesn't require arbitrary computation). */
+    void evalFileWithStrategy(const Path & path, Value & v, EvalStrategy & strat, bool mustBeTrivial = false);
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
     void resetFileCache();
@@ -174,6 +175,7 @@ public:
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
+    void evalWithStrategy(Expr * e, Value & v, EvalStrategy & strat);
     void eval(Expr * e, Value & v);
 
     /* Evaluation the expression, then verify that it has the expected
@@ -187,7 +189,7 @@ public:
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const Pos & pos = noPos);
-    inline bool evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos);
+    inline void evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos = noPos);
 
     /* Get an attribute of a value, or null if it doesn't exist */
     inline Attr * evalValueAttr(Value & v, const Symbol & name, const Pos & pos);
@@ -286,7 +288,7 @@ public:
 
     bool isFunctor(Value & fun);
 
-    bool callFunctionWithStrategy(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
+    void callFunctionWithStrategy(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
     void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 
@@ -312,8 +314,8 @@ public:
 
     void updateAttrs(const Value & v1, const Value & v2, Value & v);
 
-    void createLazyUpdate(Env & env, Value & v1, Value & v2, Value & v);
-    bool reevalLazyUpdateWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos1, const Pos & pos2);
+    void createLazyUpdate(Value & v1, Value & v2, Value & v);
+    void reevalLazyUpdateWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos1, const Pos & pos2);
 
     /* Print statistics. */
     void printStats();
@@ -359,10 +361,12 @@ private:
 class EvalStrategy
 {
 public:
+    bool done = false;
+
     // How this evaluation strategy handles attribute sets
     // The passed v is a tAttrs and can be modified by this function
     // Returns whether the value caused the evaluation strategy to be "done"
-    virtual bool handleAttrs(EvalState & state, Value & v) = 0;
+    virtual void handleAttrs(EvalState & state, Value & v) = 0;
 };
 
 // An evaluation strategy that forces values into weak head normal form, so no
@@ -377,7 +381,7 @@ public:
         static ForceEvalStrategy instance;
         return instance;
     };
-    bool handleAttrs(EvalState & state, Value & v) override;
+    void handleAttrs(EvalState & state, Value & v) override;
 };
 
 // An evaluation strategy that tries to only evaluate a specific attribute
@@ -390,7 +394,7 @@ private:
 
 public:
     AttrEvalStrategy(const Symbol & name) : name(name) { };
-    bool handleAttrs(EvalState & state, Value & v) override;
+    void handleAttrs(EvalState & state, Value & v) override;
     // Returns the attribute value if found, otherwise nullptr
     Attr * getAttr() { return attr; };
 };

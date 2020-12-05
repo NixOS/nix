@@ -86,7 +86,7 @@ struct Expr
     // Evaluates an expression with a given evaluation strategy
     // The result should be put into v, which is uninitialized at first
     // See EvalStrategy for what the return value indicates
-    virtual bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
+    virtual void evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
 
     // Evaluates an expression with the ForceEvalStrategy evaluation strategy
     // TODO: Inline?
@@ -109,7 +109,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
-    bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
+    void evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
     void bindVars(const StaticEnv & env);
 
 struct ExprInt : Expr
@@ -330,7 +330,7 @@ struct ExprOpNot : Expr
         { \
             e1->bindVars(env); e2->bindVars(env); \
         } \
-        bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
+        void evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
         Pos getPos() { return pos; }; \
     };
 

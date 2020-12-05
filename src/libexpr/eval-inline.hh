@@ -29,7 +29,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
-bool EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos)
+void EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos)
 {
     if (v.type == tThunk) {
         Env * env = v.thunk.env;
@@ -43,7 +43,7 @@ bool EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos
             // Which means that the infinite recursion detection from this forceValue is prevented, since the tBlackhole is unset before the potentially recursive evaluations
             v.type = tBlackhole;
             //checkInterrupt();
-            return expr->evalWithStrategy(*this, *env, v, strat);
+            expr->evalWithStrategy(*this, *env, v, strat);
         } catch (...) {
             v.type = tThunk;
             v.thunk.env = env;
@@ -52,16 +52,14 @@ bool EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos
         }
     }
     else if (v.type == tAttrs)
-        return strat.handleAttrs(*this, v);
-    else if ((v.type & 0b00111111) == tLazyUpdate)
+        strat.handleAttrs(*this, v);
+    else if (v.type == tLazyUpdate || v.type == tLazyUpdateLeftBlackhole)
         // TODO: positions are not as precise as they could be
-        return reevalLazyUpdateWithStrategy(v, strat, pos, pos);
+        reevalLazyUpdateWithStrategy(v, strat, pos, pos);
     else if (v.type == tApp)
-        return callFunctionWithStrategy(*v.app.left, *v.app.right, v, strat, pos);
+        callFunctionWithStrategy(*v.app.left, *v.app.right, v, strat, pos);
     else if (v.type == tBlackhole)
         throwEvalError(pos, "infinite recursion encountered (tBlackhole in forceValue)");
-    else
-        return false;
 }
 
 void EvalState::forceValue(Value & v, const Pos & pos)
