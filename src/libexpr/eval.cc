@@ -1703,7 +1703,7 @@ bool ExprConcatStrings::evalWithStrategy(EvalState & state, Env & env, Value & v
 bool ExprPos::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat)
 {
     state.mkPos(v, &pos);
-    return false;
+    return strat.handleAttrs(state, v);
 }
 
 void EvalState::forceValueDeep(Value & v)
