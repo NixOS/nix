@@ -99,8 +99,6 @@ struct Expr
 
 
     virtual Value * maybeThunk(EvalState & state, Env & env);
-    // Return a Value if it can be obtained without doing any allocations
-    virtual Value * noAllocationValue(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
     virtual Pos getPos() { return noPos; };
 };
@@ -118,7 +116,7 @@ struct ExprInt : Expr
     Value v;
     ExprInt(NixInt n) : n(n) { mkInt(v, n); };
     COMMON_METHODS
-    Value * noAllocationValue(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprFloat : Expr
@@ -127,7 +125,7 @@ struct ExprFloat : Expr
     Value v;
     ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
     COMMON_METHODS
-    Value * noAllocationValue(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprString : Expr
@@ -136,7 +134,7 @@ struct ExprString : Expr
     Value v;
     ExprString(const Symbol & s) : s(s) { mkString(v, s); };
     COMMON_METHODS
-    Value * noAllocationValue(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 /* Temporary class used during parsing of indented strings. */
@@ -152,7 +150,7 @@ struct ExprPath : Expr
     Value v;
     ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
     COMMON_METHODS
-    Value * noAllocationValue(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprVar : Expr
@@ -176,7 +174,7 @@ struct ExprVar : Expr
     ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
     COMMON_METHODS
-    Value * noAllocationValue(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env);
     Pos getPos() { return pos; };
 };
 

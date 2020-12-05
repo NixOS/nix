@@ -826,7 +826,6 @@ void EvalState::mkPos(Value & v, Pos * pos)
         mkNull(v);
 }
 
-unsigned long nrAvoided = 0;
 
 /* Create a thunk for the delayed computation of the given expression
    in the given environment.  But if the expression is a variable,
@@ -834,13 +833,8 @@ unsigned long nrAvoided = 0;
    of thunks allocated. */
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
-    Value * v = noAllocationValue(state, env);
-    if (!v) {
-        v = state.allocValue();
-        mkThunk(*v, env, this);
-    } else {
-        nrAvoided++;
-    }
+    Value * v = state.allocValue();
+    mkThunk(*v, env, this);
     return v;
 }
 
@@ -849,35 +843,39 @@ void Expr::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrateg
     abort();
 }
 
-Value * Expr::noAllocationValue(EvalState & state, Env & env)
-{
-    return nullptr;
-}
+unsigned long nrAvoided = 0;
 
-Value * ExprVar::noAllocationValue(EvalState & state, Env & env)
+Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 {
+    Value * v = state.lookupVar(&env, *this, true);
     /* The value might not be initialised in the environment yet.
        In that case, ignore it. */
-    return state.lookupVar(&env, *this, true);
+    if (v) { nrAvoided++; return v; }
+    return Expr::maybeThunk(state, env);
 }
 
-Value * ExprString::noAllocationValue(EvalState & state, Env & env)
+
+Value * ExprString::maybeThunk(EvalState & state, Env & env)
 {
+    nrAvoided++;
     return &v;
 }
 
-Value * ExprInt::noAllocationValue(EvalState & state, Env & env)
+Value * ExprInt::maybeThunk(EvalState & state, Env & env)
 {
+    nrAvoided++;
     return &v;
 }
 
-Value * ExprFloat::noAllocationValue(EvalState & state, Env & env)
+Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
 {
+    nrAvoided++;
     return &v;
 }
 
-Value * ExprPath::noAllocationValue(EvalState & state, Env & env)
+Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 {
+    nrAvoided++;
     return &v;
 }
 
