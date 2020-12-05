@@ -311,8 +311,10 @@ public:
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 
-
     void updateAttrs(const Value & v1, const Value & v2, Value & v);
+
+    void createLazyUpdate(Env & env, Value & v1, Value & v2, Value & v);
+    bool reevalLazyUpdateWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos1, const Pos & pos2);
 
     /* Print statistics. */
     void printStats();

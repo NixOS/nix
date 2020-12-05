@@ -95,8 +95,6 @@ struct Value
 
     // Stored separately from Value as to not increase sizeof(Value)
     struct LazyBinOp {
-        Env * env;
-        ExprLazy * expr;
         Value * left;
         Value * right;
     };

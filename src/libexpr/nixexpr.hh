@@ -105,19 +105,6 @@ struct Expr
     virtual Pos getPos() { return noPos; };
 };
 
-// An expression that's lazy: Evaluating it doesn't necessarily fully evaluate
-// it, allowing further evaluations to get more information about the result
-struct ExprLazy : Expr
-{
-    bool evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
-    // A function to initialize v with a Value representing this expression,
-    // without doing any evaluations. This function is only called once
-    virtual void create(EvalState & state, Env & env, Value & v) = 0;
-    // A function that takes a previously initialized v and evaluates it with a
-    // specific strategy. This function may be called multiple times
-    virtual bool reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat) = 0;
-};
-
 std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
@@ -353,29 +340,8 @@ MakeBinOp(ExprOpNEq, "!=")
 MakeBinOp(ExprOpAnd, "&&")
 MakeBinOp(ExprOpOr, "||")
 MakeBinOp(ExprOpImpl, "->")
-//MakeBinOp(ExprOpUpdate, "//")
+MakeBinOp(ExprOpUpdate, "//")
 MakeBinOp(ExprOpConcatLists, "++")
-
-
-// TODO: Make the #define above support this
-struct ExprOpUpdate : ExprLazy
-{
-    Pos pos;
-    Expr * e1, * e2;
-    ExprOpUpdate(Expr * e1, Expr * e2) : e1(e1), e2(e2) { };
-    ExprOpUpdate(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { };
-    void show(std::ostream & str) const
-    {
-        str << "(" << *e1 << " // " << *e2 << ")";
-    }
-    void bindVars(const StaticEnv & env)
-    {
-        e1->bindVars(env); e2->bindVars(env);
-    }
-    void create(EvalState & state, Env & env, Value & v);
-    bool reevalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
-    Pos getPos() { return pos; };
-};
 
 struct ExprConcatStrings : Expr
 {
