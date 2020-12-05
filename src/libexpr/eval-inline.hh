@@ -53,7 +53,7 @@ bool EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos
     }
     else if (v.type == tAttrs)
         return strat.handleAttrs(*this, v);
-    else if (v.type == tLazyUpdate)
+    else if ((v.type & 0b00111111) == tLazyUpdate)
         // TODO: positions are not as precise as they could be
         return reevalLazyUpdateWithStrategy(v, strat, pos, pos);
     else if (v.type == tApp)

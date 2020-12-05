@@ -1553,34 +1553,31 @@ bool ExprOpUpdate::evalWithStrategy(EvalState & state, Env & env, Value & v, Eva
 
 void EvalState::createLazyUpdate(Env & env, Value & v1, Value & v2, Value & v)
 {
-    // TODO: Try to avoid the allocations here
     v.type = tLazyUpdate;
     v.lazyUpdate.left = &v1;
     v.lazyUpdate.right = &v2;
-    v.binopLeftBlackhole = false;
-    v.binopRightBlackhole = false;
 }
 
 bool EvalState::reevalLazyUpdateWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos1, const Pos & pos2)
 {
 
-    if (v.binopRightBlackhole) {
+    if (v.blackholes.right) {
         throwEvalError(pos2, "infinite recursion encountered while recursing into the right side of a lazy binop");
     }
-    v.binopRightBlackhole = true;
+    v.blackholes.right = true;
     bool done = evalValueWithStrategy(*v.lazyUpdate.right, strat, pos2);
     // TODO: Do we need to reset this to false?
-    v.binopRightBlackhole = false;
+    v.blackholes.right = false;
 
     if (!done) {
 
-        if (v.binopLeftBlackhole) {
+        if (v.blackholes.left) {
             throwEvalError(pos1, "infinite recursion encountered while recursing into the left side of a lazy binop");
         }
-        v.binopLeftBlackhole = true;
+        v.blackholes.left = true;
         done = evalValueWithStrategy(*v.lazyUpdate.left, strat, pos1);
         // TODO: Do we need to reset this to false?
-        v.binopLeftBlackhole = false;
+        v.blackholes.left = false;
     }
 
     if (v.lazyUpdate.left->type == tAttrs && v.lazyUpdate.right->type == tAttrs) {

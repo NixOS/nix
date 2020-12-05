@@ -91,12 +91,21 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
 struct Value
 {
-
-    // Used for tLazyUpdate
-    bool binopLeftBlackhole : 1;
-    bool binopRightBlackhole : 1;
-
-    ValueType type : 6;
+    union
+    {
+        ValueType type;
+        // Since ValueType only uses the rightmost bits while the others are 0
+        // we use that to temporarily store two additional bits at the left
+        // For tracking blackholes of binary operations
+        struct {
+            // The order of bitfields is from LSB to MSB, so the first bitfield
+            // is where our Value type lives which we shouldn't overwrite
+            unsigned typeReserved : 6;
+            // And the two MSB's we'll use for left and right blackholes
+            unsigned left : 1;
+            unsigned right : 1;
+        } blackholes;
+    };
 
     union
     {
