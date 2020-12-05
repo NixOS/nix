@@ -27,7 +27,7 @@ typedef enum {
     tPrimOpApp,
     tExternal,
     tFloat,
-    tLazyBinOp
+    tLazyUpdate
 } ValueType;
 
 

@@ -119,6 +119,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         break;
     case tThunk:
     case tApp:
+    case tLazyUpdate:
         str << "<CODE>";
         break;
     case tLambda:
@@ -135,9 +136,6 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         break;
     case tFloat:
         str << v.fpoint;
-        break;
-    case tLazyBinOp:
-        str << "<LAZY BINOP>";
         break;
     default:
         throw Error("invalid value");
@@ -183,7 +181,7 @@ string showType(ValueType type)
         case tPrimOpApp: return "a partially applied built-in function";
         case tExternal: return "an external value";
         case tFloat: return "a float";
-        case tLazyBinOp: return "a lazy binop";
+        case tLazyUpdate: return "a lazy attribute update";
     }
     abort();
 }
@@ -1563,7 +1561,7 @@ bool ExprLazy::evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStr
 void ExprOpUpdate::create(EvalState & state, Env & env, Value & v)
 {
     // TODO: Try to avoid the allocations here
-    v.type = tLazyBinOp;
+    v.type = tLazyUpdate;
     v.lazyBinOp.contents = state.allocLazyBinOpValue();
     v.lazyBinOp.contents->expr = this;
     v.lazyBinOp.contents->env = &env;

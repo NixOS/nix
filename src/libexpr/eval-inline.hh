@@ -53,7 +53,7 @@ bool EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos
     }
     else if (v.type == tAttrs)
         return strat.handleAttrs(*this, v);
-    else if (v.type == tLazyBinOp)
+    else if (v.type == tLazyUpdate)
         return v.lazyBinOp.contents->expr->reevalWithStrategy(*this, *v.lazyBinOp.contents->env, v, strat);
     else if (v.type == tApp)
         return callFunctionWithStrategy(*v.app.left, *v.app.right, v, strat, pos);
