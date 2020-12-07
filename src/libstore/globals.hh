@@ -583,7 +583,7 @@ public:
 
     Setting<Strings> substituters{
         this,
-        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. The default
