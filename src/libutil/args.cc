@@ -254,6 +254,8 @@ nlohmann::json Args::toJSON()
     res["description"] = description();
     res["flags"] = std::move(flags);
     res["args"] = std::move(args);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
     return res;
 }
 
@@ -378,8 +380,6 @@ nlohmann::json Command::toJSON()
 
     auto res = Args::toJSON();
     res["examples"] = std::move(exs);
-    auto s = doc();
-    if (s != "") res.emplace("doc", stripIndentation(s));
     return res;
 }
 

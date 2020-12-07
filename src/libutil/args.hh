@@ -25,6 +25,9 @@ public:
     /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
+    /* Return documentation about this command, in Markdown format. */
+    virtual std::string doc() { return ""; }
+
 protected:
 
     static const size_t ArityAny = std::numeric_limits<size_t>::max();
@@ -224,9 +227,6 @@ struct Command : virtual Args
 
     virtual void prepare() { };
     virtual void run() = 0;
-
-    /* Return documentation about this command, in Markdown format. */
-    virtual std::string doc() { return ""; }
 
     struct Example
     {
