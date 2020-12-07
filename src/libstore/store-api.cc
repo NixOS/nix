@@ -772,8 +772,8 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     }
 
     auto source = sinkToSource([&](Sink & sink) {
-        LambdaSink progressSink([&](const unsigned char * data, size_t len) {
-            total += len;
+        LambdaSink progressSink([&](std::string_view data) {
+            total += data.size();
             act.progress(total, info->narSize);
         });
         TeeSink tee { sink, progressSink };

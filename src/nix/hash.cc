@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdHash : Command
+struct CmdHashBase : Command
 {
     FileIngestionMethod mode;
     Base base = SRI;
@@ -17,7 +17,7 @@ struct CmdHash : Command
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
-    CmdHash(FileIngestionMethod mode) : mode(mode)
+    CmdHashBase(FileIngestionMethod mode) : mode(mode)
     {
         mkFlag(0, "sri", "print hash in SRI format", &base, SRI);
         mkFlag(0, "base64", "print hash in base-64", &base, Base64);
@@ -51,8 +51,6 @@ struct CmdHash : Command
         return d;
     }
 
-    Category category() override { return catUtility; }
-
     void run() override
     {
         for (auto path : paths) {
@@ -79,9 +77,6 @@ struct CmdHash : Command
     }
 };
 
-static RegisterCommand rCmdHashFile("hash-file", [](){ return make_ref<CmdHash>(FileIngestionMethod::Flat); });
-static RegisterCommand rCmdHashPath("hash-path", [](){ return make_ref<CmdHash>(FileIngestionMethod::Recursive); });
-
 struct CmdToBase : Command
 {
     Base base;
@@ -103,8 +98,6 @@ struct CmdToBase : Command
             "SRI");
     }
 
-    Category category() override { return catUtility; }
-
     void run() override
     {
         for (auto s : args)
@@ -112,10 +105,41 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand rCmdToBase16("to-base16", [](){ return make_ref<CmdToBase>(Base16); });
-static RegisterCommand rCmdToBase32("to-base32", [](){ return make_ref<CmdToBase>(Base32); });
-static RegisterCommand rCmdToBase64("to-base64", [](){ return make_ref<CmdToBase>(Base64); });
-static RegisterCommand rCmdToSRI("to-sri", [](){ return make_ref<CmdToBase>(SRI); });
+struct CmdHash : NixMultiCommand
+{
+    CmdHash()
+        : MultiCommand({
+                {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
+                {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
+                {"to-base16", []() { return make_ref<CmdToBase>(Base16); }},
+                {"to-base32", []() { return make_ref<CmdToBase>(Base32); }},
+                {"to-base64", []() { return make_ref<CmdToBase>(Base64); }},
+                {"to-sri", []() { return make_ref<CmdToBase>(SRI); }},
+          })
+    { }
+
+    std::string description() override
+    {
+        return "compute and convert cryptographic hashes";
+    }
+
+    Category category() override { return catUtility; }
+
+    void run() override
+    {
+        if (!command)
+            throw UsageError("'nix hash' requires a sub-command.");
+        command->second->prepare();
+        command->second->run();
+    }
+
+    void printHelp(const string & programName, std::ostream & out) override
+    {
+        MultiCommand::printHelp(programName, out);
+    }
+};
+
+static auto rCmdHash = registerCommand<CmdHash>("hash");
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
@@ -149,7 +173,7 @@ static int compatNixHash(int argc, char * * argv)
     });
 
     if (op == opHash) {
-        CmdHash cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
+        CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
         cmd.ht = ht;
         cmd.base = base32 ? Base32 : Base16;
         cmd.truncate = truncate;

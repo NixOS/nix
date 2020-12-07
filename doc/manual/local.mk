@@ -4,7 +4,7 @@ MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
 
 # Generate man pages.
 man-pages := $(foreach n, \
-  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 nix.1 \
+  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
   nix-collect-garbage.1 \
   nix-prefetch-url.1 nix-channel.1 \
   nix-hash.1 nix-copy-closure.1 \
@@ -13,8 +13,6 @@ man-pages := $(foreach n, \
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
-dist-files += $(man-pages)
-
 # Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
 dummy-env = env -i \
 	HOME=/dummy \
@@ -22,7 +20,7 @@ dummy-env = env -i \
 	NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt \
 	NIX_STATE_DIR=/dummy
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw --expr
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
@@ -42,13 +40,17 @@ $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	$(trace-gen) lowdown -sT man $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
-	$(trace-gen) $(nix-eval) 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))' > $@.tmp
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
+	$(trace-gen) cat doc/manual/src/SUMMARY.md.in | while IFS= read line; do if [[ $$line = @manpages@ ]]; then cat doc/manual/src/command-ref/new-cli/SUMMARY.md; else echo "$$line"; fi; done > $@.tmp
 	@mv $@.tmp $@
+
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+	@rm -rf $@
+	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))'
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
@@ -61,18 +63,28 @@ $(d)/conf-file.json: $(bindir)/nix
 
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
 	@cat doc/manual/src/expressions/builtins-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/builtins.json: $(bindir)/nix
 	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
-	mv $@.tmp $@
+	@mv $@.tmp $@
 
 # Generate the HTML manual.
 install: $(docdir)/manual/index.html
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/command-ref/nix.md $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
-	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
+# Generate 'nix' manpages.
+install: $(d)/src/command-ref/new-cli
+	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
+	  name=$$(basename $$i .md); \
+	  if [[ $$name = SUMMARY ]]; then continue; fi; \
+	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
+	  cat $$i >> $$i.tmp; \
+	  lowdown -sT man $$i.tmp -o $(mandir)/man1/$$name.1; \
+	done
+
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
+	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
 	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
 endif

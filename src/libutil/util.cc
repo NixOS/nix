@@ -320,7 +320,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, const string & s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -340,13 +340,13 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::vector<unsigned char> buf(64 * 1024);
+    std::vector<char> buf(64 * 1024);
 
     try {
         while (true) {
             try {
                 auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), (unsigned char *) buf.data(), n);
+                writeFull(fd.get(), {buf.data(), n});
             } catch (EndOfFile &) { break; }
         }
     } catch (Error & e) {
@@ -632,11 +632,11 @@ void replaceSymlink(const Path & target, const Path & link,
 }
 
 
-void readFull(int fd, unsigned char * buf, size_t count)
+void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
-        ssize_t res = read(fd, (char *) buf, count);
+        ssize_t res = read(fd, buf, count);
         if (res == -1) {
             if (errno == EINTR) continue;
             throw SysError("reading from file");
@@ -648,24 +648,16 @@ void readFull(int fd, unsigned char * buf, size_t count)
 }
 
 
-void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
+void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
-    while (count) {
+    while (!s.empty()) {
         if (allowInterrupts) checkInterrupt();
-        ssize_t res = write(fd, (char *) buf, count);
+        ssize_t res = write(fd, s.data(), s.size());
         if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
-        if (res > 0) {
-            count -= res;
-            buf += res;
-        }
+        if (res > 0)
+            s.remove_prefix(res);
     }
-}
-
-
-void writeFull(int fd, const string & s, bool allowInterrupts)
-{
-    writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
 }
 
 
@@ -705,7 +697,7 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else sink(buf.data(), rd);
+        else sink({(char *) buf.data(), (size_t) rd});
     }
 }
 
@@ -1145,7 +1137,7 @@ void runProgram2(const RunOptions & options)
         in.readSide = -1;
         writerThread = std::thread([&]() {
             try {
-                std::vector<unsigned char> buf(8 * 1024);
+                std::vector<char> buf(8 * 1024);
                 while (true) {
                     size_t n;
                     try {
@@ -1153,7 +1145,7 @@ void runProgram2(const RunOptions & options)
                     } catch (EndOfFile &) {
                         break;
                     }
-                    writeFull(in.writeSide.get(), buf.data(), n);
+                    writeFull(in.writeSide.get(), {buf.data(), n});
                 }
                 promise.set_value();
             } catch (...) {

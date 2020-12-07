@@ -115,6 +115,9 @@ protected:
 
     virtual bool processArgs(const Strings & args, bool finish);
 
+    virtual Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos)
+    { return pos; }
+
     std::set<std::string> hiddenCategories;
 
 public:
@@ -256,8 +259,6 @@ public:
     Commands commands;
 
     std::map<Command::Category, std::string> categories;
-
-    std::map<std::string, std::string> deprecatedAliases;
 
     // Selected command, if any.
     std::optional<std::pair<std::string, ref<Command>>> command;

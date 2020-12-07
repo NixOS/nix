@@ -59,7 +59,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     bool useNet = true;
     bool refresh = false;
 
-    NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
+    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
         categories[Command::catDefault] = "Main commands";
@@ -112,8 +112,45 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "consider all previously downloaded files out-of-date",
             .handler = {[&]() { refresh = true; }},
         });
+    }
 
-        deprecatedAliases.insert({"dev-shell", "develop"});
+    std::map<std::string, std::vector<std::string>> aliases = {
+        {"add-to-store", {"store", "add-path"}},
+        {"cat-nar", {"nar", "cat"}},
+        {"cat-store", {"store", "cat"}},
+        {"copy-sigs", {"store", "copy-sigs"}},
+        {"dev-shell", {"develop"}},
+        {"diff-closures", {"store", "diff-closures"}},
+        {"dump-path", {"store", "dump-path"}},
+        {"hash-file", {"hash", "file"}},
+        {"hash-path", {"hash", "path"}},
+        {"ls-nar", {"nar", "ls"}},
+        {"ls-store", {"store", "ls"}},
+        {"make-content-addressable", {"store", "make-content-addressable"}},
+        {"optimise-store", {"store", "optimise"}},
+        {"ping-store", {"store", "ping"}},
+        {"sign-paths", {"store", "sign-paths"}},
+        {"to-base16", {"hash", "to-base16"}},
+        {"to-base32", {"hash", "to-base32"}},
+        {"to-base64", {"hash", "to-base64"}},
+        {"verify", {"store", "verify"}},
+    };
+
+    bool aliasUsed = false;
+
+    Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override
+    {
+        if (aliasUsed || command || pos == args.end()) return pos;
+        auto arg = *pos;
+        auto i = aliases.find(arg);
+        if (i == aliases.end()) return pos;
+        warn("'%s' is a deprecated alias for '%s'",
+            arg, concatStringsSep(" ", i->second));
+        pos = args.erase(pos);
+        for (auto j = i->second.rbegin(); j != i->second.rend(); ++j)
+            pos = args.insert(pos, *j);
+        aliasUsed = true;
+        return pos;
     }
 
     void printFlags(std::ostream & out) override
@@ -148,6 +185,50 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         return "a tool for reproducible and declarative configuration management";
     }
 };
+
+static void showHelp(std::vector<std::string> subcommand)
+{
+    showManPage(subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand)));
+}
+
+struct CmdHelp : Command
+{
+    std::vector<std::string> subcommand;
+
+    CmdHelp()
+    {
+        expectArgs({
+            .label = "subcommand",
+            .handler = {&subcommand},
+        });
+    }
+
+    std::string description() override
+    {
+        return "show help about 'nix' or a particular subcommand";
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To show help about 'nix' in general:",
+                "nix help"
+            },
+            Example{
+                "To show help about a particular subcommand:",
+                "nix help run"
+            },
+        };
+    }
+
+    void run() override
+    {
+        showHelp(subcommand);
+    }
+};
+
+static auto rCmdHelp = registerCommand<CmdHelp>("help");
 
 void mainWrapped(int argc, char * * argv)
 {

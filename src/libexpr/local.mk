@@ -35,8 +35,6 @@ $(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
 
 clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
 
-dist-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
-
 $(eval $(call install-file-in, $(d)/nix-expr.pc, $(prefix)/lib/pkgconfig, 0644))
 
 $(foreach i, $(wildcard src/libexpr/flake/*.hh), \

@@ -153,10 +153,10 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    virtual void operator () (const unsigned char * data, size_t len)
+    void operator () (std::string_view data)
     {
         to << STDERR_WRITE;
-        writeString(data, len, to);
+        writeString(data, to);
     }
 };
 
@@ -165,7 +165,7 @@ struct TunnelSource : BufferedSource
     Source & from;
     BufferedSink & to;
     TunnelSource(Source & from, BufferedSink & to) : from(from), to(to) { }
-    size_t readUnbuffered(unsigned char * data, size_t len) override
+    size_t readUnbuffered(char * data, size_t len) override
     {
         to << STDERR_READ << len;
         to.flush();
@@ -215,6 +215,8 @@ struct ClientSettings
                 for (auto & s : ss)
                     if (trusted.count(s))
                         subs.push_back(s);
+                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
+                        subs.push_back(s + "/");
                     else
                         warn("ignoring untrusted substituter '%s'", s);
                 res = subs;

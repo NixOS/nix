@@ -916,10 +916,8 @@ void DerivationGoal::buildDone()
 
                 LogSink(Activity & act) : act(act) { }
 
-                void operator() (const unsigned char * data, size_t len) override {
-                    for (size_t i = 0; i < len; i++) {
-                        auto c = data[i];
-
+                void operator() (std::string_view data) override {
+                    for (auto c : data) {
                         if (c == '\n') {
                             flushLine();
                         } else {
@@ -3127,7 +3125,7 @@ void DerivationGoal::registerOutputs()
                     StringSink sink;
                     dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
-                    rsink2((unsigned char *) sink.s->data(), sink.s->size());
+                    rsink2(*sink.s);
                     rsink2.flush();
                 });
                 Path tmpPath = actualPath + ".tmp";

@@ -3,6 +3,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "eval.hh"
+#include "eval-inline.hh"
 #include "json.hh"
 #include "value-to-json.hh"
 #include "progress-bar.hh"
@@ -13,6 +14,7 @@ struct CmdEval : MixJSON, InstallableCommand
 {
     bool raw = false;
     std::optional<std::string> apply;
+    std::optional<Path> writeTo;
 
     CmdEval()
     {
@@ -23,6 +25,13 @@ struct CmdEval : MixJSON, InstallableCommand
             .description = "apply a function to each argument",
             .labels = {"expr"},
             .handler = {&apply},
+        });
+
+        addFlag({
+            .longName = "write-to",
+            .description = "write a string or attrset of strings to 'path'",
+            .labels = {"path"},
+            .handler = {&writeTo},
         });
     }
 
@@ -66,7 +75,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto state = getEvalState();
 
-        auto v = installable->toValue(*state).first;
+        auto [v, pos] = installable->toValue(*state);
         PathSet context;
 
         if (apply) {
@@ -77,13 +86,51 @@ struct CmdEval : MixJSON, InstallableCommand
             v = vRes;
         }
 
-        if (raw) {
+        if (writeTo) {
+            stopProgressBar();
+
+            if (pathExists(*writeTo))
+                throw Error("path '%s' already exists", *writeTo);
+
+            std::function<void(Value & v, const Pos & pos, const Path & path)> recurse;
+
+            recurse = [&](Value & v, const Pos & pos, const Path & path)
+            {
+                state->forceValue(v);
+                if (v.type == tString)
+                    // FIXME: disallow strings with contexts?
+                    writeFile(path, v.string.s);
+                else if (v.type == tAttrs) {
+                    if (mkdir(path.c_str(), 0777) == -1)
+                        throw SysError("creating directory '%s'", path);
+                    for (auto & attr : *v.attrs)
+                        try {
+                            if (attr.name == "." || attr.name == "..")
+                                throw Error("invalid file name '%s'", attr.name);
+                            recurse(*attr.value, *attr.pos, path + "/" + std::string(attr.name));
+                        } catch (Error & e) {
+                            e.addTrace(*attr.pos, hintfmt("while evaluating the attribute '%s'", attr.name));
+                            throw;
+                        }
+                }
+                else
+                    throw TypeError("value at '%s' is not a string or an attribute set", pos);
+            };
+
+            recurse(*v, pos, *writeTo);
+        }
+
+        else if (raw) {
             stopProgressBar();
             std::cout << state->coerceToString(noPos, *v, context);
-        } else if (json) {
+        }
+
+        else if (json) {
             JSONPlaceholder jsonOut(std::cout);
             printValueAsJSON(*state, true, *v, jsonOut, context);
-        } else {
+        }
+
+        else {
             state->forceValueDeep(*v);
             logger->cout("%s", *v);
         }
