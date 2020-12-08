@@ -18,17 +18,18 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1602702596,
-        "narHash": "sha256-fqJ4UgOb4ZUnCDIapDb4gCrtAah5Rnr2/At3IzMitig=",
-        "owner": "NixOS",
+        "lastModified": 1607408992,
+        "narHash": "sha256-I4oaHqgXvDbhFxtnJruRVMbTP14PaBPOEZek6Dd73HM=",
+        "owner": "thefloweringash",
         "repo": "nixpkgs",
-        "rev": "ad0d20345219790533ebe06571f82ed6b034db31",
+        "rev": "5738b751bbf1d454ab9b83e77c3dc55cdc5acd0f",
         "type": "github"
       },
       "original": {
-        "id": "nixpkgs",
-        "ref": "nixos-20.09-small",
-        "type": "indirect"
+        "owner": "thefloweringash",
+        "ref": "apple-silicon",
+        "repo": "nixpkgs",
+        "type": "github"
       }
     },
     "root": {
