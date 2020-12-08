@@ -385,30 +385,11 @@ struct CmdDevelop : Common, MixEnvironment
         return "run a bash shell that provides the build environment of a derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To get the build environment of GNU hello:",
-                "nix develop nixpkgs#hello"
-            },
-            Example{
-                "To get the build environment of the default package of flake in the current directory:",
-                "nix develop"
-            },
-            Example{
-                "To store the build environment in a profile:",
-                "nix develop --profile /tmp/my-shell nixpkgs#hello"
-            },
-            Example{
-                "To use a build environment previously recorded in a profile:",
-                "nix develop /tmp/my-shell"
-            },
-            Example{
-                "To replace all occurences of a store path with a writable directory:",
-                "nix develop --redirect nixpkgs#glibc.dev ~/my-glibc/outputs/dev"
-            },
-        };
+        return
+          #include "develop.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -495,14 +476,11 @@ struct CmdPrintDevEnv : Common
         return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To apply the build environment of GNU hello to the current shell:",
-                ". <(nix print-dev-env nixpkgs#hello)"
-            },
-        };
+        return
+          #include "print-dev-env.md"
+          ;
     }
 
     Category category() override { return catUtility; }
