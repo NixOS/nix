@@ -42,6 +42,21 @@
 
 namespace nix {
 
+struct LocalStore::State::Stmts {
+    /* Some precompiled SQLite statements. */
+    SQLiteStmt RegisterValidPath;
+    SQLiteStmt UpdatePathInfo;
+    SQLiteStmt AddReference;
+    SQLiteStmt QueryPathInfo;
+    SQLiteStmt QueryReferences;
+    SQLiteStmt QueryReferrers;
+    SQLiteStmt InvalidatePath;
+    SQLiteStmt AddDerivationOutput;
+    SQLiteStmt QueryValidDerivers;
+    SQLiteStmt QueryDerivationOutputs;
+    SQLiteStmt QueryPathFromHashPart;
+    SQLiteStmt QueryValidPaths;
+};
 
 LocalStore::LocalStore(const Params & params)
     : StoreConfig(params)
@@ -60,6 +75,7 @@ LocalStore::LocalStore(const Params & params)
     , locksHeld(tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS").value_or("")))
 {
     auto state(_state.lock());
+    state->stmts = std::make_unique<State::Stmts>();
 
     /* Create missing state directories if they don't already exist. */
     createDirs(realStoreDir);
@@ -223,31 +239,31 @@ LocalStore::LocalStore(const Params & params)
     else openDB(*state, false);
 
     /* Prepare SQL statements. */
-    state->stmtRegisterValidPath.create(state->db,
+    state->stmts->RegisterValidPath.create(state->db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
-    state->stmtUpdatePathInfo.create(state->db,
+    state->stmts->UpdatePathInfo.create(state->db,
         "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
-    state->stmtAddReference.create(state->db,
+    state->stmts->AddReference.create(state->db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
-    state->stmtQueryPathInfo.create(state->db,
+    state->stmts->QueryPathInfo.create(state->db,
         "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
-    state->stmtQueryReferences.create(state->db,
+    state->stmts->QueryReferences.create(state->db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
-    state->stmtQueryReferrers.create(state->db,
+    state->stmts->QueryReferrers.create(state->db,
         "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
-    state->stmtInvalidatePath.create(state->db,
+    state->stmts->InvalidatePath.create(state->db,
         "delete from ValidPaths where path = ?;");
-    state->stmtAddDerivationOutput.create(state->db,
+    state->stmts->AddDerivationOutput.create(state->db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
-    state->stmtQueryValidDerivers.create(state->db,
+    state->stmts->QueryValidDerivers.create(state->db,
         "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
-    state->stmtQueryDerivationOutputs.create(state->db,
+    state->stmts->QueryDerivationOutputs.create(state->db,
         "select id, path from DerivationOutputs where drv = ?;");
     // Use "path >= ?" with limit 1 rather than "path like '?%'" to
     // ensure efficient lookup.
-    state->stmtQueryPathFromHashPart.create(state->db,
+    state->stmts->QueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
-    state->stmtQueryValidPaths.create(state->db, "select path from ValidPaths");
+    state->stmts->QueryValidPaths.create(state->db, "select path from ValidPaths");
 }
 
 
@@ -590,7 +606,7 @@ void LocalStore::linkDeriverToPath(const StorePath & deriver, const string & out
 void LocalStore::linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
 {
     retrySQLite<void>([&]() {
-        state.stmtAddDerivationOutput.use()
+        state.stmts->AddDerivationOutput.use()
             (deriver)
             (outputName)
             (printStorePath(output))
@@ -607,7 +623,7 @@ uint64_t LocalStore::addValidPath(State & state,
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
-    state.stmtRegisterValidPath.use()
+    state.stmts->RegisterValidPath.use()
         (printStorePath(info.path))
         (info.narHash.to_string(Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
@@ -659,7 +675,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
             auto state(_state.lock());
 
             /* Get the path info. */
-            auto useQueryPathInfo(state->stmtQueryPathInfo.use()(printStorePath(path)));
+            auto useQueryPathInfo(state->stmts->QueryPathInfo.use()(printStorePath(path)));
 
             if (!useQueryPathInfo.next())
                 return std::shared_ptr<ValidPathInfo>();
@@ -679,7 +695,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
 
             info->registrationTime = useQueryPathInfo.getInt(2);
 
-            auto s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 3);
+            auto s = (const char *) sqlite3_column_text(state->stmts->QueryPathInfo, 3);
             if (s) info->deriver = parseStorePath(s);
 
             /* Note that narSize = NULL yields 0. */
@@ -687,14 +703,14 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
 
             info->ultimate = useQueryPathInfo.getInt(5) == 1;
 
-            s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 6);
+            s = (const char *) sqlite3_column_text(state->stmts->QueryPathInfo, 6);
             if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
-            s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
+            s = (const char *) sqlite3_column_text(state->stmts->QueryPathInfo, 7);
             if (s) info->ca = parseContentAddressOpt(s);
 
             /* Get the references. */
-            auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
+            auto useQueryReferences(state->stmts->QueryReferences.use()(info->id));
 
             while (useQueryReferences.next())
                 info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
@@ -709,7 +725,7 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
 /* Update path info in the database. */
 void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
-    state.stmtUpdatePathInfo.use()
+    state.stmts->UpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
         (info.narHash.to_string(Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
@@ -722,7 +738,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 
 uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 {
-    auto use(state.stmtQueryPathInfo.use()(printStorePath(path)));
+    auto use(state.stmts->QueryPathInfo.use()(printStorePath(path)));
     if (!use.next())
         throw InvalidPath("path '%s' is not valid", printStorePath(path));
     return use.getInt(0);
@@ -731,7 +747,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 
 bool LocalStore::isValidPath_(State & state, const StorePath & path)
 {
-    return state.stmtQueryPathInfo.use()(printStorePath(path)).next();
+    return state.stmts->QueryPathInfo.use()(printStorePath(path)).next();
 }
 
 
@@ -757,7 +773,7 @@ StorePathSet LocalStore::queryAllValidPaths()
 {
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state.lock());
-        auto use(state->stmtQueryValidPaths.use());
+        auto use(state->stmts->QueryValidPaths.use());
         StorePathSet res;
         while (use.next()) res.insert(parseStorePath(use.getStr(0)));
         return res;
@@ -767,7 +783,7 @@ StorePathSet LocalStore::queryAllValidPaths()
 
 void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers)
 {
-    auto useQueryReferrers(state.stmtQueryReferrers.use()(printStorePath(path)));
+    auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
 
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
@@ -788,7 +804,7 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state.lock());
 
-        auto useQueryValidDerivers(state->stmtQueryValidDerivers.use()(printStorePath(path)));
+        auto useQueryValidDerivers(state->stmts->QueryValidDerivers.use()(printStorePath(path)));
 
         StorePathSet derivers;
         while (useQueryValidDerivers.next())
@@ -848,7 +864,7 @@ std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivati
         }
 
         auto useQueryDerivationOutputs {
-            state->stmtQueryDerivationOutputs.use()
+            state->stmts->QueryDerivationOutputs.use()
             (drvId)
         };
 
@@ -872,11 +888,11 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
     return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state.lock());
 
-        auto useQueryPathFromHashPart(state->stmtQueryPathFromHashPart.use()(prefix));
+        auto useQueryPathFromHashPart(state->stmts->QueryPathFromHashPart.use()(prefix));
 
         if (!useQueryPathFromHashPart.next()) return {};
 
-        const char * s = (const char *) sqlite3_column_text(state->stmtQueryPathFromHashPart, 0);
+        const char * s = (const char *) sqlite3_column_text(state->stmts->QueryPathFromHashPart, 0);
         if (s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0)
             return parseStorePath(s);
         return {};
@@ -990,7 +1006,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         for (auto & [_, i] : infos) {
             auto referrer = queryValidPathId(*state, i.path);
             for (auto & j : i.references)
-                state->stmtAddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
+                state->stmts->AddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
         }
 
         /* Check that the derivation outputs are correct.  We can't do
@@ -1030,7 +1046,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 {
     debug("invalidating path '%s'", printStorePath(path));
 
-    state.stmtInvalidatePath.use()(printStorePath(path)).exec();
+    state.stmts->InvalidatePath.use()(printStorePath(path)).exec();
 
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */

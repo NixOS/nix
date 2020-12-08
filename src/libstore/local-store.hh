@@ -55,19 +55,8 @@ private:
         /* The SQLite database object. */
         SQLite db;
 
-        /* Some precompiled SQLite statements. */
-        SQLiteStmt stmtRegisterValidPath;
-        SQLiteStmt stmtUpdatePathInfo;
-        SQLiteStmt stmtAddReference;
-        SQLiteStmt stmtQueryPathInfo;
-        SQLiteStmt stmtQueryReferences;
-        SQLiteStmt stmtQueryReferrers;
-        SQLiteStmt stmtInvalidatePath;
-        SQLiteStmt stmtAddDerivationOutput;
-        SQLiteStmt stmtQueryValidDerivers;
-        SQLiteStmt stmtQueryDerivationOutputs;
-        SQLiteStmt stmtQueryPathFromHashPart;
-        SQLiteStmt stmtQueryValidPaths;
+        struct Stmts;
+        std::unique_ptr<Stmts> stmts;
 
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
