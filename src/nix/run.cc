@@ -86,26 +86,11 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         return "run a shell in which the specified packages are available";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To start a shell providing GNU Hello from NixOS 20.03:",
-                "nix shell nixpkgs/nixos-20.03#hello"
-            },
-            Example{
-                "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix shell nixpkgs#youtube-dl"
-            },
-            Example{
-                "To run GNU Hello:",
-                "nix shell nixpkgs#hello -c hello --greeting 'Hi everybody!'"
-            },
-            Example{
-                "To run GNU Hello in a chroot store:",
-                "nix shell --store ~/my-nix nixpkgs#hello -c hello"
-            },
-        };
+        return
+          #include "shell.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -168,22 +153,11 @@ struct CmdRun : InstallableCommand, RunCommon
         return "run a Nix application";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To run Blender:",
-                "nix run blender-bin"
-            },
-            Example{
-                "To run vim from nixpkgs:",
-                "nix run nixpkgs#vim"
-            },
-            Example{
-                "To run vim from nixpkgs with arguments:",
-                "nix run nixpkgs#vim -- --help"
-            },
-        };
+        return
+          #include "run.md"
+          ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
