@@ -48,6 +48,10 @@ testCutoff () {
 testGC () {
     nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
     nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
+    clearStore
+    buildAttr rootCA 1 --out-link $TEST_ROOT/rootCA
+    nix-collect-garbage --experimental-features ca-derivations
+    buildAttr rootCA 1 -j0
 }
 
 testNixCommand () {
