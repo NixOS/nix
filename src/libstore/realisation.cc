@@ -1,5 +1,6 @@
 #include "realisation.hh"
 #include "store-api.hh"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -20,52 +21,28 @@ std::string DrvOutput::to_string() const {
     return std::string(drvPath.to_string()) + "!" + outputName;
 }
 
-std::string Realisation::to_string() const {
-    std::string res;
-
-    res += "Id: " + id.to_string() + '\n';
-    res += "OutPath: " + std::string(outPath.to_string()) + '\n';
-
-    return res;
+nlohmann::json Realisation::toJSON() const {
+    return nlohmann::json{
+        {"id", id.to_string()},
+        {"outPath", outPath.to_string()},
+    };
 }
 
-Realisation Realisation::parse(const std::string & s, const std::string & whence)
-{
-    // XXX: Copy-pasted from NarInfo::NarInfo. Should be factored out
-    auto corrupt = [&]() {
-        return Error("Drv output info file '%1%' is corrupt", whence);
+Realisation Realisation::fromJSON(
+    const nlohmann::json& json,
+    const std::string& whence) {
+    auto getField = [&](std::string fieldName) -> std::string {
+        auto fieldIterator = json.find(fieldName);
+        if (fieldIterator == json.end())
+            throw Error(
+                "Drv output info file '%1%' is corrupt, missing field %2%",
+                whence, fieldName);
+        return *fieldIterator;
     };
 
-    std::optional<DrvOutput> id;
-    std::optional<StorePath> outPath;
-
-    size_t pos = 0;
-    while (pos < s.size()) {
-
-        size_t colon = s.find(':', pos);
-        if (colon == std::string::npos) throw corrupt();
-
-        std::string name(s, pos, colon - pos);
-
-        size_t eol = s.find('\n', colon + 2);
-        if (eol == std::string::npos) throw corrupt();
-
-        std::string value(s, colon + 2, eol - colon - 2);
-
-        if (name == "Id")
-            id = DrvOutput::parse(value);
-
-        if (name == "OutPath")
-            outPath = StorePath(value);
-
-        pos = eol + 1;
-    }
-
-    if (!outPath) corrupt();
-    if (!id) corrupt();
-    return Realisation {
-        .id = *id,
-        .outPath = *outPath,
+    return Realisation{
+        .id = DrvOutput::parse(getField("id")),
+        .outPath = StorePath(getField("outPath")),
     };
 }
 

@@ -449,7 +449,8 @@ std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOut
     auto rawOutputInfo = getFile(outputInfoFilePath);
 
     if (rawOutputInfo) {
-        return { Realisation::parse(*rawOutputInfo, outputInfoFilePath) };
+        return {Realisation::fromJSON(
+            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath)};
     } else {
         return std::nullopt;
     }
@@ -457,7 +458,7 @@ std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOut
 
 void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
     auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
-    upsertFile(filePath, info.to_string(), "text/x-nix-derivertopath");
+    upsertFile(filePath, info.toJSON(), "application/json");
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()

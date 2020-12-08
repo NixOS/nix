@@ -1,6 +1,7 @@
 #pragma once
 
 #include "path.hh"
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -25,8 +26,8 @@ struct Realisation {
     DrvOutput id;
     StorePath outPath;
 
-    std::string to_string() const;
-    static Realisation parse(const std::string & s, const std::string & whence);
+    nlohmann::json toJSON() const;
+    static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
 };
 
 typedef std::map<DrvOutput, Realisation> DrvOutputs;
