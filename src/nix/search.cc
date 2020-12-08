@@ -41,29 +41,14 @@ struct CmdSearch : InstallableCommand, MixJSON
 
     std::string description() override
     {
-        return "query available packages";
+        return "search for packages";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show all packages in the flake in the current directory:",
-                "nix search"
-            },
-            Example{
-                "To show packages in the 'nixpkgs' flake containing 'blender' in its name or description:",
-                "nix search nixpkgs blender"
-            },
-            Example{
-                "To search for Firefox or Chromium:",
-                "nix search nixpkgs 'firefox|chromium'"
-            },
-            Example{
-                "To search for packages containing 'git' and either 'frontend' or 'gui':",
-                "nix search nixpkgs git 'frontend|gui'"
-            }
-        };
+        return
+          #include "search.md"
+          ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
