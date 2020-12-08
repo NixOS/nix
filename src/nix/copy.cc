@@ -54,32 +54,11 @@ struct CmdCopy : StorePathsCommand
         return "copy paths between Nix stores";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To copy Firefox from the local store to a binary cache in file:///tmp/cache:",
-                "nix copy --to file:///tmp/cache $(type -p firefox)"
-            },
-            Example{
-                "To copy the entire current NixOS system closure to another machine via SSH:",
-                "nix copy --to ssh://server /run/current-system"
-            },
-            Example{
-                "To copy a closure from another machine via SSH:",
-                "nix copy --from ssh://server /nix/store/a6cnl93nk1wxnq84brbbwr6hxw9gp2w9-blender-2.79-rc2"
-            },
-#ifdef ENABLE_S3
-            Example{
-                "To copy Hello to an S3 binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs#hello"
-            },
-            Example{
-                "To copy Hello to an S3-compatible binary cache:",
-                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs#hello"
-            },
-#endif
-        };
+        return
+          #include "copy.md"
+          ;
     }
 
     Category category() override { return catSecondary; }
