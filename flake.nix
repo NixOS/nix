@@ -62,7 +62,7 @@
           lib.optionals stdenv.isLinux [
             "--with-sandbox-shell=${sh}/bin/busybox"
             "LDFLAGS=-fuse-ld=gold"
-          ];
+          ] ++ lib.optional (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isAarch64) "--disable-doc-gen";
 
 
         nativeBuildDeps =
@@ -70,15 +70,18 @@
             buildPackages.bison
             buildPackages.flex
             (lib.getBin buildPackages.lowdown)
-            # buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkgconfig
 
             # Tests
             buildPackages.git
-            # buildPackages.mercurial
             buildPackages.jq
+          ] ++ lib.optional (!(stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isAarch64)) [
+            buildPackages.mercurial
+
+            # Docs
+            buildPackages.mdbook
           ];
 
         buildDeps =
