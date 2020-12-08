@@ -50,7 +50,7 @@ R""(
 
 * Use a build environment previously recorded in a profile:
 
-  ```cosnole
+  ```console
   # nix develop /tmp/my-build-env
   ```
 
