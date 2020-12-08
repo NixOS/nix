@@ -11,7 +11,7 @@ Attrs jsonToAttrs(const nlohmann::json & json)
 
     for (auto & i : json.items()) {
         if (i.value().is_number())
-            attrs.emplace(i.key(), i.value().get<int64_t>());
+            attrs.emplace(i.key(), i.value().get<uint64_t>());
         else if (i.value().is_string())
             attrs.emplace(i.key(), i.value().get<std::string>());
         else if (i.value().is_boolean())

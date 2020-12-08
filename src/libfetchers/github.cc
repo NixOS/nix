@@ -195,14 +195,14 @@ struct GitArchiveInputScheme : InputScheme
 
         auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, url.headers);
 
-        input.attrs.insert_or_assign("lastModified", lastModified);
+        input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
         getCache()->add(
             store,
             immutableAttrs,
             {
                 {"rev", rev->gitRev()},
-                {"lastModified", lastModified}
+                {"lastModified", uint64_t(lastModified)}
             },
             tree.storePath,
             true);

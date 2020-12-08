@@ -104,7 +104,7 @@ static void fetchTree(
             else if (attr.value->type == tBool)
                 attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type == tInt)
-                attrs.emplace(attr.name, attr.value->integer);
+                attrs.emplace(attr.name, uint64_t(attr.value->integer));
             else
                 throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     attr.name, showType(*attr.value));

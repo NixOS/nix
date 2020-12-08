@@ -152,7 +152,7 @@ std::pair<Tree, time_t> downloadTarball(
     }
 
     Attrs infoAttrs({
-        {"lastModified", lastModified},
+        {"lastModified", uint64_t(lastModified)},
         {"etag", res.etag},
     });
 
