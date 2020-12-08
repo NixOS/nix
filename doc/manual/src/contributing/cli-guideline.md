@@ -58,12 +58,13 @@ them.
 
 This classification tries to separate commands in 3 categories in terms of
 their importance in regards to the new users. Users who are likely to be
-impacted the most by bad user experience. This does not mean that we will not
-take care of Tier3 commands, it means we will only put more helpful details for
-beginners into Tier1 commands.
+impacted the most by bad user experience.
 
-- **Tier1**: Commands used for our main use cases and most likely used by new
-  users. From Tier1 commands we expect attention to details, such as:
+- **Main commands**
+
+  Commands used for our main use cases and most likely used by new users. We
+  expect attention to details, such as:
+
     - Proper use of [colors](#colors), [emojis](#special-unicode-characters)
       and [aligning of text](#text-alignment).
     - [Autocomplete](#shell-completion) of options.
@@ -73,15 +74,31 @@ beginners into Tier1 commands.
       Nix ecosystem.
     - [Help pages](#help-is-essential) to be as good as we can write them
       pointing to external documentation and tutorials for more.
-- **Tier2**: Commands that are somewhere between Tier1 and Tier2, not really
-  exposing some implementation detail, but not something that we expect a user.
-  From Tier2 command we expect less attention to details, but still some:
+
+  Examples of such commands: `nix init`, `nix develop`, `nix build`, `nix run`,
+  ...
+
+- **Infrequently used commands**
+
+  From infrequently used commands we expect less attention to details, but
+  still some:
+
     - Proper use of [colors](#colors), [emojis](#special-unicode-characters)
       and [aligning of text](#text-alignment).
     - [Autocomplete](#shell-completion) of options.
-- **Tier3**: Commands that expose certain internal functionality of `nix`,
-  mostly used by other scripts.
+
+  Examples of such commands: `nix doctor`, `nix edit`, `nix eval`, ...
+
+- **Utility and scripting commands**
+
+  Commands that expose certain internal functionality of `nix`, mostly used by
+  other scripts.
+
     - [Autocomplete](#shell-completion) of options.
+
+  Examples of such commands: `nix store copy`, `nix hash base16`, `nix store
+  ping`, ...
+
 
 # Help is essential
 
@@ -249,9 +266,10 @@ Here are few examples of flag `OPTIONS`:
 
 ## Prompt when input not provided
 
-For **Tier1** commands we want command to improve the discoverability of
-possible input. A new user will most likely not know which `ARGUMENTS` and
-`OPTIONS` are required or which values are possible for those options.
+For *main commands* (as [per classification](#classification)) we want command
+to improve the discoverability of possible input. A new user will most likely
+not know which `ARGUMENTS` and `OPTIONS` are required or which values are
+possible for those options.
 
 In cases, the user might not provide the input or they provide wrong input,
 rather then show the error, prompt a user with an option to find and select
