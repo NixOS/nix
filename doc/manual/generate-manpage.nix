@@ -43,7 +43,7 @@ let
         if flag.category or "" != "config"
         then
           "  - `--${longName}`"
-          + (if flag ? shortName then " / `${flag.shortName}`" else "")
+          + (if flag ? shortName then " / `-${flag.shortName}`" else "")
           + (if flag ? labels then " " + (concatStringsSep " " (map (s: "*${s}*") flag.labels)) else "")
           + "  \n"
           + "    " + flag.description + "\n\n"
