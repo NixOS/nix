@@ -18,7 +18,8 @@
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" ];
+      darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
+      systems = linuxSystems ++ darwinSystems;
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
@@ -69,14 +70,14 @@
             buildPackages.bison
             buildPackages.flex
             (lib.getBin buildPackages.lowdown)
-            buildPackages.mdbook
+            # buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkgconfig
 
             # Tests
             buildPackages.git
-            buildPackages.mercurial
+            # buildPackages.mercurial
             buildPackages.jq
           ];
 
