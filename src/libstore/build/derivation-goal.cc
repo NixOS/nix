@@ -2872,6 +2872,8 @@ void DerivationGoal::registerOutputs()
         for (auto & i : drv->outputsAndOptPaths(worker.store)) {
             if (!i.second.second || !worker.store.isValidPath(*i.second.second))
                 allValid = false;
+            else
+                finalOutputs.insert_or_assign(i.first, *i.second.second);
         }
         if (allValid) return;
     }
