@@ -75,6 +75,8 @@ struct MixLs : virtual Args, MixJSON
 
         if (json) {
             JSONPlaceholder jsonRoot(std::cout);
+            if (showDirectory)
+                throw UsageError("'--directory' is useless with '--json'");
             listNar(jsonRoot, accessor, path, recursive);
         } else
             listText(accessor);
@@ -127,14 +129,11 @@ struct CmdLsNar : Command, MixLs
         expectArg("path", &path);
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To list a specific file in a NAR:",
-                "nix nar ls -l hello.nar /bin/hello"
-            },
-        };
+        return
+          #include "nar-ls.md"
+          ;
     }
 
     std::string description() override

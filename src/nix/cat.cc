@@ -62,6 +62,13 @@ struct CmdCatNar : StoreCommand, MixCat
         return "print the contents of a file inside a NAR file on stdout";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "nar-cat.md"
+          ;
+    }
+
     void run(ref<Store> store) override
     {
         cat(makeNarAccessor(make_ref<std::string>(readFile(narPath))));

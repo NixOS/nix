@@ -49,14 +49,11 @@ struct CmdDumpPath2 : Command
         return "serialise a path to stdout in NAR format";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To serialise directory 'foo' as a NAR:",
-                "nix nar dump-path ./foo"
-            },
-        };
+        return
+          #include "nar-dump-path.md"
+          ;
     }
 
     void run() override
