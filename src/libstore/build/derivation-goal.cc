@@ -899,10 +899,8 @@ void DerivationGoal::buildDone()
                 Logger::Fields{worker.store.printStorePath(drvPath)});
             PushActivity pact(act.id);
             StorePathSet outputPaths;
-            for (auto& [_, maybeOutPath] :
-                 worker.store.queryPartialDerivationOutputMap(drvPath)) {
-                if (maybeOutPath)
-                    outputPaths.insert(*maybeOutPath);
+            for (auto i : drv->outputs) {
+                outputPaths.insert(finalOutputs.at(i.first));
             }
             std::map<std::string, std::string> hookEnvironment = getEnv();
 
@@ -2874,6 +2872,8 @@ void DerivationGoal::registerOutputs()
         for (auto & i : drv->outputsAndOptPaths(worker.store)) {
             if (!i.second.second || !worker.store.isValidPath(*i.second.second))
                 allValid = false;
+            else
+                finalOutputs.insert_or_assign(i.first, *i.second.second);
         }
         if (allValid) return;
     }
