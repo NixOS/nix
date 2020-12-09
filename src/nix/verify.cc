@@ -35,18 +35,11 @@ struct CmdVerify : StorePathsCommand
         return "verify the integrity of store paths";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To verify the entire Nix store:",
-                "nix store verify --all"
-            },
-            Example{
-                "To check whether each path in the closure of Firefox has at least 2 signatures:",
-                "nix store verify -r -n2 --no-contents $(type -p firefox)"
-            },
-        };
+        return
+          #include "verify.md"
+          ;
     }
 
     void run(ref<Store> store, StorePaths storePaths) override
