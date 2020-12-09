@@ -94,19 +94,16 @@ struct CmdLsStore : StoreCommand, MixLs
         });
     }
 
-    Examples examples() override
-    {
-        return {
-            Example{
-                "To list the contents of a store path in a binary cache:",
-                "nix store ls --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
-            },
-        };
-    }
-
     std::string description() override
     {
         return "show information about a path in the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "store-ls.md"
+          ;
     }
 
     void run(ref<Store> store) override

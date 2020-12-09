@@ -11,14 +11,11 @@ struct CmdDumpPath : StorePathCommand
         return "serialise a store path to stdout in NAR format";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To get a NAR from the binary cache https://cache.nixos.org/:",
-                "nix store dump-path --store https://cache.nixos.org/ /nix/store/7crrmih8c52r8fbnqb933dxrsp44md93-glibc-2.25"
-            },
-        };
+        return
+          #include "store-dump-path.md"
+          ;
     }
 
     void run(ref<Store> store, const StorePath & storePath) override
