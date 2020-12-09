@@ -659,7 +659,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
     auto state(_state.lock());
     retrySQLite<void>([&]() {
         state->stmts->RegisterRealisedOutput.use()
-            (info.id.drvPath.to_string())
+            (info.id.strHash())
             (info.id.outputName)
             (printStorePath(info.outPath))
             .exec();
@@ -879,17 +879,18 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
 // Try to resolve the derivation at path `original`, with a caching layer
 // to make it more efficient
-std::optional<StorePath> cachedResolve(
-    LocalStore & store,
-    const StorePath & original)
+std::optional<Derivation> cachedResolve(
+    LocalStore& store,
+    const StorePath& original)
 {
+    // This is quite dirty and leaky, but will disappear once #4340 is merged
+    static Sync<std::map<StorePath, std::optional<Derivation>>> resolutionsCache;
     {
-        auto resolutions = drvPathResolutions.lock();
-        auto resolvedPathOptIter = resolutions->find(original);
-        if (resolvedPathOptIter != resolutions->end()) {
-            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
-            if (resolvedPathOpt)
-                return resolvedPathOpt;
+        auto resolutions = resolutionsCache.lock();
+        auto resolvedDrvIter = resolutions->find(original);
+        if (resolvedDrvIter != resolutions->end()) {
+            auto & [_, resolvedDrv] = *resolvedDrvIter;
+                return *resolvedDrv;
         }
     }
 
@@ -898,12 +899,9 @@ std::optional<StorePath> cachedResolve(
     auto attempt = drv.tryResolve(store);
     if (!attempt)
         return std::nullopt;
-    /* Just compute store path */
-    auto pathResolved =
-        writeDerivation(store, *std::move(attempt), NoRepair, true);
     /* Store in memo table. */
-    drvPathResolutions.lock()->insert_or_assign(original, pathResolved);
-    return pathResolved;
+    resolutionsCache.lock()->insert_or_assign(original, *attempt);
+    return *attempt;
 }
 
 std::map<std::string, std::optional<StorePath>>
@@ -933,26 +931,24 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath& path_)
 
     auto drv = readDerivation(path);
 
-    for (auto & output : drv.outputsAndOptPaths(*this)) {
-        outputs.emplace(output.first, std::nullopt);
-    }
-
     auto resolvedDrv = cachedResolve(*this, path);
 
-    if (!resolvedDrv)
+    if (!resolvedDrv) {
+        for (auto& [outputName, _] : drv.outputsAndOptPaths(*this)) {
+            if (!outputs.count(outputName))
+                outputs.emplace(outputName, std::nullopt);
+        }
         return outputs;
+    }
 
-    retrySQLite<void>([&]() {
-        auto state(_state.lock());
-        path = *resolvedDrv;
-        auto useQueryDerivationOutputs{
-            state->stmts->QueryAllRealisedOutputs.use()(path.to_string())};
-
-        while (useQueryDerivationOutputs.next())
-            outputs.insert_or_assign(
-                useQueryDerivationOutputs.getStr(0),
-                parseStorePath(useQueryDerivationOutputs.getStr(1)));
-    });
+    auto resolvedDrvHashes = staticOutputHashes(*this, *resolvedDrv);
+    for (auto& [outputName, hash] : resolvedDrvHashes) {
+        auto realisation = queryRealisation(DrvOutput{hash, outputName});
+        if (realisation)
+            outputs.insert_or_assign(outputName, realisation->outPath);
+        else
+            outputs.insert_or_assign(outputName, std::nullopt);
+    }
 
     return outputs;
 }
@@ -1695,12 +1691,11 @@ std::optional<const Realisation> LocalStore::queryRealisation(
     typedef std::optional<const Realisation> Ret;
     return retrySQLite<Ret>([&]() -> Ret {
         auto state(_state.lock());
-        auto use(state->stmts->QueryRealisedOutput.use()(id.drvPath.to_string())(
+        auto use(state->stmts->QueryRealisedOutput.use()(id.strHash())(
             id.outputName));
         if (!use.next())
             return std::nullopt;
         auto outputPath = parseStorePath(use.getStr(0));
-        auto resolvedDrv = StorePath(use.getStr(1));
         return Ret{
             Realisation{.id = id, .outPath = outputPath}};
     });

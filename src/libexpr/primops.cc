@@ -1107,7 +1107,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](UnknownHashes) {
+            [&](DeferredHash _) {
                 for (auto & i : outputs) {
                     drv.outputs.insert_or_assign(i,
                         DerivationOutput {

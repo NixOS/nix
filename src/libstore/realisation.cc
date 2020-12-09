@@ -7,18 +7,18 @@ namespace nix {
 MakeError(InvalidDerivationOutputId, Error);
 
 DrvOutput DrvOutput::parse(const std::string &strRep) {
-    const auto &[rawPath, outputs] = parsePathWithOutputs(strRep);
-    if (outputs.size() != 1)
+    size_t n = strRep.find("!");
+    if (n == strRep.npos)
         throw InvalidDerivationOutputId("Invalid derivation output id %s", strRep);
 
     return DrvOutput{
-        .drvPath = StorePath(rawPath),
-        .outputName = *outputs.begin(),
+        .drvHash = Hash::parseAnyPrefixed(strRep.substr(0, n)),
+        .outputName = strRep.substr(n+1),
     };
 }
 
 std::string DrvOutput::to_string() const {
-    return std::string(drvPath.to_string()) + "!" + outputName;
+    return strHash() + "!" + outputName;
 }
 
 nlohmann::json Realisation::toJSON() const {
