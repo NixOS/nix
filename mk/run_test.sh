@@ -15,7 +15,10 @@ if [ -t 1 ]; then
     normal="[m"
 fi
 (cd $(dirname $1) && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
-log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)"
+tmp=$(mktemp)
+cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) > $tmp 2>&1
+log="$(cat $tmp)"
+rm $tmp
 status=$?
 if [ $status -eq 0 ]; then
   echo "$post_run_msg [${green}PASS$normal]"
