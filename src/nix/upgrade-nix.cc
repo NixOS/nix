@@ -37,18 +37,11 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         return "upgrade Nix to the latest stable version";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To upgrade Nix to the latest stable version:",
-                "nix upgrade-nix"
-            },
-            Example{
-                "To upgrade Nix in a specific profile:",
-                "nix upgrade-nix -p /nix/var/nix/profiles/per-user/alice/profile"
-            },
-        };
+        return
+          #include "upgrade-nix.md"
+          ;
     }
 
     Category category() override { return catNixInstallation; }
