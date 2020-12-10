@@ -29,18 +29,11 @@ struct CmdShowDerivation : InstallablesCommand
         return "show the contents of a store derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show the store derivation that results from evaluating the Hello package:",
-                "nix show-derivation nixpkgs#hello"
-            },
-            Example{
-                "To show the full derivation graph (if available) that produced your NixOS system:",
-                "nix show-derivation -r /run/current-system"
-            },
-        };
+        return
+          #include "show-derivation.md"
+          ;
     }
 
     Category category() override { return catUtility; }
