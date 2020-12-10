@@ -409,7 +409,7 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
     for (auto & drvInfo : drvInfos) {
         res.push_back({
             state->store->parseStorePath(drvInfo.queryDrvPath()),
-            state->store->parseStorePath(drvInfo.queryOutPath()),
+            state->store->maybeParseStorePath(drvInfo.queryOutPath()),
             drvInfo.queryOutputName()
         });
     }
