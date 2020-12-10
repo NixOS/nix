@@ -29,16 +29,21 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
-
-void EvalState::forceValue(Value & v, const Pos & pos)
+void EvalState::evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos)
 {
     if (v.type == tThunk) {
         Env * env = v.thunk.env;
         Expr * expr = v.thunk.expr;
         try {
+            // tBlackhole indicates that any further forcing of this value should throw inf rec
+            // However, this only causes inf rec when the forcing happens *before* the value is assigned its final value
+            // Meaning that within the expr->eval you'd have to do `<evaluations>; v.type = <result>`
+            // However, if expressions implement their own infinite recursion check (like ExprOpUpdate!), it can do
+            //   `v.type = <something>; <evaluations>`
+            // Which means that the infinite recursion detection from this forceValue is prevented, since the tBlackhole is unset before the potentially recursive evaluations
             v.type = tBlackhole;
             //checkInterrupt();
-            expr->eval(*this, *env, v);
+            expr->evalWithStrategy(*this, *env, v, strat);
         } catch (...) {
             v.type = tThunk;
             v.thunk.env = env;
@@ -46,12 +51,30 @@ void EvalState::forceValue(Value & v, const Pos & pos)
             throw;
         }
     }
+    else if (v.type == tAttrs)
+        strat.handleAttrs(*this, v);
+    else if (v.type == tLazyUpdate || v.type == tLazyUpdateLeftBlackhole)
+        // TODO: positions are not as precise as they could be
+        reevalLazyUpdateWithStrategy(v, strat, pos, pos);
     else if (v.type == tApp)
-        callFunction(*v.app.left, *v.app.right, v, noPos);
+        callFunctionWithStrategy(*v.app.left, *v.app.right, v, strat, pos);
     else if (v.type == tBlackhole)
-        throwEvalError(pos, "infinite recursion encountered");
+        throwEvalError(pos, "infinite recursion encountered (tBlackhole in forceValue)");
 }
 
+void EvalState::forceValue(Value & v, const Pos & pos)
+{
+    evalValueWithStrategy(v, ForceEvalStrategy::getInstance(), pos);
+}
+
+Attr * EvalState::evalValueAttr(Value & v, const Symbol & name, const Pos & pos)
+{
+    // No need to set tBlackhole's here, because evaluating attributes of values doesn't require evaluation, and inf rec within lazyBinOps is handled by them directly
+
+    auto strat = AttrEvalStrategy(name);
+    evalValueWithStrategy(v, strat, pos);
+    return strat.getAttr();
+}
 
 inline void EvalState::forceAttrs(Value & v)
 {

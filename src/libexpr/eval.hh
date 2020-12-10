@@ -21,12 +21,15 @@ class StorePath;
 enum RepairFlag : bool;
 
 
-typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
+typedef void (* PrimOpForceFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v, EvalStrategy & strat);
 
 
 struct PrimOp
 {
-    PrimOpFun fun;
+    PrimOpForceFun fun;
+    PrimOpFun funStrat;
     size_t arity;
     Symbol name;
     std::vector<std::string> args;
@@ -161,6 +164,7 @@ public:
     /* Evaluate an expression read from the given file to normal
        form. Optionally enforce that the top-level expression is
        trivial (i.e. doesn't require arbitrary computation). */
+    void evalFileWithStrategy(const Path & path, Value & v, EvalStrategy & strat, bool mustBeTrivial = false);
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
     void resetFileCache();
@@ -174,6 +178,7 @@ public:
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
+    void evalWithStrategy(Expr * e, Value & v, EvalStrategy & strat);
     void eval(Expr * e, Value & v);
 
     /* Evaluation the expression, then verify that it has the expected
@@ -187,6 +192,10 @@ public:
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const Pos & pos = noPos);
+    inline void evalValueWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos = noPos);
+
+    /* Get an attribute of a value, or null if it doesn't exist */
+    inline Attr * evalValueAttr(Value & v, const Symbol & name, const Pos & pos);
 
     /* Force a value, then recursively force list elements and
        attributes. */
@@ -244,7 +253,7 @@ private:
     Value * addConstant(const string & name, Value & v);
 
     Value * addPrimOp(const string & name,
-        size_t arity, PrimOpFun primOp);
+        size_t arity, PrimOpForceFun primOp);
 
     Value * addPrimOp(PrimOp && primOp);
 
@@ -282,8 +291,9 @@ public:
 
     bool isFunctor(Value & fun);
 
+    void callFunctionWithStrategy(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
-    void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
+    void callPrimOp(Value & fun, Value & arg, Value & v, EvalStrategy & strat, const Pos & pos);
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
@@ -304,6 +314,11 @@ public:
     void mkPos(Value & v, Pos * pos);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
+
+    void updateAttrs(const Value & v1, const Value & v2, Value & v);
+
+    void createLazyUpdate(Value & v1, Value & v2, Value & v);
+    void reevalLazyUpdateWithStrategy(Value & v, EvalStrategy & strat, const Pos & pos1, const Pos & pos2);
 
     /* Print statistics. */
     void printStats();
@@ -337,13 +352,55 @@ private:
     typedef std::map<Pos, size_t> AttrSelects;
     AttrSelects attrSelects;
 
-    friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
+// An evaluation strategy, used to implement lazy attribute names
+// For lazy expressions, evaluation will run the strategy sequentially
+// on all its parts, and exit as soon as true is returned
+class EvalStrategy
+{
+public:
+    bool done = false;
+
+    // How this evaluation strategy handles attribute sets
+    // The passed v is a tAttrs and can be modified by this function
+    // Returns whether the value caused the evaluation strategy to be "done"
+    virtual void handleAttrs(EvalState & state, Value & v) = 0;
+};
+
+// An evaluation strategy that forces values into weak head normal form, so no
+// thunks or unapplied applications
+class ForceEvalStrategy : public EvalStrategy
+{
+private:
+    ForceEvalStrategy() { };
+
+public:
+    static ForceEvalStrategy & getInstance() {
+        static ForceEvalStrategy instance;
+        return instance;
+    };
+    void handleAttrs(EvalState & state, Value & v) override;
+};
+
+// An evaluation strategy that tries to only evaluate a specific attribute
+// and gives access to the result
+class AttrEvalStrategy : public EvalStrategy
+{
+private:
+    const Symbol & name;
+    Attr * attr = nullptr;
+
+public:
+    AttrEvalStrategy(const Symbol & name) : name(name) { };
+    void handleAttrs(EvalState & state, Value & v) override;
+    // Returns the attribute value if found, otherwise nullptr
+    Attr * getAttr() { return attr; };
+};
 
 /* Return a string representing the type of the value `v'. */
 string showType(ValueType type);

@@ -627,6 +627,18 @@ static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
     .fun = prim_genericClosure,
 });
 
+static void prim_lazyAttrUpdate(EvalState & state, const Pos & pos, Value * * args, Value & v, EvalStrategy & strat)
+{
+    state.createLazyUpdate(*args[0], *args[1], v);
+    state.reevalLazyUpdateWithStrategy(v, strat, pos, pos);
+}
+
+static RegisterPrimOp primop_lazyAttrUpdate(RegisterPrimOp::Info {
+    .name = "__lazyAttrUpdate",
+    .arity = 2,
+    .funStrat = prim_lazyAttrUpdate,
+});
+
 static RegisterPrimOp primop_abort({
     .name = "abort",
     .args = {"s"},
@@ -2007,10 +2019,9 @@ static RegisterPrimOp primop_attrValues({
 void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
-    state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
+    Attr * i = state.evalValueAttr(*args[1], state.symbols.create(attr), pos);
+    if (!i)
         throw EvalError({
             .hint = hintfmt("attribute '%1%' missing", attr),
             .errPos = pos
@@ -3500,7 +3511,7 @@ static RegisterPrimOp primop_splitVersion({
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpForceFun fun,
     std::optional<std::string> requiredFeature)
 {
     if (!primOps) primOps = new PrimOps;
@@ -3587,6 +3598,7 @@ void EvalState::createBaseEnv()
             if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
                 addPrimOp({
                     .fun = primOp.fun,
+                    .funStrat = primOp.funStrat,
                     .arity = std::max(primOp.args.size(), primOp.arity),
                     .name = symbols.create(primOp.name),
                     .args = std::move(primOp.args),

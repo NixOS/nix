@@ -55,7 +55,9 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 struct Env;
 struct Value;
 class EvalState;
+class EvalStrategy;
 struct StaticEnv;
+struct Attr;
 
 
 /* An attribute path is a sequence of attribute names. */
@@ -74,12 +76,28 @@ string showAttrPath(const AttrPath & attrPath);
 
 /* Abstract syntax of Nix expressions. */
 
+
 struct Expr
 {
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
-    virtual void eval(EvalState & state, Env & env, Value & v);
+
+    // Evaluates an expression with a given evaluation strategy
+    // The result should be put into v, which is uninitialized at first
+    // See EvalStrategy for what the return value indicates
+    virtual void evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat);
+
+    // Evaluates an expression with the ForceEvalStrategy evaluation strategy
+    // TODO: Inline?
+    void eval(EvalState & state, Env & env, Value & v);
+
+    // Evaluates an expression with the AttrEvalStrategy evaluation strategy,
+    // returning the resulting attribute value
+    // TODO: Inline?
+    Attr * evalAttr(EvalState & state, Env & env, Value & v, const Symbol & name);
+
+
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
 };
@@ -88,7 +106,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
-    void eval(EvalState & state, Env & env, Value & v); \
+    void evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
     void bindVars(const StaticEnv & env);
 
 struct ExprInt : Expr
@@ -302,7 +320,7 @@ struct ExprOpNot : Expr
         { \
             e1->bindVars(env); e2->bindVars(env); \
         } \
-        void eval(EvalState & state, Env & env, Value & v); \
+        void evalWithStrategy(EvalState & state, Env & env, Value & v, EvalStrategy & strat); \
     };
 
 MakeBinOp(ExprApp, "")

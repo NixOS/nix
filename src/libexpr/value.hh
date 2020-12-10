@@ -26,7 +26,9 @@ typedef enum {
     tPrimOp,
     tPrimOpApp,
     tExternal,
-    tFloat
+    tFloat,
+    tLazyUpdate,
+    tLazyUpdateLeftBlackhole,
 } ValueType;
 
 
@@ -91,6 +93,7 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 struct Value
 {
     ValueType type;
+
     union
     {
         NixInt integer;
@@ -132,6 +135,10 @@ struct Value
             Env * env;
             Expr * expr;
         } thunk;
+        struct {
+            Value * left;
+            Value * right;
+        } lazyUpdate;
         struct {
             Value * left, * right;
         } app;
