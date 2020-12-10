@@ -103,7 +103,7 @@ struct CmdShowDerivation : InstallablesCommand
                 }
             }
 
-            drvObj.attr("platform", drv.platform);
+            drvObj.attr("system", drv.platform);
             drvObj.attr("builder", drv.builder);
 
             {
