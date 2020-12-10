@@ -205,21 +205,14 @@ struct CmdHelp : Command
 
     std::string description() override
     {
-        return "show help about 'nix' or a particular subcommand";
+        return "show help about `nix` or a particular subcommand";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show help about 'nix' in general:",
-                "nix help"
-            },
-            Example{
-                "To show help about a particular subcommand:",
-                "nix help run"
-            },
-        };
+        return
+          #include "help.md"
+          ;
     }
 
     void run() override
