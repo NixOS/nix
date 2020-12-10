@@ -29,37 +29,14 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         return "query information about store paths";
     }
 
-    Category category() override { return catSecondary; }
-
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show the closure sizes of every path in the current NixOS system closure, sorted by size:",
-                "nix path-info -rS /run/current-system | sort -nk2"
-            },
-            Example{
-                "To show a package's closure size and all its dependencies with human readable sizes:",
-                "nix path-info -rsSh nixpkgs#rust"
-            },
-            Example{
-                "To check the existence of a path in a binary cache:",
-                "nix path-info -r /nix/store/7qvk5c91...-geeqie-1.1 --store https://cache.nixos.org/"
-            },
-            Example{
-                "To print the 10 most recently added paths (using --json and the jq(1) command):",
-                "nix path-info --json --all | jq -r 'sort_by(.registrationTime)[-11:-1][].path'"
-            },
-            Example{
-                "To show the size of the entire Nix store:",
-                "nix path-info --json --all | jq 'map(.narSize) | add'"
-            },
-            Example{
-                "To show every path whose closure is bigger than 1 GB, sorted by closure size:",
-                "nix path-info --json --all -S | jq 'map(select(.closureSize > 1e9)) | sort_by(.closureSize) | map([.path, .closureSize])'"
-            },
-        };
+        return
+          #include "path-info.md"
+          ;
     }
+
+    Category category() override { return catSecondary; }
 
     void printSize(uint64_t value)
     {
