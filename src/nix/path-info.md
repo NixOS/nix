@@ -73,7 +73,7 @@ R""(
   ```console
   # nix path-info --derivation nixpkgs#hello
   /nix/store/s6rn4jz1sin56rf4qj5b5v8jxjm32hlk-hello-2.10.drv
- ```
+  ```
 
 # Description
 
