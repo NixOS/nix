@@ -25,7 +25,7 @@ void EvalState::mkAttrs(Value & v, size_t capacity)
         return;
     }
     clearValue(v);
-    v.type = tAttrs;
+    v.setAttrs();
     v.attrs = allocBindings(capacity);
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;

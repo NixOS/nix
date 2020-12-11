@@ -107,6 +107,25 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 struct Value
 {
     ValueType type;
+
+    inline void setInt() { type = tInt; };
+    inline void setBool() { type = tBool; };
+    inline void setString() { type = tString; };
+    inline void setPath() { type = tPath; };
+    inline void setNull() { type = tNull; };
+    inline void setAttrs() { type = tAttrs; };
+    inline void setList1() { type = tList1; };
+    inline void setList2() { type = tList2; };
+    inline void setListN() { type = tListN; };
+    inline void setThunk() { type = tThunk; };
+    inline void setApp() { type = tApp; };
+    inline void setLambda() { type = tLambda; };
+    inline void setBlackhole() { type = tBlackhole; };
+    inline void setPrimOp() { type = tPrimOp; };
+    inline void setPrimOpApp() { type = tPrimOpApp; };
+    inline void setExternal() { type = tExternal; };
+    inline void setFloat() { type = tFloat; };
+
     union
     {
         NixInt integer;
@@ -223,7 +242,7 @@ static inline void clearValue(Value & v)
 static inline void mkInt(Value & v, NixInt n)
 {
     clearValue(v);
-    v.type = tInt;
+    v.setInt();
     v.integer = n;
 }
 
@@ -231,7 +250,7 @@ static inline void mkInt(Value & v, NixInt n)
 static inline void mkFloat(Value & v, NixFloat n)
 {
     clearValue(v);
-    v.type = tFloat;
+    v.setFloat();
     v.fpoint = n;
 }
 
@@ -239,7 +258,7 @@ static inline void mkFloat(Value & v, NixFloat n)
 static inline void mkBool(Value & v, bool b)
 {
     clearValue(v);
-    v.type = tBool;
+    v.setBool();
     v.boolean = b;
 }
 
@@ -247,13 +266,13 @@ static inline void mkBool(Value & v, bool b)
 static inline void mkNull(Value & v)
 {
     clearValue(v);
-    v.type = tNull;
+    v.setNull();
 }
 
 
 static inline void mkApp(Value & v, Value & left, Value & right)
 {
-    v.type = tApp;
+    v.setApp();
     v.app.left = &left;
     v.app.right = &right;
 }
@@ -261,7 +280,7 @@ static inline void mkApp(Value & v, Value & left, Value & right)
 
 static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
 {
-    v.type = tPrimOpApp;
+    v.setPrimOpApp();
     v.app.left = &left;
     v.app.right = &right;
 }
@@ -269,7 +288,7 @@ static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
 
 static inline void mkStringNoCopy(Value & v, const char * s)
 {
-    v.type = tString;
+    v.setString();
     v.string.s = s;
     v.string.context = 0;
 }
@@ -287,7 +306,7 @@ void mkString(Value & v, const char * s);
 static inline void mkPathNoCopy(Value & v, const char * s)
 {
     clearValue(v);
-    v.type = tPath;
+    v.setPath();
     v.path = s;
 }
 

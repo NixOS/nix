@@ -551,7 +551,7 @@ bool NixRepl::processLine(string line)
         {
             Expr * e = parseString(string(line, p + 1));
             Value & v(*state->allocValue());
-            v.type = tThunk;
+            v.setThunk();
             v.thunk.env = env;
             v.thunk.expr = e;
             addVarToScope(state->symbols.create(name), v);

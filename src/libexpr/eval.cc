@@ -431,7 +431,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     }
 
     clearValue(vEmptySet);
-    vEmptySet.type = tAttrs;
+    vEmptySet.setAttrs();
     vEmptySet.attrs = allocBindings(0);
 
     createBaseEnv();
@@ -548,7 +548,7 @@ Value * EvalState::addPrimOp(const string & name,
        the primop to a dummy value. */
     if (arity == 0) {
         auto vPrimOp = allocValue();
-        vPrimOp->type = tPrimOp;
+        vPrimOp->setPrimOp();
         vPrimOp->primOp = new PrimOp { .fun = primOp, .arity = 1, .name = sym };
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
@@ -556,7 +556,7 @@ Value * EvalState::addPrimOp(const string & name,
     }
 
     Value * v = allocValue();
-    v->type = tPrimOp;
+    v->setPrimOp();
     v->primOp = new PrimOp { .fun = primOp, .arity = arity, .name = sym };
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
@@ -572,7 +572,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     if (primOp.arity == 0) {
         primOp.arity = 1;
         auto vPrimOp = allocValue();
-        vPrimOp->type = tPrimOp;
+        vPrimOp->setPrimOp();
         vPrimOp->primOp = new PrimOp(std::move(primOp));
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
@@ -584,7 +584,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         primOp.name = symbols.create(std::string(primOp.name, 2));
 
     Value * v = allocValue();
-    v->type = tPrimOp;
+    v->setPrimOp();
     v->primOp = new PrimOp(std::move(primOp));
     staticBaseEnv.vars[envName] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
@@ -714,7 +714,7 @@ void mkString(Value & v, const char * s)
 
 Value & mkString(Value & v, std::string_view s, const PathSet & context)
 {
-    v.type = tString;
+    v.setString();
     v.string.s = dupStringWithLen(s.data(), s.size());
     v.string.context = 0;
     if (!context.empty()) {
@@ -794,11 +794,11 @@ void EvalState::mkList(Value & v, size_t size)
 {
     clearValue(v);
     if (size == 1)
-        v.type = tList1;
+        v.setList1();
     else if (size == 2)
-        v.type = tList2;
+        v.setList2();
     else {
-        v.type = tListN;
+        v.setListN();
         v.bigList.size = size;
         v.bigList.elems = size ? (Value * *) allocBytes(size * sizeof(Value *)) : 0;
     }
@@ -810,7 +810,7 @@ unsigned long nrThunks = 0;
 
 static inline void mkThunk(Value & v, Env & env, Expr * expr)
 {
-    v.type = tThunk;
+    v.setThunk();
     v.thunk.env = &env;
     v.thunk.expr = expr;
     nrThunks++;
@@ -1207,7 +1207,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 {
-    v.type = tLambda;
+    v.setLambda();
     v.lambda.env = &env;
     v.lambda.fun = this;
 }
@@ -1252,7 +1252,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
-        v.type = tPrimOpApp;
+        v.setPrimOpApp();
         v.primOpApp.left = fun2;
         v.primOpApp.right = &arg;
     }
