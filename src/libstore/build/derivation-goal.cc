@@ -2093,18 +2093,14 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
     }
 
     void registerDrvOutput(const Realisation & info) override
-    {
-        // XXX: Should we check for something here? Probably, but I'm not sure
-        // how
-        next->registerDrvOutput(info);
-    }
+    // XXX: This should probably be allowed as a no-op if the realisation
+    // corresponds to an allowed derivation
+    { throw Error("registerDrvOutput"); }
 
     std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
-    {
-        // XXX: Should we check for something here? Probably, but I'm not sure
-        // how
-        return next->queryRealisation(id);
-    }
+    // XXX: This should probably be allowed if the realisation corresponds to
+    // an allowed derivation
+    { throw Error("queryRealisation"); }
 
     void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
     {
