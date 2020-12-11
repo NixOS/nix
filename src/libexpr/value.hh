@@ -29,6 +29,22 @@ typedef enum {
     tFloat
 } ValueType;
 
+// This type abstracts over all actual value types in the language,
+// grouping together implementation details like tList*, different function
+// types, and types in non-normal form (so thunks and co.)
+typedef enum {
+    nThunk,
+    nInt,
+    nFloat,
+    nBool,
+    nString,
+    nPath,
+    nNull,
+    nAttrs,
+    nList,
+    nFunction,
+    nExternal
+} NormalType;
 
 class Bindings;
 struct Env;
@@ -146,6 +162,26 @@ struct Value
         ExternalValueBase * external;
         NixFloat fpoint;
     };
+
+    // Returns the normal type of a Value. This only returns nThunk if the
+    // Value hasn't been forceValue'd
+    inline NormalType normalType() const
+    {
+        switch (type) {
+            case tInt: return nInt;
+            case tBool: return nBool;
+            case tString: return nString;
+            case tPath: return nPath;
+            case tNull: return nNull;
+            case tAttrs: return nAttrs;
+            case tList1: case tList2: case tListN: return nList;
+            case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
+            case tExternal: return nExternal;
+            case tFloat: return nFloat;
+            case tThunk: case tApp: case tBlackhole: return nThunk;
+        }
+        abort();
+    }
 
     bool isList() const
     {

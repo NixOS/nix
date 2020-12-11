@@ -513,7 +513,7 @@ std::string AttrCursor::getString()
     auto & v = forceValue();
 
     if (v.type != tString && v.type != tPath)
-        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
+        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.normalType()));
 
     return v.type == tString ? v.string.s : v.path;
 }
@@ -548,7 +548,7 @@ string_t AttrCursor::getStringWithContext()
     else if (v.type == tPath)
         return {v.path, {}};
     else
-        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
+        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.normalType()));
 }
 
 bool AttrCursor::getBool()

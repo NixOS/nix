@@ -165,25 +165,20 @@ const Value *getPrimOp(const Value &v) {
     return primOp;
 }
 
-
-string showType(ValueType type)
+string showType(NormalType type)
 {
     switch (type) {
-        case tInt: return "an integer";
-        case tBool: return "a Boolean";
-        case tString: return "a string";
-        case tPath: return "a path";
-        case tNull: return "null";
-        case tAttrs: return "a set";
-        case tList1: case tList2: case tListN: return "a list";
-        case tThunk: return "a thunk";
-        case tApp: return "a function application";
-        case tLambda: return "a function";
-        case tBlackhole: return "a black hole";
-        case tPrimOp: return "a built-in function";
-        case tPrimOpApp: return "a partially applied built-in function";
-        case tExternal: return "an external value";
-        case tFloat: return "a float";
+        case nInt: return "an integer";
+        case nBool: return "a Boolean";
+        case nString: return "a string";
+        case nPath: return "a path";
+        case nNull: return "null";
+        case nAttrs: return "a set";
+        case nList: return "a list";
+        case nFunction: return "a function";
+        case nExternal: return "an external value";
+        case nFloat: return "a float";
+        case nThunk: return "a thunk";
     }
     abort();
 }
@@ -198,8 +193,11 @@ string showType(const Value & v)
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
+        case tThunk: return "a thunk";
+        case tApp: return "a function application";
+        case tBlackhole: return "a black hole";
     default:
-        return showType(v.type);
+        return showType(v.normalType());
     }
 }
 
