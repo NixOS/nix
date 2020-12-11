@@ -1621,7 +1621,12 @@ static RegisterPrimOp primop_toJSON({
 static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string s = state.forceStringNoCtx(*args[0], pos);
-    parseJSON(state, s, v);
+    try {
+        parseJSON(state, s, v);
+    } catch (JSONParseError &e) {
+        e.addTrace(pos, "while decoding a JSON string");
+        throw e;
+    }
 }
 
 static RegisterPrimOp primop_fromJSON({
