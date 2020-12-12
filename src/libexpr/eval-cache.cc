@@ -390,14 +390,14 @@ Value & AttrCursor::forceValue()
     }
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
-        if (v.type == tString)
+        if (v.normalType() == nString)
             cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
                            string_t{v.string.s, {}}};
-        else if (v.type == tPath)
+        else if (v.normalType() == nPath)
             cachedValue = {root->db->setString(getKey(), v.path), v.path};
-        else if (v.type == tBool)
+        else if (v.normalType() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
-        else if (v.type == tAttrs)
+        else if (v.normalType() == nAttrs)
             ; // FIXME: do something?
         else
             cachedValue = {root->db->setMisc(getKey()), misc_t()};
@@ -442,7 +442,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
 
     auto & v = forceValue();
 
-    if (v.type != tAttrs)
+    if (v.normalType() != nAttrs)
         return nullptr;
         //throw TypeError("'%s' is not an attribute set", getAttrPathStr());
 
@@ -512,10 +512,10 @@ std::string AttrCursor::getString()
 
     auto & v = forceValue();
 
-    if (v.type != tString && v.type != tPath)
+    if (v.normalType() != nString && v.normalType() != nPath)
         throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.normalType()));
 
-    return v.type == tString ? v.string.s : v.path;
+    return v.normalType() == nString ? v.string.s : v.path;
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -543,9 +543,9 @@ string_t AttrCursor::getStringWithContext()
 
     auto & v = forceValue();
 
-    if (v.type == tString)
+    if (v.normalType() == nString)
         return {v.string.s, v.getContext()};
-    else if (v.type == tPath)
+    else if (v.normalType() == nPath)
         return {v.path, {}};
     else
         throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.normalType()));
@@ -567,7 +567,7 @@ bool AttrCursor::getBool()
 
     auto & v = forceValue();
 
-    if (v.type != tBool)
+    if (v.normalType() != nBool)
         throw TypeError("'%s' is not a Boolean", getAttrPathStr());
 
     return v.boolean;
@@ -589,7 +589,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
 
     auto & v = forceValue();
 
-    if (v.type != tAttrs)
+    if (v.normalType() != nAttrs)
         throw TypeError("'%s' is not an attribute set", getAttrPathStr());
 
     std::vector<Symbol> attrs;

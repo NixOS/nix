@@ -356,24 +356,20 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     string t;
-    switch (args[0]->type) {
-        case tInt: t = "int"; break;
-        case tBool: t = "bool"; break;
-        case tString: t = "string"; break;
-        case tPath: t = "path"; break;
-        case tNull: t = "null"; break;
-        case tAttrs: t = "set"; break;
-        case tList1: case tList2: case tListN: t = "list"; break;
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
-            t = "lambda";
-            break;
-        case tExternal:
+    switch (args[0]->normalType()) {
+        case nInt: t = "int"; break;
+        case nBool: t = "bool"; break;
+        case nString: t = "string"; break;
+        case nPath: t = "path"; break;
+        case nNull: t = "null"; break;
+        case nAttrs: t = "set"; break;
+        case nList: t = "list"; break;
+        case nFunction: t = "lambda"; break;
+        case nExternal:
             t = args[0]->external->typeOf();
             break;
-        case tFloat: t = "float"; break;
-        default: abort();
+        case nFloat: t = "float"; break;
+        case nThunk: abort();
     }
     mkString(v, state.symbols.create(t));
 }
@@ -393,7 +389,7 @@ static RegisterPrimOp primop_typeOf({
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tNull);
+    mkBool(v, args[0]->normalType() == nNull);
 }
 
 static RegisterPrimOp primop_isNull({
@@ -413,18 +409,7 @@ static RegisterPrimOp primop_isNull({
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    bool res;
-    switch (args[0]->type) {
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
-            res = true;
-            break;
-        default:
-            res = false;
-            break;
-    }
-    mkBool(v, res);
+    mkBool(v, args[0]->normalType() == nFunction);
 }
 
 static RegisterPrimOp primop_isFunction({
@@ -440,7 +425,7 @@ static RegisterPrimOp primop_isFunction({
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tInt);
+    mkBool(v, args[0]->normalType() == nInt);
 }
 
 static RegisterPrimOp primop_isInt({
@@ -456,7 +441,7 @@ static RegisterPrimOp primop_isInt({
 static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tFloat);
+    mkBool(v, args[0]->normalType() == nFloat);
 }
 
 static RegisterPrimOp primop_isFloat({
@@ -472,7 +457,7 @@ static RegisterPrimOp primop_isFloat({
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tString);
+    mkBool(v, args[0]->normalType() == nString);
 }
 
 static RegisterPrimOp primop_isString({
@@ -488,7 +473,7 @@ static RegisterPrimOp primop_isString({
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tBool);
+    mkBool(v, args[0]->normalType() == nBool);
 }
 
 static RegisterPrimOp primop_isBool({
@@ -504,7 +489,7 @@ static RegisterPrimOp primop_isBool({
 static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tPath);
+    mkBool(v, args[0]->normalType() == nPath);
 }
 
 static RegisterPrimOp primop_isPath({
@@ -520,20 +505,20 @@ struct CompareValues
 {
     bool operator () (const Value * v1, const Value * v2) const
     {
-        if (v1->type == tFloat && v2->type == tInt)
+        if (v1->normalType() == nFloat && v2->normalType() == nInt)
             return v1->fpoint < v2->integer;
-        if (v1->type == tInt && v2->type == tFloat)
+        if (v1->normalType() == nInt && v2->normalType() == nFloat)
             return v1->integer < v2->fpoint;
-        if (v1->type != v2->type)
+        if (v1->normalType() != v2->normalType())
             throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
-        switch (v1->type) {
-            case tInt:
+        switch (v1->normalType()) {
+            case nInt:
                 return v1->integer < v2->integer;
-            case tFloat:
+            case nFloat:
                 return v1->fpoint < v2->fpoint;
-            case tString:
+            case nString:
                 return strcmp(v1->string.s, v2->string.s) < 0;
-            case tPath:
+            case nPath:
                 return strcmp(v1->path, v2->path) < 0;
             default:
                 throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
@@ -777,7 +762,7 @@ static RegisterPrimOp primop_deepSeq({
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    if (args[0]->type == tString)
+    if (args[0]->normalType() == nString)
         printError("trace: %1%", args[0]->string.s);
     else
         printError("trace: %1%", *args[0]);
@@ -902,7 +887,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
             if (ignoreNulls) {
                 state.forceValue(*i->value, pos);
-                if (i->value->type == tNull) continue;
+                if (i->value->normalType() == nNull) continue;
             }
 
             if (i->name == state.sContentAddressed) {
@@ -1308,7 +1293,7 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
 {
     PathSet context;
     Path dir = dirOf(state.coerceToString(pos, *args[0], context, false, false));
-    if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
+    if (args[0]->normalType() == nPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
 }
 
 static RegisterPrimOp primop_dirOf({
@@ -1808,7 +1793,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         });
 
     state.forceValue(*args[0], pos);
-    if (args[0]->type != tLambda)
+    if (args[0]->normalType() != nFunction)
         throw TypeError({
             .hint = hintfmt(
                 "first argument in call to 'filterSource' is not a function but %1%",
@@ -2074,7 +2059,7 @@ static RegisterPrimOp primop_hasAttr({
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tAttrs);
+    mkBool(v, args[0]->normalType() == nAttrs);
 }
 
 static RegisterPrimOp primop_isAttrs({
@@ -2337,7 +2322,7 @@ static RegisterPrimOp primop_mapAttrs({
 static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->isList());
+    mkBool(v, args[0]->normalType() == nList);
 }
 
 static RegisterPrimOp primop_isList({
@@ -2831,7 +2816,7 @@ static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
+    if (args[0]->normalType() == nFloat || args[1]->normalType() == nFloat)
         mkFloat(v, state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
     else
         mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
@@ -2850,7 +2835,7 @@ static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
+    if (args[0]->normalType() == nFloat || args[1]->normalType() == nFloat)
         mkFloat(v, state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
     else
         mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
@@ -2869,7 +2854,7 @@ static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
+    if (args[0]->normalType() == nFloat || args[1]->normalType() == nFloat)
         mkFloat(v, state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
     else
         mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
@@ -2896,7 +2881,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
             .errPos = pos
         });
 
-    if (args[0]->type == tFloat || args[1]->type == tFloat) {
+    if (args[0]->normalType() == nFloat || args[1]->normalType() == nFloat) {
         mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
     } else {
         NixInt i1 = state.forceInt(*args[0], pos);

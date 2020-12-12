@@ -85,25 +85,25 @@ static void fetchTree(
 
     state.forceValue(*args[0]);
 
-    if (args[0]->type == tAttrs) {
+    if (args[0]->normalType() == nAttrs) {
         state.forceAttrs(*args[0], pos);
 
         fetchers::Attrs attrs;
 
         for (auto & attr : *args[0]->attrs) {
             state.forceValue(*attr.value);
-            if (attr.value->type == tPath || attr.value->type == tString)
+            if (attr.value->normalType() == nPath || attr.value->normalType() == nString)
                 addURI(
                     state,
                     attrs,
                     attr.name,
                     state.coerceToString(*attr.pos, *attr.value, context, false, false)
                 );
-            else if (attr.value->type == tString)
+            else if (attr.value->normalType() == nString)
                 addURI(state, attrs, attr.name, attr.value->string.s);
-            else if (attr.value->type == tBool)
+            else if (attr.value->normalType() == nBool)
                 attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
-            else if (attr.value->type == tInt)
+            else if (attr.value->normalType() == nInt)
                 attrs.emplace(attr.name, attr.value->integer);
             else
                 throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
@@ -163,7 +163,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     state.forceValue(*args[0]);
 
-    if (args[0]->type == tAttrs) {
+    if (args[0]->normalType() == nAttrs) {
 
         state.forceAttrs(*args[0], pos);
 

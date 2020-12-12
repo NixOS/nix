@@ -128,7 +128,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
     if (!outTI->isList()) throw errMsg;
     Outputs result;
     for (auto i = outTI->listElems(); i != outTI->listElems() + outTI->listSize(); ++i) {
-        if ((*i)->type != tString) throw errMsg;
+        if ((*i)->normalType() != nString) throw errMsg;
         auto out = outputs.find((*i)->string.s);
         if (out == outputs.end()) throw errMsg;
         result.insert(*out);
@@ -172,20 +172,20 @@ StringSet DrvInfo::queryMetaNames()
 bool DrvInfo::checkMeta(Value & v)
 {
     state->forceValue(v);
-    if (v.isList()) {
+    if (v.normalType() == nList) {
         for (unsigned int n = 0; n < v.listSize(); ++n)
             if (!checkMeta(*v.listElems()[n])) return false;
         return true;
     }
-    else if (v.type == tAttrs) {
+    else if (v.normalType() == nAttrs) {
         Bindings::iterator i = v.attrs->find(state->sOutPath);
         if (i != v.attrs->end()) return false;
         for (auto & i : *v.attrs)
             if (!checkMeta(*i.value)) return false;
         return true;
     }
-    else return v.type == tInt || v.type == tBool || v.type == tString ||
-                v.type == tFloat;
+    else return v.normalType() == nInt || v.normalType() == nBool || v.normalType() == nString ||
+                v.normalType() == nFloat;
 }
 
 
@@ -201,7 +201,7 @@ Value * DrvInfo::queryMeta(const string & name)
 string DrvInfo::queryMetaString(const string & name)
 {
     Value * v = queryMeta(name);
-    if (!v || v->type != tString) return "";
+    if (!v || v->normalType() != nString) return "";
     return v->string.s;
 }
 
@@ -210,8 +210,8 @@ NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type == tInt) return v->integer;
-    if (v->type == tString) {
+    if (v->normalType() == nInt) return v->integer;
+    if (v->normalType() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
         NixInt n;
@@ -224,8 +224,8 @@ NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type == tFloat) return v->fpoint;
-    if (v->type == tString) {
+    if (v->normalType() == nFloat) return v->fpoint;
+    if (v->normalType() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
         NixFloat n;
@@ -239,8 +239,8 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type == tBool) return v->boolean;
-    if (v->type == tString) {
+    if (v->normalType() == nBool) return v->boolean;
+    if (v->normalType() == nString) {
         /* Backwards compatibility with before we had support for
            Boolean meta fields. */
         if (strcmp(v->string.s, "true") == 0) return true;
@@ -331,7 +331,7 @@ static void getDerivations(EvalState & state, Value & vIn,
     /* Process the expression. */
     if (!getDerivation(state, v, pathPrefix, drvs, done, ignoreAssertionFailures)) ;
 
-    else if (v.type == tAttrs) {
+    else if (v.normalType() == nAttrs) {
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
@@ -353,7 +353,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                 /* If the value of this attribute is itself a set,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
-                if (i->value->type == tAttrs) {
+                if (i->value->normalType() == nAttrs) {
                     Bindings::iterator j = i->value->attrs->find(state.sRecurseForDerivations);
                     if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos))
                         getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
@@ -362,7 +362,7 @@ static void getDerivations(EvalState & state, Value & vIn,
         }
     }
 
-    else if (v.isList()) {
+    else if (v.normalType() == nList) {
         for (unsigned int n = 0; n < v.listSize(); ++n) {
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
             if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))

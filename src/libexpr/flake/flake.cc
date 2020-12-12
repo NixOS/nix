@@ -120,7 +120,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, nString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
             } else {
-                if (attr.value->type == tString)
+                if (attr.value->normalType() == nString)
                     attrs.emplace(attr.name, attr.value->string.s);
                 else
                     throw TypeError("flake input attribute '%s' is %s while a string is expected",
@@ -235,17 +235,17 @@ static Flake getFlake(
 
         for (auto & setting : *nixConfig->value->attrs) {
             forceTrivialValue(state, *setting.value, *setting.pos);
-            if (setting.value->type == tString)
+            if (setting.value->normalType() == nString)
                 flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
-            else if (setting.value->type == tInt)
+            else if (setting.value->normalType() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
-            else if (setting.value->type == tBool)
+            else if (setting.value->normalType() == nBool)
                 flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
-            else if (setting.value->isList()) {
+            else if (setting.value->normalType() == nList) {
                 std::vector<std::string> ss;
                 for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
                     auto elem = setting.value->listElems()[n];
-                    if (elem->type != tString)
+                    if (elem->normalType() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             setting.name, showType(*setting.value));
                     ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
