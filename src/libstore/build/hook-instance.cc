@@ -37,7 +37,7 @@ HookInstance::HookInstance()
             throw SysError("dupping builder's stdout/stderr");
 
         Strings args = {
-            std::string(baseNameOf(settings.buildHook.get())),
+            std::string(settings.buildHook.get()),
             std::to_string(verbosity),
         };
 

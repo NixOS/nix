@@ -2804,13 +2804,13 @@ void DerivationGoal::runChild()
                 args.push_back(drv->builder);
             } else {
                 builder = drv->builder.c_str();
-                args.push_back(std::string(baseNameOf(drv->builder)));
+                args.push_back(std::string(drv->builder));
             }
         }
 #else
         else {
             builder = drv->builder.c_str();
-            args.push_back(std::string(baseNameOf(drv->builder)));
+            args.push_back(std::string(drv->builder));
         }
 #endif
 
