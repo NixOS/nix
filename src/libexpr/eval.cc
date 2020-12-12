@@ -158,10 +158,10 @@ std::ostream & operator << (std::ostream & str, const Value & v)
 
 const Value *getPrimOp(const Value &v) {
     const Value * primOp = &v;
-    while (primOp->type == tPrimOpApp) {
+    while (primOp->isPrimOpApp()) {
         primOp = primOp->primOpApp.left;
     }
-    assert(primOp->type == tPrimOp);
+    assert(primOp->isPrimOp());
     return primOp;
 }
 
@@ -601,9 +601,9 @@ Value & EvalState::getBuiltin(const string & name)
 
 std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
-    if (v.type == tPrimOp || v.type == tPrimOpApp) {
+    if (v.isPrimOp() || v.isPrimOpApp()) {
         auto v2 = &v;
-        while (v2->type == tPrimOpApp)
+        while (v2->isPrimOpApp())
             v2 = v2->primOpApp.left;
         if (v2->primOp->doc)
             return Doc {
@@ -1227,11 +1227,11 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     /* Figure out the number of arguments still needed. */
     size_t argsDone = 0;
     Value * primOp = &fun;
-    while (primOp->type == tPrimOpApp) {
+    while (primOp->isPrimOpApp()) {
         argsDone++;
         primOp = primOp->primOpApp.left;
     }
-    assert(primOp->type == tPrimOp);
+    assert(primOp->isPrimOp());
     auto arity = primOp->primOp->arity;
     auto argsLeft = arity - argsDone;
 
@@ -1242,7 +1242,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         Value * vArgs[arity];
         auto n = arity - 1;
         vArgs[n--] = &arg;
-        for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
+        for (Value * arg = &fun; arg->isPrimOpApp(); arg = arg->primOpApp.left)
             vArgs[n--] = arg->primOpApp.right;
 
         /* And call the primop. */
@@ -1264,7 +1264,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     forceValue(fun, pos);
 
-    if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
+    if (fun.isPrimOp() || fun.isPrimOpApp()) {
         callPrimOp(fun, arg, v, pos);
         return;
     }
@@ -1285,7 +1285,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
       }
     }
 
-    if (fun.type != tLambda)
+    if (!fun.isLambda())
         throwTypeError(pos, "attempt to call something which is not a function but %1%", fun);
 
     ExprLambda & lambda(*fun.lambda.fun);
@@ -1378,7 +1378,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         }
     }
 
-    if (fun.type != tLambda || !fun.lambda.fun->matchAttrs) {
+    if (!fun.isLambda() || !fun.lambda.fun->matchAttrs) {
         res = fun;
         return;
     }

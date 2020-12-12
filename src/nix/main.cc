@@ -272,7 +272,7 @@ void mainWrapped(int argc, char * * argv)
         auto builtins = state.baseEnv.values[0]->attrs;
         for (auto & builtin : *builtins) {
             auto b = nlohmann::json::object();
-            if (builtin.value->type != tPrimOp) continue;
+            if (!builtin.value->isPrimOp()) continue;
             auto primOp = builtin.value->primOp;
             if (!primOp->doc) continue;
             b["arity"] = primOp->arity;

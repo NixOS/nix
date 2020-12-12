@@ -73,7 +73,7 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
 static void forceTrivialValue(EvalState & state, Value & value, const Pos & pos)
 {
-    if (value.type == tThunk && value.isTrivial())
+    if (value.isThunk() && value.isTrivial())
         state.forceValue(value, pos);
 }
 
@@ -216,7 +216,7 @@ static Flake getFlake(
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         expectType(state, nFunction, *outputs->value, *outputs->pos);
 
-        if (outputs->value->type == tLambda && outputs->value->lambda.fun->matchAttrs) {
+        if (outputs->value->isLambda() && outputs->value->lambda.fun->matchAttrs) {
             for (auto & formal : outputs->value->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {

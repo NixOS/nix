@@ -126,6 +126,20 @@ struct Value
     inline void setExternal() { type = tExternal; };
     inline void setFloat() { type = tFloat; };
 
+    // Functions needed to distinguish the type
+    // These should be removed eventually, by putting the functionality that's
+    // needed by callers into methods of this type
+
+    // normalType() == nThunk
+    inline bool isThunk() const { return type == tThunk; };
+    inline bool isApp() const { return type == tApp; };
+    inline bool isBlackhole() const { return type == tBlackhole; };
+
+    // normalType() == nFunction
+    inline bool isLambda() const { return type == tLambda; };
+    inline bool isPrimOp() const { return type == tPrimOp; };
+    inline bool isPrimOpApp() const { return type == tPrimOpApp; };
+
     union
     {
         NixInt integer;

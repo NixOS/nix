@@ -450,7 +450,7 @@ bool NixRepl::processLine(string line)
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
             pos.file = state->symbols.create(filename);
-        } else if (v.type == tLambda) {
+        } else if (v.isLambda()) {
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
@@ -760,13 +760,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nFunction:
-        if (v.type == tLambda) {
+        if (v.isLambda()) {
             std::ostringstream s;
             s << v.lambda.fun->pos;
             str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
-        } else if (v.type == tPrimOp) {
+        } else if (v.isPrimOp()) {
             str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
-        } else if (v.type == tPrimOpApp) {
+        } else if (v.isPrimOpApp()) {
             str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
         } else {
             abort();

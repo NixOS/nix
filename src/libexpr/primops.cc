@@ -2239,11 +2239,11 @@ static RegisterPrimOp primop_catAttrs({
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    if (args[0]->type == tPrimOpApp || args[0]->type == tPrimOp) {
+    if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
         state.mkAttrs(v, 0);
         return;
     }
-    if (args[0]->type != tLambda)
+    if (!args[0]->isLambda())
         throw TypeError({
             .hint = hintfmt("'functionArgs' requires a function"),
             .errPos = pos
@@ -2674,7 +2674,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
-        if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
+        if (args[0]->isPrimOp() && args[0]->primOp->fun == prim_lessThan)
             return CompareValues()(a, b);
 
         Value vTmp1, vTmp2;

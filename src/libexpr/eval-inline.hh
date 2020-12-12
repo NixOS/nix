@@ -32,7 +32,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
-    if (v.type == tThunk) {
+    if (v.isThunk()) {
         Env * env = v.thunk.env;
         Expr * expr = v.thunk.expr;
         try {
@@ -46,9 +46,9 @@ void EvalState::forceValue(Value & v, const Pos & pos)
             throw;
         }
     }
-    else if (v.type == tApp)
+    else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
-    else if (v.type == tBlackhole)
+    else if (v.isBlackhole())
         throwEvalError(pos, "infinite recursion encountered");
 }
 
