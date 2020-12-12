@@ -68,7 +68,7 @@ RootValue allocRootValue(Value * v)
 }
 
 
-static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
+void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
     checkInterrupt();
 

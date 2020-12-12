@@ -106,7 +106,13 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
 struct Value
 {
+private:
     ValueType type;
+
+friend std::string showType(const Value & v);
+friend void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v);
+
+public:
 
     inline void setInt() { type = tInt; };
     inline void setBool() { type = tBool; };
