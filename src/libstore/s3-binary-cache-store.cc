@@ -166,7 +166,8 @@ S3Helper::FileTransferResult S3Helper::getObject(
             dynamic_cast<std::stringstream &>(result.GetBody()).str());
 
     } catch (S3Error & e) {
-        if (e.err != Aws::S3::S3Errors::NO_SUCH_KEY) throw;
+        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) &&
+            (e.err != Aws::S3::S3Errors::ACCESS_DENIED)) throw;
     }
 
     auto now2 = std::chrono::steady_clock::now();
