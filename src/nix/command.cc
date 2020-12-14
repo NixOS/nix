@@ -54,7 +54,7 @@ void StoreCommand::run()
     run(getStore());
 }
 
-StorePathsCommand::StorePathsCommand(bool recursive)
+RealisedPathsCommand::RealisedPathsCommand(bool recursive)
     : recursive(recursive)
 {
     if (recursive)
@@ -81,29 +81,39 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     });
 }
 
-void StorePathsCommand::run(ref<Store> store)
+void RealisedPathsCommand::run(ref<Store> store)
 {
-    StorePaths storePaths;
-
+    std::vector<RealisedPath> paths;
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
+        // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p);
-    }
-
-    else {
-        for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
-            storePaths.push_back(p);
-
+            paths.push_back(p);
+    } else {
+        auto pathSet = toRealisedPaths(store, realiseMode, operateOn, installables);
         if (recursive) {
-            StorePathSet closure;
-            store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, false);
-            storePaths.clear();
-            for (auto & p : closure)
-                storePaths.push_back(p);
+            auto roots = std::move(pathSet);
+            pathSet = {};
+            RealisedPath::closure(*store, roots, pathSet);
         }
+        for (auto & path : pathSet)
+            paths.push_back(path);
     }
+
+    run(store, std::move(paths));
+}
+
+StorePathsCommand::StorePathsCommand(bool recursive)
+    : RealisedPathsCommand(recursive)
+{
+}
+
+void StorePathsCommand::run(ref<Store> store, std::vector<RealisedPath> paths)
+{
+    StorePaths storePaths;
+    for (auto & p : paths)
+        storePaths.push_back(p.path());
 
     run(store, std::move(storePaths));
 }

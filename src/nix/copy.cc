@@ -16,6 +16,8 @@ struct CmdCopy : StorePathsCommand
 
     SubstituteFlag substitute = NoSubstitute;
 
+    using StorePathsCommand::run;
+
     CmdCopy()
         : StorePathsCommand(true)
     {
