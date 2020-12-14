@@ -493,8 +493,9 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
-            || fullDrv.type() == DerivationType::DeferredInputAddressed) {
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") &&
+            ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
+            || fullDrv.type() == DerivationType::DeferredInputAddressed)) {
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
                aliasing that resolved derivation goal */
@@ -2094,6 +2095,20 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
         /* Nothing to be done; 'path' must already be valid. */
     }
 
+    void registerDrvOutput(const Realisation & info) override
+    {
+        if (!goal.isAllowed(info.id.drvPath))
+            throw InvalidPath("cannot register unknown drv output '%s' in recursive Nix", printStorePath(info.id.drvPath));
+        next->registerDrvOutput(info);
+    }
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
+    {
+        if (!goal.isAllowed(id.drvPath))
+            throw InvalidPath("cannot query the output info for unknown derivation '%s' in recursive Nix", printStorePath(id.drvPath));
+        return next->queryRealisation(id);
+    }
+
     void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
@@ -3391,9 +3406,11 @@ void DerivationGoal::registerOutputs()
         drvPathResolved = writeDerivation(worker.store, drv2);
     }
 
-    if (useDerivation || isCaFloating)
-        for (auto & [outputName, newInfo] : infos)
-            worker.store.linkDeriverToPath(drvPathResolved, outputName, newInfo.path);
+    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+        for (auto& [outputName, newInfo] : infos)
+            worker.store.registerDrvOutput(Realisation{
+                .id = DrvOutput{drvPathResolved, outputName},
+                .outPath = newInfo.path});
 }
 
 

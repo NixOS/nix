@@ -60,6 +60,9 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
     { unsupported("buildDerivation"); }
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
+    { unsupported("queryRealisation"); }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
