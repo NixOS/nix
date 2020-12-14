@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : RealisedPathsCommand
 {
     std::string srcUri, dstUri;
 
@@ -16,10 +16,10 @@ struct CmdCopy : StorePathsCommand
 
     SubstituteFlag substitute = NoSubstitute;
 
-    using StorePathsCommand::run;
+    using RealisedPathsCommand::run;
 
     CmdCopy()
-        : StorePathsCommand(true)
+        : RealisedPathsCommand(true)
     {
         addFlag({
             .longName = "from",
@@ -75,14 +75,15 @@ struct CmdCopy : StorePathsCommand
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
-        StorePathsCommand::run(store);
+        RealisedPathsCommand::run(store);
     }
 
-    void run(ref<Store> srcStore, StorePaths storePaths) override
+    void run(ref<Store> srcStore, std::vector<RealisedPath> paths) override
     {
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, StorePathSet(storePaths.begin(), storePaths.end()),
+        copyPaths(
+            srcStore, dstStore, RealisedPath::Set(paths.begin(), paths.end()),
             NoRepair, checkSigs, substitute);
     }
 };
