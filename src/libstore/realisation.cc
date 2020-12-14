@@ -46,4 +46,35 @@ Realisation Realisation::fromJSON(
     };
 }
 
+StorePath RealisedPath::path() const {
+    return visit([](auto && arg) { return arg.getPath(); });
+}
+
+void RealisedPath::closure(
+    Store& store,
+    const RealisedPath::Set& startPaths,
+    RealisedPath::Set& ret)
+{
+    // FIXME: This only builds the store-path closure, not the real realisation
+    // closure
+    StorePathSet initialStorePaths, pathsClosure;
+    for (auto& path : startPaths)
+        initialStorePaths.insert(path.path());
+    store.computeFSClosure(initialStorePaths, pathsClosure);
+    ret.insert(startPaths.begin(), startPaths.end());
+    ret.insert(pathsClosure.begin(), pathsClosure.end());
+}
+
+void RealisedPath::closure(Store& store, RealisedPath::Set& ret) const
+{
+    RealisedPath::closure(store, {*this}, ret);
+}
+
+RealisedPath::Set RealisedPath::closure(Store& store) const
+{
+    RealisedPath::Set ret;
+    closure(store, ret);
+    return ret;
+}
+
 } // namespace nix
