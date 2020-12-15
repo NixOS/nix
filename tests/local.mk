@@ -38,6 +38,7 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   content-addressed.sh \
+  nix-copy-content-addressed.sh \
   build.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh \
