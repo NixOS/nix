@@ -1018,26 +1018,23 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
-
-Derivation Store::readDerivation(const StorePath & drvPath)
+Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool requireValidPath)
 {
-    auto accessor = getFSAccessor();
+    auto accessor = store.getFSAccessor();
     try {
-        return parseDerivation(*this,
-            accessor->readFile(printStorePath(drvPath)),
+        return parseDerivation(store,
+            accessor->readFile(store.printStorePath(drvPath), requireValidPath),
             Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }
 }
 
+Derivation Store::readDerivation(const StorePath & drvPath)
+{ return readDerivationCommon(*this, drvPath, true); }
+
 Derivation Store::readInvalidDerivation(const StorePath & drvPath)
-{
-    return parseDerivation(
-        *this,
-        readFile(Store::toRealPath(drvPath)),
-        Derivation::nameFromPath(drvPath));
-}
+{ return readDerivationCommon(*this, drvPath, false); }
 
 }
 

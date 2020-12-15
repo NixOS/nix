@@ -203,7 +203,7 @@ struct NarAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path) override
+    std::string readFile(const Path & path, bool requireValidPath = true) override
     {
         auto i = get(path);
         if (i.type != FSAccessor::Type::tRegular)
