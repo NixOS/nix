@@ -433,7 +433,9 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     if (!repair && isValidPath(path))
         return path;
 
-    auto source = StringSource { s };
+    StringSink sink;
+    dumpString(s, sink);
+    auto source = StringSource { *sink.s };
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info { path, nar.first };
         info.narSize = nar.second;
