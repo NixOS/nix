@@ -504,9 +504,6 @@ void DerivationGoal::inputsRealised()
             Derivation drvResolved { *std::move(attempt) };
 
             auto pathResolved = writeDerivation(worker.store, drvResolved);
-            /* Add to memotable to speed up downstream goal's queries with the
-               original derivation. */
-            drvPathResolutions.lock()->insert_or_assign(drvPath, pathResolved);
 
             auto msg = fmt("Resolved derivation: '%s' -> '%s'",
                 worker.store.printStorePath(drvPath),
@@ -2096,18 +2093,14 @@ struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConf
     }
 
     void registerDrvOutput(const Realisation & info) override
-    {
-        if (!goal.isAllowed(info.id.drvPath))
-            throw InvalidPath("cannot register unknown drv output '%s' in recursive Nix", printStorePath(info.id.drvPath));
-        next->registerDrvOutput(info);
-    }
+    // XXX: This should probably be allowed as a no-op if the realisation
+    // corresponds to an allowed derivation
+    { throw Error("registerDrvOutput"); }
 
     std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
-    {
-        if (!goal.isAllowed(id.drvPath))
-            throw InvalidPath("cannot query the output info for unknown derivation '%s' in recursive Nix", printStorePath(id.drvPath));
-        return next->queryRealisation(id);
-    }
+    // XXX: This should probably be allowed if the realisation corresponds to
+    // an allowed derivation
+    { throw Error("queryRealisation"); }
 
     void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
     {
@@ -3394,23 +3387,14 @@ void DerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
-    bool isCaFloating = drv->type() == DerivationType::CAFloating;
 
-    auto drvPathResolved = drvPath;
-    if (!useDerivation && isCaFloating) {
-        /* Once a floating CA derivations reaches this point, it
-           must already be resolved, so we don't bother trying to
-           downcast drv to get would would just be an empty
-           inputDrvs field. */
-        Derivation drv2 { *drv };
-        drvPathResolved = writeDerivation(worker.store, drv2);
-    }
-
-    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        auto outputHashes = staticOutputHashes(worker.store, *drv);
         for (auto& [outputName, newInfo] : infos)
             worker.store.registerDrvOutput(Realisation{
-                .id = DrvOutput{drvPathResolved, outputName},
+                .id = DrvOutput{outputHashes.at(outputName), outputName},
                 .outPath = newInfo.path});
+    }
 }
 
 

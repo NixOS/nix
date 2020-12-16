@@ -18,8 +18,6 @@ namespace nix {
 /* The traditional non-fixed-output derivation type. */
 struct DerivationOutputInputAddressed
 {
-    /* Will need to become `std::optional<StorePath>` once input-addressed
-       derivations are allowed to depend on cont-addressed derivations */
     StorePath path;
 };
 
@@ -174,12 +172,12 @@ std::string outputPathName(std::string_view drvName, std::string_view outputName
 // whose output hashes are always known since they are fixed up-front.
 typedef std::map<std::string, Hash> CaOutputHashes;
 
-struct UnknownHashes {};
+struct DeferredHash { Hash hash; };
 
 typedef std::variant<
     Hash, // regular DRV normalized hash
     CaOutputHashes, // Fixed-output derivation hashes
-    UnknownHashes // Deferred hashes for floating outputs drvs and their dependencies
+    DeferredHash // Deferred hashes for floating outputs drvs and their dependencies
 > DrvHashModulo;
 
 /* Returns hashes with the details of fixed-output subderivations
@@ -207,21 +205,17 @@ typedef std::variant<
  */
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
+/*
+   Return a map associating each output to a hash that uniquely identifies its
+   derivation (modulo the self-references).
+ */
+std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& drv);
+
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
 // FIXME: global, though at least thread-safe.
 extern Sync<DrvHashes> drvHashes;
-
-/* Memoisation of `readDerivation(..).resove()`. */
-typedef std::map<
-    StorePath,
-    std::optional<StorePath>
-> DrvPathResolutions;
-
-// FIXME: global, though at least thread-safe.
-// FIXME: arguably overlaps with hashDerivationModulo memo table.
-extern Sync<DrvPathResolutions> drvPathResolutions;
 
 bool wantOutput(const string & output, const std::set<string> & wanted);
 

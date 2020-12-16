@@ -6,10 +6,14 @@
 namespace nix {
 
 struct DrvOutput {
-    StorePath drvPath;
+    // The hash modulo of the derivation
+    Hash drvHash;
     std::string outputName;
 
     std::string to_string() const;
+
+    std::string strHash() const
+    { return drvHash.to_string(Base16, true); }
 
     static DrvOutput parse(const std::string &);
 
@@ -18,8 +22,8 @@ struct DrvOutput {
 
 private:
     // Just to make comparison operators easier to write
-    std::pair<StorePath, std::string> to_pair() const
-    { return std::make_pair(drvPath, outputName); }
+    std::pair<Hash, std::string> to_pair() const
+    { return std::make_pair(drvHash, outputName); }
 };
 
 struct Realisation {

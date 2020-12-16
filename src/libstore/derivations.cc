@@ -496,10 +496,9 @@ static const DrvHashModulo pathDerivationModulo(Store & store, const StorePath &
  */
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
+    bool isDeferred = false;
     /* Return a fixed hash for fixed-output derivations. */
     switch (drv.type()) {
-    case DerivationType::CAFloating:
-        return UnknownHashes {};
     case DerivationType::CAFixed: {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
@@ -512,6 +511,9 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         }
         return outputHashes;
     }
+    case DerivationType::CAFloating:
+        isDeferred = true;
+        break;
     case DerivationType::InputAddressed:
         break;
     case DerivationType::DeferredInputAddressed:
@@ -522,12 +524,15 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
        calls to this function. */
     std::map<std::string, StringSet> inputs2;
     for (auto & i : drv.inputDrvs) {
-        bool hasUnknownHash = false;
         const auto & res = pathDerivationModulo(store, i.first);
         std::visit(overloaded {
             // Regular non-CA derivation, replace derivation
             [&](Hash drvHash) {
                 inputs2.insert_or_assign(drvHash.to_string(Base16, false), i.second);
+            },
+            [&](DeferredHash deferredHash) {
+                isDeferred = true;
+                inputs2.insert_or_assign(deferredHash.hash.to_string(Base16, false), i.second);
             },
             // CA derivation's output hashes
             [&](CaOutputHashes outputHashes) {
@@ -540,16 +545,37 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
                         justOut);
                 }
             },
-            [&](UnknownHashes) {
-                hasUnknownHash = true;
-            },
         }, res);
-        if (hasUnknownHash) {
-            return UnknownHashes {};
-        }
     }
 
-    return hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));
+    auto hash = hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));
+
+    if (isDeferred)
+        return DeferredHash { hash };
+    else
+        return hash;
+}
+
+
+std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& drv)
+{
+    std::map<std::string, Hash> res;
+    std::visit(overloaded {
+        [&](Hash drvHash) {
+            for (auto & outputName : drv.outputNames()) {
+                res.insert({outputName, drvHash});
+            }
+        },
+        [&](DeferredHash deferredHash) {
+            for (auto & outputName : drv.outputNames()) {
+                res.insert({outputName, deferredHash.hash});
+            }
+        },
+        [&](CaOutputHashes outputHashes) {
+            res = outputHashes;
+        },
+    }, hashDerivationModulo(store, drv, true));
+    return res;
 }
 
 
@@ -718,9 +744,6 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
     }
 
 }
-
-
-Sync<DrvPathResolutions> drvPathResolutions;
 
 std::optional<BasicDerivation> Derivation::tryResolve(Store & store) {
     BasicDerivation resolved { *this };
