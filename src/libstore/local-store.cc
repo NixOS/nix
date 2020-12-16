@@ -912,12 +912,7 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath& path_)
         auto state(_state.lock());
         std::map<std::string, std::optional<StorePath>> outputs;
         uint64_t drvId;
-        try {
-            drvId = queryValidPathId(*state, path);
-        } catch (InvalidPath&) {
-            // Ignore non-existing drvs as they might still have an output map
-            // defined if ca-derivations is enabled
-        }
+        drvId = queryValidPathId(*state, path);
         auto use(state->stmts->QueryDerivationOutputs.use()(drvId));
         while (use.next())
             outputs.insert_or_assign(
