@@ -82,7 +82,7 @@ protected:
         checkEnabled();
 
         try {
-            DownloadRequest request(cacheUri + "/" + path);
+            DownloadRequest request(makeRequest(path));
             request.head = true;
             getDownloader()->download(request);
             return true;
@@ -100,7 +100,7 @@ protected:
         const std::string & data,
         const std::string & mimeType) override
     {
-        auto req = DownloadRequest(cacheUri + "/" + path);
+        auto req = makeRequest(path);
         req.data = std::make_shared<string>(data); // FIXME: inefficient
         req.mimeType = mimeType;
         try {
@@ -112,8 +112,10 @@ protected:
 
     DownloadRequest makeRequest(const std::string & path)
     {
-        DownloadRequest request(cacheUri + "/" + path);
-        return request;
+        return DownloadRequest(
+            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
+            ? path
+            : cacheUri + "/" + path);
     }
 
     void getFile(const std::string & path, Sink & sink) override
