@@ -460,7 +460,7 @@ std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOut
 
 void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
     auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
-    upsertFile(filePath, info.toJSON(), "application/json");
+    upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
