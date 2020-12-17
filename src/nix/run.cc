@@ -168,22 +168,10 @@ struct CmdRun : InstallableCommand, RunCommon
         return "run a Nix application";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To run Blender:",
-                "nix run blender-bin"
-            },
-            Example{
-                "To run vim from nixpkgs:",
-                "nix run nixpkgs#vim"
-            },
-            Example{
-                "To run vim from nixpkgs with arguments:",
-                "nix run nixpkgs#vim -- --help"
-            },
-        };
+        #include "run.md"
+        ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
