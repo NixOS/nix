@@ -877,35 +877,9 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
     });
 }
 
-// Try to resolve the derivation at path `original`, with a caching layer
-// to make it more efficient
-std::optional<Derivation> cachedResolve(
-    LocalStore& store,
-    const StorePath& original)
-{
-    // This is quite dirty and leaky, but will disappear once #4340 is merged
-    static Sync<std::map<StorePath, std::optional<Derivation>>> resolutionsCache;
-    {
-        auto resolutions = resolutionsCache.lock();
-        auto resolvedDrvIter = resolutions->find(original);
-        if (resolvedDrvIter != resolutions->end()) {
-            auto & [_, resolvedDrv] = *resolvedDrvIter;
-                return *resolvedDrv;
-        }
-    }
-
-    /* Try resolve drv and use that path instead. */
-    auto drv = store.readDerivation(original);
-    auto attempt = drv.tryResolve(store);
-    if (!attempt)
-        return std::nullopt;
-    /* Store in memo table. */
-    resolutionsCache.lock()->insert_or_assign(original, *attempt);
-    return *attempt;
-}
 
 std::map<std::string, std::optional<StorePath>>
-LocalStore::queryPartialDerivationOutputMap(const StorePath& path_)
+LocalStore::queryDerivationOutputMapNoResolve(const StorePath& path_)
 {
     auto path = path_;
     auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
@@ -924,20 +898,9 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath& path_)
     if (!settings.isExperimentalFeatureEnabled("ca-derivations"))
         return outputs;
 
-    auto drv = readDerivation(path);
-
-    auto resolvedDrv = cachedResolve(*this, path);
-
-    if (!resolvedDrv) {
-        for (auto& [outputName, _] : drv.outputsAndOptPaths(*this)) {
-            if (!outputs.count(outputName))
-                outputs.emplace(outputName, std::nullopt);
-        }
-        return outputs;
-    }
-
-    auto resolvedDrvHashes = staticOutputHashes(*this, *resolvedDrv);
-    for (auto& [outputName, hash] : resolvedDrvHashes) {
+    auto drv = readInvalidDerivation(path);
+    auto drvHashes = staticOutputHashes(*this, drv);
+    for (auto& [outputName, hash] : drvHashes) {
         auto realisation = queryRealisation(DrvOutput{hash, outputName});
         if (realisation)
             outputs.insert_or_assign(outputName, realisation->outPath);
