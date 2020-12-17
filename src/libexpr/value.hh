@@ -27,7 +27,7 @@ typedef enum {
     tPrimOpApp,
     tExternal,
     tFloat
-} ValueType;
+} InternalType;
 
 // This type abstracts over all actual value types in the language,
 // grouping together implementation details like tList*, different function
@@ -44,7 +44,7 @@ typedef enum {
     nList,
     nFunction,
     nExternal
-} NormalType;
+} ValueType;
 
 class Bindings;
 struct Env;
@@ -107,44 +107,44 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 struct Value
 {
 private:
-    ValueType type;
+    InternalType internalType;
 
 friend std::string showType(const Value & v);
 friend void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v);
 
 public:
 
-    inline void setInt() { type = tInt; };
-    inline void setBool() { type = tBool; };
-    inline void setString() { type = tString; };
-    inline void setPath() { type = tPath; };
-    inline void setNull() { type = tNull; };
-    inline void setAttrs() { type = tAttrs; };
-    inline void setList1() { type = tList1; };
-    inline void setList2() { type = tList2; };
-    inline void setListN() { type = tListN; };
-    inline void setThunk() { type = tThunk; };
-    inline void setApp() { type = tApp; };
-    inline void setLambda() { type = tLambda; };
-    inline void setBlackhole() { type = tBlackhole; };
-    inline void setPrimOp() { type = tPrimOp; };
-    inline void setPrimOpApp() { type = tPrimOpApp; };
-    inline void setExternal() { type = tExternal; };
-    inline void setFloat() { type = tFloat; };
+    inline void setInt() { internalType = tInt; };
+    inline void setBool() { internalType = tBool; };
+    inline void setString() { internalType = tString; };
+    inline void setPath() { internalType = tPath; };
+    inline void setNull() { internalType = tNull; };
+    inline void setAttrs() { internalType = tAttrs; };
+    inline void setList1() { internalType = tList1; };
+    inline void setList2() { internalType = tList2; };
+    inline void setListN() { internalType = tListN; };
+    inline void setThunk() { internalType = tThunk; };
+    inline void setApp() { internalType = tApp; };
+    inline void setLambda() { internalType = tLambda; };
+    inline void setBlackhole() { internalType = tBlackhole; };
+    inline void setPrimOp() { internalType = tPrimOp; };
+    inline void setPrimOpApp() { internalType = tPrimOpApp; };
+    inline void setExternal() { internalType = tExternal; };
+    inline void setFloat() { internalType = tFloat; };
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
     // needed by callers into methods of this type
 
     // normalType() == nThunk
-    inline bool isThunk() const { return type == tThunk; };
-    inline bool isApp() const { return type == tApp; };
-    inline bool isBlackhole() const { return type == tBlackhole; };
+    inline bool isThunk() const { return internalType == tThunk; };
+    inline bool isApp() const { return internalType == tApp; };
+    inline bool isBlackhole() const { return internalType == tBlackhole; };
 
     // normalType() == nFunction
-    inline bool isLambda() const { return type == tLambda; };
-    inline bool isPrimOp() const { return type == tPrimOp; };
-    inline bool isPrimOpApp() const { return type == tPrimOpApp; };
+    inline bool isLambda() const { return internalType == tLambda; };
+    inline bool isPrimOp() const { return internalType == tPrimOp; };
+    inline bool isPrimOpApp() const { return internalType == tPrimOpApp; };
 
     union
     {
@@ -204,9 +204,9 @@ public:
 
     // Returns the normal type of a Value. This only returns nThunk if the
     // Value hasn't been forceValue'd
-    inline NormalType normalType() const
+    inline ValueType normalType() const
     {
-        switch (type) {
+        switch (internalType) {
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -224,22 +224,22 @@ public:
 
     bool isList() const
     {
-        return type == tList1 || type == tList2 || type == tListN;
+        return internalType == tList1 || internalType == tList2 || internalType == tListN;
     }
 
     Value * * listElems()
     {
-        return type == tList1 || type == tList2 ? smallList : bigList.elems;
+        return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
 
     const Value * const * listElems() const
     {
-        return type == tList1 || type == tList2 ? smallList : bigList.elems;
+        return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
 
     size_t listSize() const
     {
-        return type == tList1 ? 1 : type == tList2 ? 2 : bigList.size;
+        return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
     }
 
     /* Check whether forcing this value requires a trivial amount of

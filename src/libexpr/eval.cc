@@ -77,7 +77,7 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         return;
     }
 
-    switch (v.type) {
+    switch (v.internalType) {
     case tInt:
         str << v.integer;
         break;
@@ -165,7 +165,7 @@ const Value *getPrimOp(const Value &v) {
     return primOp;
 }
 
-string showType(NormalType type)
+string showType(ValueType type)
 {
     switch (type) {
         case nInt: return "an integer";
@@ -186,7 +186,7 @@ string showType(NormalType type)
 
 string showType(const Value & v)
 {
-    switch (v.type) {
+    switch (v.internalType) {
         case tString: return v.string.context ? "a string with context" : "a string";
         case tPrimOp:
             return fmt("the built-in function '%s'", string(v.primOp->name));
@@ -205,9 +205,9 @@ string showType(const Value & v)
 bool Value::isTrivial() const
 {
     return
-        type != tApp
-        && type != tPrimOpApp
-        && (type != tThunk
+        internalType != tApp
+        && internalType != tPrimOpApp
+        && (internalType != tThunk
             || (dynamic_cast<ExprAttrs *>(thunk.expr)
                 && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
             || dynamic_cast<ExprLambda *>(thunk.expr)
@@ -1562,7 +1562,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixFloat nf = 0;
 
     bool first = !forceString;
-    NormalType firstType = nString;
+    ValueType firstType = nString;
 
     for (auto & i : *es) {
         Value vTmp;
@@ -1728,7 +1728,7 @@ void copyContext(const Value & v, PathSet & context)
 std::vector<std::pair<Path, std::string>> Value::getContext()
 {
     std::vector<std::pair<Path, std::string>> res;
-    assert(type == tString);
+    assert(internalType == tString);
     if (string.context)
         for (const char * * p = string.context; *p; ++p)
             res.push_back(decodeContext(*p));

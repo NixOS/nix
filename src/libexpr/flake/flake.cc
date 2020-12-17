@@ -78,7 +78,7 @@ static void forceTrivialValue(EvalState & state, Value & value, const Pos & pos)
 }
 
 
-static void expectType(EvalState & state, NormalType type,
+static void expectType(EvalState & state, ValueType type,
     Value & value, const Pos & pos)
 {
     forceTrivialValue(state, value, pos);
