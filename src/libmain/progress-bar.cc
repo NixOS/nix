@@ -69,6 +69,7 @@ private:
         ActivityId parent;
         std::optional<std::string> name;
         std::optional<std::chrono::time_point<std::chrono::steady_clock>> startTime;
+        PathSet buildsRemaining, substitutionsRemaining;
     };
 
     struct ActivitiesByType
@@ -250,15 +251,48 @@ public:
                             resetHelp(*state);
                         } else {
                             state->helpShown = true;
-                            state->statusLines.insert_or_assign({idHelp, 0}, "");
-                            state->statusLines.insert_or_assign({idHelp, 1}, ANSI_BOLD "The following keys are available:");
-                            state->statusLines.insert_or_assign({idHelp, 2}, ANSI_BOLD "  'v' to increase verbosity.");
-                            state->statusLines.insert_or_assign({idHelp, 3}, ANSI_BOLD "  '-' to decrease verbosity.");
-                            state->statusLines.insert_or_assign({idHelp, 4}, ANSI_BOLD "  'l' to show build log output.");
-                            state->statusLines.insert_or_assign({idHelp, 5}, ANSI_BOLD "  'q' to quit.");
-                            state->statusLines.insert_or_assign({idHelp, 6}, "");
+                            size_t n = 0;
+                            state->statusLines.insert_or_assign({idHelp, n++}, "");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "The following keys are available:");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'v' to increase verbosity.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  '-' to decrease verbosity.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'l' to show build log output.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'r' to show what paths remain to be built/substituted.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'h' to hide this help message.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, ANSI_BOLD "  'q' to quit.");
+                            state->statusLines.insert_or_assign({idHelp, n++}, "");
                         }
                         draw(*state);
+                    }
+                    if (c == 'r') {
+                        auto state(state_.lock());
+
+                        PathSet buildsRemaining, substitutionsRemaining;
+                        for (auto & act : state->activities) {
+                            for (auto & path : act.buildsRemaining) buildsRemaining.insert(path);
+                            for (auto & path : act.substitutionsRemaining) substitutionsRemaining.insert(path);
+                        }
+
+                        std::string msg;
+
+                        // FIXME: sort by name?
+
+                        if (!buildsRemaining.empty()) {
+                            msg += fmt("\n" ANSI_BOLD "%d derivations remaining to be built:\n" ANSI_NORMAL, buildsRemaining.size());
+                            for (auto & path : buildsRemaining)
+                                msg += fmt("  • %s\n", path);
+                        }
+
+                        if (!substitutionsRemaining.empty()) {
+                            msg += fmt("\n" ANSI_BOLD "%d paths remaining to be substituted:\n" ANSI_NORMAL, substitutionsRemaining.size());
+                            for (auto & path : substitutionsRemaining)
+                                msg += fmt("  • %s\n", path);
+                        }
+
+                        if (buildsRemaining.empty() && substitutionsRemaining.empty())
+                            msg = "\n" ANSI_BOLD "Nothing left to be built or substituted.";
+
+                        draw(*state, chomp(msg));
                     }
                 }
             });
@@ -460,6 +494,10 @@ public:
     {
         auto state(state_.lock());
 
+        auto i = state->its.find(act);
+        assert(i != state->its.end());
+        ActInfo & actInfo = *i->second;
+
         if (type == resFileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
@@ -469,8 +507,6 @@ public:
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
             auto lastLine = chomp(getS(fields, 0));
             if (!lastLine.empty()) {
-                auto i = state->its.find(act);
-                assert(i != state->its.end());
                 i->second->lastLine = lastLine;
                 if (progressBarSettings.printBuildLogs) {
                     auto suffix = "> ";
@@ -494,16 +530,11 @@ public:
         }
 
         else if (type == resSetPhase) {
-            auto i = state->its.find(act);
-            assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
             update(*state);
         }
 
         else if (type == resProgress) {
-            auto i = state->its.find(act);
-            assert(i != state->its.end());
-            ActInfo & actInfo = *i->second;
             if (!actInfo.ignored) {
                 actInfo.done = getI(fields, 0);
                 actInfo.expected = getI(fields, 1);
@@ -514,9 +545,6 @@ public:
         }
 
         else if (type == resSetExpected) {
-            auto i = state->its.find(act);
-            assert(i != state->its.end());
-            ActInfo & actInfo = *i->second;
             if (!actInfo.ignored) {
                 auto type = (ActivityType) getI(fields, 0);
                 auto & j = actInfo.expectedByType[type];
@@ -526,6 +554,18 @@ public:
                 update(*state);
             }
         }
+
+        else if (type == resExpectBuild)
+            actInfo.buildsRemaining.insert(getS(fields, 0));
+
+        else if (type == resUnexpectBuild)
+            actInfo.buildsRemaining.erase(getS(fields, 0));
+
+        else if (type == resExpectSubstitution)
+            actInfo.substitutionsRemaining.insert(getS(fields, 0));
+
+        else if (type == resUnexpectSubstitution)
+            actInfo.substitutionsRemaining.erase(getS(fields, 0));
     }
 
     void update(State & state)

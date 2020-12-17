@@ -32,6 +32,10 @@ typedef enum {
     resProgress = 105,
     resSetExpected = 106,
     resPostBuildLogLine = 107,
+    resExpectBuild = 108,
+    resUnexpectBuild = 109,
+    resExpectSubstitution = 110,
+    resUnexpectSubstitution = 111,
 } ResultType;
 
 typedef uint64_t ActivityId;
