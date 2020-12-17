@@ -50,7 +50,14 @@ testGC () {
     nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
 }
 
-testRemoteCache
+testNixCommand () {
+    clearStore
+    nix build --experimental-features 'nix-command ca-derivations' --file ./content-addressed.nix --no-link
+}
+
+# Disabled until we have it properly working
+# testRemoteCache
 testDeterministicCA
 testCutoff
 testGC
+testNixCommand

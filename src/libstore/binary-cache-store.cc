@@ -433,7 +433,9 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     if (!repair && isValidPath(path))
         return path;
 
-    auto source = StringSource { s };
+    StringSink sink;
+    dumpString(s, sink);
+    auto source = StringSource { *sink.s };
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info { path, nar.first };
         info.narSize = nar.second;
@@ -441,6 +443,24 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
         info.references = references;
         return info;
     })->path;
+}
+
+std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
+{
+    auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
+    auto rawOutputInfo = getFile(outputInfoFilePath);
+
+    if (rawOutputInfo) {
+        return {Realisation::fromJSON(
+            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath)};
+    } else {
+        return std::nullopt;
+    }
+}
+
+void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
+    auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
+    upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()

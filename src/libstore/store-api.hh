@@ -1,5 +1,6 @@
 #pragma once
 
+#include "realisation.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -396,6 +397,8 @@ protected:
 
 public:
 
+    virtual std::optional<const Realisation> queryRealisation(const DrvOutput &) = 0;
+
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const StorePath & path, StorePathSet & referrers)
@@ -413,8 +416,13 @@ public:
     /* Query the mapping outputName => outputPath for the given derivation. All
        outputs are mentioned so ones mising the mapping are mapped to
        `std::nullopt`.  */
-    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path)
-    { unsupported("queryPartialDerivationOutputMap"); }
+    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path);
+
+    /*
+     * Similar to `queryPartialDerivationOutputMap`, but doesn't try to resolve
+     * the derivation
+     */
+    virtual std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path);
 
     /* Query the mapping outputName=>outputPath for the given derivation.
        Assume every output has a mapping and throw an exception otherwise. */
@@ -467,6 +475,18 @@ public:
        a regular file containing the given string. */
     virtual StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
+
+    /**
+     * Add a mapping indicating that `deriver!outputName` maps to the output path
+     * `output`.
+     *
+     * This is redundant for known-input-addressed and fixed-output derivations
+     * as this information is already present in the drv file, but necessary for
+     * floating-ca derivations and their dependencies as there's no way to
+     * retrieve this information otherwise.
+     */
+    virtual void registerDrvOutput(const Realisation & output)
+    { unsupported("registerDrvOutput"); }
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;

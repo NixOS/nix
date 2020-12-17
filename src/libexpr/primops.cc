@@ -1107,7 +1107,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](UnknownHashes) {
+            [&](DeferredHash _) {
                 for (auto & i : outputs) {
                     drv.outputs.insert_or_assign(i,
                         DerivationOutput {
@@ -1621,7 +1621,12 @@ static RegisterPrimOp primop_toJSON({
 static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string s = state.forceStringNoCtx(*args[0], pos);
-    parseJSON(state, s, v);
+    try {
+        parseJSON(state, s, v);
+    } catch (JSONParseError &e) {
+        e.addTrace(pos, "while decoding a JSON string");
+        throw e;
+    }
 }
 
 static RegisterPrimOp primop_fromJSON({
