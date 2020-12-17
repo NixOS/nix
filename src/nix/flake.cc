@@ -279,7 +279,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (v.isLambda()) {
                     if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
-                } else if (v.normalType() == nAttrs) {
+                } else if (v.type() == nAttrs) {
                     for (auto & attr : *v.attrs)
                         try {
                             state->forceValue(*attr.value, *attr.pos);

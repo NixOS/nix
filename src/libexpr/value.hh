@@ -136,12 +136,12 @@ public:
     // These should be removed eventually, by putting the functionality that's
     // needed by callers into methods of this type
 
-    // normalType() == nThunk
+    // type() == nThunk
     inline bool isThunk() const { return internalType == tThunk; };
     inline bool isApp() const { return internalType == tApp; };
     inline bool isBlackhole() const { return internalType == tBlackhole; };
 
-    // normalType() == nFunction
+    // type() == nFunction
     inline bool isLambda() const { return internalType == tLambda; };
     inline bool isPrimOp() const { return internalType == tPrimOp; };
     inline bool isPrimOpApp() const { return internalType == tPrimOpApp; };
@@ -204,7 +204,7 @@ public:
 
     // Returns the normal type of a Value. This only returns nThunk if the
     // Value hasn't been forceValue'd
-    inline ValueType normalType() const
+    inline ValueType type() const
     {
         switch (internalType) {
             case tInt: return nInt;

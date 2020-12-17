@@ -17,7 +17,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
 
     state.forceValue(*args[0]);
 
-    if (args[0]->normalType() == nAttrs) {
+    if (args[0]->type() == nAttrs) {
 
         state.forceAttrs(*args[0], pos);
 

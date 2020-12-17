@@ -446,7 +446,7 @@ bool NixRepl::processLine(string line)
 
         Pos pos;
 
-        if (v.normalType() == nPath || v.normalType() == nString) {
+        if (v.type() == nPath || v.type() == nString) {
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
             pos.file = state->symbols.create(filename);
@@ -669,7 +669,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     state->forceValue(v);
 
-    switch (v.normalType()) {
+    switch (v.type()) {
 
     case nInt:
         str << ANSI_CYAN << v.integer << ANSI_NORMAL;

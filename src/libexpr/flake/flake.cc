@@ -82,9 +82,9 @@ static void expectType(EvalState & state, ValueType type,
     Value & value, const Pos & pos)
 {
     forceTrivialValue(state, value, pos);
-    if (value.normalType() != type)
+    if (value.type() != type)
         throw Error("expected %s but got %s at %s",
-            showType(type), showType(value.normalType()), pos);
+            showType(type), showType(value.type()), pos);
 }
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
@@ -120,7 +120,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, nString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
             } else {
-                if (attr.value->normalType() == nString)
+                if (attr.value->type() == nString)
                     attrs.emplace(attr.name, attr.value->string.s);
                 else
                     throw TypeError("flake input attribute '%s' is %s while a string is expected",
@@ -235,17 +235,17 @@ static Flake getFlake(
 
         for (auto & setting : *nixConfig->value->attrs) {
             forceTrivialValue(state, *setting.value, *setting.pos);
-            if (setting.value->normalType() == nString)
+            if (setting.value->type() == nString)
                 flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
-            else if (setting.value->normalType() == nInt)
+            else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
-            else if (setting.value->normalType() == nBool)
+            else if (setting.value->type() == nBool)
                 flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
-            else if (setting.value->normalType() == nList) {
+            else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
                 for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
                     auto elem = setting.value->listElems()[n];
-                    if (elem->normalType() != nString)
+                    if (elem->type() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             setting.name, showType(*setting.value));
                     ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));

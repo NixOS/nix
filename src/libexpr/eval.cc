@@ -197,7 +197,7 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tBlackhole: return "a black hole";
     default:
-        return showType(v.normalType());
+        return showType(v.type());
     }
 }
 
@@ -947,7 +947,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
 {
     Value v;
     e->eval(*this, env, v);
-    if (v.normalType() != nBool)
+    if (v.type() != nBool)
         throwTypeError("value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
@@ -957,7 +957,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
 {
     Value v;
     e->eval(*this, env, v);
-    if (v.normalType() != nBool)
+    if (v.type() != nBool)
         throwTypeError(pos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
@@ -966,7 +966,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
 inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
-    if (v.normalType() != nAttrs)
+    if (v.type() != nAttrs)
         throwTypeError("value is %1% while a set was expected", v);
 }
 
@@ -1066,7 +1066,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Value nameVal;
         i.nameExpr->eval(state, *dynamicEnv, nameVal);
         state.forceValue(nameVal, i.pos);
-        if (nameVal.normalType() == nNull)
+        if (nameVal.type() == nNull)
             continue;
         state.forceStringNoCtx(nameVal);
         Symbol nameSym = state.symbols.create(nameVal.string.s);
@@ -1151,7 +1151,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             Symbol name = getName(i, state, env);
             if (def) {
                 state.forceValue(*vAttrs, pos);
-                if (vAttrs->normalType() != nAttrs ||
+                if (vAttrs->type() != nAttrs ||
                     (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
@@ -1191,7 +1191,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs);
         Bindings::iterator j;
         Symbol name = getName(i, state, env);
-        if (vAttrs->normalType() != nAttrs ||
+        if (vAttrs->type() != nAttrs ||
             (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
@@ -1269,7 +1269,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         return;
     }
 
-    if (fun.normalType() == nAttrs) {
+    if (fun.type() == nAttrs) {
       auto found = fun.attrs->find(sFunctor);
       if (found != fun.attrs->end()) {
         /* fun may be allocated on the stack of the calling function,
@@ -1368,7 +1368,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
     forceValue(fun);
 
-    if (fun.normalType() == nAttrs) {
+    if (fun.type() == nAttrs) {
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
             Value * v = allocValue();
@@ -1573,14 +1573,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            firstType = vTmp.normalType();
+            firstType = vTmp.type();
             first = false;
         }
 
         if (firstType == nInt) {
-            if (vTmp.normalType() == nInt) {
+            if (vTmp.type() == nInt) {
                 n += vTmp.integer;
-            } else if (vTmp.normalType() == nFloat) {
+            } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
                 nf = n;
@@ -1588,9 +1588,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else
                 throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp));
         } else if (firstType == nFloat) {
-            if (vTmp.normalType() == nInt) {
+            if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
-            } else if (vTmp.normalType() == nFloat) {
+            } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
                 throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
@@ -1629,7 +1629,7 @@ void EvalState::forceValueDeep(Value & v)
 
         forceValue(v);
 
-        if (v.normalType() == nAttrs) {
+        if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
                 try {
                     recurse(*i.value);
@@ -1652,7 +1652,7 @@ void EvalState::forceValueDeep(Value & v)
 NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.normalType() != nInt)
+    if (v.type() != nInt)
         throwTypeError(pos, "value is %1% while an integer was expected", v);
     return v.integer;
 }
@@ -1661,9 +1661,9 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
 NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.normalType() == nInt)
+    if (v.type() == nInt)
         return v.integer;
-    else if (v.normalType() != nFloat)
+    else if (v.type() != nFloat)
         throwTypeError(pos, "value is %1% while a float was expected", v);
     return v.fpoint;
 }
@@ -1672,7 +1672,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
 bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.normalType() != nBool)
+    if (v.type() != nBool)
         throwTypeError(pos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
@@ -1680,14 +1680,14 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 
 bool EvalState::isFunctor(Value & fun)
 {
-    return fun.normalType() == nAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
+    return fun.type() == nAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
 }
 
 
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.normalType() != nFunction && !isFunctor(v))
+    if (v.type() != nFunction && !isFunctor(v))
         throwTypeError(pos, "value is %1% while a function was expected", v);
 }
 
@@ -1695,7 +1695,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 string EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.normalType() != nString) {
+    if (v.type() != nString) {
         if (pos)
             throwTypeError(pos, "value is %1% while a string was expected", v);
         else
@@ -1761,11 +1761,11 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 
 bool EvalState::isDerivation(Value & v)
 {
-    if (v.normalType() != nAttrs) return false;
+    if (v.type() != nAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
     if (i == v.attrs->end()) return false;
     forceValue(*i->value);
-    if (i->value->normalType() != nString) return false;
+    if (i->value->type() != nString) return false;
     return strcmp(i->value->string.s, "derivation") == 0;
 }
 
@@ -1790,17 +1790,17 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
     string s;
 
-    if (v.normalType() == nString) {
+    if (v.type() == nString) {
         copyContext(v, context);
         return v.string.s;
     }
 
-    if (v.normalType() == nPath) {
+    if (v.type() == nPath) {
         Path path(canonPath(v.path));
         return copyToStore ? copyPathToStore(context, path) : path;
     }
 
-    if (v.normalType() == nAttrs) {
+    if (v.type() == nAttrs) {
         auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
         if (maybeString) {
             return *maybeString;
@@ -1810,18 +1810,18 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
-    if (v.normalType() == nExternal)
+    if (v.type() == nExternal)
         return v.external->coerceToString(pos, context, coerceMore, copyToStore);
 
     if (coerceMore) {
 
         /* Note that `false' is represented as an empty string for
            shell scripting convenience, just like `null'. */
-        if (v.normalType() == nBool && v.boolean) return "1";
-        if (v.normalType() == nBool && !v.boolean) return "";
-        if (v.normalType() == nInt) return std::to_string(v.integer);
-        if (v.normalType() == nFloat) return std::to_string(v.fpoint);
-        if (v.normalType() == nNull) return "";
+        if (v.type() == nBool && v.boolean) return "1";
+        if (v.type() == nBool && !v.boolean) return "";
+        if (v.type() == nInt) return std::to_string(v.integer);
+        if (v.type() == nFloat) return std::to_string(v.fpoint);
+        if (v.type() == nNull) return "";
 
         if (v.isList()) {
             string result;
@@ -1884,15 +1884,15 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     if (&v1 == &v2) return true;
 
     // Special case type-compatibility between float and int
-    if (v1.normalType() == nInt && v2.normalType() == nFloat)
+    if (v1.type() == nInt && v2.type() == nFloat)
         return v1.integer == v2.fpoint;
-    if (v1.normalType() == nFloat && v2.normalType() == nInt)
+    if (v1.type() == nFloat && v2.type() == nInt)
         return v1.fpoint == v2.integer;
 
     // All other types are not compatible with each other.
-    if (v1.normalType() != v2.normalType()) return false;
+    if (v1.type() != v2.type()) return false;
 
-    switch (v1.normalType()) {
+    switch (v1.type()) {
 
         case nInt:
             return v1.integer == v2.integer;

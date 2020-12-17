@@ -16,7 +16,7 @@ void printValueAsJSON(EvalState & state, bool strict,
 
     if (strict) state.forceValue(v);
 
-    switch (v.normalType()) {
+    switch (v.type()) {
 
         case nInt:
             out.write(v.integer);
