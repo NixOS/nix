@@ -366,6 +366,29 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapNoResolve(const StorePath & path)
+{
+    std::map<std::string, std::optional<StorePath>> outputs;
+    auto drv = readInvalidDerivation(path);
+    for (auto& [outputName, output] : drv.outputsAndOptPaths(*this)) {
+        outputs.emplace(outputName, output.second);
+    }
+    return outputs;
+}
+
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
+{
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        auto resolvedDrv = Derivation::tryResolve(*this, path);
+        if (resolvedDrv) {
+            auto resolvedDrvPath = writeDerivation(*this, *resolvedDrv, NoRepair, true);
+            if (isValidPath(resolvedDrvPath))
+                return queryDerivationOutputMapNoResolve(resolvedDrvPath);
+        }
+    }
+    return queryDerivationOutputMapNoResolve(path);
+}
+
 OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     auto resp = queryPartialDerivationOutputMap(path);
     OutputPathMap result;
@@ -730,14 +753,14 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMod
 
     for (auto & path : paths) {
         if (path.path.isDerivation()) {
-            if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-                for (auto & outputName : path.outputs) {
-                    if (!queryRealisation({path.path, outputName}))
-                        unsupported("buildPaths");
-                }
-            } else
-                unsupported("buildPaths");
-
+            auto outPaths = queryPartialDerivationOutputMap(path.path);
+            for (auto & outputName : path.outputs) {
+                auto currentOutputPathIter = outPaths.find(outputName);
+                if (currentOutputPathIter == outPaths.end() ||
+                    !currentOutputPathIter->second ||
+                    !isValidPath(*currentOutputPathIter->second))
+                    unsupported("buildPaths");
+            }
         } else
             paths2.insert(path.path);
     }
