@@ -151,22 +151,11 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         return "install a package into a profile";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To install a package from Nixpkgs:",
-                "nix profile install nixpkgs#hello"
-            },
-            Example{
-                "To install a package from a specific branch of Nixpkgs:",
-                "nix profile install nixpkgs/release-19.09#hello"
-            },
-            Example{
-                "To install a package from a specific revision of Nixpkgs:",
-                "nix profile install nixpkgs/1028bb33859f8dfad7f98e1c8d185f3d1aaa7340#hello"
-            },
-        };
+        return
+          #include "profile-install.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -257,26 +246,11 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
         return "remove packages from a profile";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To remove a package by attribute path:",
-                "nix profile remove packages.x86_64-linux.hello"
-            },
-            Example{
-                "To remove all packages:",
-                "nix profile remove '.*'"
-            },
-            Example{
-                "To remove a package by store path:",
-                "nix profile remove /nix/store/rr3y0c6zyk7kjjl8y19s4lsrhn4aiq1z-hello-2.10"
-            },
-            Example{
-                "To remove a package by position:",
-                "nix profile remove 3"
-            },
-        };
+        return
+          #include "profile-remove.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -310,18 +284,11 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         return "upgrade packages using their most recent flake";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To upgrade all packages that were installed using a mutable flake reference:",
-                "nix profile upgrade '.*'"
-            },
-            Example{
-                "To upgrade a specific package:",
-                "nix profile upgrade packages.x86_64-linux.hello"
-            },
-        };
+        return
+          #include "profile-upgrade.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -377,14 +344,11 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         return "list installed packages";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show what packages are installed in the default profile:",
-                "nix profile info"
-            },
-        };
+        return
+          #include "profile-info.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -405,17 +369,14 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
 {
     std::string description() override
     {
-        return "show the closure difference between each generation of a profile";
+        return "show the closure difference between each version of a profile";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show what changed between each generation of the NixOS system profile:",
-                "nix profile diff-closures --profile /nix/var/nix/profiles/system"
-            },
-        };
+        return
+          #include "profile-diff-closures.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -429,7 +390,7 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
             if (prevGen) {
                 if (!first) std::cout << "\n";
                 first = false;
-                std::cout << fmt("Generation %d -> %d:\n", prevGen->number, gen.number);
+                std::cout << fmt("Version %d -> %d:\n", prevGen->number, gen.number);
                 printClosureDiff(store,
                     store->followLinksToStorePath(prevGen->path),
                     store->followLinksToStorePath(gen.path),
@@ -456,6 +417,13 @@ struct CmdProfile : NixMultiCommand
     std::string description() override
     {
         return "manage Nix profiles";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile.md"
+          ;
     }
 
     void run() override
