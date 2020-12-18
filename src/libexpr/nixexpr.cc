@@ -124,23 +124,36 @@ void ExprList::show(std::ostream & str) const
 void ExprLambda::show(std::ostream & str) const
 {
     str << "(";
-    if (matchAttrs) {
-        str << "{ ";
-        bool first = true;
-        for (auto & i : formals->formals) {
-            if (first) first = false; else str << ", ";
-            str << i.name;
-            if (i.def) str << " ? " << *i.def;
+    for (auto & arg : args) {
+        if (arg.formals) {
+            str << "{ ";
+            bool first = true;
+            for (auto & i : arg.formals->formals) {
+                if (first) first = false; else str << ", ";
+                str << i.name;
+                if (i.def) str << " ? " << *i.def;
+            }
+            if (arg.formals->ellipsis) {
+                if (!first) str << ", ";
+                str << "...";
+            }
+            str << " }";
+            if (!arg.arg.empty()) str << " @ ";
         }
-        if (formals->ellipsis) {
-            if (!first) str << ", ";
-            str << "...";
-        }
-        str << " }";
-        if (!arg.empty()) str << " @ ";
+        if (!arg.arg.empty()) str << arg.arg;
+        str << ": ";
     }
-    if (!arg.empty()) str << arg;
-    str << ": " << *body << ")";
+    str << *body << ")";
+}
+
+void ExprCall::show(std::ostream & str) const
+{
+    str << '(' << *fun;
+    for (auto e : args) {
+        str <<  ' ';
+        str << *e;
+    }
+    str << ')';
 }
 
 void ExprLet::show(std::ostream & str) const
@@ -263,14 +276,13 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
-    unsigned int level;
+    Level level;
     int withLevel = -1;
     for (curEnv = &env, level = 0; curEnv; curEnv = curEnv->up, level++) {
         if (curEnv->isWith) {
             if (withLevel == -1) withLevel = level;
         } else {
-            StaticEnv::Vars::const_iterator i = curEnv->vars.find(name);
-            if (i != curEnv->vars.end()) {
+            if (auto i = curEnv->get(name)) {
                 fromWith = false;
                 this->level = level;
                 displ = i->second;
@@ -311,14 +323,16 @@ void ExprOpHasAttr::bindVars(const StaticEnv & env)
 void ExprAttrs::bindVars(const StaticEnv & env)
 {
     const StaticEnv * dynamicEnv = &env;
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(false, &env, recursive ? attrs.size() : 0);
 
     if (recursive) {
         dynamicEnv = &newEnv;
 
-        unsigned int displ = 0;
+        Displacement displ = 0;
         for (auto & i : attrs)
-            newEnv.vars[i.first] = i.second.displ = displ++;
+            newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+
+        // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
             i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -342,30 +356,67 @@ void ExprList::bindVars(const StaticEnv & env)
 
 void ExprLambda::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(false, &env);
+    /* The parser adds arguments in reverse order. Let's fix that
+       now. */
+    std::reverse(args.begin(), args.end());
 
-    unsigned int displ = 0;
+    envSize = 0;
 
-    if (!arg.empty()) newEnv.vars[arg] = displ++;
-
-    if (matchAttrs) {
-        for (auto & i : formals->formals)
-            newEnv.vars[i.name] = displ++;
-
-        for (auto & i : formals->formals)
-            if (i.def) i.def->bindVars(newEnv);
+    for (auto & arg :args) {
+        if (!arg.arg.empty()) envSize++;
+        if (arg.formals) envSize += arg.formals->formals.size();
     }
+
+    StaticEnv newEnv(false, &env, envSize);
+
+    Displacement displ = 0;
+
+    for (auto & arg : args) {
+        if (!arg.arg.empty()) {
+            if (auto i = const_cast<StaticEnv::Vars::value_type *>(newEnv.get(arg.arg)))
+                i->second = displ++;
+            else
+                newEnv.vars.emplace_back(arg.arg, displ++);
+        }
+
+        if (arg.formals) {
+            for (auto & i : arg.formals->formals) {
+                if (auto j = const_cast<StaticEnv::Vars::value_type *>(newEnv.get(i.name)))
+                    j->second = displ++;
+                else
+                    newEnv.vars.emplace_back(i.name, displ++);
+            }
+
+            newEnv.sort();
+
+            for (auto & i : arg.formals->formals)
+                if (i.def) i.def->bindVars(newEnv);
+        }
+    }
+
+    assert(displ == envSize);
+
+    newEnv.sort();
 
     body->bindVars(newEnv);
 }
 
+void ExprCall::bindVars(const StaticEnv & env)
+{
+    fun->bindVars(env);
+    for (auto e : args)
+        e->bindVars(env);
+}
+
 void ExprLet::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(false, &env, attrs->attrs.size());
 
-    unsigned int displ = 0;
+    Displacement displ = 0;
     for (auto & i : attrs->attrs)
-        newEnv.vars[i.first] = i.second.displ = displ++;
+        newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+
+    // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
         i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -379,7 +430,7 @@ void ExprWith::bindVars(const StaticEnv & env)
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
     const StaticEnv * curEnv;
-    unsigned int level;
+    Level level;
     prevWith = 0;
     for (curEnv = &env, level = 1; curEnv; curEnv = curEnv->up, level++)
         if (curEnv->isWith) {
@@ -451,6 +502,5 @@ size_t SymbolTable::totalSize() const
         n += i.size();
     return n;
 }
-
 
 }

@@ -21,6 +21,7 @@ typedef enum {
     tListN,
     tThunk,
     tApp,
+    tPartialApp,
     tLambda,
     tBlackhole,
     tPrimOp,
@@ -146,6 +147,12 @@ struct Value
         ExternalValueBase * external;
         NixFloat fpoint;
     };
+
+    /* Whether this is a value that can be called. */
+    bool isLambda() const
+    {
+        return type == tLambda || type == tPartialApp || type == tPrimOp || type == tPrimOpApp;
+    }
 
     bool isList() const
     {

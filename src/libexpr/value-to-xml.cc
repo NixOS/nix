@@ -125,20 +125,23 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
         }
 
-        case tLambda: {
+        case tLambda: { // FIXME: handle tPartialApp?
+
             XMLAttrs xmlAttrs;
             if (location) posToXML(xmlAttrs, v.lambda.fun->pos);
             XMLOpenElement _(doc, "function", xmlAttrs);
 
-            if (v.lambda.fun->matchAttrs) {
+            auto & arg = v.lambda.fun->args[0];
+
+            if (arg.formals) {
                 XMLAttrs attrs;
-                if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
-                if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
+                if (arg.arg != state.sEpsilon) attrs["name"] = arg.arg;
+                if (arg.formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
-                for (auto & i : v.lambda.fun->formals->formals)
+                for (auto & i : arg.formals->formals)
                     doc.writeEmptyElement("attr", singletonAttrs("name", i.name));
             } else
-                doc.writeEmptyElement("varpat", singletonAttrs("name", v.lambda.fun->arg));
+                doc.writeEmptyElement("varpat", singletonAttrs("name", arg.arg));
 
             break;
         }

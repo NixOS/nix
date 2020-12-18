@@ -216,8 +216,13 @@ static Flake getFlake(
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         expectType(state, tLambda, *outputs->value, *outputs->pos);
 
-        if (outputs->value->lambda.fun->matchAttrs) {
-            for (auto & formal : outputs->value->lambda.fun->formals->formals) {
+        if (outputs->value->lambda.fun->args.size() != 1)
+            throw Error("the 'outputs' attribute of flake '%s' is not a unary function", lockedRef);
+
+        auto & arg = outputs->value->lambda.fun->args[0];
+
+        if (arg.formals) {
+            for (auto & formal : arg.formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {
                         .ref = parseFlakeRef(formal.name)

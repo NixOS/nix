@@ -260,11 +260,13 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type != tLambda || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
-                    throw Error("overlay does not take an argument named 'final'");
-                auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
-                if (!body || body->matchAttrs || std::string(body->arg) != "prev")
-                    throw Error("overlay does not take an argument named 'prev'");
+                if (v.type != tLambda
+                    || v.lambda.fun->args.size() != 2
+                    || v.lambda.fun->args[0].formals
+                    || v.lambda.fun->args[0].arg != state->symbols.create("final")
+                    || v.lambda.fun->args[1].formals
+                    || v.lambda.fun->args[1].arg != state->symbols.create("prev"))
+                    throw Error("overlay is not a binary function with arguments 'final' and 'prev'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
@@ -277,7 +279,9 @@ struct CmdFlakeCheck : FlakeCommand
             try {
                 state->forceValue(v, pos);
                 if (v.type == tLambda) {
-                    if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
+                    if (v.lambda.fun->args.size() != 1
+                        || !v.lambda.fun->args[0].formals
+                        || !v.lambda.fun->args[0].formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
                 } else if (v.type == tAttrs) {
                     for (auto & attr : *v.attrs)
@@ -371,12 +375,12 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkBundler = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type != tLambda)
-                    throw Error("bundler must be a function");
-                if (!v.lambda.fun->formals ||
-                    v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end() ||
-                    v.lambda.fun->formals->argNames.find(state->symbols.create("system")) == v.lambda.fun->formals->argNames.end())
-                    throw Error("bundler must take formal arguments 'program' and 'system'");
+                if (v.type != tLambda
+                    || v.lambda.fun->args.size() != 1
+                    || !v.lambda.fun->args[0].formals
+                    || !v.lambda.fun->args[0].formals->argNames.count(state->symbols.create("program"))
+                    || !v.lambda.fun->args[0].formals->argNames.count(state->symbols.create("system")))
+                    throw Error("bundler must be a function that takes take arguments 'program' and 'system'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 throw;
