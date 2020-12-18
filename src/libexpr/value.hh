@@ -114,24 +114,6 @@ friend void printValue(std::ostream & str, std::set<const Value *> & active, con
 
 public:
 
-    inline void setInt() { internalType = tInt; };
-    inline void setBool() { internalType = tBool; };
-    inline void setString() { internalType = tString; };
-    inline void setPath() { internalType = tPath; };
-    inline void setNull() { internalType = tNull; };
-    inline void setAttrs() { internalType = tAttrs; };
-    inline void setList1() { internalType = tList1; };
-    inline void setList2() { internalType = tList2; };
-    inline void setListN() { internalType = tListN; };
-    inline void setThunk() { internalType = tThunk; };
-    inline void setApp() { internalType = tApp; };
-    inline void setLambda() { internalType = tLambda; };
-    inline void setBlackhole() { internalType = tBlackhole; };
-    inline void setPrimOp() { internalType = tPrimOp; };
-    inline void setPrimOpApp() { internalType = tPrimOpApp; };
-    inline void setExternal() { internalType = tExternal; };
-    inline void setFloat() { internalType = tFloat; };
-
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
     // needed by callers into methods of this type
@@ -222,6 +204,123 @@ public:
         abort();
     }
 
+    /* After overwriting an app node, be sure to clear pointers in the
+       Value to ensure that the target isn't kept alive unnecessarily. */
+    inline void clearValue()
+    {
+        app.left = app.right = 0;
+    }
+
+    inline void mkInt(NixInt n)
+    {
+        clearValue();
+        internalType = tInt;
+        integer = n;
+    }
+
+    inline void mkBool(bool b)
+    {
+        clearValue();
+        internalType = tBool;
+        boolean = b;
+    }
+
+    inline void mkString(const char * s, const char * * context = 0)
+    {
+        internalType = tString;
+        string.s = s;
+        string.context = context;
+    }
+
+    inline void mkPath(const char * s)
+    {
+        clearValue();
+        internalType = tPath;
+        path = s;
+    }
+
+    inline void mkNull()
+    {
+        clearValue();
+        internalType = tNull;
+    }
+
+    inline void mkAttrs(Bindings * a)
+    {
+        clearValue();
+        internalType = tAttrs;
+        attrs = a;
+    }
+
+    inline void mkList(size_t size)
+    {
+        clearValue();
+        if (size == 1)
+            internalType = tList1;
+        else if (size == 2)
+            internalType = tList2;
+        else {
+            internalType = tListN;
+            bigList.size = size;
+        }
+    }
+
+    inline void mkThunk(Env * e, Expr * ex)
+    {
+        internalType = tThunk;
+        thunk.env = e;
+        thunk.expr = ex;
+    }
+
+    inline void mkApp(Value * l, Value * r)
+    {
+        internalType = tApp;
+        app.left = l;
+        app.right = r;
+    }
+
+    inline void mkLambda(Env * e, ExprLambda * f)
+    {
+        internalType = tLambda;
+        lambda.env = e;
+        lambda.fun = f;
+    }
+
+    inline void mkBlackhole()
+    {
+        internalType = tBlackhole;
+        // Value will be overridden anyways
+    }
+
+    inline void mkPrimOp(PrimOp * p)
+    {
+        clearValue();
+        internalType = tPrimOp;
+        primOp = p;
+    }
+
+
+    inline void mkPrimOpApp(Value * l, Value * r)
+    {
+        internalType = tPrimOpApp;
+        app.left = l;
+        app.right = r;
+    }
+
+    inline void mkExternal(ExternalValueBase * e)
+    {
+        clearValue();
+        internalType = tExternal;
+        external = e;
+    }
+
+    inline void mkFloat(NixFloat n)
+    {
+        clearValue();
+        internalType = tFloat;
+        fpoint = n;
+    }
+
     bool isList() const
     {
         return internalType == tList1 || internalType == tList2 || internalType == tListN;
@@ -251,84 +350,40 @@ public:
 };
 
 
-/* After overwriting an app node, be sure to clear pointers in the
-   Value to ensure that the target isn't kept alive unnecessarily. */
-static inline void clearValue(Value & v)
-{
-    v.app.left = v.app.right = 0;
-}
 
-
+// TODO: Remove these static functions, replace call sites with v.mk* instead
 static inline void mkInt(Value & v, NixInt n)
 {
-    clearValue(v);
-    v.setInt();
-    v.integer = n;
+    v.mkInt(n);
 }
-
 
 static inline void mkFloat(Value & v, NixFloat n)
 {
-    clearValue(v);
-    v.setFloat();
-    v.fpoint = n;
+    v.mkFloat(n);
 }
-
 
 static inline void mkBool(Value & v, bool b)
 {
-    clearValue(v);
-    v.setBool();
-    v.boolean = b;
+    v.mkBool(b);
 }
-
 
 static inline void mkNull(Value & v)
 {
-    clearValue(v);
-    v.setNull();
+    v.mkNull();
 }
-
 
 static inline void mkApp(Value & v, Value & left, Value & right)
 {
-    v.setApp();
-    v.app.left = &left;
-    v.app.right = &right;
+    v.mkApp(&left, &right);
 }
-
-
-static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
-{
-    v.setPrimOpApp();
-    v.app.left = &left;
-    v.app.right = &right;
-}
-
-
-static inline void mkStringNoCopy(Value & v, const char * s)
-{
-    v.setString();
-    v.string.s = s;
-    v.string.context = 0;
-}
-
 
 static inline void mkString(Value & v, const Symbol & s)
 {
-    mkStringNoCopy(v, ((const string &) s).c_str());
+    v.mkString(((const string &) s).c_str());
 }
 
 
 void mkString(Value & v, const char * s);
-
-
-static inline void mkPathNoCopy(Value & v, const char * s)
-{
-    clearValue(v);
-    v.setPath();
-    v.path = s;
-}
 
 
 void mkPath(Value & v, const char * s);

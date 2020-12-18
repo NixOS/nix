@@ -430,9 +430,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         }
     }
 
-    clearValue(vEmptySet);
-    vEmptySet.setAttrs();
-    vEmptySet.attrs = allocBindings(0);
+    vEmptySet.mkAttrs(allocBindings(0));
 
     createBaseEnv();
 }
@@ -548,16 +546,14 @@ Value * EvalState::addPrimOp(const string & name,
        the primop to a dummy value. */
     if (arity == 0) {
         auto vPrimOp = allocValue();
-        vPrimOp->setPrimOp();
-        vPrimOp->primOp = new PrimOp { .fun = primOp, .arity = 1, .name = sym };
+        vPrimOp->mkPrimOp(new PrimOp { .fun = primOp, .arity = 1, .name = sym });
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
     }
 
     Value * v = allocValue();
-    v->setPrimOp();
-    v->primOp = new PrimOp { .fun = primOp, .arity = arity, .name = sym };
+    v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
@@ -572,8 +568,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     if (primOp.arity == 0) {
         primOp.arity = 1;
         auto vPrimOp = allocValue();
-        vPrimOp->setPrimOp();
-        vPrimOp->primOp = new PrimOp(std::move(primOp));
+        vPrimOp->mkPrimOp(new PrimOp(std::move(primOp)));
         Value v;
         mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(primOp.name, v);
@@ -584,8 +579,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         primOp.name = symbols.create(std::string(primOp.name, 2));
 
     Value * v = allocValue();
-    v->setPrimOp();
-    v->primOp = new PrimOp(std::move(primOp));
+    v->mkPrimOp(new PrimOp(std::move(primOp)));
     staticBaseEnv.vars[envName] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
@@ -708,15 +702,13 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 
 void mkString(Value & v, const char * s)
 {
-    mkStringNoCopy(v, dupString(s));
+    v.mkString(dupString(s));
 }
 
 
 Value & mkString(Value & v, std::string_view s, const PathSet & context)
 {
-    v.setString();
-    v.string.s = dupStringWithLen(s.data(), s.size());
-    v.string.context = 0;
+    v.mkString(dupStringWithLen(s.data(), s.size()));
     if (!context.empty()) {
         size_t n = 0;
         v.string.context = (const char * *)
@@ -731,7 +723,7 @@ Value & mkString(Value & v, std::string_view s, const PathSet & context)
 
 void mkPath(Value & v, const char * s)
 {
-    mkPathNoCopy(v, dupString(s));
+    v.mkPath(dupString(s));
 }
 
 
@@ -792,16 +784,9 @@ Env & EvalState::allocEnv(size_t size)
 
 void EvalState::mkList(Value & v, size_t size)
 {
-    clearValue(v);
-    if (size == 1)
-        v.setList1();
-    else if (size == 2)
-        v.setList2();
-    else {
-        v.setListN();
-        v.bigList.size = size;
-        v.bigList.elems = size ? (Value * *) allocBytes(size * sizeof(Value *)) : 0;
-    }
+    v.mkList(size);
+    if (size > 2)
+        v.bigList.elems = (Value * *) allocBytes(size * sizeof(Value *));
     nrListElems += size;
 }
 
@@ -810,9 +795,7 @@ unsigned long nrThunks = 0;
 
 static inline void mkThunk(Value & v, Env & env, Expr * expr)
 {
-    v.setThunk();
-    v.thunk.env = &env;
-    v.thunk.expr = expr;
+    v.mkThunk(&env, expr);
     nrThunks++;
 }
 
@@ -1207,9 +1190,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 {
-    v.setLambda();
-    v.lambda.env = &env;
-    v.lambda.fun = this;
+    v.mkLambda(&env, this);
 }
 
 
@@ -1252,9 +1233,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
-        v.setPrimOpApp();
-        v.primOpApp.left = fun2;
-        v.primOpApp.right = &arg;
+        v.mkPrimOpApp(fun2, &arg);
     }
 }
 
