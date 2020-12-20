@@ -106,7 +106,7 @@ string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, mode_t mode = 0666);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
 
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
 
@@ -155,9 +155,8 @@ void replaceSymlink(const Path & target, const Path & link,
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
-void readFull(int fd, unsigned char * buf, size_t count);
-void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
-void writeFull(int fd, const string & s, bool allowInterrupts = true);
+void readFull(int fd, char * buf, size_t count);
+void writeFull(int fd, std::string_view s, bool allowInterrupts = true);
 
 MakeError(EndOfFile, Error);
 
@@ -383,7 +382,7 @@ string trim(const string & s, const string & whitespace = " \n\r\t");
 
 
 /* Replace all occurrences of a string inside another string. */
-string replaceStrings(const std::string & s,
+string replaceStrings(std::string_view s,
     const std::string & from, const std::string & to);
 
 
@@ -536,6 +535,8 @@ typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 
+/* Common initialisation performed in child processes. */
+void commonChildInit(Pipe & logPipe);
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);

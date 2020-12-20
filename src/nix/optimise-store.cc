@@ -18,12 +18,10 @@ struct CmdOptimiseStore : StoreCommand
         return {
             Example{
                 "To optimise the Nix store:",
-                "nix optimise-store"
+                "nix store optimise"
             },
         };
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -31,4 +29,4 @@ struct CmdOptimiseStore : StoreCommand
     }
 };
 
-static auto rCmdOptimiseStore = registerCommand<CmdOptimiseStore>("optimise-store");
+static auto rCmdOptimiseStore = registerCommand2<CmdOptimiseStore>({"store", "optimise"});

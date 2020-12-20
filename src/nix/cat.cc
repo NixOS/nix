@@ -37,8 +37,6 @@ struct CmdCatStore : StoreCommand, MixCat
         return "print the contents of a file in the Nix store on stdout";
     }
 
-    Category category() override { return catUtility; }
-
     void run(ref<Store> store) override
     {
         cat(store->getFSAccessor());
@@ -64,13 +62,11 @@ struct CmdCatNar : StoreCommand, MixCat
         return "print the contents of a file inside a NAR file on stdout";
     }
 
-    Category category() override { return catUtility; }
-
     void run(ref<Store> store) override
     {
         cat(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
     }
 };
 
-static auto rCmdCatStore = registerCommand<CmdCatStore>("cat-store");
-static auto rCmdCatNar = registerCommand<CmdCatNar>("cat-nar");
+static auto rCmdCatStore = registerCommand2<CmdCatStore>({"store", "cat"});
+static auto rCmdCatNar = registerCommand2<CmdCatNar>({"nar", "cat"});

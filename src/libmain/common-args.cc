@@ -44,7 +44,7 @@ MixCommonArgs::MixCommonArgs(const string & programName)
                 globalConfig.getSettings(settings);
                 for (auto & s : settings)
                     if (hasPrefix(s.first, prefix))
-                        completions->add(s.first, s.second.description);
+                        completions->add(s.first, fmt("Set the `%s` setting.", s.first));
             }
         }
     });

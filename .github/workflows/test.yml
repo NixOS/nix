@@ -12,6 +12,6 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v11
+    - uses: cachix/install-nix-action@v12
     #- run: nix flake check
     - run: nix-build -A checks.$(if [[ `uname` = Linux ]]; then echo x86_64-linux; else echo x86_64-darwin; fi)

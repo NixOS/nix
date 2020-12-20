@@ -10,7 +10,7 @@ mkdir -p $tarroot
 cp dependencies.nix $tarroot/default.nix
 cp config.nix dependencies.builder*.sh $tarroot/
 
-hash=$(nix hash-path $tarroot)
+hash=$(nix hash path $tarroot)
 
 test_tarball() {
     local ext="$1"

@@ -12,7 +12,7 @@ cmp $outPath fetchurl.sh
 # Now using a base-64 hash.
 clearStore
 
-hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
+hash=$(nix hash file --type sha512 --base64 ./fetchurl.sh)
 
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link)
 
@@ -21,7 +21,7 @@ cmp $outPath fetchurl.sh
 # Now using an SRI hash.
 clearStore
 
-hash=$(nix hash-file ./fetchurl.sh)
+hash=$(nix hash file ./fetchurl.sh)
 
 [[ $hash =~ ^sha256- ]]
 
@@ -34,14 +34,14 @@ clearStore
 
 other_store=file://$TEST_ROOT/other_store?store=/fnord/store
 
-hash=$(nix hash-file --type sha256 --base16 ./fetchurl.sh)
+hash=$(nix hash file --type sha256 --base16 ./fetchurl.sh)
 
-storePath=$(nix --store $other_store add-to-store --flat ./fetchurl.sh)
+storePath=$(nix --store $other_store store add-file ./fetchurl.sh)
 
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
 
 # Test hashed mirrors with an SRI hash.
-nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix to-sri --type sha256 $hash) \
+nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix hash to-sri --type sha256 $hash) \
           --no-out-link --substituters $other_store
 
 # Test unpacking a NAR.

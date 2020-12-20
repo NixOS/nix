@@ -71,11 +71,17 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     return {std::move(tree), resolvedRef, lockedRef};
 }
 
-static void expectType(EvalState & state, ValueType type,
-    Value & value, const Pos & pos)
+static void forceTrivialValue(EvalState & state, Value & value, const Pos & pos)
 {
     if (value.type == tThunk && value.isTrivial())
         state.forceValue(value, pos);
+}
+
+
+static void expectType(EvalState & state, ValueType type,
+    Value & value, const Pos & pos)
+{
+    forceTrivialValue(state, value, pos);
     if (value.type != type)
         throw Error("expected %s but got %s at %s",
             showType(type), showType(value.type), pos);
@@ -114,7 +120,6 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, tString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
             } else {
-                state.forceValue(*attr.value);
                 if (attr.value->type == tString)
                     attrs.emplace(attr.name, attr.value->string.s);
                 else
@@ -196,11 +201,6 @@ static Flake getFlake(
 
     expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 
-    auto sEdition = state.symbols.create("edition"); // FIXME: remove soon
-
-    if (vInfo.attrs->get(sEdition))
-        warn("flake '%s' has deprecated attribute 'edition'", lockedRef);
-
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, tString, *description->value, *description->pos);
         flake.description = description->value->string.s;
@@ -228,11 +228,41 @@ static Flake getFlake(
     } else
         throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
 
+    auto sNixConfig = state.symbols.create("nixConfig");
+
+    if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
+        expectType(state, tAttrs, *nixConfig->value, *nixConfig->pos);
+
+        for (auto & setting : *nixConfig->value->attrs) {
+            forceTrivialValue(state, *setting.value, *setting.pos);
+            if (setting.value->type == tString)
+                flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
+            else if (setting.value->type == tInt)
+                flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
+            else if (setting.value->type == tBool)
+                flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
+            else if (setting.value->isList()) {
+                std::vector<std::string> ss;
+                for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
+                    auto elem = setting.value->listElems()[n];
+                    if (elem->type != tString)
+                        throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
+                            setting.name, showType(*setting.value));
+                    ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
+                }
+                flake.config.settings.insert({setting.name, ss});
+            }
+            else
+                throw TypeError("flake configuration setting '%s' is %s",
+                    setting.name, showType(*setting.value));
+        }
+    }
+
     for (auto & attr : *vInfo.attrs) {
-        if (attr.name != sEdition &&
-            attr.name != state.sDescription &&
+        if (attr.name != state.sDescription &&
             attr.name != sInputs &&
-            attr.name != sOutputs)
+            attr.name != sOutputs &&
+            attr.name != sNixConfig)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
                 lockedRef, attr.name, *attr.pos);
     }

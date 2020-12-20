@@ -1089,18 +1089,35 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         // Regular, non-CA derivation should always return a single hash and not
         // hash per output.
-        Hash h = std::get<0>(hashDerivationModulo(*state.store, Derivation(drv), true));
+        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        std::visit(overloaded {
+            [&](Hash h) {
+                for (auto & i : outputs) {
+                    auto outPath = state.store->makeOutputPath(i, h, drvName);
+                    drv.env[i] = state.store->printStorePath(outPath);
+                    drv.outputs.insert_or_assign(i,
+                        DerivationOutput {
+                            .output = DerivationOutputInputAddressed {
+                                .path = std::move(outPath),
+                            },
+                        });
+                }
+            },
+            [&](CaOutputHashes) {
+                // Shouldn't happen as the toplevel derivation is not CA.
+                assert(false);
+            },
+            [&](DeferredHash _) {
+                for (auto & i : outputs) {
+                    drv.outputs.insert_or_assign(i,
+                        DerivationOutput {
+                            .output = DerivationOutputDeferred{},
+                        });
+                }
+            },
+        },
+        hashModulo);
 
-        for (auto & i : outputs) {
-            auto outPath = state.store->makeOutputPath(i, h, drvName);
-            drv.env[i] = state.store->printStorePath(outPath);
-            drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = std::move(outPath),
-                    },
-                });
-        }
     }
 
     /* Write the resulting term into the Nix store directory. */
@@ -1115,9 +1132,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
        However, we don't bother doing this for floating CA derivations because
        their "hash modulo" is indeterminate until built. */
-    if (drv.type() != DerivationType::CAFloating)
-        drvHashes.insert_or_assign(drvPath,
-            hashDerivationModulo(*state.store, Derivation(drv), false));
+    if (drv.type() != DerivationType::CAFloating) {
+        auto h = hashDerivationModulo(*state.store, Derivation(drv), false);
+        drvHashes.lock()->insert_or_assign(drvPath, h);
+    }
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
@@ -1603,7 +1621,12 @@ static RegisterPrimOp primop_toJSON({
 static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string s = state.forceStringNoCtx(*args[0], pos);
-    parseJSON(state, s, v);
+    try {
+        parseJSON(state, s, v);
+    } catch (JSONParseError &e) {
+        e.addTrace(pos, "while decoding a JSON string");
+        throw e;
+    }
 }
 
 static RegisterPrimOp primop_fromJSON({

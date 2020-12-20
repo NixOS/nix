@@ -16,7 +16,34 @@
 #include <regex>
 #include <queue>
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
+
+nlohmann::json BuildableOpaque::toJSON(ref<Store> store) const {
+    nlohmann::json res;
+    res["path"] = store->printStorePath(path);
+    return res;
+}
+
+nlohmann::json BuildableFromDrv::toJSON(ref<Store> store) const {
+    nlohmann::json res;
+    res["drvPath"] = store->printStorePath(drvPath);
+    for (const auto& [output, path] : outputs) {
+        res["outputs"][output] = path ? store->printStorePath(*path) : "";
+    }
+    return res;
+}
+
+nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store) {
+    auto res = nlohmann::json::array();
+    for (const Buildable & buildable : buildables) {
+        std::visit([&res, store](const auto & buildable) {
+            res.push_back(buildable.toJSON(store));
+        }, buildable);
+    }
+    return res;
+}
 
 void completeFlakeInputPath(
     ref<EvalState> evalState,
@@ -382,7 +409,7 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
     for (auto & drvInfo : drvInfos) {
         res.push_back({
             state->store->parseStorePath(drvInfo.queryDrvPath()),
-            state->store->parseStorePath(drvInfo.queryOutPath()),
+            state->store->maybeParseStorePath(drvInfo.queryOutPath()),
             drvInfo.queryOutputName()
         });
     }
@@ -533,8 +560,11 @@ InstallableFlake::getCursors(EvalState & state)
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
-    if (!_lockedFlake)
+    if (!_lockedFlake) {
         _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+        _lockedFlake->flake.config.apply();
+        // FIXME: send new config to the daemon.
+    }
     return _lockedFlake;
 }
 

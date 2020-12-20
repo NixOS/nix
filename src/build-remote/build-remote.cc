@@ -201,7 +201,7 @@ static int main_build_remote(int argc, char * * argv)
                             % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
                         }
 
-                        logErrorInfo(lvlInfo, {
+                        logErrorInfo(canBuildLocally ? lvlChatty : lvlWarn, {
                               .name = "Remote build",
                               .description = "Failed to find a machine for remote build!",
                               .hint = hint

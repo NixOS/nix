@@ -45,6 +45,7 @@ namespace nix {
 typedef enum {
     lvlError = 0,
     lvlWarn,
+    lvlNotice,
     lvlInfo,
     lvlTalkative,
     lvlChatty,

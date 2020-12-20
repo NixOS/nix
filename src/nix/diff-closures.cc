@@ -121,14 +121,12 @@ struct CmdDiffClosures : SourceExprCommand
         return "show what packages and versions were added and removed between two closures";
     }
 
-    Category category() override { return catSecondary; }
-
     Examples examples() override
     {
         return {
             {
                 "To show what got added and removed between two versions of the NixOS system profile:",
-                "nix diff-closures /nix/var/nix/profiles/system-655-link /nix/var/nix/profiles/system-658-link",
+                "nix store diff-closures /nix/var/nix/profiles/system-655-link /nix/var/nix/profiles/system-658-link",
             },
         };
     }
@@ -143,4 +141,4 @@ struct CmdDiffClosures : SourceExprCommand
     }
 };
 
-static auto rCmdDiffClosures = registerCommand<CmdDiffClosures>("diff-closures");
+static auto rCmdDiffClosures = registerCommand2<CmdDiffClosures>({"store", "diff-closures"});

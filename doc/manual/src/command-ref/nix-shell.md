@@ -32,7 +32,7 @@ URL of a tarball that will be downloaded and unpacked to a temporary
 location. The tarball must include a single top-level directory
 containing at least a file named `default.nix`.
 
-If the derivation defines the variable `shellHook`, it will be evaluated
+If the derivation defines the variable `shellHook`, it will be run
 after `$stdenv/setup` has been sourced. Since this hook is not executed
 by regular Nix builds, it allows you to perform initialisation specific
 to `nix-shell`. For example, the derivation attribute
@@ -41,10 +41,12 @@ to `nix-shell`. For example, the derivation attribute
 shellHook =
   ''
     echo "Hello shell"
+    export SOME_API_TOKEN="$(cat ~/.config/some-app/api-token)"
   '';
 ```
 
-will cause `nix-shell` to print `Hello shell`.
+will cause `nix-shell` to print `Hello shell` and set the `SOME_API_TOKEN`
+environment variable to a user-configured value.
 
 # Options
 
@@ -76,8 +78,8 @@ All options not listed here are passed to `nix-store
     cleared before the interactive shell is started, so you get an
     environment that more closely corresponds to the “real” Nix build. A
     few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained. Note that `~/.bashrc` and (depending on your Bash
-    installation) `/etc/bashrc` are still sourced, so any variables set
+    retained. Note that (depending on your Bash
+    installation) `/etc/bashrc` is still sourced, so any variables set
     there will affect the interactive shell.
 
   - `--packages` / `-p` *packages*…  

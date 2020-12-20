@@ -25,7 +25,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
 };
 
 class Settings : public Config {
@@ -413,14 +413,6 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<PathSet> extraSandboxPaths{
-        this, {}, "extra-sandbox-paths",
-        R"(
-          A list of additional paths appended to `sandbox-paths`. Useful if
-          you want to extend its default value.
-        )",
-        {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
-
     Setting<size_t> buildRepeat{
         this, 0, "repeat",
         R"(
@@ -591,24 +583,13 @@ public:
 
     Setting<Strings> substituters{
         this,
-        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. The default
           is `https://cache.nixos.org`.
         )",
         {"binary-caches"}};
-
-    // FIXME: provide a way to add to option values.
-    Setting<Strings> extraSubstituters{
-        this, {}, "extra-substituters",
-        R"(
-          Additional binary caches appended to those specified in
-          `substituters`. When used by unprivileged users, untrusted
-          substituters (i.e. those not listed in `trusted-substituters`) are
-          silently ignored.
-        )",
-        {"extra-binary-caches"}};
 
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
@@ -886,7 +867,7 @@ public:
           Example `~/.config/nix/nix.conf`:
 
           ```
-          access-tokens = "github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk"
+          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
           ```
 
           Example `~/code/flake.nix`:

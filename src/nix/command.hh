@@ -176,20 +176,29 @@ struct StorePathCommand : public InstallablesCommand
 /* A helper class for registering commands globally. */
 struct RegisterCommand
 {
+    typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
     static Commands * commands;
 
-    RegisterCommand(const std::string & name,
+    RegisterCommand(std::vector<std::string> && name,
         std::function<ref<Command>()> command)
     {
         if (!commands) commands = new Commands;
         commands->emplace(name, command);
     }
+
+    static nix::Commands getCommandsFor(const std::vector<std::string> & prefix);
 };
 
 template<class T>
 static RegisterCommand registerCommand(const std::string & name)
 {
-    return RegisterCommand(name, [](){ return make_ref<T>(); });
+    return RegisterCommand({name}, [](){ return make_ref<T>(); });
+}
+
+template<class T>
+static RegisterCommand registerCommand2(std::vector<std::string> && name)
+{
+    return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
 Buildables build(ref<Store> store, Realise mode,

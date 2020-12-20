@@ -1,4 +1,5 @@
 // FIXME: integrate this with nix path-info?
+// FIXME: rename to 'nix store show-derivation' or 'nix debug show-derivation'?
 
 #include "command.hh"
 #include "common-args.hh"
@@ -82,6 +83,7 @@ struct CmdShowDerivation : InstallablesCommand
                         [&](DerivationOutputCAFloating dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
+                        [&](DerivationOutputDeferred) {},
                     }, output.output);
                 }
             }

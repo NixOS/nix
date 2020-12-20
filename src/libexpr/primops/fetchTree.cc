@@ -39,11 +39,12 @@ void emitTreeAttrs(
         // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
         auto emptyHash = Hash(htSHA1);
         mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
     }
 
     if (input.getType() == "git")
-        mkBool(*state.allocAttr(v, state.symbols.create("submodules")), maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
+            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (auto revCount = input.getRevCount())
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
@@ -101,7 +102,7 @@ static void fetchTree(
             else if (attr.value->type == tString)
                 addURI(state, attrs, attr.name, attr.value->string.s);
             else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, fetchers::Explicit<bool>{attr.value->boolean});
+                attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type == tInt)
                 attrs.emplace(attr.name, attr.value->integer);
             else
@@ -211,7 +212,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(htSHA256, path);
         if (hash != *expectedHash)
-            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
+            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 

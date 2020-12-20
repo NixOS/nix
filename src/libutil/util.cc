@@ -320,7 +320,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, const string & s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -340,13 +340,13 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::vector<unsigned char> buf(64 * 1024);
+    std::vector<char> buf(64 * 1024);
 
     try {
         while (true) {
             try {
                 auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), (unsigned char *) buf.data(), n);
+                writeFull(fd.get(), {buf.data(), n});
             } catch (EndOfFile &) { break; }
         }
     } catch (Error & e) {
@@ -632,11 +632,11 @@ void replaceSymlink(const Path & target, const Path & link,
 }
 
 
-void readFull(int fd, unsigned char * buf, size_t count)
+void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
-        ssize_t res = read(fd, (char *) buf, count);
+        ssize_t res = read(fd, buf, count);
         if (res == -1) {
             if (errno == EINTR) continue;
             throw SysError("reading from file");
@@ -648,24 +648,16 @@ void readFull(int fd, unsigned char * buf, size_t count)
 }
 
 
-void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
+void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
-    while (count) {
+    while (!s.empty()) {
         if (allowInterrupts) checkInterrupt();
-        ssize_t res = write(fd, (char *) buf, count);
+        ssize_t res = write(fd, s.data(), s.size());
         if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
-        if (res > 0) {
-            count -= res;
-            buf += res;
-        }
+        if (res > 0)
+            s.remove_prefix(res);
     }
-}
-
-
-void writeFull(int fd, const string & s, bool allowInterrupts)
-{
-    writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
 }
 
 
@@ -705,7 +697,7 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else sink(buf.data(), rd);
+        else sink({(char *) buf.data(), (size_t) rd});
     }
 }
 
@@ -1145,7 +1137,7 @@ void runProgram2(const RunOptions & options)
         in.readSide = -1;
         writerThread = std::thread([&]() {
             try {
-                std::vector<unsigned char> buf(8 * 1024);
+                std::vector<char> buf(8 * 1024);
                 while (true) {
                     size_t n;
                     try {
@@ -1153,7 +1145,7 @@ void runProgram2(const RunOptions & options)
                     } catch (EndOfFile &) {
                         break;
                     }
-                    writeFull(in.writeSide.get(), buf.data(), n);
+                    writeFull(in.writeSide.get(), {buf.data(), n});
                 }
                 promise.set_value();
             } catch (...) {
@@ -1273,11 +1265,11 @@ string trim(const string & s, const string & whitespace)
 }
 
 
-string replaceStrings(const std::string & s,
+string replaceStrings(std::string_view s,
     const std::string & from, const std::string & to)
 {
-    if (from.empty()) return s;
-    string res = s;
+    string res(s);
+    if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
         res.replace(pos, from.size(), to);
@@ -1409,7 +1401,28 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             i++;
 
         else {
-            t += *i++; w++;
+            w++;
+            // Copy one UTF-8 character.
+            if ((*i & 0xe0) == 0xc0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+            } else if ((*i & 0xf0) == 0xe0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                    t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                }
+            } else if ((*i & 0xf8) == 0xf0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                    t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                        t += *i++;
+                        if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                    }
+                }
+            } else
+                t += *i++;
         }
     }
 
@@ -1659,5 +1672,34 @@ string showBytes(uint64_t bytes)
     return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
 
+
+void commonChildInit(Pipe & logPipe)
+{
+    const static string pathNullDevice = "/dev/null";
+    restoreSignals();
+
+    /* Put the child in a separate session (and thus a separate
+       process group) so that it has no controlling terminal (meaning
+       that e.g. ssh cannot open /dev/tty) and it doesn't receive
+       terminal signals. */
+    if (setsid() == -1)
+        throw SysError("creating a new session");
+
+    /* Dup the write side of the logger pipe into stderr. */
+    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
+        throw SysError("cannot pipe standard error into log file");
+
+    /* Dup stderr to stdout. */
+    if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+        throw SysError("cannot dup stderr into stdout");
+
+    /* Reroute stdin to /dev/null. */
+    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+    if (fdDevNull == -1)
+        throw SysError("cannot open '%1%'", pathNullDevice);
+    if (dup2(fdDevNull, STDIN_FILENO) == -1)
+        throw SysError("cannot dup null device into stdin");
+    close(fdDevNull);
+}
 
 }

@@ -23,16 +23,14 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
         return {
             Example{
                 "To create a content-addressable representation of GNU Hello (but not its dependencies):",
-                "nix make-content-addressable nixpkgs#hello"
+                "nix store make-content-addressable nixpkgs#hello"
             },
             Example{
                 "To compute a content-addressable representation of the current NixOS system closure:",
-                "nix make-content-addressable -r /run/current-system"
+                "nix store make-content-addressable -r /run/current-system"
             },
         };
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
@@ -73,7 +71,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             *sink.s = rewriteStrings(*sink.s, rewrites);
 
             HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-            hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
+            hashModuloSink(*sink.s);
 
             auto narHash = hashModuloSink.finish().first;
 
@@ -90,11 +88,11 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             };
 
             if (!json)
-                printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
+                notice("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
 
             auto source = sinkToSource([&](Sink & nextSink) {
                 RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-                rsink2((unsigned char *) sink.s->data(), sink.s->size());
+                rsink2(*sink.s);
                 rsink2.flush();
             });
 
@@ -108,4 +106,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto rCmdMakeContentAddressable = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
+static auto rCmdMakeContentAddressable = registerCommand2<CmdMakeContentAddressable>({"store", "make-content-addressable"});

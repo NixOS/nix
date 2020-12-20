@@ -10,6 +10,8 @@
 #include "archive.hh"
 #include "callback.hh"
 
+#include <regex>
+
 namespace nix {
 
 
@@ -364,6 +366,29 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapNoResolve(const StorePath & path)
+{
+    std::map<std::string, std::optional<StorePath>> outputs;
+    auto drv = readInvalidDerivation(path);
+    for (auto& [outputName, output] : drv.outputsAndOptPaths(*this)) {
+        outputs.emplace(outputName, output.second);
+    }
+    return outputs;
+}
+
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
+{
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        auto resolvedDrv = Derivation::tryResolve(*this, path);
+        if (resolvedDrv) {
+            auto resolvedDrvPath = writeDerivation(*this, *resolvedDrv, NoRepair, true);
+            if (isValidPath(resolvedDrvPath))
+                return queryDerivationOutputMapNoResolve(resolvedDrvPath);
+        }
+    }
+    return queryDerivationOutputMapNoResolve(path);
+}
+
 OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     auto resp = queryPartialDerivationOutputMap(path);
     OutputPathMap result;
@@ -519,6 +544,28 @@ void Store::queryPathInfo(const StorePath & storePath,
                 (*callbackPtr)(ref<const ValidPathInfo>(info));
             } catch (...) { callbackPtr->rethrow(); }
         }});
+}
+
+
+void Store::substitutePaths(const StorePathSet & paths)
+{
+    std::vector<StorePathWithOutputs> paths2;
+    for (auto & path : paths)
+        if (!path.isDerivation())
+            paths2.push_back({path});
+    uint64_t downloadSize, narSize;
+    StorePathSet willBuild, willSubstitute, unknown;
+    queryMissing(paths2,
+        willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (!willSubstitute.empty())
+        try {
+            std::vector<StorePathWithOutputs> subs;
+            for (auto & p : willSubstitute) subs.push_back({p});
+            buildPaths(subs);
+        } catch (Error & e) {
+            logWarning(e.info());
+        }
 }
 
 
@@ -705,9 +752,17 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMod
     StorePathSet paths2;
 
     for (auto & path : paths) {
-        if (path.path.isDerivation())
-            unsupported("buildPaths");
-        paths2.insert(path.path);
+        if (path.path.isDerivation()) {
+            auto outPaths = queryPartialDerivationOutputMap(path.path);
+            for (auto & outputName : path.outputs) {
+                auto currentOutputPathIter = outPaths.find(outputName);
+                if (currentOutputPathIter == outPaths.end() ||
+                    !currentOutputPathIter->second ||
+                    !isValidPath(*currentOutputPathIter->second))
+                    unsupported("buildPaths");
+            }
+        } else
+            paths2.insert(path.path);
     }
 
     if (queryValidPaths(paths2).size() != paths2.size())
@@ -750,8 +805,8 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     }
 
     auto source = sinkToSource([&](Sink & sink) {
-        LambdaSink progressSink([&](const unsigned char * data, size_t len) {
-            total += len;
+        LambdaSink progressSink([&](std::string_view data) {
+            total += data.size();
             act.progress(total, info->narSize);
         });
         TeeSink tee { sink, progressSink };
@@ -1024,6 +1079,14 @@ Derivation Store::readDerivation(const StorePath & drvPath)
     }
 }
 
+Derivation Store::readInvalidDerivation(const StorePath & drvPath)
+{
+    return parseDerivation(
+        *this,
+        readFile(Store::toRealPath(drvPath)),
+        Derivation::nameFromPath(drvPath));
+}
+
 }
 
 
@@ -1078,6 +1141,34 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
     }
 }
 
+// The `parseURL` function supports both IPv6 URIs as defined in
+// RFC2732, but also pure addresses. The latter one is needed here to
+// connect to a remote store via SSH (it's possible to do e.g. `ssh root@::1`).
+//
+// This function now ensures that a usable connection string is available:
+// * If the store to be opened is not an SSH store, nothing will be done.
+// * If the URL looks like `root@[::1]` (which is allowed by the URL parser and probably
+//   needed to pass further flags), it
+//   will be transformed into `root@::1` for SSH (same for `[::1]` -> `::1`).
+// * If the URL looks like `root@::1` it will be left as-is.
+// * In any other case, the string will be left as-is.
+static std::string extractConnStr(const std::string &proto, const std::string &connStr)
+{
+    if (proto.rfind("ssh") != std::string::npos) {
+        std::smatch result;
+        std::regex v6AddrRegex("^((.*)@)?\\[(.*)\\]$");
+
+        if (std::regex_match(connStr, result, v6AddrRegex)) {
+            if (result[1].matched) {
+                return result.str(1) + result.str(3);
+            }
+            return result.str(3);
+        }
+    }
+
+    return connStr;
+}
+
 ref<Store> openStore(const std::string & uri_,
     const Store::Params & extraParams)
 {
@@ -1086,7 +1177,10 @@ ref<Store> openStore(const std::string & uri_,
         auto parsedUri = parseURL(uri_);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
-        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
+        auto baseURI = extractConnStr(
+            parsedUri.scheme,
+            parsedUri.authority.value_or("") + parsedUri.path
+        );
 
         for (auto implem : *Implementations::registered) {
             if (implem.uriSchemes.count(parsedUri.scheme)) {
@@ -1129,9 +1223,6 @@ std::list<ref<Store>> getDefaultSubstituters()
         };
 
         for (auto uri : settings.substituters.get())
-            addStore(uri);
-
-        for (auto uri : settings.extraSubstituters.get())
             addStore(uri);
 
         stores.sort([](ref<Store> & a, ref<Store> & b) {

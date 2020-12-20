@@ -179,6 +179,10 @@ AC_CHECK_HEADERS([bzlib.h], [true],
   [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
+# Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
+if test "$shared" != yes; then
+    LIBARCHIVE_LIBS+=' -lz'
+fi
 
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
@@ -251,6 +255,7 @@ if test -n "$enable_s3"; then
   declare -a aws_version_tokens=($(printf '#include <aws/core/VersionConfig.h>\nAWS_SDK_VERSION_STRING' | $CPP $CPPFLAGS - | grep -v '^#.*' | sed 's/"//g' | tr '.' ' '))
   AC_DEFINE_UNQUOTED([AWS_VERSION_MAJOR], ${aws_version_tokens@<:@0@:>@}, [Major version of aws-sdk-cpp.])
   AC_DEFINE_UNQUOTED([AWS_VERSION_MINOR], ${aws_version_tokens@<:@1@:>@}, [Minor version of aws-sdk-cpp.])
+  AC_DEFINE_UNQUOTED([AWS_VERSION_PATCH], ${aws_version_tokens@<:@2@:>@}, [Patch version of aws-sdk-cpp.])
 fi
 
 

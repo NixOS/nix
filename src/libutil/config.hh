@@ -202,7 +202,10 @@ protected:
         assert(created == 123);
     }
 
-    virtual void set(const std::string & value) = 0;
+    virtual void set(const std::string & value, bool append = false) = 0;
+
+    virtual bool isAppendable()
+    { return false; }
 
     virtual std::string to_string() const = 0;
 
@@ -243,7 +246,9 @@ public:
     void operator =(const T & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
+
+    bool isAppendable() override;
 
     virtual void override(const T & v)
     {
@@ -305,7 +310,7 @@ public:
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
 
     Path operator +(const char * p) const { return value + p; }
 

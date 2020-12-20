@@ -22,6 +22,9 @@ std::string chrootHelperName = "__run_in_chroot";
 
 struct RunCommon : virtual Command
 {
+
+    using Command::run;
+
     void runProgram(ref<Store> store,
         const std::string & program,
         const Strings & args)
@@ -59,6 +62,9 @@ struct RunCommon : virtual Command
 
 struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 {
+
+    using InstallablesCommand::run;
+
     std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
 
     CmdShell()
@@ -144,6 +150,8 @@ static auto rCmdShell = registerCommand<CmdShell>("shell");
 
 struct CmdRun : InstallableCommand, RunCommon
 {
+    using InstallableCommand::run;
+
     std::vector<std::string> args;
 
     CmdRun()

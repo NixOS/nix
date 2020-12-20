@@ -23,7 +23,7 @@ Attrs jsonToAttrs(const nlohmann::json & json)
     return attrs;
 }
 
-nlohmann::json attrsToJson(const Attrs & attrs)
+nlohmann::json attrsToJSON(const Attrs & attrs)
 {
     nlohmann::json json;
     for (auto & attr : attrs) {
@@ -44,7 +44,7 @@ std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::strin
     if (i == attrs.end()) return {};
     if (auto v = std::get_if<std::string>(&i->second))
         return *v;
-    throw Error("input attribute '%s' is not a string %s", name, attrsToJson(attrs).dump());
+    throw Error("input attribute '%s' is not a string %s", name, attrsToJSON(attrs).dump());
 }
 
 std::string getStrAttr(const Attrs & attrs, const std::string & name)

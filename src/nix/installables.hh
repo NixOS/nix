@@ -7,6 +7,8 @@
 
 #include <optional>
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 struct DrvInfo;
@@ -16,11 +18,13 @@ namespace eval_cache { class EvalCache; class AttrCursor; }
 
 struct BuildableOpaque {
     StorePath path;
+    nlohmann::json toJSON(ref<Store> store) const;
 };
 
 struct BuildableFromDrv {
     StorePath drvPath;
     std::map<std::string, std::optional<StorePath>> outputs;
+    nlohmann::json toJSON(ref<Store> store) const;
 };
 
 typedef std::variant<
@@ -29,6 +33,7 @@ typedef std::variant<
 > Buildable;
 
 typedef std::vector<Buildable> Buildables;
+nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store);
 
 struct App
 {

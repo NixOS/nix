@@ -27,6 +27,10 @@
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
+#include <boost/coroutine2/coroutine.hpp>
+#include <boost/coroutine2/protected_fixedsize_stack.hpp>
+#include <boost/context/stack_context.hpp>
+
 #endif
 
 namespace nix {
@@ -208,7 +212,8 @@ bool Value::isTrivial() const
         && (type != tThunk
             || (dynamic_cast<ExprAttrs *>(thunk.expr)
                 && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(thunk.expr));
+            || dynamic_cast<ExprLambda *>(thunk.expr)
+            || dynamic_cast<ExprList *>(thunk.expr));
 }
 
 
@@ -219,6 +224,31 @@ static void * oomHandler(size_t requested)
     /* Convert this to a proper C++ exception. */
     throw std::bad_alloc();
 }
+
+class BoehmGCStackAllocator : public StackAllocator {
+  boost::coroutines2::protected_fixedsize_stack stack {
+    // We allocate 8 MB, the default max stack size on NixOS.
+    // A smaller stack might be quicker to allocate but reduces the stack
+    // depth available for source filter expressions etc.
+    std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
+    };
+
+  public:
+    boost::context::stack_context allocate() override {
+        auto sctx = stack.allocate();
+        GC_add_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+        return sctx;
+    }
+
+    void deallocate(boost::context::stack_context sctx) override {
+        GC_remove_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+        stack.deallocate(sctx);
+    }
+
+};
+
+static BoehmGCStackAllocator boehmGCStackAllocator;
+
 #endif
 
 
@@ -255,6 +285,8 @@ void initGC()
     GC_INIT();
 
     GC_set_oom_fn(oomHandler);
+
+    StackAllocator::defaultAllocator = &boehmGCStackAllocator;
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
@@ -1404,7 +1436,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError(pos, "assertion '%1%' failed at %2%", out.str());
+        throwAssertionError(pos, "assertion '%1%' failed", out.str());
     }
     body->eval(state, env, v);
 }
@@ -2072,10 +2104,19 @@ EvalSettings::EvalSettings()
 Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
-    auto add = [&](const Path & p) { if (pathExists(p)) { res.push_back(p); } };
+    auto add = [&](const Path & p, const std::string & s = std::string()) {
+        if (pathExists(p)) {
+            if (s.empty()) {
+                res.push_back(p);
+            } else {
+                res.push_back(s + "=" + p);
+            }
+        }
+    };
+
     add(getHome() + "/.nix-defexpr/channels");
-    add("nixpkgs=" + settings.nixStateDir + "/nix/profiles/per-user/root/channels/nixpkgs");
-    add(settings.nixStateDir + "/nix/profiles/per-user/root/channels");
+    add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
+    add(settings.nixStateDir + "/profiles/per-user/root/channels");
     return res;
 }
 

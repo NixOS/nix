@@ -19,6 +19,7 @@ keep-derivations = false
 sandbox = false
 experimental-features = nix-command flakes nix-testing
 gc-reserved-space = 0
+substituters =
 flake-registry = $TEST_ROOT/registry.json
 include nix.conf.extra
 EOF
