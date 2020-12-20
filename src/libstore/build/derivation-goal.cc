@@ -592,9 +592,17 @@ void DerivationGoal::tryToBuild()
     PathSet lockFiles;
     /* FIXME: Should lock something like the drv itself so we don't build same
        CA drv concurrently */
-    for (auto & i : drv->outputsAndOptPaths(worker.store))
-        if (i.second.second)
-            lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+    if (dynamic_cast<LocalStore *>(&worker.store))
+        /* If we aren't a local store, we might need to use the local store as
+           a build remote, but that would cause a deadlock. */
+        /* FIXME: Make it so we can use ourselves as a build remote even if we
+           are the local store (separate locking for building vs scheduling? */
+        /* FIXME: find some way to lock for scheduling for the other stores so
+           a forking daemon with --store still won't farm out redundant builds.
+           */
+        for (auto & i : drv->outputsAndOptPaths(worker.store))
+            if (i.second.second)
+                lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
@@ -680,6 +688,12 @@ void DerivationGoal::tryLocalBuild() {
     /* Make sure that we are allowed to start a build.  If this
        derivation prefers to be done locally, do it even if
        maxBuildJobs is 0. */
+    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+        throw Error(
+            "unable to build with a primary store that isn't a local store; "
+            "either pass a different '--store' or enable remote builds."
+            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+    }
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs && !(buildLocally && curBuilds == 0)) {
         worker.waitForBuildSlot(shared_from_this());
