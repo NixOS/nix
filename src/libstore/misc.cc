@@ -282,4 +282,13 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
 }
 
 
+const PublicKeys & Store::getPublicKeys()
+{
+    auto cryptoState(_cryptoState.lock());
+    if (!cryptoState->publicKeys)
+        cryptoState->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys());
+    return *cryptoState->publicKeys;
+}
+
+
 }

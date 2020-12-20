@@ -1092,15 +1092,6 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 }
 
 
-const PublicKeys & LocalStore::getPublicKeys()
-{
-    auto state(_state.lock());
-    if (!state->publicKeys)
-        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys());
-    return *state->publicKeys;
-}
-
-
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {

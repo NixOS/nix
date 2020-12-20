@@ -189,6 +189,10 @@ struct StoreConfig : public Config
 
     const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
 
+    Setting<bool> requireSigs{this,
+        settings.requireSigs,
+        "require-sigs", "whether store paths should have a trusted signature on import"};
+
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
@@ -710,10 +714,19 @@ public:
         return toRealPath(printStorePath(storePath));
     }
 
+    const PublicKeys & getPublicKeys();
+
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 
 protected:
+
+    struct CryptoState
+    {
+        std::unique_ptr<PublicKeys> publicKeys;
+    };
+
+    Sync<CryptoState> _cryptoState;
 
     Stats stats;
 
