@@ -71,11 +71,15 @@ static int main_build_remote(int argc, char * * argv)
 
         initPlugins();
 
-        auto store = openStore().cast<LocalStore>();
+        auto store = openStore();
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
-        currentLoad = store->stateDir + "/current-load";
+        currentLoad = "/current-load";
+        if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
+            currentLoad = std::string { localStore->stateDir } + currentLoad;
+        else
+            currentLoad = settings.nixStateDir + currentLoad;
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
@@ -288,8 +292,9 @@ connected:
 
         if (!missing.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
-            for (auto & i : missing)
-                store->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
+            if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
+                for (auto & i : missing)
+                    localStore->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
             copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
         }
 
