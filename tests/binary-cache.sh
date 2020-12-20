@@ -1,15 +1,20 @@
 source common.sh
 
+# We can produce drvs directly into the binary cache
 clearStore
-clearCache
+clearCacheCache
+nix-instantiate --store "file://$cacheDir" dependencies.nix
 
 # Create the binary cache.
+clearStore
+clearCache
 outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix copy --to file://$cacheDir $outPath
 
 
-basicTests() {
+basicDownloadTests() {
+    # No uploading tests bcause upload with force HTTP doesn't work.
 
     # By default, a binary cache doesn't support "nix-env -qas", but does
     # support installation.
@@ -44,12 +49,12 @@ basicTests() {
 
 
 # Test LocalBinaryCacheStore.
-basicTests
+basicDownloadTests
 
 
 # Test HttpBinaryCacheStore.
 export _NIX_FORCE_HTTP=1
-basicTests
+basicDownloadTests
 
 
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
