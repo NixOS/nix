@@ -747,29 +747,6 @@ const Store::Stats & Store::getStats()
 }
 
 
-void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode)
-{
-    StorePathSet paths2;
-
-    for (auto & path : paths) {
-        if (path.path.isDerivation()) {
-            auto outPaths = queryPartialDerivationOutputMap(path.path);
-            for (auto & outputName : path.outputs) {
-                auto currentOutputPathIter = outPaths.find(outputName);
-                if (currentOutputPathIter == outPaths.end() ||
-                    !currentOutputPathIter->second ||
-                    !isValidPath(*currentOutputPathIter->second))
-                    unsupported("buildPaths");
-            }
-        } else
-            paths2.insert(path.path);
-    }
-
-    if (queryValidPaths(paths2).size() != paths2.size())
-        unsupported("buildPaths");
-}
-
-
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const StorePath & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {

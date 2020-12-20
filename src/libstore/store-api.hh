@@ -523,17 +523,17 @@ public:
            explicitly choosing to allow it).
     */
     virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode = bmNormal) = 0;
+        BuildMode buildMode = bmNormal);
 
     /* Ensure that a path is valid.  If it is not currently valid, it
        may be made valid by running a substitute (if defined for the
        path). */
-    virtual void ensurePath(const StorePath & path) = 0;
+    virtual void ensurePath(const StorePath & path);
 
     /* Add a store path as a temporary root of the garbage collector.
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
-    { unsupported("addTempRoot"); }
+    { warn("not creating temp root, store doesn't support GC"); }
 
     /* Add an indirect root, which is merely a symlink to `path' from
        /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed

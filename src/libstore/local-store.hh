@@ -133,15 +133,6 @@ public:
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
-    void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
-        BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
-
-    void ensurePath(const StorePath & path) override;
-
     void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
