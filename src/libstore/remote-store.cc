@@ -77,8 +77,8 @@ void write(const Store & store, Sink & out, const std::optional<ContentAddress> 
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
-    : Store(params)
-    , RemoteStoreConfig(params)
+    : RemoteStoreConfig(params)
+    , Store(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
             [this]() {

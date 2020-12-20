@@ -1985,7 +1985,7 @@ void DerivationGoal::writeStructuredAttrs()
     chownToBuilder(tmpDir + "/.attrs.sh");
 }
 
-struct RestrictedStoreConfig : LocalFSStoreConfig
+struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
     const std::string name() { return "Restricted Store"; }
@@ -1994,14 +1994,19 @@ struct RestrictedStoreConfig : LocalFSStoreConfig
 /* A wrapper around LocalStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
-struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConfig
+struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual LocalFSStore
 {
     ref<LocalStore> next;
 
     DerivationGoal & goal;
 
     RestrictedStore(const Params & params, ref<LocalStore> next, DerivationGoal & goal)
-        : StoreConfig(params), Store(params), LocalFSStore(params), next(next), goal(goal)
+        : StoreConfig(params)
+        , LocalFSStoreConfig(params)
+        , RestrictedStoreConfig(params)
+        , Store(params)
+        , LocalFSStore(params)
+        , next(next), goal(goal)
     { }
 
     Path getRealStoreDir() override
