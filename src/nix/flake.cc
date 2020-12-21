@@ -260,7 +260,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type != tLambda || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
+                if (!v.isLambda() || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
                 if (!body || body->matchAttrs || std::string(body->arg) != "prev")
@@ -276,10 +276,10 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkModule = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type == tLambda) {
+                if (v.isLambda()) {
                     if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
-                } else if (v.type == tAttrs) {
+                } else if (v.type() == nAttrs) {
                     for (auto & attr : *v.attrs)
                         try {
                             state->forceValue(*attr.value, *attr.pos);
@@ -371,7 +371,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkBundler = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type != tLambda)
+                if (!v.isLambda())
                     throw Error("bundler must be a function");
                 if (!v.lambda.fun->formals ||
                     v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end() ||

@@ -97,10 +97,10 @@ struct CmdEval : MixJSON, InstallableCommand
             recurse = [&](Value & v, const Pos & pos, const Path & path)
             {
                 state->forceValue(v);
-                if (v.type == tString)
+                if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path, v.string.s);
-                else if (v.type == tAttrs) {
+                else if (v.type() == nAttrs) {
                     if (mkdir(path.c_str(), 0777) == -1)
                         throw SysError("creating directory '%s'", path);
                     for (auto & attr : *v.attrs)

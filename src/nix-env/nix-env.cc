@@ -1138,38 +1138,38 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                         i.queryName(), j)
                                 });
                             else {
-                                if (v->type == tString) {
+                                if (v->type() == nString) {
                                     attrs2["type"] = "string";
                                     attrs2["value"] = v->string.s;
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tInt) {
+                                } else if (v->type() == nInt) {
                                     attrs2["type"] = "int";
                                     attrs2["value"] = (format("%1%") % v->integer).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tFloat) {
+                                } else if (v->type() == nFloat) {
                                     attrs2["type"] = "float";
                                     attrs2["value"] = (format("%1%") % v->fpoint).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tBool) {
+                                } else if (v->type() == nBool) {
                                     attrs2["type"] = "bool";
                                     attrs2["value"] = v->boolean ? "true" : "false";
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->isList()) {
+                                } else if (v->type() == nList) {
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
                                     for (unsigned int j = 0; j < v->listSize(); ++j) {
-                                        if (v->listElems()[j]->type != tString) continue;
+                                        if (v->listElems()[j]->type() != nString) continue;
                                         XMLAttrs attrs3;
                                         attrs3["value"] = v->listElems()[j]->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
-                              } else if (v->type == tAttrs) {
+                              } else if (v->type() == nAttrs) {
                                   attrs2["type"] = "strings";
                                   XMLOpenElement m(xml, "meta", attrs2);
                                   Bindings & attrs = *v->attrs;
                                   for (auto &i : attrs) {
                                       Attr & a(*attrs.find(i.name));
-                                      if(a.value->type != tString) continue;
+                                      if(a.value->type() != nString) continue;
                                       XMLAttrs attrs3;
                                       attrs3["type"] = i.name;
                                       attrs3["value"] = a.value->string.s;

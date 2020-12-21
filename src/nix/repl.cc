@@ -446,11 +446,11 @@ bool NixRepl::processLine(string line)
 
         Pos pos;
 
-        if (v.type == tPath || v.type == tString) {
+        if (v.type() == nPath || v.type() == nString) {
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
             pos.file = state->symbols.create(filename);
-        } else if (v.type == tLambda) {
+        } else if (v.isLambda()) {
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
@@ -551,9 +551,7 @@ bool NixRepl::processLine(string line)
         {
             Expr * e = parseString(string(line, p + 1));
             Value & v(*state->allocValue());
-            v.type = tThunk;
-            v.thunk.env = env;
-            v.thunk.expr = e;
+            v.mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
         } else {
             Value v;
@@ -669,31 +667,31 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     state->forceValue(v);
 
-    switch (v.type) {
+    switch (v.type()) {
 
-    case tInt:
+    case nInt:
         str << ANSI_CYAN << v.integer << ANSI_NORMAL;
         break;
 
-    case tBool:
+    case nBool:
         str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
         break;
 
-    case tString:
+    case nString:
         str << ANSI_YELLOW;
         printStringValue(str, v.string.s);
         str << ANSI_NORMAL;
         break;
 
-    case tPath:
+    case nPath:
         str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
         break;
 
-    case tNull:
+    case nNull:
         str << ANSI_CYAN "null" ANSI_NORMAL;
         break;
 
-    case tAttrs: {
+    case nAttrs: {
         seen.insert(&v);
 
         bool isDrv = state->isDerivation(v);
@@ -738,9 +736,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
     }
 
-    case tList1:
-    case tList2:
-    case tListN:
+    case nList:
         seen.insert(&v);
 
         str << "[ ";
@@ -761,22 +757,21 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << "]";
         break;
 
-    case tLambda: {
-        std::ostringstream s;
-        s << v.lambda.fun->pos;
-        str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
+    case nFunction:
+        if (v.isLambda()) {
+            std::ostringstream s;
+            s << v.lambda.fun->pos;
+            str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
+        } else if (v.isPrimOp()) {
+            str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
+        } else if (v.isPrimOpApp()) {
+            str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
+        } else {
+            abort();
+        }
         break;
-    }
 
-    case tPrimOp:
-        str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
-        break;
-
-    case tPrimOpApp:
-        str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
-        break;
-
-    case tFloat:
+    case nFloat:
         str << v.fpoint;
         break;
 

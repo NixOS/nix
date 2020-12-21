@@ -73,7 +73,7 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
 static void forceTrivialValue(EvalState & state, Value & value, const Pos & pos)
 {
-    if (value.type == tThunk && value.isTrivial())
+    if (value.isThunk() && value.isTrivial())
         state.forceValue(value, pos);
 }
 
@@ -82,9 +82,9 @@ static void expectType(EvalState & state, ValueType type,
     Value & value, const Pos & pos)
 {
     forceTrivialValue(state, value, pos);
-    if (value.type != type)
+    if (value.type() != type)
         throw Error("expected %s but got %s at %s",
-            showType(type), showType(value.type), pos);
+            showType(type), showType(value.type()), pos);
 }
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
@@ -93,7 +93,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 static FlakeInput parseFlakeInput(EvalState & state,
     const std::string & inputName, Value * value, const Pos & pos)
 {
-    expectType(state, tAttrs, *value, pos);
+    expectType(state, nAttrs, *value, pos);
 
     FlakeInput input;
 
@@ -108,19 +108,19 @@ static FlakeInput parseFlakeInput(EvalState & state,
     for (nix::Attr attr : *(value->attrs)) {
         try {
             if (attr.name == sUrl) {
-                expectType(state, tString, *attr.value, *attr.pos);
+                expectType(state, nString, *attr.value, *attr.pos);
                 url = attr.value->string.s;
                 attrs.emplace("url", *url);
             } else if (attr.name == sFlake) {
-                expectType(state, tBool, *attr.value, *attr.pos);
+                expectType(state, nBool, *attr.value, *attr.pos);
                 input.isFlake = attr.value->boolean;
             } else if (attr.name == sInputs) {
                 input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
             } else if (attr.name == sFollows) {
-                expectType(state, tString, *attr.value, *attr.pos);
+                expectType(state, nString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
             } else {
-                if (attr.value->type == tString)
+                if (attr.value->type() == nString)
                     attrs.emplace(attr.name, attr.value->string.s);
                 else
                     throw TypeError("flake input attribute '%s' is %s while a string is expected",
@@ -158,7 +158,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 {
     std::map<FlakeId, FlakeInput> inputs;
 
-    expectType(state, tAttrs, *value, pos);
+    expectType(state, nAttrs, *value, pos);
 
     for (nix::Attr & inputAttr : *(*value).attrs) {
         inputs.emplace(inputAttr.name,
@@ -199,10 +199,10 @@ static Flake getFlake(
     Value vInfo;
     state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
 
-    expectType(state, tAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
+    expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
-        expectType(state, tString, *description->value, *description->pos);
+        expectType(state, nString, *description->value, *description->pos);
         flake.description = description->value->string.s;
     }
 
@@ -214,9 +214,9 @@ static Flake getFlake(
     auto sOutputs = state.symbols.create("outputs");
 
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
-        expectType(state, tLambda, *outputs->value, *outputs->pos);
+        expectType(state, nFunction, *outputs->value, *outputs->pos);
 
-        if (outputs->value->lambda.fun->matchAttrs) {
+        if (outputs->value->isLambda() && outputs->value->lambda.fun->matchAttrs) {
             for (auto & formal : outputs->value->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {
@@ -231,21 +231,21 @@ static Flake getFlake(
     auto sNixConfig = state.symbols.create("nixConfig");
 
     if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
-        expectType(state, tAttrs, *nixConfig->value, *nixConfig->pos);
+        expectType(state, nAttrs, *nixConfig->value, *nixConfig->pos);
 
         for (auto & setting : *nixConfig->value->attrs) {
             forceTrivialValue(state, *setting.value, *setting.pos);
-            if (setting.value->type == tString)
+            if (setting.value->type() == nString)
                 flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
-            else if (setting.value->type == tInt)
+            else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
-            else if (setting.value->type == tBool)
+            else if (setting.value->type() == nBool)
                 flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
-            else if (setting.value->isList()) {
+            else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
                 for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
                     auto elem = setting.value->listElems()[n];
-                    if (elem->type != tString)
+                    if (elem->type() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             setting.name, showType(*setting.value));
                     ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
