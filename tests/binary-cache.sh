@@ -181,6 +181,50 @@ clearCacheCache
 
 nix-store -r $outPath --substituters "file://$cacheDir2 file://$cacheDir" --trusted-public-keys "$publicKey"
 
+# Test whether fallback works if a NAR is missing and new narinfo is available. This does not require --fallback.
+clearStore
+clearCacheCache
+cacheDir3=$TEST_ROOT/binary-cache-3
+rm -rf $cacheDir3
+cp -r $cacheDir $cacheDir3
+
+# populate the binary cache 
+nondeter=$(nix-build nondeterministic.nix --no-out-link)
+_NIX_FORCE_HTTP= nix copy --to file://$cacheDir3?secret-key=$TEST_ROOT/sk1 $nondeter
+
+# populate disk cache
+clearStore
+nix-build  --trusted-public-keys "$publicKey" --substituters "file://$cacheDir3" nondeterministic.nix 2>&1 | tee $TEST_ROOT/log
+grep -q "copying path.*non-deterministic" $TEST_ROOT/log
+
+# preserve disk cache
+cp -v $TEST_HOME/.cache/nix/binary-cache*.sqlite .
+
+# garbage collect
+clearStore
+rm -rf $cacheDir3/nar
+rm -rf $cacheDir3/*.narinfo
+
+# populate the binary cache again, this time store hash won't change but nar will
+nondeter=$(nix-build nondeterministic.nix --no-out-link)
+_NIX_FORCE_HTTP= nix copy --to file://$cacheDir3?secret-key=$TEST_ROOT/sk1 $nondeter
+
+# restore the previous view of on disk cache
+clearStore
+clearCacheCache
+mv -v binary-cache*.sqlite $TEST_HOME/.cache/nix/
+
+# make sure nars differ
+nar=$(ls $cacheDir3/nar)
+sqlite3 $TEST_HOME/.cache/nix/*.sqlite 'select * from NARs;' > log
+grep -v $nar log
+
+
+# check substitution happens by refreshing narinfo and getting new nar
+nix-build -vvvvvvv --trusted-public-keys "$publicKey" --substituters "file://$cacheDir3" nondeterministic.nix 2>&1 | tee $TEST_ROOT/log
+grep -q $nar $TEST_ROOT/log
+grep -v "building" log
+
 fi # HAVE_LIBSODIUM
 
 

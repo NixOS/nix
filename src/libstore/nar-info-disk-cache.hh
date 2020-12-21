@@ -25,6 +25,8 @@ public:
 
     virtual std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
         const std::string & uri, const std::string & hashPart) = 0;
+        
+    virtual void deleteNarInfo(const std::string & hashPart) = 0;
 
     virtual void upsertNarInfo(
         const std::string & uri, const std::string & hashPart,
