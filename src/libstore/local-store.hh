@@ -43,7 +43,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 };
 
 
-class LocalStore : public LocalFSStore, public virtual LocalStoreConfig
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore
 {
 private:
 

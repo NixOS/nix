@@ -9,7 +9,7 @@ struct DummyStoreConfig : virtual StoreConfig {
     const std::string name() override { return "Dummy Store"; }
 };
 
-struct DummyStore : public Store, public virtual DummyStoreConfig
+struct DummyStore : public virtual DummyStoreConfig, public virtual Store
 {
     DummyStore(const std::string scheme, const std::string uri, const Params & params)
         : DummyStore(params)
@@ -17,6 +17,7 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
 
     DummyStore(const Params & params)
         : StoreConfig(params)
+        , DummyStoreConfig(params)
         , Store(params)
     { }
 

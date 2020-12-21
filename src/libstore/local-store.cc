@@ -100,6 +100,8 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 
 LocalStore::LocalStore(const Params & params)
     : StoreConfig(params)
+    , LocalFSStoreConfig(params)
+    , LocalStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
     , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",

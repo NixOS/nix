@@ -29,7 +29,7 @@ struct RemoteStoreConfig : virtual StoreConfig
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual Store, public virtual RemoteStoreConfig
+class RemoteStore : public virtual RemoteStoreConfig, public virtual Store
 {
 public:
 
