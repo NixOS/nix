@@ -168,34 +168,3 @@ clearCacheCache
 nix-store -r $outPath --substituters "file://$cacheDir2 file://$cacheDir" --trusted-public-keys "$publicKey"
 
 fi # HAVE_LIBSODIUM
-
-# Test against issue https://github.com/NixOS/nix/issues/3964
-#
-expr='
-  with import ./config.nix;
-  mkDerivation {
-    name = "multi-output";
-    buildCommand = "mkdir -p $out; echo foo > $doc; echo $doc > $out/docref";
-    outputs = ["out" "doc"];
-  }
-'
-outPath=$(nix-build --no-out-link -E "$expr")
-docPath=$(nix-store -q --references $outPath)
-
-# $ nix-store -q --tree $outPath
-# ...-multi-output
-# +---...-multi-output-doc
-
-nix copy --to "file://$cacheDir" $outPath
-
-hashpart() {
-  basename "$1" | cut -c1-32
-}
-
-# break the closure of out by removing doc
-rm $cacheDir/$(hashpart $docPath).narinfo
-
-nix-store --delete $outPath $docPath
-# -vvv is the level that logs during the loop
-timeout 60 nix-build -E "$expr" --option substituters "file://$cacheDir" \
-  --option trusted-binary-caches "file://$cacheDir"  --no-require-sigs
