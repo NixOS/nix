@@ -402,11 +402,6 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
 
-    try {
-        addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
-    } catch (Error &) {
-    }
-
     if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
 
@@ -456,6 +451,8 @@ Path EvalState::checkSourcePath(const Path & path_)
      * and thus leak symlink targets.
      */
     Path abspath = canonPath(path_);
+
+    if (hasPrefix(abspath, corepkgsPrefix)) return abspath;
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(abspath, i)) {

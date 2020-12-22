@@ -164,7 +164,15 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         state.forceFunction(**fun, pos);
         mkApp(v, **fun, w);
         state.forceAttrs(v, pos);
-    } else {
+    }
+
+    else if (path == corepkgsPrefix + "fetchurl.nix") {
+        state.eval(state.parseExprFromString(
+            #include "fetchurl.nix.gen.hh"
+            , "/"), v);
+    }
+
+    else {
         if (!vScope)
             state.evalFile(realPath, v);
         else {
