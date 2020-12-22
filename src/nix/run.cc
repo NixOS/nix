@@ -258,14 +258,16 @@ void chrootHelper(int argc, char * * argv)
 
         for (auto entry : readDirectory("/")) {
             auto src = "/" + entry.name;
-            auto st = lstat(src);
-            if (!S_ISDIR(st.st_mode)) continue;
             Path dst = tmpDir + "/" + entry.name;
             if (pathExists(dst)) continue;
-            if (mkdir(dst.c_str(), 0700) == -1)
-                throw SysError("creating directory '%s'", dst);
-            if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                throw SysError("mounting '%s' on '%s'", src, dst);
+            auto st = lstat(src);
+            if (S_ISDIR(st.st_mode)) {
+                if (mkdir(dst.c_str(), 0700) == -1)
+                    throw SysError("creating directory '%s'", dst);
+                if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                    throw SysError("mounting '%s' on '%s'", src, dst);
+            } else if (S_ISLNK(st.st_mode))
+                createSymlink(readLink(src), dst);
         }
 
         char * cwd = getcwd(0, 0);
