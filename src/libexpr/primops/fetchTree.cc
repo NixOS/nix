@@ -324,6 +324,11 @@ static RegisterPrimOp primop_fetchGit({
           A Boolean parameter that specifies whether submodules should be
           checked out. Defaults to `false`.
 
+        - allRefs  
+          Whether to fetch all refs of the repository. With this argument being
+          true, it's possible to load a `rev` from *any* `ref` (by default only
+          `rev`s from the specified `ref` are supported).
+
       Here are some examples of how to use `fetchGit`.
 
         - To fetch a private repository over SSH:
