@@ -254,6 +254,8 @@ nlohmann::json Args::toJSON()
     res["description"] = description();
     res["flags"] = std::move(flags);
     res["args"] = std::move(args);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
     return res;
 }
 
@@ -349,38 +351,6 @@ void printTable(std::ostream & out, const Table2 & table)
             << std::string(max - filterANSIEscapes(row.first, true).size() + 2, ' ')
             << row.second << "\n";
     }
-}
-
-void Command::printHelp(const string & programName, std::ostream & out)
-{
-    Args::printHelp(programName, out);
-
-    auto exs = examples();
-    if (!exs.empty()) {
-        out << "\n" ANSI_BOLD "Examples:" ANSI_NORMAL "\n";
-        for (auto & ex : exs)
-            out << "\n"
-                << "  " << ex.description << "\n" // FIXME: wrap
-                << "  $ " << ex.command << "\n";
-    }
-}
-
-nlohmann::json Command::toJSON()
-{
-    auto exs = nlohmann::json::array();
-
-    for (auto & example : examples()) {
-        auto ex = nlohmann::json::object();
-        ex["description"] = example.description;
-        ex["command"] = chomp(stripIndentation(example.command));
-        exs.push_back(std::move(ex));
-    }
-
-    auto res = Args::toJSON();
-    res["examples"] = std::move(exs);
-    auto s = doc();
-    if (s != "") res.emplace("doc", stripIndentation(s));
-    return res;
 }
 
 MultiCommand::MultiCommand(const Commands & commands)

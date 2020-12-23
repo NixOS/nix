@@ -13,14 +13,11 @@ struct CmdOptimiseStore : StoreCommand
         return "replace identical files in the store by hard links";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To optimise the Nix store:",
-                "nix store optimise"
-            },
-        };
+        return
+          #include "optimise-store.md"
+          ;
     }
 
     void run(ref<Store> store) override

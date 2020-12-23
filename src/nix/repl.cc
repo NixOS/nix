@@ -405,6 +405,7 @@ bool NixRepl::processLine(string line)
     }
 
     if (command == ":?" || command == ":help") {
+        // FIXME: convert to Markdown, include in the 'nix repl' manpage.
         std::cout
              << "The following commands are available:\n"
              << "\n"
@@ -801,14 +802,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         return "start an interactive environment for evaluating Nix expressions";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-          Example{
-            "Display all special commands within the REPL:",
-            "nix repl\nnix-repl> :?"
-          }
-        };
+        return
+          #include "repl.md"
+          ;
     }
 
     void run(ref<Store> store) override
