@@ -415,6 +415,7 @@ bool NixRepl::processLine(string line)
              << "  :e <expr>     Open the derivation in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :lh <hash>    Download and load Nixpkgs commit from GitHub\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
@@ -433,6 +434,12 @@ bool NixRepl::processLine(string line)
     else if (command == ":l" || command == ":load") {
         state->resetFileCache();
         loadFile(arg);
+    }
+
+    else if (command == ":lh" || command == ":loadhash") {
+        state->resetFileCache();
+        std::string url = "https://github.com/NixOS/nixpkgs/tarball/" + arg;
+        loadFile(url);
     }
 
     else if (command == ":r" || command == ":reload") {
