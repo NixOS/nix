@@ -228,25 +228,11 @@ struct Command : virtual Args
     virtual void prepare() { };
     virtual void run() = 0;
 
-    struct Example
-    {
-        std::string description;
-        std::string command;
-    };
-
-    typedef std::list<Example> Examples;
-
-    virtual Examples examples() { return Examples(); }
-
     typedef int Category;
 
     static constexpr Category catDefault = 0;
 
     virtual Category category() { return catDefault; }
-
-    void printHelp(const string & programName, std::ostream & out) override;
-
-    nlohmann::json toJSON() override;
 };
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;

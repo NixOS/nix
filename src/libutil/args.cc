@@ -353,36 +353,6 @@ void printTable(std::ostream & out, const Table2 & table)
     }
 }
 
-void Command::printHelp(const string & programName, std::ostream & out)
-{
-    Args::printHelp(programName, out);
-
-    auto exs = examples();
-    if (!exs.empty()) {
-        out << "\n" ANSI_BOLD "Examples:" ANSI_NORMAL "\n";
-        for (auto & ex : exs)
-            out << "\n"
-                << "  " << ex.description << "\n" // FIXME: wrap
-                << "  $ " << ex.command << "\n";
-    }
-}
-
-nlohmann::json Command::toJSON()
-{
-    auto exs = nlohmann::json::array();
-
-    for (auto & example : examples()) {
-        auto ex = nlohmann::json::object();
-        ex["description"] = example.description;
-        ex["command"] = chomp(stripIndentation(example.command));
-        exs.push_back(std::move(ex));
-    }
-
-    auto res = Args::toJSON();
-    res["examples"] = std::move(exs);
-    return res;
-}
-
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
