@@ -184,6 +184,13 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     {
         return "a tool for reproducible and declarative configuration management";
     }
+
+    std::string doc() override
+    {
+        return
+          #include "nix.md"
+          ;
+    }
 };
 
 static void showHelp(std::vector<std::string> subcommand)
