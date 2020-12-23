@@ -104,6 +104,13 @@ struct CmdFlakeUpdate : FlakeCommand
         return "update flake lock file";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "flake-update.md"
+          ;
+    }
+
     void run(nix::ref<nix::Store> store) override
     {
         /* Use --refresh by default for 'nix flake update'. */
@@ -134,6 +141,13 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         return "list info about a given flake";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "flake-info.md"
+          ;
+    }
+
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
@@ -151,6 +165,13 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
     std::string description() override
     {
         return "list flake inputs";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-list-inputs.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -209,6 +230,13 @@ struct CmdFlakeCheck : FlakeCommand
     std::string description() override
     {
         return "check whether the flake evaluates and run its tests";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-check.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -631,22 +659,11 @@ struct CmdFlakeInit : CmdFlakeInitCommon
         return "create a flake in the current directory from a template";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To create a flake using the default template:",
-                "nix flake init"
-            },
-            Example{
-                "To see available templates:",
-                "nix flake show templates"
-            },
-            Example{
-                "To create a flake from a specific template:",
-                "nix flake init -t templates#nixos-container"
-            },
-        };
+        return
+          #include "flake-init.md"
+          ;
     }
 
     CmdFlakeInit()
@@ -660,6 +677,13 @@ struct CmdFlakeNew : CmdFlakeInitCommon
     std::string description() override
     {
         return "create a flake in the specified directory from a template";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-new.md"
+          ;
     }
 
     CmdFlakeNew()
@@ -679,6 +703,13 @@ struct CmdFlakeClone : FlakeCommand
     std::string description() override
     {
         return "clone flake repository";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-clone.md"
+          ;
     }
 
     CmdFlakeClone()
@@ -720,22 +751,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
         return "copy a flake and all its inputs to a store";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To copy the dwarffs flake and its dependencies to a binary cache:",
-                "nix flake archive --to file:///tmp/my-cache dwarffs"
-            },
-            Example{
-                "To fetch the dwarffs flake and its dependencies to the local Nix store:",
-                "nix flake archive dwarffs"
-            },
-            Example{
-                "To print the store paths of the flake sources of NixOps without fetching them:",
-                "nix flake archive --json --dry-run nixops"
-            },
-        };
+        return
+          #include "flake-archive.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -795,6 +815,13 @@ struct CmdFlakeShow : FlakeCommand
     std::string description() override
     {
         return "show the outputs provided by a flake";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-show.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -953,6 +980,13 @@ struct CmdFlake : NixMultiCommand
     std::string description() override
     {
         return "manage Nix flakes";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake.md"
+          ;
     }
 
     void run() override
