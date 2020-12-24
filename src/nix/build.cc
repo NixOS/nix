@@ -43,22 +43,11 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         return "build a derivation or fetch a store path";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To build and run GNU Hello from NixOS 17.03:",
-                "nix build -f channel:nixos-17.03 hello; ./result/bin/hello"
-            },
-            Example{
-                "To build the build.x86_64-linux attribute from release.nix:",
-                "nix build -f release.nix build.x86_64-linux"
-            },
-            Example{
-                "To make a profile point at GNU Hello:",
-                "nix build --profile /tmp/profile nixpkgs#hello"
-            },
-        };
+        return
+          #include "build.md"
+          ;
     }
 
     void run(ref<Store> store) override

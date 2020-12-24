@@ -20,12 +20,14 @@ struct SSHStoreConfig : virtual RemoteStoreConfig
     const std::string name() override { return "SSH Store"; }
 };
 
-class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig
+class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
 
     SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
+        , RemoteStoreConfig(params)
+        , SSHStoreConfig(params)
         , Store(params)
         , RemoteStore(params)
         , host(host)

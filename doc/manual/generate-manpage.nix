@@ -20,11 +20,6 @@ let
            (attrNames def.commands))
          + "\n"
        else "")
-    + (if def.examples or [] != []
-       then
-         "# Examples\n\n"
-         + concatStrings (map ({ description, command }: "${description}\n\n```console\n${command}\n```\n\n") def.examples)
-       else "")
     + (if def ? doc
        then def.doc + "\n\n"
        else "")
@@ -43,7 +38,7 @@ let
         if flag.category or "" != "config"
         then
           "  - `--${longName}`"
-          + (if flag ? shortName then " / `${flag.shortName}`" else "")
+          + (if flag ? shortName then " / `-${flag.shortName}`" else "")
           + (if flag ? labels then " " + (concatStringsSep " " (map (s: "*${s}*") flag.labels)) else "")
           + "  \n"
           + "    " + flag.description + "\n\n"

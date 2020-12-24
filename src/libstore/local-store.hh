@@ -43,7 +43,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 };
 
 
-class LocalStore : public LocalFSStore, public virtual LocalStoreConfig
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore
 {
 private:
 
@@ -127,7 +127,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -208,6 +208,13 @@ public:
        garbage until it exceeds maxFree. */
     void autoGC(bool sync = true);
 
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
+    void registerDrvOutput(const Realisation & info) override;
+    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
+
 private:
 
     int getSchema();
@@ -275,11 +282,6 @@ private:
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
-
-    /* Register the store path 'output' as the output named 'outputName' of
-       derivation 'deriver'. */
-    void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output);
-    void linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
 
     Path getRealStoreDir() override { return realStoreDir; }
 

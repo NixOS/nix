@@ -15,21 +15,14 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
     std::string description() override
     {
-        return "rewrite a path or closure to content-addressable form";
+        return "rewrite a path or closure to content-addressed form";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To create a content-addressable representation of GNU Hello (but not its dependencies):",
-                "nix store make-content-addressable nixpkgs#hello"
-            },
-            Example{
-                "To compute a content-addressable representation of the current NixOS system closure:",
-                "nix store make-content-addressable -r /run/current-system"
-            },
-        };
+        return
+          #include "make-content-addressable.md"
+          ;
     }
 
     void run(ref<Store> store, StorePaths storePaths) override

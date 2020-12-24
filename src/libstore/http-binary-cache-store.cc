@@ -15,7 +15,7 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     const std::string name() override { return "Http Binary Cache Store"; }
 };
 
-class HttpBinaryCacheStore : public BinaryCacheStore, public HttpBinaryCacheStoreConfig
+class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
 private:
 
@@ -36,6 +36,9 @@ public:
         const Path & _cacheUri,
         const Params & params)
         : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , HttpBinaryCacheStoreConfig(params)
+        , Store(params)
         , BinaryCacheStore(params)
         , cacheUri(scheme + "://" + _cacheUri)
     {

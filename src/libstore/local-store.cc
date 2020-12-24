@@ -52,14 +52,56 @@ struct LocalStore::State::Stmts {
     SQLiteStmt QueryReferrers;
     SQLiteStmt InvalidatePath;
     SQLiteStmt AddDerivationOutput;
+    SQLiteStmt RegisterRealisedOutput;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
+    SQLiteStmt QueryRealisedOutput;
+    SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
 };
 
+int getSchema(Path schemaPath)
+{
+    int curSchema = 0;
+    if (pathExists(schemaPath)) {
+        string s = readFile(schemaPath);
+        if (!string2Int(s, curSchema))
+            throw Error("'%1%' is corrupt", schemaPath);
+    }
+    return curSchema;
+}
+
+void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
+{
+    const int nixCASchemaVersion = 1;
+    int curCASchema = getSchema(schemaPath);
+    if (curCASchema != nixCASchemaVersion) {
+        if (curCASchema > nixCASchemaVersion) {
+            throw Error("current Nix store ca-schema is version %1%, but I only support %2%",
+                 curCASchema, nixCASchemaVersion);
+        }
+
+        if (!lockFile(lockFd.get(), ltWrite, false)) {
+            printInfo("waiting for exclusive access to the Nix store for ca drvs...");
+            lockFile(lockFd.get(), ltWrite, true);
+        }
+
+        if (curCASchema == 0) {
+            static const char schema[] =
+              #include "ca-specific-schema.sql.gen.hh"
+                ;
+            db.exec(schema);
+        }
+        writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
+        lockFile(lockFd.get(), ltRead, true);
+    }
+}
+
 LocalStore::LocalStore(const Params & params)
     : StoreConfig(params)
+    , LocalFSStoreConfig(params)
+    , LocalStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
     , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
@@ -238,6 +280,10 @@ LocalStore::LocalStore(const Params & params)
 
     else openDB(*state, false);
 
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+    }
+
     /* Prepare SQL statements. */
     state->stmts->RegisterValidPath.create(state->db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
@@ -264,6 +310,28 @@ LocalStore::LocalStore(const Params & params)
     state->stmts->QueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
     state->stmts->QueryValidPaths.create(state->db, "select path from ValidPaths");
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        state->stmts->RegisterRealisedOutput.create(state->db,
+            R"(
+                insert or replace into Realisations (drvPath, outputName, outputPath)
+                values (?, ?, (select id from ValidPaths where path = ?))
+                ;
+            )");
+        state->stmts->QueryRealisedOutput.create(state->db,
+            R"(
+                select Output.path from Realisations
+                    inner join ValidPaths as Output on Output.id = Realisations.outputPath
+                    where drvPath = ? and outputName = ?
+                    ;
+            )");
+        state->stmts->QueryAllRealisedOutputs.create(state->db,
+            R"(
+                select outputName, Output.path from Realisations
+                    inner join ValidPaths as Output on Output.id = Realisations.outputPath
+                    where drvPath = ?
+                    ;
+            )");
+    }
 }
 
 
@@ -301,16 +369,7 @@ std::string LocalStore::getUri()
 
 
 int LocalStore::getSchema()
-{
-    int curSchema = 0;
-    if (pathExists(schemaPath)) {
-        string s = readFile(schemaPath);
-        if (!string2Int(s, curSchema))
-            throw Error("'%1%' is corrupt", schemaPath);
-    }
-    return curSchema;
-}
-
+{ return nix::getSchema(schemaPath); }
 
 void LocalStore::openDB(State & state, bool create)
 {
@@ -597,13 +656,19 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 }
 
 
-void LocalStore::linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output)
+void LocalStore::registerDrvOutput(const Realisation & info)
 {
     auto state(_state.lock());
-    return linkDeriverToPath(*state, queryValidPathId(*state, deriver), outputName, output);
+    retrySQLite<void>([&]() {
+        state->stmts->RegisterRealisedOutput.use()
+            (info.id.strHash())
+            (info.id.outputName)
+            (printStorePath(info.outPath))
+            .exec();
+    });
 }
 
-void LocalStore::linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output)
+void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output)
 {
     retrySQLite<void>([&]() {
         state.stmts->AddDerivationOutput.use()
@@ -653,7 +718,7 @@ uint64_t LocalStore::addValidPath(State & state,
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
             if (i.second.second)
-                linkDeriverToPath(state, id, i.first, *i.second.second);
+                cacheDrvOutputMapping(state, id, i.first, *i.second.second);
         }
     }
 
@@ -815,69 +880,38 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
+std::map<std::string, std::optional<StorePath>>
+LocalStore::queryDerivationOutputMapNoResolve(const StorePath& path_)
 {
     auto path = path_;
-    std::map<std::string, std::optional<StorePath>> outputs;
-    Derivation drv = readDerivation(path);
-    for (auto & [outName, _] : drv.outputs) {
-        outputs.insert_or_assign(outName, std::nullopt);
-    }
-    bool haveCached = false;
-    {
-        auto resolutions = drvPathResolutions.lock();
-        auto resolvedPathOptIter = resolutions->find(path);
-        if (resolvedPathOptIter != resolutions->end()) {
-            auto & [_, resolvedPathOpt] = *resolvedPathOptIter;
-            if (resolvedPathOpt)
-                path = *resolvedPathOpt;
-            haveCached = true;
-        }
-    }
-    /* can't just use else-if instead of `!haveCached` because we need to unlock
-       `drvPathResolutions` before it is locked in `Derivation::resolve`. */
-    if (!haveCached && (drv.type() == DerivationType::CAFloating || drv.type() == DerivationType::DeferredInputAddressed)) {
-        /* Try resolve drv and use that path instead. */
-        auto attempt = drv.tryResolve(*this);
-        if (!attempt)
-            /* If we cannot resolve the derivation, we cannot have any path
-               assigned so we return the map of all std::nullopts. */
-            return outputs;
-        /* Just compute store path */
-        auto pathResolved = writeDerivation(*this, *std::move(attempt), NoRepair, true);
-        /* Store in memo table. */
-        /* FIXME: memo logic should not be local-store specific, should have
-           wrapper-method instead. */
-        drvPathResolutions.lock()->insert_or_assign(path, pathResolved);
-        path = std::move(pathResolved);
-    }
-    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
+    auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
-
+        std::map<std::string, std::optional<StorePath>> outputs;
         uint64_t drvId;
-        try {
-            drvId = queryValidPathId(*state, path);
-        } catch (InvalidPath &) {
-            /* FIXME? if the derivation doesn't exist, we cannot have a mapping
-               for it. */
-            return outputs;
-        }
-
-        auto useQueryDerivationOutputs {
-            state->stmts->QueryDerivationOutputs.use()
-            (drvId)
-        };
-
-        while (useQueryDerivationOutputs.next())
+        drvId = queryValidPathId(*state, path);
+        auto use(state->stmts->QueryDerivationOutputs.use()(drvId));
+        while (use.next())
             outputs.insert_or_assign(
-                useQueryDerivationOutputs.getStr(0),
-                parseStorePath(useQueryDerivationOutputs.getStr(1))
-            );
+                use.getStr(0), parseStorePath(use.getStr(1)));
 
         return outputs;
     });
-}
 
+    if (!settings.isExperimentalFeatureEnabled("ca-derivations"))
+        return outputs;
+
+    auto drv = readInvalidDerivation(path);
+    auto drvHashes = staticOutputHashes(*this, drv);
+    for (auto& [outputName, hash] : drvHashes) {
+        auto realisation = queryRealisation(DrvOutput{hash, outputName});
+        if (realisation)
+            outputs.insert_or_assign(outputName, realisation->outPath);
+        else
+            outputs.insert_or_assign(outputName, std::nullopt);
+    }
+
+    return outputs;
+}
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
 {
@@ -1612,5 +1646,18 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
-
+std::optional<const Realisation> LocalStore::queryRealisation(
+    const DrvOutput& id) {
+    typedef std::optional<const Realisation> Ret;
+    return retrySQLite<Ret>([&]() -> Ret {
+        auto state(_state.lock());
+        auto use(state->stmts->QueryRealisedOutput.use()(id.strHash())(
+            id.outputName));
+        if (!use.next())
+            return std::nullopt;
+        auto outputPath = parseStorePath(use.getStr(0));
+        return Ret{
+            Realisation{.id = id, .outPath = outputPath}};
+    });
 }
+}  // namespace nix

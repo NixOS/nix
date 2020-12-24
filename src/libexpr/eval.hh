@@ -432,4 +432,6 @@ struct EvalSettings : Config
 
 extern EvalSettings evalSettings;
 
+static const std::string corepkgsPrefix{"/__corepkgs__/"};
+
 }

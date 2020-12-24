@@ -24,7 +24,7 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
         "enable multi-threading compression, available for xz only currently"};
 };
 
-class BinaryCacheStore : public Store, public virtual BinaryCacheStoreConfig
+class BinaryCacheStore : public virtual BinaryCacheStoreConfig, public virtual Store
 {
 
 private:
@@ -32,6 +32,9 @@ private:
     std::unique_ptr<SecretKey> secretKey;
 
 protected:
+
+    // The prefix under which realisation infos will be stored
+    const std::string realisationsPrefix = "/realisations";
 
     BinaryCacheStore(const Params & params);
 
@@ -98,6 +101,10 @@ public:
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
+
+    void registerDrvOutput(const Realisation & info) override;
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

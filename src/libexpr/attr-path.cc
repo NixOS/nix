@@ -67,7 +67,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 
         if (apType == apAttr) {
 
-            if (v->type != tAttrs)
+            if (v->type() != nAttrs)
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a set but is %2%",
                     attrPath,

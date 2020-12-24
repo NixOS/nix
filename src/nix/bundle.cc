@@ -40,14 +40,11 @@ struct CmdBundle : InstallableCommand
         return "bundle an application so that it works outside of the Nix store";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To bundle Hello:",
-                "nix bundle hello"
-            },
-        };
+        return
+          #include "bundle.md"
+          ;
     }
 
     Category category() override { return catSecondary; }

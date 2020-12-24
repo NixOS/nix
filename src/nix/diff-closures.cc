@@ -121,14 +121,11 @@ struct CmdDiffClosures : SourceExprCommand
         return "show what packages and versions were added and removed between two closures";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            {
-                "To show what got added and removed between two versions of the NixOS system profile:",
-                "nix store diff-closures /nix/var/nix/profiles/system-655-link /nix/var/nix/profiles/system-658-link",
-            },
-        };
+        return
+          #include "diff-closures.md"
+          ;
     }
 
     void run(ref<Store> store) override

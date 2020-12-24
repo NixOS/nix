@@ -366,6 +366,29 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapNoResolve(const StorePath & path)
+{
+    std::map<std::string, std::optional<StorePath>> outputs;
+    auto drv = readInvalidDerivation(path);
+    for (auto& [outputName, output] : drv.outputsAndOptPaths(*this)) {
+        outputs.emplace(outputName, output.second);
+    }
+    return outputs;
+}
+
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
+{
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        auto resolvedDrv = Derivation::tryResolve(*this, path);
+        if (resolvedDrv) {
+            auto resolvedDrvPath = writeDerivation(*this, *resolvedDrv, NoRepair, true);
+            if (isValidPath(resolvedDrvPath))
+                return queryDerivationOutputMapNoResolve(resolvedDrvPath);
+        }
+    }
+    return queryDerivationOutputMapNoResolve(path);
+}
+
 OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     auto resp = queryPartialDerivationOutputMap(path);
     OutputPathMap result;
@@ -729,9 +752,17 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMod
     StorePathSet paths2;
 
     for (auto & path : paths) {
-        if (path.path.isDerivation())
-            unsupported("buildPaths");
-        paths2.insert(path.path);
+        if (path.path.isDerivation()) {
+            auto outPaths = queryPartialDerivationOutputMap(path.path);
+            for (auto & outputName : path.outputs) {
+                auto currentOutputPathIter = outPaths.find(outputName);
+                if (currentOutputPathIter == outPaths.end() ||
+                    !currentOutputPathIter->second ||
+                    !isValidPath(*currentOutputPathIter->second))
+                    unsupported("buildPaths");
+            }
+        } else
+            paths2.insert(path.path);
     }
 
     if (queryValidPaths(paths2).size() != paths2.size())
@@ -1018,26 +1049,23 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
-
-Derivation Store::readDerivation(const StorePath & drvPath)
+Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool requireValidPath)
 {
-    auto accessor = getFSAccessor();
+    auto accessor = store.getFSAccessor();
     try {
-        return parseDerivation(*this,
-            accessor->readFile(printStorePath(drvPath)),
+        return parseDerivation(store,
+            accessor->readFile(store.printStorePath(drvPath), requireValidPath),
             Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }
 }
 
+Derivation Store::readDerivation(const StorePath & drvPath)
+{ return readDerivationCommon(*this, drvPath, true); }
+
 Derivation Store::readInvalidDerivation(const StorePath & drvPath)
-{
-    return parseDerivation(
-        *this,
-        readFile(Store::toRealPath(drvPath)),
-        Derivation::nameFromPath(drvPath));
-}
+{ return readDerivationCommon(*this, drvPath, false); }
 
 }
 
