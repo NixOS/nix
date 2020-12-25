@@ -1222,8 +1222,13 @@ void DerivationGoal::outputsSubstituted()
 
     /*  If the substitutes form an incomplete closure, then we should
         build the dependencies of this derivation, but after that, we
-        can still use the substitutes for this derivation itself. */
-    if (nrIncompleteClosure > 0) retrySubstitution = true;
+        can still use the substitutes for this derivation itself.
+
+        If the nrIncompleteClosure != nrFailed, we have another issue as well.
+        In particular, it may be the case that the hole in the closure is
+        an output of the current derivation, which causes a loop if retried.
+     */
+    if (nrIncompleteClosure > 0 && nrIncompleteClosure == nrFailed) retrySubstitution = true;
 
     nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
 
