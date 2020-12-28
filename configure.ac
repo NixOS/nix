@@ -174,9 +174,9 @@ PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"]
 
 # Look for libbz2, a required dependency.
 AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
+  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
 AC_CHECK_HEADERS([bzlib.h], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
+  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
