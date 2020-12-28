@@ -88,9 +88,6 @@ PathSet scanForReferences(Sink & toTee,
     TeeSink sink { refsSink, toTee };
     std::map<string, Path> backMap;
 
-    /* For efficiency (and a higher hit rate), just search for the
-       hash part of the file name.  (This assumes that all references
-       have the form `HASH-bla'). */
     for (auto & i : refs) {
         auto baseName = std::string(baseNameOf(i));
         string::size_type pos = baseName.find('-');
