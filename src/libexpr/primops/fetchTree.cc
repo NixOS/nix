@@ -103,7 +103,7 @@ static void fetchTree(
                 addURI(state, attrs, attr.name, attr.value->string.s);
             else if (attr.value->type() == nBool)
                 attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
-            else if (attr.value->type == nInt)
+            else if (attr.value->type() == nInt)
                 attrs.emplace(attr.name, uint64_t(attr.value->integer));
             else
                 throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
