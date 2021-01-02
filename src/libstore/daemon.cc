@@ -142,6 +142,14 @@ struct TunnelLogger : public Logger
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 22 && type == resBuildLogLine && settings.verboseBuild) {
+            // Nix < 2.4 expects build logs to be logged as general logs at lvlError.
+            // We probably shouldn't do this for repeated builds, but that's not
+            // something we can know here without complicating the implementation
+            // unnecessarily.
+            auto lastLine = fields[0].s;
+            log(lvlError, lastLine);
+        }
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
