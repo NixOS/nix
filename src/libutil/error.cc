@@ -61,6 +61,8 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
     if (errPos.origin == foFile) {
         LinesOfCode loc;
         try {
+            // FIXME: when running as the daemon, make sure we don't
+            // open a file to which the client doesn't have access.
             AutoCloseFD fd = open(errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
             if (!fd) return {};
 
