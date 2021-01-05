@@ -394,7 +394,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw Error("output '%s' has no store path mapped to it", outName);
+            throw Error("output '%s' of derivation '%s' has no store path mapped to it", outName, printStorePath(path));
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
