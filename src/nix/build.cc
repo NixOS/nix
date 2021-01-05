@@ -56,6 +56,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         if (dryRun) return;
 
+        PathSet symlinks;
+
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
                 for (size_t i = 0; i < buildables.size(); ++i)
@@ -63,7 +65,9 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                         [&](BuildableOpaque bo) {
                             std::string symlink = outLink;
                             if (i) symlink += fmt("-%d", i);
-                            store2->addPermRoot(bo.path, absPath(symlink));
+                            symlink = absPath(symlink);
+                            store2->addPermRoot(bo.path, symlink);
+                            symlinks.insert(symlink);
                         },
                         [&](BuildableFromDrv bfd) {
                             auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
@@ -71,14 +75,22 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);
                                 if (output.first != "out") symlink += fmt("-%s", output.first);
-                                store2->addPermRoot(output.second, absPath(symlink));
+                                symlink = absPath(symlink);
+                                store2->addPermRoot(output.second, symlink);
+                                symlinks.insert(symlink);
                             }
                         },
                     }, buildables[i]);
 
         updateProfile(buildables);
 
-        if (json) logger->cout("%s", buildablesToJSON(buildables, store).dump());
+        if (json)
+            logger->cout("%s", buildablesToJSON(buildables, store).dump());
+        else
+            notice(
+                ANSI_GREEN "Build succeeded." ANSI_NORMAL
+                " The result is available through the symlink " ANSI_BOLD "%s" ANSI_NORMAL ".",
+                showPaths(symlinks));
     }
 };
 

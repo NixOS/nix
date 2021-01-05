@@ -285,6 +285,8 @@ LockedFlake lockFlake(
 {
     settings.requireExperimentalFeature("flakes");
 
+    Activity act(*logger, lvlTalkative, actLockFlake);
+
     FlakeCache flakeCache;
 
     auto flake = getFlake(state, topRef, lockFlags.useRegistries, flakeCache);
