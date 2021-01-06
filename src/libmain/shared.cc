@@ -18,6 +18,10 @@
 
 #include <openssl/crypto.h>
 
+#if HAVE_SODIUM
+#include <sodium.h>
+#endif
+
 
 namespace nix {
 
@@ -124,6 +128,11 @@ void initNix()
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
+
+#if HAVE_SODIUM
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
 #endif
 
     loadConfFile();
