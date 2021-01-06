@@ -131,14 +131,14 @@ if [ -n "$HAVE_SODIUM" ]; then
 clearCache
 clearCacheCache
 
-declare -a res=($(nix-store --generate-binary-cache-key test.nixos.org-1 $TEST_ROOT/sk1 $TEST_ROOT/pk1 ))
-publicKey="$(cat $TEST_ROOT/pk1)"
+nix key generate-secret --key-name test.nixos.org-1 > $TEST_ROOT/sk1
+publicKey=$(nix key convert-secret-to-public < $TEST_ROOT/sk1)
 
-res=($(nix-store --generate-binary-cache-key test.nixos.org-1 $TEST_ROOT/sk2 $TEST_ROOT/pk2))
-badKey="$(cat $TEST_ROOT/pk2)"
+nix key generate-secret --key-name test.nixos.org-1 > $TEST_ROOT/sk2
+badKey=$(nix key convert-secret-to-public < $TEST_ROOT/sk2)
 
-res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
-otherKey="$(cat $TEST_ROOT/pk3)"
+nix key generate-secret --key-name foo.nixos.org-1 > $TEST_ROOT/sk3
+otherKey=$(nix key convert-secret-to-public < $TEST_ROOT/sk3)
 
 _NIX_FORCE_HTTP= nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
 

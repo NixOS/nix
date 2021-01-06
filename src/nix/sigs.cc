@@ -141,3 +141,90 @@ struct CmdSignPaths : StorePathsCommand
 };
 
 static auto rCmdSignPaths = registerCommand2<CmdSignPaths>({"store", "sign-paths"});
+
+#if HAVE_SODIUM
+struct CmdKeyGenerateSecret : Command
+{
+    std::optional<std::string> keyName;
+
+    CmdKeyGenerateSecret()
+    {
+        addFlag({
+            .longName = "key-name",
+            .description = "identifier of the key (e.g. `cache.example.org-1`)",
+            .labels = {"name"},
+            .handler = {&keyName},
+        });
+    }
+
+    std::string description() override
+    {
+        return "generate a secret key for signing store paths";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "key-generate-secret.md"
+          ;
+    }
+
+    void run() override
+    {
+        if (!keyName)
+            throw UsageError("required argument '--key-name' is missing");
+
+        std::cout << SecretKey::generate(*keyName).to_string();
+    }
+};
+
+struct CmdKeyConvertSecretToPublic : Command
+{
+    std::string description() override
+    {
+        return "generate a public key for verifying store paths from a secret key read from standard input";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "key-convert-secret-to-public.md"
+          ;
+    }
+
+    void run() override
+    {
+        SecretKey secretKey(drainFD(STDIN_FILENO));
+        std::cout << secretKey.toPublicKey().to_string();
+    }
+};
+
+struct CmdKey : NixMultiCommand
+{
+    CmdKey()
+        : MultiCommand({
+                {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
+                {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
+            })
+    {
+    }
+
+    std::string description() override
+    {
+        return "generate and convert Nix signing keys";
+    }
+
+    Category category() override { return catUtility; }
+
+    void run() override
+    {
+        if (!command)
+            throw UsageError("'nix flake' requires a sub-command.");
+        settings.requireExperimentalFeature("flakes");
+        command->second->prepare();
+        command->second->run();
+    }
+};
+
+static auto rCmdKey = registerCommand<CmdKey>("key");
+#endif
