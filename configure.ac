@@ -203,11 +203,7 @@ PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLA
 ])
 
 # Look for libsodium, an optional dependency.
-PKG_CHECK_MODULES([SODIUM], [libsodium],
-  [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
-   CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"
-   have_sodium=1], [have_sodium=])
-AC_SUBST(HAVE_SODIUM, [$have_sodium])
+PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])

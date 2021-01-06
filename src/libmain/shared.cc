@@ -18,9 +18,7 @@
 
 #include <openssl/crypto.h>
 
-#if HAVE_SODIUM
 #include <sodium.h>
-#endif
 
 
 namespace nix {
@@ -130,10 +128,8 @@ void initNix()
     CRYPTO_set_locking_callback(opensslLockCallback);
 #endif
 
-#if HAVE_SODIUM
     if (sodium_init() == -1)
         throw Error("could not initialise libsodium");
-#endif
 
     loadConfFile();
 
@@ -283,9 +279,7 @@ void printVersion(const string & programName)
 #if HAVE_BOEHMGC
         cfg.push_back("gc");
 #endif
-#if HAVE_SODIUM
         cfg.push_back("signed-caches");
-#endif
         std::cout << "System type: " << settings.thisSystem << "\n";
         std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";

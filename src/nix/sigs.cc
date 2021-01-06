@@ -142,7 +142,6 @@ struct CmdSignPaths : StorePathsCommand
 
 static auto rCmdSignPaths = registerCommand2<CmdSignPaths>({"store", "sign-paths"});
 
-#if HAVE_SODIUM
 struct CmdKeyGenerateSecret : Command
 {
     std::optional<std::string> keyName;
@@ -227,4 +226,3 @@ struct CmdKey : NixMultiCommand
 };
 
 static auto rCmdKey = registerCommand<CmdKey>("key");
-#endif

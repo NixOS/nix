@@ -125,8 +125,6 @@ grep -q "copying path.*input-0" $TEST_ROOT/log
 grep -q "copying path.*top" $TEST_ROOT/log
 
 
-if [ -n "$HAVE_SODIUM" ]; then
-
 # Create a signed binary cache.
 clearCache
 clearCacheCache
@@ -180,8 +178,6 @@ clearCacheCache
 # If we provide a bad and a good binary cache, it should succeed.
 
 nix-store -r $outPath --substituters "file://$cacheDir2 file://$cacheDir" --trusted-public-keys "$publicKey"
-
-fi # HAVE_LIBSODIUM
 
 
 unset _NIX_FORCE_HTTP
