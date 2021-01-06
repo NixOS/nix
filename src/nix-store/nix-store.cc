@@ -19,10 +19,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#if HAVE_SODIUM
-#include <sodium.h>
-#endif
-
 
 namespace nix_store {
 
@@ -980,18 +976,11 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     string secretKeyFile = *i++;
     string publicKeyFile = *i++;
 
-#if HAVE_SODIUM
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    unsigned char sk[crypto_sign_SECRETKEYBYTES];
-    if (crypto_sign_keypair(pk, sk) != 0)
-        throw Error("key generation failed");
+    auto secretKey = SecretKey::generate(keyName);
 
-    writeFile(publicKeyFile, keyName + ":" + base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)));
+    writeFile(publicKeyFile, secretKey.toPublicKey().to_string());
     umask(0077);
-    writeFile(secretKeyFile, keyName + ":" + base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)));
-#else
-    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
+    writeFile(secretKeyFile, secretKey.to_string());
 }
 
 

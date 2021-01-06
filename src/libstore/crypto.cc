@@ -8,15 +8,15 @@
 
 namespace nix {
 
-static std::pair<std::string, std::string> split(const string & s)
+static std::pair<std::string_view, std::string_view> split(std::string_view s)
 {
     size_t colon = s.find(':');
     if (colon == std::string::npos || colon == 0)
         return {"", ""};
-    return {std::string(s, 0, colon), std::string(s, colon + 1)};
+    return {s.substr(0, colon), s.substr(colon + 1)};
 }
 
-Key::Key(const string & s)
+Key::Key(std::string_view s)
 {
     auto ss = split(s);
 
@@ -29,7 +29,12 @@ Key::Key(const string & s)
     key = base64Decode(key);
 }
 
-SecretKey::SecretKey(const string & s)
+std::string Key::to_string() const
+{
+    return name + ":" + base64Encode(key);
+}
+
+SecretKey::SecretKey(std::string_view s)
     : Key(s)
 {
 #if HAVE_SODIUM
@@ -45,7 +50,7 @@ SecretKey::SecretKey(const string & s)
 }
 #endif
 
-std::string SecretKey::signDetached(const std::string & data) const
+std::string SecretKey::signDetached(std::string_view data) const
 {
 #if HAVE_SODIUM
     unsigned char sig[crypto_sign_BYTES];
@@ -69,7 +74,21 @@ PublicKey SecretKey::toPublicKey() const
 #endif
 }
 
-PublicKey::PublicKey(const string & s)
+SecretKey SecretKey::generate(std::string_view name)
+{
+#if HAVE_SODIUM
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    unsigned char sk[crypto_sign_SECRETKEYBYTES];
+    if (crypto_sign_keypair(pk, sk) != 0)
+        throw Error("key generation failed");
+
+    return SecretKey(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+#else
+    noSodium();
+#endif
+}
+
+PublicKey::PublicKey(std::string_view s)
     : Key(s)
 {
 #if HAVE_SODIUM
@@ -84,7 +103,7 @@ bool verifyDetached(const std::string & data, const std::string & sig,
 #if HAVE_SODIUM
     auto ss = split(sig);
 
-    auto key = publicKeys.find(ss.first);
+    auto key = publicKeys.find(std::string(ss.first));
     if (key == publicKeys.end()) return false;
 
     auto sig2 = base64Decode(ss.second);
