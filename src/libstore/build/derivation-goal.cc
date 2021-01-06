@@ -50,6 +50,10 @@
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
+#if __APPLE__
+#include <spawn.h>
+#endif
+
 #include <pwd.h>
 #include <grp.h>
 
@@ -2857,7 +2861,27 @@ void DerivationGoal::runChild()
             }
         }
 
+#if __APPLE__
+        posix_spawnattr_t attrp;
+
+        if (posix_spawnattr_init(&attrp))
+            throw SysError("failed to initialize builder");
+
+        if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
+            throw SysError("failed to initialize builder");
+
+        if (drv->platform == "aarch64-darwin") {
+            cpu_type_t cpu = CPU_TYPE_ARM64;
+            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
+        } else if (drv->platform == "x86_64-darwin") {
+            cpu_type_t cpu = CPU_TYPE_X86_64;
+            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
+        }
+
+        posix_spawn(NULL, builder, NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+#else
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+#endif
 
         throw SysError("executing '%1%'", drv->builder);
 

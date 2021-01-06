@@ -131,6 +131,28 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
+StringSet Settings::getDefaultExtraPlatforms()
+{
+    if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
+        return StringSet{"i686-linux"};
+#if __APPLE__
+    // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
+    // machines. Note that we can’t force processes from executing
+    // x86_64 in aarch64 environments or vice versa since they can
+    // always exec with their own binary preferences.
+    else if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+        if (std::string{SYSTEM} == "x86_64-darwin")
+            return StringSet{"aarch64-darwin"};
+        else if (std::string{SYSTEM} == "aarch64-darwin")
+            return StringSet{"x86_64-darwin"};
+        else
+            return StringSet{};
+    }
+#endif
+    else
+        return StringSet{};
+}
+
 bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 {
     auto & f = experimentalFeatures.get();
