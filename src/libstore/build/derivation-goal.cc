@@ -539,12 +539,12 @@ void DerivationGoal::inputsRealised()
                     if (!optRealizedInput)
                         throw Error(
                             "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output",
-                            worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
+                            worker.store.printStorePath(drvPath), j, worker.store.printStorePath(depDrvPath));
                     worker.store.computeFSClosure(*optRealizedInput, inputPaths);
                 } else
                     throw Error(
                         "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath), j, worker.store.printStorePath(drvPath));
+                        worker.store.printStorePath(drvPath), j, worker.store.printStorePath(depDrvPath));
             }
         }
     }
