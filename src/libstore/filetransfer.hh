@@ -63,7 +63,7 @@ struct FileTransferRequest
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
 
-    FileTransferRequest(const std::string & uri)
+    FileTransferRequest(std::string_view uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
     std::string verb()

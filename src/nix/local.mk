@@ -12,7 +12,6 @@ nix_SOURCES := \
   $(wildcard src/nix-daemon/*.cc) \
   $(wildcard src/nix-env/*.cc) \
   $(wildcard src/nix-instantiate/*.cc) \
-  $(wildcard src/nix-prefetch-url/*.cc) \
   $(wildcard src/nix-store/*.cc) \
 
 nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain
