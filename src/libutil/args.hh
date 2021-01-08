@@ -143,19 +143,6 @@ public:
     /* Helper functions for constructing flags / positional
        arguments. */
 
-    void mkFlag1(char shortName, const std::string & longName,
-        const std::string & label, const std::string & description,
-        std::function<void(std::string)> fun)
-    {
-        addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
-            .labels = {label},
-            .handler = {[=](std::string s) { fun(s); }}
-        });
-    }
-
     void mkFlag(char shortName, const std::string & name,
         const std::string & description, bool * dest)
     {
