@@ -953,7 +953,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     }
 
                 } else {
-                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    auto s = state.coerceToString(*i->pos, *i->value, context, true);
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = s;
                     else if (i->name == state.sSystem) drv.platform = s;
