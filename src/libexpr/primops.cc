@@ -2149,21 +2149,27 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         state.forceAttrs(v2, pos);
 
         Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end())
-            throw TypeError({
-                .msg = hintfmt("'name' attribute missing in a call to 'listToAttrs'"),
-                .errPos = pos
+        if (j == v2.attrs->end()) {
+            auto e = TypeError({
+                .msg = hintfmt("'name' attribute missing for 'listToAttrs'"),
+                .errPos = *v2.attrs->pos
             });
-        string name = state.forceStringNoCtx(*j->value, pos);
+            e.addTrace(pos, hintfmt("while invoking '%s'", "listToAttrs"));
+            throw e;
+        }
+        string name = state.forceStringNoCtx(*j->value, *j->pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
             Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end())
-                throw TypeError({
-                    .msg = hintfmt("'value' attribute missing in a call to 'listToAttrs'"),
-                    .errPos = pos
+            if (j2 == v2.attrs->end()) {
+                auto e = TypeError({
+                    .msg = hintfmt("'value' attribute missing for 'listToAttrs'"),
+                    .errPos = *v2.attrs->pos
                 });
+                e.addTrace(pos, hintfmt("while invoking '%s'", "listToAttrs"));
+                throw e;
+            }
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
     }
@@ -2804,7 +2810,12 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], pos);
+        try {
+            state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)));
+        } catch (TypeError &e) {
+            e.addTrace(pos, hintfmt("while invoking '%s'", "concatMap"));
+            throw e;
+        }
         len += lists[n].listSize();
     }
 
