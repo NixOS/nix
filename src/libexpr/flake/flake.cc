@@ -120,11 +120,16 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, nString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
             } else {
-                if (attr.value->type() == nString)
+                if (attr.value->type() == nString) {
                     attrs.emplace(attr.name, attr.value->string.s);
-                else
-                    throw TypeError("flake input attribute '%s' is %s while a string is expected",
+                } else if (attr.value->type() == nBool) {
+                    attrs.emplace(attr.name, Explicit<bool>{ attr.value->boolean });
+                } else if (attr.value->type() == nInt) {
+                    attrs.emplace(attr.name, attr.value->integer);
+                } else {
+                    throw TypeError("flake input attribute '%s' is %s while a string, boolean, or integer is expected",
                         attr.name, showType(*attr.value));
+                }
             }
         } catch (Error & e) {
             e.addTrace(*attr.pos, hintfmt("in flake attribute '%s'", attr.name));
