@@ -68,8 +68,12 @@ protected:
             , arity(ArityAny)
         { }
 
-        template<class T>
-        Handler(T * dest)
+        Handler(std::string * dest)
+            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::optional<std::string> * dest)
             : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
@@ -78,6 +82,15 @@ protected:
         Handler(T * dest, const T & val)
             : fun([=](std::vector<std::string> ss) { *dest = val; })
             , arity(0)
+        { }
+
+        template<class I>
+        Handler(I * dest)
+            : fun([=](std::vector<std::string> ss) {
+                if (!string2Int(ss[0], *dest))
+                    throw UsageError("'%s' is not an integer", ss[0]);
+              })
+            , arity(1)
         { }
     };
 
@@ -158,15 +171,6 @@ public:
             .shortName = shortName,
             .description = description,
             .handler = {[=]() { *dest = value; }}
-        });
-    }
-
-    template<class I>
-    void mkIntFlag(char shortName, const std::string & longName,
-        const std::string & description, I * dest)
-    {
-        mkFlag<I>(shortName, longName, description, [=](I n) {
-            *dest = n;
         });
     }
 
