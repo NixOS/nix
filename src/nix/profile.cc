@@ -209,9 +209,8 @@ public:
         std::vector<Matcher> res;
 
         for (auto & s : _matchers) {
-            size_t n;
-            if (string2Int(s, n))
-                res.push_back(n);
+            if (auto n = string2Int<size_t>(s))
+                res.push_back(*n);
             else if (store->isStorePath(s))
                 res.push_back(s);
             else

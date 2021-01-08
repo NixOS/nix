@@ -1699,12 +1699,10 @@ void DerivationGoal::startBuilder()
             userNamespaceSync.writeSide = -1;
         });
 
-        pid_t tmp;
         auto ss = tokenizeString<std::vector<std::string>>(readLine(builderOut.readSide.get()));
         assert(ss.size() == 2);
         usingUserNamespace = ss[0] == "1";
-        if (!string2Int<pid_t>(ss[1], tmp)) abort();
-        pid = tmp;
+        pid = string2Int<pid_t>(ss[1]).value();
 
         if (usingUserNamespace) {
             /* Set the UID/GID mapping of the builder's user namespace

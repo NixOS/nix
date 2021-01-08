@@ -228,8 +228,12 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
 void MaxBuildJobsSetting::set(const std::string & str, bool append)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
-    else if (!string2Int(str, value))
-        throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    else {
+        if (auto n = string2Int<decltype(value)>(str))
+            value = *n;
+        else
+            throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    }
 }
 
 

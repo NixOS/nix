@@ -397,21 +397,27 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
-template<class N> bool string2Int(const string & s, N & n)
+template<class N>
+std::optional<N> string2Int(const std::string & s)
 {
-    if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return false;
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return {};
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return {};
 }
 
 /* Parse a string into a float. */
-template<class N> bool string2Float(const string & s, N & n)
+template<class N>
+std::optional<N> string2Float(const string & s)
 {
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return {};
 }
 
 

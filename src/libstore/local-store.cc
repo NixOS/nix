@@ -66,8 +66,10 @@ int getSchema(Path schemaPath)
     int curSchema = 0;
     if (pathExists(schemaPath)) {
         string s = readFile(schemaPath);
-        if (!string2Int(s, curSchema))
+        auto n = string2Int<int>(s);
+        if (!n)
             throw Error("'%1%' is corrupt", schemaPath);
+        curSchema = *n;
     }
     return curSchema;
 }

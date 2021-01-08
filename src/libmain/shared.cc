@@ -219,10 +219,10 @@ LegacyArgs::LegacyArgs(const std::string & programName,
             .description = description,
             .labels = {"n"},
             .handler = {[=](std::string s) {
-                unsigned int n;
-                if (!string2Int(s, n))
+                if (auto n = string2Int<unsigned int>(s))
+                    settings.set(dest, std::to_string(*n));
+                else
                     throw UsageError("'%s' is not an integer", s);
-                settings.set(dest, std::to_string(n));
             }}
         });
     };

@@ -70,10 +70,9 @@ template<class N> N getIntArg(const string & opt,
             s.resize(s.size() - 1);
         }
     }
-    N n;
-    if (!string2Int(s, n))
-        throw UsageError("'%1%' requires an integer argument", opt);
-    return n * multiplier;
+    if (auto n = string2Int<N>(s))
+        return *n * multiplier;
+    throw UsageError("'%1%' requires an integer argument", opt);
 }
 
 

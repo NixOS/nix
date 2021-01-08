@@ -214,8 +214,8 @@ NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        NixInt n;
-        if (string2Int(v->string.s, n)) return n;
+        if (auto n = string2Int<NixInt>(v->string.s))
+            return *n;
     }
     return def;
 }
@@ -228,8 +228,8 @@ NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        NixFloat n;
-        if (string2Float(v->string.s, n)) return n;
+        if (auto n = string2Float<NixFloat>(v->string.s))
+            return *n;
     }
     return def;
 }
