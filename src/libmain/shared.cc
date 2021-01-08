@@ -211,9 +211,19 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
-        const std::string & description, const std::string & dest) {
-        mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
-            settings.set(dest, std::to_string(n));
+        const std::string & description, const std::string & dest)
+    {
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .labels = {"n"},
+            .handler = {[=](std::string s) {
+                unsigned int n;
+                if (!string2Int(s, n))
+                    throw UsageError("'%s' is not an integer", s);
+                settings.set(dest, std::to_string(n));
+            }}
         });
     };
 

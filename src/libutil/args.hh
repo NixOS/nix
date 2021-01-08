@@ -174,24 +174,6 @@ public:
         });
     }
 
-    template<class I>
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & description, std::function<void(I)> fun)
-    {
-        addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
-            .labels = {"N"},
-            .handler = {[=](std::string s) {
-                I n;
-                if (!string2Int(s, n))
-                    throw UsageError("flag '--%s' requires a integer argument", longName);
-                fun(n);
-            }}
-        });
-    }
-
     void expectArgs(ExpectedArg && arg)
     {
         expectedArgs.emplace_back(std::move(arg));
