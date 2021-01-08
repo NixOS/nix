@@ -87,10 +87,7 @@ protected:
         template<class I>
         Handler(I * dest)
             : fun([=](std::vector<std::string> ss) {
-                if (auto n = string2Int<I>(ss[0]))
-                    *dest = *n;
-                else
-                    throw UsageError("'%s' is not an integer", ss[0]);
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
               })
             , arity(1)
         { }

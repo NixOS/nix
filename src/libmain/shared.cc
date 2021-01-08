@@ -219,10 +219,8 @@ LegacyArgs::LegacyArgs(const std::string & programName,
             .description = description,
             .labels = {"n"},
             .handler = {[=](std::string s) {
-                if (auto n = string2Int<unsigned int>(s))
-                    settings.set(dest, std::to_string(*n));
-                else
-                    throw UsageError("'%s' is not an integer", s);
+                auto n = string2IntWithUnitPrefix<uint64_t>(s);
+                settings.set(dest, std::to_string(n));
             }}
         });
     };

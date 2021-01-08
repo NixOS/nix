@@ -401,12 +401,34 @@ template<class N>
 std::optional<N> string2Int(const std::string & s)
 {
     if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return {};
+        return std::nullopt;
     std::istringstream str(s);
     N n;
     str >> n;
     if (str && str.get() == EOF) return n;
-    return {};
+    return std::nullopt;
+}
+
+/* Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
+   'T' denoting a binary unit prefix. */
+template<class N>
+N string2IntWithUnitPrefix(std::string s)
+{
+    N multiplier = 1;
+    if (!s.empty()) {
+        char u = std::toupper(*s.rbegin());
+        if (std::isalpha(u)) {
+            if (u == 'K') multiplier = 1ULL << 10;
+            else if (u == 'M') multiplier = 1ULL << 20;
+            else if (u == 'G') multiplier = 1ULL << 30;
+            else if (u == 'T') multiplier = 1ULL << 40;
+            else throw UsageError("invalid unit specifier '%1%'", u);
+            s.resize(s.size() - 1);
+        }
+    }
+    if (auto n = string2Int<N>(s))
+        return *n * multiplier;
+    throw UsageError("'%s' is not an integer", s);
 }
 
 /* Parse a string into a float. */
@@ -417,7 +439,7 @@ std::optional<N> string2Float(const string & s)
     N n;
     str >> n;
     if (str && str.get() == EOF) return n;
-    return {};
+    return std::nullopt;
 }
 
 
