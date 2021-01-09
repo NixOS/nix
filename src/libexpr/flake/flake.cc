@@ -131,7 +131,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         attrs.emplace(attr.name, attr.value->integer);
                         break;
                     default:
-                        throw TypeError("flake input attribute '%s' is %s while a string, boolean, or integer is expected",
+                        throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                             attr.name, showType(*attr.value));
                 }
             }
