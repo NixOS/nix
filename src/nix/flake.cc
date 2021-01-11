@@ -960,6 +960,45 @@ struct CmdFlakeShow : FlakeCommand
     }
 };
 
+struct CmdFlakePrefetch : FlakeCommand, MixJSON
+{
+    CmdFlakePrefetch()
+    {
+    }
+
+    std::string description() override
+    {
+        return "download the source tree denoted by a flake reference into the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-prefetch.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto originalRef = getFlakeRef();
+        auto resolvedRef = originalRef.resolve(store);
+        auto [tree, lockedRef] = resolvedRef.fetchTree(store);
+        auto hash = store->queryPathInfo(tree.storePath)->narHash;
+
+        if (json) {
+            auto res = nlohmann::json::object();
+            res["storePath"] = store->printStorePath(tree.storePath);
+            res["hash"] = hash.to_string(SRI, true);
+            logger->cout(res.dump());
+        } else {
+            notice("Downloaded '%s' to '%s' (hash '%s').",
+                lockedRef.to_string(),
+                store->printStorePath(tree.storePath),
+                hash.to_string(SRI, true));
+        }
+    }
+};
+
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
@@ -973,6 +1012,7 @@ struct CmdFlake : NixMultiCommand
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
+                {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
             })
     {
     }

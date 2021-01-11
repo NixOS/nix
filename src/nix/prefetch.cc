@@ -246,17 +246,15 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
 static RegisterLegacyCommand r_nix_prefetch_url("nix-prefetch-url", main_nix_prefetch_url);
 
-struct CmdStorePrefetch : StoreCommand, MixJSON
+struct CmdStorePrefetchFile : StoreCommand, MixJSON
 {
     std::string url;
     bool executable = false;
-    bool unpack;
     std::optional<std::string> name;
     HashType hashType = htSHA256;
     std::optional<Hash> expectedHash;
 
-    CmdStorePrefetch(bool unpack)
-        : unpack(unpack)
+    CmdStorePrefetchFile()
     {
         addFlag({
             .longName = "name",
@@ -267,7 +265,7 @@ struct CmdStorePrefetch : StoreCommand, MixJSON
 
         addFlag({
             .longName = "expected-hash",
-            .description = unpack ? "expected NAR hash of the unpacked tarball" : "expected hash of the file",
+            .description = "expected hash of the file",
             .labels = {"hash"},
             .handler = {[&](std::string s) {
                 expectedHash = Hash::parseAny(s, hashType);
@@ -276,14 +274,31 @@ struct CmdStorePrefetch : StoreCommand, MixJSON
 
         addFlag(Flag::mkHashTypeFlag("hash-type", &hashType));
 
+        addFlag({
+            .longName = "executable",
+            .description = "make the resulting file executable",
+            .handler = {&executable, true},
+        });
+
         expectArg("url", &url);
     }
 
     Category category() override { return catUtility; }
 
+    std::string description() override
+    {
+        return "download a file into the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "store-prefetch-file.md"
+          ;
+    }
     void run(ref<Store> store) override
     {
-        auto [storePath, hash] = prefetchFile(store, url, name, hashType, expectedHash, unpack, executable);
+        auto [storePath, hash] = prefetchFile(store, url, name, hashType, expectedHash, false, executable);
 
         if (json) {
             auto res = nlohmann::json::object();
@@ -299,54 +314,4 @@ struct CmdStorePrefetch : StoreCommand, MixJSON
     }
 };
 
-struct CmdStorePrefetchFile : CmdStorePrefetch
-{
-    CmdStorePrefetchFile()
-        : CmdStorePrefetch(false)
-    {
-        name = "source";
-
-        addFlag({
-            .longName = "executable",
-            .description = "make the resulting file executable",
-            .handler = {&executable, true},
-        });
-    }
-
-    std::string description() override
-    {
-        return "download a file into the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "store-prefetch-file.md"
-          ;
-    }
-};
-
 static auto rCmdStorePrefetchFile = registerCommand2<CmdStorePrefetchFile>({"store", "prefetch-file"});
-
-struct CmdStorePrefetchTarball : CmdStorePrefetch
-{
-    CmdStorePrefetchTarball()
-        : CmdStorePrefetch(true)
-    {
-        name = "source";
-    }
-
-    std::string description() override
-    {
-        return "download and unpack a tarball into the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "store-prefetch-tarball.md"
-          ;
-    }
-};
-
-static auto rCmdStorePrefetchTarball = registerCommand2<CmdStorePrefetchTarball>({"store", "prefetch-tarball"});
