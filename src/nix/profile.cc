@@ -8,6 +8,7 @@
 #include "flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
 #include "profiles.hh"
+#include "names.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -21,6 +22,13 @@ struct ProfileElementSource
     FlakeRef resolvedRef;
     std::string attrPath;
     // FIXME: output names
+
+    bool operator < (const ProfileElementSource & other) const
+    {
+        return
+            std::pair(originalRef.to_string(), attrPath) <
+            std::pair(other.originalRef.to_string(), other.attrPath);
+    }
 };
 
 struct ProfileElement
@@ -29,6 +37,29 @@ struct ProfileElement
     std::optional<ProfileElementSource> source;
     bool active = true;
     // FIXME: priority
+
+    std::string describe() const
+    {
+        if (source)
+            return fmt("%s#%s", source->originalRef, source->attrPath);
+        StringSet names;
+        for (auto & path : storePaths)
+            names.insert(DrvName(path.name()).name);
+        return concatStringsSep(", ", names);
+    }
+
+    std::string versions() const
+    {
+        StringSet versions;
+        for (auto & path : storePaths)
+            versions.insert(DrvName(path.name()).version);
+        return showVersions(versions);
+    }
+
+    bool operator < (const ProfileElement & other) const
+    {
+        return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
+    }
 };
 
 struct ProfileManifest
@@ -141,6 +172,46 @@ struct ProfileManifest
         store->addToStore(info, source);
 
         return std::move(info.path);
+    }
+
+    static void printDiff(const ProfileManifest & prev, const ProfileManifest & cur, std::string_view indent)
+    {
+        auto prevElems = prev.elements;
+        std::sort(prevElems.begin(), prevElems.end());
+
+        auto curElems = cur.elements;
+        std::sort(curElems.begin(), curElems.end());
+
+        auto i = prevElems.begin();
+        auto j = curElems.begin();
+
+        bool changes = false;
+
+        while (i != prevElems.end() || j != curElems.end()) {
+            if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
+                std::cout << fmt("%s%s: ∅ -> %s\n", indent, j->describe(), j->versions());
+                changes = true;
+                ++j;
+            }
+            else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
+                std::cout << fmt("%s%s: %s -> ∅\n", indent, i->describe(), i->versions());
+                changes = true;
+                ++i;
+            }
+            else {
+                auto v1 = i->versions();
+                auto v2 = j->versions();
+                if (v1 != v2) {
+                    std::cout << fmt("%s%s: %s -> %s\n", indent, i->describe(), v1, v2);
+                    changes = true;
+                }
+                ++i;
+                ++j;
+            }
+        }
+
+        if (!changes)
+            std::cout << fmt("%sNo changes.\n", indent);
     }
 };
 
@@ -401,6 +472,48 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
     }
 };
 
+struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
+{
+    std::string description() override
+    {
+        return "show all versions of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-history.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto [gens, curGen] = findGenerations(*profile);
+
+        std::optional<std::pair<Generation, ProfileManifest>> prevGen;
+        bool first = true;
+
+        for (auto & gen : gens) {
+            ProfileManifest manifest(*getEvalState(), gen.path);
+
+            if (!first) std::cout << "\n";
+            first = false;
+
+            if (prevGen)
+                std::cout << fmt("Version %d -> %d:\n", prevGen->first.number, gen.number);
+            else
+                std::cout << fmt("Version %d:\n", gen.number);
+
+            ProfileManifest::printDiff(
+                prevGen ? prevGen->second : ProfileManifest(),
+                manifest,
+                "  ");
+
+            prevGen = {gen, std::move(manifest)};
+        }
+    }
+};
+
 struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
@@ -410,6 +523,7 @@ struct CmdProfile : NixMultiCommand
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
               {"list", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
+              {"history", []() { return make_ref<CmdProfileHistory>(); }},
           })
     { }
 
