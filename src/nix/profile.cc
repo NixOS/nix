@@ -336,7 +336,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
     }
 };
 
-struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
+struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
 {
     std::string description() override
     {
@@ -346,7 +346,7 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
     std::string doc() override
     {
         return
-          #include "profile-info.md"
+          #include "profile-list.md"
           ;
     }
 
@@ -408,7 +408,7 @@ struct CmdProfile : NixMultiCommand
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
-              {"info", []() { return make_ref<CmdProfileInfo>(); }},
+              {"list", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
           })
     { }
