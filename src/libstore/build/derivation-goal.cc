@@ -52,6 +52,7 @@
 
 #if __APPLE__
 #include <spawn.h>
+#include <sys/sysctl.h>
 #endif
 
 #include <pwd.h>
@@ -2869,6 +2870,10 @@ void DerivationGoal::runChild()
             throw SysError("failed to initialize builder");
 
         if (drv->platform == "aarch64-darwin") {
+            // Unset kern.curproc_arch_affinity so we can escape Rosetta
+            int affinity = 0;
+            sysctlbyname("kern.curproc_arch_affinity", NULL, NULL, &affinity, sizeof(affinity));
+
             cpu_type_t cpu = CPU_TYPE_ARM64;
             posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
         } else if (drv->platform == "x86_64-darwin") {
