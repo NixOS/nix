@@ -679,13 +679,9 @@ void DerivationGoal::tryToBuild()
 }
 
 void DerivationGoal::tryLocalBuild() {
-    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
-
-    /* Make sure that we are allowed to start a build.  If this
-       derivation prefers to be done locally, do it even if
-       maxBuildJobs is 0. */
+    /* Make sure that we are allowed to start a build. */
     unsigned int curBuilds = worker.getNrLocalBuilds();
-    if (curBuilds >= settings.maxBuildJobs && !(buildLocally && curBuilds == 0)) {
+    if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
