@@ -12,7 +12,7 @@ R""(
 
   ```console
   # nix build nixpkgs#hello
-  # nix store sign-paths --key-file ./secret-key --recursive ./result
+  # nix store sign --key-file ./secret-key --recursive ./result
   ```
 
   Finally, we can verify the store paths using the corresponding

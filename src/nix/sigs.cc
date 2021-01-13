@@ -92,11 +92,11 @@ struct CmdCopySigs : StorePathsCommand
 
 static auto rCmdCopySigs = registerCommand2<CmdCopySigs>({"store", "copy-sigs"});
 
-struct CmdSignPaths : StorePathsCommand
+struct CmdSign : StorePathsCommand
 {
     Path secretKeyFile;
 
-    CmdSignPaths()
+    CmdSign()
     {
         addFlag({
             .longName = "key-file",
@@ -140,7 +140,7 @@ struct CmdSignPaths : StorePathsCommand
     }
 };
 
-static auto rCmdSignPaths = registerCommand2<CmdSignPaths>({"store", "sign-paths"});
+static auto rCmdSign = registerCommand2<CmdSign>({"store", "sign"});
 
 struct CmdKeyGenerateSecret : Command
 {

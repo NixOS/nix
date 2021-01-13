@@ -129,7 +129,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"make-content-addressable", {"store", "make-content-addressable"}},
         {"optimise-store", {"store", "optimise"}},
         {"ping-store", {"store", "ping"}},
-        {"sign-paths", {"store", "sign-paths"}},
+        {"sign-paths", {"store", "sign"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
