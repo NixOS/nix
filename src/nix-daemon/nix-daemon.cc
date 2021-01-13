@@ -318,7 +318,7 @@ static int main_nix_daemon(int argc, char * * argv)
                 FdSource from(STDIN_FILENO);
                 FdSink to(STDOUT_FILENO);
                 /* Auth hook is empty because in this mode we blindly trust the
-                   standard streams. Limitting access to thoses is explicitly
+                   standard streams. Limiting access to those is explicitly
                    not `nix-daemon`'s responsibility. */
                 processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
             }
