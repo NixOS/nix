@@ -18,13 +18,13 @@ struct CmdVerify : StorePathsCommand
 
     CmdVerify()
     {
-        mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
-        mkFlag(0, "no-trust", "do not verify whether each store path is trusted", &noTrust);
+        mkFlag(0, "no-contents", "Do not verify the contents of each store path.", &noContents);
+        mkFlag(0, "no-trust", "Do not verify whether each store path is trusted.", &noTrust);
 
         addFlag({
             .longName = "substituter",
             .shortName = 's',
-            .description = "use signatures from specified store",
+            .description = "Use signatures from the specified store.",
             .labels = {"store-uri"},
             .handler = {[&](std::string s) { substituterUris.push_back(s); }}
         });
@@ -32,7 +32,7 @@ struct CmdVerify : StorePathsCommand
         addFlag({
             .longName = "sigs-needed",
             .shortName = 'n',
-            .description = "require that each path has at least N valid signatures",
+            .description = "Require that each path has at least *n* valid signatures.",
             .labels = {"n"},
             .handler = {&sigsNeeded}
         });

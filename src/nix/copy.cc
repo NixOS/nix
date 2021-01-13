@@ -21,28 +21,28 @@ struct CmdCopy : StorePathsCommand
     {
         addFlag({
             .longName = "from",
-            .description = "URI of the source Nix store",
+            .description = "URL of the source Nix store.",
             .labels = {"store-uri"},
             .handler = {&srcUri},
         });
 
         addFlag({
             .longName = "to",
-            .description = "URI of the destination Nix store",
+            .description = "URL of the destination Nix store.",
             .labels = {"store-uri"},
             .handler = {&dstUri},
         });
 
         addFlag({
             .longName = "no-check-sigs",
-            .description = "do not require that paths are signed by trusted keys",
+            .description = "Do not require that paths are signed by trusted keys.",
             .handler = {&checkSigs, NoCheckSigs},
         });
 
         addFlag({
             .longName = "substitute-on-destination",
             .shortName = 's',
-            .description = "whether to try substitutes on the destination store (only supported by SSH)",
+            .description = "Whether to try substitutes on the destination store (only supported by SSH stores).",
             .handler = {&substitute, Substitute},
         });
 

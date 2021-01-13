@@ -222,7 +222,7 @@ struct CmdFlakeCheck : FlakeCommand
     {
         addFlag({
             .longName = "no-build",
-            .description = "do not build checks",
+            .description = "Do not build checks.",
             .handler = {&build, false}
         });
     }
@@ -573,7 +573,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         addFlag({
             .longName = "template",
             .shortName = 't',
-            .description = "the template to use",
+            .description = "The template to use.",
             .labels = {"template"},
             .handler = {&templateUrl},
             .completer = {[&](size_t, std::string_view prefix) {
@@ -717,7 +717,7 @@ struct CmdFlakeClone : FlakeCommand
         addFlag({
             .longName = "dest",
             .shortName = 'f',
-            .description = "destination path",
+            .description = "Clone the flake to path *dest*.",
             .labels = {"path"},
             .handler = {&destDir}
         });
@@ -807,7 +807,7 @@ struct CmdFlakeShow : FlakeCommand
     {
         addFlag({
             .longName = "legacy",
-            .description = "show the contents of the 'legacyPackages' output",
+            .description = "Show the contents of the `legacyPackages` output.",
             .handler = {&showLegacy, true}
         });
     }

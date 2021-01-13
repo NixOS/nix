@@ -13,7 +13,7 @@ struct CmdStoreGC : StoreCommand, MixDryRun
     {
         addFlag({
             .longName = "max",
-            .description = "stop after freeing `n` bytes of disk space",
+            .description = "Stop after freeing *n* bytes of disk space.",
             .labels = {"n"},
             .handler = {&options.maxFreed}
         });

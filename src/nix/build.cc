@@ -19,7 +19,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         addFlag({
             .longName = "out-link",
             .shortName = 'o',
-            .description = "path of the symlink to the build result",
+            .description = "Use *path* as prefix for the symlinks to the build results. It defaults to `result`.",
             .labels = {"path"},
             .handler = {&outLink},
             .completer = completePath
@@ -27,13 +27,13 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         addFlag({
             .longName = "no-link",
-            .description = "do not create a symlink to the build result",
+            .description = "Do not create symlinks to the build results.",
             .handler = {&outLink, Path("")},
         });
 
         addFlag({
             .longName = "rebuild",
-            .description = "rebuild an already built package and compare the result to the existing store paths",
+            .description = "Rebuild an already built package and compare the result to the existing store paths.",
             .handler = {&buildMode, bmCheck},
         });
     }

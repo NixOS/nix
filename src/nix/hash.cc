@@ -19,15 +19,15 @@ struct CmdHashBase : Command
 
     CmdHashBase(FileIngestionMethod mode) : mode(mode)
     {
-        mkFlag(0, "sri", "print hash in SRI format", &base, SRI);
-        mkFlag(0, "base64", "print hash in base-64", &base, Base64);
-        mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
-        mkFlag(0, "base16", "print hash in base-16", &base, Base16);
+        mkFlag(0, "sri", "Print the hash in SRI format.", &base, SRI);
+        mkFlag(0, "base64", "Print the hash in base-64 format.", &base, Base64);
+        mkFlag(0, "base32", "Print the hash in base-32 (Nix-specific) format.", &base, Base32);
+        mkFlag(0, "base16", "Print the hash in base-16 format.", &base, Base16);
         addFlag(Flag::mkHashTypeFlag("type", &ht));
         #if 0
         mkFlag()
             .longName("modulo")
-            .description("compute hash modulo specified string")
+            .description("Compute the hash modulo specified the string.")
             .labels({"modulus"})
             .dest(&modulus);
         #endif
@@ -40,15 +40,14 @@ struct CmdHashBase : Command
 
     std::string description() override
     {
-        const char* d;
         switch (mode) {
         case FileIngestionMethod::Flat:
-            d = "print cryptographic hash of a regular file";
-            break;
+            return  "print cryptographic hash of a regular file";
         case FileIngestionMethod::Recursive:
-            d = "print cryptographic hash of the NAR serialisation of a path";
+            return "print cryptographic hash of the NAR serialisation of a path";
+        default:
+            assert(false);
         };
-        return d;
     }
 
     void run() override

@@ -258,14 +258,14 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
     {
         addFlag({
             .longName = "name",
-            .description = "store path name",
+            .description = "Override the name component of the resulting store path. It defaults to the base name of *url*.",
             .labels = {"name"},
             .handler = {&name}
         });
 
         addFlag({
             .longName = "expected-hash",
-            .description = "expected hash of the file",
+            .description = "The expected hash of the file.",
             .labels = {"hash"},
             .handler = {[&](std::string s) {
                 expectedHash = Hash::parseAny(s, hashType);
@@ -276,7 +276,9 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
 
         addFlag({
             .longName = "executable",
-            .description = "make the resulting file executable",
+            .description =
+                "Make the resulting file executable. Note that this causes the "
+                "resulting hash to be a NAR hash rather than a flat file hash.",
             .handler = {&executable, true},
         });
 

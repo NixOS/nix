@@ -69,15 +69,15 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         addFlag({
             .longName = "help",
-            .description = "show usage information",
+            .description = "Show usage information.",
             .handler = {[&]() { if (!completions) showHelpAndExit(); }},
         });
 
         addFlag({
             .longName = "help-config",
-            .description = "show configuration options",
+            .description = "Show configuration settings.",
             .handler = {[&]() {
-                std::cout << "The following configuration options are available:\n\n";
+                std::cout << "The following configuration settings are available:\n\n";
                 Table2 tbl;
                 std::map<std::string, Config::SettingInfo> settings;
                 globalConfig.getSettings(settings);
@@ -91,25 +91,25 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
-            .description = "print full build logs on stderr",
+            .description = "Print full build logs on standard error.",
             .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
         });
 
         addFlag({
             .longName = "version",
-            .description = "show version information",
+            .description = "Show version information.",
             .handler = {[&]() { if (!completions) printVersion(programName); }},
         });
 
         addFlag({
             .longName = "no-net",
-            .description = "disable substituters and consider all previously downloaded files up-to-date",
+            .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .handler = {[&]() { useNet = false; }},
         });
 
         addFlag({
             .longName = "refresh",
-            .description = "consider all previously downloaded files out-of-date",
+            .description = "Consider all previously downloaded files out-of-date.",
             .handler = {[&]() { refresh = true; }},
         });
     }

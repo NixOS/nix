@@ -16,7 +16,7 @@ struct MixDryRun : virtual Args
 
     MixDryRun()
     {
-        mkFlag(0, "dry-run", "show what this command would do without doing it", &dryRun);
+        mkFlag(0, "dry-run", "Show what this command would do without doing it.", &dryRun);
     }
 };
 
@@ -26,7 +26,7 @@ struct MixJSON : virtual Args
 
     MixJSON()
     {
-        mkFlag(0, "json", "produce JSON output", &json);
+        mkFlag(0, "json", "Produce output in JSON format, suitable for consumption by another program.", &json);
     }
 };
 

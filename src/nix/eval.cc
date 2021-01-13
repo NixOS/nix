@@ -18,18 +18,18 @@ struct CmdEval : MixJSON, InstallableCommand
 
     CmdEval()
     {
-        mkFlag(0, "raw", "print strings unquoted", &raw);
+        mkFlag(0, "raw", "Print strings without quotes or escaping.", &raw);
 
         addFlag({
             .longName = "apply",
-            .description = "apply a function to each argument",
+            .description = "Apply the function *expr* to each argument.",
             .labels = {"expr"},
             .handler = {&apply},
         });
 
         addFlag({
             .longName = "write-to",
-            .description = "write a string or attrset of strings to 'path'",
+            .description = "Write a string or attrset of strings to *path*.",
             .labels = {"path"},
             .handler = {&writeTo},
         });

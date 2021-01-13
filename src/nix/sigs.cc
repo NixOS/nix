@@ -16,7 +16,7 @@ struct CmdCopySigs : StorePathsCommand
         addFlag({
             .longName = "substituter",
             .shortName = 's',
-            .description = "use signatures from specified store",
+            .description = "Use signatures from specified store.",
             .labels = {"store-uri"},
             .handler = {[&](std::string s) { substituterUris.push_back(s); }},
         });
@@ -101,7 +101,7 @@ struct CmdSignPaths : StorePathsCommand
         addFlag({
             .longName = "key-file",
             .shortName = 'k',
-            .description = "file containing the secret signing key",
+            .description = "File containing the secret signing key.",
             .labels = {"file"},
             .handler = {&secretKeyFile},
             .completer = completePath
@@ -150,7 +150,7 @@ struct CmdKeyGenerateSecret : Command
     {
         addFlag({
             .longName = "key-name",
-            .description = "identifier of the key (e.g. `cache.example.org-1`)",
+            .description = "Identifier of the key (e.g. `cache.example.org-1`).",
             .labels = {"name"},
             .handler = {&keyName},
         });

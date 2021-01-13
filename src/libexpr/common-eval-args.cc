@@ -14,14 +14,14 @@ MixEvalArgs::MixEvalArgs()
 {
     addFlag({
         .longName = "arg",
-        .description = "argument to be passed to Nix functions",
+        .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .labels = {"name", "expr"},
         .handler = {[&](std::string name, std::string expr) { autoArgs[name] = 'E' + expr; }}
     });
 
     addFlag({
         .longName = "argstr",
-        .description = "string-valued argument to be passed to Nix functions",
+        .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .labels = {"name", "string"},
         .handler = {[&](std::string name, std::string s) { autoArgs[name] = 'S' + s; }},
     });
@@ -29,14 +29,14 @@ MixEvalArgs::MixEvalArgs()
     addFlag({
         .longName = "include",
         .shortName = 'I',
-        .description = "add a path to the list of locations used to look up `<...>` file names",
+        .description = "Add *path* to the list of locations used to look up `<...>` file names.",
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}
     });
 
     addFlag({
         .longName = "impure",
-        .description = "allow access to mutable paths and repositories",
+        .description = "Allow access to mutable paths and repositories.",
         .handler = {[&]() {
             evalSettings.pureEval = false;
         }},
@@ -44,7 +44,7 @@ MixEvalArgs::MixEvalArgs()
 
     addFlag({
         .longName = "override-flake",
-        .description = "override a flake registry value",
+        .description = "Override the flake registries, redirecting *original-ref* to *resolved-ref*.",
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
             auto from = parseFlakeRef(_from, absPath("."));

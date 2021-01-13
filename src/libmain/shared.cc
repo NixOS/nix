@@ -186,27 +186,27 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',
-        .description = "do not show build output",
+        .description = "Do not show build output.",
         .handler = {[&]() {setLogFormat(LogFormat::raw); }},
     });
 
     addFlag({
         .longName = "keep-failed",
         .shortName ='K',
-        .description = "keep temporary directories of failed builds",
+        .description = "Keep temporary directories of failed builds.",
         .handler = {&(bool&) settings.keepFailed, true},
     });
 
     addFlag({
         .longName = "keep-going",
         .shortName ='k',
-        .description = "keep going after a build fails",
+        .description = "Keep going after a build fails.",
         .handler = {&(bool&) settings.keepGoing, true},
     });
 
     addFlag({
         .longName = "fallback",
-        .description = "build from source if substitution fails",
+        .description = "Build from source if substitution fails.",
         .handler = {&(bool&) settings.tryFallback, true},
     });
 
@@ -225,19 +225,19 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         });
     };
 
-    intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
-    intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
-    intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
+    intSettingAlias(0, "cores", "Maximum number of CPU cores to use inside a build.", "cores");
+    intSettingAlias(0, "max-silent-time", "Number of seconds of silence before a build is killed.", "max-silent-time");
+    intSettingAlias(0, "timeout", "Number of seconds before a build is killed.", "timeout");
 
-    mkFlag(0, "readonly-mode", "do not write to the Nix store",
+    mkFlag(0, "readonly-mode", "Do not write to the Nix store.",
         &settings.readOnlyMode);
 
-    mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
+    mkFlag(0, "no-gc-warning", "Disable warnings about not using `--add-root`.",
         &gcWarning, false);
 
     addFlag({
         .longName = "store",
-        .description = "URI of the Nix store to use",
+        .description = "The URL of the Nix store to use.",
         .labels = {"store-uri"},
         .handler = {&(std::string&) settings.storeUri},
     });

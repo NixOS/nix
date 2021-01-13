@@ -72,7 +72,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         addFlag({
             .longName = "command",
             .shortName = 'c',
-            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
             .labels = {"command", "args"},
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");

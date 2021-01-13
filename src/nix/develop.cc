@@ -204,7 +204,7 @@ struct Common : InstallableCommand, MixProfile
     {
         addFlag({
             .longName = "redirect",
-            .description = "redirect a store path to a mutable location",
+            .description = "Redirect a store path to a mutable location.",
             .labels = {"installable", "outputs-dir"},
             .handler = {[&](std::string installable, std::string outputsDir) {
                 redirects.push_back({installable, outputsDir});
@@ -334,7 +334,7 @@ struct CmdDevelop : Common, MixEnvironment
         addFlag({
             .longName = "command",
             .shortName = 'c',
-            .description = "command and arguments to be executed instead of an interactive shell",
+            .description = "Instead of starting an interactive shell, start the specified command and arguments.",
             .labels = {"command", "args"},
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
@@ -344,38 +344,38 @@ struct CmdDevelop : Common, MixEnvironment
 
         addFlag({
             .longName = "phase",
-            .description = "phase to run (e.g. `build` or `configure`)",
+            .description = "The stdenv phase to run (e.g. `build` or `configure`).",
             .labels = {"phase-name"},
             .handler = {&phase},
         });
 
         addFlag({
             .longName = "configure",
-            .description = "run the configure phase",
+            .description = "Run the `configure` phase.",
             .handler = {&phase, {"configure"}},
         });
 
         addFlag({
             .longName = "build",
-            .description = "run the build phase",
+            .description = "Run the `build` phase.",
             .handler = {&phase, {"build"}},
         });
 
         addFlag({
             .longName = "check",
-            .description = "run the check phase",
+            .description = "Run the `check` phase.",
             .handler = {&phase, {"check"}},
         });
 
         addFlag({
             .longName = "install",
-            .description = "run the install phase",
+            .description = "Run the `install` phase.",
             .handler = {&phase, {"install"}},
         });
 
         addFlag({
             .longName = "installcheck",
-            .description = "run the installcheck phase",
+            .description = "Run the `installcheck` phase.",
             .handler = {&phase, {"installCheck"}},
         });
     }

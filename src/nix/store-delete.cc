@@ -13,7 +13,7 @@ struct CmdStoreDelete : StorePathsCommand
     {
         addFlag({
             .longName = "ignore-liveness",
-            .description = "do not check whether the paths are reachable from a root",
+            .description = "Do not check whether the paths are reachable from a root.",
             .handler = {&options.ignoreLiveness, true}
         });
     }
