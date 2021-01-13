@@ -52,6 +52,7 @@ static bool haveInternet()
 }
 
 std::string programPath;
+char * * savedArgv;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
@@ -232,6 +233,8 @@ static auto rCmdHelp = registerCommand<CmdHelp>("help");
 
 void mainWrapped(int argc, char * * argv)
 {
+    savedArgv = argv;
+
     /* The chroot helper needs to be run before any threads have been
        started. */
     if (argc > 0 && argv[0] == chrootHelperName) {
