@@ -198,9 +198,7 @@ public:
 
     void vacuumDB();
 
-    /* Repair the contents of the given path by redownloading it using
-       a substituter (if available). */
-    void repairPath(const StorePath & path);
+    void repairPath(const StorePath & path) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 

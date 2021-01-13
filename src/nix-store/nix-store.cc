@@ -757,7 +757,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
         throw UsageError("no flags expected");
 
     for (auto & i : opArgs)
-        ensureLocalStore()->repairPath(store->followLinksToStorePath(i));
+        store->repairPath(store->followLinksToStorePath(i));
 }
 
 /* Optimise the disk space usage of the Nix store by hard-linking
