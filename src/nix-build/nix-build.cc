@@ -74,11 +74,21 @@ static void main_nix_build(int argc, char * * argv)
     auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
     auto fromArgs = false;
-    auto packages = false;
+    // whether we're assembling a custom shell with (-p, --packages, --package and/or --tools)
+    auto adHocShellExpression = false;
+    // During arg parsing, whether subsequent arguments are packages (--package) or tools (--tools). Implies adHocShellExpression. 
+    auto tool = false;
     // Same condition as bash uses for interactive shells
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
     Strings attrPaths;
+
+    // all leftovers in order (not always used)
     Strings left;
+    // package leftovers (not always used)
+    Strings inputs;
+    // tool leftovers (not always used)
+    Strings tools;
+
     RepairFlag repair = NoRepair;
     Path gcRoot;
     BuildMode buildMode = bmNormal;
@@ -193,8 +203,15 @@ static void main_nix_build(int argc, char * * argv)
         else if (*arg == "--pure") pure = true;
         else if (*arg == "--impure") pure = false;
 
-        else if (runEnv && (*arg == "--packages" || *arg == "-p"))
-            packages = true;
+        else if (runEnv && (*arg == "--inputs" || *arg == "--packages" || *arg == "-p")) {
+            adHocShellExpression = true;
+            tool = false;
+        }
+
+        else if (runEnv && (*arg == "--tools" || *arg == "-t")) {
+            adHocShellExpression = true;
+            tool = true;
+        }
 
         else if (inShebang && *arg == "-i") {
             auto interpreter = getArg(*arg, arg, end);
@@ -232,8 +249,13 @@ static void main_nix_build(int argc, char * * argv)
         else if (*arg != "" && arg->at(0) == '-')
             return false;
 
-        else
+        else {
             left.push_back(*arg);
+            if (tool)
+                tools.push_back(*arg);
+            else
+                inputs.push_back(*arg);
+        }
 
         return true;
     });
@@ -242,7 +264,7 @@ static void main_nix_build(int argc, char * * argv)
 
     initPlugins();
 
-    if (packages && fromArgs)
+    if (adHocShellExpression && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
     auto store = openStore();
@@ -262,10 +284,15 @@ static void main_nix_build(int argc, char * * argv)
         autoArgs = newArgs;
     }
 
-    if (packages) {
+    if (adHocShellExpression) {
         std::ostringstream joined;
-        joined << "with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
-        for (const auto & i : left)
+        joined << "with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { ";
+        joined << "buildInputs = [ ";
+        for (const auto & i : inputs)
+            joined << '(' << i << ") ";
+        joined << "]; ";
+        joined << "nativeBuildInputs = [ ";
+        for (const auto & i : tools)
             joined << '(' << i << ") ";
         joined << "]; } \"\"";
         fromArgs = true;
@@ -303,7 +330,7 @@ static void main_nix_build(int argc, char * * argv)
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
                     exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
-                                        inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+                                        inShebang && !adHocShellExpression ? absPath(i, absPath(dirOf(script))) : i)))));
             }
         }
 

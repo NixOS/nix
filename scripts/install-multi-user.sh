@@ -260,7 +260,7 @@ them and open them again. Other than that, you should be ready to go.
 
 Try it! Open a new terminal, and type:
 $(poly_extra_try_me_commands)
-  $ nix-shell -p nix-info --run "nix-info -m"
+  $ nix-shell -t nix-info --run "nix-info -m"
 $(poly_extra_setup_instructions)
 Thank you for using this installer. If you have any feedback, don't
 hesitate:

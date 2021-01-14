@@ -13,7 +13,7 @@
   [`--exclude` *regexp*]
   [--pure]
   [--keep *name*]
-  {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
+  {[*path*] | {`--tools` | `--inputs`} {*packages* | *expressions*} … | }
 
 # Description
 
@@ -82,12 +82,40 @@ All options not listed here are passed to `nix-store
     installation) `/etc/bashrc` is still sourced, so any variables set
     there will affect the interactive shell.
 
-  - `--packages` / `-p` *packages*…  
-    Set up an environment in which the specified packages are present.
-    The command line arguments are interpreted as attribute names inside
-    the Nix Packages collection. Thus, `nix-shell -p libjpeg openjdk`
+  - `--tools` / `-t` *packages*…
+    Instead of loading an environment from a `*path*` argument or `shell.nix`,
+    create an ad-hoc Nixpkgs derivation. Subsequent arguments are treated as
+    `nativeBuildInputs`.
+
+    You can use this to provide commands to a shell for its duration, without
+    installing them in a globally discoverable manner such as `nix-env -i`.
+
+    The arguments are interpreted as attribute names inside the Nix Packages
+    collection or expressions with these attribute names in scope.
+
+    This can be combined with `--inputs`. For example, 
+    `nix-shell --inputs libjpeg --tools openjdk pandoc` will enter a shell where
+    the `java` and `pandoc` commands are provided, while also making `libjpeg`
+    discoverable for the C compiler and linker.
+
+  - `--inputs` *packages*…
+    Like `--tools`, except it is for libraries and such. The `packages` will be
+    listed in `buildInputs`, whereas commands go in `nativeBuildInputs`.
+
+    This can be combined with `--tools`. For example, `nix-shell --inputs libjpeg libpng --tools openjdk`
     will start a shell in which the packages denoted by the attribute
-    names `libjpeg` and `openjdk` are present.
+    names `libjpeg` and `openjdk` are present. `openjdk` will be provided in
+    `nativeBuildInputs`, making its commands runnable, whereas `libjpeg` will
+    be added to `buildInputs`, so the shell's compiler can find it.
+
+  - `--packages` / `-p` *packages*…
+    *Legacy option* for adding packages to a shell, ambiguously.
+    Use `--tools` for commands or `--inputs` for libraries.
+
+    Some resources may still refer to this option, which does not run the
+    correct setup for commands. This causes breaks shell autocompletion
+    and will stop working altogether when Nixpkgs enables `strictDeps` by
+    default.
 
   - `-i` *interpreter*  
     The chained script interpreter to be invoked by `nix-shell`. Only
@@ -127,8 +155,8 @@ $ nix-shell '<nixpkgs>' -A pan --pure \
     --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
 ```
 
-Nix expressions can also be given on the command line using the `-E` and
-`-p` flags. For instance, the following starts a shell containing the
+Nix expressions can also be given on the command line using the `-E`, `--tools`
+and `--inputs` flags. For instance, the following starts a shell containing the
 packages `sqlite` and `libX11`:
 
 ```console
@@ -138,26 +166,26 @@ $ nix-shell -E 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ 
 A shorter way to do the same is:
 
 ```console
-$ nix-shell -p sqlite xorg.libX11
+$ nix-shell --inputs sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
 ```
 
-Note that `-p` accepts multiple full nix expressions that are valid in
+Note that `--inputs` and `--tools` accept multiple full nix expressions that are valid in
 the `buildInputs = [ ... ]` shown above, not only package names. So the
 following is also legal:
 
 ```console
-$ nix-shell -p sqlite 'git.override { withManual = false; }'
+$ nix-shell --inputs sqlite libjpeg --tools 'git.override { withManual = false; }'
 ```
 
-The `-p` flag looks up Nixpkgs in the Nix search path. You can override
+The `--tools` and `--input` flag look up Nixpkgs attributes in the Nix search path. You can override
 it by passing `-I` or setting `NIX_PATH`. For example, the following
 gives you a shell containing the Pan package from a specific revision of
 Nixpkgs:
 
 ```console
-$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+$ nix-shell --tools pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 
 [nix-shell:~]$ pan --version
 Pan 0.139
@@ -171,7 +199,7 @@ done by starting the script with the following lines:
 
 ```bash
 #! /usr/bin/env nix-shell
-#! nix-shell -i real-interpreter -p packages
+#! nix-shell -i real-interpreter --tools packages
 ```
 
 where *real-interpreter* is the “real” script interpreter that will be
@@ -188,7 +216,7 @@ For example, here is a Python script that depends on Python and the
 
 ```python
 #! /usr/bin/env nix-shell
-#! nix-shell -i python -p python pythonPackages.prettytable
+#! nix-shell -i python --tools python --inputs pythonPackages.prettytable
 
 import prettytable
 
@@ -203,7 +231,7 @@ requires Perl and the `HTML::TokeParser::Simple` and `LWP` packages:
 
 ```perl
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
+#! nix-shell -i perl --tools perl --inputs perlPackages.HTMLTokeParserSimple perlPackages.LWP
 
 use HTML::TokeParser::Simple;
 
@@ -221,7 +249,7 @@ package like Terraform:
 
 ```bash
 #! /usr/bin/env nix-shell
-#! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
+#! nix-shell -i bash --tools "terraform.withPlugins (plugins: [ plugins.openstack ])"
 
 terraform apply
 ```
@@ -237,7 +265,7 @@ branch):
 
 ```haskell
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
+#! nix-shell -i runghc --tools "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
 #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
 
 import Network.HTTP
@@ -257,7 +285,7 @@ of Nixpkgs:
 
     #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/0672315759b3e15e2121365f067c1c8c56bb4722.tar.gz
 
-The examples above all used `-p` to get dependencies from Nixpkgs. You
+The examples above all used `--tools` and `--inputs` to get dependencies from Nixpkgs. You
 can also use a Nix expression to build your own dependencies. For
 example, the Python example could have been written as:
 
@@ -272,5 +300,8 @@ contains:
 ```nix
 with import <nixpkgs> {};
 
-runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
+mkShell {
+  nativeBuildInputs = [ python ];
+  buildInputs = [ pythonPackages.prettytable ];
+}
 ```
