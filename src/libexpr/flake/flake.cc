@@ -128,7 +128,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         attrs.emplace(attr.name, Explicit<bool> { attr.value->boolean });
                         break;
                     case nInt:
-                        attrs.emplace(attr.name, attr.value->integer);
+                        attrs.emplace(attr.name, (long unsigned int)attr.value->integer);
                         break;
                     default:
                         throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
