@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
+  inputs.nixpkgs.url = "nixpkgs/nixos-unstable-small";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
@@ -90,7 +90,7 @@
             lowdown
             gmock
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+          ++ lib.optionals stdenv.isLinux [libseccomp util-linuxMinimal]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
