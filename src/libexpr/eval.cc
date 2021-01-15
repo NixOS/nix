@@ -657,11 +657,6 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
-{
-    throw TypeError(s, s1);
-}
-
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
     throw TypeError({
@@ -681,6 +676,14 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
 {
     throw UndefinedVarError({
+        .hint = hintfmt(s, s1),
+        .errPos = pos
+    });
+}
+
+LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1))
+{
+    throw MissingArgumentError({
         .hint = hintfmt(s, s1),
         .errPos = pos
     });
@@ -1376,7 +1379,13 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             if (j != args.end()) {
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
-                throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
+                throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
+
+nix attempted to evaluate a function as a top level expression; in this case it must have its
+arguments supplied either by default values, or passed explicitly with --arg or --argstr.
+
+https://nixos.org/manual/nix/stable/#ss-functions)", i.name);
+
             }
         }
     }
