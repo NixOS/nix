@@ -142,9 +142,7 @@ void SubstitutionGoal::tryNext()
     /* Bail out early if this substituter lacks a valid
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
-    if (worker.store.requireSigs
-        && !sub->isTrusted
-        && !info->checkSignatures(worker.store, worker.store.getPublicKeys()))
+    if (!sub->isTrusted && worker.store.pathInfoIsTrusted(*info))
     {
         logWarning({
             .name = "Invalid path signature",

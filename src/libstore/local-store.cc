@@ -1098,11 +1098,23 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
     }
 }
 
+const PublicKeys & LocalStore::getPublicKeys()
+{
+    auto state(_state.lock());
+    if (!state->publicKeys)
+        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys());
+    return *state->publicKeys;
+}
+
+bool LocalStore::pathInfoIsTrusted(const ValidPathInfo & info)
+{
+    return requireSigs && !info.checkSignatures(*this, getPublicKeys());
+}
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (requireSigs && checkSigs && !info.checkSignatures(*this, getPublicKeys()))
+    if (checkSigs && pathInfoIsTrusted(info))
         throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
 
     addTempRoot(info.path);

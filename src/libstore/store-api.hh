@@ -189,10 +189,6 @@ struct StoreConfig : public Config
 
     const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
 
-    Setting<bool> requireSigs{this,
-        settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
-
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
@@ -375,6 +371,21 @@ public:
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
+
+    /* Check whether the given valid path info is sufficiently well-formed
+       (e.g. hash content-address or signature) in order to be included in the
+       given store.
+
+       These same checks would be performed in addToStore, but this allows an
+       earlier failure in the case where dependencies need to be added too, but
+       the addToStore wouldn't fail until those dependencies are added. Also,
+       we don't really want to add the dependencies listed in a nar info we
+       don't trust anyyways.
+       */
+    virtual bool pathInfoIsTrusted(const ValidPathInfo &)
+    {
+        return true;
+    }
 
 protected:
 
@@ -719,19 +730,10 @@ public:
         return toRealPath(printStorePath(storePath));
     }
 
-    const PublicKeys & getPublicKeys();
-
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 
 protected:
-
-    struct CryptoState
-    {
-        std::unique_ptr<PublicKeys> publicKeys;
-    };
-
-    Sync<CryptoState> _cryptoState;
 
     Stats stats;
 

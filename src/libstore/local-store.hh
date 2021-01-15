@@ -35,6 +35,10 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
+    Setting<bool> requireSigs{(StoreConfig*) this,
+        settings.requireSigs,
+        "require-sigs", "whether store paths should have a trusted signature on import"};
+
     const std::string name() override { return "Local Store"; }
 };
 
@@ -71,6 +75,8 @@ private:
            minFree but not much below availAfterGC, then there is no
            point in starting a new GC. */
         uint64_t availAfterGC = std::numeric_limits<uint64_t>::max();
+
+        std::unique_ptr<PublicKeys> publicKeys;
     };
 
     Sync<State> _state;
@@ -87,6 +93,12 @@ public:
     const Path trashDir;
     const Path tempRootsDir;
     const Path fnTempRoots;
+
+private:
+
+    const PublicKeys & getPublicKeys();
+
+public:
 
     // Hack for build-remote.cc.
     PathSet locksHeld;
@@ -123,6 +135,8 @@ public:
 
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
+
+    bool pathInfoIsTrusted(const ValidPathInfo &) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
