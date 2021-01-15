@@ -18,10 +18,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
     CmdPathInfo()
     {
-        mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
-        mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
-        mkFlag('h', "human-readable", "with -s and -S, print sizes like 1K 234M 5.67G etc.", &humanReadable);
-        mkFlag(0, "sigs", "show signatures", &showSigs);
+        mkFlag('s', "size", "Print the size of the NAR serialisation of each path.", &showSize);
+        mkFlag('S', "closure-size", "Print the sum of the sizes of the NAR serialisations of the closure of each path.", &showClosureSize);
+        mkFlag('h', "human-readable", "With `-s` and `-S`, print sizes in a human-friendly format such as `5.67G`.", &humanReadable);
+        mkFlag(0, "sigs", "Show signatures.", &showSigs);
     }
 
     std::string description() override

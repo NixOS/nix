@@ -66,8 +66,10 @@ int getSchema(Path schemaPath)
     int curSchema = 0;
     if (pathExists(schemaPath)) {
         string s = readFile(schemaPath);
-        if (!string2Int(s, curSchema))
+        auto n = string2Int<int>(s);
+        if (!n)
             throw Error("'%1%' is corrupt", schemaPath);
+        curSchema = *n;
     }
     return curSchema;
 }
@@ -736,54 +738,59 @@ void LocalStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        callback(retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
+        callback(retrySQLite<std::shared_ptr<const ValidPathInfo>>([&]() {
             auto state(_state.lock());
-
-            /* Get the path info. */
-            auto useQueryPathInfo(state->stmts->QueryPathInfo.use()(printStorePath(path)));
-
-            if (!useQueryPathInfo.next())
-                return std::shared_ptr<ValidPathInfo>();
-
-            auto id = useQueryPathInfo.getInt(0);
-
-            auto narHash = Hash::dummy;
-            try {
-                narHash = Hash::parseAnyPrefixed(useQueryPathInfo.getStr(1));
-            } catch (BadHash & e) {
-                throw Error("invalid-path entry for '%s': %s", printStorePath(path), e.what());
-            }
-
-            auto info = std::make_shared<ValidPathInfo>(path, narHash);
-
-            info->id = id;
-
-            info->registrationTime = useQueryPathInfo.getInt(2);
-
-            auto s = (const char *) sqlite3_column_text(state->stmts->QueryPathInfo, 3);
-            if (s) info->deriver = parseStorePath(s);
-
-            /* Note that narSize = NULL yields 0. */
-            info->narSize = useQueryPathInfo.getInt(4);
-
-            info->ultimate = useQueryPathInfo.getInt(5) == 1;
-
-            s = (const char *) sqlite3_column_text(state->stmts->QueryPathInfo, 6);
-            if (s) info->sigs = tokenizeString<StringSet>(s, " ");
-
-            s = (const char *) sqlite3_column_text(state->stmts->QueryPathInfo, 7);
-            if (s) info->ca = parseContentAddressOpt(s);
-
-            /* Get the references. */
-            auto useQueryReferences(state->stmts->QueryReferences.use()(info->id));
-
-            while (useQueryReferences.next())
-                info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
-
-            return info;
+            return queryPathInfoInternal(*state, path);
         }));
 
     } catch (...) { callback.rethrow(); }
+}
+
+
+std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & state, const StorePath & path)
+{
+    /* Get the path info. */
+    auto useQueryPathInfo(state.stmts->QueryPathInfo.use()(printStorePath(path)));
+
+    if (!useQueryPathInfo.next())
+        return std::shared_ptr<ValidPathInfo>();
+
+    auto id = useQueryPathInfo.getInt(0);
+
+    auto narHash = Hash::dummy;
+    try {
+        narHash = Hash::parseAnyPrefixed(useQueryPathInfo.getStr(1));
+    } catch (BadHash & e) {
+        throw Error("invalid-path entry for '%s': %s", printStorePath(path), e.what());
+    }
+
+    auto info = std::make_shared<ValidPathInfo>(path, narHash);
+
+    info->id = id;
+
+    info->registrationTime = useQueryPathInfo.getInt(2);
+
+    auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 3);
+    if (s) info->deriver = parseStorePath(s);
+
+    /* Note that narSize = NULL yields 0. */
+    info->narSize = useQueryPathInfo.getInt(4);
+
+    info->ultimate = useQueryPathInfo.getInt(5) == 1;
+
+    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 6);
+    if (s) info->sigs = tokenizeString<StringSet>(s, " ");
+
+    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
+    if (s) info->ca = parseContentAddressOpt(s);
+
+    /* Get the references. */
+    auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
+
+    while (useQueryReferences.next())
+        info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
+
+    return info;
 }
 
 
@@ -1599,7 +1606,7 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
 
         SQLiteTxn txn(state->db);
 
-        auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(storePath)));
+        auto info = std::const_pointer_cast<ValidPathInfo>(queryPathInfoInternal(*state, storePath));
 
         info->sigs.insert(sigs.begin(), sigs.end());
 

@@ -19,7 +19,7 @@ struct CmdShowDerivation : InstallablesCommand
         addFlag({
             .longName = "recursive",
             .shortName = 'r',
-            .description = "include the dependencies of the specified derivations",
+            .description = "Include the dependencies of the specified derivations.",
             .handler = {&recursive, true}
         });
     }

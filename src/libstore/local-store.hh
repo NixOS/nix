@@ -177,9 +177,7 @@ public:
 
     void vacuumDB();
 
-    /* Repair the contents of the given path by redownloading it using
-       a substituter (if available). */
-    void repairPath(const StorePath & path);
+    void repairPath(const StorePath & path) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
@@ -213,6 +211,8 @@ private:
 
     void verifyPath(const Path & path, const StringSet & store,
         PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
+    std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 

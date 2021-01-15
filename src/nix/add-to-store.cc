@@ -19,7 +19,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         addFlag({
             .longName = "name",
             .shortName = 'n',
-            .description = "name component of the store path",
+            .description = "Override the name component of the store path. It defaults to the base name of *path*.",
             .labels = {"name"},
             .handler = {&namePart},
         });

@@ -608,6 +608,11 @@ public:
     virtual ref<FSAccessor> getFSAccessor()
     { unsupported("getFSAccessor"); }
 
+    /* Repair the contents of the given path by redownloading it using
+       a substituter (if available). */
+    virtual void repairPath(const StorePath & path)
+    { unsupported("repairPath"); }
+
     /* Add signatures to the specified store path. The signatures are
        not verified. */
     virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)

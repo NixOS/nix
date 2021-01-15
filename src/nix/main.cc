@@ -52,6 +52,7 @@ static bool haveInternet()
 }
 
 std::string programPath;
+char * * savedArgv;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
@@ -69,15 +70,15 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         addFlag({
             .longName = "help",
-            .description = "show usage information",
+            .description = "Show usage information.",
             .handler = {[&]() { if (!completions) showHelpAndExit(); }},
         });
 
         addFlag({
             .longName = "help-config",
-            .description = "show configuration options",
+            .description = "Show configuration settings.",
             .handler = {[&]() {
-                std::cout << "The following configuration options are available:\n\n";
+                std::cout << "The following configuration settings are available:\n\n";
                 Table2 tbl;
                 std::map<std::string, Config::SettingInfo> settings;
                 globalConfig.getSettings(settings);
@@ -91,25 +92,25 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
-            .description = "print full build logs on stderr",
+            .description = "Print full build logs on standard error.",
             .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
         });
 
         addFlag({
             .longName = "version",
-            .description = "show version information",
+            .description = "Show version information.",
             .handler = {[&]() { if (!completions) printVersion(programName); }},
         });
 
         addFlag({
             .longName = "no-net",
-            .description = "disable substituters and consider all previously downloaded files up-to-date",
+            .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .handler = {[&]() { useNet = false; }},
         });
 
         addFlag({
             .longName = "refresh",
-            .description = "consider all previously downloaded files out-of-date",
+            .description = "Consider all previously downloaded files out-of-date.",
             .handler = {[&]() { refresh = true; }},
         });
     }
@@ -129,7 +130,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"make-content-addressable", {"store", "make-content-addressable"}},
         {"optimise-store", {"store", "optimise"}},
         {"ping-store", {"store", "ping"}},
-        {"sign-paths", {"store", "sign-paths"}},
+        {"sign-paths", {"store", "sign"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
@@ -232,6 +233,8 @@ static auto rCmdHelp = registerCommand<CmdHelp>("help");
 
 void mainWrapped(int argc, char * * argv)
 {
+    savedArgv = argv;
+
     /* The chroot helper needs to be run before any threads have been
        started. */
     if (argc > 0 && argv[0] == chrootHelperName) {

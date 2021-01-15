@@ -19,10 +19,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#if HAVE_SODIUM
-#include <sodium.h>
-#endif
-
 
 namespace nix_store {
 
@@ -761,7 +757,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
         throw UsageError("no flags expected");
 
     for (auto & i : opArgs)
-        ensureLocalStore()->repairPath(store->followLinksToStorePath(i));
+        store->repairPath(store->followLinksToStorePath(i));
 }
 
 /* Optimise the disk space usage of the Nix store by hard-linking
@@ -980,21 +976,11 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     string secretKeyFile = *i++;
     string publicKeyFile = *i++;
 
-#if HAVE_SODIUM
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
+    auto secretKey = SecretKey::generate(keyName);
 
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    unsigned char sk[crypto_sign_SECRETKEYBYTES];
-    if (crypto_sign_keypair(pk, sk) != 0)
-        throw Error("key generation failed");
-
-    writeFile(publicKeyFile, keyName + ":" + base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)));
+    writeFile(publicKeyFile, secretKey.toPublicKey().to_string());
     umask(0077);
-    writeFile(secretKeyFile, keyName + ":" + base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)));
-#else
-    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
+    writeFile(secretKeyFile, secretKey.to_string());
 }
 
 

@@ -65,18 +65,18 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     if (recursive)
         addFlag({
             .longName = "no-recursive",
-            .description = "apply operation to specified paths only",
+            .description = "Apply operation to specified paths only.",
             .handler = {&this->recursive, false},
         });
     else
         addFlag({
             .longName = "recursive",
             .shortName = 'r',
-            .description = "apply operation to closure of the specified paths",
+            .description = "Apply operation to closure of the specified paths.",
             .handler = {&this->recursive, true},
         });
 
-    mkFlag(0, "all", "apply operation to the entire store", &all);
+    mkFlag(0, "all", "Apply the operation to every store path.", &all);
 }
 
 void StorePathsCommand::run(ref<Store> store)
@@ -133,7 +133,7 @@ MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
-        .description = "profile to update",
+        .description = "The profile to update.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath
@@ -190,14 +190,14 @@ MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
     addFlag({
         .longName = "ignore-environment",
         .shortName = 'i',
-        .description = "clear the entire environment (except those specified with --keep)",
+        .description = "Clear the entire environment (except those specified with `--keep`).",
         .handler = {&ignoreEnvironment, true},
     });
 
     addFlag({
         .longName = "keep",
         .shortName = 'k',
-        .description = "keep specified environment variable",
+        .description = "Keep the environment variable *name*.",
         .labels = {"name"},
         .handler = {[&](std::string s) { keep.insert(s); }},
     });
@@ -205,7 +205,7 @@ MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
     addFlag({
         .longName = "unset",
         .shortName = 'u',
-        .description = "unset specified environment variable",
+        .description = "Unset the environment variable *name*.",
         .labels = {"name"},
         .handler = {[&](std::string s) { unset.insert(s); }},
     });

@@ -1250,11 +1250,10 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
     if (opArgs.size() != 1)
         throw UsageError("exactly one argument expected");
 
-    GenerationNumber dstGen;
-    if (!string2Int(opArgs.front(), dstGen))
+    if (auto dstGen = string2Int<GenerationNumber>(opArgs.front()))
+        switchGeneration(globals, *dstGen);
+    else
         throw UsageError("expected a generation number");
-
-    switchGeneration(globals, dstGen);
 }
 
 
@@ -1308,17 +1307,17 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
         if(opArgs.front().size() < 2)
             throw Error("invalid number of generations ‘%1%’", opArgs.front());
         string str_max = string(opArgs.front(), 1, opArgs.front().size());
-        GenerationNumber max;
-        if (!string2Int(str_max, max) || max == 0)
+        auto max = string2Int<GenerationNumber>(str_max);
+        if (!max || *max == 0)
             throw Error("invalid number of generations to keep ‘%1%’", opArgs.front());
-        deleteGenerationsGreaterThan(globals.profile, max, globals.dryRun);
+        deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
     } else {
         std::set<GenerationNumber> gens;
         for (auto & i : opArgs) {
-            GenerationNumber n;
-            if (!string2Int(i, n))
+            if (auto n = string2Int<GenerationNumber>(i))
+                gens.insert(*n);
+            else
                 throw UsageError("invalid generation number '%1%'", i);
-            gens.insert(n);
         }
         deleteGenerations(globals.profile, gens, globals.dryRun);
     }

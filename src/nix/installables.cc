@@ -60,37 +60,37 @@ MixFlakeOptions::MixFlakeOptions()
 {
     addFlag({
         .longName = "recreate-lock-file",
-        .description = "recreate lock file from scratch",
+        .description = "Recreate the flake's lock file from scratch.",
         .handler = {&lockFlags.recreateLockFile, true}
     });
 
     addFlag({
         .longName = "no-update-lock-file",
-        .description = "do not allow any updates to the lock file",
+        .description = "Do not allow any updates to the flake's lock file.",
         .handler = {&lockFlags.updateLockFile, false}
     });
 
     addFlag({
         .longName = "no-write-lock-file",
-        .description = "do not write the newly generated lock file",
+        .description = "Do not write the flake's newly generated lock file.",
         .handler = {&lockFlags.writeLockFile, false}
     });
 
     addFlag({
         .longName = "no-registries",
-        .description = "don't use flake registries",
+        .description = "Don't allow lookups in the flake registries.",
         .handler = {&lockFlags.useRegistries, false}
     });
 
     addFlag({
         .longName = "commit-lock-file",
-        .description = "commit changes to the lock file",
+        .description = "Commit changes to the flake's lock file.",
         .handler = {&lockFlags.commitLockFile, true}
     });
 
     addFlag({
         .longName = "update-input",
-        .description = "update a specific flake input",
+        .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
@@ -103,7 +103,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "override a specific flake input (e.g. `dwarffs/nixpkgs`)",
+        .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`).",
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
@@ -114,7 +114,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "inputs-from",
-        .description = "use the inputs of the specified flake as registry entries",
+        .description = "Use the inputs of the specified flake as registry entries.",
         .labels = {"flake-url"},
         .handler = {[&](std::string flakeRef) {
             auto evalState = getEvalState();
@@ -143,22 +143,22 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "file",
         .shortName = 'f',
-        .description = "evaluate *file* rather than the default",
+        .description = "Interpret installables as attribute paths relative to the Nix expression stored in *file*.",
         .labels = {"file"},
         .handler = {&file},
         .completer = completePath
     });
 
     addFlag({
-        .longName ="expr",
-        .description = "evaluate attributes from *expr*",
+        .longName = "expr",
+        .description = "Interpret installables as attribute paths relative to the Nix expression *expr*.",
         .labels = {"expr"},
         .handler = {&expr}
     });
 
     addFlag({
-        .longName ="derivation",
-        .description = "operate on the store derivation rather than its outputs",
+        .longName = "derivation",
+        .description = "Operate on the store derivation rather than its outputs.",
         .handler = {&operateOn, OperateOn::Derivation},
     });
 }

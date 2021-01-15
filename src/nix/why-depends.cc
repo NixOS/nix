@@ -40,7 +40,7 @@ struct CmdWhyDepends : SourceExprCommand
         addFlag({
             .longName = "all",
             .shortName = 'a',
-            .description = "show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path",
+            .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
             .handler = {&all, true},
         });
     }

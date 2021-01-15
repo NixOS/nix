@@ -1,3 +1,4 @@
+#include "command.hh"
 #include "shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
@@ -150,7 +151,7 @@ static ref<Store> openUncachedStore()
 }
 
 
-static void daemonLoop(char * * argv)
+static void daemonLoop()
 {
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
@@ -232,9 +233,9 @@ static void daemonLoop(char * * argv)
                 setSigChldAction(false);
 
                 //  For debugging, stuff the pid into argv[1].
-                if (peer.pidKnown && argv[1]) {
+                if (peer.pidKnown && savedArgv[1]) {
                     string processName = std::to_string(peer.pid);
-                    strncpy(argv[1], processName.c_str(), strlen(argv[1]));
+                    strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
                 }
 
                 //  Handle the connection.
@@ -264,6 +265,48 @@ static void daemonLoop(char * * argv)
     }
 }
 
+static void runDaemon(bool stdio)
+{
+    if (stdio) {
+        if (auto store = openUncachedStore().dynamic_pointer_cast<RemoteStore>()) {
+            auto conn = store->openConnectionWrapper();
+            int from = conn->from.fd;
+            int to = conn->to.fd;
+
+            auto nfds = std::max(from, STDIN_FILENO) + 1;
+            while (true) {
+                fd_set fds;
+                FD_ZERO(&fds);
+                FD_SET(from, &fds);
+                FD_SET(STDIN_FILENO, &fds);
+                if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
+                    throw SysError("waiting for data from client or server");
+                if (FD_ISSET(from, &fds)) {
+                    auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+                    if (res == -1)
+                        throw SysError("splicing data from daemon socket to stdout");
+                    else if (res == 0)
+                        throw EndOfFile("unexpected EOF from daemon socket");
+                }
+                if (FD_ISSET(STDIN_FILENO, &fds)) {
+                    auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+                    if (res == -1)
+                        throw SysError("splicing data from stdin to daemon socket");
+                    else if (res == 0)
+                        return;
+                }
+            }
+        } else {
+            FdSource from(STDIN_FILENO);
+            FdSink to(STDOUT_FILENO);
+            /* Auth hook is empty because in this mode we blindly trust the
+               standard streams. Limiting access to those is explicitly
+               not `nix-daemon`'s responsibility. */
+            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
+        }
+    } else
+        daemonLoop();
+}
 
 static int main_nix_daemon(int argc, char * * argv)
 {
@@ -285,49 +328,34 @@ static int main_nix_daemon(int argc, char * * argv)
 
         initPlugins();
 
-        if (stdio) {
-            if (auto store = openUncachedStore().dynamic_pointer_cast<RemoteStore>()) {
-                auto conn = store->openConnectionWrapper();
-                int from = conn->from.fd;
-                int to = conn->to.fd;
-
-                auto nfds = std::max(from, STDIN_FILENO) + 1;
-                while (true) {
-                    fd_set fds;
-                    FD_ZERO(&fds);
-                    FD_SET(from, &fds);
-                    FD_SET(STDIN_FILENO, &fds);
-                    if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
-                        throw SysError("waiting for data from client or server");
-                    if (FD_ISSET(from, &fds)) {
-                        auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
-                        if (res == -1)
-                            throw SysError("splicing data from daemon socket to stdout");
-                        else if (res == 0)
-                            throw EndOfFile("unexpected EOF from daemon socket");
-                    }
-                    if (FD_ISSET(STDIN_FILENO, &fds)) {
-                        auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
-                        if (res == -1)
-                            throw SysError("splicing data from stdin to daemon socket");
-                        else if (res == 0)
-                            return 0;
-                    }
-                }
-            } else {
-                FdSource from(STDIN_FILENO);
-                FdSink to(STDOUT_FILENO);
-                /* Auth hook is empty because in this mode we blindly trust the
-                   standard streams. Limitting access to thoses is explicitly
-                   not `nix-daemon`'s responsibility. */
-                processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
-            }
-        } else {
-            daemonLoop(argv);
-        }
+        runDaemon(stdio);
 
         return 0;
     }
 }
 
 static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
+
+struct CmdDaemon : StoreCommand
+{
+    std::string description() override
+    {
+        return "daemon to perform store operations on behalf of non-root clients";
+    }
+
+    Category category() override { return catUtility; }
+
+    std::string doc() override
+    {
+        return
+          #include "daemon.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        runDaemon(false);
+    }
+};
+
+static auto rCmdDaemon = registerCommand2<CmdDaemon>({"daemon"});
