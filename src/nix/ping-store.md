@@ -27,6 +27,7 @@ argument `--store` *url*) can be accessed. What this means is
 dependent on the type of the store. For instance, for an SSH store it
 means that Nix can connect to the specified machine.
 
-When the command succeeds a zero exit code is returned with no output.
+If the command succeeds, Nix returns a exit code of 0 and does not
+print any output.
 
 )""
