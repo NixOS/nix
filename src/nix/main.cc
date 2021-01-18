@@ -330,8 +330,11 @@ void mainWrapped(int argc, char * * argv)
             fileTransferSettings.connectTimeout = 1;
     }
 
-    if (args.refresh)
+    if (args.refresh) {
         settings.tarballTtl = 0;
+        settings.ttlNegativeNarInfoCache = 0;
+        settings.ttlPositiveNarInfoCache = 0;
+    }
 
     args.command->second->prepare();
     args.command->second->run();
