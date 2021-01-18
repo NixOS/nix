@@ -501,7 +501,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
         auto drvInfo = DerivationInfo{
             std::move(drvPath),
-            state->store->parseStorePath(attr->getAttr(state->sOutPath)->getString()),
+            state->store->maybeParseStorePath(attr->getAttr(state->sOutPath)->getString()),
             attr->getAttr(state->sOutputName)->getString()
         };
 
