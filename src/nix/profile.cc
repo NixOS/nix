@@ -252,8 +252,28 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
 
                 manifest.elements.emplace_back(std::move(element));
-            } else
-                throw UnimplementedError("'nix profile install' does not support argument '%s'", installable->what());
+            } else {
+                auto buildables = build(store, Realise::Outputs, {installable}, bmNormal);
+
+                for (auto & buildable : buildables) {
+                    ProfileElement element;
+
+                    std::visit(overloaded {
+                        [&](BuildableOpaque bo) {
+                            pathsToBuild.push_back({bo.path, {}});
+                            element.storePaths.insert(bo.path);
+                        },
+                        [&](BuildableFromDrv bfd) {
+                            for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
+                                pathsToBuild.push_back({bfd.drvPath, {output.first}});
+                                element.storePaths.insert(output.second);
+                            }
+                        },
+                    }, buildable);
+
+                    manifest.elements.emplace_back(std::move(element));
+                }
+            }
         }
 
         store->buildPaths(pathsToBuild);
