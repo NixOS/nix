@@ -19,6 +19,8 @@ private:
     EvalState * state;
 
     mutable std::string name;
+    mutable std::optional<std::optional<std::string>> pname;
+    mutable std::optional<std::optional<std::string>> version;
     mutable std::string system;
     mutable std::optional<std::optional<StorePath>> drvPath;
     mutable std::optional<StorePath> outPath;
@@ -41,6 +43,8 @@ public:
     DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
     std::string queryName() const;
+    std::optional<std::string> queryPname() const;
+    std::optional<std::string> queryVersion() const;
     std::string querySystem() const;
     std::optional<StorePath> queryDrvPath() const;
     StorePath requireDrvPath() const;

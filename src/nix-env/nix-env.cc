@@ -920,8 +920,8 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
 
             auto drvName = DrvName(i.queryName());
             pkgObj.attr("name", drvName.fullName);
-            pkgObj.attr("pname", drvName.name);
-            pkgObj.attr("version", drvName.version);
+            pkgObj.attr("pname", i.queryPname() ? *i.queryPname() : drvName.name);
+            pkgObj.attr("version", i.queryVersion() ? *i.queryVersion() : drvName.version);
             pkgObj.attr("system", i.querySystem());
             pkgObj.attr("outputName", i.queryOutputName());
 
@@ -1115,8 +1115,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             if (xmlOutput) {
                 auto drvName = DrvName(i.queryName());
                 attrs["name"] = drvName.fullName;
-                attrs["pname"] = drvName.name;
-                attrs["version"] = drvName.version;
+                attrs["pname"] = i.queryPname() ? *i.queryPname() : drvName.name;
+                attrs["version"] = i.queryVersion() ? *i.queryVersion() : drvName.version;
             } else if (printName) {
                 columns.push_back(i.queryName());
             }
