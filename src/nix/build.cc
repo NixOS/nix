@@ -58,7 +58,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                for (size_t i = 0; i < buildables.size(); ++i)
+                for (const auto & [i, buildable] : enumerate(buildables)) {
                     std::visit(overloaded {
                         [&](BuildableOpaque bo) {
                             std::string symlink = outLink;
@@ -74,7 +74,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                                 store2->addPermRoot(output.second, absPath(symlink));
                             }
                         },
-                    }, buildables[i]);
+                    }, buildable);
+                }
 
         updateProfile(buildables);
 
