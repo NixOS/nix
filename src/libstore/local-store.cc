@@ -914,7 +914,7 @@ LocalStore::queryDerivationOutputMapNoResolve(const StorePath& path_)
         if (realisation)
             outputs.insert_or_assign(outputName, realisation->outPath);
         else
-            outputs.insert_or_assign(outputName, std::nullopt);
+            outputs.insert({outputName, std::nullopt});
     }
 
     return outputs;
