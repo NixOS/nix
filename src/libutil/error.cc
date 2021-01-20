@@ -43,9 +43,9 @@ string showErrPos(const ErrPos & errPos)
 {
     if (errPos.line > 0) {
         if (errPos.column > 0) {
-            return fmt("(%1%:%2%)", errPos.line, errPos.column);
+            return fmt("%d:%d", errPos.line, errPos.column);
         } else {
-            return fmt("(%1%)", errPos.line);
+            return fmt("%d", errPos.line);
         }
     }
     else {
@@ -178,24 +178,20 @@ void printCodeLines(std::ostream & out,
     }
 }
 
-void printAtPos(const string & prefix, const ErrPos & pos, std::ostream & out)
+void printAtPos(const ErrPos & pos, std::ostream & out)
 {
-    if (pos)
-    {
+    if (pos) {
         switch (pos.origin) {
             case foFile: {
-                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
-                    ANSI_BLUE << " in file: " << ANSI_NORMAL << pos.file;
+                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
                 break;
             }
             case foString: {
-                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
-                    ANSI_BLUE << " from string" << ANSI_NORMAL;
+                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             case foStdin: {
-                out << prefix << ANSI_BLUE << "at: " << ANSI_YELLOW << showErrPos(pos) <<
-                    ANSI_BLUE << " from stdin" << ANSI_NORMAL;
+                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             default:
@@ -272,7 +268,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     if (einfo.errPos.has_value() && *einfo.errPos) {
         oss << "\n";
-        printAtPos("", *einfo.errPos, oss);
+        printAtPos(*einfo.errPos, oss);
 
         auto loc = getCodeLines(*einfo.errPos);
 
@@ -292,7 +288,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             if (iter->pos.has_value() && (*iter->pos)) {
                 auto pos = iter->pos.value();
                 oss << "\n";
-                printAtPos("", pos, oss);
+                printAtPos(pos, oss);
 
                 auto loc = getCodeLines(pos);
                 if (loc.has_value()) {
