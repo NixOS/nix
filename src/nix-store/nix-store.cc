@@ -708,10 +708,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        logWarning({
-            .name = "Store consistency",
-            .description = "not all errors were fixed"
-            });
+        warn("not all store errors were fixed");
         throw Exit(1);
     }
 }
@@ -733,14 +730,10 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            logError({
-                .name = "Hash mismatch",
-                .hint = hintfmt(
-                    "path '%s' was modified! expected hash '%s', got '%s'",
-                    store->printStorePath(path),
-                    info->narHash.to_string(Base32, true),
-                    current.first.to_string(Base32, true))
-            });
+            printError("path '%s' was modified! expected hash '%s', got '%s'",
+                store->printStorePath(path),
+                info->narHash.to_string(Base32, true),
+                current.first.to_string(Base32, true));
             status = 1;
         }
     }

@@ -146,11 +146,8 @@ void SubstitutionGoal::tryNext()
         && !sub->isTrusted
         && !info->checkSignatures(worker.store, worker.store.getPublicKeys()))
     {
-        logWarning({
-            .name = "Invalid path signature",
-            .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
-                sub->getUri(), worker.store.printStorePath(storePath))
-        });
+        warn("substituter '%s' does not have a valid signature for path '%s'",
+            sub->getUri(), worker.store.printStorePath(storePath));
         tryNext();
         return;
     }

@@ -1,3 +1,5 @@
+#if 0
+
 #include "logging.hh"
 #include "nixexpr.hh"
 #include "util.hh"
@@ -41,8 +43,7 @@ namespace nix {
 
         makeJSONLogger(*logger)->logEI({
                 .name = "error name",
-                .description = "error without any code lines.",
-                .hint = hintfmt("this hint has %1% templated %2%!!",
+                .msg = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foFile, problem_file, 02, 13)
@@ -62,7 +63,7 @@ namespace nix {
             throw TestError(e.info());
         } catch (Error &e) {
             ErrorInfo ei = e.info();
-            ei.hint = hintfmt("%s; subsequent error message.", normaltxt(e.info().hint ? e.info().hint->str() : ""));
+            ei.msg = hintfmt("%s; subsequent error message.", normaltxt(e.info().msg.str()));
 
             testing::internal::CaptureStderr();
             logger->logEI(ei);
@@ -95,7 +96,6 @@ namespace nix {
 
         logger->logEI({ .level = lvlInfo,
                         .name = "Info name",
-                        .description = "Info description",
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -109,7 +109,6 @@ namespace nix {
 
         logger->logEI({ .level = lvlTalkative,
                         .name = "Talkative name",
-                        .description = "Talkative description",
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -123,7 +122,6 @@ namespace nix {
 
         logger->logEI({ .level = lvlChatty,
                         .name = "Chatty name",
-                        .description = "Talkative description",
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -137,7 +135,6 @@ namespace nix {
 
         logger->logEI({ .level = lvlDebug,
                         .name = "Debug name",
-                        .description = "Debug description",
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -151,7 +148,6 @@ namespace nix {
 
         logger->logEI({ .level = lvlVomit,
                         .name = "Vomit name",
-                        .description = "Vomit description",
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -167,7 +163,6 @@ namespace nix {
 
         logError({
                 .name = "name",
-                .description = "error description",
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -182,8 +177,7 @@ namespace nix {
 
         logError({
                 .name = "error name",
-                .description = "error with code lines",
-                .hint = hintfmt("this hint has %1% templated %2%!!",
+                .msg = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foString, problem_file, 02, 13),
@@ -200,8 +194,7 @@ namespace nix {
 
         logError({
                 .name = "error name",
-                .description = "error without any code lines.",
-                .hint = hintfmt("this hint has %1% templated %2%!!",
+                .msg = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foFile, problem_file, 02, 13)
@@ -216,7 +209,7 @@ namespace nix {
 
         logError({
                 .name = "error name",
-                .hint = hintfmt("hint %1%", "only"),
+                .msg = hintfmt("hint %1%", "only"),
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -233,8 +226,7 @@ namespace nix {
 
         logWarning({
                 .name = "name",
-                .description = "warning description",
-                .hint = hintfmt("there was a %1%", "warning"),
+                .msg = hintfmt("there was a %1%", "warning"),
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -250,8 +242,7 @@ namespace nix {
 
         logWarning({
                 .name = "warning name",
-                .description = "warning description",
-                .hint = hintfmt("this hint has %1% templated %2%!!",
+                .msg = hintfmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foStdin, problem_file, 2, 13),
@@ -274,8 +265,7 @@ namespace nix {
 
         auto e = AssertionError(ErrorInfo {
                 .name = "wat",
-                .description = "show-traces",
-                .hint = hintfmt("it has been %1% days since our last error", "zero"),
+                .msg = hintfmt("it has been %1% days since our last error", "zero"),
                 .errPos = Pos(foString, problem_file, 2, 13),
             });
 
@@ -301,8 +291,7 @@ namespace nix {
 
         auto e = AssertionError(ErrorInfo {
                 .name = "wat",
-                .description = "hide traces",
-                .hint = hintfmt("it has been %1% days since our last error", "zero"),
+                .msg = hintfmt("it has been %1% days since our last error", "zero"),
                 .errPos = Pos(foString, problem_file, 2, 13),
             });
 
@@ -377,3 +366,5 @@ namespace nix {
     }
 
 }
+
+#endif

@@ -172,13 +172,14 @@ static int main_build_remote(int argc, char * * argv)
                     else
                     {
                         // build the hint template.
-                        string hintstring =  "derivation: %s\nrequired (system, features): (%s, %s)";
-                        hintstring += "\n%s available machines:";
-                        hintstring += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
+                        string errorText =
+                            "Failed to find a machine for remote build!\n"
+                            "derivation: %s\nrequired (system, features): (%s, %s)";
+                        errorText += "\n%s available machines:";
+                        errorText += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
 
-                        for (unsigned int i = 0; i < machines.size(); ++i) {
-                          hintstring += "\n(%s, %s, %s, %s)";
-                        }
+                        for (unsigned int i = 0; i < machines.size(); ++i)
+                            errorText += "\n(%s, %s, %s, %s)";
 
                         // add the template values.
                         string drvstr;
@@ -187,25 +188,21 @@ static int main_build_remote(int argc, char * * argv)
                         else
                             drvstr = "<unknown>";
 
-                        auto hint = hintformat(hintstring);
-                        hint
-                          % drvstr
-                          % neededSystem
-                          % concatStringsSep<StringSet>(", ", requiredFeatures)
-                          % machines.size();
+                        auto error = hintformat(errorText);
+                        error
+                            % drvstr
+                            % neededSystem
+                            % concatStringsSep<StringSet>(", ", requiredFeatures)
+                            % machines.size();
 
-                        for (auto & m : machines) {
-                          hint % concatStringsSep<vector<string>>(", ", m.systemTypes)
-                            % m.maxJobs
-                            % concatStringsSep<StringSet>(", ", m.supportedFeatures)
-                            % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
-                        }
+                        for (auto & m : machines)
+                            error
+                                % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                                % m.maxJobs
+                                % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+                                % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
-                        logErrorInfo(canBuildLocally ? lvlChatty : lvlWarn, {
-                              .name = "Remote build",
-                              .description = "Failed to find a machine for remote build!",
-                              .hint = hint
-                        });
+                        printMsg(canBuildLocally ? lvlChatty : lvlWarn, error);
 
                         std::cerr << "# decline\n";
                     }
@@ -230,12 +227,9 @@ static int main_build_remote(int argc, char * * argv)
 
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
-                    logError({
-                        .name = "Remote build",
-                        .hint = hintfmt("cannot build on '%s': %s%s",
-                            bestMachine->storeUri, e.what(),
-                            (msg.empty() ? "" : ": " + msg))
-                    });
+                    printError("cannot build on '%s': %s%s",
+                        bestMachine->storeUri, e.what(),
+                        msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
                 }

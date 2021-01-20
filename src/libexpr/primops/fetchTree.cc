@@ -115,7 +115,7 @@ static void fetchTree(
 
         if (!attrs.count("type"))
             throw Error({
-                .hint = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
                 .errPos = pos
             });
 
@@ -177,14 +177,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError({
-                    .hint = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
                     .errPos = *attr.pos
                 });
             }
 
         if (!url)
             throw EvalError({
-                .hint = hintfmt("'url' argument required"),
+                .msg = hintfmt("'url' argument required"),
                 .errPos = pos
             });
     } else

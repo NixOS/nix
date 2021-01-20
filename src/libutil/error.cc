@@ -204,167 +204,108 @@ void printAtPos(const string & prefix, const ErrPos & pos, std::ostream & out)
     }
 }
 
+static std::string indent(std::string_view indentFirst, std::string_view indentRest, std::string_view s)
+{
+    std::string res;
+    bool first = true;
+
+    while (!s.empty()) {
+        auto end = s.find('\n');
+        if (!first) res += "\n";
+        res += first ? indentFirst : indentRest;
+        res += s.substr(0, end);
+        first = false;
+        if (end == s.npos) break;
+        s = s.substr(end + 1);
+    }
+
+    return res;
+}
+
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
-    auto errwidth = std::max<size_t>(getWindowSize().second, 20);
-    string prefix = "";
-
-    string levelString;
+    std::string prefix;
     switch (einfo.level) {
         case Verbosity::lvlError: {
-            levelString = ANSI_RED;
-            levelString += "error:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_RED "error";
+            break;
+        }
+        case Verbosity::lvlNotice: {
+            prefix = ANSI_RED "note";
             break;
         }
         case Verbosity::lvlWarn: {
-            levelString = ANSI_YELLOW;
-            levelString += "warning:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_YELLOW "warning";
             break;
         }
         case Verbosity::lvlInfo: {
-            levelString = ANSI_GREEN;
-            levelString += "info:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_GREEN "info";
             break;
         }
         case Verbosity::lvlTalkative: {
-            levelString = ANSI_GREEN;
-            levelString += "talk:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_GREEN "talk";
             break;
         }
         case Verbosity::lvlChatty: {
-            levelString = ANSI_GREEN;
-            levelString += "chat:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_GREEN "chat";
             break;
         }
         case Verbosity::lvlVomit: {
-            levelString = ANSI_GREEN;
-            levelString += "vomit:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_GREEN "vomit";
             break;
         }
         case Verbosity::lvlDebug: {
-            levelString = ANSI_YELLOW;
-            levelString += "debug:";
-            levelString += ANSI_NORMAL;
+            prefix = ANSI_YELLOW "debug";
             break;
         }
-        default: {
-            levelString = fmt("invalid error level: %1%", einfo.level);
-            break;
-        }
+        default:
+            assert(false);
     }
 
-    auto ndl = prefix.length()
-        + filterANSIEscapes(levelString, true).length()
-        + 7
-        + einfo.name.length()
-        + einfo.programName.value_or("").length();
-    auto dashwidth = std::max<int>(errwidth - ndl, 3);
-
-    std::string dashes(dashwidth, '-');
-
-    // divider.
-    if (einfo.name != "")
-        out << fmt("%1%%2%" ANSI_BLUE " --- %3% %4% %5%" ANSI_NORMAL,
-            prefix,
-            levelString,
-            einfo.name,
-            dashes,
-            einfo.programName.value_or(""));
+    // FIXME: show the program name as part of the trace?
+    if (einfo.programName && einfo.programName != ErrorInfo::programName)
+        prefix += fmt(" [%s]:" ANSI_NORMAL " ", einfo.programName.value_or(""));
     else
-        out << fmt("%1%%2%" ANSI_BLUE " -----%3% %4%" ANSI_NORMAL,
-            prefix,
-            levelString,
-            dashes,
-            einfo.programName.value_or(""));
+        prefix += ":" ANSI_NORMAL " ";
 
-    bool nl = false;  // intersperse newline between sections.
-    if (einfo.errPos.has_value() && (*einfo.errPos)) {
-        out << prefix << std::endl;
-        printAtPos(prefix, *einfo.errPos, out);
-        nl = true;
-    }
+    std::ostringstream oss;
+    oss << einfo.msg << "\n";
 
-    // description
-    if (einfo.description != "") {
-        if (nl)
-            out << std::endl << prefix;
-        out << std::endl << prefix << einfo.description;
-        nl = true;
-    }
+    if (einfo.errPos.has_value() && *einfo.errPos) {
+        oss << "\n";
+        printAtPos("", *einfo.errPos, oss);
 
-    if (einfo.errPos.has_value() && (*einfo.errPos)) {
         auto loc = getCodeLines(*einfo.errPos);
 
         // lines of code.
         if (loc.has_value()) {
-            if (nl)
-                out << std::endl << prefix;
-            printCodeLines(out, prefix, *einfo.errPos, *loc);
-            nl = true;
+            oss << "\n";
+            printCodeLines(oss, "", *einfo.errPos, *loc);
+            oss << "\n";
         }
-    }
-
-    // hint
-    if (einfo.hint.has_value()) {
-        if (nl)
-            out << std::endl << prefix;
-        out << std::endl << prefix << *einfo.hint;
-        nl = true;
     }
 
     // traces
-    if (showTrace && !einfo.traces.empty())
-    {
-        const string tracetitle(" show-trace ");
-
-        int fill = errwidth - tracetitle.length();
-        int lw = 0;
-        int rw = 0;
-        const int min_dashes = 3;
-        if (fill > min_dashes * 2) {
-            if (fill % 2 != 0) {
-                lw = fill / 2;
-                rw = lw + 1;
-            }
-            else
-            {
-                lw = rw = fill / 2;
-            }
-        }
-        else
-            lw = rw = min_dashes;
-
-        if (nl)
-            out << std::endl << prefix;
-
-        out << ANSI_BLUE << std::string(lw, '-') << tracetitle << std::string(rw, '-') << ANSI_NORMAL;
-
-        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter)
-        {
-            out << std::endl << prefix;
-            out << ANSI_BLUE << "trace: " << ANSI_NORMAL << iter->hint.str();
+    if (showTrace && !einfo.traces.empty()) {
+        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {
+            oss << "\n" << "… " << iter->hint.str() << "\n";
 
             if (iter->pos.has_value() && (*iter->pos)) {
                 auto pos = iter->pos.value();
-                out << std::endl << prefix;
-                printAtPos(prefix, pos, out);
+                oss << "\n";
+                printAtPos("", pos, oss);
 
                 auto loc = getCodeLines(pos);
-                if (loc.has_value())
-                {
-                    out << std::endl << prefix;
-                    printCodeLines(out, prefix, pos, *loc);
-                    out << std::endl << prefix;
+                if (loc.has_value()) {
+                    oss << "\n";
+                    printCodeLines(oss, "", pos, *loc);
+                    oss << "\n";
                 }
             }
         }
     }
+
+    out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
 
     return out;
 }
