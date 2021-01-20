@@ -1249,7 +1249,7 @@ template StringSet tokenizeString(std::string_view s, const string & separators)
 template vector<string> tokenizeString(std::string_view s, const string & separators);
 
 
-string chomp(const string & s)
+string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
     return i == string::npos ? "" : string(s, 0, i + 1);

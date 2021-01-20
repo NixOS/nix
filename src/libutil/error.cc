@@ -212,8 +212,7 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
     while (!s.empty()) {
         auto end = s.find('\n');
         if (!first) res += "\n";
-        res += first ? indentFirst : indentRest;
-        res += s.substr(0, end);
+        res += chomp(std::string(first ? indentFirst : indentRest) + std::string(s.substr(0, end)));
         first = false;
         if (end == s.npos) break;
         s = s.substr(end + 1);
