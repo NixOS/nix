@@ -58,7 +58,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                for (const auto & [i, buildable] : enumerate(buildables)) {
+                for (const auto & [_i, buildable] : enumerate(buildables)) {
+                    auto i = _i;
                     std::visit(overloaded {
                         [&](BuildableOpaque bo) {
                             std::string symlink = outLink;
