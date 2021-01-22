@@ -375,6 +375,13 @@ struct curlFileTransfer : public FileTransfer
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus))
             {
                 result.cached = httpStatus == 304;
+
+                // In 2021, GitHub responds to If-None-Match with 304,
+                // but omits ETag. We just use the If-None-Match etag
+                // since 304 implies they are the same.
+                if (httpStatus == 304 && result.etag == "")
+                    result.etag = request.expectedETag;
+
                 act.progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
