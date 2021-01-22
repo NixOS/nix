@@ -372,9 +372,9 @@ public:
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
-    /* Check whether the given valid path info is sufficiently well-formed
-       (e.g. hash content-address or signature) in order to be included in the
-       given store.
+    /* Check whether the given valid path info is sufficiently attested, by
+       either being signed by a trusted public key or content-addressed, in
+       order to be included in the given store.
 
        These same checks would be performed in addToStore, but this allows an
        earlier failure in the case where dependencies need to be added too, but
