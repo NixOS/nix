@@ -349,6 +349,13 @@ struct CurlDownloader : public Downloader
                 (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 206 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
+
+                // In 2021, GitHub responds to If-None-Match with 304,
+                // but omits ETag. We just use the If-None-Match etag
+                // since 304 implies they are the same.
+                if (httpStatus == 304 && result.etag == "")
+                    result.etag = request.expectedETag;
+
                 act.progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
