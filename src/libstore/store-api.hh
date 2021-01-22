@@ -175,25 +175,7 @@ struct StoreConfig : public Config
 {
     using Config::Config;
 
-    /**
-     * When constructing a store implementation, we pass in a map `params` of
-     * parameters that's supposed to initialize the associated config.
-     * To do that, we must use the `StoreConfig(StringMap & params)`
-     * constructor, so we'd like to `delete` its default constructor to enforce
-     * it.
-     *
-     * However, actually deleting it means that all the subclasses of
-     * `StoreConfig` will have their default constructor deleted (because it's
-     * supposed to call the deleted default constructor of `StoreConfig`). But
-     * because we're always using virtual inheritance, the constructors of
-     * child classes will never implicitely call this one, so deleting it will
-     * be more painful than anything else.
-     *
-     * So we `assert(false)` here to ensure at runtime that the right
-     * constructor is always called without having to redefine a custom
-     * constructor for each `*Config` class.
-     */
-    StoreConfig() { assert(false); }
+    StoreConfig() = delete;
 
     virtual ~StoreConfig() { }
 
@@ -623,6 +605,11 @@ public:
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor()
     { unsupported("getFSAccessor"); }
+
+    /* Repair the contents of the given path by redownloading it using
+       a substituter (if available). */
+    virtual void repairPath(const StorePath & path)
+    { unsupported("repairPath"); }
 
     /* Add signatures to the specified store path. The signatures are
        not verified. */

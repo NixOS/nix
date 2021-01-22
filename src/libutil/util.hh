@@ -397,21 +397,49 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
-template<class N> bool string2Int(const string & s, N & n)
+template<class N>
+std::optional<N> string2Int(const std::string & s)
 {
-    if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return false;
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return std::nullopt;
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return std::nullopt;
+}
+
+/* Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
+   'T' denoting a binary unit prefix. */
+template<class N>
+N string2IntWithUnitPrefix(std::string s)
+{
+    N multiplier = 1;
+    if (!s.empty()) {
+        char u = std::toupper(*s.rbegin());
+        if (std::isalpha(u)) {
+            if (u == 'K') multiplier = 1ULL << 10;
+            else if (u == 'M') multiplier = 1ULL << 20;
+            else if (u == 'G') multiplier = 1ULL << 30;
+            else if (u == 'T') multiplier = 1ULL << 40;
+            else throw UsageError("invalid unit specifier '%1%'", u);
+            s.resize(s.size() - 1);
+        }
+    }
+    if (auto n = string2Int<N>(s))
+        return *n * multiplier;
+    throw UsageError("'%s' is not an integer", s);
 }
 
 /* Parse a string into a float. */
-template<class N> bool string2Float(const string & s, N & n)
+template<class N>
+std::optional<N> string2Float(const string & s)
 {
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return std::nullopt;
 }
 
 

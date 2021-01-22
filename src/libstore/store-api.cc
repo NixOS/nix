@@ -949,19 +949,20 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
         getline(str, s);
         auto narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
-        uint64_t narSize;
-        if (!string2Int(s, narSize)) throw Error("number expected");
-        hashGiven = { narHash, narSize };
+        auto narSize = string2Int<uint64_t>(s);
+        if (!narSize) throw Error("number expected");
+        hashGiven = { narHash, *narSize };
     }
     ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
     info.narSize = hashGiven->second;
     std::string deriver;
     getline(str, deriver);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    string s; int n;
+    string s;
     getline(str, s);
-    if (!string2Int(s, n)) throw Error("number expected");
-    while (n--) {
+    auto n = string2Int<int>(s);
+    if (!n) throw Error("number expected");
+    while ((*n)--) {
         getline(str, s);
         info.references.insert(store.parseStorePath(s));
     }
@@ -1066,26 +1067,23 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
-
-Derivation Store::readDerivation(const StorePath & drvPath)
+Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool requireValidPath)
 {
-    auto accessor = getFSAccessor();
+    auto accessor = store.getFSAccessor();
     try {
-        return parseDerivation(*this,
-            accessor->readFile(printStorePath(drvPath)),
+        return parseDerivation(store,
+            accessor->readFile(store.printStorePath(drvPath), requireValidPath),
             Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.msg());
+        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }
 }
 
+Derivation Store::readDerivation(const StorePath & drvPath)
+{ return readDerivationCommon(*this, drvPath, true); }
+
 Derivation Store::readInvalidDerivation(const StorePath & drvPath)
-{
-    return parseDerivation(
-        *this,
-        readFile(Store::toRealPath(drvPath)),
-        Derivation::nameFromPath(drvPath));
-}
+{ return readDerivationCommon(*this, drvPath, false); }
 
 }
 

@@ -16,7 +16,7 @@ struct CmdCopySigs : StorePathsCommand
         addFlag({
             .longName = "substituter",
             .shortName = 's',
-            .description = "use signatures from specified store",
+            .description = "Use signatures from specified store.",
             .labels = {"store-uri"},
             .handler = {[&](std::string s) { substituterUris.push_back(s); }},
         });
@@ -92,16 +92,16 @@ struct CmdCopySigs : StorePathsCommand
 
 static auto rCmdCopySigs = registerCommand2<CmdCopySigs>({"store", "copy-sigs"});
 
-struct CmdSignPaths : StorePathsCommand
+struct CmdSign : StorePathsCommand
 {
     Path secretKeyFile;
 
-    CmdSignPaths()
+    CmdSign()
     {
         addFlag({
             .longName = "key-file",
             .shortName = 'k',
-            .description = "file containing the secret signing key",
+            .description = "File containing the secret signing key.",
             .labels = {"file"},
             .handler = {&secretKeyFile},
             .completer = completePath
@@ -140,4 +140,89 @@ struct CmdSignPaths : StorePathsCommand
     }
 };
 
-static auto rCmdSignPaths = registerCommand2<CmdSignPaths>({"store", "sign-paths"});
+static auto rCmdSign = registerCommand2<CmdSign>({"store", "sign"});
+
+struct CmdKeyGenerateSecret : Command
+{
+    std::optional<std::string> keyName;
+
+    CmdKeyGenerateSecret()
+    {
+        addFlag({
+            .longName = "key-name",
+            .description = "Identifier of the key (e.g. `cache.example.org-1`).",
+            .labels = {"name"},
+            .handler = {&keyName},
+        });
+    }
+
+    std::string description() override
+    {
+        return "generate a secret key for signing store paths";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "key-generate-secret.md"
+          ;
+    }
+
+    void run() override
+    {
+        if (!keyName)
+            throw UsageError("required argument '--key-name' is missing");
+
+        std::cout << SecretKey::generate(*keyName).to_string();
+    }
+};
+
+struct CmdKeyConvertSecretToPublic : Command
+{
+    std::string description() override
+    {
+        return "generate a public key for verifying store paths from a secret key read from standard input";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "key-convert-secret-to-public.md"
+          ;
+    }
+
+    void run() override
+    {
+        SecretKey secretKey(drainFD(STDIN_FILENO));
+        std::cout << secretKey.toPublicKey().to_string();
+    }
+};
+
+struct CmdKey : NixMultiCommand
+{
+    CmdKey()
+        : MultiCommand({
+                {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
+                {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
+            })
+    {
+    }
+
+    std::string description() override
+    {
+        return "generate and convert Nix signing keys";
+    }
+
+    Category category() override { return catUtility; }
+
+    void run() override
+    {
+        if (!command)
+            throw UsageError("'nix flake' requires a sub-command.");
+        settings.requireExperimentalFeature("flakes");
+        command->second->prepare();
+        command->second->run();
+    }
+};
+
+static auto rCmdKey = registerCommand<CmdKey>("key");

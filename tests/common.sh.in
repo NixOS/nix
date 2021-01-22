@@ -34,7 +34,6 @@ coreutils=@coreutils@
 export dot=@dot@
 export SHELL="@bash@"
 export PAGER=cat
-export HAVE_SODIUM="@HAVE_SODIUM@"
 export busybox="@sandbox_shell@"
 
 export version=@PACKAGE_VERSION@
@@ -74,7 +73,7 @@ startDaemon() {
     # Start the daemon, wait for the socket to appear.  !!!
     # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_STATE_DIR/daemon-socket/socket
-    nix-daemon &
+    nix daemon &
     for ((i = 0; i < 30; i++)); do
         if [ -e $NIX_DAEMON_SOCKET_PATH ]; then break; fi
         sleep 1

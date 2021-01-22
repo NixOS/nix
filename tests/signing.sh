@@ -47,8 +47,8 @@ expect 2 nix store verify -r $outPath2 --sigs-needed 1
 
 expect 2 nix store verify -r $outPath2 --sigs-needed 1 --trusted-public-keys $pk1
 
-# Test "nix store sign-paths".
-nix store sign-paths --key-file $TEST_ROOT/sk1 $outPath2
+# Test "nix store sign".
+nix store sign --key-file $TEST_ROOT/sk1 $outPath2
 
 nix store verify -r $outPath2 --sigs-needed 1 --trusted-public-keys $pk1
 
@@ -63,7 +63,7 @@ nix store verify $outPathCA
 nix store verify $outPathCA --sigs-needed 1000
 
 # Check that signing a content-addressed path doesn't overflow validSigs
-nix store sign-paths --key-file $TEST_ROOT/sk1 $outPathCA
+nix store sign --key-file $TEST_ROOT/sk1 $outPathCA
 nix store verify -r $outPathCA --sigs-needed 1000 --trusted-public-keys $pk1
 
 # Copy to a binary cache.
@@ -76,7 +76,7 @@ info=$(nix path-info --store file://$cacheDir --json $outPath2)
 (! [[ $info =~ 'cache2.example.org' ]])
 
 # Verify that adding a signature to a path in a binary cache works.
-nix store sign-paths --store file://$cacheDir --key-file $TEST_ROOT/sk2 $outPath2
+nix store sign --store file://$cacheDir --key-file $TEST_ROOT/sk2 $outPath2
 info=$(nix path-info --store file://$cacheDir --json $outPath2)
 [[ $info =~ 'cache1.example.org' ]]
 [[ $info =~ 'cache2.example.org' ]]

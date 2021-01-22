@@ -61,36 +61,31 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
     if (errPos.origin == foFile) {
         LinesOfCode loc;
         try {
+            // FIXME: when running as the daemon, make sure we don't
+            // open a file to which the client doesn't have access.
             AutoCloseFD fd = open(errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
-            if (!fd) {
-                logError(SysError("opening file '%1%'", errPos.file).info());
-                return std::nullopt;
-            }
-            else
+            if (!fd) return {};
+
+            // count the newlines.
+            int count = 0;
+            string line;
+            int pl = errPos.line - 1;
+            do
             {
-                // count the newlines.
-                int count = 0;
-                string line;
-                int pl = errPos.line - 1;
-                do
-                {
-                    line = readLine(fd.get());
-                    ++count;
-                    if (count < pl)
-                    {
-                        ;
-                    }
-                    else if (count == pl) {
-                        loc.prevLineOfCode = line;
-                    } else if (count == pl + 1) {
-                        loc.errLineOfCode = line;
-                    } else if (count == pl + 2) {
-                        loc.nextLineOfCode = line;
-                        break;
-                    }
-                } while (true);
-                return loc;
-            }
+                line = readLine(fd.get());
+                ++count;
+                if (count < pl)
+                    ;
+                else if (count == pl)
+                    loc.prevLineOfCode = line;
+                else if (count == pl + 1)
+                    loc.errLineOfCode = line;
+                else if (count == pl + 2) {
+                    loc.nextLineOfCode = line;
+                    break;
+                }
+            } while (true);
+            return loc;
         }
         catch (EndOfFile & eof) {
             if (loc.errLineOfCode.has_value())
@@ -99,7 +94,6 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
                 return std::nullopt;
         }
         catch (std::exception & e) {
-            printError("error reading nix file: %s\n%s", errPos.file, e.what());
             return std::nullopt;
         }
     } else {

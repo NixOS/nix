@@ -301,7 +301,7 @@ struct MercurialInputScheme : InputScheme
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
-            {"revCount", (int64_t) revCount},
+            {"revCount", (uint64_t) revCount},
         });
 
         if (!_input.getRev())

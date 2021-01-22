@@ -50,6 +50,11 @@
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
+#if __APPLE__
+#include <spawn.h>
+#include <sys/sysctl.h>
+#endif
+
 #include <pwd.h>
 #include <grp.h>
 
@@ -675,13 +680,9 @@ void DerivationGoal::tryToBuild()
 }
 
 void DerivationGoal::tryLocalBuild() {
-    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
-
-    /* Make sure that we are allowed to start a build.  If this
-       derivation prefers to be done locally, do it even if
-       maxBuildJobs is 0. */
+    /* Make sure that we are allowed to start a build. */
     unsigned int curBuilds = worker.getNrLocalBuilds();
-    if (curBuilds >= settings.maxBuildJobs && !(buildLocally && curBuilds == 0)) {
+    if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
@@ -1695,12 +1696,10 @@ void DerivationGoal::startBuilder()
             userNamespaceSync.writeSide = -1;
         });
 
-        pid_t tmp;
         auto ss = tokenizeString<std::vector<std::string>>(readLine(builderOut.readSide.get()));
         assert(ss.size() == 2);
         usingUserNamespace = ss[0] == "1";
-        if (!string2Int<pid_t>(ss[1], tmp)) abort();
-        pid = tmp;
+        pid = string2Int<pid_t>(ss[1]).value();
 
         if (usingUserNamespace) {
             /* Set the UID/GID mapping of the builder's user namespace
@@ -1985,7 +1984,7 @@ void DerivationGoal::writeStructuredAttrs()
     chownToBuilder(tmpDir + "/.attrs.sh");
 }
 
-struct RestrictedStoreConfig : LocalFSStoreConfig
+struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
     const std::string name() { return "Restricted Store"; }
@@ -1994,14 +1993,19 @@ struct RestrictedStoreConfig : LocalFSStoreConfig
 /* A wrapper around LocalStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
-struct RestrictedStore : public LocalFSStore, public virtual RestrictedStoreConfig
+struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual LocalFSStore
 {
     ref<LocalStore> next;
 
     DerivationGoal & goal;
 
     RestrictedStore(const Params & params, ref<LocalStore> next, DerivationGoal & goal)
-        : StoreConfig(params), Store(params), LocalFSStore(params), next(next), goal(goal)
+        : StoreConfig(params)
+        , LocalFSStoreConfig(params)
+        , RestrictedStoreConfig(params)
+        , Store(params)
+        , LocalFSStore(params)
+        , next(next), goal(goal)
     { }
 
     Path getRealStoreDir() override
@@ -2852,7 +2856,31 @@ void DerivationGoal::runChild()
             }
         }
 
+#if __APPLE__
+        posix_spawnattr_t attrp;
+
+        if (posix_spawnattr_init(&attrp))
+            throw SysError("failed to initialize builder");
+
+        if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
+            throw SysError("failed to initialize builder");
+
+        if (drv->platform == "aarch64-darwin") {
+            // Unset kern.curproc_arch_affinity so we can escape Rosetta
+            int affinity = 0;
+            sysctlbyname("kern.curproc_arch_affinity", NULL, NULL, &affinity, sizeof(affinity));
+
+            cpu_type_t cpu = CPU_TYPE_ARM64;
+            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
+        } else if (drv->platform == "x86_64-darwin") {
+            cpu_type_t cpu = CPU_TYPE_X86_64;
+            posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
+        }
+
+        posix_spawn(NULL, builder, NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+#else
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+#endif
 
         throw SysError("executing '%1%'", drv->builder);
 

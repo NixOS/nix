@@ -204,7 +204,7 @@ struct Common : InstallableCommand, MixProfile
     {
         addFlag({
             .longName = "redirect",
-            .description = "redirect a store path to a mutable location",
+            .description = "Redirect a store path to a mutable location.",
             .labels = {"installable", "outputs-dir"},
             .handler = {[&](std::string installable, std::string outputsDir) {
                 redirects.push_back({installable, outputsDir});
@@ -334,7 +334,7 @@ struct CmdDevelop : Common, MixEnvironment
         addFlag({
             .longName = "command",
             .shortName = 'c',
-            .description = "command and arguments to be executed instead of an interactive shell",
+            .description = "Instead of starting an interactive shell, start the specified command and arguments.",
             .labels = {"command", "args"},
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
@@ -344,38 +344,38 @@ struct CmdDevelop : Common, MixEnvironment
 
         addFlag({
             .longName = "phase",
-            .description = "phase to run (e.g. `build` or `configure`)",
+            .description = "The stdenv phase to run (e.g. `build` or `configure`).",
             .labels = {"phase-name"},
             .handler = {&phase},
         });
 
         addFlag({
             .longName = "configure",
-            .description = "run the configure phase",
+            .description = "Run the `configure` phase.",
             .handler = {&phase, {"configure"}},
         });
 
         addFlag({
             .longName = "build",
-            .description = "run the build phase",
+            .description = "Run the `build` phase.",
             .handler = {&phase, {"build"}},
         });
 
         addFlag({
             .longName = "check",
-            .description = "run the check phase",
+            .description = "Run the `check` phase.",
             .handler = {&phase, {"check"}},
         });
 
         addFlag({
             .longName = "install",
-            .description = "run the install phase",
+            .description = "Run the `install` phase.",
             .handler = {&phase, {"install"}},
         });
 
         addFlag({
             .longName = "installcheck",
-            .description = "run the installcheck phase",
+            .description = "Run the `installcheck` phase.",
             .handler = {&phase, {"installCheck"}},
         });
     }
@@ -385,30 +385,11 @@ struct CmdDevelop : Common, MixEnvironment
         return "run a bash shell that provides the build environment of a derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To get the build environment of GNU hello:",
-                "nix develop nixpkgs#hello"
-            },
-            Example{
-                "To get the build environment of the default package of flake in the current directory:",
-                "nix develop"
-            },
-            Example{
-                "To store the build environment in a profile:",
-                "nix develop --profile /tmp/my-shell nixpkgs#hello"
-            },
-            Example{
-                "To use a build environment previously recorded in a profile:",
-                "nix develop /tmp/my-shell"
-            },
-            Example{
-                "To replace all occurences of a store path with a writable directory:",
-                "nix develop --redirect nixpkgs#glibc.dev ~/my-glibc/outputs/dev"
-            },
-        };
+        return
+          #include "develop.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -495,14 +476,11 @@ struct CmdPrintDevEnv : Common
         return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To apply the build environment of GNU hello to the current shell:",
-                ". <(nix print-dev-env nixpkgs#hello)"
-            },
-        };
+        return
+          #include "print-dev-env.md"
+          ;
     }
 
     Category category() override { return catUtility; }

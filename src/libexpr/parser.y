@@ -698,6 +698,10 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
+
+    if (hasPrefix(path, "nix/"))
+        return corepkgsPrefix + path.substr(4);
+
     throw ThrownError({
         .hint = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"

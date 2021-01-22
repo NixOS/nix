@@ -17,6 +17,7 @@ MakeError(ThrownError, AssertionError);
 MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
+MakeError(MissingArgumentError, Error);
 MakeError(RestrictedPathError, Error);
 
 
@@ -129,7 +130,7 @@ struct ExprPath : Expr
 {
     string s;
     Value v;
-    ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
+    ExprPath(const string & s) : s(s) { v.mkPath(this->s.c_str()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

@@ -25,6 +25,9 @@ public:
     /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
+    /* Return documentation about this command, in Markdown format. */
+    virtual std::string doc() { return ""; }
+
 protected:
 
     static const size_t ArityAny = std::numeric_limits<size_t>::max();
@@ -65,8 +68,12 @@ protected:
             , arity(ArityAny)
         { }
 
-        template<class T>
-        Handler(T * dest)
+        Handler(std::string * dest)
+            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::optional<std::string> * dest)
             : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
@@ -75,6 +82,14 @@ protected:
         Handler(T * dest, const T & val)
             : fun([=](std::vector<std::string> ss) { *dest = val; })
             , arity(0)
+        { }
+
+        template<class I>
+        Handler(I * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+              })
+            , arity(1)
         { }
     };
 
@@ -127,19 +142,6 @@ public:
     /* Helper functions for constructing flags / positional
        arguments. */
 
-    void mkFlag1(char shortName, const std::string & longName,
-        const std::string & label, const std::string & description,
-        std::function<void(std::string)> fun)
-    {
-        addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
-            .labels = {label},
-            .handler = {[=](std::string s) { fun(s); }}
-        });
-    }
-
     void mkFlag(char shortName, const std::string & name,
         const std::string & description, bool * dest)
     {
@@ -155,33 +157,6 @@ public:
             .shortName = shortName,
             .description = description,
             .handler = {[=]() { *dest = value; }}
-        });
-    }
-
-    template<class I>
-    void mkIntFlag(char shortName, const std::string & longName,
-        const std::string & description, I * dest)
-    {
-        mkFlag<I>(shortName, longName, description, [=](I n) {
-            *dest = n;
-        });
-    }
-
-    template<class I>
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & description, std::function<void(I)> fun)
-    {
-        addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
-            .labels = {"N"},
-            .handler = {[=](std::string s) {
-                I n;
-                if (!string2Int(s, n))
-                    throw UsageError("flag '--%s' requires a integer argument", longName);
-                fun(n);
-            }}
         });
     }
 
@@ -225,28 +200,11 @@ struct Command : virtual Args
     virtual void prepare() { };
     virtual void run() = 0;
 
-    /* Return documentation about this command, in Markdown format. */
-    virtual std::string doc() { return ""; }
-
-    struct Example
-    {
-        std::string description;
-        std::string command;
-    };
-
-    typedef std::list<Example> Examples;
-
-    virtual Examples examples() { return Examples(); }
-
     typedef int Category;
 
     static constexpr Category catDefault = 0;
 
     virtual Category category() { return catDefault; }
-
-    void printHelp(const string & programName, std::ostream & out) override;
-
-    nlohmann::json toJSON() override;
 };
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;

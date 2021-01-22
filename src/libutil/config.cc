@@ -230,7 +230,9 @@ template<typename T>
 void BaseSetting<T>::set(const std::string & str, bool append)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
-    if (!string2Int(str, value))
+    if (auto n = string2Int<T>(str))
+        value = *n;
+    else
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
 }
 

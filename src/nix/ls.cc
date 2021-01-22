@@ -17,9 +17,9 @@ struct MixLs : virtual Args, MixJSON
 
     MixLs()
     {
-        mkFlag('R', "recursive", "list subdirectories recursively", &recursive);
-        mkFlag('l', "long", "show more file information", &verbose);
-        mkFlag('d', "directory", "show directories rather than their contents", &showDirectory);
+        mkFlag('R', "recursive", "List subdirectories recursively.", &recursive);
+        mkFlag('l', "long", "Show detailed file information.", &verbose);
+        mkFlag('d', "directory", "Show directories rather than their contents.", &showDirectory);
     }
 
     void listText(ref<FSAccessor> accessor)
@@ -75,6 +75,8 @@ struct MixLs : virtual Args, MixJSON
 
         if (json) {
             JSONPlaceholder jsonRoot(std::cout);
+            if (showDirectory)
+                throw UsageError("'--directory' is useless with '--json'");
             listNar(jsonRoot, accessor, path, recursive);
         } else
             listText(accessor);
@@ -92,19 +94,16 @@ struct CmdLsStore : StoreCommand, MixLs
         });
     }
 
-    Examples examples() override
-    {
-        return {
-            Example{
-                "To list the contents of a store path in a binary cache:",
-                "nix store ls --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
-            },
-        };
-    }
-
     std::string description() override
     {
         return "show information about a path in the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "store-ls.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -127,14 +126,11 @@ struct CmdLsNar : Command, MixLs
         expectArg("path", &path);
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To list a specific file in a NAR:",
-                "nix nar ls -l hello.nar /bin/hello"
-            },
-        };
+        return
+          #include "nar-ls.md"
+          ;
     }
 
     std::string description() override

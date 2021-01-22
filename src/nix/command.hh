@@ -13,6 +13,8 @@ namespace nix {
 
 extern std::string programPath;
 
+extern char * * savedArgv;
+
 class EvalState;
 struct Pos;
 class Store;
@@ -260,6 +262,8 @@ void completeFlakeRefWithFragment(
     Strings attrPathPrefixes,
     const Strings & defaultFlakeAttrPaths,
     std::string_view prefix);
+
+std::string showVersions(const std::set<std::string> & versions);
 
 void printClosureDiff(
     ref<Store> store,

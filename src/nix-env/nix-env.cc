@@ -1138,38 +1138,38 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                         i.queryName(), j)
                                 });
                             else {
-                                if (v->type == tString) {
+                                if (v->type() == nString) {
                                     attrs2["type"] = "string";
                                     attrs2["value"] = v->string.s;
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tInt) {
+                                } else if (v->type() == nInt) {
                                     attrs2["type"] = "int";
                                     attrs2["value"] = (format("%1%") % v->integer).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tFloat) {
+                                } else if (v->type() == nFloat) {
                                     attrs2["type"] = "float";
                                     attrs2["value"] = (format("%1%") % v->fpoint).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tBool) {
+                                } else if (v->type() == nBool) {
                                     attrs2["type"] = "bool";
                                     attrs2["value"] = v->boolean ? "true" : "false";
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->isList()) {
+                                } else if (v->type() == nList) {
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
                                     for (unsigned int j = 0; j < v->listSize(); ++j) {
-                                        if (v->listElems()[j]->type != tString) continue;
+                                        if (v->listElems()[j]->type() != nString) continue;
                                         XMLAttrs attrs3;
                                         attrs3["value"] = v->listElems()[j]->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
-                              } else if (v->type == tAttrs) {
+                              } else if (v->type() == nAttrs) {
                                   attrs2["type"] = "strings";
                                   XMLOpenElement m(xml, "meta", attrs2);
                                   Bindings & attrs = *v->attrs;
                                   for (auto &i : attrs) {
                                       Attr & a(*attrs.find(i.name));
-                                      if(a.value->type != tString) continue;
+                                      if(a.value->type() != nString) continue;
                                       XMLAttrs attrs3;
                                       attrs3["type"] = i.name;
                                       attrs3["value"] = a.value->string.s;
@@ -1250,11 +1250,10 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
     if (opArgs.size() != 1)
         throw UsageError("exactly one argument expected");
 
-    GenerationNumber dstGen;
-    if (!string2Int(opArgs.front(), dstGen))
+    if (auto dstGen = string2Int<GenerationNumber>(opArgs.front()))
+        switchGeneration(globals, *dstGen);
+    else
         throw UsageError("expected a generation number");
-
-    switchGeneration(globals, dstGen);
 }
 
 
@@ -1308,17 +1307,17 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
         if(opArgs.front().size() < 2)
             throw Error("invalid number of generations ‘%1%’", opArgs.front());
         string str_max = string(opArgs.front(), 1, opArgs.front().size());
-        GenerationNumber max;
-        if (!string2Int(str_max, max) || max == 0)
+        auto max = string2Int<GenerationNumber>(str_max);
+        if (!max || *max == 0)
             throw Error("invalid number of generations to keep ‘%1%’", opArgs.front());
-        deleteGenerationsGreaterThan(globals.profile, max, globals.dryRun);
+        deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
     } else {
         std::set<GenerationNumber> gens;
         for (auto & i : opArgs) {
-            GenerationNumber n;
-            if (!string2Int(i, n))
+            if (auto n = string2Int<GenerationNumber>(i))
+                gens.insert(*n);
+            else
                 throw UsageError("invalid generation number '%1%'", i);
-            gens.insert(n);
         }
         deleteGenerations(globals.profile, gens, globals.dryRun);
     }

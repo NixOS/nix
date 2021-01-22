@@ -9,7 +9,14 @@ struct CmdNar : NixMultiCommand
 
     std::string description() override
     {
-        return "query the contents of NAR files";
+        return "create or inspect NAR files";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "nar.md"
+          ;
     }
 
     Category category() override { return catUtility; }

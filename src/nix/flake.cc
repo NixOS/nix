@@ -104,6 +104,13 @@ struct CmdFlakeUpdate : FlakeCommand
         return "update flake lock file";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "flake-update.md"
+          ;
+    }
+
     void run(nix::ref<nix::Store> store) override
     {
         /* Use --refresh by default for 'nix flake update'. */
@@ -134,6 +141,13 @@ struct CmdFlakeInfo : FlakeCommand, MixJSON
         return "list info about a given flake";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "flake-info.md"
+          ;
+    }
+
     void run(nix::ref<nix::Store> store) override
     {
         auto flake = getFlake();
@@ -151,6 +165,13 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
     std::string description() override
     {
         return "list flake inputs";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-list-inputs.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -201,7 +222,7 @@ struct CmdFlakeCheck : FlakeCommand
     {
         addFlag({
             .longName = "no-build",
-            .description = "do not build checks",
+            .description = "Do not build checks.",
             .handler = {&build, false}
         });
     }
@@ -209,6 +230,13 @@ struct CmdFlakeCheck : FlakeCommand
     std::string description() override
     {
         return "check whether the flake evaluates and run its tests";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-check.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -260,7 +288,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type != tLambda || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
+                if (!v.isLambda() || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
                 if (!body || body->matchAttrs || std::string(body->arg) != "prev")
@@ -276,10 +304,10 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkModule = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type == tLambda) {
+                if (v.isLambda()) {
                     if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
-                } else if (v.type == tAttrs) {
+                } else if (v.type() == nAttrs) {
                     for (auto & attr : *v.attrs)
                         try {
                             state->forceValue(*attr.value, *attr.pos);
@@ -371,7 +399,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkBundler = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.type != tLambda)
+                if (!v.isLambda())
                     throw Error("bundler must be a function");
                 if (!v.lambda.fun->formals ||
                     v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end() ||
@@ -545,7 +573,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         addFlag({
             .longName = "template",
             .shortName = 't',
-            .description = "the template to use",
+            .description = "The template to use.",
             .labels = {"template"},
             .handler = {&templateUrl},
             .completer = {[&](size_t, std::string_view prefix) {
@@ -631,22 +659,11 @@ struct CmdFlakeInit : CmdFlakeInitCommon
         return "create a flake in the current directory from a template";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To create a flake using the default template:",
-                "nix flake init"
-            },
-            Example{
-                "To see available templates:",
-                "nix flake show templates"
-            },
-            Example{
-                "To create a flake from a specific template:",
-                "nix flake init -t templates#nixos-container"
-            },
-        };
+        return
+          #include "flake-init.md"
+          ;
     }
 
     CmdFlakeInit()
@@ -660,6 +677,13 @@ struct CmdFlakeNew : CmdFlakeInitCommon
     std::string description() override
     {
         return "create a flake in the specified directory from a template";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-new.md"
+          ;
     }
 
     CmdFlakeNew()
@@ -681,12 +705,19 @@ struct CmdFlakeClone : FlakeCommand
         return "clone flake repository";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "flake-clone.md"
+          ;
+    }
+
     CmdFlakeClone()
     {
         addFlag({
             .longName = "dest",
             .shortName = 'f',
-            .description = "destination path",
+            .description = "Clone the flake to path *dest*.",
             .labels = {"path"},
             .handler = {&destDir}
         });
@@ -720,22 +751,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
         return "copy a flake and all its inputs to a store";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To copy the dwarffs flake and its dependencies to a binary cache:",
-                "nix flake archive --to file:///tmp/my-cache dwarffs"
-            },
-            Example{
-                "To fetch the dwarffs flake and its dependencies to the local Nix store:",
-                "nix flake archive dwarffs"
-            },
-            Example{
-                "To print the store paths of the flake sources of NixOps without fetching them:",
-                "nix flake archive --json --dry-run nixops"
-            },
-        };
+        return
+          #include "flake-archive.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -787,7 +807,7 @@ struct CmdFlakeShow : FlakeCommand
     {
         addFlag({
             .longName = "legacy",
-            .description = "show the contents of the 'legacyPackages' output",
+            .description = "Show the contents of the `legacyPackages` output.",
             .handler = {&showLegacy, true}
         });
     }
@@ -795,6 +815,13 @@ struct CmdFlakeShow : FlakeCommand
     std::string description() override
     {
         return "show the outputs provided by a flake";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-show.md"
+          ;
     }
 
     void run(nix::ref<nix::Store> store) override
@@ -933,6 +960,45 @@ struct CmdFlakeShow : FlakeCommand
     }
 };
 
+struct CmdFlakePrefetch : FlakeCommand, MixJSON
+{
+    CmdFlakePrefetch()
+    {
+    }
+
+    std::string description() override
+    {
+        return "download the source tree denoted by a flake reference into the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-prefetch.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto originalRef = getFlakeRef();
+        auto resolvedRef = originalRef.resolve(store);
+        auto [tree, lockedRef] = resolvedRef.fetchTree(store);
+        auto hash = store->queryPathInfo(tree.storePath)->narHash;
+
+        if (json) {
+            auto res = nlohmann::json::object();
+            res["storePath"] = store->printStorePath(tree.storePath);
+            res["hash"] = hash.to_string(SRI, true);
+            logger->cout(res.dump());
+        } else {
+            notice("Downloaded '%s' to '%s' (hash '%s').",
+                lockedRef.to_string(),
+                store->printStorePath(tree.storePath),
+                hash.to_string(SRI, true));
+        }
+    }
+};
+
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
@@ -946,6 +1012,7 @@ struct CmdFlake : NixMultiCommand
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
+                {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
             })
     {
     }
@@ -953,6 +1020,13 @@ struct CmdFlake : NixMultiCommand
     std::string description() override
     {
         return "manage Nix flakes";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake.md"
+          ;
     }
 
     void run() override

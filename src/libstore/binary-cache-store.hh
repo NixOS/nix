@@ -24,7 +24,7 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
         "enable multi-threading compression, available for xz only currently"};
 };
 
-class BinaryCacheStore : public Store, public virtual BinaryCacheStoreConfig
+class BinaryCacheStore : public virtual BinaryCacheStoreConfig, public virtual Store
 {
 
 private:

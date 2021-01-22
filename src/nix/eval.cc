@@ -18,18 +18,18 @@ struct CmdEval : MixJSON, InstallableCommand
 
     CmdEval()
     {
-        mkFlag(0, "raw", "print strings unquoted", &raw);
+        mkFlag(0, "raw", "Print strings without quotes or escaping.", &raw);
 
         addFlag({
             .longName = "apply",
-            .description = "apply a function to each argument",
+            .description = "Apply the function *expr* to each argument.",
             .labels = {"expr"},
             .handler = {&apply},
         });
 
         addFlag({
             .longName = "write-to",
-            .description = "write a string or attrset of strings to 'path'",
+            .description = "Write a string or attrset of strings to *path*.",
             .labels = {"path"},
             .handler = {&writeTo},
         });
@@ -40,30 +40,11 @@ struct CmdEval : MixJSON, InstallableCommand
         return "evaluate a Nix expression";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            {
-                "To evaluate a Nix expression given on the command line:",
-                "nix eval --expr '1 + 2'"
-            },
-            {
-                "To evaluate a Nix expression from a file or URI:",
-                "nix eval -f ./my-nixpkgs hello.name"
-            },
-            {
-                "To get the current version of Nixpkgs:",
-                "nix eval --raw nixpkgs#lib.version"
-            },
-            {
-                "To print the store path of the Hello package:",
-                "nix eval --raw nixpkgs#hello"
-            },
-            {
-                "To get a list of checks in the 'nix' flake:",
-                "nix eval nix#checks.x86_64-linux --apply builtins.attrNames"
-            },
-        };
+        return
+          #include "eval.md"
+          ;
     }
 
     Category category() override { return catSecondary; }
@@ -97,10 +78,10 @@ struct CmdEval : MixJSON, InstallableCommand
             recurse = [&](Value & v, const Pos & pos, const Path & path)
             {
                 state->forceValue(v);
-                if (v.type == tString)
+                if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path, v.string.s);
-                else if (v.type == tAttrs) {
+                else if (v.type() == nAttrs) {
                     if (mkdir(path.c_str(), 0777) == -1)
                         throw SysError("creating directory '%s'", path);
                     for (auto & attr : *v.attrs)

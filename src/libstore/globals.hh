@@ -34,6 +34,8 @@ class Settings : public Config {
 
     StringSet getDefaultSystemFeatures();
 
+    StringSet getDefaultExtraPlatforms();
+
     bool isWSL1();
 
 public:
@@ -545,7 +547,7 @@ public:
 
     Setting<StringSet> extraPlatforms{
         this,
-        std::string{SYSTEM} == "x86_64-linux" && !isWSL1() ? StringSet{"i686-linux"} : StringSet{},
+        getDefaultExtraPlatforms(),
         "extra-platforms",
         R"(
           Platforms other than the native one which this machine is capable of
