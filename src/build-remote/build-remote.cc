@@ -75,11 +75,11 @@ static int main_build_remote(int argc, char * * argv)
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
-        currentLoad = "/current-load";
+        auto currentLoadName = "/current-load";
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = std::string { localStore->stateDir } + currentLoad;
+            currentLoad = std::string { localStore->stateDir } + currentLoadName;
         else
-            currentLoad = settings.nixStateDir + currentLoad;
+            currentLoad = settings.nixStateDir + currentLoadName;
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;

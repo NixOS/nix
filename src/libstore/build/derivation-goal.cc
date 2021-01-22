@@ -3291,7 +3291,7 @@ void DerivationGoal::registerOutputs()
 
         auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
         if (!localStoreP)
-            Unsupported("Can only register outputs with local store");
+            throw Unsupported("can only register outputs with local store, but this is %s", worker.store.getUri());
         auto & localStore = *localStoreP;
 
         if (buildMode == bmCheck) {
@@ -3426,7 +3426,7 @@ void DerivationGoal::registerOutputs()
     {
         auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
         if (!localStoreP)
-            Unsupported("Can only register outputs with local store");
+            throw Unsupported("can only register outputs with local store, but this is %s", worker.store.getUri());
         auto & localStore = *localStoreP;
 
         ValidPathInfos infos2;
