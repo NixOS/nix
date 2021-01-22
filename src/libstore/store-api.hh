@@ -738,17 +738,33 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
 
+/* copyStorePath wrapped to be used with `copyPaths`. */
+void copyStorePathAdapter(ref<Store> srcStore, ref<Store> dstStore,
+    const ValidPathInfo & info, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+
+/* The more liberal alternative to `copyStorePathAdapter`, useful for remote
+   stores that do not trust us. */
+void copyOrBuildStorePath(ref<Store> srcStore, ref<Store> dstStore,
+    const ValidPathInfo & info, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+
 /* Copy store paths from one store to another. The paths may be copied
    in parallel. They are copied in a topologically sorted order (i.e.
    if A is a reference of B, then A is copied before B), but the set
    of store paths is not automatically closed; use copyClosure() for
    that. Returns a map of what each path was copied to the dstStore
-   as. */
+   as.
+
+   The `copyStorePathImpl` parameter allows doing something other than just
+   copying. For example, this is used with the build hook to allow the other
+   side to build dependencies we don't have permission to copy. This behavior
+   isn't just the default that way `nix copy` etc. still can be relied upon to
+   not build anything. */
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
     const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
+    SubstituteFlag substitute = NoSubstitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl = copyStorePathAdapter);
 
 
 /* Copy the closure of the specified paths from one store to another. */

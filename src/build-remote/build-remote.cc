@@ -270,9 +270,11 @@ connected:
 
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
+        auto copyStorePathImpl = sshStore2->isTrusting ? copyStorePathAdapter : copyOrBuildStorePath;
+
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, sshStore2, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(store, sshStore2, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
         }
 
         uploadLock = -1;
@@ -285,7 +287,7 @@ connected:
             if (!result.success())
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
         } else {
-            copyPaths(store, sshStore2, {*drvPath}, NoRepair, NoCheckSigs, substitute);
+            copyPaths(store, sshStore2, {*drvPath}, NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
             sshStore2->buildPaths({{*drvPath}});
         }
 
@@ -298,6 +300,7 @@ connected:
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
             for (auto & i : missing)
                 store->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
+            /* No `copyStorePathImpl` because we always trust ourselves. */
             copyPaths(sshStore2, store, missing, NoRepair, NoCheckSigs, NoSubstitute);
         }
 
