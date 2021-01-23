@@ -64,7 +64,6 @@ DownloadFileResult downloadFile(
 
     if (res.cached) {
         assert(cached);
-        assert(request.expectedETag == res.etag);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
