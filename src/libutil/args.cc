@@ -341,7 +341,10 @@ nlohmann::json MultiCommand::toJSON()
     for (auto & [name, commandFun] : commands) {
         auto command = commandFun();
         auto j = command->toJSON();
-        j["category"] = categories[command->category()];
+        auto cat = nlohmann::json::object();
+        cat["id"] = command->category();
+        cat["description"] = categories[command->category()];
+        j["category"] = std::move(cat);
         cmds[name] = std::move(j);
     }
 

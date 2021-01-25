@@ -13,12 +13,27 @@ let
     + showSynopsis { inherit command; args = def.args; }
     + (if def.commands or {} != {}
        then
+         let
+           categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues def.commands)));
+           listCommands = cmds:
+             concatStrings (map (name:
+               "* [`${command} ${name}`](./${appendName filename name}.md) - ${cmds.${name}.description}\n")
+               (attrNames cmds));
+         in
          "where *subcommand* is one of the following:\n\n"
          # FIXME: group by category
-         + concatStrings (map (name:
-           "* [`${command} ${name}`](./${appendName filename name}.md) - ${def.commands.${name}.description}\n")
-           (attrNames def.commands))
-         + "\n"
+         + (if length categories > 1
+            then
+              concatStrings (map
+                (cat:
+                  "**${toString cat.description}:**\n\n"
+                  + listCommands (filterAttrs (n: v: v.category == cat) def.commands)
+                  + "\n"
+                ) categories)
+              + "\n"
+            else
+              listCommands def.commands
+              + "\n")
        else "")
     + (if def ? doc
        then def.doc + "\n\n"
