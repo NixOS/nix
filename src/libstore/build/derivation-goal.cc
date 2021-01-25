@@ -597,9 +597,17 @@ void DerivationGoal::tryToBuild()
     PathSet lockFiles;
     /* FIXME: Should lock something like the drv itself so we don't build same
        CA drv concurrently */
-    for (auto & i : drv->outputsAndOptPaths(worker.store))
-        if (i.second.second)
-            lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+    if (dynamic_cast<LocalStore *>(&worker.store))
+        /* If we aren't a local store, we might need to use the local store as
+           a build remote, but that would cause a deadlock. */
+        /* FIXME: Make it so we can use ourselves as a build remote even if we
+           are the local store (separate locking for building vs scheduling? */
+        /* FIXME: find some way to lock for scheduling for the other stores so
+           a forking daemon with --store still won't farm out redundant builds.
+           */
+        for (auto & i : drv->outputsAndOptPaths(worker.store))
+            if (i.second.second)
+                lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
@@ -681,6 +689,12 @@ void DerivationGoal::tryToBuild()
 
 void DerivationGoal::tryLocalBuild() {
     /* Make sure that we are allowed to start a build. */
+    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+        throw Error(
+            "unable to build with a primary store that isn't a local store; "
+            "either pass a different '--store' or enable remote builds."
+            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+    }
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
@@ -849,14 +863,16 @@ void DerivationGoal::buildDone()
                So instead, check if the disk is (nearly) full now.  If
                so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
-            uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
-            struct statvfs st;
-            if (statvfs(worker.store.realStoreDir.c_str(), &st) == 0 &&
-                (uint64_t) st.f_bavail * st.f_bsize < required)
-                diskFull = true;
-            if (statvfs(tmpDir.c_str(), &st) == 0 &&
-                (uint64_t) st.f_bavail * st.f_bsize < required)
-                diskFull = true;
+            if (auto localStore = dynamic_cast<LocalStore *>(&worker.store)) {
+                uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
+                struct statvfs st;
+                if (statvfs(localStore->realStoreDir.c_str(), &st) == 0 &&
+                    (uint64_t) st.f_bavail * st.f_bsize < required)
+                    diskFull = true;
+                if (statvfs(tmpDir.c_str(), &st) == 0 &&
+                    (uint64_t) st.f_bavail * st.f_bsize < required)
+                    diskFull = true;
+            }
 #endif
 
             deleteTmpDir(false);
@@ -1216,12 +1232,15 @@ void DerivationGoal::startBuilder()
             useChroot = !(derivationIsImpure(derivationType)) && !noChroot;
     }
 
-    if (worker.store.storeDir != worker.store.realStoreDir) {
-        #if __linux__
-            useChroot = true;
-        #else
-            throw Error("building using a diverted store is not supported on this platform");
-        #endif
+    if (auto localStoreP = dynamic_cast<LocalStore *>(&worker.store)) {
+        auto & localStore = *localStoreP;
+        if (localStore.storeDir != localStore.realStoreDir) {
+            #if __linux__
+                useChroot = true;
+            #else
+                throw Error("building using a diverted store is not supported on this platform");
+            #endif
+        }
     }
 
     /* Create a temporary directory where the build will take
@@ -2181,7 +2200,8 @@ void DerivationGoal::startDaemon()
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
-    params["root"] = worker.store.rootDir;
+    if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
+        params["root"] = localStore->rootDir;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
     auto store = make_ref<RestrictedStore>(params,
@@ -3269,7 +3289,13 @@ void DerivationGoal::registerOutputs()
             }
         }
 
+        auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+        if (!localStoreP)
+            throw Unsupported("can only register outputs with local store, but this is %s", worker.store.getUri());
+        auto & localStore = *localStoreP;
+
         if (buildMode == bmCheck) {
+
             if (!worker.store.isValidPath(newInfo.path)) continue;
             ValidPathInfo oldInfo(*worker.store.queryPathInfo(newInfo.path));
             if (newInfo.narHash != oldInfo.narHash) {
@@ -3294,8 +3320,8 @@ void DerivationGoal::registerOutputs()
             /* Since we verified the build, it's now ultimately trusted. */
             if (!oldInfo.ultimate) {
                 oldInfo.ultimate = true;
-                worker.store.signPathInfo(oldInfo);
-                worker.store.registerValidPaths({{oldInfo.path, oldInfo}});
+                localStore.signPathInfo(oldInfo);
+                localStore.registerValidPaths({{oldInfo.path, oldInfo}});
             }
 
             continue;
@@ -3311,13 +3337,13 @@ void DerivationGoal::registerOutputs()
         }
 
         if (curRound == nrRounds) {
-            worker.store.optimisePath(actualPath); // FIXME: combine with scanForReferences()
+            localStore.optimisePath(actualPath); // FIXME: combine with scanForReferences()
             worker.markContentsGood(newInfo.path);
         }
 
         newInfo.deriver = drvPath;
         newInfo.ultimate = true;
-        worker.store.signPathInfo(newInfo);
+        localStore.signPathInfo(newInfo);
 
         finish(newInfo.path);
 
@@ -3325,7 +3351,7 @@ void DerivationGoal::registerOutputs()
            isn't statically known so that we can safely unlock the path before
            the next iteration */
         if (newInfo.ca)
-            worker.store.registerValidPaths({{newInfo.path, newInfo}});
+            localStore.registerValidPaths({{newInfo.path, newInfo}});
 
         infos.emplace(outputName, std::move(newInfo));
     }
@@ -3398,11 +3424,16 @@ void DerivationGoal::registerOutputs()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     {
+        auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+        if (!localStoreP)
+            throw Unsupported("can only register outputs with local store, but this is %s", worker.store.getUri());
+        auto & localStore = *localStoreP;
+
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
             infos2.insert_or_assign(newInfo.path, newInfo);
         }
-        worker.store.registerValidPaths(infos2);
+        localStore.registerValidPaths(infos2);
     }
 
     /* In case of a fixed-output derivation hash mismatch, throw an
@@ -3600,7 +3631,12 @@ Path DerivationGoal::openLogFile()
     auto baseName = std::string(baseNameOf(worker.store.printStorePath(drvPath)));
 
     /* Create a log file. */
-    Path dir = fmt("%s/%s/%s/", worker.store.logDir, worker.store.drvsLogDir, string(baseName, 0, 2));
+    Path logDir;
+    if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
+        logDir = localStore->logDir;
+    else
+        logDir = settings.nixLogDir;
+    Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, string(baseName, 0, 2));
     createDirs(dir);
 
     Path logFileName = fmt("%s/%s%s", dir, string(baseName, 2),

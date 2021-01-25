@@ -136,6 +136,8 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    bool pathInfoIsTrusted(const ValidPathInfo &) override;
+
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
@@ -144,15 +146,6 @@ public:
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
-
-    void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
-        BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
-
-    void ensurePath(const StorePath & path) override;
 
     void addTempRoot(const StorePath & path) override;
 

@@ -372,6 +372,21 @@ public:
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
+    /* Check whether the given valid path info is sufficiently attested, by
+       either being signed by a trusted public key or content-addressed, in
+       order to be included in the given store.
+
+       These same checks would be performed in addToStore, but this allows an
+       earlier failure in the case where dependencies need to be added too, but
+       the addToStore wouldn't fail until those dependencies are added. Also,
+       we don't really want to add the dependencies listed in a nar info we
+       don't trust anyyways.
+       */
+    virtual bool pathInfoIsTrusted(const ValidPathInfo &)
+    {
+        return true;
+    }
+
 protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
@@ -519,17 +534,17 @@ public:
            explicitly choosing to allow it).
     */
     virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode = bmNormal) = 0;
+        BuildMode buildMode = bmNormal);
 
     /* Ensure that a path is valid.  If it is not currently valid, it
        may be made valid by running a substitute (if defined for the
        path). */
-    virtual void ensurePath(const StorePath & path) = 0;
+    virtual void ensurePath(const StorePath & path);
 
     /* Add a store path as a temporary root of the garbage collector.
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
-    { unsupported("addTempRoot"); }
+    { warn("not creating temp root, store doesn't support GC"); }
 
     /* Add an indirect root, which is merely a symlink to `path' from
        /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
