@@ -896,6 +896,8 @@ void DerivationGoal::buildDone()
                     msg += line;
                     msg += "\n";
                 }
+                msg += fmt("For full logs, run '" ANSI_BOLD "nix log %s" ANSI_NORMAL "'.",
+                    worker.store.printStorePath(drvPath));
             }
 
             if (diskFull)
