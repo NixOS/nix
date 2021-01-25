@@ -153,6 +153,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
     fetchTree(state, pos, args, v, std::nullopt);
 }
 
+// FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
