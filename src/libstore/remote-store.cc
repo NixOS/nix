@@ -680,6 +680,10 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     unsigned int status;
     conn->from >> status >> res.errorMsg;
     res.status = (BuildResult::Status) status;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0xc) {
+        auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+        res.builtOutputs = builtOutputs;
+    }
     return res;
 }
 
