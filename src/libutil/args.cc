@@ -96,41 +96,6 @@ void Args::parseCmdline(const Strings & _cmdline)
     processArgs(pendingArgs, true);
 }
 
-void Args::printHelp(const string & programName, std::ostream & out)
-{
-    std::cout << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "FLAGS..." ANSI_NORMAL, programName);
-    for (auto & exp : expectedArgs) {
-        std::cout << renderLabels({exp.label});
-        // FIXME: handle arity > 1
-        if (exp.handler.arity == ArityAny) std::cout << "...";
-        if (exp.optional) std::cout << "?";
-    }
-    std::cout << "\n";
-
-    auto s = description();
-    if (s != "")
-        std::cout << "\n" ANSI_BOLD "Summary:" ANSI_NORMAL " " << s << ".\n";
-
-    if (longFlags.size()) {
-        std::cout << "\n";
-        std::cout << ANSI_BOLD "Flags:" ANSI_NORMAL "\n";
-        printFlags(out);
-    }
-}
-
-void Args::printFlags(std::ostream & out)
-{
-    Table2 table;
-    for (auto & flag : longFlags) {
-        if (hiddenCategories.count(flag.second->category)) continue;
-        table.push_back(std::make_pair(
-                (flag.second->shortName ? std::string("-") + flag.second->shortName + ", " : "    ")
-                + "--" + flag.first + renderLabels(flag.second->labels),
-                flag.second->description));
-    }
-    printTable(out, table);
-}
-
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
     assert(pos != end);
@@ -331,28 +296,6 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-std::string renderLabels(const Strings & labels)
-{
-    std::string res;
-    for (auto label : labels) {
-        for (auto & c : label) c = std::toupper(c);
-        res += " " ANSI_ITALIC + label + ANSI_NORMAL;
-    }
-    return res;
-}
-
-void printTable(std::ostream & out, const Table2 & table)
-{
-    size_t max = 0;
-    for (auto & row : table)
-        max = std::max(max, filterANSIEscapes(row.first, true).size());
-    for (auto & row : table) {
-        out << "  " << row.first
-            << std::string(max - filterANSIEscapes(row.first, true).size() + 2, ' ')
-            << row.second << "\n";
-    }
-}
-
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
@@ -374,38 +317,6 @@ MultiCommand::MultiCommand(const Commands & commands)
     });
 
     categories[Command::catDefault] = "Available commands";
-}
-
-void MultiCommand::printHelp(const string & programName, std::ostream & out)
-{
-    if (command) {
-        command->second->printHelp(programName + " " + command->first, out);
-        return;
-    }
-
-    out << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "COMMAND FLAGS... ARGS..." ANSI_NORMAL "\n", programName);
-
-    out << "\n" ANSI_BOLD "Common flags:" ANSI_NORMAL "\n";
-    printFlags(out);
-
-    std::map<Command::Category, std::map<std::string, ref<Command>>> commandsByCategory;
-
-    for (auto & [name, commandFun] : commands) {
-        auto command = commandFun();
-        commandsByCategory[command->category()].insert_or_assign(name, command);
-    }
-
-    for (auto & [category, commands] : commandsByCategory) {
-        out << fmt("\n" ANSI_BOLD "%s:" ANSI_NORMAL "\n", categories[category]);
-
-        Table2 table;
-        for (auto & [name, command] : commands) {
-            auto descr = command->description();
-            if (!descr.empty())
-                table.push_back(std::make_pair(name, descr));
-        }
-        printTable(out, table);
-    }
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)

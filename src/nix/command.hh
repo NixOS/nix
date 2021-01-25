@@ -25,8 +25,6 @@ static constexpr Command::Category catNixInstallation = 102;
 
 struct NixMultiCommand : virtual MultiCommand, virtual Command
 {
-    void printHelp(const string & programName, std::ostream & out) override;
-
     nlohmann::json toJSON() override;
 };
 

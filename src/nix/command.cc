@@ -27,11 +27,6 @@ nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & p
     return res;
 }
 
-void NixMultiCommand::printHelp(const string & programName, std::ostream & out)
-{
-    MultiCommand::printHelp(programName, out);
-}
-
 nlohmann::json NixMultiCommand::toJSON()
 {
     // FIXME: use Command::toJSON() as well.

@@ -20,8 +20,6 @@ public:
        wrong. */
     void parseCmdline(const Strings & cmdline);
 
-    virtual void printHelp(const string & programName, std::ostream & out);
-
     /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
@@ -114,8 +112,6 @@ protected:
     std::map<char, Flag::ptr> shortFlags;
 
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
-
-    virtual void printFlags(std::ostream & out);
 
     /* Positional arguments. */
     struct ExpectedArg
@@ -223,8 +219,6 @@ public:
 
     MultiCommand(const Commands & commands);
 
-    void printHelp(const string & programName, std::ostream & out) override;
-
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
@@ -233,14 +227,6 @@ public:
 };
 
 Strings argvToStrings(int argc, char * * argv);
-
-/* Helper function for rendering argument labels. */
-std::string renderLabels(const Strings & labels);
-
-/* Helper function for printing 2-column tables. */
-typedef std::vector<std::pair<std::string, std::string>> Table2;
-
-void printTable(std::ostream & out, const Table2 & table);
 
 struct Completion {
     std::string completion;

@@ -21,11 +21,6 @@ struct CmdStore : virtual NixMultiCommand
         command->second->prepare();
         command->second->run();
     }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
-    }
 };
 
 static auto rCmdStore = registerCommand<CmdStore>("store");
