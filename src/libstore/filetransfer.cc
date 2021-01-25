@@ -639,11 +639,7 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            logError({
-                .name = "File transfer",
-                .hint = hintfmt("unexpected error in download thread: %s",
-                                e.what())
-            });
+            printError("unexpected error in download thread: %s", e.what());
         }
 
         {
@@ -859,11 +855,10 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
-    if (response && (response->size() < 1024 || response->find("<html>") != string::npos)) {
-            err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
-    } else {
-        err.hint = hf;
-    }
+    if (response && (response->size() < 1024 || response->find("<html>") != string::npos))
+        err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
+    else
+        err.msg = hf;
 }
 
 bool isUri(const string & s)

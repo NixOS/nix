@@ -87,8 +87,8 @@ void handleDiffHook(
                 printError(chomp(diffRes.second));
         } catch (Error & error) {
             ErrorInfo ei = error.info();
-            ei.hint = hintfmt("diff hook execution failed: %s",
-                (error.info().hint.has_value() ? error.info().hint->str() : ""));
+            // FIXME: wrap errors.
+            ei.msg = hintfmt("diff hook execution failed: %s", ei.msg.str());
             logError(ei);
         }
     }
@@ -439,12 +439,9 @@ void DerivationGoal::repairClosure()
     /* Check each path (slow!). */
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        logError({
-            .name = "Corrupt path in closure",
-            .hint = hintfmt(
-                "found corrupted or missing path '%s' in the output closure of '%s'",
-                worker.store.printStorePath(i), worker.store.printStorePath(drvPath))
-        });
+        printError(
+            "found corrupted or missing path '%s' in the output closure of '%s'",
+            worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
             addWaitee(upcast_goal(worker.makeSubstitutionGoal(i, Repair)));
@@ -893,9 +890,12 @@ void DerivationGoal::buildDone()
                 statusToString(status));
 
             if (!logger->isVerbose() && !logTail.empty()) {
-                msg += (format("; last %d log lines:") % logTail.size()).str();
-                for (auto & line : logTail)
-                    msg += "\n  " + line;
+                msg += fmt(";\nlast %d log lines:\n", logTail.size());
+                for (auto & line : logTail) {
+                    msg += "> ";
+                    msg += line;
+                    msg += "\n";
+                }
             }
 
             if (diskFull)
@@ -1071,12 +1071,9 @@ HookReply DerivationGoal::tryBuildHook()
 
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
-            logError({
-                .name = "Build hook died",
-                .hint = hintfmt(
-                    "build hook died unexpectedly: %s",
-                    chomp(drainFD(worker.hook->fromHook.readSide.get())))
-            });
+            printError(
+                "build hook died unexpectedly: %s",
+                chomp(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
             return rpDecline;
         } else
@@ -3088,10 +3085,7 @@ void DerivationGoal::registerOutputs()
         auto rewriteOutput = [&]() {
             /* Apply hash rewriting if necessary. */
             if (!outputRewrites.empty()) {
-                logWarning({
-                    .name = "Rewriting hashes",
-                    .hint = hintfmt("rewriting hashes in '%1%'; cross fingers", actualPath),
-                });
+                warn("rewriting hashes in '%1%'; cross fingers", actualPath);
 
                 /* FIXME: this is in-memory. */
                 StringSink sink;
@@ -3385,10 +3379,7 @@ void DerivationGoal::registerOutputs()
                 if (settings.enforceDeterminism)
                     throw NotDeterministic(hint);
 
-                logError({
-                    .name = "Output determinism error",
-                    .hint = hint
-                });
+                printError(hint);
 
                 curRound = nrRounds; // we know enough, bail out early
             }

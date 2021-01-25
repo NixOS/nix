@@ -456,10 +456,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     }
     pathContentsGoodCache.insert_or_assign(path, res);
     if (!res)
-        logError({
-            .name = "Corrupted path",
-            .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
-        });
+        printError("path '%s' is corrupted or missing!", store.printStorePath(path));
     return res;
 }
 

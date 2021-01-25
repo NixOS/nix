@@ -150,12 +150,7 @@ LocalStore::LocalStore(const Params & params)
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
-            logError({
-                .name = "'build-users-group' not found",
-                .hint = hintfmt(
-                    "warning: the group '%1%' specified in 'build-users-group' does not exist",
-                    settings.buildUsersGroup)
-            });
+            printError("warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
         else {
             struct stat st;
             if (stat(realStoreDir.c_str(), &st))
@@ -1406,12 +1401,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             Path linkPath = linksDir + "/" + link.name;
             string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
             if (hash != link.name) {
-                logError({
-                    .name = "Invalid hash",
-                    .hint = hintfmt(
-                        "link '%s' was modified! expected hash '%s', got '%s'",
-                        linkPath, link.name, hash)
-                });
+                printError("link '%s' was modified! expected hash '%s', got '%s'",
+                    linkPath, link.name, hash);
                 if (repair) {
                     if (unlink(linkPath.c_str()) == 0)
                         printInfo("removed link '%s'", linkPath);
@@ -1444,11 +1435,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 auto current = hashSink->finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
-                    logError({
-                        .name = "Invalid hash - path modified",
-                        .hint = hintfmt("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true))
-                    });
+                    printError("path '%s' was modified! expected hash '%s', got '%s'",
+                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true));
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
@@ -1499,10 +1487,7 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
     if (!done.insert(pathS).second) return;
 
     if (!isStorePath(pathS)) {
-        logError({
-            .name = "Nix path not found",
-            .hint = hintfmt("path '%s' is not in the Nix store", pathS)
-        });
+        printError("path '%s' is not in the Nix store", pathS);
         return;
     }
 
@@ -1525,10 +1510,7 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            logError({
-                .name = "Missing path with referrers",
-                .hint = hintfmt("path '%s' disappeared, but it still has valid referrers!", pathS)
-            });
+            printError("path '%s' disappeared, but it still has valid referrers!", pathS);
             if (repair)
                 try {
                     repairPath(path);

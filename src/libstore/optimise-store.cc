@@ -126,16 +126,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        logWarning({
-            .name = "Suspicious file",
-            .hint = hintfmt("skipping suspicious writable file '%1%'", path)
-        });
+        warn("skipping suspicious writable file '%1%'", path);
         return;
     }
 
     /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        debug(format("'%1%' is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
+        debug("'%s' is already linked, with %d other file(s)", path, st.st_nlink - 2);
         return;
     }
 
@@ -191,10 +188,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     if (st.st_size != stLink.st_size) {
-        logWarning({
-            .name = "Corrupted link",
-            .hint = hintfmt("removing corrupted link '%1%'", linkPath)
-        });
+        warn("removing corrupted link '%s'", linkPath);
         unlink(linkPath.c_str());
         goto retry;
     }
@@ -229,10 +223,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
-            logError({
-                .name = "Unlink error",
-                .hint = hintfmt("unable to unlink '%1%'", tempLink)
-            });
+            printError("unable to unlink '%1%'", tempLink);
         if (errno == EMLINK) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it

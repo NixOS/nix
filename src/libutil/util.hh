@@ -373,8 +373,9 @@ template<class C> Strings quoteStrings(const C & c)
 }
 
 
-/* Remove trailing whitespace from a string. */
-string chomp(const string & s);
+/* Remove trailing whitespace from a string. FIXME: return
+   std::string_view. */
+string chomp(std::string_view s);
 
 
 /* Remove whitespace from the start and end of a string. */

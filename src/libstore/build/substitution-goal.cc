@@ -144,11 +144,8 @@ void SubstitutionGoal::tryNext()
        only after we've downloaded the path. */
     if (!sub->isTrusted && worker.store.pathInfoIsTrusted(*info))
     {
-        logWarning({
-            .name = "Invalid path signature",
-            .hint = hintfmt("substituter '%s' does not have a valid signature for path '%s'",
-                sub->getUri(), worker.store.printStorePath(storePath))
-        });
+        warn("substituter '%s' does not have a valid signature for path '%s'",
+            sub->getUri(), worker.store.printStorePath(storePath));
         tryNext();
         return;
     }

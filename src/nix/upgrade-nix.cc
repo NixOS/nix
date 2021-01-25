@@ -61,10 +61,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (dryRun) {
             stopProgressBar();
-            logWarning({
-                .name = "Version update",
-                .hint = hintfmt("would upgrade to version %s", version)
-            });
+            warn("would upgrade to version %s", version);
             return;
         }
 

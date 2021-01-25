@@ -52,10 +52,7 @@ size_t threshold = 256 * 1024 * 1024;
 
 static void warnLargeDump()
 {
-    logWarning({
-        .name = "Large path",
-        .description = "dumping very large path (> 256 MiB); this may run out of memory"
-    });
+    warn("dumping very large path (> 256 MiB); this may run out of memory");
 }
 
 
@@ -306,8 +303,7 @@ Sink & operator << (Sink & sink, const Error & ex)
         << "Error"
         << info.level
         << info.name
-        << info.description
-        << (info.hint ? info.hint->str() : "")
+        << info.msg.str()
         << 0 // FIXME: info.errPos
         << info.traces.size();
     for (auto & trace : info.traces) {
@@ -374,12 +370,14 @@ Error readError(Source & source)
 {
     auto type = readString(source);
     assert(type == "Error");
-    ErrorInfo info;
-    info.level = (Verbosity) readInt(source);
-    info.name = readString(source);
-    info.description = readString(source);
-    auto hint = readString(source);
-    if (hint != "") info.hint = hintformat(std::move(format("%s") % hint));
+    auto level = (Verbosity) readInt(source);
+    auto name = readString(source);
+    auto msg = readString(source);
+    ErrorInfo info {
+        .level = level,
+        .name = name,
+        .msg = hintformat(std::move(format("%s") % msg)),
+    };
     auto havePos = readNum<size_t>(source);
     assert(havePos == 0);
     auto nrTraces = readNum<size_t>(source);

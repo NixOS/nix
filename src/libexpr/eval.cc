@@ -622,7 +622,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
 {
     throw EvalError({
-        .hint = hintfmt(s, s2),
+        .msg = hintfmt(s, s2),
         .errPos = pos
     });
 }
@@ -635,7 +635,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
 {
     throw EvalError({
-        .hint = hintfmt(s, s2, s3),
+        .msg = hintfmt(s, s2, s3),
         .errPos = pos
     });
 }
@@ -644,7 +644,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
-        .hint = hintfmt(s, sym, p2),
+        .msg = hintfmt(s, sym, p2),
         .errPos = p1
     });
 }
@@ -652,7 +652,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 {
     throw TypeError({
-        .hint = hintfmt(s),
+        .msg = hintfmt(s),
         .errPos = pos
     });
 }
@@ -660,7 +660,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
     throw TypeError({
-        .hint = hintfmt(s, fun.showNamePos(), s2),
+        .msg = hintfmt(s, fun.showNamePos(), s2),
         .errPos = pos
     });
 }
@@ -668,7 +668,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
     throw AssertionError({
-        .hint = hintfmt(s, s1),
+        .msg = hintfmt(s, s1),
         .errPos = pos
     });
 }
@@ -676,7 +676,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
 {
     throw UndefinedVarError({
-        .hint = hintfmt(s, s1),
+        .msg = hintfmt(s, s1),
         .errPos = pos
     });
 }
@@ -684,7 +684,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
 LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1))
 {
     throw MissingArgumentError({
-        .hint = hintfmt(s, s1),
+        .msg = hintfmt(s, s1),
         .errPos = pos
     });
 }
@@ -2057,7 +2057,7 @@ void EvalState::printStats()
 string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError({
-        .hint = hintfmt("cannot coerce %1% to a string", showType()),
+        .msg = hintfmt("cannot coerce %1% to a string", showType()),
         .errPos = pos
     });
 }
