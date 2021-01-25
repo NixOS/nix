@@ -195,8 +195,7 @@ nlohmann::json Args::toJSON()
             j["shortName"] = std::string(1, flag->shortName);
         if (flag->description != "")
             j["description"] = flag->description;
-        if (flag->category != "")
-            j["category"] = flag->category;
+        j["category"] = flag->category;
         if (flag->handler.arity != ArityAny)
             j["arity"] = flag->handler.arity;
         if (!flag->labels.empty())

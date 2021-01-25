@@ -80,6 +80,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName = "print-build-logs",
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
+            .category = loggingCategory,
             .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
         });
 

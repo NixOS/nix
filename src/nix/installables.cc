@@ -58,39 +58,47 @@ void completeFlakeInputPath(
 
 MixFlakeOptions::MixFlakeOptions()
 {
+    auto category = "Common flake-related options";
+
     addFlag({
         .longName = "recreate-lock-file",
         .description = "Recreate the flake's lock file from scratch.",
+        .category = category,
         .handler = {&lockFlags.recreateLockFile, true}
     });
 
     addFlag({
         .longName = "no-update-lock-file",
         .description = "Do not allow any updates to the flake's lock file.",
+        .category = category,
         .handler = {&lockFlags.updateLockFile, false}
     });
 
     addFlag({
         .longName = "no-write-lock-file",
         .description = "Do not write the flake's newly generated lock file.",
+        .category = category,
         .handler = {&lockFlags.writeLockFile, false}
     });
 
     addFlag({
         .longName = "no-registries",
         .description = "Don't allow lookups in the flake registries.",
+        .category = category,
         .handler = {&lockFlags.useRegistries, false}
     });
 
     addFlag({
         .longName = "commit-lock-file",
         .description = "Commit changes to the flake's lock file.",
+        .category = category,
         .handler = {&lockFlags.commitLockFile, true}
     });
 
     addFlag({
         .longName = "update-input",
         .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
+        .category = category,
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
@@ -104,6 +112,7 @@ MixFlakeOptions::MixFlakeOptions()
     addFlag({
         .longName = "override-input",
         .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`).",
+        .category = category,
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
@@ -115,6 +124,7 @@ MixFlakeOptions::MixFlakeOptions()
     addFlag({
         .longName = "inputs-from",
         .description = "Use the inputs of the specified flake as registry entries.",
+        .category = category,
         .labels = {"flake-url"},
         .handler = {[&](std::string flakeRef) {
             auto evalState = getEvalState();
@@ -144,6 +154,7 @@ SourceExprCommand::SourceExprCommand()
         .longName = "file",
         .shortName = 'f',
         .description = "Interpret installables as attribute paths relative to the Nix expression stored in *file*.",
+        .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
         .completer = completePath
@@ -152,6 +163,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "expr",
         .description = "Interpret installables as attribute paths relative to the Nix expression *expr*.",
+        .category = installablesCategory,
         .labels = {"expr"},
         .handler = {&expr}
     });
@@ -159,6 +171,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "derivation",
         .description = "Operate on the store derivation rather than its outputs.",
+        .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
 }

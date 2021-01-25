@@ -61,6 +61,7 @@ StorePathsCommand::StorePathsCommand(bool recursive)
         addFlag({
             .longName = "no-recursive",
             .description = "Apply operation to specified paths only.",
+            .category = installablesCategory,
             .handler = {&this->recursive, false},
         });
     else
@@ -68,10 +69,16 @@ StorePathsCommand::StorePathsCommand(bool recursive)
             .longName = "recursive",
             .shortName = 'r',
             .description = "Apply operation to closure of the specified paths.",
+            .category = installablesCategory,
             .handler = {&this->recursive, true},
         });
 
-    mkFlag(0, "all", "Apply the operation to every store path.", &all);
+    addFlag({
+        .longName = "all",
+        .description = "Apply the operation to every store path.",
+        .category = installablesCategory,
+        .handler = {&all, true},
+    });
 }
 
 void StorePathsCommand::run(ref<Store> store)

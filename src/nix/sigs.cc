@@ -16,7 +16,7 @@ struct CmdCopySigs : StorePathsCommand
         addFlag({
             .longName = "substituter",
             .shortName = 's',
-            .description = "Use signatures from specified store.",
+            .description = "Copy signatures from the specified store.",
             .labels = {"store-uri"},
             .handler = {[&](std::string s) { substituterUris.push_back(s); }},
         });
@@ -24,7 +24,7 @@ struct CmdCopySigs : StorePathsCommand
 
     std::string description() override
     {
-        return "copy path signatures from substituters (like binary caches)";
+        return "copy store path signatures from substituters";
     }
 
     void run(ref<Store> store, StorePaths storePaths) override
@@ -110,7 +110,7 @@ struct CmdSign : StorePathsCommand
 
     std::string description() override
     {
-        return "sign the specified paths";
+        return "sign store paths";
     }
 
     void run(ref<Store> store, StorePaths storePaths) override

@@ -91,7 +91,7 @@ protected:
         { }
     };
 
-    /* Flags. */
+    /* Options. */
     struct Flag
     {
         typedef std::shared_ptr<Flag> ptr;

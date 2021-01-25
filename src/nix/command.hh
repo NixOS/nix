@@ -23,6 +23,8 @@ static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;
 
+static constexpr auto installablesCategory = "Options that change the interpretation of installables";
+
 struct NixMultiCommand : virtual MultiCommand, virtual Command
 {
     nlohmann::json toJSON() override;
