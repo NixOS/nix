@@ -311,6 +311,13 @@ connected:
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
             copyPaths(ref<Store>(sshStore), store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
         }
+        // XXX: Should e done as part of `copyPaths`
+        for (auto & realisation : missingRealisations) {
+            // Should hold, because if the feature isn't enabled the set
+            // of missing realisations should be empty
+            settings.requireExperimentalFeature("ca-derivations");
+            store->registerDrvOutput(realisation);
+        }
 
         return 0;
     }
