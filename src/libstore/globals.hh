@@ -819,6 +819,9 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
+    /* !!! We should probably disable --plugin-files and
+           --option plugin-files in normal arg parsing, since those
+           are handled by initPlugins */
     Setting<Paths> pluginFiles{
         this, {}, "plugin-files",
         R"(
@@ -929,8 +932,8 @@ public:
 extern Settings settings;
 
 /* This should be called after settings are initialized, but before
-   anything else */
-void initPlugins();
+   anything else, including arg parsing. */
+void initPlugins(const Strings & cmdline);
 
 void loadConfFile();
 

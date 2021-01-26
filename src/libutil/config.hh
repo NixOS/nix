@@ -50,6 +50,8 @@ class AbstractConfig
 protected:
     StringMap unknownSettings;
 
+    bool warnOnUnknownEncounter = false;
+
     AbstractConfig(const StringMap & initials = {})
         : unknownSettings(initials)
     { }
@@ -107,7 +109,7 @@ public:
     virtual void convertToArgs(Args & args, const std::string & category) = 0;
 
     /**
-     * Logs a warning for each unregistered setting
+     * Logs a warning for each unregistered setting, and any unregistered settings found moving forward
      */
     void warnUnknownSettings();
 

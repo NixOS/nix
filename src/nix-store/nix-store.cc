@@ -1067,8 +1067,6 @@ static int main_nix_store(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         if (!op) throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */

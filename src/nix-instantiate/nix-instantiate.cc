@@ -100,6 +100,9 @@ static int main_nix_instantiate(int argc, char * * argv)
         bool wantsReadWrite = false;
         RepairFlag repair = NoRepair;
 
+        auto args = argvToStrings(argc, argv);
+        initPlugins(args);
+
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
             using LegacyArgs::LegacyArgs;
@@ -147,9 +150,7 @@ static int main_nix_instantiate(int argc, char * * argv)
             return true;
         });
 
-        myArgs.parseCmdline(argvToStrings(argc, argv));
-
-        initPlugins();
+        myArgs.parseCmdline(args);
 
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;

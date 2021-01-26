@@ -222,6 +222,10 @@ void mainWrapped(int argc, char * * argv)
 
     Finally f([] { logger->stop(); });
 
+    /* would be nice to do this above legacy, but nix-build has custom arg list logic */
+    auto argStrings = argvToStrings(argc, argv);
+    initPlugins(argStrings);
+
     NixArgs args;
 
     if (argc == 2 && std::string(argv[1]) == "__dump-args") {
@@ -258,7 +262,7 @@ void mainWrapped(int argc, char * * argv)
     });
 
     try {
-        args.parseCmdline(argvToStrings(argc, argv));
+        args.parseCmdline(argStrings);
     } catch (HelpRequested &) {
         std::vector<std::string> subcommand;
         MultiCommand * command = &args;
@@ -276,8 +280,6 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (completions) return;
-
-    initPlugins();
 
     if (!args.command)
         throw UsageError("no subcommand specified");

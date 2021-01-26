@@ -69,7 +69,7 @@ static int main_build_remote(int argc, char * * argv)
 
         settings.maxBuildJobs.set("1"); // hack to make tests with local?root= work
 
-        initPlugins();
+        initPlugins({});
 
         auto store = openStore();
 

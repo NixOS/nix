@@ -136,6 +136,9 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         bool executable = false;
         std::optional<std::string> name;
 
+        auto argStrings = argvToStrings(argc, argv);
+        initPlugins(argStrings);
+
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
             using LegacyArgs::LegacyArgs;
@@ -169,9 +172,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             return true;
         });
 
-        myArgs.parseCmdline(argvToStrings(argc, argv));
-
-        initPlugins();
+        myArgs.parseCmdline(argStrings);
 
         if (args.size() > 2)
             throw UsageError("too many arguments");

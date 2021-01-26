@@ -104,9 +104,7 @@ static void main_nix_build(int argc, char * * argv)
         "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"
     };
 
-    Strings args;
-    for (int i = 1; i < argc; ++i)
-        args.push_back(argv[i]);
+    auto args = argvToStrings(argc, argv);
 
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
@@ -131,6 +129,8 @@ static void main_nix_build(int argc, char * * argv)
             }
         } catch (SysError &) { }
     }
+
+    initPlugins(args);
 
     struct MyArgs : LegacyArgs, MixEvalArgs
     {
@@ -239,8 +239,6 @@ static void main_nix_build(int argc, char * * argv)
     });
 
     myArgs.parseCmdline(args);
-
-    initPlugins();
 
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");

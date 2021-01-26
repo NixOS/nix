@@ -237,8 +237,32 @@ void MaxBuildJobsSetting::set(const std::string & str, bool append)
 }
 
 
-void initPlugins()
+void initPlugins(const Strings & cmdline)
 {
+    /* !!! This is not quite correct, but while it could be better
+       some error is unavoidable. Consider a plugin that adds a
+       command foo, with flag bar that takes one argument. How could
+       we know that nix foo --bar --plugin-files xyz needs to pass
+       --plugin-files as an argument to --bar, not as a top-level
+       flag, before plugins are loaded? */
+    for (auto pos = cmdline.begin(); pos != cmdline.end(); ++pos) {
+        auto arg = *pos;
+        auto found = false;
+        if (arg == "--")
+            break;
+        else if (arg == "--option") {
+            if (++pos == cmdline.end())
+                break;
+            if (*pos == "plugin-files")
+                found = true;
+        } else if (arg == "--plugin-files")
+            found = true;
+        if (found) {
+            if (++pos == cmdline.end())
+                break;
+            settings.pluginFiles.set(*pos);
+        }
+    }
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {
@@ -261,7 +285,8 @@ void initPlugins()
     }
 
     /* Since plugins can add settings, try to re-apply previously
-       unknown settings. */
+       unknown settings. Anything remaining unknown, or anything
+       unknown encountered moving forward, will result in a warning. */
     globalConfig.reapplyUnknownSettings();
     globalConfig.warnUnknownSettings();
 }

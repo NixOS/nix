@@ -1330,6 +1330,9 @@ static int main_nix_env(int argc, char * * argv)
 
         Globals globals;
 
+        auto args = argvToStrings(argc, argv);
+        initPlugins(args);
+
         globals.instSource.type = srcUnknown;
         globals.instSource.nixExprPath = getHome() + "/.nix-defexpr";
         globals.instSource.systemFilter = "*";
@@ -1418,9 +1421,7 @@ static int main_nix_env(int argc, char * * argv)
             return true;
         });
 
-        myArgs.parseCmdline(argvToStrings(argc, argv));
-
-        initPlugins();
+        myArgs.parseCmdline(args);
 
         if (!op) throw UsageError("no operation specified");
 
