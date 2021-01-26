@@ -244,6 +244,7 @@ void parseCmdLine(int argc, char * * argv,
 void parseCmdLine(const string & programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
+    initPlugins(args);
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 

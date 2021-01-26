@@ -135,11 +135,13 @@ void mainWrapped(int argc, char * * argv)
     verbosity = lvlWarn;
     settings.verboseBuild = false;
 
+    /* would be nice to do this above legacy, but nix-build has custom arg list logic */
+    auto argStrings = argvToStrings(argc, argv);
+    initPlugins(argStrings);
+
     NixArgs args;
 
-    args.parseCmdline(argvToStrings(argc, argv));
-
-    initPlugins();
+    args.parseCmdline(argStrings);
 
     if (!args.command) args.showHelpAndExit();
 

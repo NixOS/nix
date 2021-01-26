@@ -1094,8 +1094,6 @@ static int _main(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         if (!op) throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */

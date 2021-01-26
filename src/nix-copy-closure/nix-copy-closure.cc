@@ -43,8 +43,6 @@ static int _main(int argc, char ** argv)
             return true;
         });
 
-        initPlugins();
-
         if (sshHost.empty())
             throw UsageError("no host name specified");
 

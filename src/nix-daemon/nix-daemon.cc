@@ -1088,8 +1088,6 @@ static int _main(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         if (stdio) {
             if (getStoreType() == tDaemon) {
                 /* Forward on this connection to the real daemon */

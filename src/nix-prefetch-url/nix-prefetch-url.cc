@@ -58,6 +58,9 @@ static int _main(int argc, char * * argv)
         bool unpack = false;
         string name;
 
+        auto argStrings = argvToStrings(argc, argv);
+        initPlugins(argStrings);
+
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
             using LegacyArgs::LegacyArgs;
@@ -91,9 +94,7 @@ static int _main(int argc, char * * argv)
             return true;
         });
 
-        myArgs.parseCmdline(argvToStrings(argc, argv));
-
-        initPlugins();
+        myArgs.parseCmdline(argStrings);
 
         if (args.size() > 2)
             throw UsageError("too many arguments");

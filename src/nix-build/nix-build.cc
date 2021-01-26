@@ -99,9 +99,7 @@ static void _main(int argc, char * * argv)
     // List of environment variables kept for --pure
     std::set<string> keepVars{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"};
 
-    Strings args;
-    for (int i = 1; i < argc; ++i)
-        args.push_back(argv[i]);
+    auto args = argvToStrings(argc, argv);
 
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
@@ -126,6 +124,8 @@ static void _main(int argc, char * * argv)
             }
         } catch (SysError &) { }
     }
+
+    initPlugins(args);
 
     struct MyArgs : LegacyArgs, MixEvalArgs
     {
@@ -234,8 +234,6 @@ static void _main(int argc, char * * argv)
     });
 
     myArgs.parseCmdline(args);
-
-    initPlugins();
 
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");

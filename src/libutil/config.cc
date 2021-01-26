@@ -49,6 +49,7 @@ void AbstractConfig::warnUnknownSettings()
 {
     for (auto & s : unknownSettings)
         warn("unknown setting '%s'", s.first);
+    warnOnUnknownEncounter = true;
 }
 
 void AbstractConfig::reapplyUnknownSettings()
@@ -296,6 +297,8 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
         if (config->set(name, value)) return true;
 
     unknownSettings.emplace(name, value);
+    if (warnOnUnknownEncounter)
+        warn("unknown setting '%s'", name);
 
     return false;
 }
