@@ -3001,11 +3001,11 @@ void DerivationGoal::registerOutputs()
      */
     if (hook) {
         bool allValid = true;
-        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
-            if (!i.second.second || !worker.store.isValidPath(*i.second.second))
+        for (auto & [outputName, outputPath] : worker.store.queryPartialDerivationOutputMap(drvPath)) {
+            if (!outputPath || !worker.store.isValidPath(*outputPath))
                 allValid = false;
             else
-                finalOutputs.insert_or_assign(i.first, *i.second.second);
+                finalOutputs.insert_or_assign(outputName, *outputPath);
         }
         if (allValid) return;
     }
