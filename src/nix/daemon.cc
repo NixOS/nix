@@ -8,7 +8,7 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "finally.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 #include "daemon.hh"
 
 #include <algorithm>

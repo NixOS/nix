@@ -14,7 +14,7 @@
 #include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <cerrno>
 #include <ctime>

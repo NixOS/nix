@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 #include "fetchers.hh"
 
 #include <fcntl.h>

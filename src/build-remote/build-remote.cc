@@ -17,7 +17,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using std::cin;

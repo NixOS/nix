@@ -10,7 +10,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <map>
 #include <iostream>
