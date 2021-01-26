@@ -162,6 +162,8 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
+    DrvOutputs builtOutputs;
+
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */
     time_t startTime = 0, stopTime = 0;

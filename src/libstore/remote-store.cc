@@ -12,6 +12,7 @@
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -49,6 +50,21 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
     out << renderContentAddress(ca);
 }
 
+Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
+{
+    std::string rawInput = readString(from);
+    return Realisation::fromJSON(
+        nlohmann::json::parse(rawInput),
+        "remote-protocol"
+    );
+}
+void write(const Store & store, Sink & out, const Realisation & realisation)
+{ out << realisation.toJSON().dump(); }
+
+DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
+{ return DrvOutput::parse(readString(from)); }
+void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
+{ out << drvOutput.to_string(); }
 
 std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
 {

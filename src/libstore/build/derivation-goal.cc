@@ -1159,13 +1159,14 @@ HookReply DerivationGoal::tryBuildHook()
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
     {
-        StorePathSet missingPaths;
-        for (auto & [_, status] : initialOutputs) {
+        StringSet missingOutputs;
+        for (auto & [outputName, status] : initialOutputs) {
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
-            missingPaths.insert(status.known->path);
+            missingOutputs.insert(outputName);
+            /* missingPaths.insert(status.known->path); */
         }
-        worker_proto::write(worker.store, hook->sink, missingPaths);
+        worker_proto::write(worker.store, hook->sink, missingOutputs);
     }
 
     hook->sink = FdSink();
