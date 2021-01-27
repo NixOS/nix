@@ -883,7 +883,7 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
 
 std::map<std::string, std::optional<StorePath>>
-LocalStore::queryDerivationOutputMapNoResolve(const StorePath& path_)
+LocalStore::queryPartialDerivationOutputMap(const StorePath& path_)
 {
     auto path = path_;
     auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
