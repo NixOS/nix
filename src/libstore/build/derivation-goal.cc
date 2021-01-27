@@ -506,6 +506,7 @@ void DerivationGoal::inputsRealised()
             Derivation drvResolved { *std::move(attempt) };
 
             auto pathResolved = writeDerivation(worker.store, drvResolved);
+            resolvedDrv = drvResolved;
 
             auto msg = fmt("Resolved derivation: '%s' -> '%s'",
                 worker.store.printStorePath(drvPath),
@@ -1019,7 +1020,45 @@ void DerivationGoal::buildDone()
 }
 
 void DerivationGoal::resolvedFinished() {
-    done(BuildResult::Built);
+    assert(resolvedDrv);
+
+    // If the derivation was originally a full `Derivation` (and not just
+    // a `BasicDerivation`, we must retrieve it because the `staticOutputHashes`
+    // will be wrong otherwise
+    Derivation fullDrv = *drv;
+    if (auto upcasted = dynamic_cast<Derivation *>(drv.get()))
+        fullDrv = *upcasted;
+
+    auto originalHashes = staticOutputHashes(worker.store, fullDrv);
+    auto resolvedHashes = staticOutputHashes(worker.store, *resolvedDrv);
+
+    // `wantedOutputs` might be empty, which means “all the outputs”
+    auto realWantedOutputs = wantedOutputs;
+    if (realWantedOutputs.empty())
+        realWantedOutputs = resolvedDrv->outputNames();
+
+    for (auto & wantedOutput : realWantedOutputs) {
+        assert(originalHashes.count(wantedOutput) != 0);
+        assert(resolvedHashes.count(wantedOutput) != 0);
+        auto realisation = worker.store.queryRealisation(
+                DrvOutput{resolvedHashes.at(wantedOutput), wantedOutput}
+        );
+        // We've just built it, but maybe the build failed, in which case the
+        // realisation won't be there
+        if (realisation) {
+            auto newRealisation = *realisation;
+            newRealisation.id = DrvOutput{originalHashes.at(wantedOutput), wantedOutput};
+            worker.store.registerDrvOutput(newRealisation);
+        } else {
+            // If we don't have a realisation, then it must mean that something
+            // failed when building the resolved drv
+            assert(!result.success());
+        }
+    }
+
+    // This is potentially a bit fishy in terms of error reporting. Not sure
+    // how to do it in a cleaner way
+    amDone(nrFailed == 0 ? ecSuccess : ecFailed, ex);
 }
 
 HookReply DerivationGoal::tryBuildHook()
@@ -3781,6 +3820,19 @@ void DerivationGoal::checkPathValidity()
                     ? PathStatus::Valid
                     : PathStatus::Corrupt,
             };
+        }
+        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+            Derivation fullDrv = *drv;
+            if (auto upcasted = dynamic_cast<Derivation *>(drv.get()))
+                fullDrv = *upcasted;
+            auto outputHashes = staticOutputHashes(worker.store, fullDrv);
+            if (auto real = worker.store.queryRealisation(
+                    DrvOutput{outputHashes.at(i.first), i.first})) {
+                info.known = {
+                    .path = real->outPath,
+                    .status = PathStatus::Valid,
+                };
+            }
         }
         initialOutputs.insert_or_assign(i.first, info);
     }
