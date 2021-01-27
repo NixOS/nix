@@ -415,12 +415,6 @@ public:
        `std::nullopt`.  */
     virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path);
 
-    /*
-     * Similar to `queryPartialDerivationOutputMap`, but doesn't try to resolve
-     * the derivation
-     */
-    virtual std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path);
-
     /* Query the mapping outputName=>outputPath for the given derivation.
        Assume every output has a mapping and throw an exception otherwise. */
     OutputPathMap queryDerivationOutputMap(const StorePath & path);
