@@ -366,7 +366,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
-std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapNoResolve(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     auto drv = readInvalidDerivation(path);
@@ -374,19 +374,6 @@ std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapN
         outputs.emplace(outputName, output.second);
     }
     return outputs;
-}
-
-std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
-{
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        auto resolvedDrv = Derivation::tryResolve(*this, path);
-        if (resolvedDrv) {
-            auto resolvedDrvPath = writeDerivation(*this, *resolvedDrv, NoRepair, true);
-            if (isValidPath(resolvedDrvPath))
-                return queryDerivationOutputMapNoResolve(resolvedDrvPath);
-        }
-    }
-    return queryDerivationOutputMapNoResolve(path);
 }
 
 OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {

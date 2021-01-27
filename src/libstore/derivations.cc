@@ -756,8 +756,13 @@ std::optional<BasicDerivation> Derivation::tryResolveUncached(Store & store) {
         StringSet newOutputNames;
         for (auto & outputName : input.second) {
             auto actualPathOpt = inputDrvOutputs.at(outputName);
-            if (!actualPathOpt)
+            if (!actualPathOpt) {
+                warn("Input %s!%s missing, aborting the resolving",
+                    store.printStorePath(input.first),
+                    outputName
+                );
                 return std::nullopt;
+            }
             auto actualPath = *actualPathOpt;
             inputRewrites.emplace(
                 downstreamPlaceholder(store, input.first, outputName),
@@ -781,6 +786,8 @@ std::optional<BasicDerivation> Derivation::tryResolve(Store& store, const StoreP
 {
     // This is quite dirty and leaky, but will disappear once #4340 is merged
     static Sync<std::map<StorePath, std::optional<Derivation>>> resolutionsCache;
+
+    debug("Trying to resolve %s", store.printStorePath(drvPath));
 
     {
         auto resolutions = resolutionsCache.lock();
