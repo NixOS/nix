@@ -18,7 +18,11 @@ struct CmdEval : MixJSON, InstallableCommand
 
     CmdEval()
     {
-        mkFlag(0, "raw", "Print strings without quotes or escaping.", &raw);
+        addFlag({
+            .longName = "raw",
+            .description = "Print strings without quotes or escaping.",
+            .handler = {&raw, true},
+        });
 
         addFlag({
             .longName = "apply",

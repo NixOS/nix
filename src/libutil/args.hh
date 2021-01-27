@@ -135,27 +135,6 @@ public:
 
     void addFlag(Flag && flag);
 
-    /* Helper functions for constructing flags / positional
-       arguments. */
-
-    void mkFlag(char shortName, const std::string & name,
-        const std::string & description, bool * dest)
-    {
-        mkFlag(shortName, name, description, dest, true);
-    }
-
-    template<class T>
-    void mkFlag(char shortName, const std::string & longName, const std::string & description,
-        T * dest, const T & value)
-    {
-        addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
-            .handler = {[=]() { *dest = value; }}
-        });
-    }
-
     void expectArgs(ExpectedArg && arg)
     {
         expectedArgs.emplace_back(std::move(arg));

@@ -18,8 +18,17 @@ struct CmdVerify : StorePathsCommand
 
     CmdVerify()
     {
-        mkFlag(0, "no-contents", "Do not verify the contents of each store path.", &noContents);
-        mkFlag(0, "no-trust", "Do not verify whether each store path is trusted.", &noTrust);
+        addFlag({
+            .longName = "no-contents",
+            .description = "Do not verify the contents of each store path.",
+            .handler = {&noContents, true},
+        });
+
+        addFlag({
+            .longName = "no-trust",
+            .description = "Do not verify whether each store path is trusted.",
+            .handler = {&noTrust, true},
+        });
 
         addFlag({
             .longName = "substituter",
