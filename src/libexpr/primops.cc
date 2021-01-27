@@ -118,6 +118,9 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
             .errPos = pos
         });
+    } catch (Error & e) {
+        e.addTrace(pos, "while importing '%s'", path);
+        throw e;
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
