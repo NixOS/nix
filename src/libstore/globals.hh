@@ -28,6 +28,23 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     void set(const std::string & str, bool append = false) override;
 };
 
+struct PluginFilesSetting : public BaseSetting<Paths>
+{
+    bool pluginsLoaded = false;
+
+    PluginFilesSetting(Config * options,
+        const Paths & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<Paths>(def, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str, bool append = false) override;
+};
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
@@ -819,7 +836,7 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
-    Setting<Paths> pluginFiles{
+    PluginFilesSetting pluginFiles{
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
