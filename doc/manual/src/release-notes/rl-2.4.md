@@ -5,3 +5,4 @@
     to any command, including a subcommand to `nix`. For example,
     `nix-instantiate default.nix --plugin-files ""` must now become
     `nix-instantiate --plugin-files "" default.nix`.
+  - Plugins that add new `nix` subcommands are now actually respected.

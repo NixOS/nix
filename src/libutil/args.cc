@@ -306,8 +306,8 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-MultiCommand::MultiCommand(const Commands & commands)
-    : commands(commands)
+MultiCommand::MultiCommand(const Commands & commands_)
+    : commands(commands_)
 {
     expectArgs({
         .label = "subcommand",

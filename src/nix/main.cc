@@ -159,6 +159,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
           #include "nix.md"
           ;
     }
+
+    // Plugins may add new subcommands.
+    void pluginsInited() override
+    {
+        commands = RegisterCommand::getCommandsFor({});
+    }
 };
 
 static void showHelp(std::vector<std::string> subcommand)
