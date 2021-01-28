@@ -132,6 +132,10 @@ protected:
 
     std::set<std::string> hiddenCategories;
 
+    /* Called after all command line flags before the first non-flag
+       argument (if any) have been processed. */
+    virtual void initialFlagsProcessed() {}
+
 public:
 
     void addFlag(Flag && flag);

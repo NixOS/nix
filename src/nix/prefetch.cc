@@ -171,8 +171,6 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
-        initPlugins();
-
         if (args.size() > 2)
             throw UsageError("too many arguments");
 

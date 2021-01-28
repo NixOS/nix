@@ -253,6 +253,7 @@ void PluginFilesSetting::set(const std::string & str, bool append)
 
 void initPlugins()
 {
+    assert(!settings.pluginFiles.pluginsLoaded);
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {

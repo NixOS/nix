@@ -283,8 +283,6 @@ void mainWrapped(int argc, char * * argv)
 
     if (completions) return;
 
-    initPlugins();
-
     if (args.showVersion) {
         printVersion(programName);
         return;
