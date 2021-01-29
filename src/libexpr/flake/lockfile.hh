@@ -6,12 +6,10 @@
 
 namespace nix {
 class Store;
-struct StorePath;
+class StorePath;
 }
 
 namespace nix::flake {
-
-using namespace fetchers;
 
 typedef std::vector<FlakeId> InputPath;
 
@@ -54,7 +52,7 @@ struct LockFile
     LockFile() {};
     LockFile(const nlohmann::json & json, const Path & path);
 
-    nlohmann::json toJson() const;
+    nlohmann::json toJSON() const;
 
     std::string to_string() const;
 

@@ -10,14 +10,14 @@ mkdir -p $tarroot
 cp dependencies.nix $tarroot/default.nix
 cp config.nix dependencies.builder*.sh $tarroot/
 
-hash=$(nix hash-path $tarroot)
+hash=$(nix hash path $tarroot)
 
 test_tarball() {
     local ext="$1"
     local compressor="$2"
 
     tarball=$TEST_ROOT/tarball.tar$ext
-    (cd $TEST_ROOT && tar c tarball) | $compressor > $tarball
+    (cd $TEST_ROOT && tar cf - tarball) | $compressor > $tarball
 
     nix-env -f file://$tarball -qa --out-path | grep -q dependencies
 

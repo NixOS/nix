@@ -1,4 +1,5 @@
 #include "fetchers.hh"
+#include "url-parts.hh"
 
 namespace nix::fetchers {
 
@@ -99,6 +100,6 @@ struct IndirectInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<IndirectInputScheme>()); });
+static auto rIndirectInputScheme = OnStartup([] { registerInputScheme(std::make_unique<IndirectInputScheme>()); });
 
 }

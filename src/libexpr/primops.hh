@@ -1,3 +1,5 @@
+#pragma once
+
 #include "eval.hh"
 
 #include <tuple>
@@ -10,9 +12,11 @@ struct RegisterPrimOp
     struct Info
     {
         std::string name;
-        size_t arity;
-        PrimOpFun primOp;
+        std::vector<std::string> args;
+        size_t arity = 0;
+        const char * doc;
         std::optional<std::string> requiredFeature;
+        PrimOpFun fun;
     };
 
     typedef std::vector<Info> PrimOps;
@@ -26,6 +30,8 @@ struct RegisterPrimOp
         size_t arity,
         PrimOpFun fun,
         std::optional<std::string> requiredFeature = {});
+
+    RegisterPrimOp(Info && info);
 };
 
 /* These primops are disabled without enableNativeCode, but plugins

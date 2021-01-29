@@ -20,10 +20,10 @@ struct PathInputScheme : InputScheme
             if (name == "rev" || name == "narHash")
                 input.attrs.insert_or_assign(name, value);
             else if (name == "revCount" || name == "lastModified") {
-                uint64_t n;
-                if (!string2Int(value, n))
+                if (auto n = string2Int<uint64_t>(value))
+                    input.attrs.insert_or_assign(name, *n);
+                else
                     throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
-                input.attrs.insert_or_assign(name, n);
             }
             else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
@@ -102,6 +102,6 @@ struct PathInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<PathInputScheme>()); });
+static auto rPathInputScheme = OnStartup([] { registerInputScheme(std::make_unique<PathInputScheme>()); });
 
 }

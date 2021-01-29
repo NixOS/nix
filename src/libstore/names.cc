@@ -1,8 +1,16 @@
 #include "names.hh"
 #include "util.hh"
 
+#include <regex>
+
 
 namespace nix {
+
+
+struct Regex
+{
+    std::regex regex;
+};
 
 
 DrvName::DrvName()
@@ -30,11 +38,18 @@ DrvName::DrvName(std::string_view s) : hits(0)
 }
 
 
+DrvName::~DrvName()
+{ }
+
+
 bool DrvName::matches(DrvName & n)
 {
     if (name != "*") {
-        if (!regex) regex = std::unique_ptr<std::regex>(new std::regex(name, std::regex::extended));
-        if (!std::regex_match(n.name, *regex)) return false;
+        if (!regex) {
+            regex = std::make_unique<Regex>();
+            regex->regex = std::regex(name, std::regex::extended);
+        }
+        if (!std::regex_match(n.name, regex->regex)) return false;
     }
     if (version != "" && version != n.version) return false;
     return true;
@@ -65,16 +80,16 @@ string nextComponent(string::const_iterator & p,
 
 static bool componentsLT(const string & c1, const string & c2)
 {
-    int n1, n2;
-    bool c1Num = string2Int(c1, n1), c2Num = string2Int(c2, n2);
+    auto n1 = string2Int<int>(c1);
+    auto n2 = string2Int<int>(c2);
 
-    if (c1Num && c2Num) return n1 < n2;
-    else if (c1 == "" && c2Num) return true;
+    if (n1 && n2) return *n1 < *n2;
+    else if (c1 == "" && n2) return true;
     else if (c1 == "pre" && c2 != "pre") return true;
     else if (c2 == "pre") return false;
     /* Assume that `2.3a' < `2.3.1'. */
-    else if (c2Num) return true;
-    else if (c1Num) return false;
+    else if (n2) return true;
+    else if (n1) return false;
     else return c1 < c2;
 }
 
@@ -99,7 +114,7 @@ DrvNames drvNamesFromArgs(const Strings & opArgs)
 {
     DrvNames result;
     for (auto & i : opArgs)
-        result.push_back(DrvName(i));
+        result.emplace_back(i);
     return result;
 }
 

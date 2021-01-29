@@ -9,7 +9,7 @@ for more details.
 
 ## Installation
 
-On Linux and macOS the easiest way to Install Nix is to run the following shell command
+On Linux and macOS the easiest way to install Nix is to run the following shell command
 (as a user other than root):
 
 ```console
@@ -20,7 +20,7 @@ Information on additional installation methods is available on the [Nix download
 
 ## Building And Developing
 
-See our [Hacking guide](https://hydra.nixos.org/job/nix/master/build.x86_64-linux/latest/download-by-type/doc/manual#chap-hacking) in our manual for instruction on how to
+See our [Hacking guide](https://hydra.nixos.org/job/nix/master/build.x86_64-linux/latest/download-by-type/doc/manual/contributing/hacking.html) in our manual for instruction on how to
 build nix from source with nix-build or how to get a development environment.
 
 ## Additional Resources

@@ -9,12 +9,15 @@ nix_tests = \
   local-store.sh remote-store.sh export.sh export-graph.sh \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
-  binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh \
+  binary-cache.sh \
+  binary-cache-build-remote.sh \
+  nix-profile.sh repair.sh dump-db.sh case-hack.sh \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
+  ssh-relay.sh \
   nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
@@ -32,7 +35,10 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   recursive.sh \
-  flakes.sh
+  describe-stores.sh \
+  flakes.sh \
+  content-addressed.sh \
+  build.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh \
 

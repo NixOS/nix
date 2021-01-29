@@ -9,40 +9,21 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
+    FileIngestionMethod ingestionMethod;
 
     CmdAddToStore()
     {
+        // FIXME: completion
         expectArg("path", &path);
 
         addFlag({
             .longName = "name",
             .shortName = 'n',
-            .description = "name component of the store path",
+            .description = "Override the name component of the store path. It defaults to the base name of *path*.",
             .labels = {"name"},
             .handler = {&namePart},
         });
-
-        addFlag({
-            .longName = "flat",
-            .shortName = 0,
-            .description = "add flat file to the Nix store",
-            .handler = {&ingestionMethod, FileIngestionMethod::Flat},
-        });
     }
-
-    std::string description() override
-    {
-        return "add a path to the Nix store";
-    }
-
-    Examples examples() override
-    {
-        return {
-        };
-    }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -75,8 +56,49 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             store->addToStore(info, source);
         }
 
-        logger->stdout("%s", store->printStorePath(info.path));
+        logger->cout("%s", store->printStorePath(info.path));
     }
 };
 
-static auto r1 = registerCommand<CmdAddToStore>("add-to-store");
+struct CmdAddFile : CmdAddToStore
+{
+    CmdAddFile()
+    {
+        ingestionMethod = FileIngestionMethod::Flat;
+    }
+
+    std::string description() override
+    {
+        return "add a regular file to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add-file.md"
+          ;
+    }
+};
+
+struct CmdAddPath : CmdAddToStore
+{
+    CmdAddPath()
+    {
+        ingestionMethod = FileIngestionMethod::Recursive;
+    }
+
+    std::string description() override
+    {
+        return "add a path to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add-path.md"
+          ;
+    }
+};
+
+static auto rCmdAddFile = registerCommand2<CmdAddFile>({"store", "add-file"});
+static auto rCmdAddPath = registerCommand2<CmdAddPath>({"store", "add-path"});

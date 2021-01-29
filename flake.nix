@@ -1,7 +1,8 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-20.03-small";
+  inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
+  #inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
   outputs = { self, nixpkgs }:
 
@@ -11,11 +12,13 @@
       versionSuffix =
         if officialRelease
         then ""
-        else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified)}_${self.shortRev or "dirty"}";
+        else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
       officialRelease = false;
 
-      systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+      linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
+      linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
+      systems = linuxSystems ++ [ "x86_64-darwin" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
@@ -57,41 +60,44 @@
         configureFlags =
           lib.optionals stdenv.isLinux [
             "--with-sandbox-shell=${sh}/bin/busybox"
+            "LDFLAGS=-fuse-ld=gold"
+          ];
+
+
+        nativeBuildDeps =
+          [
+            buildPackages.bison
+            buildPackages.flex
+            (lib.getBin buildPackages.lowdown)
+            buildPackages.mdbook
+            buildPackages.autoconf-archive
+            buildPackages.autoreconfHook
+            buildPackages.pkgconfig
+
+            # Tests
+            buildPackages.git
+            buildPackages.mercurial
+            buildPackages.jq
           ];
 
         buildDeps =
-          [ bison
-            flex
-            libxml2
-            libxslt
-            docbook5
-            docbook_xsl_ns
-            autoconf-archive
-            autoreconfHook
-
-            curl
+          [ curl
             bzip2 xz brotli zlib editline
-            openssl pkgconfig sqlite
+            openssl sqlite
             libarchive
             boost
-            (if lib.versionAtLeast lib.version "20.03pre"
-             then nlohmann_json
-             else nlohmann_json.override { multipleHeaders = true; })
             nlohmann_json
-
-            # Tests
-            git
-            mercurial
-            jq
+            lowdown
             gmock
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
-            (aws-sdk-cpp.override {
-              apis = ["s3" "transfer"];
-              customMemoryManagement = false;
-            });
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+
+        awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
+          (aws-sdk-cpp.override {
+            apis = ["s3" "transfer"];
+            customMemoryManagement = false;
+          });
 
         propagatedDeps =
           [ (boehmgc.override { enableLargeConfig = true; })
@@ -111,6 +117,7 @@
 
         nix = with final; with commonDeps pkgs; (stdenv.mkDerivation {
           name = "nix-${version}";
+          inherit version;
 
           src = self;
 
@@ -118,7 +125,8 @@
 
           outputs = [ "out" "dev" "doc" ];
 
-          buildInputs = buildDeps;
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ awsDeps;
 
           propagatedBuildInputs = propagatedDeps;
 
@@ -140,7 +148,7 @@
 
           enableParallelBuilding = true;
 
-          makeFlags = "profiledir=$(out)/etc/profile.d";
+          makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
           doCheck = true;
 
@@ -162,16 +170,20 @@
 
             src = self;
 
+            nativeBuildInputs =
+              [ buildPackages.autoconf-archive
+                buildPackages.autoreconfHook
+                buildPackages.pkgconfig
+              ];
+
             buildInputs =
-              [ autoconf-archive
-                autoreconfHook
-                nix
+              [ nix
                 curl
                 bzip2
                 xz
-                pkgconfig
                 pkgs.perl
                 boost
+                nlohmann_json
               ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
@@ -187,15 +199,39 @@
 
         };
 
+        lowdown = with final; stdenv.mkDerivation {
+          name = "lowdown-0.7.9";
+
+          src = fetchurl {
+            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.9.tar.gz;
+            hash = "sha512-7GQrKFICyTI5T4SinATfohiCq9TC0OgN8NmVfG3B3BZJM9J00DT8llAco8kNykLIKtl/AXuS4X8fETiCFEWEUQ==";
+          };
+
+          #src = lowdown-src;
+
+          outputs = [ "out" "bin" "dev" ];
+
+          nativeBuildInputs = [ which ];
+
+          configurePhase =
+            ''
+              ./configure \
+                PREFIX=${placeholder "dev"} \
+                BINDIR=${placeholder "bin"}/bin
+            '';
+        };
+
       };
 
       hydraJobs = {
 
         # Binary package for various platforms.
-        build = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix);
+        build = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix);
+
+        buildStatic = nixpkgs.lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
         # Perl bindings for various platforms.
-        perlBindings = nixpkgs.lib.genAttrs systems (system: nixpkgsFor.${system}.nix.perl-bindings);
+        perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
@@ -214,6 +250,7 @@
             }
             ''
               cp ${installerClosureInfo}/registration $TMPDIR/reginfo
+              cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
               substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
                 --subst-var-by nix ${nix} \
                 --subst-var-by cacert ${cacert}
@@ -232,6 +269,7 @@
                 # SC1090: Don't worry about not being able to find
                 #         $nix/etc/profile.d/nix.sh
                 shellcheck --exclude SC1090 $TMPDIR/install
+                shellcheck $TMPDIR/create-darwin-volume.sh
                 shellcheck $TMPDIR/install-darwin-multi-user.sh
                 shellcheck $TMPDIR/install-systemd-multi-user.sh
 
@@ -247,6 +285,7 @@
               fi
 
               chmod +x $TMPDIR/install
+              chmod +x $TMPDIR/create-darwin-volume.sh
               chmod +x $TMPDIR/install-darwin-multi-user.sh
               chmod +x $TMPDIR/install-systemd-multi-user.sh
               chmod +x $TMPDIR/install-multi-user
@@ -259,11 +298,15 @@
                 --absolute-names \
                 --hard-dereference \
                 --transform "s,$TMPDIR/install,$dir/install," \
+                --transform "s,$TMPDIR/create-darwin-volume.sh,$dir/create-darwin-volume.sh," \
                 --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
                 --transform "s,$NIX_STORE,$dir/store,S" \
-                $TMPDIR/install $TMPDIR/install-darwin-multi-user.sh \
+                $TMPDIR/install \
+                $TMPDIR/create-darwin-volume.sh \
+                $TMPDIR/install-darwin-multi-user.sh \
                 $TMPDIR/install-systemd-multi-user.sh \
-                $TMPDIR/install-multi-user $TMPDIR/reginfo \
+                $TMPDIR/install-multi-user \
+                $TMPDIR/reginfo \
                 $(cat ${installerClosureInfo}/store-paths)
             '');
 
@@ -279,9 +322,26 @@
             ''
               mkdir -p $out/nix-support
 
+              # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
+              # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
+              tarballPath() {
+                # Remove the store prefix
+                local path=''${1#${builtins.storeDir}/}
+                # Get the path relative to the derivation root
+                local rest=''${path#*/}
+                # Get the derivation hash
+                local drvHash=''${path%%-*}
+                echo "$drvHash/$rest"
+              }
+
               substitute ${./scripts/install.in} $out/install \
                 ${pkgs.lib.concatMapStrings
-                  (system: "--replace '@binaryTarball_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) ")
+                  (system:
+                    '' \
+                    --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                    --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                    ''
+                  )
                   [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
                 } \
                 --replace '@nixVersion@' ${version}
@@ -301,7 +361,8 @@
 
             enableParallelBuilding = true;
 
-            buildInputs = buildDeps ++ propagatedDeps;
+            nativeBuildInputs = nativeBuildDeps;
+            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
 
             dontInstall = false;
 
@@ -313,9 +374,6 @@
             # syntax-check generated dot files, it still requires some
             # fonts.  So provide those.
             FONTCONFIG_FILE = texFunctions.fontsConf;
-
-            # To test building without precompiled headers.
-            makeFlagsArray = [ "PRECOMPILE_HEADERS=0" ];
           };
 
         # System tests.
@@ -344,38 +402,6 @@
               inherit nixpkgs system;
               inherit (self) overlay;
             });
-
-        # Test whether the binary tarball works in an Ubuntu system.
-        tests.binaryTarball =
-          with nixpkgsFor.x86_64-linux;
-          vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
-            { diskImage = vmTools.diskImages.ubuntu1204x86_64;
-            }
-            ''
-              set -x
-              useradd -m alice
-              su - alice -c 'tar xf ${self.hydraJobs.binaryTarball.x86_64-linux}/*.tar.*'
-              mkdir /dest-nix
-              mount -o bind /dest-nix /nix # Provide a writable /nix.
-              chown alice /nix
-              su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
-              su - alice -c 'nix-store --verify'
-              su - alice -c 'PAGER= nix-store -qR ${self.hydraJobs.build.x86_64-linux}'
-
-              # Check whether 'nix upgrade-nix' works.
-              cat > /tmp/paths.nix <<EOF
-              {
-                x86_64-linux = "${self.hydraJobs.build.x86_64-linux}";
-              }
-              EOF
-              su - alice -c 'nix --experimental-features nix-command upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
-              (! [ -L /home/alice/.profile-1-link ])
-              su - alice -c 'PAGER= nix-store -qR ${self.hydraJobs.build.x86_64-linux}'
-
-              mkdir -p $out/nix-support
-              touch $out/nix-support/hydra-build-products
-              umount /nix
-            '');
 
         /*
         # Check whether we can still evaluate all of Nixpkgs.
@@ -410,6 +436,43 @@
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
+      } // nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
+        nix-static = let
+          nixpkgs = nixpkgsFor.${system}.pkgsStatic;
+        in with commonDeps nixpkgs; nixpkgs.stdenv.mkDerivation {
+          name = "nix-${version}";
+
+          src = self;
+
+          VERSION_SUFFIX = versionSuffix;
+
+          outputs = [ "out" "dev" "doc" ];
+
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ propagatedDeps;
+
+          configureFlags = [ "--sysconfdir=/etc" ];
+
+          enableParallelBuilding = true;
+
+          makeFlags = "profiledir=$(out)/etc/profile.d";
+
+          doCheck = true;
+
+          installFlags = "sysconfdir=$(out)/etc";
+
+          postInstall = ''
+            mkdir -p $doc/nix-support
+            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+            mkdir -p $out/nix-support
+            echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
+          '';
+
+          doInstallCheck = true;
+          installCheckFlags = "sysconfdir=$(out)/etc";
+
+          stripAllList = ["bin"];
+        };
       });
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
@@ -423,13 +486,21 @@
 
           outputs = [ "out" "dev" "doc" ];
 
-          buildInputs = buildDeps ++ propagatedDeps ++ perlDeps;
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ perlDeps;
 
           inherit configureFlags;
 
           enableParallelBuilding = true;
 
           installFlags = "sysconfdir=$(out)/etc";
+
+          shellHook =
+            ''
+              PATH=$prefix/bin:$PATH
+              unset PYTHONPATH
+              export MANPATH=$out/share/man:$MANPATH
+            '';
         });
 
   };

@@ -41,29 +41,14 @@ struct CmdSearch : InstallableCommand, MixJSON
 
     std::string description() override
     {
-        return "query available packages";
+        return "search for packages";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show all packages in the flake in the current directory:",
-                "nix search"
-            },
-            Example{
-                "To show packages in the 'nixpkgs' flake containing 'blender' in its name or description:",
-                "nix search nixpkgs blender"
-            },
-            Example{
-                "To search for Firefox or Chromium:",
-                "nix search nixpkgs 'firefox|chromium'"
-            },
-            Example{
-                "To search for packages containing 'git' and either 'frontend' or 'gui':",
-                "nix search nixpkgs git 'frontend|gui'"
-            }
-        };
+        return
+          #include "search.md"
+          ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -147,13 +132,13 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("description", description);
                         } else {
                             auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
-                            if (results > 1) logger->stdout("");
-                            logger->stdout(
+                            if (results > 1) logger->cout("");
+                            logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
-                                logger->stdout(
+                                logger->cout(
                                     "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
@@ -185,4 +170,4 @@ struct CmdSearch : InstallableCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdSearch>("search");
+static auto rCmdSearch = registerCommand<CmdSearch>("search");

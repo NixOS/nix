@@ -1,3 +1,5 @@
+#pragma once
+
 #include "error.hh"
 
 namespace nix {

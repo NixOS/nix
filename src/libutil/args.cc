@@ -3,6 +3,8 @@
 
 #include <glob.h>
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 void Args::addFlag(Flag && flag_)
@@ -15,8 +17,20 @@ void Args::addFlag(Flag && flag_)
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
+void Completions::add(std::string completion, std::string description)
+{
+    assert(description.find('\n') == std::string::npos);
+    insert(Completion {
+        .completion = completion,
+        .description = description
+    });
+}
+
+bool Completion::operator<(const Completion & other) const
+{ return completion < other.completion || (completion == other.completion && description < other.description); }
+
 bool pathCompletions = false;
-std::shared_ptr<std::set<std::string>> completions;
+std::shared_ptr<Completions> completions;
 
 std::string completionMarker = "___COMPLETE___";
 
@@ -72,6 +86,7 @@ void Args::parseCmdline(const Strings & _cmdline)
                 throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
+            pos = rewriteArgs(cmdline, pos);
             pendingArgs.push_back(*pos++);
             if (processArgs(pendingArgs, false))
                 pendingArgs.clear();
@@ -79,41 +94,6 @@ void Args::parseCmdline(const Strings & _cmdline)
     }
 
     processArgs(pendingArgs, true);
-}
-
-void Args::printHelp(const string & programName, std::ostream & out)
-{
-    std::cout << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "FLAGS..." ANSI_NORMAL, programName);
-    for (auto & exp : expectedArgs) {
-        std::cout << renderLabels({exp.label});
-        // FIXME: handle arity > 1
-        if (exp.handler.arity == ArityAny) std::cout << "...";
-        if (exp.optional) std::cout << "?";
-    }
-    std::cout << "\n";
-
-    auto s = description();
-    if (s != "")
-        std::cout << "\n" ANSI_BOLD "Summary:" ANSI_NORMAL " " << s << ".\n";
-
-    if (longFlags.size()) {
-        std::cout << "\n";
-        std::cout << ANSI_BOLD "Flags:" ANSI_NORMAL "\n";
-        printFlags(out);
-    }
-}
-
-void Args::printFlags(std::ostream & out)
-{
-    Table2 table;
-    for (auto & flag : longFlags) {
-        if (hiddenCategories.count(flag.second->category)) continue;
-        table.push_back(std::make_pair(
-                (flag.second->shortName ? std::string("-") + flag.second->shortName + ", " : "    ")
-                + "--" + flag.first + renderLabels(flag.second->labels),
-                flag.second->description));
-    }
-    printTable(out, table);
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -146,7 +126,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
             for (auto & [name, flag] : longFlags) {
                 if (!hiddenCategories.count(flag->category)
                     && hasPrefix(name, std::string(*prefix, 2)))
-                    completions->insert("--" + name);
+                    completions->add("--" + name, flag->description);
             }
         }
         auto i = longFlags.find(string(*pos, 2));
@@ -163,9 +143,9 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 
     if (auto prefix = needsCompletion(*pos)) {
         if (prefix == "-") {
-            completions->insert("--");
-            for (auto & [flag, _] : shortFlags)
-                completions->insert(std::string("-") + flag);
+            completions->add("--");
+            for (auto & [flagName, flag] : shortFlags)
+                completions->add(std::string("-") + flagName, flag->description);
         }
     }
 
@@ -205,11 +185,49 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-static void hashTypeCompleter(size_t index, std::string_view prefix) 
+nlohmann::json Args::toJSON()
+{
+    auto flags = nlohmann::json::object();
+
+    for (auto & [name, flag] : longFlags) {
+        auto j = nlohmann::json::object();
+        if (flag->shortName)
+            j["shortName"] = std::string(1, flag->shortName);
+        if (flag->description != "")
+            j["description"] = flag->description;
+        j["category"] = flag->category;
+        if (flag->handler.arity != ArityAny)
+            j["arity"] = flag->handler.arity;
+        if (!flag->labels.empty())
+            j["labels"] = flag->labels;
+        flags[name] = std::move(j);
+    }
+
+    auto args = nlohmann::json::array();
+
+    for (auto & arg : expectedArgs) {
+        auto j = nlohmann::json::object();
+        j["label"] = arg.label;
+        j["optional"] = arg.optional;
+        if (arg.handler.arity != ArityAny)
+            j["arity"] = arg.handler.arity;
+        args.push_back(std::move(j));
+    }
+
+    auto res = nlohmann::json::object();
+    res["description"] = description();
+    res["flags"] = std::move(flags);
+    res["args"] = std::move(args);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
+    return res;
+}
+
+static void hashTypeCompleter(size_t index, std::string_view prefix)
 {
     for (auto & type : hashTypes)
         if (hasPrefix(type, prefix))
-            completions->insert(type);
+            completions->add(type);
 }
 
 Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
@@ -238,7 +256,7 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
     };
 }
 
-static void completePath(std::string_view prefix, bool onlyDirs)
+static void _completePath(std::string_view prefix, bool onlyDirs)
 {
     pathCompletions = true;
     glob_t globbuf;
@@ -253,7 +271,7 @@ static void completePath(std::string_view prefix, bool onlyDirs)
                 auto st = lstat(globbuf.gl_pathv[i]);
                 if (!S_ISDIR(st.st_mode)) continue;
             }
-            completions->insert(globbuf.gl_pathv[i]);
+            completions->add(globbuf.gl_pathv[i]);
         }
         globfree(&globbuf);
     }
@@ -261,12 +279,12 @@ static void completePath(std::string_view prefix, bool onlyDirs)
 
 void completePath(size_t, std::string_view prefix)
 {
-    completePath(prefix, false);
+    _completePath(prefix, false);
 }
 
 void completeDir(size_t, std::string_view prefix)
 {
-    completePath(prefix, true);
+    _completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -277,58 +295,18 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-std::string renderLabels(const Strings & labels)
-{
-    std::string res;
-    for (auto label : labels) {
-        for (auto & c : label) c = std::toupper(c);
-        res += " " ANSI_ITALIC + label + ANSI_NORMAL;
-    }
-    return res;
-}
-
-void printTable(std::ostream & out, const Table2 & table)
-{
-    size_t max = 0;
-    for (auto & row : table)
-        max = std::max(max, filterANSIEscapes(row.first, true).size());
-    for (auto & row : table) {
-        out << "  " << row.first
-            << std::string(max - filterANSIEscapes(row.first, true).size() + 2, ' ')
-            << row.second << "\n";
-    }
-}
-
-void Command::printHelp(const string & programName, std::ostream & out)
-{
-    Args::printHelp(programName, out);
-
-    auto exs = examples();
-    if (!exs.empty()) {
-        out << "\n" ANSI_BOLD "Examples:" ANSI_NORMAL "\n";
-        for (auto & ex : exs)
-            out << "\n"
-                << "  " << ex.description << "\n" // FIXME: wrap
-                << "  $ " << ex.command << "\n";
-    }
-}
-
 MultiCommand::MultiCommand(const Commands & commands)
     : commands(commands)
 {
     expectArgs({
-        .label = "command",
+        .label = "subcommand",
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
-            if (auto alias = get(deprecatedAliases, s)) {
-                warn("'%s' is a deprecated alias for '%s'", s, *alias);
-                s = *alias;
-            }
             if (auto prefix = needsCompletion(s)) {
                 for (auto & [name, command] : commands)
                     if (hasPrefix(name, *prefix))
-                        completions->insert(name);
+                        completions->add(name);
             }
             auto i = commands.find(s);
             if (i == commands.end())
@@ -338,38 +316,6 @@ MultiCommand::MultiCommand(const Commands & commands)
     });
 
     categories[Command::catDefault] = "Available commands";
-}
-
-void MultiCommand::printHelp(const string & programName, std::ostream & out)
-{
-    if (command) {
-        command->second->printHelp(programName + " " + command->first, out);
-        return;
-    }
-
-    out << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "COMMAND FLAGS... ARGS..." ANSI_NORMAL "\n", programName);
-
-    out << "\n" ANSI_BOLD "Common flags:" ANSI_NORMAL "\n";
-    printFlags(out);
-
-    std::map<Command::Category, std::map<std::string, ref<Command>>> commandsByCategory;
-
-    for (auto & [name, commandFun] : commands) {
-        auto command = commandFun();
-        commandsByCategory[command->category()].insert_or_assign(name, command);
-    }
-
-    for (auto & [category, commands] : commandsByCategory) {
-        out << fmt("\n" ANSI_BOLD "%s:" ANSI_NORMAL "\n", categories[category]);
-
-        Table2 table;
-        for (auto & [name, command] : commands) {
-            auto descr = command->description();
-            if (!descr.empty())
-                table.push_back(std::make_pair(name, descr));
-        }
-        printTable(out, table);
-    }
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -385,6 +331,25 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
         return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
+}
+
+nlohmann::json MultiCommand::toJSON()
+{
+    auto cmds = nlohmann::json::object();
+
+    for (auto & [name, commandFun] : commands) {
+        auto command = commandFun();
+        auto j = command->toJSON();
+        auto cat = nlohmann::json::object();
+        cat["id"] = command->category();
+        cat["description"] = categories[command->category()];
+        j["category"] = std::move(cat);
+        cmds[name] = std::move(j);
+    }
+
+    auto res = Args::toJSON();
+    res["commands"] = std::move(cmds);
+    return res;
 }
 
 }

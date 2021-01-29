@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
@@ -52,10 +53,12 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
         Path drvPath = keepDerivations ? i.queryDrvPath() : "";
+        DrvInfo::Outputs outputs = i.queryOutputs(true);
+        StringSet metaNames = i.queryMetaNames();
 
         Value & v(*state.allocValue());
         manifest.listElems()[n++] = &v;
-        state.mkAttrs(v, 16);
+        state.mkAttrs(v, 7 + outputs.size());
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
         mkString(*state.allocAttr(v, state.sName), i.queryName());
@@ -67,7 +70,6 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
 
         // Copy each output meant for installation.
-        DrvInfo::Outputs outputs = i.queryOutputs(true);
         Value & vOutputs = *state.allocAttr(v, state.sOutputs);
         state.mkList(vOutputs, outputs.size());
         unsigned int m = 0;
@@ -87,8 +89,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         // Copy the meta attributes.
         Value & vMeta = *state.allocAttr(v, state.sMeta);
-        state.mkAttrs(vMeta, 16);
-        StringSet metaNames = i.queryMetaNames();
+        state.mkAttrs(vMeta, metaNames.size());
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
@@ -151,7 +152,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         debug(format("switching to new user environment"));
-        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
+        Path generation = createGeneration(ref<LocalFSStore>(store2), profile,
+            store2->parseStorePath(topLevelOut));
         switchLink(profile, generation);
     }
 

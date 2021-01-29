@@ -2,7 +2,6 @@
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "store-api.hh"
-#include "local-store.hh"
 #include "finally.hh"
 #include "affinity.hh"
 #include "archive.hh"
@@ -102,17 +101,20 @@ struct TunnelLogger : public Logger
 
     /* stopWork() means that we're done; stop sending stderr to the
        client. */
-    void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
+    void stopWork(const Error * ex = nullptr)
     {
         auto state(state_.lock());
 
         state->canSendStderr = false;
 
-        if (success)
+        if (!ex)
             to << STDERR_LAST;
         else {
-            to << STDERR_ERROR << msg;
-            if (status != 0) to << status;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
+                to << STDERR_ERROR << *ex;
+            } else {
+                to << STDERR_ERROR << ex->what() << ex->status;
+            }
         }
     }
 
@@ -151,10 +153,10 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    virtual void operator () (const unsigned char * data, size_t len)
+    void operator () (std::string_view data)
     {
         to << STDERR_WRITE;
-        writeString(data, len, to);
+        writeString(data, to);
     }
 };
 
@@ -163,7 +165,7 @@ struct TunnelSource : BufferedSource
     Source & from;
     BufferedSink & to;
     TunnelSource(Source & from, BufferedSink & to) : from(from), to(to) { }
-    size_t readUnbuffered(unsigned char * data, size_t len) override
+    size_t readUnbuffered(char * data, size_t len) override
     {
         to << STDERR_READ << len;
         to.flush();
@@ -213,6 +215,8 @@ struct ClientSettings
                 for (auto & s : ss)
                     if (trusted.count(s))
                         subs.push_back(s);
+                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
+                        subs.push_back(s + "/");
                     else
                         warn("ignoring untrusted substituter '%s'", s);
                 res = subs;
@@ -229,16 +233,31 @@ struct ClientSettings
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;
-                else if (setSubstituters(settings.extraSubstituters))
-                    ;
                 else
-                    warn("ignoring the user-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
         }
     }
 };
+
+static void writeValidPathInfo(
+    ref<Store> store,
+    unsigned int clientVersion,
+    Sink & to,
+    std::shared_ptr<const ValidPathInfo> info)
+{
+    to << (info->deriver ? store->printStorePath(*info->deriver) : "")
+       << info->narHash.to_string(Base16, false);
+    worker_proto::write(*store, to, info->references);
+    to << info->registrationTime << info->narSize;
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
+        to << info->ultimate
+           << info->sigs
+           << renderContentAddress(info->ca);
+    }
+}
 
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
@@ -256,11 +275,20 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQueryValidPaths: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+
+        SubstituteFlag substitute = NoSubstitute;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 27) {
+            substitute = readInt(from) ? Substitute : NoSubstitute;
+        }
+
         logger->startWork();
-        auto res = store->queryValidPaths(paths);
+        if (substitute) {
+            store->substitutePaths(paths);
+        }
+        auto res = store->queryValidPaths(paths, substitute);
         logger->stopWork();
-        writeStorePaths(*store, to, res);
+        worker_proto::write(*store, to, res);
         break;
     }
 
@@ -276,11 +304,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePaths: {
-        auto paths = readStorePaths<StorePathSet>(*store, from);
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto res = store->querySubstitutablePaths(paths);
         logger->stopWork();
-        writeStorePaths(*store, to, res);
+        worker_proto::write(*store, to, res);
         break;
     }
 
@@ -309,7 +337,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             paths = store->queryValidDerivers(path);
         else paths = store->queryDerivationOutputs(path);
         logger->stopWork();
-        writeStorePaths(*store, to, paths);
+        worker_proto::write(*store, to, paths);
         break;
     }
 
@@ -350,54 +378,90 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        HashType hashAlgo;
-        std::string baseName;
-        FileIngestionMethod method;
-        {
-            bool fixed;
-            uint8_t recursive;
-            std::string hashAlgoRaw;
-            from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
-            if (recursive > (uint8_t) FileIngestionMethod::Recursive)
-                throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
-            method = FileIngestionMethod { recursive };
-            /* Compatibility hack. */
-            if (!fixed) {
-                hashAlgoRaw = "sha256";
-                method = FileIngestionMethod::Recursive;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 25) {
+            auto name = readString(from);
+            auto camStr = readString(from);
+            auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+            bool repairBool;
+            from >> repairBool;
+            auto repair = RepairFlag{repairBool};
+
+            logger->startWork();
+            auto pathInfo = [&]() {
+                // NB: FramedSource must be out of scope before logger->stopWork();
+                ContentAddressMethod contentAddressMethod = parseContentAddressMethod(camStr);
+                FramedSource source(from);
+                // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
+                return std::visit(overloaded {
+                    [&](TextHashMethod &_) {
+                        // We could stream this by changing Store
+                        std::string contents = source.drain();
+                        auto path = store->addTextToStore(name, contents, refs, repair);
+                        return store->queryPathInfo(path);
+                    },
+                    [&](FixedOutputHashMethod &fohm) {
+                        if (!refs.empty())
+                            throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
+                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                        return store->queryPathInfo(path);
+                    },
+                }, contentAddressMethod);
+            }();
+            logger->stopWork();
+
+            to << store->printStorePath(pathInfo->path);
+            writeValidPathInfo(store, clientVersion, to, pathInfo);
+
+        } else {
+            HashType hashAlgo;
+            std::string baseName;
+            FileIngestionMethod method;
+            {
+                bool fixed;
+                uint8_t recursive;
+                std::string hashAlgoRaw;
+                from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
+                if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                    throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
+                method = FileIngestionMethod { recursive };
+                /* Compatibility hack. */
+                if (!fixed) {
+                    hashAlgoRaw = "sha256";
+                    method = FileIngestionMethod::Recursive;
+                }
+                hashAlgo = parseHashType(hashAlgoRaw);
             }
-            hashAlgo = parseHashType(hashAlgoRaw);
+
+            StringSink saved;
+            TeeSource savedNARSource(from, saved);
+            RetrieveRegularNARSink savedRegular { saved };
+
+            if (method == FileIngestionMethod::Recursive) {
+                /* Get the entire NAR dump from the client and save it to
+                  a string so that we can pass it to
+                  addToStoreFromDump(). */
+                ParseSink sink; /* null sink; just parse the NAR */
+                parseDump(sink, savedNARSource);
+            } else
+                parseDump(savedRegular, from);
+
+            logger->startWork();
+            if (!savedRegular.regular) throw Error("regular file expected");
+
+            // FIXME: try to stream directly from `from`.
+            StringSource dumpSource { *saved.s };
+            auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+            logger->stopWork();
+
+            to << store->printStorePath(path);
         }
-
-        StringSink saved;
-        TeeSource savedNARSource(from, saved);
-        RetrieveRegularNARSink savedRegular { saved };
-
-        if (method == FileIngestionMethod::Recursive) {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNARSource);
-        } else
-            parseDump(savedRegular, from);
-
-        logger->startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
-
-        // FIXME: try to stream directly from `from`.
-        StringSource dumpSource { *saved.s };
-        auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
-        logger->stopWork();
-
-        to << store->printStorePath(path);
         break;
     }
 
     case wopAddTextToStore: {
         string suffix = readString(from);
         string s = readString(from);
-        auto refs = readStorePaths<StorePathSet>(*store, from);
+        auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto path = store->addTextToStore(suffix, s, refs, NoRepair);
         logger->stopWork();
@@ -494,6 +558,20 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            are in fact content-addressed if we don't trust them. */
         assert(derivationIsCA(drv.type()) || trusted);
 
+        /* Recompute the derivation path when we cannot trust the original. */
+        if (!trusted) {
+            /* Recomputing the derivation path for input-address derivations
+               makes it harder to audit them after the fact, since we need the
+               original not-necessarily-resolved derivation to verify the drv
+               derivation as adequate claim to the input-addressed output
+               paths. */
+            assert(derivationIsCA(drv.type()));
+
+            Derivation drv2;
+            static_cast<BasicDerivation &>(drv2) = drv;
+            drvPath = writeDerivation(*store, Derivation { drv2 });
+        }
+
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
@@ -556,7 +634,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopCollectGarbage: {
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
-        options.pathsToDelete = readStorePaths<StorePathSet>(*store, from);
+        options.pathsToDelete = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(from);
@@ -625,7 +703,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             to << 1
                << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
-            writeStorePaths(*store, to, i->second.references);
+            worker_proto::write(*store, to, i->second.references);
             to << i->second.downloadSize
                << i->second.narSize;
         }
@@ -636,11 +714,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         SubstitutablePathInfos infos;
         StorePathCAMap pathsMap = {};
         if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
-            auto paths = readStorePaths<StorePathSet>(*store, from);
+            auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
             for (auto & path : paths)
                 pathsMap.emplace(path, std::nullopt);
         } else
-            pathsMap = readStorePathCAMap(*store, from);
+            pathsMap = worker_proto::read(*store, from, Phantom<StorePathCAMap> {});
         logger->startWork();
         store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
@@ -648,7 +726,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         for (auto & i : infos) {
             to << store->printStorePath(i.first)
                << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
-            writeStorePaths(*store, to, i.second.references);
+            worker_proto::write(*store, to, i.second.references);
             to << i.second.downloadSize << i.second.narSize;
         }
         break;
@@ -658,7 +736,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto paths = store->queryAllValidPaths();
         logger->stopWork();
-        writeStorePaths(*store, to, paths);
+        worker_proto::write(*store, to, paths);
         break;
     }
 
@@ -675,15 +753,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-               << info->narHash.to_string(Base16, false);
-            writeStorePaths(*store, to, info->references);
-            to << info->registrationTime << info->narSize;
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-                to << info->ultimate
-                   << info->sigs
-                   << renderContentAddress(info->ca);
-            }
+            writeValidPathInfo(store, clientVersion, to, info);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
@@ -738,7 +808,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.references = readStorePaths<StorePathSet>(*store, from);
+        info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
         info.ca = parseContentAddressOpt(readString(from));
@@ -749,59 +819,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             info.ultimate = false;
 
         if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
-
-            struct FramedSource : Source
-            {
-                Source & from;
-                bool eof = false;
-                std::vector<unsigned char> pending;
-                size_t pos = 0;
-
-                FramedSource(Source & from) : from(from)
-                { }
-
-                ~FramedSource()
-                {
-                    if (!eof) {
-                        while (true) {
-                            auto n = readInt(from);
-                            if (!n) break;
-                            std::vector<unsigned char> data(n);
-                            from(data.data(), n);
-                        }
-                    }
-                }
-
-                size_t read(unsigned char * data, size_t len) override
-                {
-                    if (eof) throw EndOfFile("reached end of FramedSource");
-
-                    if (pos >= pending.size()) {
-                        size_t len = readInt(from);
-                        if (!len) {
-                            eof = true;
-                            return 0;
-                        }
-                        pending = std::vector<unsigned char>(len);
-                        pos = 0;
-                        from(pending.data(), len);
-                    }
-
-                    auto n = std::min(len, pending.size() - pos);
-                    memcpy(data, pending.data() + pos, n);
-                    pos += n;
-                    return n;
-                }
-            };
-
             logger->startWork();
-
             {
                 FramedSource source(from);
                 store->addToStore(info, source, (RepairFlag) repair,
                     dontCheckSigs ? NoCheckSigs : CheckSigs);
             }
-
             logger->stopWork();
         }
 
@@ -838,10 +861,32 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         uint64_t downloadSize, narSize;
         store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
         logger->stopWork();
-        writeStorePaths(*store, to, willBuild);
-        writeStorePaths(*store, to, willSubstitute);
-        writeStorePaths(*store, to, unknown);
+        worker_proto::write(*store, to, willBuild);
+        worker_proto::write(*store, to, willSubstitute);
+        worker_proto::write(*store, to, unknown);
         to << downloadSize << narSize;
+        break;
+    }
+
+    case wopRegisterDrvOutput: {
+        logger->startWork();
+        auto outputId = DrvOutput::parse(readString(from));
+        auto outputPath = StorePath(readString(from));
+        auto resolvedDrv = StorePath(readString(from));
+        store->registerDrvOutput(Realisation{
+            .id = outputId, .outPath = outputPath});
+        logger->stopWork();
+        break;
+    }
+
+    case wopQueryRealisation: {
+        logger->startWork();
+        auto outputId = DrvOutput::parse(readString(from));
+        auto info = store->queryRealisation(outputId);
+        logger->stopWork();
+        std::set<StorePath> outPaths;
+        if (info) outPaths.insert(info->outPath);
+        worker_proto::write(*store, to, outPaths);
         break;
     }
 
@@ -924,10 +969,11 @@ void processConnection(
                    during addTextToStore() / importPath().  If that
                    happens, just send the error message and exit. */
                 bool errorAllowed = tunnelLogger->state_.lock()->canSendStderr;
-                tunnelLogger->stopWork(false, e.msg(), e.status);
+                tunnelLogger->stopWork(&e);
                 if (!errorAllowed) throw;
             } catch (std::bad_alloc & e) {
-                tunnelLogger->stopWork(false, "Nix daemon out of memory", 1);
+                auto ex = Error("Nix daemon out of memory");
+                tunnelLogger->stopWork(&ex);
                 throw;
             }
 
@@ -936,8 +982,13 @@ void processConnection(
             assert(!tunnelLogger->state_.lock()->canSendStderr);
         };
 
+    } catch (Error & e) {
+        tunnelLogger->stopWork(&e);
+        to.flush();
+        return;
     } catch (std::exception & e) {
-        tunnelLogger->stopWork(false, e.what(), 1);
+        auto ex = Error(e.what());
+        tunnelLogger->stopWork(&ex);
         to.flush();
         return;
     }

@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "tarfile.hh"
+#include "types.hh"
 
 namespace nix::fetchers {
 
@@ -12,7 +13,8 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable)
+    bool immutable,
+    const Headers & headers)
 {
     // FIXME: check store
 
@@ -37,6 +39,7 @@ DownloadFileResult downloadFile(
         return useCached();
 
     FileTransferRequest request(url);
+    request.headers = headers;
     if (cached)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
     FileTransferResult res;
@@ -61,7 +64,6 @@ DownloadFileResult downloadFile(
 
     if (res.cached) {
         assert(cached);
-        assert(request.expectedETag == res.etag);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
@@ -111,7 +113,8 @@ std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable)
+    bool immutable,
+    const Headers & headers)
 {
     Attrs inAttrs({
         {"type", "tarball"},
@@ -127,7 +130,7 @@ std::pair<Tree, time_t> downloadTarball(
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
-    auto res = downloadFile(store, url, name, immutable);
+    auto res = downloadFile(store, url, name, immutable, headers);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -148,7 +151,7 @@ std::pair<Tree, time_t> downloadTarball(
     }
 
     Attrs infoAttrs({
-        {"lastModified", lastModified},
+        {"lastModified", uint64_t(lastModified)},
         {"etag", res.etag},
     });
 
@@ -227,6 +230,6 @@ struct TarballInputScheme : InputScheme
     }
 };
 
-static auto r1 = OnStartup([] { registerInputScheme(std::make_unique<TarballInputScheme>()); });
+static auto rTarballInputScheme = OnStartup([] { registerInputScheme(std::make_unique<TarballInputScheme>()); });
 
 }

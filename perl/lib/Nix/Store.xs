@@ -14,9 +14,7 @@
 #include "util.hh"
 #include "crypto.hh"
 
-#if HAVE_SODIUM
 #include <sodium.h>
-#endif
 
 
 using namespace nix;
@@ -110,10 +108,14 @@ SV * queryPathInfo(char * path, int base32)
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
-            AV * arr = newAV();
+            AV * refs = newAV();
             for (auto & i : info->references)
-                av_push(arr, newSVpv(store()->printStorePath(i).c_str(), 0));
-            XPUSHs(sv_2mortal(newRV((SV *) arr)));
+                av_push(refs, newSVpv(store()->printStorePath(i).c_str(), 0));
+            XPUSHs(sv_2mortal(newRV((SV *) refs)));
+            AV * sigs = newAV();
+            for (auto & i : info->sigs)
+                av_push(sigs, newSVpv(i.c_str(), 0));
+            XPUSHs(sv_2mortal(newRV((SV *) sigs)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -235,12 +237,8 @@ SV * convertHash(char * algo, char * s, int toBase32)
 SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
-#if HAVE_SODIUM
             auto sig = SecretKey(secretKey_).signDetached(msg);
             XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -249,7 +247,6 @@ SV * signString(char * secretKey_, char * msg)
 int checkSignature(SV * publicKey_, SV * sig_, char * msg)
     CODE:
         try {
-#if HAVE_SODIUM
             STRLEN publicKeyLen;
             unsigned char * publicKey = (unsigned char *) SvPV(publicKey_, publicKeyLen);
             if (publicKeyLen != crypto_sign_PUBLICKEYBYTES)
@@ -261,9 +258,6 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
                 throw Error("signature is not valid");
 
             RETVAL = crypto_sign_verify_detached(sig, (unsigned char *) msg, strlen(msg), publicKey) == 0;
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -303,11 +297,14 @@ SV * derivationFromPath(char * drvPath)
             hash = newHV();
 
             HV * outputs = newHV();
-            for (auto & i : drv.outputsAndPaths(*store()))
+            for (auto & i : drv.outputsAndOptPaths(*store())) {
                 hv_store(
                     outputs, i.first.c_str(), i.first.size(),
-                    newSVpv(store()->printStorePath(i.second.second).c_str(), 0),
+                    !i.second.second
+                        ? newSV(0) /* null value */
+                        : newSVpv(store()->printStorePath(*i.second.second).c_str(), 0),
                     0);
+            }
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
@@ -348,3 +345,13 @@ void addTempRoot(char * storePath)
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+
+SV * getBinDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixBinDir.c_str(), 0)));
+
+
+SV * getStoreDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixStore.c_str(), 0)));

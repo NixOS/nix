@@ -2,12 +2,15 @@
 #include "util.hh"
 #include "archive.hh"
 #include "args.hh"
+#include "abstract-setting-to-json.hh"
 
 #include <algorithm>
 #include <map>
 #include <thread>
 #include <dlfcn.h>
 #include <sys/utsname.h>
+
+#include <nlohmann/json.hpp>
 
 
 namespace nix {
@@ -22,7 +25,7 @@ namespace nix {
 
 Settings settings;
 
-static GlobalConfig::Register r1(&settings);
+static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
@@ -39,6 +42,7 @@ Settings::Settings()
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
+    allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
     if (caFile == "") {
@@ -82,6 +86,12 @@ void loadConfFile()
     for (auto file = files.rbegin(); file != files.rend(); file++) {
         globalConfig.applyConfigFile(*file);
     }
+
+    auto nixConfEnv = getEnv("NIX_CONFIG");
+    if (nixConfEnv.has_value()) {
+        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+    }
+
 }
 
 std::vector<Path> getUserConfigFiles()
@@ -121,6 +131,28 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
+StringSet Settings::getDefaultExtraPlatforms()
+{
+    if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
+        return StringSet{"i686-linux"};
+#if __APPLE__
+    // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
+    // machines. Note that we can’t force processes from executing
+    // x86_64 in aarch64 environments or vice versa since they can
+    // always exec with their own binary preferences.
+    else if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+        if (std::string{SYSTEM} == "x86_64-darwin")
+            return StringSet{"aarch64-darwin"};
+        else if (std::string{SYSTEM} == "aarch64-darwin")
+            return StringSet{"x86_64-darwin"};
+        else
+            return StringSet{};
+    }
+#endif
+    else
+        return StringSet{};
+}
+
 bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 {
     auto & f = experimentalFeatures.get();
@@ -144,12 +176,23 @@ bool Settings::isWSL1()
 
 const string nixVersion = PACKAGE_VERSION;
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str)
+NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
+    {SandboxMode::smEnabled, true},
+    {SandboxMode::smRelaxed, "relaxed"},
+    {SandboxMode::smDisabled, false},
+});
+
+template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
 {
     if (str == "true") value = smEnabled;
     else if (str == "relaxed") value = smRelaxed;
     else if (str == "false") value = smDisabled;
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<> bool BaseSetting<SandboxMode>::isAppendable()
+{
+    return false;
 }
 
 template<> std::string BaseSetting<SandboxMode>::to_string() const
@@ -158,11 +201,6 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
     else abort();
-}
-
-template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
-{
-    AbstractSetting::toJSON(out);
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
@@ -187,11 +225,15 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
-void MaxBuildJobsSetting::set(const std::string & str)
+void MaxBuildJobsSetting::set(const std::string & str, bool append)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
-    else if (!string2Int(str, value))
-        throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    else {
+        if (auto n = string2Int<decltype(value)>(str))
+            value = *n;
+        else
+            throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    }
 }
 
 

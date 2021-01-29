@@ -4,6 +4,8 @@
 
 #include "types.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 #pragma once
 
 namespace nix {
@@ -42,8 +44,6 @@ namespace nix {
 
 class Args;
 class AbstractSetting;
-class JSONPlaceholder;
-class JSONObject;
 
 class AbstractConfig
 {
@@ -97,7 +97,7 @@ public:
      * Outputs all settings to JSON
      * - out: JSONObject to write the configuration to
      */
-    virtual void toJSON(JSONObject & out) = 0;
+    virtual nlohmann::json toJSON() = 0;
 
     /**
      * Converts settings to `Args` to be used on the command line interface
@@ -167,7 +167,7 @@ public:
 
     void resetOverriden() override;
 
-    void toJSON(JSONObject & out) override;
+    nlohmann::json toJSON() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 };
@@ -202,11 +202,16 @@ protected:
         assert(created == 123);
     }
 
-    virtual void set(const std::string & value) = 0;
+    virtual void set(const std::string & value, bool append = false) = 0;
+
+    virtual bool isAppendable()
+    { return false; }
 
     virtual std::string to_string() const = 0;
 
-    virtual void toJSON(JSONPlaceholder & out);
+    nlohmann::json toJSON();
+
+    virtual std::map<std::string, nlohmann::json> toJSONObject();
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -220,6 +225,7 @@ class BaseSetting : public AbstractSetting
 protected:
 
     T value;
+    const T defaultValue;
 
 public:
 
@@ -229,6 +235,7 @@ public:
         const std::set<std::string> & aliases = {})
         : AbstractSetting(name, description, aliases)
         , value(def)
+        , defaultValue(def)
     { }
 
     operator const T &() const { return value; }
@@ -239,7 +246,9 @@ public:
     void operator =(const T & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
+
+    bool isAppendable() override;
 
     virtual void override(const T & v)
     {
@@ -251,7 +260,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    void toJSON(JSONPlaceholder & out) override;
+    std::map<std::string, nlohmann::json> toJSONObject() override;
 };
 
 template<typename T>
@@ -301,7 +310,7 @@ public:
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
 
     Path operator +(const char * p) const { return value + p; }
 
@@ -319,7 +328,7 @@ struct GlobalConfig : public AbstractConfig
 
     void resetOverriden() override;
 
-    void toJSON(JSONObject & out) override;
+    nlohmann::json toJSON() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

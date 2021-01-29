@@ -10,7 +10,6 @@ bin-scripts :=
 noinst-scripts :=
 man-pages :=
 install-tests :=
-dist-files :=
 OS = $(shell uname -s)
 
 
@@ -110,9 +109,6 @@ $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
 $(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
-
-
-include mk/dist.mk
 
 
 .PHONY: default all man help

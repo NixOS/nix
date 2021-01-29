@@ -1,5 +1,6 @@
 #include "profiles.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "util.hh"
 
 #include <sys/types.h>
@@ -20,9 +21,8 @@ static std::optional<GenerationNumber> parseName(const string & profileName, con
     string s = string(name, profileName.size() + 1);
     string::size_type p = s.find("-link");
     if (p == string::npos) return {};
-    unsigned int n;
-    if (string2Int(string(s, 0, p), n) && n >= 0)
-        return n;
+    if (auto n = string2Int<unsigned int>(s.substr(0, p)))
+        return *n;
     else
         return {};
 }
@@ -39,13 +39,10 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     for (auto & i : readDirectory(profileDir)) {
         if (auto n = parseName(profileName, i.name)) {
             auto path = profileDir + "/" + i.name;
-            struct stat st;
-            if (lstat(path.c_str(), &st) != 0)
-                throw SysError("statting '%1%'", path);
             gens.push_back({
                 .number = *n,
                 .path = path,
-                .creationTime = st.st_mtime
+                .creationTime = lstat(path).st_mtime
             });
         }
     }
@@ -72,7 +69,7 @@ static void makeName(const Path & profile, GenerationNumber num,
 }
 
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
+Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -82,7 +79,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
     if (gens.size() > 0) {
         Generation last = gens.back();
 
-        if (readLink(last.path) == outPath) {
+        if (readLink(last.path) == store->printStorePath(outPath)) {
             /* We only create a new generation symlink if it differs
                from the last one.
 
@@ -105,7 +102,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    store->addPermRoot(store->parseStorePath(outPath), generation, false, true);
+    store->addPermRoot(outPath, generation);
 
     return generation;
 }
@@ -216,12 +213,12 @@ void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, b
 {
     time_t curTime = time(0);
     string strDays = string(timeSpec, 0, timeSpec.size() - 1);
-    int days;
+    auto days = string2Int<int>(strDays);
 
-    if (!string2Int(strDays, days) || days < 1)
+    if (!days || *days < 1)
         throw Error("invalid number of days specifier '%1%'", timeSpec);
 
-    time_t oldTime = curTime - days * 24 * 3600;
+    time_t oldTime = curTime - *days * 24 * 3600;
 
     deleteGenerationsOlderThan(profile, oldTime, dryRun);
 }

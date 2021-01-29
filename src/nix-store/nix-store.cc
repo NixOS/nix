@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -19,9 +19,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#if HAVE_SODIUM
-#include <sodium.h>
-#endif
+
+namespace nix_store {
 
 
 using namespace nix;
@@ -34,7 +33,6 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 static Path gcRoot;
 static int rootNr = 0;
-static bool indirectRoot = false;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
@@ -65,6 +63,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
 
     if (path.path.isDerivation()) {
         if (build) store->buildPaths({path});
+        auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
@@ -77,7 +76,8 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
                     store2->printStorePath(path.path), j);
-            auto outPath = store2->printStorePath(i->second.path(*store, drv.name));
+            auto outPath = outputPaths.at(i->first);
+            auto retPath = store->printStorePath(outPath);
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -85,10 +85,10 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                     Path rootName = gcRoot;
                     if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out") rootName += "-" + i->first;
-                    outPath = store2->addPermRoot(store->parseStorePath(outPath), rootName, indirectRoot);
+                    retPath = store2->addPermRoot(outPath, rootName);
                 }
             }
-            outputs.insert(outPath);
+            outputs.insert(retPath);
         }
         return outputs;
     }
@@ -104,7 +104,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 Path rootName = gcRoot;
                 rootNr++;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName, indirectRoot)};
+                return {store2->addPermRoot(path.path, rootName)};
             }
         }
         return {store->printStorePath(path.path)};
@@ -218,8 +218,13 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
     if (useOutput && storePath.isDerivation()) {
         auto drv = store->derivationFromPath(storePath);
         StorePathSet outputs;
-        for (auto & i : drv.outputsAndPaths(*store))
-            outputs.insert(i.second.second);
+        if (forceRealise)
+            return store->queryDerivationOutputs(storePath);
+        for (auto & i : drv.outputsAndOptPaths(*store)) {
+            if (!i.second.second)
+                throw UsageError("Cannot use output path of floating content-addressed derivation until we know what it is (e.g. by building it)");
+            outputs.insert(*i.second.second);
+        }
         return outputs;
     }
     else return {storePath};
@@ -309,11 +314,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qOutputs: {
             for (auto & i : opArgs) {
-                auto i2 = store->followLinksToStorePath(i);
-                if (forceRealise) realisePath({i2});
-                Derivation drv = store->derivationFromPath(i2);
-                for (auto & j : drv.outputsAndPaths(*store))
-                    cout << fmt("%1%\n", store->printStorePath(j.second.second));
+                auto outputs = maybeUseOutputs(store->followLinksToStorePath(i), true, forceRealise);
+                for (auto & outputPath : outputs)
+                    cout << fmt("%1%\n", store->printStorePath(outputPath));
             }
             break;
         }
@@ -509,7 +512,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
-            infos.push_back(std::move(*info));
+            infos.insert_or_assign(info->path, *info);
         }
     }
 
@@ -705,10 +708,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        logWarning({
-            .name = "Store consistency",
-            .description = "not all errors were fixed"
-            });
+        warn("not all store errors were fixed");
         throw Exit(1);
     }
 }
@@ -730,14 +730,10 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            logError({
-                .name = "Hash mismatch",
-                .hint = hintfmt(
-                    "path '%s' was modified! expected hash '%s', got '%s'",
-                    store->printStorePath(path),
-                    info->narHash.to_string(Base32, true),
-                    current.first.to_string(Base32, true))
-            });
+            printError("path '%s' was modified! expected hash '%s', got '%s'",
+                store->printStorePath(path),
+                info->narHash.to_string(Base32, true),
+                current.first.to_string(Base32, true));
             status = 1;
         }
     }
@@ -754,7 +750,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
         throw UsageError("no flags expected");
 
     for (auto & i : opArgs)
-        ensureLocalStore()->repairPath(store->followLinksToStorePath(i));
+        store->repairPath(store->followLinksToStorePath(i));
 }
 
 /* Optimise the disk space usage of the Nix store by hard-linking
@@ -818,49 +814,28 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = readStorePaths<StorePathSet>(*store, in);
+                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
 
-                /* If requested, substitute missing paths. This
-                   implements nix-copy-closure's --use-substitutes
-                   flag. */
                 if (substitute && writeAllowed) {
-                    /* Filter out .drv files (we don't want to build anything). */
-                    std::vector<StorePathWithOutputs> paths2;
-                    for (auto & path : paths)
-                        if (!path.isDerivation())
-                            paths2.push_back({path});
-                    uint64_t downloadSize, narSize;
-                    StorePathSet willBuild, willSubstitute, unknown;
-                    store->queryMissing(paths2,
-                        willBuild, willSubstitute, unknown, downloadSize, narSize);
-                    /* FIXME: should use ensurePath(), but it only
-                       does one path at a time. */
-                    if (!willSubstitute.empty())
-                        try {
-                            std::vector<StorePathWithOutputs> subs;
-                            for (auto & p : willSubstitute) subs.push_back({p});
-                            store->buildPaths(subs);
-                        } catch (Error & e) {
-                            logWarning(e.info());
-                        }
+                    store->substitutePaths(paths);
                 }
 
-                writeStorePaths(*store, out, store->queryValidPaths(paths));
+                worker_proto::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = readStorePaths<StorePathSet>(*store, in);
+                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        writeStorePaths(*store, out, info->references);
+                        worker_proto::write(*store, out, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -888,7 +863,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(readStorePaths<StorePathSet>(*store, in), out);
+                store->exportPaths(worker_proto::read(*store, in, Phantom<StorePathSet> {}), out);
                 break;
             }
 
@@ -937,9 +912,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(readStorePaths<StorePathSet>(*store, in),
+                store->computeFSClosure(worker_proto::read(*store, in, Phantom<StorePathSet> {}),
                     closure, false, includeOutputs);
-                writeStorePaths(*store, out, closure);
+                worker_proto::write(*store, out, closure);
                 break;
             }
 
@@ -954,7 +929,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = readStorePaths<StorePathSet>(*store, in);
+                info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));
@@ -994,21 +969,11 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     string secretKeyFile = *i++;
     string publicKeyFile = *i++;
 
-#if HAVE_SODIUM
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
+    auto secretKey = SecretKey::generate(keyName);
 
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    unsigned char sk[crypto_sign_SECRETKEYBYTES];
-    if (crypto_sign_keypair(pk, sk) != 0)
-        throw Error("key generation failed");
-
-    writeFile(publicKeyFile, keyName + ":" + base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)));
+    writeFile(publicKeyFile, secretKey.toPublicKey().to_string());
     umask(0077);
-    writeFile(secretKeyFile, keyName + ":" + base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)));
-#else
-    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
+    writeFile(secretKeyFile, secretKey.to_string());
 }
 
 
@@ -1021,7 +986,7 @@ static void opVersion(Strings opFlags, Strings opArgs)
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
-static int _main(int argc, char * * argv)
+static int main_nix_store(int argc, char * * argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1085,7 +1050,7 @@ static int _main(int argc, char * * argv)
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
             else if (*arg == "--indirect")
-                indirectRoot = true;
+                ;
             else if (*arg == "--no-output")
                 noOutput = true;
             else if (*arg != "" && arg->at(0) == '-') {
@@ -1117,4 +1082,6 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-store", _main);
+static RegisterLegacyCommand r_nix_store("nix-store", main_nix_store);
+
+}
