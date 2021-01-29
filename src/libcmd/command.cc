@@ -82,10 +82,10 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     });
 
     addFlag({
-        .longName = "build-deps",
-        .description = "Include build-time dependencies of specified path.",
+        .longName = "include-build-refs",
+        .description = "Include build-time references of specified path closure.",
         .category = installablesCategory,
-        .handler = {&includeBuildDeps, true},
+        .handler = {&includeBuildRefs, true},
     });
 }
 
@@ -101,14 +101,14 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
-        if (!recursive && includeBuildDeps)
-            throw UsageError("--build requires --recursive");
+        if (!recursive && includeBuildRefs)
+            throw UsageError("--include-build-refs requires --recursive");
 
         for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
             storePaths.push_back(p);
 
         if (recursive) {
-            if (includeBuildDeps)
+            if (includeBuildRefs)
                 for (auto & i : installables)
                     for (auto & b : i->toBuildables()) {
                         if (!b.drvPath) {
@@ -122,7 +122,7 @@ void StorePathsCommand::run(ref<Store> store)
                     }
 
             StorePathSet closure;
-            store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, includeBuildDeps);
+            store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, includeBuildRefs);
             storePaths.clear();
             for (auto & p : closure)
                 if (!p.isDerivation())

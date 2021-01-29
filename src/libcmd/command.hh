@@ -148,7 +148,7 @@ private:
     bool recursive = false;
     bool all = false;
 
-    bool includeBuildDeps = false;
+    bool includeBuildRefs = false;
 
 protected:
 
