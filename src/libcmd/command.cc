@@ -108,18 +108,24 @@ void StorePathsCommand::run(ref<Store> store)
             storePaths.push_back(p);
 
         if (recursive) {
-            if (includeBuildRefs)
-                for (auto & i : installables)
+            if (includeBuildRefs) {
+                for (auto & i : installables) {
                     for (auto & b : i->toBuildables()) {
-                        if (!b.drvPath) {
-                            auto info = store->queryPathInfo(b.outputs.at("out"));
-                            if (info->deriver)
-                                storePaths.push_back(*info->deriver);
-                            else
-                                throw UsageError("Cannot find build references for '%s' without a derivation path", b.what());
-                        } else
-                            storePaths.push_back(*b.drvPath);
+                        std::visit(overloaded {
+                                [&](BuildableOpaque bo) {
+                                    auto info = store->queryPathInfo(bo.path);
+                                    if (info->deriver)
+                                        storePaths.push_back(*info->deriver);
+                                    else
+                                        throw UsageError("Cannot find build references for '%s' without a derivation path", store->printStorePath(bo.path));
+                                },
+                                [&](BuildableFromDrv bfd) {
+                                    storePaths.push_back(bfd.drvPath);
+                                },
+                            }, b);
                     }
+                }
+            }
 
             StorePathSet closure;
             store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, includeBuildRefs);
