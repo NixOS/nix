@@ -83,9 +83,16 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 
     addFlag({
         .longName = "include-build-refs",
-        .description = "Include build-time references of specified path closure.",
+        .description = "Include build-time references of specified closure.",
         .category = installablesCategory,
         .handler = {&includeBuildRefs, true},
+    });
+
+    addFlag({
+        .longName = "include-eval-refs",
+        .description = "Include eval-time references of specified closure.",
+        .category = installablesCategory,
+        .handler = {&includeEvalRefs, true},
     });
 }
 
@@ -101,13 +108,30 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
-        if (!recursive && includeBuildRefs)
-            throw UsageError("--include-build-refs requires --recursive");
+        if (!recursive && (includeBuildRefs || includeEvalRefs))
+            throw UsageError("--include-build-refs and --include-eval-refs require --recursive");
 
         for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
             storePaths.push_back(p);
 
         if (recursive) {
+            if (includeEvalRefs) {
+                auto state = getEvalState();
+
+                for (auto & i : installables) {
+                    for (auto & b : i->toBuildables()) {
+                        if (std::holds_alternative<BuildableOpaque>(b))
+                            throw UsageError("Cannot find eval references without a derivation path");
+                    }
+
+                    // force evaluation of package argument
+                    i->toValue(*state);
+
+                    for (auto & path : state->realisedPaths)
+                        storePaths.push_back(path);
+                }
+            }
+
             if (includeBuildRefs) {
                 for (auto & i : installables) {
                     for (auto & b : i->toBuildables()) {

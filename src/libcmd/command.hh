@@ -149,6 +149,7 @@ private:
     bool all = false;
 
     bool includeBuildRefs = false;
+    bool includeEvalRefs = false;
 
 protected:
 
