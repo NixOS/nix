@@ -38,6 +38,10 @@ public:
 
 private:
     size_t size_, capacity_;
+
+public:
+
+private:
     Attr attrs[0];
 
     Bindings(size_t capacity) : size_(0), capacity_(capacity) { }

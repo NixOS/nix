@@ -10,14 +10,14 @@
 namespace nix {
 
 
-DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
+DrvInfo::DrvInfo(EvalState & state, const string & attrPath, std::optional<Value> attrs)
     : state(&state), attrs(attrs), attrPath(attrPath)
 {
 }
 
 
 DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
-    : state(&state), attrs(nullptr), attrPath("")
+    : state(&state), attrs(std::nullopt), attrPath("")
 {
     auto [drvPath, selectedOutputs] = store->parsePathWithOutputs(drvPathWithOutputs);
 
@@ -46,12 +46,28 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
 }
 
 
+std::optional<Value> DrvInfo::queryOptionalAttr(const Symbol attrName) const
+{
+    // Erk
+    Value * mutableAttrs = const_cast<Value*>(&attrs.value());
+    auto accessResult = state->getOptionalAttrField(*mutableAttrs, {attrName}, noPos);
+    return accessResult.error ? std::nullopt : std::optional{*accessResult.value};
+}
+
+Value DrvInfo::queryAttr(const Symbol attrName) const
+{
+    Value res;
+    // Erk
+    Value * mutableAttrs = const_cast<Value*>(&attrs.value());
+    state->getAttrField(*mutableAttrs, {attrName}, noPos, res);
+    return res;
+}
+
 string DrvInfo::queryName() const
 {
     if (name == "" && attrs) {
-        auto i = attrs->find(state->sName);
-        if (i == attrs->end()) throw TypeError("derivation name missing");
-        name = state->forceStringNoCtx(*i->value);
+        Value nameVal = queryAttr(state->sName);
+        name = state->forceStringNoCtx(nameVal);
     }
     return name;
 }
@@ -60,8 +76,8 @@ string DrvInfo::queryName() const
 string DrvInfo::querySystem() const
 {
     if (system == "" && attrs) {
-        auto i = attrs->find(state->sSystem);
-        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos);
+        auto maybeSystemVal = queryOptionalAttr(state->sSystem);
+        system = maybeSystemVal ? state->forceStringNoCtx(*maybeSystemVal) : "unknown";
     }
     return system;
 }
@@ -70,9 +86,10 @@ string DrvInfo::querySystem() const
 string DrvInfo::queryDrvPath() const
 {
     if (drvPath == "" && attrs) {
-        Bindings::iterator i = attrs->find(state->sDrvPath);
+        auto drvPathVal = queryOptionalAttr(state->sDrvPath);
         PathSet context;
-        drvPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
+        if (drvPathVal)
+            drvPath = state->coerceToPath(noPos, *drvPathVal, context);
     }
     return drvPath;
 }
@@ -81,10 +98,10 @@ string DrvInfo::queryDrvPath() const
 string DrvInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
-        Bindings::iterator i = attrs->find(state->sOutPath);
+        auto val = queryOptionalAttr(state->sOutPath);
         PathSet context;
-        if (i != attrs->end())
-            outPath = state->coerceToPath(*i->pos, *i->value, context);
+        if (val)
+            outPath = state->coerceToPath(noPos, *val, context);
     }
     if (!outPath)
         throw UnimplementedError("CA derivations are not yet supported");
@@ -96,23 +113,23 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
-        Bindings::iterator i;
-        if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
-            state->forceList(*i->value, *i->pos);
+        std::optional<Value> outputsList;
+        if (attrs && (outputsList = queryOptionalAttr(state->sOutputs))) {
+            state->forceList(*outputsList);
 
             /* For each output... */
-            for (unsigned int j = 0; j < i->value->listSize(); ++j) {
+            for (unsigned int j = 0; j < outputsList->listSize(); ++j) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*i->value->listElems()[j], *i->pos);
-                Bindings::iterator out = attrs->find(state->symbols.create(name));
-                if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value);
+                string name = state->forceStringNoCtx(*outputsList->listElems()[j]);
+                auto out = queryOptionalAttr(state->symbols.create(name));
+                if (!out) continue;
+                state->forceAttrs(*out);
 
                 /* And evaluate its ‘outPath’ attribute. */
-                Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
-                if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
+                Value outPath;
+                state->getAttrField(*out, {state->sOutPath}, noPos, outPath);
                 PathSet context;
-                outputs[name] = state->coerceToPath(*outPath->pos, *outPath->value, context);
+                outputs[name] = state->coerceToPath(noPos, outPath, context);
             }
         } else
             outputs["out"] = queryOutPath();
@@ -140,8 +157,8 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 string DrvInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
-        Bindings::iterator i = attrs->find(state->sOutputName);
-        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value) : "";
+        auto val = queryOptionalAttr(state->sOutputName);
+        outputName = val ? state->forceStringNoCtx(*val) : "";
     }
     return outputName;
 }
@@ -151,10 +168,10 @@ Bindings * DrvInfo::getMeta()
 {
     if (meta) return meta;
     if (!attrs) return 0;
-    Bindings::iterator a = attrs->find(state->sMeta);
-    if (a == attrs->end()) return 0;
-    state->forceAttrs(*a->value, *a->pos);
-    meta = a->value->attrs;
+    auto val = queryOptionalAttr(state->sMeta);
+    if (!val) return 0;
+    state->forceAttrs(*val);
+    meta = val->attrs;
     return meta;
 }
 
@@ -285,7 +302,7 @@ static bool getDerivation(EvalState & state, Value & v,
            derivation {...}; y = x;}'. */
         if (!done.insert(v.attrs).second) return false;
 
-        DrvInfo drv(state, attrPath, v.attrs);
+        DrvInfo drv(state, attrPath, v);
 
         drv.queryName();
 

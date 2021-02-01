@@ -11,7 +11,6 @@
 #include "fetchers.hh"
 #include "registry.hh"
 #include "json.hh"
-#include "eval-cache.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -600,9 +599,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings{templateName == "" ? "defaultTemplate" : templateName},
             Strings(attrsPathPrefixes), lockFlags);
 
-        auto [cursor, attrPath] = installable.getCursor(*evalState);
-
-        auto templateDir = cursor->getAttr("path")->getString();
+        auto flakeValue = installable.toValue(*evalState);
+        auto templateDir = evalState->forceStringNoCtx(*evalState->getAttrField(*flakeValue.value, {evalState->symbols.create("path")}, flakeValue.pos));
 
         assert(store->isInStore(templateDir));
 
@@ -829,9 +827,9 @@ struct CmdFlakeShow : FlakeCommand
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
 
-        std::function<void(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
+        std::function<void(Value & value, Pos & pos, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
 
-        visit = [&](eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)
+        visit = [&](Value & value, Pos & pos, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
@@ -839,13 +837,13 @@ struct CmdFlakeShow : FlakeCommand
                 auto recurse = [&]()
                 {
                     logger->cout("%s", headerPrefix);
-                    auto attrs = visitor.getAttrs();
+                    auto attrs = state->listAttrFields(value, pos);
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         bool last = i + 1 == attrs.size();
-                        auto visitor2 = visitor.getAttr(attr);
+                        auto value2 = state->getAttrField(value, {attr}, pos);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*visitor2, attrPath2,
+                        visit(*value2, pos, attrPath2,
                             fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
                             nextPrefix + (last ? treeNull : treeLine));
                     }
@@ -853,7 +851,7 @@ struct CmdFlakeShow : FlakeCommand
 
                 auto showDerivation = [&]()
                 {
-                    auto name = visitor.getAttr(state->sName)->getString();
+                    auto name = state->forceStringNoCtx(*state->getAttrField(value, {state->sName}, pos));
 
                     /*
                     std::string description;
@@ -895,14 +893,14 @@ struct CmdFlakeShow : FlakeCommand
                     || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages"))
                     )
                 {
-                    if (visitor.isDerivation())
+                    if (state->isDerivation(value))
                         showDerivation();
                     else
                         throw Error("expected a derivation");
                 }
 
                 else if (attrPath.size() > 0 && attrPath[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
+                    if (state->isDerivation(value))
                         showDerivation();
                     else
                         recurse();
@@ -914,7 +912,7 @@ struct CmdFlakeShow : FlakeCommand
                     else if (!showLegacy)
                         logger->cout("%s: " ANSI_YELLOW "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
                     else {
-                        if (visitor.isDerivation())
+                        if (state->isDerivation(value))
                             showDerivation();
                         else if (attrPath.size() <= 2)
                             // FIXME: handle recurseIntoAttrs
@@ -926,8 +924,8 @@ struct CmdFlakeShow : FlakeCommand
                     (attrPath.size() == 2 && attrPath[0] == "defaultApp") ||
                     (attrPath.size() == 3 && attrPath[0] == "apps"))
                 {
-                    auto aType = visitor.maybeGetAttr("type");
-                    if (!aType || aType->getString() != "app")
+                    auto aType = state->getOptionalAttrField(value, {state->sType}, pos);
+                    if (aType.error || state->forceStringNoCtx(*aType.value) != "app")
                         throw EvalError("not an app definition");
                     logger->cout("%s: app", headerPrefix);
                 }
@@ -936,7 +934,8 @@ struct CmdFlakeShow : FlakeCommand
                     (attrPath.size() == 1 && attrPath[0] == "defaultTemplate") ||
                     (attrPath.size() == 2 && attrPath[0] == "templates"))
                 {
-                    auto description = visitor.getAttr("description")->getString();
+                    /* auto description = visitor.getAttr("description")->getString(); */
+                    auto description = state->forceStringNoCtx(*state->getAttrField(value, {state->sDescription}, pos));
                     logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
                 }
 
@@ -954,9 +953,9 @@ struct CmdFlakeShow : FlakeCommand
             }
         };
 
-        auto cache = openEvalCache(*state, flake);
+        auto flakeValue = getFlakeValue(*state, *flake);
 
-        visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        visit(*flakeValue, noPos, {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
     }
 };
 

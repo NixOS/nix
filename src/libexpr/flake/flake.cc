@@ -617,9 +617,13 @@ void callFlake(EvalState & state,
             , "/"), **vCallFlake);
     }
 
-    state.callFunction(**vCallFlake, *vLocks, *vTmp1, noPos);
-    state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
-    state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
+    vTmp1->mkApp(*vCallFlake, vLocks);
+    vTmp2->mkApp(vTmp1, vRootSrc);
+    vRes.mkApp(vTmp2, vRootSubdir);
+    auto fingerprint = lockedFlake.getFingerprint();
+    auto evalCache = state.openTreeCache(fingerprint);
+    auto cacheRoot = evalCache ? evalCache->getRoot() : nullptr;
+    vRes.setCache(ValueCache(cacheRoot));
 }
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -657,5 +661,20 @@ Fingerprint LockedFlake::getFingerprint() const
 }
 
 Flake::~Flake() { }
+
+Value* getFlakeValue(EvalState & state, const flake::LockedFlake lockedFlake)
+{
+    /* For testing whether the evaluation cache is
+        complete. */
+    if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
+        throw Error("not everything is cached, but evaluation is not allowed");
+
+    auto vFlake = state.allocValue();
+    flake::callFlake(state, lockedFlake, *vFlake);
+
+    auto aOutputs = state.getAttrField(*vFlake, {state.symbols.create("outputs")}, noPos);
+
+    return aOutputs;
+}
 
 }

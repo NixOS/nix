@@ -28,7 +28,7 @@ struct CmdEdit : InstallableCommand
     {
         auto state = getEvalState();
 
-        auto [v, pos] = installable->toValue(*state);
+        auto [v, pos, _] = installable->toValue(*state);
 
         try {
             pos = findDerivationFilename(*state, *v, installable->what());

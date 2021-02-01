@@ -6,7 +6,6 @@
 #include "value.hh"
 
 namespace nix {
-
 class EvalState;
 
 namespace fetchers { struct Tree; }
@@ -139,4 +138,5 @@ void emitTreeAttrs(
     const fetchers::Input & input,
     Value & v, bool emptyRevFallback = false);
 
+Value* getFlakeValue(EvalState & state, const flake::LockedFlake lockedFlake);
 }

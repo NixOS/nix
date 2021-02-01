@@ -7,7 +7,6 @@
 #include "common-args.hh"
 #include "json.hh"
 #include "shared.hh"
-#include "eval-cache.hh"
 #include "attr-path.hh"
 
 #include <regex>
@@ -81,31 +80,38 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
+        std::function<void(Value & cursor, const Pos& pos, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
+        visit = [&](Value & cursor, const Pos& pos, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
             try {
                 auto recurse = [&]()
                 {
-                    for (const auto & attr : cursor.getAttrs()) {
-                        auto cursor2 = cursor.getAttr(attr);
+                    for (const auto & attr : evalState->listAttrFields(cursor, pos)) {
+                        Value* cursor2;
+                        try {
+                            auto cursor2Res = evalState->lazyGetOptionalAttrField(cursor, {attr}, pos);
+                            if (cursor2Res.error)
+                                continue; // Shouldn't happen, but who knows
+                            cursor2 = cursor2Res.value;
+                        } catch (EvalError&) {
+                            continue;
+                        }
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*cursor2, attrPath2, false);
+                        visit(*cursor2, pos, attrPath2, false);
                     }
                 };
 
-                if (cursor.isDerivation()) {
+                if (evalState->isDerivation(cursor)) {
                     size_t found = 0;
 
-                    DrvName name(cursor.getAttr("name")->getString());
+                    DrvName name(evalState->forceStringNoCtx(*evalState->getAttrField(cursor, {evalState->sName}, pos)));
 
-                    auto aMeta = cursor.maybeGetAttr("meta");
-                    auto aDescription = aMeta ? aMeta->maybeGetAttr("description") : nullptr;
-                    auto description = aDescription ? aDescription->getString() : "";
+                    auto descriptionGetRes = evalState->getOptionalAttrField(cursor, {evalState->sMeta, evalState->sDescription}, pos);
+                    auto description = !descriptionGetRes.error ? state->forceStringNoCtx(*descriptionGetRes.value) : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
                     auto attrPath2 = concatStringsSep(".", attrPath);
 
@@ -154,8 +160,8 @@ struct CmdSearch : InstallableCommand, MixJSON
                     recurse();
 
                 else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
-                    auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
-                    if (attr && attr->getBool())
+                    auto recurseForDrvGetRes = evalState->getOptionalAttrField(cursor, {evalState->sRecurseForDerivations}, pos);
+                    if (!recurseForDrvGetRes.error && evalState->forceBool(*recurseForDrvGetRes.value, pos))
                         recurse();
                 }
 
@@ -165,8 +171,8 @@ struct CmdSearch : InstallableCommand, MixJSON
             }
         };
 
-        for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix), true);
+        for (auto & [cursor, pos, prefix] : installable->toValues(*state))
+            visit(*cursor, pos, parseAttrPath(*state, prefix), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

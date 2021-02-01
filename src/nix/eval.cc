@@ -60,7 +60,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto state = getEvalState();
 
-        auto [v, pos] = installable->toValue(*state);
+        auto [v, pos, _] = installable->toValue(*state);
         PathSet context;
 
         if (apply) {

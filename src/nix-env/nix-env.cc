@@ -374,7 +374,7 @@ static void queryInstSources(EvalState & state,
 
                 std::string name(path.name());
 
-                DrvInfo elem(state, "", nullptr);
+                DrvInfo elem(state, "", std::nullopt);
                 elem.setName(name);
 
                 if (path.isDerivation()) {
