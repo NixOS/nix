@@ -34,7 +34,7 @@ void StoreCommand::run()
 EvalCommand::EvalCommand()
 {
     addFlag({
-        .longName = "start-repl-on-eval-errors",
+        .longName = "debugger",
         .description = "start an interactive environment if evaluation fails",
         .handler = {&startReplOnEvalErrors, true},
     });
