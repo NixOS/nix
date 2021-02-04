@@ -124,6 +124,17 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
+
+    auto outputHashes = staticOutputHashes(worker.store, drv);
+    for (auto &[outputName, outputHash] : outputHashes)
+      initialOutputs.insert({
+            outputName,
+            InitialOutput{
+                .wanted = true, // Will be refined later
+                .outputHash = outputHash
+            }
+          });
+
     state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
@@ -258,8 +269,20 @@ void DerivationGoal::loadDerivation()
 
     assert(worker.store.isValidPath(drvPath));
 
+    auto fullDrv = new Derivation(worker.store.derivationFromPath(drvPath));
+
+    auto outputHashes = staticOutputHashes(worker.store, *fullDrv);
+    for (auto &[outputName, outputHash] : outputHashes)
+      initialOutputs.insert({
+            outputName,
+            InitialOutput{
+                .wanted = true, // Will be refined later
+                .outputHash = outputHash
+            }
+          });
+
     /* Get the derivation. */
-    drv = std::unique_ptr<BasicDerivation>(new Derivation(worker.store.derivationFromPath(drvPath)));
+    drv = std::unique_ptr<BasicDerivation>(fullDrv);
 
     haveDerivation();
 }
@@ -1022,14 +1045,6 @@ void DerivationGoal::buildDone()
 void DerivationGoal::resolvedFinished() {
     assert(resolvedDrv);
 
-    // If the derivation was originally a full `Derivation` (and not just
-    // a `BasicDerivation`, we must retrieve it because the `staticOutputHashes`
-    // will be wrong otherwise
-    Derivation fullDrv = *drv;
-    if (auto upcasted = dynamic_cast<Derivation *>(drv.get()))
-        fullDrv = *upcasted;
-
-    auto originalHashes = staticOutputHashes(worker.store, fullDrv);
     auto resolvedHashes = staticOutputHashes(worker.store, *resolvedDrv);
 
     // `wantedOutputs` might be empty, which means “all the outputs”
@@ -1038,7 +1053,7 @@ void DerivationGoal::resolvedFinished() {
         realWantedOutputs = resolvedDrv->outputNames();
 
     for (auto & wantedOutput : realWantedOutputs) {
-        assert(originalHashes.count(wantedOutput) != 0);
+        assert(initialOutputs.count(wantedOutput) != 0);
         assert(resolvedHashes.count(wantedOutput) != 0);
         auto realisation = worker.store.queryRealisation(
                 DrvOutput{resolvedHashes.at(wantedOutput), wantedOutput}
@@ -1047,7 +1062,7 @@ void DerivationGoal::resolvedFinished() {
         // realisation won't be there
         if (realisation) {
             auto newRealisation = *realisation;
-            newRealisation.id = DrvOutput{originalHashes.at(wantedOutput), wantedOutput};
+            newRealisation.id = DrvOutput{initialOutputs.at(wantedOutput).outputHash, wantedOutput};
             worker.store.registerDrvOutput(newRealisation);
         } else {
             // If we don't have a realisation, then it must mean that something
@@ -3829,9 +3844,8 @@ void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
     for (auto & i : queryPartialDerivationOutputMap()) {
-        InitialOutput info {
-            .wanted = wantOutput(i.first, wantedOutputs),
-        };
+        InitialOutput & info = initialOutputs.at(i.first);
+        info.wanted = wantOutput(i.first, wantedOutputs);
         if (i.second) {
             auto outputPath = *i.second;
             info.known = {
@@ -3844,19 +3858,14 @@ void DerivationGoal::checkPathValidity()
             };
         }
         if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-            Derivation fullDrv = *drv;
-            if (auto upcasted = dynamic_cast<Derivation *>(drv.get()))
-                fullDrv = *upcasted;
-            auto outputHashes = staticOutputHashes(worker.store, fullDrv);
             if (auto real = worker.store.queryRealisation(
-                    DrvOutput{outputHashes.at(i.first), i.first})) {
+                    DrvOutput{initialOutputs.at(i.first).outputHash, i.first})) {
                 info.known = {
                     .path = real->outPath,
                     .status = PathStatus::Valid,
                 };
             }
         }
-        initialOutputs.insert_or_assign(i.first, info);
     }
 }
 
