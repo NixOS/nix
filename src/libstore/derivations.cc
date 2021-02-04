@@ -757,9 +757,9 @@ std::optional<BasicDerivation> Derivation::tryResolveUncached(Store & store) {
         for (auto & outputName : input.second) {
             auto actualPathOpt = inputDrvOutputs.at(outputName);
             if (!actualPathOpt) {
-                warn("Input %s!%s missing, aborting the resolving",
-                    store.printStorePath(input.first),
-                    outputName
+                warn("output %s of input %s missing, aborting the resolving",
+                    outputName,
+                    store.printStorePath(input.first)
                 );
                 return std::nullopt;
             }
