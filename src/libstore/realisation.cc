@@ -65,7 +65,7 @@ void RealisedPath::closure(
     ret.insert(pathsClosure.begin(), pathsClosure.end());
 }
 
-void RealisedPath::closure(Store& store, RealisedPath::Set& ret) const
+void RealisedPath::closure(Store& store, RealisedPath::Set & ret) const
 {
     RealisedPath::closure(store, {*this}, ret);
 }
