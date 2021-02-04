@@ -724,14 +724,13 @@ std::set<RealisedPath> toRealisedPaths(
                         if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
                             if (!outputHashes.count(output.first))
                                 throw Error(
-                                    "The derivation %s doesn't have an output "
-                                    "named %s",
+                                    "the derivation '%s' doesn't have an output named '%s'",
                                     store->printStorePath(bfd.drvPath),
                                     output.first);
                             auto outputId = DrvOutput{outputHashes.at(output.first), output.first};
                             auto realisation = store->queryRealisation(outputId);
                             if (!realisation)
-                                throw Error("Cannot operate on output of unbuilt CA drv %s", outputId.to_string());
+                                throw Error("cannot operate on an output of unbuilt content-addresed derivation '%s'", outputId.to_string());
                             res.insert(RealisedPath{*realisation});
                         }
                         else {
