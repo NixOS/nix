@@ -59,19 +59,6 @@ struct RealisedPath {
     RealisedPath(Realisation r) : raw(r) {}
 
     /**
-     * Syntactic sugar to run `std::visit` on the raw value:
-     * path.visit(blah) == std::visit(blah, path.raw)
-     */
-    template <class Visitor>
-    constexpr decltype(auto) visit(Visitor && vis) {
-        return std::visit(vis, raw);
-    }
-    template <class Visitor>
-    constexpr decltype(auto) visit(Visitor && vis) const {
-        return std::visit(vis, raw);
-    }
-
-    /**
      * Get the raw store path associated to this
      */
     StorePath path() const;

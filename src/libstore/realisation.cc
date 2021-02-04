@@ -47,7 +47,7 @@ Realisation Realisation::fromJSON(
 }
 
 StorePath RealisedPath::path() const {
-    return visit([](auto && arg) { return arg.getPath(); });
+    return std::visit([](auto && arg) { return arg.getPath(); }, raw);
 }
 
 void RealisedPath::closure(
