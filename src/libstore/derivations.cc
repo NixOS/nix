@@ -787,7 +787,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(Store& store, const StoreP
     // This is quite dirty and leaky, but will disappear once #4340 is merged
     static Sync<std::map<StorePath, std::optional<Derivation>>> resolutionsCache;
 
-    debug("Trying to resolve %s", store.printStorePath(drvPath));
+    debug("trying to resolve %s", store.printStorePath(drvPath));
 
     {
         auto resolutions = resolutionsCache.lock();
