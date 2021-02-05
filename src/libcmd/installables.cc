@@ -283,6 +283,12 @@ ref<EvalState> EvalCommand::getEvalState()
     return ref<EvalState>(evalState);
 }
 
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
+}
+
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
     if (prefix == "")
