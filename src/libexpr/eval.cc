@@ -1163,6 +1163,28 @@ std::pair<ValueCache::CacheResult, ValueCache> ValueCache::getValue(EvalState & 
     return { cacheResult, ValueCache(resultingCursor) };
 }
 
+void EvalState::updateCacheStats(ValueCache::CacheResult cacheResult)
+{
+    switch (cacheResult.returnCode) {
+        case ValueCache::CacheHit:
+            nrCacheHits++;
+            break;
+        case ValueCache::CacheMiss:
+            nrCacheMisses++;
+            break;
+        case ValueCache::UnCacheable:
+            nrUncacheable++;
+            break;
+        case ValueCache::NoCacheKey:
+            nrUncached++;
+            break;
+        case ValueCache::Forward:
+            nrCacheHits++;
+            break;
+    };
+}
+
+
 bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
 {
     Pos * pos2 = 0;
@@ -1171,6 +1193,7 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
     if (attrs.type() == nAttrs) {
         auto eval_cache = attrs.attrs->eval_cache;
         auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
+        updateCacheStats(cacheResult);
         switch (cacheResult.returnCode) {
             case ValueCache::CacheHit:
                 if (cacheResult.lastQueriedSymbolIfMissing)
@@ -2063,6 +2086,13 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        {
+            auto cache = topObj.object("evalCache");
+            cache.attr("nrCacheMisses", nrCacheMisses);
+            cache.attr("nrCacheHits", nrCacheHits);
+            cache.attr("nrUncached", nrUncached);
+            cache.attr("nrUncacheable", nrUncacheable);
+        }
 #if HAVE_BOEHMGC
         {
             auto gc = topObj.object("gc");
