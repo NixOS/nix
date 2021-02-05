@@ -115,7 +115,7 @@
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
 
-        nix = with final; with commonDeps pkgs; (stdenv.mkDerivation {
+        nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
           name = "nix-${version}";
           inherit version;
 
@@ -163,9 +163,8 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           separateDebugInfo = true;
-        }) // {
 
-          perl-bindings = with final; stdenv.mkDerivation {
+          passthru.perl-bindings = with final; stdenv.mkDerivation {
             name = "nix-perl-${version}";
 
             src = self;
