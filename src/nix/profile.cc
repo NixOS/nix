@@ -249,7 +249,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     attrPath,
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
+                pathsToBuild.push_back({drv.drvPath, StringSet{drv.outputName}});
 
                 manifest.elements.emplace_back(std::move(element));
             } else {
