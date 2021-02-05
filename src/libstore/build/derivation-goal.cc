@@ -1044,7 +1044,14 @@ HookReply DerivationGoal::tryBuildHook()
            whether the hook wishes to perform the build. */
         string reply;
         while (true) {
-            string s = readLine(worker.hook->fromHook.readSide.get());
+            auto s = [&]() {
+                try {
+                    return readLine(worker.hook->fromHook.readSide.get());
+                } catch (Error & e) {
+                    e.addTrace({}, "while reading the response from the build hook");
+                    throw e;
+                }
+            }();
             if (handleJSONLogMessage(s, worker.act, worker.hook->activities, true))
                 ;
             else if (string(s, 0, 2) == "# ") {
@@ -1084,7 +1091,12 @@ HookReply DerivationGoal::tryBuildHook()
 
     hook = std::move(worker.hook);
 
-    machineName = readLine(hook->fromHook.readSide.get());
+    try {
+        machineName = readLine(hook->fromHook.readSide.get());
+    } catch (Error & e) {
+        e.addTrace({}, "while reading the machine name from the build hook");
+        throw e;
+    }
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
@@ -1773,7 +1785,14 @@ void DerivationGoal::startBuilder()
 
     /* Check if setting up the build environment failed. */
     while (true) {
-        string msg = readLine(builderOut.readSide.get());
+        string msg = [&]() {
+            try {
+                return readLine(builderOut.readSide.get());
+            } catch (Error & e) {
+                e.addTrace({}, "while reading the response of setting up the build environment");
+                throw e;
+            }
+        }();
         if (string(msg, 0, 1) == "\2") break;
         if (string(msg, 0, 1) == "\1") {
             FdSource source(builderOut.readSide.get());
