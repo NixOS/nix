@@ -342,6 +342,8 @@ public:
 
     void realiseContext(const PathSet & context);
 
+    void updateCacheStats(ValueCache::CacheResult);
+
 private:
 
     unsigned long nrEnvs = 0;
@@ -355,6 +357,10 @@ private:
     unsigned long nrListConcats = 0;
     unsigned long nrPrimOpCalls = 0;
     unsigned long nrFunctionCalls = 0;
+    unsigned long nrCacheHits = 0;
+    unsigned long nrCacheMisses = 0;
+    unsigned long nrUncacheable = 0;
+    unsigned long nrUncached = 0;
 
     bool countCalls;
 

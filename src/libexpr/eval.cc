@@ -1257,6 +1257,27 @@ ValueCache::CacheResult ValueCache::getValue(Store & store, const std::vector<Sy
         cachedValue);
 }
 
+void EvalState::updateCacheStats(ValueCache::CacheResult cacheResult)
+{
+    switch (cacheResult.returnCode) {
+        case ValueCache::CacheHit:
+            nrCacheHits++;
+            break;
+        case ValueCache::CacheMiss:
+            nrCacheMisses++;
+            break;
+        case ValueCache::UnCacheable:
+            nrUncacheable++;
+            break;
+        case ValueCache::NoCacheKey:
+            nrUncached++;
+            break;
+        case ValueCache::Forward:
+            nrCacheHits++;
+            break;
+    };
+}
+
 struct ExprCastedVar : Expr
 {
     Value * v;
@@ -1280,6 +1301,7 @@ EvalState::AttrAccesResult EvalState::lazyGetOptionalAttrField(Value & attrs, co
     Value * dest = allocValue();
     auto evalCache = attrs.getCache();
     auto cacheResult = evalCache.getValue(*store, selector, *dest);
+    updateCacheStats(cacheResult);
 
     if (cacheResult.returnCode == ValueCache::CacheHit) {
         if (cacheResult.lastQueriedSymbolIfMissing)
@@ -1324,6 +1346,7 @@ EvalState::AttrAccesResult EvalState::getOptionalAttrField(Value & attrs, const 
         };
 
     auto cacheResult = evalCache.getValue(*store, selector, dest);
+    updateCacheStats(cacheResult);
 
     if (cacheResult.returnCode == ValueCache::CacheHit) {
         if (cacheResult.lastQueriedSymbolIfMissing)
@@ -2306,6 +2329,13 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        {
+            auto cache = topObj.object("evalCache");
+            cache.attr("nrCacheMisses", nrCacheMisses);
+            cache.attr("nrCacheHits", nrCacheHits);
+            cache.attr("nrUncached", nrUncached);
+            cache.attr("nrUncacheable", nrUncacheable);
+        }
 #if HAVE_BOEHMGC
         {
             auto gc = topObj.object("gc");
