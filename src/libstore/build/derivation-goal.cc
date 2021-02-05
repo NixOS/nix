@@ -1784,12 +1784,14 @@ void DerivationGoal::startBuilder()
     worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
+    std::vector<std::string> msgs;
     while (true) {
         string msg = [&]() {
             try {
                 return readLine(builderOut.readSide.get());
             } catch (Error & e) {
-                e.addTrace({}, "while reading the response of setting up the build environment");
+                e.addTrace({}, "while waiting for the build environment to initialize (previous messages: %s)",
+                    concatStringsSep("|", msgs));
                 throw e;
             }
         }();
@@ -1801,6 +1803,7 @@ void DerivationGoal::startBuilder()
             throw ex;
         }
         debug("sandbox setup: " + msg);
+        msgs.push_back(std::move(msg));
     }
 }
 
