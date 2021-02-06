@@ -20,7 +20,7 @@
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
       systems = linuxSystems ++ [ "x86_64-darwin" ];
 
-      crossSystems = [ "armv7l-linux" ];
+      crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
