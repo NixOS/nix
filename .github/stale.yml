@@ -1,0 +1,9 @@
+# Configuration for probot-stale - https://github.com/probot/stale
+daysUntilStale: 180
+daysUntilClose: false
+exemptLabels:
+  - "critical"
+staleLabel: "2.status: stale"
+markComment: |
+  I marked this as stale due to inactivity. &rarr; [More info](https://github.com/NixOS/nix/blob/master/.github/STALE-BOT.md)
+closeComment: false
