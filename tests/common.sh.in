@@ -1,6 +1,6 @@
 set -e
 
-export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)
+export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
@@ -11,15 +11,20 @@ export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
+export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/daemon-socket
+unset NIX_USER_CONF_FILES
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
     export _NIX_TEST_NO_SANDBOX=1
 fi
 export _NIX_IN_TEST=$TEST_ROOT/shared
+export _NIX_TEST_NO_LSOF=1
 export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
+unset XDG_CONFIG_HOME
+unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
 mkdir -p $TEST_HOME
 
@@ -27,10 +32,9 @@ export PATH=@bindir@:$PATH
 coreutils=@coreutils@
 
 export dot=@dot@
-export xmllint="@xmllint@"
 export SHELL="@bash@"
 export PAGER=cat
-export HAVE_SODIUM="@HAVE_SODIUM@"
+export busybox="@sandbox_shell@"
 
 export version=@PACKAGE_VERSION@
 export system=@system@
@@ -69,9 +73,9 @@ startDaemon() {
     # Start the daemon, wait for the socket to appear.  !!!
     # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_STATE_DIR/daemon-socket/socket
-    nix-daemon &
+    nix daemon &
     for ((i = 0; i < 30; i++)); do
-        if [ -e $NIX_STATE_DIR/daemon-socket/socket ]; then break; fi
+        if [ -e $NIX_DAEMON_SOCKET_PATH ]; then break; fi
         sleep 1
     done
     pidDaemon=$!

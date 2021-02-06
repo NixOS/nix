@@ -197,7 +197,22 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     if (!pos)
         str << "undefined position";
     else
-        str << (format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%") % (string) pos.file % pos.line % pos.column).str();
+    {
+        auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
+        switch (pos.origin) {
+            case foFile:
+                f % (string) pos.file;
+                break;
+            case foStdin:
+            case foString:
+                f % "(string)";
+                break;
+            default:
+                throw Error("unhandled Pos origin!");
+        }
+        str << (f % pos.line % pos.column).str();
+    }
+
     return str;
 }
 
@@ -267,8 +282,11 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) throw UndefinedVarError(format("undefined variable '%1%' at %2%") % name % pos);
-
+    if (withLevel == -1)
+        throw UndefinedVarError({
+            .msg = hintfmt("undefined variable '%1%'", name),
+            .errPos = pos
+        });
     fromWith = true;
     this->level = withLevel;
 }

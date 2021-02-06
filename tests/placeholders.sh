@@ -18,5 +18,3 @@ nix-build --no-out-link -E '
     ";
   }
 '
-
-echo XYZZY

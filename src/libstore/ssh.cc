@@ -1,5 +1,4 @@
 #include "ssh.hh"
-#include "affinity.hh"
 
 namespace nix {
 
@@ -17,7 +16,7 @@ SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool
 
 void SSHMaster::addCommonSSHOpts(Strings & args)
 {
-    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS")))
+    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
         args.push_back(i);
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
@@ -34,10 +33,11 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
     out.create();
 
     auto conn = std::make_unique<Connection>();
+    ProcessOptions options;
+    options.dieWithParent = false;
+
     conn->sshPid = startProcess([&]() {
-        restoreAffinity();
         restoreSignals();
-        restoreMountNamespace();
 
         close(in.writeSide.get());
         close(out.readSide.get());
@@ -65,8 +65,9 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         args.push_back(command);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("executing '%s' on '%s'", command, host);
-    });
+        // could not exec ssh/bash
+        throw SysError("unable to execute '%s'", args.front());
+    }, options);
 
 
     in.readSide = -1;
@@ -93,6 +94,9 @@ Path SSHMaster::startMaster()
     Pipe out;
     out.create();
 
+    ProcessOptions options;
+    options.dieWithParent = false;
+
     state->sshMaster = startProcess([&]() {
         restoreSignals();
 
@@ -111,8 +115,8 @@ Path SSHMaster::startMaster()
         addCommonSSHOpts(args);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("starting SSH master");
-    });
+        throw SysError("unable to execute '%s'", args.front());
+    }, options);
 
     out.writeSide = -1;
 

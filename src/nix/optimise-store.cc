@@ -8,28 +8,16 @@ using namespace nix;
 
 struct CmdOptimiseStore : StoreCommand
 {
-    CmdOptimiseStore()
-    {
-    }
-
-    std::string name() override
-    {
-        return "optimise-store";
-    }
-
     std::string description() override
     {
         return "replace identical files in the store by hard links";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To optimise the Nix store:",
-                "nix optimise-store"
-            },
-        };
+        return
+          #include "optimise-store.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -38,4 +26,4 @@ struct CmdOptimiseStore : StoreCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdOptimiseStore>());
+static auto rCmdOptimiseStore = registerCommand2<CmdOptimiseStore>({"store", "optimise"});

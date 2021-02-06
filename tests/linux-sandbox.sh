@@ -22,6 +22,16 @@ outPath=$(nix-build dependencies.nix --no-out-link --sandbox-paths /nix/store)
 
 nix path-info -r $outPath | grep input-2
 
-nix ls-store -R -l $outPath | grep foobar
+nix store ls -R -l $outPath | grep foobar
 
-nix cat-store $outPath/foobar | grep FOOBAR
+nix store cat $outPath/foobar | grep FOOBAR
+
+# Test --check without hash rewriting.
+nix-build dependencies.nix --no-out-link --check --sandbox-paths /nix/store
+
+# Test that sandboxed builds with --check and -K can move .check directory to store
+nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link
+
+(! nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link --check -K 2> $TEST_ROOT/log)
+if grep -q 'error: renaming' $TEST_ROOT/log; then false; fi
+grep -q 'may not be deterministic' $TEST_ROOT/log

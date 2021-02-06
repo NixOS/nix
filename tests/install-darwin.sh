@@ -34,7 +34,7 @@ cleanup() {
     sudo rm -rf /etc/nix \
          /nix \
          /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels \
-         "$USER/.nix-profile" "$USER/.nix-defexpr" "$USER/.nix-channels"
+         "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels"
 }
 
 verify() {
@@ -53,7 +53,7 @@ trap finish EXIT
 
 # First setup Nix
 cleanup
-curl -o install https://nixos.org/nix/install
+curl -L -o install https://nixos.org/nix/install
 yes | bash ./install
 verify
 

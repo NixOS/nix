@@ -6,24 +6,16 @@ using namespace nix;
 
 struct CmdPingStore : StoreCommand
 {
-    std::string name() override
-    {
-        return "ping-store";
-    }
-
     std::string description() override
     {
-        return "test whether a store can be opened";
+        return "test whether a store can be accessed";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To test whether connecting to a remote Nix store via SSH works:",
-                "nix ping-store --store ssh://mac1"
-            },
-        };
+        return
+          #include "ping-store.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -32,4 +24,4 @@ struct CmdPingStore : StoreCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdPingStore>());
+static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "ping"});

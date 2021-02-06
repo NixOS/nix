@@ -2,6 +2,7 @@
 
 #include "value.hh"
 #include "symbol-table.hh"
+#include "error.hh"
 
 #include <map>
 
@@ -9,25 +10,27 @@
 namespace nix {
 
 
-MakeError(EvalError, Error)
-MakeError(ParseError, Error)
-MakeError(AssertionError, EvalError)
-MakeError(ThrownError, AssertionError)
-MakeError(Abort, EvalError)
-MakeError(TypeError, EvalError)
-MakeError(UndefinedVarError, Error)
-MakeError(RestrictedPathError, Error)
+MakeError(EvalError, Error);
+MakeError(ParseError, Error);
+MakeError(AssertionError, EvalError);
+MakeError(ThrownError, AssertionError);
+MakeError(Abort, EvalError);
+MakeError(TypeError, EvalError);
+MakeError(UndefinedVarError, Error);
+MakeError(MissingArgumentError, Error);
+MakeError(RestrictedPathError, Error);
 
 
 /* Position objects. */
 
 struct Pos
 {
+    FileOrigin origin;
     Symbol file;
     unsigned int line, column;
-    Pos() : line(0), column(0) { };
-    Pos(const Symbol & file, unsigned int line, unsigned int column)
-        : file(file), line(line), column(column) { };
+    Pos() : origin(foString), line(0), column(0) { };
+    Pos(FileOrigin origin, const Symbol & file, unsigned int line, unsigned int column)
+        : origin(origin), file(file), line(line), column(column) { };
     operator bool() const
     {
         return line != 0;
@@ -127,7 +130,7 @@ struct ExprPath : Expr
 {
     string s;
     Value v;
-    ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
+    ExprPath(const string & s) : s(s) { v.mkPath(this->s.c_str()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -209,9 +212,10 @@ struct ExprList : Expr
 
 struct Formal
 {
+    Pos pos;
     Symbol name;
     Expr * def;
-    Formal(const Symbol & name, Expr * def) : name(name), def(def) { };
+    Formal(const Pos & pos, const Symbol & name, Expr * def) : pos(pos), name(name), def(def) { };
 };
 
 struct Formals
@@ -234,8 +238,10 @@ struct ExprLambda : Expr
         : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError(format("duplicate formal function argument '%1%' at %2%")
-                % arg % pos);
+            throw ParseError({
+                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
+                .errPos = pos
+            });
     };
     void setName(Symbol & name);
     string showNamePos() const;
@@ -261,8 +267,9 @@ struct ExprWith : Expr
 
 struct ExprIf : Expr
 {
+    Pos pos;
     Expr * cond, * then, * else_;
-    ExprIf(Expr * cond, Expr * then, Expr * else_) : cond(cond), then(then), else_(else_) { };
+    ExprIf(const Pos & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
     COMMON_METHODS
 };
 

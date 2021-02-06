@@ -1,31 +1,24 @@
 #include "command.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 using namespace nix;
 
 struct CmdDumpPath : StorePathCommand
 {
-    std::string name() override
-    {
-        return "dump-path";
-    }
-
     std::string description() override
     {
-        return "dump a store path to stdout (in NAR format)";
+        return "serialise a store path to stdout in NAR format";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To get a NAR from the binary cache https://cache.nixos.org/:",
-                "nix dump-path --store https://cache.nixos.org/ /nix/store/7crrmih8c52r8fbnqb933dxrsp44md93-glibc-2.25"
-            },
-        };
+        return
+          #include "store-dump-path.md"
+          ;
     }
 
-    void run(ref<Store> store, const Path & storePath) override
+    void run(ref<Store> store, const StorePath & storePath) override
     {
         FdSink sink(STDOUT_FILENO);
         store->narFromPath(storePath, sink);
@@ -33,4 +26,39 @@ struct CmdDumpPath : StorePathCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdDumpPath>());
+static auto rDumpPath = registerCommand2<CmdDumpPath>({"store", "dump-path"});
+
+struct CmdDumpPath2 : Command
+{
+    Path path;
+
+    CmdDumpPath2()
+    {
+        expectArgs({
+            .label = "path",
+            .handler = {&path},
+            .completer = completePath
+        });
+    }
+
+    std::string description() override
+    {
+        return "serialise a path to stdout in NAR format";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "nar-dump-path.md"
+          ;
+    }
+
+    void run() override
+    {
+        FdSink sink(STDOUT_FILENO);
+        dumpPath(path, sink);
+        sink.flush();
+    }
+};
+
+static auto rDumpPath2 = registerCommand2<CmdDumpPath2>({"nar", "dump-path"});

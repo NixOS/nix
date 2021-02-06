@@ -16,26 +16,26 @@ RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, const Path & cacheDir)
         createDirs(cacheDir);
 }
 
-Path RemoteFSAccessor::makeCacheFile(const Path & storePath, const std::string & ext)
+Path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::string & ext)
 {
     assert(cacheDir != "");
-    return fmt("%s/%s.%s", cacheDir, storePathToHash(storePath), ext);
+    return fmt("%s/%s.%s", cacheDir, hashPart, ext);
 }
 
-void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & nar,
+void RemoteFSAccessor::addToCache(std::string_view hashPart, const std::string & nar,
     ref<FSAccessor> narAccessor)
 {
-    nars.emplace(storePath, narAccessor);
+    nars.emplace(hashPart, narAccessor);
 
     if (cacheDir != "") {
         try {
             std::ostringstream str;
             JSONPlaceholder jsonRoot(str);
             listNar(jsonRoot, narAccessor, "", true);
-            writeFile(makeCacheFile(storePath, "ls"), str.str());
+            writeFile(makeCacheFile(hashPart, "ls"), str.str());
 
             /* FIXME: do this asynchronously. */
-            writeFile(makeCacheFile(storePath, "nar"), nar);
+            writeFile(makeCacheFile(hashPart, "nar"), nar);
 
         } catch (...) {
             ignoreException();
@@ -43,27 +43,26 @@ void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & na
     }
 }
 
-std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
+std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, bool requireValidPath)
 {
     auto path = canonPath(path_);
 
-    auto storePath = store->toStorePath(path);
-    std::string restPath = std::string(path, storePath.size());
+    auto [storePath, restPath] = store->toStorePath(path);
 
-    if (!store->isValidPath(storePath))
-        throw InvalidPath(format("path '%1%' is not a valid store path") % storePath);
+    if (requireValidPath && !store->isValidPath(storePath))
+        throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
 
-    auto i = nars.find(storePath);
+    auto i = nars.find(std::string(storePath.hashPart()));
     if (i != nars.end()) return {i->second, restPath};
 
     StringSink sink;
     std::string listing;
     Path cacheFile;
 
-    if (cacheDir != "" && pathExists(cacheFile = makeCacheFile(storePath, "nar"))) {
+    if (cacheDir != "" && pathExists(cacheFile = makeCacheFile(storePath.hashPart(), "nar"))) {
 
         try {
-            listing = nix::readFile(makeCacheFile(storePath, "ls"));
+            listing = nix::readFile(makeCacheFile(storePath.hashPart(), "ls"));
 
             auto narAccessor = makeLazyNarAccessor(listing,
                 [cacheFile](uint64_t offset, uint64_t length) {
@@ -76,12 +75,12 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
                         throw SysError("seeking in '%s'", cacheFile);
 
                     std::string buf(length, 0);
-                    readFull(fd.get(), (unsigned char *) buf.data(), length);
+                    readFull(fd.get(), buf.data(), length);
 
                     return buf;
                 });
 
-            nars.emplace(storePath, narAccessor);
+            nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
 
         } catch (SysError &) { }
@@ -90,7 +89,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
             *sink.s = nix::readFile(cacheFile);
 
             auto narAccessor = makeNarAccessor(sink.s);
-            nars.emplace(storePath, narAccessor);
+            nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
 
         } catch (SysError &) { }
@@ -98,7 +97,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
 
     store->narFromPath(storePath, sink);
     auto narAccessor = makeNarAccessor(sink.s);
-    addToCache(storePath, *sink.s, narAccessor);
+    addToCache(storePath.hashPart(), *sink.s, narAccessor);
     return {narAccessor, restPath};
 }
 
@@ -114,9 +113,9 @@ StringSet RemoteFSAccessor::readDirectory(const Path & path)
     return res.first->readDirectory(res.second);
 }
 
-std::string RemoteFSAccessor::readFile(const Path & path)
+std::string RemoteFSAccessor::readFile(const Path & path, bool requireValidPath)
 {
-    auto res = fetch(path);
+    auto res = fetch(path, requireValidPath);
     return res.first->readFile(res.second);
 }
 

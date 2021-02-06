@@ -4,9 +4,9 @@ clearStore
 
 max=500
 
-reference=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+reference=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bla
 touch $reference
-(echo $reference && echo && echo 0) | nix-store --register-validity 
+(echo $reference && echo && echo 0) | nix-store --register-validity
 
 echo "making registration..."
 

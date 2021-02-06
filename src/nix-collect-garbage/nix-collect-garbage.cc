@@ -49,7 +49,7 @@ void removeOldGenerations(std::string dir)
     }
 }
 
-static int _main(int argc, char * * argv)
+static int main_nix_collect_garbage(int argc, char * * argv)
 {
     {
         bool removeOld = false;
@@ -67,10 +67,8 @@ static int _main(int argc, char * * argv)
                 deleteOlderThan = getArg(*arg, arg, end);
             }
             else if (*arg == "--dry-run") dryRun = true;
-            else if (*arg == "--max-freed") {
-                long long maxFreed = getIntArg<long long>(*arg, arg, end, true);
-                options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
-            }
+            else if (*arg == "--max-freed")
+                options.maxFreed = std::max(getIntArg<int64_t>(*arg, arg, end, true), (int64_t) 0);
             else
                 return false;
             return true;
@@ -94,4 +92,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-collect-garbage", _main);
+static RegisterLegacyCommand r_nix_collect_garbage("nix-collect-garbage", main_nix_collect_garbage);

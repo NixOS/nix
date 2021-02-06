@@ -4,7 +4,7 @@
 
 using namespace nix;
 
-static int _main(int argc, char ** argv)
+static int main_nix_copy_closure(int argc, char ** argv)
 {
     {
         auto gzip = false;
@@ -52,11 +52,11 @@ static int _main(int argc, char ** argv)
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
 
-        PathSet storePaths2;
+        StorePathSet storePaths2;
         for (auto & path : storePaths)
             storePaths2.insert(from->followLinksToStorePath(path));
 
-        PathSet closure;
+        StorePathSet closure;
         from->computeFSClosure(storePaths2, closure, false, includeOutputs);
 
         copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
@@ -65,4 +65,4 @@ static int _main(int argc, char ** argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-copy-closure", _main);
+static RegisterLegacyCommand r_nix_copy_closure("nix-copy-closure", main_nix_copy_closure);

@@ -2,10 +2,14 @@
 
 source common.sh
 
-failed=0
-messages="`nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1 || failed=1`"
-if [ $failed -ne 0 ]; then
-    echo "error: 'nix-store' succeeded; should have timed out"
+
+set +e
+messages=$(nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1)
+status=$?
+set -e
+
+if [ $status -ne 101 ]; then
+    echo "error: 'nix-store' exited with '$status'; should have exited 101"
     exit 1
 fi
 

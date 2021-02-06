@@ -1,3 +1,4 @@
+#include "serialise.hh"
 #include "store-api.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"
@@ -6,27 +7,9 @@
 
 namespace nix {
 
-struct HashAndWriteSink : Sink
+void Store::exportPaths(const StorePathSet & paths, Sink & sink)
 {
-    Sink & writeSink;
-    HashSink hashSink;
-    HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
-    {
-    }
-    virtual void operator () (const unsigned char * data, size_t len)
-    {
-        writeSink(data, len);
-        hashSink(data, len);
-    }
-    Hash currentHash()
-    {
-        return hashSink.currentHash().first;
-    }
-};
-
-void Store::exportPaths(const Paths & paths, Sink & sink)
-{
-    Paths sorted = topoSortPaths(PathSet(paths.begin(), paths.end()));
+    auto sorted = topoSortPaths(paths);
     std::reverse(sorted.begin(), sorted.end());
 
     std::string doneLabel("paths exported");
@@ -42,60 +25,71 @@ void Store::exportPaths(const Paths & paths, Sink & sink)
     sink << 0;
 }
 
-void Store::exportPath(const Path & path, Sink & sink)
+void Store::exportPath(const StorePath & path, Sink & sink)
 {
     auto info = queryPathInfo(path);
 
-    HashAndWriteSink hashAndWriteSink(sink);
+    HashSink hashSink(htSHA256);
+    TeeSink teeSink(sink, hashSink);
 
-    narFromPath(path, hashAndWriteSink);
+    narFromPath(path, teeSink);
 
     /* Refuse to export paths that have changed.  This prevents
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
-    Hash hash = hashAndWriteSink.currentHash();
+    Hash hash = hashSink.currentHash().first;
     if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
-        throw Error(format("hash of path '%1%' has changed from '%2%' to '%3%'!") % path
-            % info->narHash.to_string() % hash.to_string());
+        throw Error("hash of path '%s' has changed from '%s' to '%s'!",
+            printStorePath(path), info->narHash.to_string(Base32, true), hash.to_string(Base32, true));
 
-    hashAndWriteSink << exportMagic << path << info->references << info->deriver << 0;
+    teeSink
+        << exportMagic
+        << printStorePath(path);
+    worker_proto::write(*this, teeSink, info->references);
+    teeSink
+        << (info->deriver ? printStorePath(*info->deriver) : "")
+        << 0;
 }
 
-Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, CheckSigsFlag checkSigs)
+StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 {
-    Paths res;
+    StorePaths res;
     while (true) {
         auto n = readNum<uint64_t>(source);
         if (n == 0) break;
         if (n != 1) throw Error("input doesn't look like something created by 'nix-store --export'");
 
         /* Extract the NAR from the source. */
-        TeeSink tee(source);
-        parseDump(tee, tee.source);
+        StringSink saved;
+        TeeSource tee { source, saved };
+        ParseSink ether;
+        parseDump(ether, tee);
 
         uint32_t magic = readInt(source);
         if (magic != exportMagic)
             throw Error("Nix archive cannot be imported; wrong format");
 
-        ValidPathInfo info;
-
-        info.path = readStorePath(*this, source);
+        auto path = parseStorePath(readString(source));
 
         //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
 
-        info.references = readStorePaths<PathSet>(*this, source);
+        auto references = worker_proto::read(*this, source, Phantom<StorePathSet> {});
+        auto deriver = readString(source);
+        auto narHash = hashString(htSHA256, *saved.s);
 
-        info.deriver = readString(source);
-        if (info.deriver != "") assertStorePath(info.deriver);
-
-        info.narHash = hashString(htSHA256, *tee.source.data);
-        info.narSize = tee.source.data->size();
+        ValidPathInfo info { path, narHash };
+        if (deriver != "")
+            info.deriver = parseStorePath(deriver);
+        info.references = references;
+        info.narSize = saved.s->size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.source.data, NoRepair, checkSigs, accessor);
+        // Can't use underlying source, which would have been exhausted
+        auto source = StringSource { *saved.s };
+        addToStore(info, source, NoRepair, checkSigs);
 
         res.push_back(info.path);
     }

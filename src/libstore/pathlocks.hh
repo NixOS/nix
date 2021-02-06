@@ -16,8 +16,6 @@ enum LockType { ltRead, ltWrite, ltNone };
 
 bool lockFile(int fd, LockType lockType, bool wait);
 
-MakeError(AlreadyLocked, Error);
-
 class PathLocks
 {
 private:
@@ -36,7 +34,5 @@ public:
     void unlock();
     void setDeletion(bool deletePaths);
 };
-
-bool pathIsLockedByMe(const Path & path);
 
 }

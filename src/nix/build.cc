@@ -1,32 +1,41 @@
+#include "eval.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
-struct CmdBuild : MixDryRun, InstallablesCommand
+struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
+    BuildMode buildMode = bmNormal;
 
     CmdBuild()
     {
-        mkFlag()
-            .longName("out-link")
-            .shortName('o')
-            .description("path of the symlink to the build result")
-            .labels({"path"})
-            .dest(&outLink);
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description = "Use *path* as prefix for the symlinks to the build results. It defaults to `result`.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath
+        });
 
-        mkFlag()
-            .longName("no-link")
-            .description("do not create a symlink to the build result")
-            .set(&outLink, Path(""));
-    }
+        addFlag({
+            .longName = "no-link",
+            .description = "Do not create symlinks to the build results.",
+            .handler = {&outLink, Path("")},
+        });
 
-    std::string name() override
-    {
-        return "build";
+        addFlag({
+            .longName = "rebuild",
+            .description = "Rebuild an already built package and compare the result to the existing store paths.",
+            .handler = {&buildMode, bmCheck},
+        });
     }
 
     std::string description() override
@@ -34,39 +43,45 @@ struct CmdBuild : MixDryRun, InstallablesCommand
         return "build a derivation or fetch a store path";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To build and run GNU Hello from NixOS 17.03:",
-                "nix build -f channel:nixos-17.03 hello; ./result/bin/hello"
-            },
-            Example{
-                "To build the build.x86_64-linux attribute from release.nix:",
-                "nix build -f release.nix build.x86_64-linux"
-            },
-        };
+        return
+          #include "build.md"
+          ;
     }
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? DryRun : Build, installables);
+        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables, buildMode);
 
         if (dryRun) return;
 
-        for (size_t i = 0; i < buildables.size(); ++i) {
-            auto & b(buildables[i]);
+        if (outLink != "")
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                for (const auto & [_i, buildable] : enumerate(buildables)) {
+                    auto i = _i;
+                    std::visit(overloaded {
+                        [&](BuildableOpaque bo) {
+                            std::string symlink = outLink;
+                            if (i) symlink += fmt("-%d", i);
+                            store2->addPermRoot(bo.path, absPath(symlink));
+                        },
+                        [&](BuildableFromDrv bfd) {
+                            auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
+                            for (auto & output : builtOutputs) {
+                                std::string symlink = outLink;
+                                if (i) symlink += fmt("-%d", i);
+                                if (output.first != "out") symlink += fmt("-%s", output.first);
+                                store2->addPermRoot(output.second, absPath(symlink));
+                            }
+                        },
+                    }, buildable);
+                }
 
-            if (outLink != "")
-                for (auto & output : b.outputs)
-                    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-                        std::string symlink = outLink;
-                        if (i) symlink += fmt("-%d", i);
-                        if (output.first != "out") symlink += fmt("-%s", output.first);
-                        store2->addPermRoot(output.second, absPath(symlink), true);
-                    }
-        }
+        updateProfile(buildables);
+
+        if (json) logger->cout("%s", buildablesToJSON(buildables, store).dump());
     }
 };
 
-static RegisterCommand r1(make_ref<CmdBuild>());
+static auto rCmdBuild = registerCommand<CmdBuild>("build");

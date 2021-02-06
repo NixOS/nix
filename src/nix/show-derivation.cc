@@ -1,4 +1,5 @@
 // FIXME: integrate this with nix path-info?
+// FIXME: rename to 'nix store show-derivation' or 'nix debug show-derivation'?
 
 #include "command.hh"
 #include "common-args.hh"
@@ -15,16 +16,12 @@ struct CmdShowDerivation : InstallablesCommand
 
     CmdShowDerivation()
     {
-        mkFlag()
-            .longName("recursive")
-            .shortName('r')
-            .description("include the dependencies of the specified derivations")
-            .set(&recursive, true);
-    }
-
-    std::string name() override
-    {
-        return "show-derivation";
+        addFlag({
+            .longName = "recursive",
+            .shortName = 'r',
+            .description = "Include the dependencies of the specified derivations.",
+            .handler = {&recursive, true}
+        });
     }
 
     std::string description() override
@@ -32,28 +29,23 @@ struct CmdShowDerivation : InstallablesCommand
         return "show the contents of a store derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show the store derivation that results from evaluating the Hello package:",
-                "nix show-derivation nixpkgs.hello"
-            },
-            Example{
-                "To show the full derivation graph (if available) that produced your NixOS system:",
-                "nix show-derivation -r /run/current-system"
-            },
-        };
+        return
+          #include "show-derivation.md"
+          ;
     }
+
+    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
         auto drvPaths = toDerivations(store, installables, true);
 
         if (recursive) {
-            PathSet closure;
+            StorePathSet closure;
             store->computeFSClosure(drvPaths, closure);
-            drvPaths = closure;
+            drvPaths = std::move(closure);
         }
 
         {
@@ -61,40 +53,50 @@ struct CmdShowDerivation : InstallablesCommand
         JSONObject jsonRoot(std::cout, true);
 
         for (auto & drvPath : drvPaths) {
-            if (!isDerivation(drvPath)) continue;
+            if (!drvPath.isDerivation()) continue;
 
-            auto drvObj(jsonRoot.object(drvPath));
+            auto drvObj(jsonRoot.object(store->printStorePath(drvPath)));
 
-            auto drv = readDerivation(drvPath);
+            auto drv = store->readDerivation(drvPath);
 
             {
                 auto outputsObj(drvObj.object("outputs"));
-                for (auto & output : drv.outputs) {
-                    auto outputObj(outputsObj.object(output.first));
-                    outputObj.attr("path", output.second.path);
-                    if (output.second.hash != "") {
-                        outputObj.attr("hashAlgo", output.second.hashAlgo);
-                        outputObj.attr("hash", output.second.hash);
-                    }
+                for (auto & [_outputName, output] : drv.outputs) {
+                    auto & outputName = _outputName; // work around clang bug
+                    auto outputObj { outputsObj.object(outputName) };
+                    std::visit(overloaded {
+                        [&](DerivationOutputInputAddressed doi) {
+                            outputObj.attr("path", store->printStorePath(doi.path));
+                        },
+                        [&](DerivationOutputCAFixed dof) {
+                            outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
+                            outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
+                            outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
+                        },
+                        [&](DerivationOutputCAFloating dof) {
+                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
+                        },
+                        [&](DerivationOutputDeferred) {},
+                    }, output.output);
                 }
             }
 
             {
                 auto inputsList(drvObj.list("inputSrcs"));
                 for (auto & input : drv.inputSrcs)
-                    inputsList.elem(input);
+                    inputsList.elem(store->printStorePath(input));
             }
 
             {
                 auto inputDrvsObj(drvObj.object("inputDrvs"));
                 for (auto & input : drv.inputDrvs) {
-                    auto inputList(inputDrvsObj.list(input.first));
+                    auto inputList(inputDrvsObj.list(store->printStorePath(input.first)));
                     for (auto & outputId : input.second)
                         inputList.elem(outputId);
                 }
             }
 
-            drvObj.attr("platform", drv.platform);
+            drvObj.attr("system", drv.platform);
             drvObj.attr("builder", drv.builder);
 
             {
@@ -116,4 +118,4 @@ struct CmdShowDerivation : InstallablesCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdShowDerivation>());
+static auto rCmdShowDerivation = registerCommand<CmdShowDerivation>("show-derivation");

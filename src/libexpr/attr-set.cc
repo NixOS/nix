@@ -24,9 +24,7 @@ void EvalState::mkAttrs(Value & v, size_t capacity)
         v = vEmptySet;
         return;
     }
-    clearValue(v);
-    v.type = tAttrs;
-    v.attrs = allocBindings(capacity);
+    v.mkAttrs(allocBindings(capacity));
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;
 }
@@ -40,6 +38,12 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
     Value * v = allocValue();
     vAttrs.attrs->push_back(Attr(name, v));
     return v;
+}
+
+
+Value * EvalState::allocAttr(Value & vAttrs, const std::string & name)
+{
+    return allocAttr(vAttrs, symbols.create(name));
 }
 
 

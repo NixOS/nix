@@ -4,11 +4,12 @@
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
-#include "hash.hh"
 #include "config.hh"
 
 #include <map>
+#include <optional>
 #include <unordered_map>
+#include <mutex>
 
 
 namespace nix {
@@ -16,6 +17,7 @@ namespace nix {
 
 class Store;
 class EvalState;
+class StorePath;
 enum RepairFlag : bool;
 
 
@@ -27,29 +29,28 @@ struct PrimOp
     PrimOpFun fun;
     size_t arity;
     Symbol name;
-    PrimOp(PrimOpFun fun, size_t arity, Symbol name)
-        : fun(fun), arity(arity), name(name) { }
+    std::vector<std::string> args;
+    const char * doc = nullptr;
 };
 
 
 struct Env
 {
     Env * up;
-    unsigned short size; // used by ‘valueSize’
     unsigned short prevWith:14; // nr of levels up to next `with' environment
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
 
 
-Value & mkString(Value & v, const string & s, const PathSet & context = PathSet());
+Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
 
 void copyContext(const Value & v, PathSet & context);
 
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
-typedef std::map<Path, Path> SrcToStore;
+typedef std::map<Path, StorePath> SrcToStore;
 
 
 std::ostream & operator << (std::ostream & str, const Value & v);
@@ -63,6 +64,11 @@ typedef std::list<SearchPathElem> SearchPath;
 void initGC();
 
 
+struct RegexCache;
+
+std::shared_ptr<RegexCache> makeRegexCache();
+
+
 class EvalState
 {
 public:
@@ -72,7 +78,10 @@ public:
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
-        sOutputHash, sOutputHashAlgo, sOutputHashMode;
+        sContentAddressed,
+        sOutputHash, sOutputHashAlgo, sOutputHashMode,
+        sRecurseForDerivations,
+        sDescription, sSelf, sEpsilon;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -81,11 +90,12 @@ public:
 
     /* The allowed filesystem paths in restricted or pure evaluation
        mode. */
-    std::experimental::optional<PathSet> allowedPaths;
+    std::optional<PathSet> allowedPaths;
 
     Value vEmptySet;
 
     const ref<Store> store;
+
 
 private:
     SrcToStore srcToStore;
@@ -112,6 +122,9 @@ private:
 
     /* Cache used by checkSourcePath(). */
     std::unordered_map<Path, Path> resolvedPaths;
+
+    /* Cache used by prim_match(). */
+    std::shared_ptr<RegexCache> regexCache;
 
 public:
 
@@ -140,14 +153,15 @@ public:
     Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
-    Expr * parseExprFromString(const string & s, const Path & basePath);
+    Expr * parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv);
+    Expr * parseExprFromString(std::string_view s, const Path & basePath);
 
     Expr * parseStdin();
 
     /* Evaluate an expression read from the given file to normal
-       form. */
-    void evalFile(const Path & path, Value & v);
+       form. Optionally enforce that the top-level expression is
+       trivial (i.e. doesn't require arbitrary computation). */
+    void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
     void resetFileCache();
 
@@ -195,6 +209,9 @@ public:
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);
 
+    std::optional<string> tryAttrsToString(const Pos & pos, Value & v,
+        PathSet & context, bool coerceMore = false, bool copyToStore = true);
+
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
@@ -229,9 +246,22 @@ private:
     Value * addPrimOp(const string & name,
         size_t arity, PrimOpFun primOp);
 
+    Value * addPrimOp(PrimOp && primOp);
+
 public:
 
     Value & getBuiltin(const string & name);
+
+    struct Doc
+    {
+        Pos pos;
+        std::optional<Symbol> name;
+        size_t arity;
+        std::vector<std::string> args;
+        const char * doc;
+    };
+
+    std::optional<Doc> getDoc(Value & v);
 
 private:
 
@@ -241,7 +271,7 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(const char * text, const Path & path,
+    Expr * parse(const char * text, FileOrigin origin, const Path & path,
         const Path & basePath, StaticEnv & staticEnv);
 
 public:
@@ -264,6 +294,7 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
+    Value * allocAttr(Value & vAttrs, const std::string & name);
 
     Bindings * allocBindings(size_t capacity);
 
@@ -310,12 +341,17 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
 
 /* Return a string representing the type of the value `v'. */
+string showType(ValueType type);
 string showType(const Value & v);
 
+/* Decode a context string ‘!<name>!<path>’ into a pair <path,
+   name>. */
+std::pair<string, string> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
@@ -331,23 +367,71 @@ struct InvalidPathError : EvalError
 
 struct EvalSettings : Config
 {
+    EvalSettings();
+
+    static Strings getDefaultNixPath();
+
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
-    Setting<bool> restrictEval{this, false, "restrict-eval",
-        "Whether to restrict file system access to paths in $NIX_PATH, "
-        "and network access to the URI prefixes listed in 'allowed-uris'."};
+    Setting<Strings> nixPath{
+        this, getDefaultNixPath(), "nix-path",
+        "List of directories to be searched for `<...>` file references."};
+
+    Setting<bool> restrictEval{
+        this, false, "restrict-eval",
+        R"(
+          If set to `true`, the Nix evaluator will not allow access to any
+          files outside of the Nix search path (as set via the `NIX_PATH`
+          environment variable or the `-I` option), or to URIs outside of
+          `allowed-uri`. The default is `false`.
+        )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
         "Whether to restrict file system and network access to files specified by cryptographic hash."};
 
-    Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
-        "Whether the evaluator allows importing the result of a derivation."};
+    Setting<bool> enableImportFromDerivation{
+        this, true, "allow-import-from-derivation",
+        R"(
+          By default, Nix allows you to `import` from a derivation, allowing
+          building at evaluation time. With this option set to false, Nix will
+          throw an error when evaluating an expression that uses this feature,
+          allowing users to ensure their evaluation will not require any
+          builds to take place.
+        )"};
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
-        "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+        R"(
+          A list of URI prefixes to which access is allowed in restricted
+          evaluation mode. For example, when set to
+          `https://github.com/NixOS`, builtin functions such as `fetchGit` are
+          allowed to access `https://github.com/NixOS/patchelf.git`.
+        )"};
+
+    Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
+        R"(
+          If set to `true`, the Nix evaluator will trace every function call.
+          Nix will print a log message at the "vomit" level for every function
+          entrance and function exit.
+
+              function-trace entered undefined position at 1565795816999559622
+              function-trace exited undefined position at 1565795816999581277
+              function-trace entered /nix/store/.../example.nix:226:41 at 1565795253249935150
+              function-trace exited /nix/store/.../example.nix:226:41 at 1565795253249941684
+
+          The `undefined position` means the function call is a builtin.
+
+          Use the `contrib/stack-collapse.py` script distributed with the Nix
+          source code to convert the trace logs in to a format suitable for
+          `flamegraph.pl`.
+        )"};
+
+    Setting<bool> useEvalCache{this, true, "eval-cache",
+        "Whether to use the flake evaluation cache."};
 };
 
 extern EvalSettings evalSettings;
+
+static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 }

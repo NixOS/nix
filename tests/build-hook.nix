@@ -1,23 +1,50 @@
+{ busybox }:
+
 with import ./config.nix;
 
 let
 
+  mkDerivation = args:
+    derivation ({
+      inherit system;
+      builder = busybox;
+      args = ["sh" "-e" args.builder or (builtins.toFile "builder-${args.name}.sh" "if [ -e .attrs.sh ]; then source .attrs.sh; fi; eval \"$buildCommand\"")];
+    } // removeAttrs args ["builder" "meta"])
+    // { meta = args.meta or {}; };
+
   input1 = mkDerivation {
-    name = "build-hook-input-1";
-    builder = ./dependencies.builder1.sh;
+    shell = busybox;
+    name = "build-remote-input-1";
+    buildCommand = "echo FOO > $out";
     requiredSystemFeatures = ["foo"];
   };
 
   input2 = mkDerivation {
-    name = "build-hook-input-2";
-    builder = ./dependencies.builder2.sh;
+    shell = busybox;
+    name = "build-remote-input-2";
+    buildCommand = "echo BAR > $out";
+    requiredSystemFeatures = ["bar"];
+  };
+
+  input3 = mkDerivation {
+    shell = busybox;
+    name = "build-remote-input-3";
+    buildCommand = ''
+      read x < ${input2}
+      echo $x BAZ > $out
+    '';
+    requiredSystemFeatures = ["baz"];
   };
 
 in
 
   mkDerivation {
-    name = "build-hook";
-    builder = ./dependencies.builder0.sh;
-    input1 = " " + input1 + "/.";
-    input2 = " ${input2}/.";
+    shell = busybox;
+    name = "build-remote";
+    buildCommand =
+      ''
+        read x < ${input1}
+        read y < ${input3}
+        echo "$x $y" > $out
+      '';
   }

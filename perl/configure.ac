@@ -1,4 +1,4 @@
-AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../version)$VERSION_SUFFIX"]))
+AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../.version)$VERSION_SUFFIX"]))
 AC_CONFIG_SRCDIR(MANIFEST)
 AC_CONFIG_AUX_DIR(../config)
 
@@ -6,7 +6,6 @@ CFLAGS=
 CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX_11
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE
@@ -41,11 +40,7 @@ AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
 AC_MSG_RESULT($perllibdir)
 
 # Look for libsodium, an optional dependency.
-PKG_CHECK_MODULES([SODIUM], [libsodium],
-  [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
-   CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"
-   have_sodium=1], [have_sodium=])
-AC_SUBST(HAVE_SODIUM, [$have_sodium])
+PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Check for the required Perl dependencies (DBI and DBD::SQLite).
 perlFlags="-I$perllibdir"
@@ -69,19 +64,7 @@ AC_SUBST(perlFlags)
 
 PKG_CHECK_MODULES([NIX], [nix-store])
 
-NEED_PROG([NIX_INSTANTIATE_PROGRAM], [nix-instantiate])
-
-# Get nix configure values
-nixbindir=$("$NIX_INSTANTIATE_PROGRAM" --eval '<nix/config.nix>' -A nixBinDir | tr -d \")
-nixlibexecdir=$("$NIX_INSTANTIATE_PROGRAM" --eval '<nix/config.nix>' -A nixLibexecDir | tr -d \")
-nixlocalstatedir=$("$NIX_INSTANTIATE_PROGRAM" --eval '<nix/config.nix>' -A nixLocalstateDir | tr -d \")
-nixsysconfdir=$("$NIX_INSTANTIATE_PROGRAM" --eval '<nix/config.nix>' -A nixSysconfDir | tr -d \")
-nixstoredir=$("$NIX_INSTANTIATE_PROGRAM" --eval '<nix/config.nix>' -A nixStoreDir | tr -d \")
-AC_SUBST(nixbindir)
-AC_SUBST(nixlibexecdir)
-AC_SUBST(nixlocalstatedir)
-AC_SUBST(nixsysconfdir)
-AC_SUBST(nixstoredir)
+NEED_PROG([NIX], [nix])
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix

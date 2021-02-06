@@ -2,6 +2,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "loggers.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -16,6 +17,8 @@
 #include <signal.h>
 
 #include <openssl/crypto.h>
+
+#include <sodium.h>
 
 
 namespace nix {
@@ -33,40 +36,52 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const PathSet & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
 {
-    unsigned long long downloadSize, narSize;
-    PathSet willBuild, willSubstitute, unknown;
+    uint64_t downloadSize, narSize;
+    StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
     printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
 }
 
 
-void printMissing(ref<Store> store, const PathSet & willBuild,
-    const PathSet & willSubstitute, const PathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
+void printMissing(ref<Store> store, const StorePathSet & willBuild,
+    const StorePathSet & willSubstitute, const StorePathSet & unknown,
+    uint64_t downloadSize, uint64_t narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
-        printMsg(lvl, "these derivations will be built:");
-        Paths sorted = store->topoSortPaths(willBuild);
+        if (willBuild.size() == 1)
+            printMsg(lvl, fmt("this derivation will be built:"));
+        else
+            printMsg(lvl, fmt("these %d derivations will be built:", willBuild.size()));
+        auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvl, fmt("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
-                downloadSize / (1024.0 * 1024.0),
-                narSize / (1024.0 * 1024.0)));
+        const float downloadSizeMiB = downloadSize / (1024.f * 1024.f);
+        const float narSizeMiB = narSize / (1024.f * 1024.f);
+        if (willSubstitute.size() == 1) {
+            printMsg(lvl, fmt("this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+                downloadSizeMiB,
+                narSizeMiB));
+        } else {
+            printMsg(lvl, fmt("these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+                willSubstitute.size(),
+                downloadSizeMiB,
+                narSizeMiB));
+        }
         for (auto & i : willSubstitute)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 
     if (!unknown.empty()) {
         printMsg(lvl, fmt("don't know how to build these paths%s:",
                 (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
         for (auto & i : unknown)
-            printMsg(lvl, fmt("  %s", i));
+            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
     }
 }
 
@@ -75,11 +90,12 @@ string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
-    if (i == end) throw UsageError(format("'%1%' requires an argument") % opt);
+    if (i == end) throw UsageError("'%1%' requires an argument", opt);
     return *i;
 }
 
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
 /* OpenSSL is not thread-safe by default - it will randomly crash
    unless the user supplies a mutex locking function. So let's do
    that. */
@@ -92,6 +108,7 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
     else
         opensslLocks[type].unlock();
 }
+#endif
 
 
 static void sigHandler(int signo) { }
@@ -105,9 +122,14 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
+
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
 
     loadConfFile();
 
@@ -124,6 +146,15 @@ void initNix()
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+
+#if __APPLE__
+    /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
+     * Instead, add a dummy sigaction handler, and signalHandlerThread
+     * can handle the rest. */
+    struct sigaction sa;
+    sa.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &sa, 0)) throw SysError("handling SIGWINCH");
+#endif
 
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
@@ -142,7 +173,7 @@ void initNix()
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (getuid() == 0 && hasPrefix(getEnv("TMPDIR"), "/var/folders/"))
+    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 }
@@ -152,55 +183,70 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
-    mkFlag()
-        .longName("no-build-output")
-        .shortName('Q')
-        .description("do not show build output")
-        .set(&settings.verboseBuild, false);
+    addFlag({
+        .longName = "no-build-output",
+        .shortName = 'Q',
+        .description = "Do not show build output.",
+        .handler = {[&]() {setLogFormat(LogFormat::raw); }},
+    });
 
-    mkFlag()
-        .longName("keep-failed")
-        .shortName('K')
-        .description("keep temporary directories of failed builds")
-        .set(&(bool&) settings.keepFailed, true);
+    addFlag({
+        .longName = "keep-failed",
+        .shortName ='K',
+        .description = "Keep temporary directories of failed builds.",
+        .handler = {&(bool&) settings.keepFailed, true},
+    });
 
-    mkFlag()
-        .longName("keep-going")
-        .shortName('k')
-        .description("keep going after a build fails")
-        .set(&(bool&) settings.keepGoing, true);
+    addFlag({
+        .longName = "keep-going",
+        .shortName ='k',
+        .description = "Keep going after a build fails.",
+        .handler = {&(bool&) settings.keepGoing, true},
+    });
 
-    mkFlag()
-        .longName("fallback")
-        .description("build from source if substitution fails")
-        .set(&(bool&) settings.tryFallback, true);
-
-    mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-        settings.set("max-jobs", s);
+    addFlag({
+        .longName = "fallback",
+        .description = "Build from source if substitution fails.",
+        .handler = {&(bool&) settings.tryFallback, true},
     });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
-        const std::string & description, const std::string & dest) {
-        mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
-            settings.set(dest, std::to_string(n));
+        const std::string & description, const std::string & dest)
+    {
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .labels = {"n"},
+            .handler = {[=](std::string s) {
+                auto n = string2IntWithUnitPrefix<uint64_t>(s);
+                settings.set(dest, std::to_string(n));
+            }}
         });
     };
 
-    intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
-    intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
-    intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
+    intSettingAlias(0, "cores", "Maximum number of CPU cores to use inside a build.", "cores");
+    intSettingAlias(0, "max-silent-time", "Number of seconds of silence before a build is killed.", "max-silent-time");
+    intSettingAlias(0, "timeout", "Number of seconds before a build is killed.", "timeout");
 
-    mkFlag(0, "readonly-mode", "do not write to the Nix store",
-        &settings.readOnlyMode);
+    addFlag({
+        .longName = "readonly-mode",
+        .description = "Do not write to the Nix store.",
+        .handler = {&settings.readOnlyMode, true},
+    });
 
-    mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
-        &gcWarning, false);
+    addFlag({
+        .longName = "no-gc-warning",
+        .description = "Disable warnings about not using `--add-root`.",
+        .handler = {&gcWarning, true},
+    });
 
-    mkFlag()
-        .longName("store")
-        .label("store-uri")
-        .description("URI of the Nix store to use")
-        .dest(&(std::string&) settings.storeUri);
+    addFlag({
+        .longName = "store",
+        .description = "The URL of the Nix store to use.",
+        .labels = {"store-uri"},
+        .handler = {&(std::string&) settings.storeUri},
+    });
 }
 
 
@@ -220,7 +266,7 @@ bool LegacyArgs::processArgs(const Strings & args, bool finish)
     Strings ss(args);
     auto pos = ss.begin();
     if (!parseArg(pos, ss.end()))
-        throw UsageError(format("unexpected argument '%1%'") % args.front());
+        throw UsageError("unexpected argument '%1%'", args.front());
     return true;
 }
 
@@ -228,7 +274,7 @@ bool LegacyArgs::processArgs(const Strings & args, bool finish)
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    parseCmdLine(baseNameOf(argv[0]), argvToStrings(argc, argv), parseArg);
+    parseCmdLine(std::string(baseNameOf(argv[0])), argvToStrings(argc, argv), parseArg);
 }
 
 
@@ -247,11 +293,14 @@ void printVersion(const string & programName)
 #if HAVE_BOEHMGC
         cfg.push_back("gc");
 #endif
-#if HAVE_SODIUM
         cfg.push_back("signed-caches");
-#endif
+        std::cout << "System type: " << settings.thisSystem << "\n";
+        std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
-        std::cout << "Configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
+        std::cout << "System configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
+        std::cout << "User configuration files: " <<
+            concatStringsSep(":", settings.nixUserConfFiles)
+            << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
     }
@@ -264,13 +313,15 @@ void showManPage(const string & name)
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
-    throw SysError(format("command 'man %1%' failed") % name.c_str());
+    throw SysError("command 'man %1%' failed", name.c_str());
 }
 
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
+
+    ErrorInfo::programName = baseNameOf(programName);
 
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
@@ -287,13 +338,12 @@ int handleExceptions(const string & programName, std::function<void()> fun)
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {
-        printError(
-            format(error + "%1%\nTry '%2% --help' for more information.")
-            % e.what() % programName);
+        logError(e.info());
+        printError("Try '%1% --help' for more information.", programName);
         return 1;
     } catch (BaseError & e) {
-        printError(format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
-        if (e.prefix() != "" && !settings.showTrace)
+        logError(e.info());
+        if (e.hasTrace() && !loggerSettings.showTrace.get())
             printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
@@ -329,7 +379,7 @@ RunPager::RunPager()
         execlp("pager", "pager", nullptr);
         execlp("less", "less", nullptr);
         execlp("more", "more", nullptr);
-        throw SysError(format("executing '%1%'") % pager);
+        throw SysError("executing '%1%'", pager);
     });
 
     pid.setKillSignal(SIGINT);
@@ -353,18 +403,12 @@ RunPager::~RunPager()
 }
 
 
-string showBytes(unsigned long long bytes)
-{
-    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
-}
-
-
 PrintFreed::~PrintFreed()
 {
     if (show)
-        std::cout << format("%1% store paths deleted, %2% freed\n")
-            % results.paths.size()
-            % showBytes(results.bytesFreed);
+        std::cout << fmt("%d store paths deleted, %s freed\n",
+            results.paths.size(),
+            showBytes(results.bytesFreed));
 }
 
 Exit::~Exit() { }

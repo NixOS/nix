@@ -1,6 +1,7 @@
 ((c++-mode . (
   (c-file-style . "k&r")
   (c-basic-offset . 4)
+  (c-block-comment-prefix . "  ")
   (indent-tabs-mode . nil)
   (tab-width . 4)
   (show-trailing-whitespace . t)
@@ -13,4 +14,5 @@
   (eval . (c-set-offset 'arglist-cont-nonempty '+))
   (eval . (c-set-offset 'substatement-open 0))
   (eval . (c-set-offset 'access-label '-))
+  (eval . (c-set-offset 'inlambda 0))
   )))

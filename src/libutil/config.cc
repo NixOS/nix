@@ -1,14 +1,25 @@
 #include "config.hh"
 #include "args.hh"
-#include "json.hh"
+#include "abstract-setting-to-json.hh"
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
 bool Config::set(const std::string & name, const std::string & value)
 {
+    bool append = false;
     auto i = _settings.find(name);
-    if (i == _settings.end()) return false;
-    i->second.setting->set(value);
+    if (i == _settings.end()) {
+        if (hasPrefix(name, "extra-")) {
+            i = _settings.find(std::string(name, 6));
+            if (i == _settings.end() || !i->second.setting->isAppendable())
+                return false;
+            append = true;
+        } else
+            return false;
+    }
+    i->second.setting->set(value, append);
     i->second.setting->overriden = true;
     return true;
 }
@@ -65,60 +76,63 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool override
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
+void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+    unsigned int pos = 0;
+
+    while (pos < contents.size()) {
+        string line;
+        while (pos < contents.size() && contents[pos] != '\n')
+            line += contents[pos++];
+        pos++;
+
+        string::size_type hash = line.find('#');
+        if (hash != string::npos)
+            line = string(line, 0, hash);
+
+        vector<string> tokens = tokenizeString<vector<string> >(line);
+        if (tokens.empty()) continue;
+
+        if (tokens.size() < 2)
+            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+        auto include = false;
+        auto ignoreMissing = false;
+        if (tokens[0] == "include")
+            include = true;
+        else if (tokens[0] == "!include") {
+            include = true;
+            ignoreMissing = true;
+        }
+
+        if (include) {
+            if (tokens.size() != 2)
+                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            auto p = absPath(tokens[1], dirOf(path));
+            if (pathExists(p)) {
+                applyConfigFile(p);
+            } else if (!ignoreMissing) {
+                throw Error("file '%1%' included from '%2%' not found", p, path);
+            }
+            continue;
+        }
+
+        if (tokens[1] != "=")
+            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+        string name = tokens[0];
+
+        vector<string>::iterator i = tokens.begin();
+        advance(i, 2);
+
+        set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
+    };
+}
+
 void AbstractConfig::applyConfigFile(const Path & path)
 {
     try {
         string contents = readFile(path);
-
-        unsigned int pos = 0;
-
-        while (pos < contents.size()) {
-            string line;
-            while (pos < contents.size() && contents[pos] != '\n')
-                line += contents[pos++];
-            pos++;
-
-            string::size_type hash = line.find('#');
-            if (hash != string::npos)
-                line = string(line, 0, hash);
-
-            vector<string> tokens = tokenizeString<vector<string> >(line);
-            if (tokens.empty()) continue;
-
-            if (tokens.size() < 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-
-            auto include = false;
-            auto ignoreMissing = false;
-            if (tokens[0] == "include")
-                include = true;
-            else if (tokens[0] == "!include") {
-                include = true;
-                ignoreMissing = true;
-            }
-
-            if (include) {
-                if (tokens.size() != 2)
-                    throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-                auto p = absPath(tokens[1], dirOf(path));
-                if (pathExists(p)) {
-                    applyConfigFile(p);
-                } else if (!ignoreMissing) {
-                    throw Error("file '%1%' included from '%2%' not found", p, path);
-                }
-                continue;
-            }
-
-            if (tokens[1] != "=")
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
-
-            string name = tokens[0];
-
-            vector<string>::iterator i = tokens.begin();
-            advance(i, 2);
-
-            set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
-        };
+        applyConfig(contents, path);
     } catch (SysError &) { }
 }
 
@@ -128,15 +142,14 @@ void Config::resetOverriden()
         s.second.setting->overriden = false;
 }
 
-void Config::toJSON(JSONObject & out)
+nlohmann::json Config::toJSON()
 {
+    auto res = nlohmann::json::object();
     for (auto & s : _settings)
         if (!s.second.isAlias) {
-            JSONObject out2(out.object(s.first));
-            out2.attr("description", s.second.setting->description);
-            JSONPlaceholder out3(out2.placeholder("value"));
-            s.second.setting->toJSON(out3);
+            res.emplace(s.first, s.second.setting->toJSON());
         }
+    return res;
 }
 
 void Config::convertToArgs(Args & args, const std::string & category)
@@ -150,13 +163,26 @@ AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
     const std::set<std::string> & aliases)
-    : name(name), description(description), aliases(aliases)
+    : name(name), description(stripIndentation(description)), aliases(aliases)
 {
 }
 
-void AbstractSetting::toJSON(JSONPlaceholder & out)
+void AbstractSetting::setDefault(const std::string & str)
 {
-    out.write(to_string());
+    if (!overriden) set(str);
+}
+
+nlohmann::json AbstractSetting::toJSON()
+{
+    return nlohmann::json(toJSONObject());
+}
+
+std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
+{
+    std::map<std::string, nlohmann::json> obj;
+    obj.emplace("description", description);
+    obj.emplace("aliases", aliases);
+    return obj;
 }
 
 void AbstractSetting::convertToArg(Args & args, const std::string & category)
@@ -164,48 +190,60 @@ void AbstractSetting::convertToArg(Args & args, const std::string & category)
 }
 
 template<typename T>
-void BaseSetting<T>::toJSON(JSONPlaceholder & out)
+bool BaseSetting<T>::isAppendable()
 {
-    out.write(value);
+    return false;
 }
 
 template<typename T>
 void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description(description)
-        .arity(1)
-        .handler([=](std::vector<std::string> ss) { overriden = true; set(ss[0]); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = fmt("Set the `%s` setting.", name),
+        .category = category,
+        .labels = {"value"},
+        .handler = {[=](std::string s) { overriden = true; set(s); }},
+    });
+
+    if (isAppendable())
+        args.addFlag({
+            .longName = "extra-" + name,
+            .description = fmt("Append to the `%s` setting.", name),
+            .category = category,
+            .labels = {"value"},
+            .handler = {[=](std::string s) { overriden = true; set(s, true); }},
+        });
 }
 
-template<> void BaseSetting<std::string>::set(const std::string & str)
+template<> void BaseSetting<std::string>::set(const std::string & str, bool append)
 {
     value = str;
 }
 
-template<> std::string BaseSetting<std::string>::to_string()
+template<> std::string BaseSetting<std::string>::to_string() const
 {
     return value;
 }
 
 template<typename T>
-void BaseSetting<T>::set(const std::string & str)
+void BaseSetting<T>::set(const std::string & str, bool append)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
-    if (!string2Int(str, value))
+    if (auto n = string2Int<T>(str))
+        value = *n;
+    else
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
 }
 
 template<typename T>
-std::string BaseSetting<T>::to_string()
+std::string BaseSetting<T>::to_string() const
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
     return std::to_string(value);
 }
 
-template<> void BaseSetting<bool>::set(const std::string & str)
+template<> void BaseSetting<bool>::set(const std::string & str, bool append)
 {
     if (str == "true" || str == "yes" || str == "1")
         value = true;
@@ -215,57 +253,83 @@ template<> void BaseSetting<bool>::set(const std::string & str)
         throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
-template<> std::string BaseSetting<bool>::to_string()
+template<> std::string BaseSetting<bool>::to_string() const
 {
     return value ? "true" : "false";
 }
 
 template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag()
-        .longName(name)
-        .description(description)
-        .handler([=](std::vector<std::string> ss) { override(true); })
-        .category(category);
-    args.mkFlag()
-        .longName("no-" + name)
-        .description(description)
-        .handler([=](std::vector<std::string> ss) { override(false); })
-        .category(category);
+    args.addFlag({
+        .longName = name,
+        .description = fmt("Enable the `%s` setting.", name),
+        .category = category,
+        .handler = {[=]() { override(true); }}
+    });
+    args.addFlag({
+        .longName = "no-" + name,
+        .description = fmt("Disable the `%s` setting.", name),
+        .category = category,
+        .handler = {[=]() { override(false); }}
+    });
 }
 
-template<> void BaseSetting<Strings>::set(const std::string & str)
+template<> void BaseSetting<Strings>::set(const std::string & str, bool append)
 {
-    value = tokenizeString<Strings>(str);
+    auto ss = tokenizeString<Strings>(str);
+    if (!append) value.clear();
+    for (auto & s : ss) value.push_back(std::move(s));
 }
 
-template<> std::string BaseSetting<Strings>::to_string()
+template<> bool BaseSetting<Strings>::isAppendable()
 {
-    return concatStringsSep(" ", value);
+    return true;
 }
 
-template<> void BaseSetting<Strings>::toJSON(JSONPlaceholder & out)
-{
-    JSONList list(out.list());
-    for (auto & s : value)
-        list.elem(s);
-}
-
-template<> void BaseSetting<StringSet>::set(const std::string & str)
-{
-    value = tokenizeString<StringSet>(str);
-}
-
-template<> std::string BaseSetting<StringSet>::to_string()
+template<> std::string BaseSetting<Strings>::to_string() const
 {
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringSet>::toJSON(JSONPlaceholder & out)
+template<> void BaseSetting<StringSet>::set(const std::string & str, bool append)
 {
-    JSONList list(out.list());
-    for (auto & s : value)
-        list.elem(s);
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<StringSet>(str))
+        value.insert(s);
+}
+
+template<> bool BaseSetting<StringSet>::isAppendable()
+{
+    return true;
+}
+
+template<> std::string BaseSetting<StringSet>::to_string() const
+{
+    return concatStringsSep(" ", value);
+}
+
+template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
+{
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<Strings>(str)) {
+        auto eq = s.find_first_of('=');
+        if (std::string::npos != eq)
+            value.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
+        // else ignored
+    }
+}
+
+template<> bool BaseSetting<StringMap>::isAppendable()
+{
+    return true;
+}
+
+template<> std::string BaseSetting<StringMap>::to_string() const
+{
+    Strings kvstrs;
+    std::transform(value.begin(), value.end(), back_inserter(kvstrs),
+        [&](auto kvpair){ return kvpair.first + "=" + kvpair.second; });
+    return concatStringsSep(" ", kvstrs);
 }
 
 template class BaseSetting<int>;
@@ -278,8 +342,9 @@ template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
+template class BaseSetting<StringMap>;
 
-void PathSetting::set(const std::string & str)
+void PathSetting::set(const std::string & str, bool append)
 {
     if (str == "") {
         if (allowEmpty)
@@ -312,10 +377,12 @@ void GlobalConfig::resetOverriden()
         config->resetOverriden();
 }
 
-void GlobalConfig::toJSON(JSONObject & out)
+nlohmann::json GlobalConfig::toJSON()
 {
+    auto res = nlohmann::json::object();
     for (auto & config : *configRegistrations)
-        config->toJSON(out);
+        res.update(config->toJSON());
+    return res;
 }
 
 void GlobalConfig::convertToArgs(Args & args, const std::string & category)

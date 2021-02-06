@@ -2,53 +2,7 @@
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 __ETC_PROFILE_NIX_SOURCED=1
 
-# Set up secure multi-user builds: non-root users build through the
-# Nix daemon.
-if [ "$USER" != root -o ! -w @localstatedir@/nix/db ]; then
-    export NIX_REMOTE=daemon
-fi
-
-export NIX_USER_PROFILE_DIR="@localstatedir@/nix/profiles/per-user/$USER"
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
-
-# Set up the per-user profile.
-mkdir -m 0755 -p $NIX_USER_PROFILE_DIR
-if ! test -O "$NIX_USER_PROFILE_DIR"; then
-    echo "WARNING: bad ownership on $NIX_USER_PROFILE_DIR" >&2
-fi
-
-if test -w $HOME; then
-  if ! test -L $HOME/.nix-profile; then
-      if test "$USER" != root; then
-          ln -s $NIX_USER_PROFILE_DIR/profile $HOME/.nix-profile
-      else
-          # Root installs in the system-wide profile by default.
-          ln -s @localstatedir@/nix/profiles/default $HOME/.nix-profile
-      fi
-  fi
-
-  # Subscribe the root user to the NixOS channel by default.
-  if [ "$USER" = root -a ! -e $HOME/.nix-channels ]; then
-      echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
-  fi
-
-  # Create the per-user garbage collector roots directory.
-  NIX_USER_GCROOTS_DIR=@localstatedir@/nix/gcroots/per-user/$USER
-  mkdir -m 0755 -p $NIX_USER_GCROOTS_DIR
-  if ! test -O "$NIX_USER_GCROOTS_DIR"; then
-      echo "WARNING: bad ownership on $NIX_USER_GCROOTS_DIR" >&2
-  fi
-
-  # Set up a default Nix expression from which to install stuff.
-  if [ ! -e $HOME/.nix-defexpr -o -L $HOME/.nix-defexpr ]; then
-      rm -f $HOME/.nix-defexpr
-      mkdir -p $HOME/.nix-defexpr
-      if [ "$USER" != root ]; then
-          ln -s @localstatedir@/nix/profiles/per-user/root/channels $HOME/.nix-defexpr/channels_root
-      fi
-  fi
-fi
-
 
 # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
 if [ ! -z "${NIX_SSL_CERT_FILE:-}" ]; then
@@ -63,12 +17,21 @@ elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
     export NIX_SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
 else
   # Fall back to what is in the nix profiles, favouring whatever is defined last.
-  for i in $NIX_PROFILES; do
-    if [ -e $i/etc/ssl/certs/ca-bundle.crt ]; then
-      export NIX_SSL_CERT_FILE=$i/etc/ssl/certs/ca-bundle.crt
+  check_nix_profiles() {
+    if [ "$ZSH_VERSION" ]; then
+      # Zsh by default doesn't split words in unquoted parameter expansion.
+      # Set local_options for these options to be reverted at the end of the function
+      # and shwordsplit to force splitting words in $NIX_PROFILES below.
+      setopt local_options shwordsplit
     fi
-  done
+    for i in $NIX_PROFILES; do
+      if [ -e $i/etc/ssl/certs/ca-bundle.crt ]; then
+        export NIX_SSL_CERT_FILE=$i/etc/ssl/certs/ca-bundle.crt
+      fi
+    done
+  }
+  check_nix_profiles
+  unset -f check_nix_profiles
 fi
 
-export NIX_PATH="nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs:@localstatedir@/nix/profiles/per-user/root/channels"
 export PATH="$HOME/.nix-profile/bin:@localstatedir@/nix/profiles/default/bin:$PATH"

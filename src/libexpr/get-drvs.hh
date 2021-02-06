@@ -20,7 +20,7 @@ private:
     mutable string name;
     mutable string system;
     mutable string drvPath;
-    mutable string outPath;
+    mutable std::optional<string> outPath;
     mutable string outputName;
     Outputs outputs;
 
@@ -78,7 +78,7 @@ typedef list<DrvInfo> DrvInfos;
 
 /* If value `v' denotes a derivation, return a DrvInfo object
    describing it. Otherwise return nothing. */
-std::experimental::optional<DrvInfo> getDerivation(EvalState & state,
+std::optional<DrvInfo> getDerivation(EvalState & state,
     Value & v, bool ignoreAssertionFailures);
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,

@@ -1,22 +1,35 @@
-Nix, the purely functional package manager
-------------------------------------------
+# Nix
 
-Nix is a new take on package management that is fairly unique. Because of its
-purity aspects, a lot of issues found in traditional package managers don't
-appear with Nix.
+[![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
+[![Test](https://github.com/NixOS/nix/workflows/Test/badge.svg)](https://github.com/NixOS/nix/actions)
 
-To find out more about the tool, usage and installation instructions, please
-read the manual, which is available on the Nix website at
-<http://nixos.org/nix/manual>.
+Nix is a powerful package manager for Linux and other Unix systems that makes package
+management reliable and reproducible. Please refer to the [Nix manual](https://nixos.org/nix/manual)
+for more details.
 
-## Contributing
+## Installation
 
-Take a look at the [Hacking Section](http://nixos.org/nix/manual/#chap-hacking)
-of the manual. It helps you to get started with building Nix from source.
+On Linux and macOS the easiest way to install Nix is to run the following shell command
+(as a user other than root):
+
+```console
+$ curl -L https://nixos.org/nix/install | sh
+```
+
+Information on additional installation methods is available on the [Nix download page](https://nixos.org/download.html).
+
+## Building And Developing
+
+See our [Hacking guide](https://hydra.nixos.org/job/nix/master/build.x86_64-linux/latest/download-by-type/doc/manual/contributing/hacking.html) in our manual for instruction on how to
+build nix from source with nix-build or how to get a development environment.
+
+## Additional Resources
+
+- [Nix manual](https://nixos.org/nix/manual)
+- [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
+- [NixOS Discourse](https://discourse.nixos.org/)
+- [IRC - #nixos on freenode.net](irc://irc.freenode.net/#nixos)
 
 ## License
 
-Nix is released under the LGPL v2.1
-
-This product includes software developed by the OpenSSL Project for
-use in the [OpenSSL Toolkit](http://www.OpenSSL.org/).
+Nix is released under the [LGPL v2.1](./COPYING).

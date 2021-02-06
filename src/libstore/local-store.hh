@@ -4,6 +4,7 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "sync.hh"
 #include "util.hh"
 
@@ -23,18 +24,26 @@ namespace nix {
 const int nixSchemaVersion = 10;
 
 
-struct Derivation;
-
-
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;
-    unsigned long long bytesFreed = 0;
-    unsigned long long blocksFreed = 0;
+    uint64_t bytesFreed = 0;
+    uint64_t blocksFreed = 0;
+};
+
+struct LocalStoreConfig : virtual LocalFSStoreConfig
+{
+    using LocalFSStoreConfig::LocalFSStoreConfig;
+
+    Setting<bool> requireSigs{(StoreConfig*) this,
+        settings.requireSigs,
+        "require-sigs", "whether store paths should have a trusted signature on import"};
+
+    const std::string name() override { return "Local Store"; }
 };
 
 
-class LocalStore : public LocalFSStore
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore
 {
 private:
 
@@ -46,19 +55,8 @@ private:
         /* The SQLite database object. */
         SQLite db;
 
-        /* Some precompiled SQLite statements. */
-        SQLiteStmt stmtRegisterValidPath;
-        SQLiteStmt stmtUpdatePathInfo;
-        SQLiteStmt stmtAddReference;
-        SQLiteStmt stmtQueryPathInfo;
-        SQLiteStmt stmtQueryReferences;
-        SQLiteStmt stmtQueryReferrers;
-        SQLiteStmt stmtInvalidatePath;
-        SQLiteStmt stmtAddDerivationOutput;
-        SQLiteStmt stmtQueryValidDerivers;
-        SQLiteStmt stmtQueryDerivationOutputs;
-        SQLiteStmt stmtQueryPathFromHashPart;
-        SQLiteStmt stmtQueryValidPaths;
+        struct Stmts;
+        std::unique_ptr<Stmts> stmts;
 
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
@@ -81,7 +79,7 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    Sync<State, std::recursive_mutex> _state;
+    Sync<State> _state;
 
 public:
 
@@ -98,16 +96,12 @@ public:
 
 private:
 
-    Setting<bool> requireSigs{(Store*) this,
-        settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
-
     const PublicKeys & getPublicKeys();
 
 public:
 
     // Hack for build-remote.cc.
-    PathSet locksHeld = tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS"));
+    PathSet locksHeld;
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
@@ -119,57 +113,41 @@ public:
 
     std::string getUri() override;
 
-    bool isValidPathUncached(const Path & path) override;
+    bool isValidPathUncached(const StorePath & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths,
+    StorePathSet queryValidPaths(const StorePathSet & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
-    PathSet queryAllValidPaths() override;
+    StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) override;
+    void queryPathInfoUncached(const StorePath & path,
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    void queryReferrers(const Path & path, PathSet & referrers) override;
+    void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
-    PathSet queryValidDerivers(const Path & path) override;
+    StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    PathSet queryDerivationOutputs(const Path & path) override;
+    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path) override;
 
-    StringSet queryDerivationOutputNames(const Path & path) override;
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    Path queryPathFromHashPart(const string & hashPart) override;
+    StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    PathSet querySubstitutablePaths(const PathSet & paths) override;
-
-    void querySubstitutablePathInfos(const PathSet & paths,
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    bool pathInfoIsTrusted(const ValidPathInfo &) override;
+
     void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    Path addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override;
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair) override;
 
-    /* Like addToStore(), but the contents of the path are contained
-       in `dump', which is either a NAR serialisation (if recursive ==
-       true) or simply the contents of a regular file (if recursive ==
-       false). */
-    Path addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair);
+    StorePath addTextToStore(const string & name, const string & s,
+        const StorePathSet & references, RepairFlag repair) override;
 
-    Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, RepairFlag repair) override;
-
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
-
-    void ensurePath(const Path & path) override;
-
-    void addTempRoot(const Path & path) override;
+    void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
 
@@ -180,11 +158,11 @@ private:
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
-    std::set<std::pair<pid_t, Path>> readTempRoots(FDs & fds);
+    void findTempRoots(FDs & fds, Roots & roots, bool censor);
 
 public:
 
-    Roots findRoots() override;
+    Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
@@ -213,15 +191,20 @@ public:
 
     void vacuumDB();
 
-    /* Repair the contents of the given path by redownloading it using
-       a substituter (if available). */
-    void repairPath(const Path & path);
+    void repairPath(const StorePath & path) override;
 
-    void addSignatures(const Path & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     /* If free disk space in /nix/store if below minFree, delete
        garbage until it exceeds maxFree. */
     void autoGC(bool sync = true);
+
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
+    void registerDrvOutput(const Realisation & info) override;
+    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
 
 private:
 
@@ -231,17 +214,19 @@ private:
 
     void makeStoreWritable();
 
-    uint64_t queryValidPathId(State & state, const Path & path);
+    uint64_t queryValidPathId(State & state, const StorePath & path);
 
     uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
 
-    void invalidatePath(State & state, const Path & path);
+    void invalidatePath(State & state, const StorePath & path);
 
     /* Delete a path from the Nix store. */
-    void invalidatePathChecked(const Path & path);
+    void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const PathSet & store,
-        PathSet & done, PathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const Path & path, const StringSet & store,
+        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
+    std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
@@ -256,26 +241,26 @@ private:
 
     void tryToDelete(GCState & state, const Path & path);
 
-    bool canReachRoot(GCState & state, PathSet & visited, const Path & path);
+    bool canReachRoot(GCState & state, StorePathSet & visited, const StorePath & path);
 
     void deletePathRecursive(GCState & state, const Path & path);
 
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
 
-    int openGCLock(LockType lockType);
+    AutoCloseFD openGCLock(LockType lockType);
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
-    Roots findRootsNoTemp();
+    void findRootsNoTemp(Roots & roots, bool censor);
 
-    PathSet findRuntimeRoots();
+    void findRuntimeRoots(Roots & roots, bool censor);
 
     void removeUnusedLinks(const GCState & state);
 
     Path createTempDirInStore();
 
-    void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
+    void checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv);
 
     typedef std::unordered_set<ino_t> InodeHash;
 
@@ -284,8 +269,8 @@ private:
     void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
-    bool isValidPath_(State & state, const Path & path);
-    void queryReferrers(State & state, const Path & path, PathSet & referrers);
+    bool isValidPath_(State & state, const StorePath & path);
+    void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */
@@ -293,8 +278,10 @@ private:
 
     Path getRealStoreDir() override { return realStoreDir; }
 
-    friend class DerivationGoal;
-    friend class SubstitutionGoal;
+    void createUser(const std::string & userName, uid_t userId) override;
+
+    friend struct DerivationGoal;
+    friend struct SubstitutionGoal;
 };
 
 

@@ -1,13 +1,21 @@
 #include "binary-cache-store.hh"
-#include "download.hh"
+#include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
+#include "callback.hh"
 
 namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
-class HttpBinaryCacheStore : public BinaryCacheStore
+struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+{
+    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+
+    const std::string name() override { return "Http Binary Cache Store"; }
+};
+
+class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
 private:
 
@@ -24,9 +32,15 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const Params & params, const Path & _cacheUri)
-        : BinaryCacheStore(params)
-        , cacheUri(_cacheUri)
+        const std::string & scheme,
+        const Path & _cacheUri,
+        const Params & params)
+        : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , HttpBinaryCacheStoreConfig(params)
+        , Store(params)
+        , BinaryCacheStore(params)
+        , cacheUri(scheme + "://" + _cacheUri)
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -42,14 +56,25 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (!diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
+        if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
+            priority.setDefault(fmt("%d", cacheInfo->priority));
+        } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", cacheUri);
             }
-            diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
+            diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
+    }
+
+    static std::set<std::string> uriSchemes()
+    {
+        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
+        auto ret = std::set<std::string>({"http", "https"});
+        if (forceHttp) ret.insert("file");
+        return ret;
     }
 
 protected:
@@ -82,15 +107,14 @@ protected:
         checkEnabled();
 
         try {
-            DownloadRequest request(cacheUri + "/" + path);
+            FileTransferRequest request(makeRequest(path));
             request.head = true;
-            request.tries = 5;
-            getDownloader()->download(request);
+            getFileTransfer()->download(request);
             return true;
-        } catch (DownloadError & e) {
+        } catch (FileTransferError & e) {
             /* S3 buckets return 403 if a file doesn't exist and the
                bucket is unlistable, so treat 403 as 404. */
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+            if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                 return false;
             maybeDisable();
             throw;
@@ -98,24 +122,26 @@ protected:
     }
 
     void upsertFile(const std::string & path,
-        const std::string & data,
+        std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
-        auto req = DownloadRequest(cacheUri + "/" + path);
-        req.data = std::make_shared<string>(data); // FIXME: inefficient
+        auto req = makeRequest(path);
+        req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
         req.mimeType = mimeType;
         try {
-            getDownloader()->download(req);
-        } catch (DownloadError & e) {
+            getFileTransfer()->upload(req);
+        } catch (FileTransferError & e) {
             throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
     }
 
-    DownloadRequest makeRequest(const std::string & path)
+    FileTransferRequest makeRequest(const std::string & path)
     {
-        DownloadRequest request(cacheUri + "/" + path);
-        request.tries = 8;
-        return request;
+        return FileTransferRequest(
+            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
+            ? path
+            : cacheUri + "/" + path);
+
     }
 
     void getFile(const std::string & path, Sink & sink) override
@@ -123,9 +149,9 @@ protected:
         checkEnabled();
         auto request(makeRequest(path));
         try {
-            getDownloader()->download(std::move(request), sink);
-        } catch (DownloadError & e) {
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+            getFileTransfer()->download(std::move(request), sink);
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
             maybeDisable();
             throw;
@@ -133,41 +159,31 @@ protected:
     }
 
     void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) override
+        Callback<std::shared_ptr<std::string>> callback) noexcept override
     {
         checkEnabled();
 
         auto request(makeRequest(path));
 
-        getDownloader()->enqueueDownload(request,
-            {[callback, this](std::future<DownloadResult> result) {
+        auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+        getFileTransfer()->enqueueFileTransfer(request,
+            {[callbackPtr, this](std::future<FileTransferResult> result) {
                 try {
-                    callback(result.get().data);
-                } catch (DownloadError & e) {
-                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
-                        return callback(std::shared_ptr<std::string>());
+                    (*callbackPtr)(result.get().data);
+                } catch (FileTransferError & e) {
+                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
+                        return (*callbackPtr)(std::shared_ptr<std::string>());
                     maybeDisable();
-                    callback.rethrow();
+                    callbackPtr->rethrow();
                 } catch (...) {
-                    callback.rethrow();
+                    callbackPtr->rethrow();
                 }
             }});
     }
 
 };
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, 7) != "http://" &&
-        std::string(uri, 0, 8) != "https://" &&
-        (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") != "1" || std::string(uri, 0, 7) != "file://")
-        ) return 0;
-    auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
-    store->init();
-    return store;
-});
+static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
 
 }
-

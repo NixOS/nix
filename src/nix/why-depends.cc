@@ -37,16 +37,12 @@ struct CmdWhyDepends : SourceExprCommand
         expectArg("package", &_package);
         expectArg("dependency", &_dependency);
 
-        mkFlag()
-            .longName("all")
-            .shortName('a')
-            .description("show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path")
-            .set(&all, true);
-    }
-
-    std::string name() override
-    {
-        return "why-depends";
+        addFlag({
+            .longName = "all",
+            .shortName = 'a',
+            .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
+            .handler = {&all, true},
+        });
     }
 
     std::string description() override
@@ -54,37 +50,30 @@ struct CmdWhyDepends : SourceExprCommand
         return "show why a package has another package in its closure";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show one path through the dependency graph leading from Hello to Glibc:",
-                "nix why-depends nixpkgs.hello nixpkgs.glibc"
-            },
-            Example{
-                "To show all files and paths in the dependency graph leading from Thunderbird to libX11:",
-                "nix why-depends --all nixpkgs.thunderbird nixpkgs.xorg.libX11"
-            },
-            Example{
-                "To show why Glibc depends on itself:",
-                "nix why-depends nixpkgs.glibc nixpkgs.glibc"
-            },
-        };
+        return
+          #include "why-depends.md"
+          ;
     }
+
+    Category category() override { return catSecondary; }
 
     void run(ref<Store> store) override
     {
-        auto package = parseInstallable(*this, store, _package, false);
-        auto packagePath = toStorePath(store, Build, package);
-        auto dependency = parseInstallable(*this, store, _dependency, false);
-        auto dependencyPath = toStorePath(store, NoBuild, dependency);
-        auto dependencyPathHash = storePathToHash(dependencyPath);
+        auto package = parseInstallable(store, _package);
+        auto packagePath = toStorePath(store, Realise::Outputs, operateOn, package);
+        auto dependency = parseInstallable(store, _dependency);
+        auto dependencyPath = toStorePath(store, Realise::Derivation, operateOn, dependency);
+        auto dependencyPathHash = dependencyPath.hashPart();
 
-        PathSet closure;
+        StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
         if (!closure.count(dependencyPath)) {
-            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
+            printError("'%s' does not depend on '%s'",
+                store->printStorePath(packagePath),
+                store->printStorePath(dependencyPath));
             return;
         }
 
@@ -96,29 +85,31 @@ struct CmdWhyDepends : SourceExprCommand
 
         struct Node
         {
-            Path path;
-            PathSet refs;
-            PathSet rrefs;
+            StorePath path;
+            StorePathSet refs;
+            StorePathSet rrefs;
             size_t dist = inf;
             Node * prev = nullptr;
             bool queued = false;
             bool visited = false;
         };
 
-        std::map<Path, Node> graph;
+        std::map<StorePath, Node> graph;
 
         for (auto & path : closure)
-            graph.emplace(path, Node{path, store->queryPathInfo(path)->references});
+            graph.emplace(path, Node {
+                .path = path,
+                .refs = store->queryPathInfo(path)->references,
+                .dist = path == dependencyPath ? 0 : inf
+            });
 
         // Transpose the graph.
         for (auto & node : graph)
             for (auto & ref : node.second.refs)
-                graph[ref].rrefs.insert(node.first);
+                graph.find(ref)->second.rrefs.insert(node.first);
 
         /* Run Dijkstra's shortest path algorithm to get the distance
            of every path in the closure to 'dependency'. */
-        graph[dependencyPath].dist = 0;
-
         std::priority_queue<Node *> queue;
 
         queue.push(&graph.at(dependencyPath));
@@ -148,20 +139,17 @@ struct CmdWhyDepends : SourceExprCommand
            and `dependency`. */
         std::function<void(Node &, const string &, const string &)> printNode;
 
-        const string treeConn = "╠═══";
-        const string treeLast = "╚═══";
-        const string treeLine = "║   ";
-        const string treeNull = "    ";
-
         struct BailOut { };
 
         printNode = [&](Node & node, const string & firstPad, const string & tailPad) {
+            auto pathS = store->printStorePath(node.path);
+
             assert(node.dist != inf);
-            std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
+            logger->cout("%s%s%s%s" ANSI_NORMAL,
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
-                firstPad != "" ? "=> " : "",
-                node.path);
+                firstPad != "" ? "→ " : "",
+                pathS);
 
             if (node.path == dependencyPath && !all
                 && packagePath != dependencyPath)
@@ -180,7 +168,7 @@ struct CmdWhyDepends : SourceExprCommand
                 auto & node2 = graph.at(ref);
                 if (node2.dist == inf) continue;
                 refs.emplace(node2.dist, &node2);
-                hashes.insert(storePathToHash(node2.path));
+                hashes.insert(std::string(node2.path.hashPart()));
             }
 
             /* For each reference, find the files and symlinks that
@@ -192,7 +180,7 @@ struct CmdWhyDepends : SourceExprCommand
             visitPath = [&](const Path & p) {
                 auto st = accessor->stat(p);
 
-                auto p2 = p == node.path ? "/" : std::string(p, node.path.size() + 1);
+                auto p2 = p == pathS ? "/" : std::string(p, pathS.size() + 1);
 
                 auto getColour = [&](const std::string & hash) {
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
@@ -216,7 +204,7 @@ struct CmdWhyDepends : SourceExprCommand
                                     p2,
                                     hilite(filterPrintable(
                                             std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
-                                        pos - pos2, storePathHashLen,
+                                        pos - pos2, StorePath::HashLen,
                                         getColour(hash))));
                         }
                     }
@@ -229,18 +217,18 @@ struct CmdWhyDepends : SourceExprCommand
                         auto pos = target.find(hash);
                         if (pos != std::string::npos)
                             hits[hash].emplace_back(fmt("%s -> %s\n", p2,
-                                    hilite(target, pos, storePathHashLen, getColour(hash))));
+                                    hilite(target, pos, StorePath::HashLen, getColour(hash))));
                     }
                 }
             };
 
             // FIXME: should use scanForReferences().
 
-            visitPath(node.path);
+            visitPath(pathS);
 
             RunPager pager;
             for (auto & ref : refs) {
-                auto hash = storePathToHash(ref.second->path);
+                std::string hash(ref.second->path.hashPart());
 
                 bool last = all ? ref == *refs.rbegin() : true;
 
@@ -264,4 +252,4 @@ struct CmdWhyDepends : SourceExprCommand
     }
 };
 
-static RegisterCommand r1(make_ref<CmdWhyDepends>());
+static auto rCmdWhyDepends = registerCommand<CmdWhyDepends>("why-depends");

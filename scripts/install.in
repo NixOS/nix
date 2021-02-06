@@ -10,6 +10,8 @@ oops() {
     exit 1
 }
 
+umask 0022
+
 tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
           oops "Can't create temporary directory for downloading the Nix binary tarball")"
 cleanup() {
@@ -18,34 +20,72 @@ cleanup() {
 trap cleanup EXIT INT QUIT TERM
 
 require_util() {
-    type "$1" > /dev/null 2>&1 || command -v "$1" > /dev/null 2>&1 ||
+    command -v "$1" > /dev/null 2>&1 ||
         oops "you do not have '$1' installed, which I need to $2"
 }
 
 case "$(uname -s).$(uname -m)" in
-    Linux.x86_64) system=x86_64-linux; hash=@binaryTarball_x86_64-linux@;;
-    Linux.i?86) system=i686-linux; hash=@binaryTarball_i686-linux@;;
-    Linux.aarch64) system=aarch64-linux; hash=@binaryTarball_aarch64-linux@;;
-    Darwin.x86_64) system=x86_64-darwin; hash=@binaryTarball_x86_64-darwin@;;
+    Linux.x86_64)
+        hash=@tarballHash_x86_64-linux@
+        path=@tarballPath_x86_64-linux@
+        system=x86_64-linux
+        ;;
+    Linux.i?86)
+        hash=@tarballHash_i686-linux@
+        path=@tarballPath_i686-linux@
+        system=i686-linux
+        ;;
+    Linux.aarch64)
+        hash=@tarballHash_aarch64-linux@
+        path=@tarballPath_aarch64-linux@
+        system=aarch64-linux
+        ;;
+    Darwin.x86_64)
+        hash=@tarballHash_x86_64-darwin@
+        path=@tarballPath_x86_64-darwin@
+        system=x86_64-darwin
+        ;;
+    Darwin.arm64|Darwin.aarch64)
+        # check for Rosetta 2 support
+        if ! [ -f /Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist ]; then
+          oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
+        fi
+
+        hash=@binaryTarball_x86_64-darwin@
+        path=@tarballPath_x86_64-darwin@
+        # eventually maybe: aarch64-darwin
+        system=x86_64-darwin
+        ;;
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
 
-url="https://nixos.org/releases/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.bz2"
+# Use this command-line option to fetch the tarballs using nar-serve or Cachix
+if "${1:---tarball-url-prefix}"; then
+    if [ -z "${2:-}" ]; then
+        oops "missing argument for --tarball-url-prefix"
+    fi
+    url=${2}/${path}
+    shift 2
+else
+    url=https://releases.nixos.org/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz
+fi
 
-tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.bz2")"
+tarball=$tmpDir/nix-@nixVersion@-$system.tar.xz
 
 require_util curl "download the binary tarball"
-require_util bzcat "decompress the binary tarball"
 require_util tar "unpack the binary tarball"
+if [ "$(uname -s)" != "Darwin" ]; then
+    require_util xz "unpack the binary tarball"
+fi
 
 echo "downloading Nix @nixVersion@ binary tarball for $system from '$url' to '$tmpDir'..."
 curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
 
-if type sha256sum > /dev/null 2>&1; then
+if command -v sha256sum > /dev/null 2>&1; then
     hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
-elif type shasum > /dev/null 2>&1; then
+elif command -v shasum > /dev/null 2>&1; then
     hash2="$(shasum -a 256 -b "$tarball" | cut -c1-64)"
-elif type openssl > /dev/null 2>&1; then
+elif command -v openssl > /dev/null 2>&1; then
     hash2="$(openssl dgst -r -sha256 "$tarball" | cut -c1-64)"
 else
     oops "cannot verify the SHA-256 hash of '$url'; you need one of 'shasum', 'sha256sum', or 'openssl'"
@@ -57,11 +97,12 @@ fi
 
 unpack=$tmpDir/unpack
 mkdir -p "$unpack"
-< "$tarball" bzcat | tar -xf - -C "$unpack" || oops "failed to unpack '$url'"
+tar -xJf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
 
 script=$(echo "$unpack"/*/install)
 
 [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
+export INVOKED_FROM_INSTALL_IN=1
 "$script" "$@"
 
 } # End of wrapping

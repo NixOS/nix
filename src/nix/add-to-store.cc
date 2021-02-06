@@ -8,34 +8,21 @@ using namespace nix;
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
-    std::experimental::optional<std::string> namePart;
+    std::optional<std::string> namePart;
+    FileIngestionMethod ingestionMethod;
 
     CmdAddToStore()
     {
+        // FIXME: completion
         expectArg("path", &path);
 
-        mkFlag()
-            .longName("name")
-            .shortName('n')
-            .description("name component of the store path")
-            .labels({"name"})
-            .dest(&namePart);
-    }
-
-    std::string name() override
-    {
-        return "add-to-store";
-    }
-
-    std::string description() override
-    {
-        return "add a path to the Nix store";
-    }
-
-    Examples examples() override
-    {
-        return {
-        };
+        addFlag({
+            .longName = "name",
+            .shortName = 'n',
+            .description = "Override the name component of the store path. It defaults to the base name of *path*.",
+            .labels = {"name"},
+            .handler = {&namePart},
+        });
     }
 
     void run(ref<Store> store) override
@@ -45,17 +32,73 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         StringSink sink;
         dumpPath(path, sink);
 
-        ValidPathInfo info;
-        info.narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, *sink.s);
+
+        Hash hash = narHash;
+        if (ingestionMethod == FileIngestionMethod::Flat) {
+            HashSink hsink(htSHA256);
+            readFile(path, hsink);
+            hash = hsink.finish().first;
+        }
+
+        ValidPathInfo info {
+            store->makeFixedOutputPath(ingestionMethod, hash, *namePart),
+            narHash,
+        };
         info.narSize = sink.s->size();
-        info.path = store->makeFixedOutputPath(true, info.narHash, *namePart);
-        info.ca = makeFixedOutputCA(true, info.narHash);
+        info.ca = std::optional { FixedOutputHash {
+            .method = ingestionMethod,
+            .hash = hash,
+        } };
 
-        if (!dryRun)
-            store->addToStore(info, sink.s);
+        if (!dryRun) {
+            auto source = StringSource { *sink.s };
+            store->addToStore(info, source);
+        }
 
-        std::cout << fmt("%s\n", info.path);
+        logger->cout("%s", store->printStorePath(info.path));
     }
 };
 
-static RegisterCommand r1(make_ref<CmdAddToStore>());
+struct CmdAddFile : CmdAddToStore
+{
+    CmdAddFile()
+    {
+        ingestionMethod = FileIngestionMethod::Flat;
+    }
+
+    std::string description() override
+    {
+        return "add a regular file to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add-file.md"
+          ;
+    }
+};
+
+struct CmdAddPath : CmdAddToStore
+{
+    CmdAddPath()
+    {
+        ingestionMethod = FileIngestionMethod::Recursive;
+    }
+
+    std::string description() override
+    {
+        return "add a path to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add-path.md"
+          ;
+    }
+};
+
+static auto rCmdAddFile = registerCommand2<CmdAddFile>({"store", "add-file"});
+static auto rCmdAddPath = registerCommand2<CmdAddPath>({"store", "add-path"});

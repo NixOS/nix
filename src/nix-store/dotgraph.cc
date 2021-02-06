@@ -10,9 +10,9 @@ using std::cout;
 namespace nix {
 
 
-static string dotQuote(const string & s)
+static string dotQuote(std::string_view s)
 {
-    return "\"" + s + "\"";
+    return "\"" + std::string(s) + "\"";
 }
 
 
@@ -34,7 +34,7 @@ static string makeEdge(const string & src, const string & dst)
 }
 
 
-static string makeNode(const string & id, const string & label,
+static string makeNode(const string & id, std::string_view label,
     const string & colour)
 {
     format f = format("%1% [label = %2%, shape = box, "
@@ -44,108 +44,26 @@ static string makeNode(const string & id, const string & label,
 }
 
 
-static string symbolicName(const string & path)
+void printDotGraph(ref<Store> store, StorePathSet && roots)
 {
-    string p = baseNameOf(path);
-    return string(p, p.find('-') + 1);
-}
-
-
-#if 0
-string pathLabel(const Path & nePath, const string & elemPath)
-{
-    return (string) nePath + "-" + elemPath;
-}
-
-
-void printClosure(const Path & nePath, const StoreExpr & fs)
-{
-    PathSet workList(fs.closure.roots);
-    PathSet doneSet;
-
-    for (PathSet::iterator i = workList.begin(); i != workList.end(); ++i) {
-        cout << makeEdge(pathLabel(nePath, *i), nePath);
-    }
-
-    while (!workList.empty()) {
-        Path path = *(workList.begin());
-        workList.erase(path);
-
-        if (doneSet.find(path) == doneSet.end()) {
-            doneSet.insert(path);
-
-            ClosureElems::const_iterator elem = fs.closure.elems.find(path);
-            if (elem == fs.closure.elems.end())
-                throw Error(format("bad closure, missing path '%1%'") % path);
-
-            for (StringSet::const_iterator i = elem->second.refs.begin();
-                 i != elem->second.refs.end(); ++i)
-            {
-                workList.insert(*i);
-                cout << makeEdge(pathLabel(nePath, *i), pathLabel(nePath, path));
-            }
-
-            cout << makeNode(pathLabel(nePath, path),
-                symbolicName(path), "#ff0000");
-        }
-    }
-}
-#endif
-
-
-void printDotGraph(ref<Store> store, const PathSet & roots)
-{
-    PathSet workList(roots);
-    PathSet doneSet;
+    StorePathSet workList(std::move(roots));
+    StorePathSet doneSet;
 
     cout << "digraph G {\n";
 
     while (!workList.empty()) {
-        Path path = *(workList.begin());
-        workList.erase(path);
+        auto path = std::move(workList.extract(workList.begin()).value());
 
-        if (doneSet.find(path) != doneSet.end()) continue;
-        doneSet.insert(path);
+        if (!doneSet.insert(path).second) continue;
 
-        cout << makeNode(path, symbolicName(path), "#ff0000");
+        cout << makeNode(std::string(path.to_string()), path.name(), "#ff0000");
 
         for (auto & p : store->queryPathInfo(path)->references) {
             if (p != path) {
                 workList.insert(p);
-                cout << makeEdge(p, path);
+                cout << makeEdge(std::string(p.to_string()), std::string(path.to_string()));
             }
         }
-
-#if 0
-        StoreExpr ne = storeExprFromPath(path);
-
-        string label, colour;
-
-        if (ne.type == StoreExpr::neDerivation) {
-            for (PathSet::iterator i = ne.derivation.inputs.begin();
-                 i != ne.derivation.inputs.end(); ++i)
-            {
-                workList.insert(*i);
-                cout << makeEdge(*i, path);
-            }
-
-            label = "derivation";
-            colour = "#00ff00";
-            for (StringPairs::iterator i = ne.derivation.env.begin();
-                 i != ne.derivation.env.end(); ++i)
-                if (i->first == "name") label = i->second;
-        }
-
-        else if (ne.type == StoreExpr::neClosure) {
-            label = "<closure>";
-            colour = "#00ffff";
-            printClosure(path, ne);
-        }
-
-        else abort();
-
-        cout << makeNode(path, label, colour);
-#endif
     }
 
     cout << "}\n";

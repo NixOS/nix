@@ -1,18 +1,46 @@
 #include "args.hh"
 #include "hash.hh"
 
+#include <glob.h>
+
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
-Args::FlagMaker Args::mkFlag()
+void Args::addFlag(Flag && flag_)
 {
-    return FlagMaker(*this);
+    auto flag = std::make_shared<Flag>(std::move(flag_));
+    if (flag->handler.arity != ArityAny)
+        assert(flag->handler.arity == flag->labels.size());
+    assert(flag->longName != "");
+    longFlags[flag->longName] = flag;
+    if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
-Args::FlagMaker::~FlagMaker()
+void Completions::add(std::string completion, std::string description)
 {
-    assert(flag->longName != "");
-    args.longFlags[flag->longName] = flag;
-    if (flag->shortName) args.shortFlags[flag->shortName] = flag;
+    assert(description.find('\n') == std::string::npos);
+    insert(Completion {
+        .completion = completion,
+        .description = description
+    });
+}
+
+bool Completion::operator<(const Completion & other) const
+{ return completion < other.completion || (completion == other.completion && description < other.description); }
+
+bool pathCompletions = false;
+std::shared_ptr<Completions> completions;
+
+std::string completionMarker = "___COMPLETE___";
+
+std::optional<std::string> needsCompletion(std::string_view s)
+{
+    if (!completions) return {};
+    auto i = s.find(completionMarker);
+    if (i != std::string::npos)
+        return std::string(s.begin(), i);
+    return {};
 }
 
 void Args::parseCmdline(const Strings & _cmdline)
@@ -21,6 +49,14 @@ void Args::parseCmdline(const Strings & _cmdline)
     bool dashDash = false;
 
     Strings cmdline(_cmdline);
+
+    if (auto s = getEnv("NIX_GET_COMPLETIONS")) {
+        size_t n = std::stoi(*s);
+        assert(n > 0 && n <= cmdline.size());
+        *std::next(cmdline.begin(), n - 1) += completionMarker;
+        completions = std::make_shared<decltype(completions)::element_type>();
+        verbosity = lvlError;
+    }
 
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
@@ -47,9 +83,10 @@ void Args::parseCmdline(const Strings & _cmdline)
         }
         else if (!dashDash && std::string(arg, 0, 1) == "-") {
             if (!processFlag(pos, cmdline.end()))
-                throw UsageError(format("unrecognised flag '%1%'") % arg);
+                throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
+            pos = rewriteArgs(cmdline, pos);
             pendingArgs.push_back(*pos++);
             if (processArgs(pendingArgs, false))
                 pendingArgs.clear();
@@ -59,41 +96,6 @@ void Args::parseCmdline(const Strings & _cmdline)
     processArgs(pendingArgs, true);
 }
 
-void Args::printHelp(const string & programName, std::ostream & out)
-{
-    std::cout << "Usage: " << programName << " <FLAGS>...";
-    for (auto & exp : expectedArgs) {
-        std::cout << renderLabels({exp.label});
-        // FIXME: handle arity > 1
-        if (exp.arity == 0) std::cout << "...";
-        if (exp.optional) std::cout << "?";
-    }
-    std::cout << "\n";
-
-    auto s = description();
-    if (s != "")
-        std::cout << "\nSummary: " << s << ".\n";
-
-    if (longFlags.size()) {
-        std::cout << "\n";
-        std::cout << "Flags:\n";
-        printFlags(out);
-    }
-}
-
-void Args::printFlags(std::ostream & out)
-{
-    Table2 table;
-    for (auto & flag : longFlags) {
-        if (hiddenCategories.count(flag.second->category)) continue;
-        table.push_back(std::make_pair(
-                (flag.second->shortName ? std::string("-") + flag.second->shortName + ", " : "    ")
-                + "--" + flag.first + renderLabels(flag.second->labels),
-                flag.second->description));
-    }
-    printTable(out, table);
-}
-
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
     assert(pos != end);
@@ -101,19 +103,32 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
         std::vector<std::string> args;
-        for (size_t n = 0 ; n < flag.arity; ++n) {
+        bool anyCompleted = false;
+        for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
-                if (flag.arity == ArityAny) break;
-                throw UsageError(format("flag '%1%' requires %2% argument(s)")
-                    % name % flag.arity);
+                if (flag.handler.arity == ArityAny) break;
+                throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
+            if (flag.completer)
+                if (auto prefix = needsCompletion(*pos)) {
+                    anyCompleted = true;
+                    flag.completer(n, *prefix);
+                }
             args.push_back(*pos++);
         }
-        flag.handler(std::move(args));
+        if (!anyCompleted)
+            flag.handler.fun(std::move(args));
         return true;
     };
 
     if (string(*pos, 0, 2) == "--") {
+        if (auto prefix = needsCompletion(*pos)) {
+            for (auto & [name, flag] : longFlags) {
+                if (!hiddenCategories.count(flag->category)
+                    && hasPrefix(name, std::string(*prefix, 2)))
+                    completions->add("--" + name, flag->description);
+            }
+        }
         auto i = longFlags.find(string(*pos, 2));
         if (i == longFlags.end()) return false;
         return process("--" + i->first, *i->second);
@@ -126,6 +141,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         return process(std::string("-") + c, *i->second);
     }
 
+    if (auto prefix = needsCompletion(*pos)) {
+        if (prefix == "-") {
+            completions->add("--");
+            for (auto & [flagName, flag] : shortFlags)
+                completions->add(std::string("-") + flagName, flag->description);
+        }
+    }
+
     return false;
 }
 
@@ -133,7 +156,7 @@ bool Args::processArgs(const Strings & args, bool finish)
 {
     if (expectedArgs.empty()) {
         if (!args.empty())
-            throw UsageError(format("unexpected argument '%1%'") % args.front());
+            throw UsageError("unexpected argument '%1%'", args.front());
         return true;
     }
 
@@ -141,12 +164,17 @@ bool Args::processArgs(const Strings & args, bool finish)
 
     bool res = false;
 
-    if ((exp.arity == 0 && finish) ||
-        (exp.arity > 0 && args.size() == exp.arity))
+    if ((exp.handler.arity == ArityAny && finish) ||
+        (exp.handler.arity != ArityAny && args.size() == exp.handler.arity))
     {
         std::vector<std::string> ss;
-        for (auto & s : args) ss.push_back(s);
-        exp.handler(std::move(ss));
+        for (const auto &[n, s] : enumerate(args)) {
+            ss.push_back(s);
+            if (exp.completer)
+                if (auto prefix = needsCompletion(s))
+                    exp.completer(n, *prefix);
+        }
+        exp.handler.fun(ss);
         expectedArgs.pop_front();
         res = true;
     }
@@ -157,17 +185,106 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-Args::FlagMaker & Args::FlagMaker::mkHashTypeFlag(HashType * ht)
+nlohmann::json Args::toJSON()
 {
-    arity(1);
-    label("type");
-    description("hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')");
-    handler([ht](std::string s) {
-        *ht = parseHashType(s);
-        if (*ht == htUnknown)
-            throw UsageError("unknown hash type '%1%'", s);
-    });
-    return *this;
+    auto flags = nlohmann::json::object();
+
+    for (auto & [name, flag] : longFlags) {
+        auto j = nlohmann::json::object();
+        if (flag->shortName)
+            j["shortName"] = std::string(1, flag->shortName);
+        if (flag->description != "")
+            j["description"] = flag->description;
+        j["category"] = flag->category;
+        if (flag->handler.arity != ArityAny)
+            j["arity"] = flag->handler.arity;
+        if (!flag->labels.empty())
+            j["labels"] = flag->labels;
+        flags[name] = std::move(j);
+    }
+
+    auto args = nlohmann::json::array();
+
+    for (auto & arg : expectedArgs) {
+        auto j = nlohmann::json::object();
+        j["label"] = arg.label;
+        j["optional"] = arg.optional;
+        if (arg.handler.arity != ArityAny)
+            j["arity"] = arg.handler.arity;
+        args.push_back(std::move(j));
+    }
+
+    auto res = nlohmann::json::object();
+    res["description"] = description();
+    res["flags"] = std::move(flags);
+    res["args"] = std::move(args);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
+    return res;
+}
+
+static void hashTypeCompleter(size_t index, std::string_view prefix)
+{
+    for (auto & type : hashTypes)
+        if (hasPrefix(type, prefix))
+            completions->add(type);
+}
+
+Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
+{
+    return Flag {
+        .longName = std::move(longName),
+        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+        .labels = {"hash-algo"},
+        .handler = {[ht](std::string s) {
+            *ht = parseHashType(s);
+        }},
+        .completer = hashTypeCompleter
+    };
+}
+
+Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht)
+{
+    return Flag {
+        .longName = std::move(longName),
+        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+        .labels = {"hash-algo"},
+        .handler = {[oht](std::string s) {
+            *oht = std::optional<HashType> { parseHashType(s) };
+        }},
+        .completer = hashTypeCompleter
+    };
+}
+
+static void _completePath(std::string_view prefix, bool onlyDirs)
+{
+    pathCompletions = true;
+    glob_t globbuf;
+    int flags = GLOB_NOESCAPE | GLOB_TILDE;
+    #ifdef GLOB_ONLYDIR
+    if (onlyDirs)
+        flags |= GLOB_ONLYDIR;
+    #endif
+    if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
+        for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
+            if (onlyDirs) {
+                auto st = lstat(globbuf.gl_pathv[i]);
+                if (!S_ISDIR(st.st_mode)) continue;
+            }
+            completions->add(globbuf.gl_pathv[i]);
+        }
+        globfree(&globbuf);
+    }
+}
+
+void completePath(size_t, std::string_view prefix)
+{
+    _completePath(prefix, false);
+}
+
+void completeDir(size_t, std::string_view prefix)
+{
+    _completePath(prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -178,26 +295,61 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-std::string renderLabels(const Strings & labels)
+MultiCommand::MultiCommand(const Commands & commands)
+    : commands(commands)
 {
-    std::string res;
-    for (auto label : labels) {
-        for (auto & c : label) c = std::toupper(c);
-        res += " <" + label + ">";
-    }
-    return res;
+    expectArgs({
+        .label = "subcommand",
+        .optional = true,
+        .handler = {[=](std::string s) {
+            assert(!command);
+            if (auto prefix = needsCompletion(s)) {
+                for (auto & [name, command] : commands)
+                    if (hasPrefix(name, *prefix))
+                        completions->add(name);
+            }
+            auto i = commands.find(s);
+            if (i == commands.end())
+                throw UsageError("'%s' is not a recognised command", s);
+            command = {s, i->second()};
+        }}
+    });
+
+    categories[Command::catDefault] = "Available commands";
 }
 
-void printTable(std::ostream & out, const Table2 & table)
+bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
-    size_t max = 0;
-    for (auto & row : table)
-        max = std::max(max, row.first.size());
-    for (auto & row : table) {
-        out << "  " << row.first
-            << std::string(max - row.first.size() + 2, ' ')
-            << row.second << "\n";
+    if (Args::processFlag(pos, end)) return true;
+    if (command && command->second->processFlag(pos, end)) return true;
+    return false;
+}
+
+bool MultiCommand::processArgs(const Strings & args, bool finish)
+{
+    if (command)
+        return command->second->processArgs(args, finish);
+    else
+        return Args::processArgs(args, finish);
+}
+
+nlohmann::json MultiCommand::toJSON()
+{
+    auto cmds = nlohmann::json::object();
+
+    for (auto & [name, commandFun] : commands) {
+        auto command = commandFun();
+        auto j = command->toJSON();
+        auto cat = nlohmann::json::object();
+        cat["id"] = command->category();
+        cat["description"] = categories[command->category()];
+        j["category"] = std::move(cat);
+        cmds[name] = std::move(j);
     }
+
+    auto res = Args::toJSON();
+    res["commands"] = std::move(cmds);
+    return res;
 }
 
 }

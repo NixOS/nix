@@ -1,22 +1,26 @@
 #include "parsed-derivations.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
-ParsedDerivation::ParsedDerivation(const Path & drvPath, BasicDerivation & drv)
+ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv)
     : drvPath(drvPath), drv(drv)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = drv.env.find("__json");
     if (jsonAttr != drv.env.end()) {
         try {
-            structuredAttrs = nlohmann::json::parse(jsonAttr->second);
+            structuredAttrs = std::make_unique<nlohmann::json>(nlohmann::json::parse(jsonAttr->second));
         } catch (std::exception & e) {
-            throw Error("cannot process __json attribute of '%s': %s", drvPath, e.what());
+            throw Error("cannot process __json attribute of '%s': %s", drvPath.to_string(), e.what());
         }
     }
 }
 
-std::experimental::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
+ParsedDerivation::~ParsedDerivation() { }
+
+std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);
@@ -24,7 +28,7 @@ std::experimental::optional<std::string> ParsedDerivation::getStringAttr(const s
             return {};
         else {
             if (!i->is_string())
-                throw Error("attribute '%s' of derivation '%s' must be a string", name, drvPath);
+                throw Error("attribute '%s' of derivation '%s' must be a string", name, drvPath.to_string());
             return i->get<std::string>();
         }
     } else {
@@ -44,7 +48,7 @@ bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
             return def;
         else {
             if (!i->is_boolean())
-                throw Error("attribute '%s' of derivation '%s' must be a Boolean", name, drvPath);
+                throw Error("attribute '%s' of derivation '%s' must be a Boolean", name, drvPath.to_string());
             return i->get<bool>();
         }
     } else {
@@ -56,7 +60,7 @@ bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
     }
 }
 
-std::experimental::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
+std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);
@@ -64,11 +68,11 @@ std::experimental::optional<Strings> ParsedDerivation::getStringsAttr(const std:
             return {};
         else {
             if (!i->is_array())
-                throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
+                throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
             Strings res;
             for (auto j = i->begin(); j != i->end(); ++j) {
                 if (!j->is_string())
-                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
+                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
                 res.push_back(j->get<std::string>());
             }
             return res;
@@ -90,22 +94,31 @@ StringSet ParsedDerivation::getRequiredSystemFeatures() const
     return res;
 }
 
-bool ParsedDerivation::canBuildLocally() const
+bool ParsedDerivation::canBuildLocally(Store & localStore) const
 {
     if (drv.platform != settings.thisSystem.get()
         && !settings.extraPlatforms.get().count(drv.platform)
         && !drv.isBuiltin())
         return false;
 
+    if (settings.maxBuildJobs.get() == 0
+        && !drv.isBuiltin())
+        return false;
+
     for (auto & feature : getRequiredSystemFeatures())
-        if (!settings.systemFeatures.get().count(feature)) return false;
+        if (!localStore.systemFeatures.get().count(feature)) return false;
 
     return true;
 }
 
-bool ParsedDerivation::willBuildLocally() const
+bool ParsedDerivation::willBuildLocally(Store & localStore) const
 {
-    return getBoolAttr("preferLocalBuild") && canBuildLocally();
+    return getBoolAttr("preferLocalBuild") && canBuildLocally(localStore);
+}
+
+bool ParsedDerivation::substitutesAllowed() const
+{
+    return getBoolAttr("allowSubstitutes", true);
 }
 
 }

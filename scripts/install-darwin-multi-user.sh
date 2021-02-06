@@ -37,9 +37,16 @@ poly_service_setup_note() {
 EOF
 }
 
+poly_extra_try_me_commands(){
+  :
+}
+poly_extra_setup_instructions(){
+  :
+}
+
 poly_configure_nix_daemon_service() {
     _sudo "to set up the nix-daemon as a LaunchDaemon" \
-          ln -sfn "/nix/var/nix/profiles/default$PLIST_DEST" "$PLIST_DEST"
+          cp -f "/nix/var/nix/profiles/default$PLIST_DEST" "$PLIST_DEST"
 
     _sudo "to load the LaunchDaemon plist for nix-daemon" \
           launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist

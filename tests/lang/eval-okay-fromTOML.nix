@@ -46,15 +46,15 @@
     "character encoding" = "value"
     "ʎǝʞ" = "value"
     'key2' = "value"
-    #'quoted "value"' = "value"
+    'quoted "value"' = "value"
 
     name = "Orange"
 
-    # FIXME: cpptoml doesn't handle dotted keys properly yet.
-    #physical.color = "orange"
-    #physical.shape = "round"
-    #site."google.com" = true
+    physical.color = "orange"
+    physical.shape = "round"
+    site."google.com" = true
 
+    # This is legal according to the spec, but cpptoml doesn't handle it.
     #a.b.c = 1
     #a.d = 2
 
@@ -68,16 +68,14 @@
     int6 = 5_349_221
     int7 = 1_2_3_4_5
 
-    # FIXME: cpptoml doesn't support these yet:
+    hex1 = 0xDEADBEEF
+    hex2 = 0xdeadbeef
+    hex3 = 0xdead_beef
 
-    #hex1 = 0xDEADBEEF
-    #hex2 = 0xdeadbeef
-    #hex3 = 0xdead_beef
+    oct1 = 0o01234567
+    oct2 = 0o755
 
-    #oct1 = 0o01234567
-    #oct2 = 0o755
-
-    #bin1 = 0b11010110
+    bin1 = 0b11010110
 
     flt1 = +1.0
     flt2 = 3.1415
@@ -126,8 +124,8 @@
     key1 = "another string"
     key2 = 456
 
-    #[dog."tater.man"]
-    #type.name = "pug"
+    [dog."tater.man"]
+    type.name = "pug"
 
     [a.b.c]
     [ d.e.f ]
@@ -137,7 +135,7 @@
 
     name = { first = "Tom", last = "Preston-Werner" }
     point = { x = 1, y = 2 }
-    #animal = { type.name = "pug" }
+    animal = { type.name = "pug" }
 
     [[products]]
     name = "Hammer"
@@ -149,6 +147,25 @@
     name = "Nail"
     sku = 284758393
     color = "gray"
+
+    [[fruit]]
+      name = "apple"
+
+      [fruit.physical]
+        color = "red"
+        shape = "round"
+
+      [[fruit.variety]]
+        name = "red delicious"
+
+      [[fruit.variety]]
+        name = "granny smith"
+
+    [[fruit]]
+      name = "banana"
+
+      [[fruit.variety]]
+        name = "plantain"
   '')
 
   (builtins.fromTOML ''
@@ -181,4 +198,11 @@
     "checksum ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
     "checksum arrayvec 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)" = "a1e964f9e24d588183fcb43503abda40d288c8657dfc27311516ce2f05675aef"
   '')
+
+  (builtins.fromTOML ''
+    a = [[{ b = true }]]
+    c = [ [ { d = true } ] ]
+    e = [[123]]
+  '')
+
 ]

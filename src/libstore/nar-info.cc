@@ -1,39 +1,43 @@
 #include "globals.hh"
 #include "nar-info.hh"
+#include "store-api.hh"
 
 namespace nix {
 
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
+    : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {
     auto corrupt = [&]() {
-        throw Error(format("NAR info file '%1%' is corrupt") % whence);
+        return Error("NAR info file '%1%' is corrupt", whence);
     };
 
     auto parseHashField = [&](const string & s) {
         try {
-            return Hash(s);
+            return Hash::parseAnyPrefixed(s);
         } catch (BadHash &) {
-            corrupt();
-            return Hash(); // never reached
+            throw corrupt();
         }
     };
+
+    bool havePath = false;
+    bool haveNarHash = false;
 
     size_t pos = 0;
     while (pos < s.size()) {
 
         size_t colon = s.find(':', pos);
-        if (colon == std::string::npos) corrupt();
+        if (colon == std::string::npos) throw corrupt();
 
         std::string name(s, pos, colon - pos);
 
         size_t eol = s.find('\n', colon + 2);
-        if (eol == std::string::npos) corrupt();
+        if (eol == std::string::npos) throw corrupt();
 
         std::string value(s, colon + 2, eol - colon - 2);
 
         if (name == "StorePath") {
-            if (!store.isStorePath(value)) corrupt();
-            path = value;
+            path = store.parseStorePath(value);
+            havePath = true;
         }
         else if (name == "URL")
             url = value;
@@ -42,36 +46,37 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "FileHash")
             fileHash = parseHashField(value);
         else if (name == "FileSize") {
-            if (!string2Int(value, fileSize)) corrupt();
+            auto n = string2Int<decltype(fileSize)>(value);
+            if (!n) throw corrupt();
+            fileSize = *n;
         }
-        else if (name == "NarHash")
+        else if (name == "NarHash") {
             narHash = parseHashField(value);
+            haveNarHash = true;
+        }
         else if (name == "NarSize") {
-            if (!string2Int(value, narSize)) corrupt();
+            auto n = string2Int<decltype(narSize)>(value);
+            if (!n) throw corrupt();
+            narSize = *n;
         }
         else if (name == "References") {
             auto refs = tokenizeString<Strings>(value, " ");
-            if (!references.empty()) corrupt();
-            for (auto & r : refs) {
-                auto r2 = store.storeDir + "/" + r;
-                if (!store.isStorePath(r2)) corrupt();
-                references.insert(r2);
-            }
+            if (!references.empty()) throw corrupt();
+            for (auto & r : refs)
+                references.insert(StorePath(r));
         }
         else if (name == "Deriver") {
-            if (value != "unknown-deriver") {
-                auto p = store.storeDir + "/" + value;
-                if (!store.isStorePath(p)) corrupt();
-                deriver = p;
-            }
+            if (value != "unknown-deriver")
+                deriver = StorePath(value);
         }
         else if (name == "System")
             system = value;
         else if (name == "Sig")
             sigs.insert(value);
         else if (name == "CA") {
-            if (!ca.empty()) corrupt();
-            ca = value;
+            if (ca) throw corrupt();
+            // FIXME: allow blank ca or require skipping field?
+            ca = parseContentAddressOpt(value);
         }
 
         pos = eol + 1;
@@ -79,27 +84,27 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     if (compression == "") compression = "bzip2";
 
-    if (path.empty() || url.empty() || narSize == 0 || !narHash) corrupt();
+    if (!havePath || !haveNarHash || url.empty() || narSize == 0) throw corrupt();
 }
 
-std::string NarInfo::to_string() const
+std::string NarInfo::to_string(const Store & store) const
 {
     std::string res;
-    res += "StorePath: " + path + "\n";
+    res += "StorePath: " + store.printStorePath(path) + "\n";
     res += "URL: " + url + "\n";
     assert(compression != "");
     res += "Compression: " + compression + "\n";
-    assert(fileHash.type == htSHA256);
-    res += "FileHash: " + fileHash.to_string(Base32) + "\n";
+    assert(fileHash && fileHash->type == htSHA256);
+    res += "FileHash: " + fileHash->to_string(Base32, true) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
     assert(narHash.type == htSHA256);
-    res += "NarHash: " + narHash.to_string(Base32) + "\n";
+    res += "NarHash: " + narHash.to_string(Base32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";
 
-    if (!deriver.empty())
-        res += "Deriver: " + baseNameOf(deriver) + "\n";
+    if (deriver)
+        res += "Deriver: " + std::string(deriver->to_string()) + "\n";
 
     if (!system.empty())
         res += "System: " + system + "\n";
@@ -107,8 +112,8 @@ std::string NarInfo::to_string() const
     for (auto sig : sigs)
         res += "Sig: " + sig + "\n";
 
-    if (!ca.empty())
-        res += "CA: " + ca + "\n";
+    if (ca)
+        res += "CA: " + renderContentAddress(*ca) + "\n";
 
     return res;
 }

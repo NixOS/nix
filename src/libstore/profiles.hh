@@ -8,38 +8,35 @@
 
 namespace nix {
 
+class StorePath;
+
+
+typedef unsigned int GenerationNumber;
 
 struct Generation
 {
-    int number;
+    GenerationNumber number;
     Path path;
     time_t creationTime;
-    Generation()
-    {
-        number = -1;
-    }
-    operator bool() const
-    {
-        return number != -1;
-    }
 };
 
-typedef list<Generation> Generations;
+typedef std::list<Generation> Generations;
 
 
 /* Returns the list of currently present generations for the specified
-   profile, sorted by generation number. */
-Generations findGenerations(Path profile, int & curGen);
+   profile, sorted by generation number. Also returns the number of
+   the current generation. */
+std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile);
 
 class LocalFSStore;
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath);
+Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath);
 
-void deleteGeneration(const Path & profile, unsigned int gen);
+void deleteGeneration(const Path & profile, GenerationNumber gen);
 
-void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun);
+void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun);
 
-void deleteGenerationsGreaterThan(const Path & profile, const int max, bool dryRun);
+void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun);
 
 void deleteOldGenerations(const Path & profile, bool dryRun);
 
@@ -63,5 +60,9 @@ void lockProfile(PathLocks & lock, const Path & profile);
    store.  Most of the time, only the user environment has to be
    rebuilt. */
 string optimisticLockProfile(const Path & profile);
+
+/* Resolve ~/.nix-profile. If ~/.nix-profile doesn't exist yet, create
+   it. */
+Path getDefaultProfile();
 
 }

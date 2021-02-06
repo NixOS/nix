@@ -2,39 +2,32 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "json.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
 struct CmdShowConfig : Command, MixJSON
 {
-    CmdShowConfig()
-    {
-    }
-
-    std::string name() override
-    {
-        return "show-config";
-    }
-
     std::string description() override
     {
         return "show the Nix configuration";
     }
 
+    Category category() override { return catUtility; }
+
     void run() override
     {
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
-            JSONObject jsonObj(std::cout);
-            globalConfig.toJSON(jsonObj);
+            logger->cout("%s", globalConfig.toJSON().dump());
         } else {
             std::map<std::string, Config::SettingInfo> settings;
             globalConfig.getSettings(settings);
             for (auto & s : settings)
-                std::cout << s.first + " = " + s.second.value + "\n";
+                logger->cout("%s = %s", s.first, s.second.value);
         }
     }
 };
 
-static RegisterCommand r1(make_ref<CmdShowConfig>());
+static auto rShowConfig = registerCommand<CmdShowConfig>("show-config");
