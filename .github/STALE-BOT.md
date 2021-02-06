@@ -27,7 +27,7 @@ Don't be afraid to close an issue that holds valuable information. Closed issues
 
 ## Useful GitHub search queries
 
-- [Open PRs with any stale-bot interaction](https://github.com/NixOS/nixs/pulls?q=is%3Apr+is%3Aopen+commenter%3Aapp%2Fstale+)
+- [Open PRs with any stale-bot interaction](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+commenter%3Aapp%2Fstale+)
 - [Open PRs with any stale-bot interaction and `stale`](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+commenter%3Aapp%2Fstale+label%3A%22stale%22)
 - [Open PRs with any stale-bot interaction and NOT `stale`](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+commenter%3Aapp%2Fstale+-label%3A%22stale%22+)
 - [Open Issues with any stale-bot interaction](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+commenter%3Aapp%2Fstale+)
