@@ -596,11 +596,10 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. These are
-          not used by default, but can be enabled by users of the Nix daemon
-          by specifying `--option substituters urls` on the command
-          line. Unprivileged users are only allowed to pass a subset of the
-          URLs listed in `substituters` and `trusted-substituters`.
+          DEPRECATED:  This option is now ignored. It used to be a list of 
+          additional subsituters a user could request. However there were
+          many ways around this option and signed packages provide much
+          better security.
         )",
         {"trusted-binary-caches"}};
 
