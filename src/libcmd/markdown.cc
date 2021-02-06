@@ -3,9 +3,7 @@
 #include "finally.hh"
 
 #include <sys/queue.h>
-extern "C" {
 #include <lowdown.h>
-}
 
 namespace nix {
 
@@ -42,7 +40,9 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
         throw Error("cannot allocate Markdown output buffer");
     Finally freeBuffer([&]() { lowdown_buf_free(buf); });
 
-    lowdown_term_rndr(buf, nullptr, renderer, node);
+    int rndr_res = lowdown_term_rndr(buf, nullptr, renderer, node);
+    if (!rndr_res)
+        throw Error("allocation error while rendering Markdown");
 
     return std::string(buf->data, buf->size);
 }
