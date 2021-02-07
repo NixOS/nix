@@ -92,6 +92,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         addFlag({
             .longName = "offline",
+            .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .handler = {[&]() { useNet = false; }},
         });

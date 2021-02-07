@@ -14,6 +14,8 @@ void Args::addFlag(Flag && flag_)
         assert(flag->handler.arity == flag->labels.size());
     assert(flag->longName != "");
     longFlags[flag->longName] = flag;
+    for (auto & alias : flag->aliases)
+        longFlags[alias] = flag;
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
@@ -191,6 +193,7 @@ nlohmann::json Args::toJSON()
 
     for (auto & [name, flag] : longFlags) {
         auto j = nlohmann::json::object();
+        if (flag->aliases.count(name)) continue;
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
         if (flag->description != "")

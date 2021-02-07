@@ -97,6 +97,7 @@ protected:
         typedef std::shared_ptr<Flag> ptr;
 
         std::string longName;
+        std::set<std::string> aliases;
         char shortName = 0;
         std::string description;
         std::string category;
