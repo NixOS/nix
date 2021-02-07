@@ -198,12 +198,12 @@
 
         };
 
-        lowdown = with final; stdenv.mkDerivation {
-          name = "lowdown-0.7.9";
+        lowdown = with final; stdenv.mkDerivation rec {
+          name = "lowdown-0.8.0";
 
           src = fetchurl {
-            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.9.tar.gz;
-            hash = "sha512-7GQrKFICyTI5T4SinATfohiCq9TC0OgN8NmVfG3B3BZJM9J00DT8llAco8kNykLIKtl/AXuS4X8fETiCFEWEUQ==";
+            url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
+            hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
 
           #src = lowdown-src;
