@@ -60,7 +60,7 @@ basicDownloadTests
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
 clearStore
 
-nar=$(ls $cacheDir/nar/*.nar.xz | head -n1)
+nar=$(ls $cacheDir/nar/*.nar | head -n1)
 mv $nar $nar.good
 mkdir -p $TEST_ROOT/empty
 nix-store --dump $TEST_ROOT/empty | xz > $nar
