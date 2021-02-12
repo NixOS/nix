@@ -118,10 +118,8 @@ void StorePathsCommand::run(ref<Store> store, std::vector<RealisedPath> paths)
     run(store, std::move(storePaths));
 }
 
-void StorePathCommand::run(ref<Store> store)
+void StorePathCommand::run(ref<Store> store, std::vector<StorePath> storePaths)
 {
-    auto storePaths = toStorePaths(store, Realise::Nothing, operateOn, installables);
-
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
 
