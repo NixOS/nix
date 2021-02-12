@@ -41,6 +41,7 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   build.sh \
+  build-explicit-output.sh \
   compute-levels.sh \
   ca/build.sh \
   ca/substitute.sh \

@@ -349,6 +349,31 @@ struct InstallableStorePath : Installable
     }
 };
 
+struct InstallableIndexedStorePath : Installable
+{
+    ref<Store> store;
+    DerivedPath::Built req;
+
+    InstallableIndexedStorePath(ref<Store> store, DerivedPath::Built && req)
+        : store(store), req(std::move(req))
+    { }
+
+    std::string what() override
+    {
+        return req.to_string(*store);
+    }
+
+    DerivedPathsWithHints toDerivedPathsWithHints() override
+    {
+        std::map<std::string, std::optional<StorePath>> outputs;
+        for (auto & output : req.outputs)
+            outputs.insert_or_assign(output, std::nullopt);
+        return {
+            DerivedPathWithHints { DerivedPathWithHints::Built { req.drvPath, std::move(outputs) } }
+        };
+    }
+};
+
 DerivedPathsWithHints InstallableValue::toDerivedPathsWithHints()
 {
     DerivedPathsWithHints res;
@@ -638,7 +663,22 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                 ex = std::current_exception();
             }
 
-            if (s.find('/') != std::string::npos) {
+            auto found = s.rfind('!');
+            if (found != std::string::npos) {
+                try {
+                    result.push_back(std::make_shared<InstallableIndexedStorePath>(
+                        store,
+                        DerivedPath::Built::parse(*store, s)));
+                    continue;
+                } catch (BadStorePath &) {
+                } catch (...) {
+                    if (!ex)
+                        ex = std::current_exception();
+                }
+            }
+
+            found = s.find('/');
+            if (found != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
