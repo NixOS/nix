@@ -36,9 +36,31 @@ nix-instantiate shell.nix -A shellDrv --add-root $TEST_ROOT/shell
 [[ $(nix-shell --pure $TEST_ROOT/shell --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
 
-# Test nix-shell -p
-output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure -p foo bar --run 'echo "$(foo) $(bar)"')
+# Test nix-shell --tools
+output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure --tools foo bar --run 'echo "$(foo) $(bar)"')
 [ "$output" = "foo bar" ]
+
+# Test nix-shell -p
+output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure -p flibble flobble --run 'for bi in $buildInputs; do cat $bi/data; done')
+[ "$(echo $output)" = "flibble flobble" ]
+
+# Test mix of nix-shell --tools, --inputs
+# make sure "strictDeps" works
+output=$(NIX_PATH=nixpkgs=shell.nix:strictDeps=shell.nix nix-shell --pure -p foo bar --run 'echo "$(foo) $(bar)"')
+[ "$output" = " " ]
+# leading arguments are inputs
+output=$(NIX_PATH=nixpkgs=shell.nix:strictDeps=shell.nix nix-shell --pure flibble flobble --tools --run 'for bi in $buildInputs; do cat $bi/data; done')
+[ "$(echo $output)" = "flibble flobble" ]
+# swapping inputs swaps the output value
+output=$(NIX_PATH=nixpkgs=shell.nix:strictDeps=shell.nix nix-shell --pure flobble flibble --tools --run 'for bi in $buildInputs; do cat $bi/data; done')
+[ "$(echo $output)" = "flobble flibble" ]
+# leading arguments are not tools (under strictDeps)
+output=$(NIX_PATH=nixpkgs=shell.nix:strictDeps=shell.nix nix-shell --pure foo bar --tools --run 'echo "$(foo) $(bar)"')
+[ "$output" = " " ]
+# tools and inputs can be mixed
+output=$(NIX_PATH=nixpkgs=shell.nix:strictDeps=shell.nix nix-shell --tools foo --inputs flibble --tools bar --inputs flobble --tools --inputs --run 'echo $(foo) $(bar); for bi in $buildInputs; do cat $bi/data; done')
+[ "$(echo $output)" = "foo bar flibble flobble" ]
+
 
 # Test nix-shell shebang mode
 sed -e "s|@ENV_PROG@|$(type -p env)|" shell.shebang.sh > $TEST_ROOT/shell.shebang.sh

@@ -5,10 +5,12 @@ with import ./config.nix;
 let pkgs = rec {
   setupSh = builtins.toFile "setup" ''
     export VAR_FROM_STDENV_SETUP=foo
-    for pkg in $buildInputs; do
+    for pkg in $nativeBuildInputs ${if isStrictDeps then "" else "$buildInputs"}; do
       export PATH=$PATH:$pkg/bin
     done
   '';
+
+  isStrictDeps = (builtins.tryEval <strictDeps>).success;
 
   stdenv = mkDerivation {
     name = "stdenv";
@@ -43,6 +45,16 @@ let pkgs = rec {
     mkdir -p $out/bin
     echo 'echo bar' > $out/bin/bar
     chmod a+rx $out/bin/bar
+  '';
+
+  flibble = runCommand "flibble" {} ''
+    mkdir -p $out
+    echo 'flibble' > $out/data
+  '';
+
+  flobble = runCommand "flobble" {} ''
+    mkdir -p $out
+    echo 'flobble' > $out/data
   '';
 
   bash = shell;
