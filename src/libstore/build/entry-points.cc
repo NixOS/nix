@@ -5,7 +5,7 @@
 
 namespace nix {
 
-void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
     Worker worker(*this);
 
@@ -43,7 +43,7 @@ void LocalStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, 
     }
 }
 
-BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
+BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
     Worker worker(*this);
@@ -63,7 +63,7 @@ BuildResult LocalStore::buildDerivation(const StorePath & drvPath, const BasicDe
 }
 
 
-void LocalStore::ensurePath(const StorePath & path)
+void Store::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;

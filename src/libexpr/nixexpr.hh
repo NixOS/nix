@@ -239,7 +239,7 @@ struct ExprLambda : Expr
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
             throw ParseError({
-                .hint = hintfmt("duplicate formal function argument '%1%'", arg),
+                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
                 .errPos = pos
             });
     };

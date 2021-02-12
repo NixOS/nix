@@ -2,9 +2,9 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
-  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  #inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
-  outputs = { self, nixpkgs, lowdown-src }:
+  outputs = { self, nixpkgs }:
 
     let
 
@@ -115,7 +115,7 @@
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
 
-        nix = with final; with commonDeps pkgs; (stdenv.mkDerivation {
+        nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
           name = "nix-${version}";
           inherit version;
 
@@ -163,9 +163,8 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           separateDebugInfo = true;
-        }) // {
 
-          perl-bindings = with final; stdenv.mkDerivation {
+          passthru.perl-bindings = with final; stdenv.mkDerivation {
             name = "nix-perl-${version}";
 
             src = self;
@@ -199,17 +198,15 @@
 
         };
 
-        lowdown = with final; stdenv.mkDerivation {
-          name = "lowdown-0.7.1";
+        lowdown = with final; stdenv.mkDerivation rec {
+          name = "lowdown-0.8.0";
 
-          /*
           src = fetchurl {
-            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.1.tar.gz;
-            hash = "sha512-1daoAQfYD0LdhK6aFhrSQvadjc5GsSPBZw0fJDb+BEHYMBLjqiUl2A7H8N+l0W4YfGKqbsPYSrCy4vct+7U6FQ==";
+            url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
+            hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
-          */
 
-          src = lowdown-src;
+          #src = lowdown-src;
 
           outputs = [ "out" "bin" "dev" ];
 

@@ -58,39 +58,47 @@ void completeFlakeInputPath(
 
 MixFlakeOptions::MixFlakeOptions()
 {
+    auto category = "Common flake-related options";
+
     addFlag({
         .longName = "recreate-lock-file",
         .description = "Recreate the flake's lock file from scratch.",
+        .category = category,
         .handler = {&lockFlags.recreateLockFile, true}
     });
 
     addFlag({
         .longName = "no-update-lock-file",
         .description = "Do not allow any updates to the flake's lock file.",
+        .category = category,
         .handler = {&lockFlags.updateLockFile, false}
     });
 
     addFlag({
         .longName = "no-write-lock-file",
         .description = "Do not write the flake's newly generated lock file.",
+        .category = category,
         .handler = {&lockFlags.writeLockFile, false}
     });
 
     addFlag({
         .longName = "no-registries",
         .description = "Don't allow lookups in the flake registries.",
+        .category = category,
         .handler = {&lockFlags.useRegistries, false}
     });
 
     addFlag({
         .longName = "commit-lock-file",
         .description = "Commit changes to the flake's lock file.",
+        .category = category,
         .handler = {&lockFlags.commitLockFile, true}
     });
 
     addFlag({
         .longName = "update-input",
         .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
+        .category = category,
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
@@ -104,6 +112,7 @@ MixFlakeOptions::MixFlakeOptions()
     addFlag({
         .longName = "override-input",
         .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`).",
+        .category = category,
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
@@ -115,6 +124,7 @@ MixFlakeOptions::MixFlakeOptions()
     addFlag({
         .longName = "inputs-from",
         .description = "Use the inputs of the specified flake as registry entries.",
+        .category = category,
         .labels = {"flake-url"},
         .handler = {[&](std::string flakeRef) {
             auto evalState = getEvalState();
@@ -144,6 +154,7 @@ SourceExprCommand::SourceExprCommand()
         .longName = "file",
         .shortName = 'f',
         .description = "Interpret installables as attribute paths relative to the Nix expression stored in *file*.",
+        .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
         .completer = completePath
@@ -152,6 +163,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "expr",
         .description = "Interpret installables as attribute paths relative to the Nix expression *expr*.",
+        .category = installablesCategory,
         .labels = {"expr"},
         .handler = {&expr}
     });
@@ -159,6 +171,7 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "derivation",
         .description = "Operate on the store derivation rather than its outputs.",
+        .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
 }
@@ -691,23 +704,42 @@ Buildables build(ref<Store> store, Realise mode,
     return buildables;
 }
 
-StorePathSet toStorePaths(ref<Store> store,
-    Realise mode, OperateOn operateOn,
+std::set<RealisedPath> toRealisedPaths(
+    ref<Store> store,
+    Realise mode,
+    OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables)
 {
-    StorePathSet outPaths;
-
+    std::set<RealisedPath> res;
     if (operateOn == OperateOn::Output) {
         for (auto & b : build(store, mode, installables))
             std::visit(overloaded {
                 [&](BuildableOpaque bo) {
-                    outPaths.insert(bo.path);
+                    res.insert(bo.path);
                 },
                 [&](BuildableFromDrv bfd) {
+                    auto drv = store->readDerivation(bfd.drvPath);
+                    auto outputHashes = staticOutputHashes(*store, drv);
                     for (auto & output : bfd.outputs) {
-                        if (!output.second)
-                            throw Error("Cannot operate on output of unbuilt CA drv");
-                        outPaths.insert(*output.second);
+                        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+                            if (!outputHashes.count(output.first))
+                                throw Error(
+                                    "the derivation '%s' doesn't have an output named '%s'",
+                                    store->printStorePath(bfd.drvPath),
+                                    output.first);
+                            auto outputId = DrvOutput{outputHashes.at(output.first), output.first};
+                            auto realisation = store->queryRealisation(outputId);
+                            if (!realisation)
+                                throw Error("cannot operate on an output of unbuilt content-addresed derivation '%s'", outputId.to_string());
+                            res.insert(RealisedPath{*realisation});
+                        }
+                        else {
+                            // If ca-derivations isn't enabled, behave as if
+                            // all the paths are opaque to keep the default
+                            // behavior
+                            assert(output.second);
+                            res.insert(*output.second);
+                        }
                     }
                 },
             }, b);
@@ -718,9 +750,19 @@ StorePathSet toStorePaths(ref<Store> store,
         for (auto & i : installables)
             for (auto & b : i->toBuildables())
                 if (auto bfd = std::get_if<BuildableFromDrv>(&b))
-                    outPaths.insert(bfd->drvPath);
+                    res.insert(bfd->drvPath);
     }
 
+    return res;
+}
+
+StorePathSet toStorePaths(ref<Store> store,
+    Realise mode, OperateOn operateOn,
+    std::vector<std::shared_ptr<Installable>> installables)
+{
+    StorePathSet outPaths;
+    for (auto & path : toRealisedPaths(store, mode, operateOn, installables))
+            outPaths.insert(path.path());
     return outPaths;
 }
 

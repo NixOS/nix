@@ -20,8 +20,6 @@ public:
        wrong. */
     void parseCmdline(const Strings & cmdline);
 
-    virtual void printHelp(const string & programName, std::ostream & out);
-
     /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
@@ -93,12 +91,13 @@ protected:
         { }
     };
 
-    /* Flags. */
+    /* Options. */
     struct Flag
     {
         typedef std::shared_ptr<Flag> ptr;
 
         std::string longName;
+        std::set<std::string> aliases;
         char shortName = 0;
         std::string description;
         std::string category;
@@ -114,8 +113,6 @@ protected:
     std::map<char, Flag::ptr> shortFlags;
 
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
-
-    virtual void printFlags(std::ostream & out);
 
     /* Positional arguments. */
     struct ExpectedArg
@@ -138,27 +135,6 @@ protected:
 public:
 
     void addFlag(Flag && flag);
-
-    /* Helper functions for constructing flags / positional
-       arguments. */
-
-    void mkFlag(char shortName, const std::string & name,
-        const std::string & description, bool * dest)
-    {
-        mkFlag(shortName, name, description, dest, true);
-    }
-
-    template<class T>
-    void mkFlag(char shortName, const std::string & longName, const std::string & description,
-        T * dest, const T & value)
-    {
-        addFlag({
-            .longName = longName,
-            .shortName = shortName,
-            .description = description,
-            .handler = {[=]() { *dest = value; }}
-        });
-    }
 
     void expectArgs(ExpectedArg && arg)
     {
@@ -223,8 +199,6 @@ public:
 
     MultiCommand(const Commands & commands);
 
-    void printHelp(const string & programName, std::ostream & out) override;
-
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
@@ -233,14 +207,6 @@ public:
 };
 
 Strings argvToStrings(int argc, char * * argv);
-
-/* Helper function for rendering argument labels. */
-std::string renderLabels(const Strings & labels);
-
-/* Helper function for printing 2-column tables. */
-typedef std::vector<std::pair<std::string, std::string>> Table2;
-
-void printTable(std::ostream & out, const Table2 & table);
 
 struct Completion {
     std::string completion;

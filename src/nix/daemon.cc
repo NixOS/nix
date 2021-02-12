@@ -8,7 +8,7 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "finally.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 #include "daemon.hh"
 
 #include <algorithm>
@@ -258,8 +258,8 @@ static void daemonLoop()
             return;
         } catch (Error & error) {
             ErrorInfo ei = error.info();
-            ei.hint = std::optional(hintfmt("error processing connection: %1%",
-                (error.info().hint.has_value() ? error.info().hint->str() : "")));
+            // FIXME: add to trace?
+            ei.msg = hintfmt("error processing connection: %1%", ei.msg.str());
             logError(ei);
         }
     }

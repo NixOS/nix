@@ -21,6 +21,7 @@ experimental-features = nix-command flakes nix-testing
 gc-reserved-space = 0
 substituters =
 flake-registry = $TEST_ROOT/registry.json
+show-trace = true
 include nix.conf.extra
 EOF
 

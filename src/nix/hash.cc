@@ -19,18 +19,41 @@ struct CmdHashBase : Command
 
     CmdHashBase(FileIngestionMethod mode) : mode(mode)
     {
-        mkFlag(0, "sri", "Print the hash in SRI format.", &base, SRI);
-        mkFlag(0, "base64", "Print the hash in base-64 format.", &base, Base64);
-        mkFlag(0, "base32", "Print the hash in base-32 (Nix-specific) format.", &base, Base32);
-        mkFlag(0, "base16", "Print the hash in base-16 format.", &base, Base16);
+        addFlag({
+            .longName = "sri",
+            .description = "Print the hash in SRI format.",
+            .handler = {&base, SRI},
+        });
+
+        addFlag({
+            .longName = "base64",
+            .description = "Print the hash in base-64 format.",
+            .handler = {&base, Base64},
+        });
+
+        addFlag({
+            .longName = "base32",
+            .description = "Print the hash in base-32 (Nix-specific) format.",
+            .handler = {&base, Base32},
+        });
+
+        addFlag({
+            .longName = "base16",
+            .description = "Print the hash in base-16 format.",
+            .handler = {&base, Base16},
+        });
+
         addFlag(Flag::mkHashTypeFlag("type", &ht));
+
         #if 0
-        mkFlag()
-            .longName("modulo")
-            .description("Compute the hash modulo specified the string.")
-            .labels({"modulus"})
-            .dest(&modulus);
-        #endif
+        addFlag({
+            .longName = "modulo",
+            .description = "Compute the hash modulo the specified string.",
+            .labels = {"modulus"},
+            .handler = {&modulus},
+        });
+        #endif\
+
         expectArgs({
             .label = "paths",
             .handler = {&paths},

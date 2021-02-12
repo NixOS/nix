@@ -115,7 +115,7 @@ static void fetchTree(
 
         if (!attrs.count("type"))
             throw Error({
-                .hint = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
                 .errPos = pos
             });
 
@@ -153,6 +153,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
     fetchTree(state, pos, args, v, std::nullopt);
 }
 
+// FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
@@ -177,14 +178,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError({
-                    .hint = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
                     .errPos = *attr.pos
                 });
             }
 
         if (!url)
             throw EvalError({
-                .hint = hintfmt("'url' argument required"),
+                .msg = hintfmt("'url' argument required"),
                 .errPos = pos
             });
     } else

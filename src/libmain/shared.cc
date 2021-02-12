@@ -229,11 +229,17 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     intSettingAlias(0, "max-silent-time", "Number of seconds of silence before a build is killed.", "max-silent-time");
     intSettingAlias(0, "timeout", "Number of seconds before a build is killed.", "timeout");
 
-    mkFlag(0, "readonly-mode", "Do not write to the Nix store.",
-        &settings.readOnlyMode);
+    addFlag({
+        .longName = "readonly-mode",
+        .description = "Do not write to the Nix store.",
+        .handler = {&settings.readOnlyMode, true},
+    });
 
-    mkFlag(0, "no-gc-warning", "Disable warnings about not using `--add-root`.",
-        &gcWarning, false);
+    addFlag({
+        .longName = "no-gc-warning",
+        .description = "Disable warnings about not using `--add-root`.",
+        .handler = {&gcWarning, true},
+    });
 
     addFlag({
         .longName = "store",

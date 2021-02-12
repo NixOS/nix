@@ -211,7 +211,7 @@ void handleSQLiteBusy(const SQLiteBusy & e)
         lastWarned = now;
         logWarning({
             .name = "Sqlite busy",
-            .hint = hintfmt(e.what())
+            .msg = hintfmt(e.what())
         });
     }
 

@@ -55,13 +55,6 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
 
-    void ensurePath(const StorePath & path) override
-    { unsupported("ensurePath"); }
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override
-    { unsupported("buildDerivation"); }
-
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override
     { unsupported("queryRealisation"); }
 };

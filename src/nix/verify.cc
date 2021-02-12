@@ -18,8 +18,17 @@ struct CmdVerify : StorePathsCommand
 
     CmdVerify()
     {
-        mkFlag(0, "no-contents", "Do not verify the contents of each store path.", &noContents);
-        mkFlag(0, "no-trust", "Do not verify whether each store path is trusted.", &noTrust);
+        addFlag({
+            .longName = "no-contents",
+            .description = "Do not verify the contents of each store path.",
+            .handler = {&noContents, true},
+        });
+
+        addFlag({
+            .longName = "no-trust",
+            .description = "Do not verify whether each store path is trusted.",
+            .handler = {&noTrust, true},
+        });
 
         addFlag({
             .longName = "substituter",
@@ -101,14 +110,10 @@ struct CmdVerify : StorePathsCommand
                     if (hash.first != info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
-                        logError({
-                            .name = "Hash error - path modified",
-                            .hint = hintfmt(
-                                "path '%s' was modified! expected hash '%s', got '%s'",
-                                store->printStorePath(info->path),
-                                info->narHash.to_string(Base32, true),
-                                hash.first.to_string(Base32, true))
-                        });
+                        printError("path '%s' was modified! expected hash '%s', got '%s'",
+                            store->printStorePath(info->path),
+                            info->narHash.to_string(Base32, true),
+                            hash.first.to_string(Base32, true));
                     }
                 }
 
@@ -156,12 +161,7 @@ struct CmdVerify : StorePathsCommand
                     if (!good) {
                         untrusted++;
                         act2.result(resUntrustedPath, store->printStorePath(info->path));
-                        logError({
-                            .name = "Untrusted path",
-                            .hint = hintfmt("path '%s' is untrusted",
-                                store->printStorePath(info->path))
-                        });
-
+                        printError("path '%s' is untrusted", store->printStorePath(info->path));
                     }
 
                 }

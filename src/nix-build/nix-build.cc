@@ -17,7 +17,7 @@
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -369,11 +369,8 @@ static void main_nix_build(int argc, char * * argv)
                 shell = drv->queryOutPath() + "/bin/bash";
 
             } catch (Error & e) {
-                logWarning({
-                    .name = "bashInteractive",
-                    .hint = hintfmt("%s; will use bash from your environment",
-                        (e.info().hint ? e.info().hint->str() : ""))
-                });
+                logError(e.info());
+                notice("will use bash from your environment");
                 shell = "bash";
             }
         }

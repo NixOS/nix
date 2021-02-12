@@ -54,6 +54,8 @@ static bool haveInternet()
 std::string programPath;
 char * * savedArgv;
 
+struct HelpRequested { };
+
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     bool printBuildLogs = false;
@@ -71,28 +73,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "help",
             .description = "Show usage information.",
-            .handler = {[&]() { if (!completions) showHelpAndExit(); }},
-        });
-
-        addFlag({
-            .longName = "help-config",
-            .description = "Show configuration settings.",
-            .handler = {[&]() {
-                std::cout << "The following configuration settings are available:\n\n";
-                Table2 tbl;
-                std::map<std::string, Config::SettingInfo> settings;
-                globalConfig.getSettings(settings);
-                for (const auto & s : settings)
-                    tbl.emplace_back(s.first, s.second.description);
-                printTable(std::cout, tbl);
-                throw Exit();
-            }},
+            .handler = {[&]() { throw HelpRequested(); }},
         });
 
         addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
+            .category = loggingCategory,
             .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
         });
 
@@ -103,7 +91,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         });
 
         addFlag({
-            .longName = "no-net",
+            .longName = "offline",
+            .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .handler = {[&]() { useNet = false; }},
         });
@@ -152,33 +141,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             pos = args.insert(pos, *j);
         aliasUsed = true;
         return pos;
-    }
-
-    void printFlags(std::ostream & out) override
-    {
-        Args::printFlags(out);
-        std::cout <<
-            "\n"
-            "In addition, most configuration settings can be overriden using '--" ANSI_ITALIC "name value" ANSI_NORMAL "'.\n"
-            "Boolean settings can be overriden using '--" ANSI_ITALIC "name" ANSI_NORMAL "' or '--no-" ANSI_ITALIC "name" ANSI_NORMAL "'. See 'nix\n"
-            "--help-config' for a list of configuration settings.\n";
-    }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
-
-#if 0
-        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-" ANSI_ITALIC "COMMAND" ANSI_NORMAL "'.\n";
-#endif
-
-        std::cout << "\nNote: this program is " ANSI_RED "EXPERIMENTAL" ANSI_NORMAL " and subject to change.\n";
-    }
-
-    void showHelpAndExit()
-    {
-        printHelp(programName, std::cout);
-        throw Exit();
     }
 
     std::string description() override
@@ -298,6 +260,18 @@ void mainWrapped(int argc, char * * argv)
 
     try {
         args.parseCmdline(argvToStrings(argc, argv));
+    } catch (HelpRequested &) {
+        std::vector<std::string> subcommand;
+        MultiCommand * command = &args;
+        while (command) {
+            if (command && command->command) {
+                subcommand.push_back(command->command->first);
+                command = dynamic_cast<MultiCommand *>(&*command->command->second);
+            } else
+                break;
+        }
+        showHelp(subcommand);
+        return;
     } catch (UsageError &) {
         if (!completions) throw;
     }
@@ -306,7 +280,8 @@ void mainWrapped(int argc, char * * argv)
 
     initPlugins();
 
-    if (!args.command) args.showHelpAndExit();
+    if (!args.command)
+        throw UsageError("no subcommand specified");
 
     if (args.command->first != "repl"
         && args.command->first != "doctor"

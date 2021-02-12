@@ -394,7 +394,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw Error("output '%s' has no store path mapped to it", outName);
+            throw Error("output '%s' of derivation '%s' has no store path mapped to it", outName, printStorePath(path));
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
@@ -744,29 +744,6 @@ const Store::Stats & Store::getStats()
         stats.pathInfoCacheSize = state_->pathInfoCache.size();
     }
     return stats;
-}
-
-
-void Store::buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode)
-{
-    StorePathSet paths2;
-
-    for (auto & path : paths) {
-        if (path.path.isDerivation()) {
-            auto outPaths = queryPartialDerivationOutputMap(path.path);
-            for (auto & outputName : path.outputs) {
-                auto currentOutputPathIter = outPaths.find(outputName);
-                if (currentOutputPathIter == outPaths.end() ||
-                    !currentOutputPathIter->second ||
-                    !isValidPath(*currentOutputPathIter->second))
-                    unsupported("buildPaths");
-            }
-        } else
-            paths2.insert(path.path);
-    }
-
-    if (queryValidPaths(paths2).size() != paths2.size())
-        unsupported("buildPaths");
 }
 
 
