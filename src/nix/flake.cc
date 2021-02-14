@@ -893,7 +893,7 @@ struct CmdFlakeShow : FlakeCommand
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
                         visit(*visitor2, attrPath2,
-                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
+                            fmt(ANSI_GREEN + "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
                             nextPrefix + (last ? treeNull : treeLine));
                     }
                 };
@@ -962,7 +962,7 @@ struct CmdFlakeShow : FlakeCommand
                     if (attrPath.size() == 1)
                         recurse();
                     else if (!showLegacy)
-                        logger->cout("%s: " ANSI_YELLOW "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
+                        logger->cout("%s: " + ANSI_YELLOW + "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
                     else {
                         if (visitor.isDerivation())
                             showDerivation();
@@ -997,7 +997,7 @@ struct CmdFlakeShow : FlakeCommand
                         || (attrPath.size() == 2 && attrPath[0] == "overlays") ? "Nixpkgs overlay" :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
                         attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
-                        ANSI_YELLOW "unknown" ANSI_NORMAL);
+                        ANSI_YELLOW + "unknown" ANSI_NORMAL);
                 }
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))

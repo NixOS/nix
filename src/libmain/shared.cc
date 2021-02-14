@@ -323,7 +323,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 
     ErrorInfo::programName = baseNameOf(programName);
 
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    string error = ANSI_RED + "error:" ANSI_NORMAL " ";
     try {
         try {
             fun();

@@ -389,10 +389,10 @@ public:
             if (running || done || expected || failed) {
                 if (running)
                     if (expected != 0)
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" + ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
                             running / unit, done / unit, expected / unit);
                     else
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" + ANSI_GREEN + numberFmt + ANSI_NORMAL,
                             running / unit, done / unit);
                 else if (expected != done)
                     if (expected != 0)
@@ -405,7 +405,7 @@ public:
                 s = fmt(itemFmt, s);
 
                 if (failed)
-                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
+                    s += fmt(" (" + ANSI_RED + "%d failed" ANSI_NORMAL ")", failed / unit);
             }
 
             return s;
@@ -445,12 +445,12 @@ public:
 
         if (state.corruptedPaths) {
             if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d corrupted" ANSI_NORMAL, state.corruptedPaths);
+            res += fmt(ANSI_RED + "%d corrupted" ANSI_NORMAL, state.corruptedPaths);
         }
 
         if (state.untrustedPaths) {
             if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d untrusted" ANSI_NORMAL, state.untrustedPaths);
+            res += fmt(ANSI_RED + "%d untrusted" ANSI_NORMAL, state.untrustedPaths);
         }
 
         return res;

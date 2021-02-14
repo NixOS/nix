@@ -87,7 +87,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
-        printInfo(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
+        printInfo(ANSI_GREEN + "upgrade to version %s done" ANSI_NORMAL, version);
     }
 
     /* Return the profile in which Nix is installed. */

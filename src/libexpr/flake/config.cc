@@ -57,7 +57,7 @@ void ConfigFile::apply()
                 trusted = *saved;
             } else {
                 // FIXME: filter ANSI escapes, newlines, \r, etc.
-                if (std::tolower(logger->ask(fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED "%s" ANSI_NORMAL "' (y/N)?", name, valueS)).value_or('n')) != 'y') {
+                if (std::tolower(logger->ask(fmt("do you want to allow configuration setting '%s' to be set to '" + ANSI_RED + "%s" ANSI_NORMAL  "' (y/N)?", name, valueS)).value_or('n')) != 'y') {
                     if (std::tolower(logger->ask("do you want to permanently mark this value as untrusted (y/N)?").value_or('n')) == 'y') {
                         trustedList[name][valueS] = false;
                         writeTrustedList(trustedList);

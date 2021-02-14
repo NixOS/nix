@@ -163,7 +163,7 @@ void printCodeLines(std::ostream & out,
             std::string arrows("^");
 
             out << std::endl
-                << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL,
+                << fmt("%1%      |%2%" + ANSI_RED + "%3%" ANSI_NORMAL,
                 prefix,
                 spaces,
                 arrows);
@@ -185,15 +185,15 @@ void printAtPos(const ErrPos & pos, std::ostream & out)
     if (pos) {
         switch (pos.origin) {
             case foFile: {
-                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
+                out << fmt(ANSI_BLUE + "at " + ANSI_YELLOW + "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
                 break;
             }
             case foString: {
-                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ANSI_BLUE + "at " + ANSI_YELLOW + "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             case foStdin: {
-                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ANSI_BLUE + "at " + ANSI_YELLOW + "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             default:
@@ -224,35 +224,35 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     std::string prefix;
     switch (einfo.level) {
         case Verbosity::lvlError: {
-            prefix = ANSI_RED "error";
+            prefix = ANSI_RED + "error";
             break;
         }
         case Verbosity::lvlNotice: {
-            prefix = ANSI_RED "note";
+            prefix = ANSI_RED + "note";
             break;
         }
         case Verbosity::lvlWarn: {
-            prefix = ANSI_YELLOW "warning";
+            prefix = ANSI_YELLOW + "warning";
             break;
         }
         case Verbosity::lvlInfo: {
-            prefix = ANSI_GREEN "info";
+            prefix = ANSI_GREEN + "info";
             break;
         }
         case Verbosity::lvlTalkative: {
-            prefix = ANSI_GREEN "talk";
+            prefix = ANSI_GREEN + "talk";
             break;
         }
         case Verbosity::lvlChatty: {
-            prefix = ANSI_GREEN "chat";
+            prefix = ANSI_GREEN + "chat";
             break;
         }
         case Verbosity::lvlVomit: {
-            prefix = ANSI_GREEN "vomit";
+            prefix = ANSI_GREEN + "vomit";
             break;
         }
         case Verbosity::lvlDebug: {
-            prefix = ANSI_YELLOW "debug";
+            prefix = ANSI_YELLOW + "debug";
             break;
         }
         default:

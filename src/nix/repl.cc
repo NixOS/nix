@@ -197,7 +197,7 @@ namespace {
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    string error = ANSI_RED + "error:" ANSI_NORMAL " ";
     std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
 
     for (auto & i : files)
@@ -715,7 +715,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nNull:
-        str << ANSI_CYAN "null" ANSI_NORMAL;
+        str << ANSI_CYAN + "null" ANSI_NORMAL;
         break;
 
     case nAttrs: {
@@ -751,7 +751,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     try {
                         printValue(str, *i.second, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
+                        str << ANSI_RED << "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }
                 str << "; ";
             }
@@ -775,7 +775,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     try {
                         printValue(str, *v.listElems()[n], maxDepth - 1, seen);
                     } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
+                        str << ANSI_RED << "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }
                 str << " ";
             }
@@ -788,11 +788,11 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         if (v.isLambda()) {
             std::ostringstream s;
             s << v.lambda.fun->pos;
-            str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
+            str << ANSI_BLUE << "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
         } else if (v.isPrimOp()) {
-            str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
+            str << ANSI_MAGENTA << "«primop»" ANSI_NORMAL;
         } else if (v.isPrimOpApp()) {
-            str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
+            str << ANSI_BLUE << "«primop-app»" ANSI_NORMAL;
         } else {
             abort();
         }
@@ -803,7 +803,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     default:
-        str << ANSI_RED "«unknown»" ANSI_NORMAL;
+        str << ANSI_RED << "«unknown»" ANSI_NORMAL;
         break;
     }
 
