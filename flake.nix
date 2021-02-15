@@ -109,6 +109,40 @@
           ];
       };
 
+    installScriptFor = systems:
+      with nixpkgsFor.x86_64-linux;
+        runCommand "installer-script"
+          { buildInputs = [ nix ];
+          }
+          ''
+            mkdir -p $out/nix-support
+
+            # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
+            # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
+            tarballPath() {
+              # Remove the store prefix
+              local path=''${1#${builtins.storeDir}/}
+              # Get the path relative to the derivation root
+              local rest=''${path#*/}
+              # Get the derivation hash
+              local drvHash=''${path%%-*}
+              echo "$drvHash/$rest"
+            }
+
+            substitute ${./scripts/install.in} $out/install \
+              ${pkgs.lib.concatMapStrings
+                (system:
+                  '' \
+                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                  --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                  ''
+                )
+                systems
+              } --replace '@nixVersion@' ${version}
+
+            echo "file installer $out/install" >> $out/nix-support/hydra-build-products
+          '';
+
     in {
 
       # A Nixpkgs overlay that overrides the 'nix' and
@@ -313,40 +347,8 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript =
-          with nixpkgsFor.x86_64-linux;
-          runCommand "installer-script"
-            { buildInputs = [ nix ];
-            }
-            ''
-              mkdir -p $out/nix-support
-
-              # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
-              # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
-              tarballPath() {
-                # Remove the store prefix
-                local path=''${1#${builtins.storeDir}/}
-                # Get the path relative to the derivation root
-                local rest=''${path#*/}
-                # Get the derivation hash
-                local drvHash=''${path%%-*}
-                echo "$drvHash/$rest"
-              }
-
-              substitute ${./scripts/install.in} $out/install \
-                ${pkgs.lib.concatMapStrings
-                  (system:
-                    '' \
-                    --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                    --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                    ''
-                  )
-                  [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
-                } \
-                --replace '@nixVersion@' ${version}
-
-              echo "file installer $out/install" >> $out/nix-support/hydra-build-products
-            '';
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
 
         # Line coverage analysis.
         coverage =
