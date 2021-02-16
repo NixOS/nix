@@ -118,13 +118,6 @@ struct AttrDb
         });
     }
 
-    AttrId setBool(
-        AttrKey key,
-        bool b)
-    {
-        return addEntry(key, b);
-    }
-
     std::optional<AttrId> getId(const AttrKey& key)
     {
         auto state(_state->lock());
@@ -180,11 +173,11 @@ struct AttrDb
                 return {{rowId, string_t{queryAttribute.getStr(2), context}}};
             }
             case AttrType::Bool:
-                return {{rowId, queryAttribute.getInt(2) != 0}};
+                return {{rowId, wrapped_basetype<bool>{queryAttribute.getInt(2) != 0}}};
             case AttrType::Int:
-                return {{rowId, queryAttribute.getInt(2)}};
+                return {{rowId, wrapped_basetype<int64_t>{queryAttribute.getInt(2)}}};
             case AttrType::Double:
-                return {{rowId, queryAttribute.getInt(2)}};
+                return {{rowId, wrapped_basetype<double>{(double)queryAttribute.getInt(2)}}};
             case AttrType::Unknown:
                 return {{rowId, unknown_t{}}};
             case AttrType::Thunk:
@@ -359,17 +352,17 @@ const RawValue RawValue::fromVariant(const AttrValue & value)
         res.value = x.first;
         res.context = x.second;
       },
-      [&](bool x) {
+      [&](wrapped_basetype<bool> x) {
         res.type = AttrType::Bool;
-        res.value = x ? "1" : "0";
+        res.value = x.value ? "1" : "0";
       },
-      [&](int64_t x) {
+      [&](wrapped_basetype<int64_t> x) {
         res.type = AttrType::Int;
-        res.value = std::to_string(x);
+        res.value = std::to_string(x.value);
       },
-      [&](double x) {
+      [&](wrapped_basetype<double> x) {
         res.type = AttrType::Double;
-        res.value = std::to_string(x);
+        res.value = std::to_string(x.value);
       },
       [&](unknown_t x) { res.type = AttrType::Unknown; },
       [&](missing_t x) { res.type = AttrType::Missing; },

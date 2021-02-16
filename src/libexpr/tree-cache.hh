@@ -70,6 +70,14 @@ struct unknown_t {};
 struct thunk_t {};
 struct failed_t { string error; };
 struct missing_t { Symbol attrName; };
+
+// Putting several different primitive types in an `std::variant` partially
+// breaks the `std::visit(overloaded{...` hackery because of the implicit cast
+// from one to another which breaks the exhaustiveness check.
+// So we wrap them in a trivial class just to force the disambiguation
+template<typename T>
+struct wrapped_basetype{ T value; };
+
 typedef uint64_t AttrId;
 
 typedef std::pair<AttrId, Symbol> AttrKey;
@@ -82,9 +90,9 @@ typedef std::variant<
     thunk_t,
     missing_t,
     failed_t,
-    bool,
-    int64_t,
-    double
+    wrapped_basetype<bool>,
+    wrapped_basetype<int64_t>,
+    wrapped_basetype<double>
 > AttrValue;
 
 struct RawValue {

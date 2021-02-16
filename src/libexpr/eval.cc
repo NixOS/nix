@@ -1135,7 +1135,7 @@ tree_cache::AttrValue cachedValueFor(const Value& v)
             valueToCache = tree_cache::unknown_t{};
             break;
         case nBool:
-            valueToCache = v.boolean;
+            valueToCache = tree_cache::wrapped_basetype<bool>{v.boolean};
             break;
         case nString:
             valueToCache = tree_cache::string_t{
@@ -1153,10 +1153,10 @@ tree_cache::AttrValue cachedValueFor(const Value& v)
             valueToCache = tree_cache::attributeSet_t{};
             break;
         case nInt:
-            valueToCache = v.integer;
+            valueToCache = tree_cache::wrapped_basetype<int64_t>{v.integer};
             break;
         case nFloat:
-            valueToCache = v.fpoint;
+            valueToCache = tree_cache::wrapped_basetype<double>{v.fpoint};
             break;
     };
     return valueToCache;
@@ -1249,8 +1249,16 @@ ValueCache::CacheResult ValueCache::getValue(Store & store, const std::vector<Sy
                 mkString(dest, s.first, context);
                 return ValueCache::CacheResult{CacheHit};
             },
-            [&](bool b) {
-                dest.mkBool(b);
+            [&](tree_cache::wrapped_basetype<bool> b) {
+                dest.mkBool(b.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<int64_t> i) {
+                dest.mkInt(i.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<double> d) {
+                dest.mkFloat(d.value);
                 return ValueCache::CacheResult{CacheHit};
             },
         },
