@@ -238,7 +238,7 @@ branch):
 ```haskell
 #! /usr/bin/env nix-shell
 #! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])"
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-20.03.tar.gz
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-20.03.tar.gz
 
 import Network.Curl.Download
 import Text.HTML.TagSoup
