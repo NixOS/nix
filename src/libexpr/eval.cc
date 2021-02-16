@@ -1385,12 +1385,16 @@ EvalState::AttrAccesResult EvalState::getOptionalAttrField(Value & attrs, const 
             resultingCursor.addFailedChild(name, e);
             throw;
         };
-        resultingCursor = resultingCursor.addChild(name, *currentValue);
-        if (cacheResult.returnCode == ValueCache::CacheMiss && currentValue->type() == nAttrs) {
-            resultingCursor.addAttrSetChilds(*currentValue->attrs);
+        if (cacheResult.returnCode == ValueCache::CacheMiss) {
+            resultingCursor = resultingCursor.addChild(name, *currentValue);
+            currentValue->setCache(resultingCursor);
         }
-        currentValue->setCache(resultingCursor);
         if (countCalls && pos2) attrSelects[*pos2]++;
+    }
+
+    if (cacheResult.returnCode != ValueCache::CacheMiss) {
+        resultingCursor = dest.getCache();
+        currentValue->setCache(resultingCursor);
     }
 
     dest = *currentValue;
@@ -1410,7 +1414,12 @@ ValueCache ValueCache::addChild(const Symbol& name, const Value& value)
 {
     if (!rawCache)
         return ValueCache::empty;
-    return ValueCache(rawCache->addChild(name, cachedValueFor(value)));
+
+    auto cachedValue = cachedValueFor(value);
+    auto ret = ValueCache(rawCache->addChild(name, cachedValue));
+    if (value.type() == nAttrs)
+        ret.addAttrSetChilds(*value.attrs);
+    return ret;
 }
 
 ValueCache ValueCache::addFailedChild(const Symbol& name, const Error & error)
@@ -1428,7 +1437,11 @@ void ValueCache::addAttrSetChilds(Bindings & children)
 {
     if (!rawCache) return;
     for (auto & attr : children) {
-        addChild(attr.name, *attr.value);
+        // We could in theory directly store the value, but that would cause
+        // an infinite recursion in case of a cyclic attrset.
+        // So in a first time, just store a thunk
+        rawCache->addChild(attr.name, tree_cache::thunk_t{});
+        /* addChild(attr.name, *attr.value); */
     }
 
 }
