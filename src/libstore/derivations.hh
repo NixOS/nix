@@ -138,14 +138,10 @@ struct Derivation : BasicDerivation
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);
-    static std::optional<BasicDerivation> tryResolve(Store & store, const StorePath & drvPath);
 
     Derivation() = default;
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
-
-private:
-    std::optional<BasicDerivation> tryResolveUncached(Store & store);
 };
 
 
