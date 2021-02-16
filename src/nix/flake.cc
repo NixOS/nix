@@ -841,12 +841,17 @@ struct CmdFlakeShow : FlakeCommand
                     auto attrs = state->listAttrFields(value, pos);
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         bool last = i + 1 == attrs.size();
-                        auto value2 = state->getAttrField(value, {attr}, pos);
-                        auto attrPath2(attrPath);
-                        attrPath2.push_back(attr);
-                        visit(*value2, pos, attrPath2,
-                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
-                            nextPrefix + (last ? treeNull : treeLine));
+                        try {
+                            auto value2 = state->getAttrField(value, {attr}, pos);
+                            auto attrPath2(attrPath);
+                            attrPath2.push_back(attr);
+                            visit(*value2, pos, attrPath2,
+                                fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
+                                nextPrefix + (last ? treeNull : treeLine));
+                        } catch (EvalError& e) {
+                            if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
+                                throw;
+                        }
                     }
                 };
 
