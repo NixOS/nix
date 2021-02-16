@@ -600,7 +600,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings(attrsPathPrefixes), lockFlags);
 
         auto flakeValue = installable.toValue(*evalState);
-        auto templateDir = evalState->forceStringNoCtx(*evalState->getAttrField(*flakeValue.value, {evalState->symbols.create("path")}, flakeValue.pos));
+        PathSet context;
+        auto templateDir = evalState->coerceToString(flakeValue.pos, *evalState->getAttrField(*flakeValue.value, {evalState->symbols.create("path")}, flakeValue.pos), context, false, false);
 
         assert(store->isInStore(templateDir));
 
