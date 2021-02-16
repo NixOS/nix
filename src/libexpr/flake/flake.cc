@@ -462,6 +462,7 @@ LockedFlake lockFlake(
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
                                     fakeInputs.emplace(i.first, FlakeInput {
+                                        .isFlake = true,  // can only follow other flakes
                                         .follows = *follows,
                                         .absolute = true
                                     });
@@ -479,27 +480,34 @@ LockedFlake lockFlake(
                         if (!lockFlags.allowMutable && !input.ref->input.isImmutable())
                             throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
-                        if (input.isFlake) {
-                            auto inputFlake = getFlake(state, *input.ref, lockFlags.useRegistries, flakeCache);
+                        auto fetchedInp = getInput(state, *input.ref, lockFlags.useRegistries, flakeCache);
+                        bool const isFlake = std::holds_alternative<Flake>(fetchedInp);
 
-                            /* Note: in case of an --override-input, we use
-                               the *original* ref (input2.ref) for the
-                               "original" field, rather than the
-                               override. This ensures that the override isn't
-                               nuked the next time we update the lock
-                               file. That is, overrides are sticky unless you
-                               use --no-write-lock-file. */
-                            auto childNode = std::make_shared<LockedNode>(
-                                inputFlake.lockedRef, input2.ref ? *input2.ref : *input.ref);
+                        /* Note: in case of an --override-input, we use
+                           the *original* ref (input2.ref) for the
+                           "original" field, rather than the
+                           override. This ensures that the override isn't
+                           nuked the next time we update the lock
+                           file. That is, overrides are sticky unless you
+                           use --no-write-lock-file. */
+                        auto childNode = std::make_shared<LockedNode>(
+                            isFlake ?
+                            std::get<Flake>(fetchedInp).lockedRef :
+                            std::get<2>(std::get<1>(fetchedInp)),
+                            input2.ref ? *input2.ref : *input.ref,
+                            isFlake);
 
-                            node->inputs.insert_or_assign(id, childNode);
+                        node->inputs.insert_or_assign(id, childNode);
 
+                        if (isFlake) {
                             /* Guard against circular flake imports. */
                             for (auto & parent : parents)
                                 if (parent == *input.ref)
                                     throw Error("found circular import of flake '%s'", parent);
                             parents.push_back(*input.ref);
                             Finally cleanup([&]() { parents.pop_back(); });
+
+                            auto inputFlake = std::get<Flake>(fetchedInp);
 
                             /* Recursively process the inputs of this
                                flake. Also, unless we already have this flake
@@ -513,12 +521,6 @@ LockedFlake lockFlake(
                                     inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root);
                         }
 
-                        else {
-                            auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                state, *input.ref, lockFlags.useRegistries, flakeCache);
-                            node->inputs.insert_or_assign(id,
-                                std::make_shared<LockedNode>(lockedRef, *input.ref, false));
-                        }
                     }
 
                 } catch (Error & e) {
