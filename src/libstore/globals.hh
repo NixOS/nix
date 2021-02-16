@@ -34,6 +34,8 @@ class Settings : public Config {
 
     StringSet getDefaultSystemFeatures();
 
+    StringSet getDefaultExtraPlatforms();
+
     bool isWSL1();
 
 public:
@@ -545,7 +547,7 @@ public:
 
     Setting<StringSet> extraPlatforms{
         this,
-        std::string{SYSTEM} == "x86_64-linux" && !isWSL1() ? StringSet{"i686-linux"} : StringSet{},
+        getDefaultExtraPlatforms(),
         "extra-platforms",
         R"(
           Platforms other than the native one which this machine is capable of
@@ -583,7 +585,7 @@ public:
 
     Setting<Strings> substituters{
         this,
-        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. The default
@@ -867,7 +869,7 @@ public:
           Example `~/.config/nix/nix.conf`:
 
           ```
-          access-tokens = "github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk"
+          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
           ```
 
           Example `~/code/flake.nix`:

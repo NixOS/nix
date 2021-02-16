@@ -17,7 +17,7 @@
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -217,9 +217,9 @@ static void main_nix_build(int argc, char * * argv)
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
                 // in ruby -e 'load' which ignores the shebangs.
-                envCommand = (format("exec %1% %2% -e 'load(\"%3%\")' -- %4%") % execArgs % interpreter % script % joined.str()).str();
+                envCommand = (format("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%") % execArgs % interpreter % shellEscape(script) % joined.str()).str();
             } else {
-                envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % script % joined.str()).str();
+                envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % shellEscape(script) % joined.str()).str();
             }
         }
 
@@ -369,11 +369,8 @@ static void main_nix_build(int argc, char * * argv)
                 shell = drv->queryOutPath() + "/bin/bash";
 
             } catch (Error & e) {
-                logWarning({
-                    .name = "bashInteractive",
-                    .hint = hintfmt("%s; will use bash from your environment",
-                        (e.info().hint ? e.info().hint->str() : ""))
-                });
+                logError(e.info());
+                notice("will use bash from your environment");
                 shell = "bash";
             }
         }

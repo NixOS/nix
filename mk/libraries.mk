@@ -159,5 +159,4 @@ define build-library
   libs-list += $$($(1)_PATH)
   endif
   clean-files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
-  dist-files += $$(_srcs)
 endef

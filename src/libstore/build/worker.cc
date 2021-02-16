@@ -8,7 +8,7 @@
 
 namespace nix {
 
-Worker::Worker(LocalStore & store)
+Worker::Worker(Store & store)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
@@ -207,7 +207,21 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    for (auto & i : _topGoals) topGoals.insert(i);
+    std::vector<nix::StorePathWithOutputs> topPaths;
+
+    for (auto & i : _topGoals) {
+        topGoals.insert(i);
+        if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
+            topPaths.push_back({goal->drvPath, goal->wantedOutputs});
+        } else if (auto goal = dynamic_cast<SubstitutionGoal *>(i.get())) {
+            topPaths.push_back({goal->storePath});
+        }
+    }
+
+    /* Call queryMissing() efficiently query substitutes. */
+    StorePathSet willBuild, willSubstitute, unknown;
+    uint64_t downloadSize, narSize;
+    store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     debug("entered goal loop");
 
@@ -215,7 +229,9 @@ void Worker::run(const Goals & _topGoals)
 
         checkInterrupt();
 
-        store.autoGC(false);
+        // TODO GC interface?
+        if (auto localStore = dynamic_cast<LocalStore *>(&store))
+            localStore->autoGC(false);
 
         /* Call every wake goal (in the ordering established by
            CompareGoalPtrs). */
@@ -440,10 +456,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     }
     pathContentsGoodCache.insert_or_assign(path, res);
     if (!res)
-        logError({
-            .name = "Corrupted path",
-            .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
-        });
+        printError("path '%s' is corrupted or missing!", store.printStorePath(path));
     return res;
 }
 

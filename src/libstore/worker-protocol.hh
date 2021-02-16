@@ -1,5 +1,8 @@
 #pragma once
 
+#include "store-api.hh"
+#include "serialise.hh"
+
 namespace nix {
 
 
@@ -50,6 +53,8 @@ typedef enum {
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
     wopQueryDerivationOutputMap = 41,
+    wopRegisterDrvOutput = 42,
+    wopQueryRealisation = 43,
 } WorkerOp;
 
 

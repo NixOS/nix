@@ -16,7 +16,7 @@ struct CmdBundle : InstallableCommand
     {
         addFlag({
             .longName = "bundler",
-            .description = "use custom bundler",
+            .description = fmt("Use a custom bundler instead of the default (`%s`).", bundler),
             .labels = {"flake-url"},
             .handler = {&bundler},
             .completer = {[&](size_t, std::string_view prefix) {
@@ -27,7 +27,7 @@ struct CmdBundle : InstallableCommand
         addFlag({
             .longName = "out-link",
             .shortName = 'o',
-            .description = "path of the symlink to the build result",
+            .description = "Override the name of the symlink to the build result. It defaults to the base name of the app.",
             .labels = {"path"},
             .handler = {&outLink},
             .completer = completePath
@@ -40,14 +40,11 @@ struct CmdBundle : InstallableCommand
         return "bundle an application so that it works outside of the Nix store";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To bundle Hello:",
-                "nix bundle hello"
-            },
-        };
+        return
+          #include "bundle.md"
+          ;
     }
 
     Category category() override { return catSecondary; }
@@ -93,7 +90,7 @@ struct CmdBundle : InstallableCommand
         mkString(*evalState->allocAttr(*arg, evalState->symbols.create("system")), settings.thisSystem.get());
 
         arg->attrs->sort();
- 
+
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
 

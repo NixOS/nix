@@ -87,7 +87,7 @@ struct NarAccessor : public FSAccessor
             parents.top()->start = pos;
         }
 
-        void receiveContents(unsigned char * data, size_t len) override
+        void receiveContents(std::string_view data) override
         { }
 
         void createSymlink(const Path & path, const string & target) override
@@ -96,7 +96,7 @@ struct NarAccessor : public FSAccessor
                 NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
         }
 
-        size_t read(unsigned char * data, size_t len) override
+        size_t read(char * data, size_t len) override
         {
             auto n = source.read(data, len);
             pos += n;
@@ -203,7 +203,7 @@ struct NarAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path) override
+    std::string readFile(const Path & path, bool requireValidPath = true) override
     {
         auto i = get(path);
         if (i.type != FSAccessor::Type::tRegular)

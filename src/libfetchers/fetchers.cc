@@ -132,7 +132,14 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }
 
-    auto [tree, input] = scheme->fetch(store, *this);
+    auto [tree, input] = [&]() -> std::pair<Tree, Input> {
+        try {
+            return scheme->fetch(store, *this);
+        } catch (Error & e) {
+            e.addTrace({}, "while fetching the input '%s'", to_string());
+            throw;
+        }
+    }();
 
     if (tree.actualPath == "")
         tree.actualPath = store->toRealPath(tree.storePath);

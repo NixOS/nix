@@ -47,6 +47,14 @@ chmod a+rx $TEST_ROOT/shell.shebang.sh
 output=$($TEST_ROOT/shell.shebang.sh abc def)
 [ "$output" = "foo bar abc def" ]
 
+# Test nix-shell shebang mode again with metacharacters in the filename.
+# First word of filename is chosen to not match any file in the test root.
+sed -e "s|@ENV_PROG@|$(type -p env)|" shell.shebang.sh > $TEST_ROOT/spaced\ \\\'\"shell.shebang.sh
+chmod a+rx $TEST_ROOT/spaced\ \\\'\"shell.shebang.sh
+
+output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.sh abc def)
+[ "$output" = "foo bar abc def" ]
+
 # Test nix-shell shebang mode for ruby
 # This uses a fake interpreter that returns the arguments passed
 # This, in turn, verifies the `rc` script is valid and the `load()` script (given using `-e`) is as expected.
@@ -54,7 +62,15 @@ sed -e "s|@SHELL_PROG@|$(type -p nix-shell)|" shell.shebang.rb > $TEST_ROOT/shel
 chmod a+rx $TEST_ROOT/shell.shebang.rb
 
 output=$($TEST_ROOT/shell.shebang.rb abc ruby)
-[ "$output" = '-e load("'"$TEST_ROOT"'/shell.shebang.rb") -- abc ruby' ]
+[ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/shell.shebang.rb abc ruby' ]
+
+# Test nix-shell shebang mode for ruby again with metacharacters in the filename.
+# Note: fake interpreter only space-separates args without adding escapes to its output.
+sed -e "s|@SHELL_PROG@|$(type -p nix-shell)|" shell.shebang.rb > $TEST_ROOT/spaced\ \\\'\"shell.shebang.rb
+chmod a+rx $TEST_ROOT/spaced\ \\\'\"shell.shebang.rb
+
+output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
+[ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/spaced \'\''"shell.shebang.rb abc ruby' ]
 
 # Test 'nix develop'.
 nix develop -f shell.nix shellDrv -c bash -c '[[ -n $stdenv ]]'

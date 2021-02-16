@@ -77,8 +77,8 @@ void write(const Store & store, Sink & out, const std::optional<ContentAddress> 
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
-    : Store(params)
-    , RemoteStoreConfig(params)
+    : RemoteStoreConfig(params)
+    , Store(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
             [this]() {
@@ -609,6 +609,27 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
 }
 
+void RemoteStore::registerDrvOutput(const Realisation & info)
+{
+    auto conn(getConnection());
+    conn->to << wopRegisterDrvOutput;
+    conn->to << info.id.to_string();
+    conn->to << std::string(info.outPath.to_string());
+    conn.processStderr();
+}
+
+std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput & id)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryRealisation;
+    conn->to << id.to_string();
+    conn.processStderr();
+    auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
+    if (outPaths.empty())
+        return std::nullopt;
+    return {Realisation{.id = id, .outPath = *outPaths.begin()}};
+}
+
 
 void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
@@ -856,8 +877,8 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
             size_t len = readNum<size_t>(from);
-            auto buf = std::make_unique<unsigned char[]>(len);
-            writeString(buf.get(), source->read(buf.get(), len), to);
+            auto buf = std::make_unique<char[]>(len);
+            writeString({(const char *) buf.get(), source->read(buf.get(), len)}, to);
             to.flush();
         }
 

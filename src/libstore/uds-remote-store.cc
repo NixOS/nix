@@ -15,6 +15,9 @@ namespace nix {
 
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
+    , LocalFSStoreConfig(params)
+    , RemoteStoreConfig(params)
+    , UDSRemoteStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)

@@ -55,25 +55,21 @@ struct RefScanSink : Sink
 
     RefScanSink() { }
 
-    void operator () (const unsigned char * data, size_t len);
+    void operator () (std::string_view data) override
+    {
+        /* It's possible that a reference spans the previous and current
+           fragment, so search in the concatenation of the tail of the
+           previous fragment and the start of the current fragment. */
+        string s = tail + std::string(data, 0, refLength);
+        search((const unsigned char *) s.data(), s.size(), hashes, seen);
+
+        search((const unsigned char *) data.data(), data.size(), hashes, seen);
+
+        size_t tailLen = data.size() <= refLength ? data.size() : refLength;
+        tail = std::string(tail, tail.size() < refLength - tailLen ? 0 : tail.size() - (refLength - tailLen));
+        tail.append({data.data() + data.size() - tailLen, tailLen});
+    }
 };
-
-
-void RefScanSink::operator () (const unsigned char * data, size_t len)
-{
-    /* It's possible that a reference spans the previous and current
-       fragment, so search in the concatenation of the tail of the
-       previous fragment and the start of the current fragment. */
-    string s = tail + string((const char *) data, len > refLength ? refLength : len);
-    search((const unsigned char *) s.data(), s.size(), hashes, seen);
-
-    search(data, len, hashes, seen);
-
-    size_t tailLen = len <= refLength ? len : refLength;
-    tail =
-        string(tail, tail.size() < refLength - tailLen ? 0 : tail.size() - (refLength - tailLen)) +
-        string((const char *) data + len - tailLen, tailLen);
-}
 
 
 std::pair<PathSet, HashResult> scanForReferences(const string & path,
@@ -92,9 +88,6 @@ PathSet scanForReferences(Sink & toTee,
     TeeSink sink { refsSink, toTee };
     std::map<string, Path> backMap;
 
-    /* For efficiency (and a higher hit rate), just search for the
-       hash part of the file name.  (This assumes that all references
-       have the form `HASH-bla'). */
     for (auto & i : refs) {
         auto baseName = std::string(baseNameOf(i));
         string::size_type pos = baseName.find('-');
@@ -129,10 +122,10 @@ RewritingSink::RewritingSink(const std::string & from, const std::string & to, S
     assert(from.size() == to.size());
 }
 
-void RewritingSink::operator () (const unsigned char * data, size_t len)
+void RewritingSink::operator () (std::string_view data)
 {
     std::string s(prev);
-    s.append((const char *) data, len);
+    s.append(data);
 
     size_t j = 0;
     while ((j = s.find(from, j)) != string::npos) {
@@ -146,14 +139,14 @@ void RewritingSink::operator () (const unsigned char * data, size_t len)
 
     pos += consumed;
 
-    if (consumed) nextSink((unsigned char *) s.data(), consumed);
+    if (consumed) nextSink(s.substr(0, consumed));
 }
 
 void RewritingSink::flush()
 {
     if (prev.empty()) return;
     pos += prev.size();
-    nextSink((unsigned char *) prev.data(), prev.size());
+    nextSink(prev);
     prev.clear();
 }
 
@@ -163,9 +156,9 @@ HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
 {
 }
 
-void HashModuloSink::operator () (const unsigned char * data, size_t len)
+void HashModuloSink::operator () (std::string_view data)
 {
-    rewritingSink(data, len);
+    rewritingSink(data);
 }
 
 HashResult HashModuloSink::finish()
@@ -176,10 +169,8 @@ HashResult HashModuloSink::finish()
        NAR with self-references and a NAR with some of the
        self-references already zeroed out do not produce a hash
        collision. FIXME: proof. */
-    for (auto & pos : rewritingSink.matches) {
-        auto s = fmt("|%d", pos);
-        hashSink((unsigned char *) s.data(), s.size());
-    }
+    for (auto & pos : rewritingSink.matches)
+        hashSink(fmt("|%d", pos));
 
     auto h = hashSink.finish();
     return {h.first, rewritingSink.pos};

@@ -2,14 +2,17 @@
 
 #include "types.hh"
 #include "lock.hh"
-#include "local-store.hh"
+#include "store-api.hh"
 #include "goal.hh"
+
+#include <future>
+#include <thread>
 
 namespace nix {
 
 /* Forward definition. */
-class DerivationGoal;
-class SubstitutionGoal;
+struct DerivationGoal;
+struct SubstitutionGoal;
 
 /* Workaround for not being able to declare a something like
 
@@ -102,7 +105,7 @@ public:
     /* Set if at least one derivation is not deterministic in check mode. */
     bool checkMismatch;
 
-    LocalStore & store;
+    Store & store;
 
     std::unique_ptr<HookInstance> hook;
 
@@ -124,7 +127,7 @@ public:
        it answers with "decline-permanently", we don't try again. */
     bool tryBuildHook = true;
 
-    Worker(LocalStore & store);
+    Worker(Store & store);
     ~Worker();
 
     /* Make a goal (with caching). */

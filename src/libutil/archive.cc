@@ -50,14 +50,14 @@ static void dumpContents(const Path & path, size_t size,
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw SysError("opening file '%1%'", path);
 
-    std::vector<unsigned char> buf(65536);
+    std::vector<char> buf(65536);
     size_t left = size;
 
     while (left > 0) {
         auto n = std::min(left, buf.size());
         readFull(fd.get(), buf.data(), n);
         left -= n;
-        sink(buf.data(), n);
+        sink({buf.data(), n});
     }
 
     writePadding(size, sink);
@@ -155,14 +155,14 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
     sink.preallocateContents(size);
 
     uint64_t left = size;
-    std::vector<unsigned char> buf(65536);
+    std::vector<char> buf(65536);
 
     while (left) {
         checkInterrupt();
         auto n = buf.size();
         if ((uint64_t)n > left) n = left;
         source(buf.data(), n);
-        sink.receiveContents(buf.data(), n);
+        sink.receiveContents({buf.data(), n});
         left -= n;
     }
 
@@ -300,21 +300,21 @@ struct RestoreSink : ParseSink
     Path dstPath;
     AutoCloseFD fd;
 
-    void createDirectory(const Path & path)
+    void createDirectory(const Path & path) override
     {
         Path p = dstPath + path;
         if (mkdir(p.c_str(), 0777) == -1)
             throw SysError("creating directory '%1%'", p);
     };
 
-    void createRegularFile(const Path & path)
+    void createRegularFile(const Path & path) override
     {
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (!fd) throw SysError("creating file '%1%'", p);
     }
 
-    void isExecutable()
+    void isExecutable() override
     {
         struct stat st;
         if (fstat(fd.get(), &st) == -1)
@@ -323,7 +323,7 @@ struct RestoreSink : ParseSink
             throw SysError("fchmod");
     }
 
-    void preallocateContents(uint64_t len)
+    void preallocateContents(uint64_t len) override
     {
         if (!archiveSettings.preallocateContents)
             return;
@@ -341,12 +341,12 @@ struct RestoreSink : ParseSink
 #endif
     }
 
-    void receiveContents(unsigned char * data, size_t len)
+    void receiveContents(std::string_view data) override
     {
-        writeFull(fd.get(), data, len);
+        writeFull(fd.get(), data);
     }
 
-    void createSymlink(const Path & path, const string & target)
+    void createSymlink(const Path & path, const string & target) override
     {
         Path p = dstPath + path;
         nix::createSymlink(target, p);

@@ -14,9 +14,7 @@
 #include "util.hh"
 #include "crypto.hh"
 
-#if HAVE_SODIUM
 #include <sodium.h>
-#endif
 
 
 using namespace nix;
@@ -239,12 +237,8 @@ SV * convertHash(char * algo, char * s, int toBase32)
 SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
-#if HAVE_SODIUM
             auto sig = SecretKey(secretKey_).signDetached(msg);
             XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -253,7 +247,6 @@ SV * signString(char * secretKey_, char * msg)
 int checkSignature(SV * publicKey_, SV * sig_, char * msg)
     CODE:
         try {
-#if HAVE_SODIUM
             STRLEN publicKeyLen;
             unsigned char * publicKey = (unsigned char *) SvPV(publicKey_, publicKeyLen);
             if (publicKeyLen != crypto_sign_PUBLICKEYBYTES)
@@ -265,9 +258,6 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
                 throw Error("signature is not valid");
 
             RETVAL = crypto_sign_verify_detached(sig, (unsigned char *) msg, strlen(msg), publicKey) == 0;
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
