@@ -6,8 +6,7 @@
 #include "derivations.hh"
 #include "affinity.hh"
 #include "progress-bar.hh"
-
-#include <regex>
+#include "regex.hh"
 
 using namespace nix;
 
@@ -64,42 +63,42 @@ BuildEnvironment readEnvironment(const Path & path)
     static std::string indexedArrayRegex =
         R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
 
-    static std::regex declareRegex(
+    static regex::regex declareRegex(
         "^declare -a?x (" + varNameRegex + ")(=(" +
         dquotedStringRegex + "|" + indexedArrayRegex + "))?\n");
 
-    static std::regex varRegex(
+    static regex::regex varRegex(
         "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + squotedStringRegex + "|" + indexedArrayRegex + ")\n");
 
     /* Note: we distinguish between an indexed and associative array
        using the space before the closing parenthesis. Will
        undoubtedly regret this some day. */
-    static std::regex assocArrayRegex(
+    static regex::regex assocArrayRegex(
         "^(" + varNameRegex + ")=" + R"re((?:\(( *\[[^\]]+\]="(?:[^"\\]|\\.)*")* *\)))re" + "\n");
 
-    static std::regex functionRegex(
+    static regex::regex functionRegex(
         "^" + varNameRegex + " \\(\\) *\n");
 
     while (pos != file.end()) {
 
-        std::smatch match;
+        regex::smatch match;
 
-        if (std::regex_search(pos, file.cend(), match, declareRegex, std::regex_constants::match_continuous)) {
+        if (regex::regex_search(pos, file.cend(), match, declareRegex, regex::regex_constants::match_continuous)) {
             pos = match[0].second;
             exported.insert(match[1]);
         }
 
-        else if (std::regex_search(pos, file.cend(), match, varRegex, std::regex_constants::match_continuous)) {
+        else if (regex::regex_search(pos, file.cend(), match, varRegex, regex::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .quoted = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex, std::regex_constants::match_continuous)) {
+        else if (regex::regex_search(pos, file.cend(), match, assocArrayRegex, regex::regex_constants::match_continuous)) {
             pos = match[0].second;
             res.env.insert({match[1], Var { .associative = true, .quoted = match[2] }});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, functionRegex, std::regex_constants::match_continuous)) {
+        else if (regex::regex_search(pos, file.cend(), match, functionRegex, regex::regex_constants::match_continuous)) {
             res.bashFunctions = std::string(pos, file.cend());
             break;
         }
