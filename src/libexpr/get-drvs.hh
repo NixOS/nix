@@ -26,7 +26,8 @@ private:
 
     bool failed = false; // set if we get an AssertionError
 
-    Bindings * attrs = nullptr, * meta = nullptr;
+    std::optional<Value> attrs;
+    Bindings * meta = nullptr;
 
     Bindings * getMeta();
 
@@ -36,8 +37,11 @@ public:
     string attrPath; /* path towards the derivation */
 
     DrvInfo(EvalState & state) : state(&state) { };
-    DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs);
+    DrvInfo(EvalState & state, const string & attrPath, std::optional<Value> attrs);
     DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
+
+    Value queryAttr(const Symbol attrName) const;
+    std::optional<Value> queryOptionalAttr(const Symbol attrName) const;
 
     string queryName() const;
     string querySystem() const;

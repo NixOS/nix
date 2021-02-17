@@ -433,6 +433,9 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
 EvalState::~EvalState()
 {
+    for (auto [_, cache] : evalCache) {
+        cache->commit();
+    }
 }
 
 
@@ -1118,48 +1121,396 @@ static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPa
 
 unsigned long nrLookups = 0;
 
+tree_cache::AttrValue cachedValueFor(const Value& v)
+{
+    tree_cache::AttrValue valueToCache;
+    switch (v.type()) {
+        case nThunk:
+            valueToCache = tree_cache::thunk_t{};
+            break;
+        case nNull:
+        case nList:
+        case nFunction:
+        case nExternal:
+            valueToCache = tree_cache::unknown_t{};
+            break;
+        case nBool:
+            valueToCache = tree_cache::wrapped_basetype<bool>{v.boolean};
+            break;
+        case nString:
+            valueToCache = tree_cache::string_t{
+                v.string.s,
+                v.getContext()
+            };
+            break;
+        case nPath:
+            valueToCache = tree_cache::string_t{
+                v.path,
+                {}
+            };
+            break;
+        case nAttrs:
+            valueToCache = tree_cache::attributeSet_t{};
+            break;
+        case nInt:
+            valueToCache = tree_cache::wrapped_basetype<int64_t>{v.integer};
+            break;
+        case nFloat:
+            valueToCache = tree_cache::wrapped_basetype<double>{v.fpoint};
+            break;
+    };
+    return valueToCache;
+}
+
+std::optional<std::vector<Symbol>> ValueCache::listChildren(SymbolTable& symbols)
+{
+    auto ret = std::vector<Symbol>();
+    if (rawCache) {
+        auto cachedValue = rawCache->getCachedValue();
+            if (std::get_if<tree_cache::attributeSet_t>(&cachedValue)) {
+                for (auto & fieldStr : rawCache->getChildren())
+                    ret.push_back(symbols.create(fieldStr));
+            }
+            return ret;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::vector<Symbol>> ValueCache::listChildrenAtPath(SymbolTable & symbols, const std::vector<Symbol> & attrPath)
+{
+    auto ret = std::vector<Symbol>();
+    if (rawCache) {
+        auto rawChildren = rawCache->getChildrenAtPath(attrPath);
+        if (!rawChildren) return std::nullopt;
+        for (auto & fieldStr : rawChildren.value())
+            ret.push_back(symbols.create(fieldStr));
+        return ret;
+    }
+    return std::nullopt;
+}
+
+std::vector<Symbol> EvalState::listAttrFields(Value & attrs, const Pos & pos)
+{
+    // First try to get it from the cache
+    if (auto cachedRes = attrs.getCache().listChildren(symbols))
+        return cachedRes.value();
+
+    auto ret = std::vector<Symbol>();
+    forceAttrs(attrs, pos);
+    ret.reserve(attrs.attrs->size());
+    for (auto & attr : *attrs.attrs) {
+        ret.push_back(attr.name);
+    }
+    return ret;
+}
+
+EvalState::AttrAccesResult EvalState::getOptionalAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos)
+{
+    Value* resValue = allocValue();
+    auto accessResult = getOptionalAttrField(attrs, selector, pos, *resValue);
+    accessResult.value = resValue;
+    return accessResult;
+}
+
+ValueCache::CacheResult ValueCache::getValue(Store & store, const std::vector<Symbol> & selector, Value & dest)
+{
+    if (!rawCache)
+        return { NoCacheKey };
+    auto resultingCursor = rawCache->findAlongAttrPath(selector);
+    if (!resultingCursor)
+        return { CacheMiss };
+
+    dest.setCache(ValueCache(resultingCursor));
+
+    auto cachedValue = resultingCursor->getCachedValue();
+    return std::visit(
+        overloaded{
+            [&](tree_cache::attributeSet_t) { return ValueCache::CacheResult{ Forward }; },
+            [&](tree_cache::unknown_t) { return ValueCache::CacheResult{ UnCacheable }; },
+            [&](tree_cache::thunk_t) { return ValueCache::CacheResult{ CacheMiss }; },
+            [&](tree_cache::failed_t x) -> ValueCache::CacheResult {throw EvalError(x.error); },
+            [&](tree_cache::missing_t x) {
+                return ValueCache::CacheResult{
+                    .returnCode = CacheHit,
+                    .lastQueriedSymbolIfMissing = x.attrName
+                };
+            },
+            [&](tree_cache::string_t s) {
+                PathSet context;
+                for (auto& [pathName, outputName] : s.second) {
+                    // If the cached value depends on some non-existent
+                    // path, we need to discard it and force the evaluation
+                    // to bring back the context in the store
+                    if (!store.isValidPath(
+                            store.parseStorePath(pathName)))
+                        return ValueCache::CacheResult{UnCacheable};
+                    context.insert("!" + outputName + "!" + pathName);
+                }
+                mkString(dest, s.first, context);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<bool> b) {
+                dest.mkBool(b.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<int64_t> i) {
+                dest.mkInt(i.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<double> d) {
+                dest.mkFloat(d.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+        },
+        cachedValue);
+}
+
+void EvalState::updateCacheStats(ValueCache::CacheResult cacheResult)
+{
+    switch (cacheResult.returnCode) {
+        case ValueCache::CacheHit:
+            nrCacheHits++;
+            break;
+        case ValueCache::CacheMiss:
+            nrCacheMisses++;
+            break;
+        case ValueCache::UnCacheable:
+            nrUncacheable++;
+            break;
+        case ValueCache::NoCacheKey:
+            nrUncached++;
+            break;
+        case ValueCache::Forward:
+            nrCacheHits++;
+            break;
+    };
+}
+
+struct ExprCastedVar : Expr
+{
+    Value * v;
+    ExprCastedVar(Value * v) : v(v) {};
+    void show(std::ostream & str) const override {
+        std::set<const Value*> active;
+        printValue(str, active, *v);
+    }
+
+    void bindVars(const StaticEnv & env) override {}
+    void eval(EvalState & state, Env & env, Value & v) override {
+        v = std::move(*this->v);
+    }
+    Value * maybeThunk(EvalState & state, Env & env) override {
+        return v;
+    }
+};
+
+EvalState::AttrAccesResult EvalState::lazyGetOptionalAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos)
+{
+    Value * dest = allocValue();
+    auto evalCache = attrs.getCache();
+    auto cacheResult = evalCache.getValue(*store, selector, *dest);
+    updateCacheStats(cacheResult);
+
+    if (cacheResult.returnCode == ValueCache::CacheHit) {
+        if (cacheResult.lastQueriedSymbolIfMissing)
+            return {
+                .error =
+                    AttrAccessError{*cacheResult.lastQueriedSymbolIfMissing},
+                .pos = &pos,
+            };
+        else
+            return {.pos = &pos, .value = dest};
+    }
+
+    auto & newEnv(allocEnv(0));
+
+    auto recordAsVar = new ExprCastedVar(&attrs);
+
+    auto accessExpr = new ExprSelect(pos, recordAsVar, selector);
+    dest->mkThunk (&newEnv, accessExpr);
+
+    return {
+        .pos = &pos,
+        .value = dest,
+    };
+
+}
+
+EvalState::AttrAccesResult EvalState::getOptionalAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+{
+    auto evalCache = attrs.getCache();
+
+    if (auto maybeRawVal = evalCache.getRawValue();
+            maybeRawVal.has_value() &&
+            !std::holds_alternative<tree_cache::attributeSet_t>(maybeRawVal.value()) &&
+            !std::holds_alternative<tree_cache::thunk_t>(maybeRawVal.value())
+        )
+        return {
+            .error = AttrAccessError{
+                .attrName = selector[0],
+                .illTypedValue = &attrs,
+            },
+            .pos = &pos,
+        };
+
+    auto cacheResult = evalCache.getValue(*store, selector, dest);
+    updateCacheStats(cacheResult);
+
+    if (cacheResult.returnCode == ValueCache::CacheHit) {
+        if (cacheResult.lastQueriedSymbolIfMissing)
+            return {
+                .error =
+                    AttrAccessError{*cacheResult.lastQueriedSymbolIfMissing},
+                .pos = &pos,
+            };
+        else
+            return {.pos = &pos, .value = &dest};
+    }
+
+    const Pos * pos2 = &pos;
+    Value * currentValue = &attrs;
+    forceValue(*currentValue, *pos2);
+
+    auto resultingCursor = evalCache;
+    for (auto & name : selector) {
+        nrLookups++;
+        Bindings::iterator j;
+        if (currentValue->type() != nAttrs)
+            return {
+                .error = AttrAccessError{
+                    .attrName = name,
+                    .illTypedValue = currentValue,
+                },
+                .pos = pos2,
+            };
+        if ((j = currentValue->attrs->find(name)) == currentValue->attrs->end())
+            return {.error = AttrAccessError { name }, .pos = pos2 };
+        currentValue = j->value;
+        pos2 = j->pos;
+        try {
+            forceValue(*currentValue, *pos2);
+        } catch (EvalError & e) {
+            resultingCursor.addFailedChild(name, e);
+            throw;
+        };
+        if (cacheResult.returnCode == ValueCache::CacheMiss) {
+            resultingCursor = resultingCursor.addChild(name, *currentValue);
+            currentValue->setCache(resultingCursor);
+        }
+        if (countCalls && pos2) attrSelects[*pos2]++;
+    }
+
+    if (cacheResult.returnCode != ValueCache::CacheMiss) {
+        resultingCursor = dest.getCache();
+        currentValue->setCache(resultingCursor);
+    }
+
+    dest = *currentValue;
+    return { .pos = pos2 };
+}
+
+const ValueCache ValueCache::empty = ValueCache(nullptr);
+
+std::optional<tree_cache::AttrValue> ValueCache::getRawValue()
+{
+    if (!rawCache)
+        return std::nullopt;
+    return rawCache->getCachedValue();
+}
+
+ValueCache ValueCache::addChild(const Symbol& name, const Value& value)
+{
+    if (!rawCache)
+        return ValueCache::empty;
+
+    auto cachedValue = cachedValueFor(value);
+    auto ret = ValueCache(rawCache->addChild(name, cachedValue));
+    if (value.type() == nAttrs)
+        ret.addAttrSetChilds(*value.attrs);
+    return ret;
+}
+
+ValueCache ValueCache::addFailedChild(const Symbol& name, const Error & error)
+{
+    if (!rawCache) return ValueCache::empty;
+    return ValueCache(rawCache->addChild(name, tree_cache::failed_t{ .error = error.msg() }));
+}
+
+ValueCache ValueCache::addNumChild(SymbolTable & symbols, int idx, const Value & value)
+{
+    return addChild(symbols.create(std::to_string(idx)), value);
+}
+
+void ValueCache::addAttrSetChilds(Bindings & children)
+{
+    if (!rawCache) return;
+    for (auto & attr : children) {
+        // We could in theory directly store the value, but that would cause
+        // an infinite recursion in case of a cyclic attrset.
+        // So in a first time, just store a thunk
+        rawCache->addChild(attr.name, tree_cache::thunk_t{});
+        /* addChild(attr.name, *attr.value); */
+    }
+
+}
+
+void ValueCache::addListChilds(SymbolTable & symbols, Value** elems, int listSize)
+{
+    if (!rawCache) return;
+    for (auto i = 0; i < listSize; i++) {
+        addNumChild(symbols, i, *elems[i]);
+    }
+}
+
+void EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+{
+    auto missingFieldInfo = getOptionalAttrField(attrs, selector, pos, dest);
+    if (missingFieldInfo.error) {
+        if (missingFieldInfo.error->illTypedValue) {
+            throwTypeError("value is %1% while a set was expected", **missingFieldInfo.error->illTypedValue);
+        } else {
+            throwEvalError(
+                    *missingFieldInfo.pos,
+                    "attribute '%1%' missing", missingFieldInfo.error->attrName
+            );
+        }
+    }
+}
+
+Value* EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos)
+{
+    Value* res = allocValue();
+    getAttrField(attrs, selector, pos, *res);
+    return res;
+}
+
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos2 = 0;
-    Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
 
-    try {
-
-        for (auto & i : attrPath) {
-            nrLookups++;
-            Bindings::iterator j;
-            Symbol name = getName(i, state, env);
-            if (def) {
-                state.forceValue(*vAttrs, pos);
-                if (vAttrs->type() != nAttrs ||
-                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                {
-                    def->eval(state, env, v);
-                    return;
-                }
-            } else {
-                state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
-            }
-            vAttrs = j->value;
-            pos2 = j->pos;
-            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
-        }
-
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
-
-    } catch (Error & e) {
-        if (pos2 && pos2->file != state.sDerivationNix)
-            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
-                showAttrPath(state, env, attrPath));
-        throw;
+    std::vector<Symbol> evaluatedAttrs;
+    for (auto & i : attrPath) {
+        evaluatedAttrs.push_back(getName(i, state, env));
     }
 
-    v = *vAttrs;
+    try {
+        if (def) {
+            auto missingFieldInfo = state.getOptionalAttrField(vTmp, evaluatedAttrs, pos, v);
+            if (missingFieldInfo.error) {
+                def->eval(state, env, v);
+                return;
+            }
+            return;
+        }
+        state.getAttrField(vTmp, evaluatedAttrs, pos, v);
+    } catch (Error & e) {
+        if (pos.file != state.sDerivationNix)
+            addErrorTrace(e, pos, "while evaluating the attribute '%1%'",
+                    showAttrPath(state, env, attrPath));
+        throw;
+    }
 }
 
 
@@ -1690,18 +2041,6 @@ string EvalState::forceString(Value & v, const Pos & pos)
 }
 
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-std::pair<string, string> decodeContext(std::string_view s)
-{
-    if (s.at(0) == '!') {
-        size_t index = s.find("!", 1);
-        return {std::string(s.substr(index + 1)), std::string(s.substr(1, index - 1))};
-    } else
-        return {s.at(0) == '/' ? std::string(s) : std::string(s.substr(1)), ""};
-}
-
-
 void copyContext(const Value & v, PathSet & context)
 {
     if (v.string.context)
@@ -1710,7 +2049,7 @@ void copyContext(const Value & v, PathSet & context)
 }
 
 
-std::vector<std::pair<Path, std::string>> Value::getContext()
+std::vector<std::pair<Path, std::string>> Value::getContext() const
 {
     std::vector<std::pair<Path, std::string>> res;
     assert(internalType == tString);
@@ -1720,6 +2059,15 @@ std::vector<std::pair<Path, std::string>> Value::getContext()
     return res;
 }
 
+void Value::setCache(ValueCache cache)
+{
+    evalCache = cache;
+}
+
+ValueCache Value::getCache() const
+{
+    return evalCache;
+}
 
 string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {
@@ -1746,12 +2094,12 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 
 bool EvalState::isDerivation(Value & v)
 {
-    if (v.type() != nAttrs) return false;
-    Bindings::iterator i = v.attrs->find(sType);
-    if (i == v.attrs->end()) return false;
-    forceValue(*i->value);
-    if (i->value->type() != nString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    auto typeAccesRes = getOptionalAttrField(v, {sType}, noPos);
+    if (typeAccesRes.error)
+        return false;
+    forceValue(*typeAccesRes.value);
+    if (typeAccesRes.value->type() != nString) return false;
+    return strcmp(typeAccesRes.value->string.s, "derivation") == 0;
 }
 
 
@@ -1790,9 +2138,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         if (maybeString) {
             return *maybeString;
         }
-        auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
-        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
+        auto accessResult = getOptionalAttrField(v, {sOutPath}, pos);
+        if (accessResult.error) throwTypeError(pos, "cannot coerce a set to a string");
+        return coerceToString(pos, *accessResult.value, context, coerceMore, copyToStore);
     }
 
     if (v.type() == nExternal)
@@ -2002,6 +2350,13 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        {
+            auto cache = topObj.object("evalCache");
+            cache.attr("nrCacheMisses", nrCacheMisses);
+            cache.attr("nrCacheHits", nrCacheHits);
+            cache.attr("nrUncached", nrUncached);
+            cache.attr("nrUncacheable", nrUncacheable);
+        }
 #if HAVE_BOEHMGC
         {
             auto gc = topObj.object("gc");
@@ -2103,5 +2458,19 @@ EvalSettings evalSettings;
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
 
+std::shared_ptr<tree_cache::Cache> EvalState::openTreeCache(Hash cacheKey)
+{
+    if (auto iter = evalCache.find(cacheKey); iter != evalCache.end())
+        return iter->second;
+
+    if (!(evalSettings.useEvalCache && evalSettings.pureEval))
+        return nullptr;
+    auto thisCache = tree_cache::Cache::tryCreate(
+            cacheKey,
+            symbols
+    );
+    evalCache.insert({cacheKey, thisCache});
+    return thisCache;
+}
 
 }

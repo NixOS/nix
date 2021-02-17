@@ -166,6 +166,10 @@ struct ExprSelect : Expr
     AttrPath attrPath;
     ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
     ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const Pos & pos, Expr * e, const std::vector<Symbol> & names) : pos(pos), e(e), def(0) {
+        for (auto & name : names)
+            attrPath.push_back(AttrName(name));
+    };
     COMMON_METHODS
 };
 

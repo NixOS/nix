@@ -54,7 +54,23 @@ struct Installable
 
     App toApp(EvalState & state);
 
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
+    struct ValueInfo {
+        Value * value;
+        Pos pos;
+        string positionInfo;
+    };
+
+    virtual ValueInfo toValue(EvalState & state)
+    {
+        auto values = toValues(state);
+        if (values.empty())
+            throw Error("Installable '%s' does not provide a default value",
+                    what());
+        return values[0];
+    }
+
+    virtual std::vector<ValueInfo>
+    toValues(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -66,11 +82,6 @@ struct Installable
         return {};
     }
 
-    virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursors(EvalState & state);
-
-    std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
-    getCursor(EvalState & state);
 
     virtual FlakeRef nixpkgsFlakeRef() const
     {
@@ -122,18 +133,14 @@ struct InstallableFlake : InstallableValue
 
     std::vector<DerivationInfo> toDerivations() override;
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
+    ValueInfo toValue(EvalState & state) override;
 
-    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursors(EvalState & state) override;
+    std::vector<ValueInfo>
+    toValues(EvalState & state) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
     FlakeRef nixpkgsFlakeRef() const override;
 };
-
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }

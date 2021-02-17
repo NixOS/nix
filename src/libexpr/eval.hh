@@ -1,10 +1,14 @@
 #pragma once
 
 #include "attr-set.hh"
+#include "context.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
+#include "hash.hh"
+#include "sqlite.hh"
+#include "tree-cache.hh"
 
 #include <map>
 #include <optional>
@@ -14,6 +18,9 @@
 
 namespace nix {
 
+namespace eval_cache {
+    class EvalCache;
+}
 
 class Store;
 class EvalState;
@@ -116,6 +123,8 @@ private:
 #endif
     FileEvalCache fileEvalCache;
 
+    std::map<Hash, std::shared_ptr<tree_cache::Cache>> evalCache;
+
     SearchPath searchPath;
 
     std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
@@ -130,6 +139,9 @@ public:
 
     EvalState(const Strings & _searchPath, ref<Store> store);
     ~EvalState();
+
+    std::shared_ptr<eval_cache::EvalCache> openCache(Hash, std::function<Value *()> rootLoader);
+    std::shared_ptr<tree_cache::Cache> openTreeCache(Hash);
 
     void addToSearchPath(const string & s);
 
@@ -303,12 +315,34 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, Pos * pos);
 
+    struct AttrAccessError {
+        const Symbol attrName;
+
+        // To distinguish between a missing field in an attribute set
+        // and an access to something that's not an attribute set
+        std::optional<Value* > illTypedValue;
+    };
+    struct AttrAccesResult {
+        std::optional<AttrAccessError> error;
+        const Pos * pos;
+        Value* value;
+    };
+    AttrAccesResult getOptionalAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
+    AttrAccesResult getOptionalAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos);
+    AttrAccesResult lazyGetOptionalAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos);
+    void getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
+    Value* getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos);
+
+    std::vector<Symbol> listAttrFields(Value & attrs, const Pos & pos);
+
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 
     /* Print statistics. */
     void printStats();
 
     void realiseContext(const PathSet & context);
+
+    void updateCacheStats(ValueCache::CacheResult);
 
 private:
 
@@ -323,6 +357,10 @@ private:
     unsigned long nrListConcats = 0;
     unsigned long nrPrimOpCalls = 0;
     unsigned long nrFunctionCalls = 0;
+    unsigned long nrCacheHits = 0;
+    unsigned long nrCacheMisses = 0;
+    unsigned long nrUncacheable = 0;
+    unsigned long nrUncached = 0;
 
     bool countCalls;
 

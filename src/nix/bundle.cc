@@ -92,7 +92,7 @@ struct CmdBundle : InstallableCommand
         arg->attrs->sort();
 
         auto vRes = evalState->allocValue();
-        evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
+        evalState->callFunction(*bundler.toValue(*evalState).value, *arg, *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
