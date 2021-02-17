@@ -232,22 +232,23 @@ terraform apply
 > in a nix-shell shebang.
 
 Finally, using the merging of multiple nix-shell shebangs the following
-Haskell script uses a specific branch of Nixpkgs/NixOS (the 18.03 stable
+Haskell script uses a specific branch of Nixpkgs/NixOS (the 20.03 stable
 branch):
 
 ```haskell
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
+#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])"
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-20.03.tar.gz
 
-import Network.HTTP
+import Network.Curl.Download
 import Text.HTML.TagSoup
+import Data.Either
+import Data.ByteString.Char8 (unpack)
 
 -- Fetch nixos.org and print all hrefs.
 main = do
-  resp <- Network.HTTP.simpleHTTP (getRequest "http://nixos.org/")
-  body <- getResponseBody resp
-  let tags = filter (isTagOpenName "a") $ parseTags body
+  resp <- openURI "https://nixos.org/"
+  let tags = filter (isTagOpenName "a") $ parseTags $ unpack $ fromRight undefined resp
   let tags' = map (fromAttrib "href") tags
   mapM_ putStrLn $ filter (/= "") tags'
 ```
