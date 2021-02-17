@@ -443,6 +443,7 @@ struct CmdDevelop : Common, MixEnvironment
             auto state = getEvalState();
 
             auto bashInstallable = std::make_shared<InstallableFlake>(
+                this,
                 state,
                 installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},

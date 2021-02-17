@@ -399,7 +399,13 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                InstallableFlake installable(getEvalState(), FlakeRef(element.source->originalRef), {element.source->attrPath}, {}, lockFlags);
+                InstallableFlake installable(
+                    this,
+                    getEvalState(),
+                    FlakeRef(element.source->originalRef),
+                    {element.source->attrPath},
+                    {},
+                    lockFlags);
 
                 auto [attrPath, resolvedRef, drv] = installable.toDerivation();
 

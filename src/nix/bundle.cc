@@ -74,7 +74,7 @@ struct CmdBundle : InstallableCommand
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
-        auto bundler = InstallableFlake(
+        auto bundler = InstallableFlake(this,
             evalState, std::move(bundlerFlakeRef),
             Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
             Strings({"bundlers."}), lockFlags);
