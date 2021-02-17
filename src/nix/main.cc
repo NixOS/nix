@@ -61,6 +61,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
+    bool showVersion = false;
 
     NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
@@ -87,7 +88,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "version",
             .description = "Show version information.",
-            .handler = {[&]() { if (!completions) printVersion(programName); }},
+            .handler = {[&]() { showVersion = true; }},
         });
 
         addFlag({
@@ -279,6 +280,11 @@ void mainWrapped(int argc, char * * argv)
     if (completions) return;
 
     initPlugins();
+
+    if (args.showVersion) {
+        printVersion(programName);
+        return;
+    }
 
     if (!args.command)
         throw UsageError("no subcommand specified");
