@@ -294,6 +294,13 @@
             '';
         };
 
+        nix-benchmarks = prev.runCommandNoCC "nix-benchmarks" {
+          buildInputs = [ final.nix prev.hyperfine ];
+          THINGTOBENCH = ./thingToBench.nix;
+          NIX_PATH="nixpkgs=${prev.path}";
+        } ''
+          bash ${./benchmark.sh} run_all
+        '';
       };
 
       hydraJobs = {
@@ -485,7 +492,7 @@
       });
 
       packages = forAllSystems (system: {
-        inherit (nixpkgsFor.${system}) nix;
+        inherit (nixpkgsFor.${system}) nix nix-benchmarks;
       } // nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = let
           nixpkgs = nixpkgsFor.${system}.pkgsStatic;
