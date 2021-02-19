@@ -177,13 +177,13 @@ struct StorePathsCommand : public RealisedPathsCommand
 };
 
 /* A command that operates on exactly one store path. */
-struct StorePathCommand : public InstallablesCommand
+struct StorePathCommand : public StorePathsCommand
 {
-    using StoreCommand::run;
+    using StorePathsCommand::run;
 
     virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
-    void run(ref<Store> store) override;
+    void run(ref<Store> store, std::vector<StorePath> storePaths) override;
 };
 
 /* A helper class for registering commands globally. */
