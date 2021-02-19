@@ -252,6 +252,7 @@ StorePath Store::addToStore(const string & name, const Path & _srcPath,
         else
             readFile(srcPath, sink);
     });
+    source->source_identifier = _srcPath;
     return addToStoreFromDump(*source, name, method, hashAlgo, repair);
 }
 
