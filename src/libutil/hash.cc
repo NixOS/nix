@@ -341,7 +341,7 @@ HashSink::~HashSink()
     delete ctx;
 }
 
-void HashSink::write(std::string_view data)
+void HashSink::write(std::string_view data, std::string_view source_identifier)
 {
     bytes += data.size();
     update(ht, *ctx, data);

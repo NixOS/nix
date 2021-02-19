@@ -171,8 +171,8 @@ struct curlFileTransfer : public FileTransfer
                 }
 
                 if (errorSink)
-                    (*errorSink)({(char *) contents, realSize});
-                (*decompressionSink)({(char *) contents, realSize});
+                    (*errorSink)({(char *) contents, realSize}, request.uri);
+                (*decompressionSink)({(char *) contents, realSize}, request.uri);
 
                 return realSize;
             } catch (...) {
@@ -843,7 +843,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            if it's blocked on a full buffer. We don't hold the state
            lock while doing this to prevent blocking the download
            thread if sink() takes a long time. */
-        sink(chunk);
+        sink(chunk, request.uri);
     }
 }
 

@@ -86,7 +86,7 @@ void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
                 promise.set_exception(std::current_exception());
             }
         }});
-    sink(*promise.get_future().get());
+    sink(*promise.get_future().get(), path);
 }
 
 std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)

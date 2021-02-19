@@ -55,7 +55,7 @@ struct RefScanSink : Sink
 
     RefScanSink() { }
 
-    void operator () (std::string_view data) override
+    void operator () (std::string_view data, std::string_view source_identifier) override
     {
         /* It's possible that a reference spans the previous and current
            fragment, so search in the concatenation of the tail of the
@@ -122,7 +122,7 @@ RewritingSink::RewritingSink(const std::string & from, const std::string & to, S
     assert(from.size() == to.size());
 }
 
-void RewritingSink::operator () (std::string_view data)
+void RewritingSink::operator () (std::string_view data, std::string_view source_identifier)
 {
     std::string s(prev);
     s.append(data);
@@ -139,14 +139,14 @@ void RewritingSink::operator () (std::string_view data)
 
     pos += consumed;
 
-    if (consumed) nextSink(s.substr(0, consumed));
+    if (consumed) nextSink(s.substr(0, consumed), source_identifier);
 }
 
 void RewritingSink::flush()
 {
     if (prev.empty()) return;
     pos += prev.size();
-    nextSink(prev);
+    nextSink(prev, "");
     prev.clear();
 }
 
@@ -156,9 +156,9 @@ HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
 {
 }
 
-void HashModuloSink::operator () (std::string_view data)
+void HashModuloSink::operator () (std::string_view data, std::string_view source_identifier)
 {
-    rewritingSink(data);
+    rewritingSink(data, source_identifier);
 }
 
 HashResult HashModuloSink::finish()
@@ -170,7 +170,7 @@ HashResult HashModuloSink::finish()
        self-references already zeroed out do not produce a hash
        collision. FIXME: proof. */
     for (auto & pos : rewritingSink.matches)
-        hashSink(fmt("|%d", pos));
+        hashSink(fmt("|%d", pos), "final pos");
 
     auto h = hashSink.finish();
     return {h.first, rewritingSink.pos};

@@ -11,7 +11,7 @@
 namespace nix {
 
 
-void BufferedSink::operator () (std::string_view data)
+void BufferedSink::operator () (std::string_view data, std::string_view source_identifier)
 {
     if (!buffer) buffer = decltype(buffer)(new char[bufSize]);
 
@@ -20,7 +20,7 @@ void BufferedSink::operator () (std::string_view data)
            buffer size. */
         if (bufPos + data.size() >= bufSize) {
             flush();
-            write(data);
+            write(data, source_identifier);
             break;
         }
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
@@ -38,7 +38,7 @@ void BufferedSink::flush()
     if (bufPos == 0) return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
-    write({buffer.get(), n});
+    write({buffer.get(), n}, "BufferedSink::flush");
 }
 
 
@@ -50,19 +50,19 @@ FdSink::~FdSink()
 
 size_t threshold = 256 * 1024 * 1024;
 
-static void warnLargeDump()
+static void warnLargeDump(std::string_view source_identifier)
 {
-    warn("dumping very large path (> 256 MiB); this may run out of memory");
+    warn("dumping very large path (> 256 MiB); this may run out of memory\npath: %s", source_identifier);
 }
 
 
-void FdSink::write(std::string_view data)
+void FdSink::write(std::string_view data, std::string_view source_identifier)
 {
     written += data.size();
     static bool warned = false;
     if (warn && !warned) {
         if (written > threshold) {
-            warnLargeDump();
+            warnLargeDump(source_identifier);
             warned = true;
         }
     }
@@ -98,7 +98,7 @@ void Source::drainInto(Sink & sink)
         size_t n;
         try {
             n = read(buf.data(), buf.size());
-            sink({buf.data(), n});
+            sink({buf.data(), n}, source_identifier);
         } catch (EndOfFile &) {
             break;
         }
@@ -257,7 +257,7 @@ void writePadding(size_t len, Sink & sink)
     if (len % 8) {
         char zero[8];
         memset(zero, 0, sizeof(zero));
-        sink({zero, 8 - (len % 8)});
+        sink({zero, 8 - (len % 8)}, "padding");
     }
 }
 
@@ -265,7 +265,7 @@ void writePadding(size_t len, Sink & sink)
 void writeString(std::string_view data, Sink & sink)
 {
     sink << data.size();
-    sink(data);
+    sink(data, "string");
     writePadding(data.size(), sink);
 }
 
@@ -392,11 +392,11 @@ Error readError(Source & source)
 }
 
 
-void StringSink::operator () (std::string_view data)
+void StringSink::operator () (std::string_view data, std::string_view source_identifier)
 {
     static bool warned = false;
     if (!warned && s->size() > threshold) {
-        warnLargeDump();
+        warnLargeDump(source_identifier);
         warned = true;
     }
     s->append(data);

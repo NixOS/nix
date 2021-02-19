@@ -79,7 +79,7 @@ struct RetrieveRegularNARSink : ParseSink
 
     void receiveContents(std::string_view data) override
     {
-        sink(data);
+        sink(data, "");
     }
 
     void createSymlink(const Path & path, const string & target) override

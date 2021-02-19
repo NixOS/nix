@@ -156,7 +156,7 @@ public:
     HashSink(HashType ht);
     HashSink(const HashSink & h);
     ~HashSink();
-    void write(std::string_view data) override;
+    void write(std::string_view data, std::string_view source_identifier) override;
     HashResult finish() override;
     HashResult currentHash();
 };

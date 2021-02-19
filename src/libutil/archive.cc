@@ -57,7 +57,7 @@ static void dumpContents(const Path & path, size_t size,
         auto n = std::min(left, buf.size());
         readFull(fd.get(), buf.data(), n);
         left -= n;
-        sink({buf.data(), n});
+        sink({buf.data(), n}, "Path: " + path);
     }
 
     writePadding(size, sink);

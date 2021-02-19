@@ -933,7 +933,7 @@ void DerivationGoal::buildDone()
 
                 LogSink(Activity & act) : act(act) { }
 
-                void operator() (std::string_view data) override {
+                void operator() (std::string_view data, std::string_view source_identifier) override {
                     for (auto c : data) {
                         if (c == '\n') {
                             flushLine();
@@ -3201,7 +3201,7 @@ void DerivationGoal::registerOutputs()
                     StringSink sink;
                     dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
-                    rsink2(*sink.s);
+                    rsink2(*sink.s, actualPath);
                     rsink2.flush();
                 });
                 Path tmpPath = actualPath + ".tmp";
@@ -3723,7 +3723,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
                 currentLogLine[currentLogLinePos++] = c;
             }
 
-        if (logSink) (*logSink)(data);
+        if (logSink) (*logSink)(data, "derivation output");  // TODO actual information?
     }
 
     if (hook && fd == hook->fromHook.readSide.get()) {

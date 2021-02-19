@@ -51,7 +51,7 @@ struct TunnelLogger : public Logger
         if (state->canSendStderr) {
             assert(state->pendingMsgs.empty());
             try {
-                to(s);
+                to(s, "TunnelLogger");  // TODO better, or ""?
                 to.flush();
             } catch (...) {
                 /* Write failed; that means that the other side is
@@ -92,7 +92,7 @@ struct TunnelLogger : public Logger
         state->canSendStderr = true;
 
         for (auto & msg : state->pendingMsgs)
-            to(msg);
+            to(msg, "TunnelLogger::startWork");  // TODO not sure function names the best here.
 
         state->pendingMsgs.clear();
 
@@ -153,7 +153,7 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    void operator () (std::string_view data)
+    void operator () (std::string_view data, std::string_view source_identifier)
     {
         to << STDERR_WRITE;
         writeString(data, to);

@@ -22,17 +22,17 @@ struct ChunkedCompressionSink : CompressionSink
 {
     uint8_t outbuf[32 * 1024];
 
-    void write(std::string_view data) override
+    void write(std::string_view data, std::string_view source_identifier) override
     {
         const size_t CHUNK_SIZE = sizeof(outbuf) << 2;
         while (!data.empty()) {
             size_t n = std::min(CHUNK_SIZE, data.size());
-            writeInternal(data);
+            writeInternal(data, source_identifier);
             data.remove_prefix(n);
         }
     }
 
-    virtual void writeInternal(std::string_view data) = 0;
+    virtual void writeInternal(std::string_view data, std::string_view source_identifier) = 0;
 };
 
 struct NoneSink : CompressionSink
@@ -40,7 +40,7 @@ struct NoneSink : CompressionSink
     Sink & nextSink;
     NoneSink(Sink & nextSink) : nextSink(nextSink) { }
     void finish() override { flush(); }
-    void write(std::string_view data) override { nextSink(data); }
+    void write(std::string_view data, std::string_view source_identifier) override { nextSink(data, source_identifier); }
 };
 
 struct GzipDecompressionSink : CompressionSink
@@ -74,10 +74,10 @@ struct GzipDecompressionSink : CompressionSink
     void finish() override
     {
         CompressionSink::flush();
-        write({});
+        write({}, "GzipDecompressionSink");
     }
 
-    void write(std::string_view data) override
+    void write(std::string_view data, std::string_view source_identifier) override
     {
         assert(data.size() <= std::numeric_limits<decltype(strm.avail_in)>::max());
 
@@ -95,7 +95,7 @@ struct GzipDecompressionSink : CompressionSink
             finished = ret == Z_STREAM_END;
 
             if (strm.avail_out < sizeof(outbuf) || strm.avail_in == 0) {
-                nextSink({(char *) outbuf, sizeof(outbuf) - strm.avail_out});
+                nextSink({(char *) outbuf, sizeof(outbuf) - strm.avail_out}, source_identifier);
                 strm.next_out = (Bytef *) outbuf;
                 strm.avail_out = sizeof(outbuf);
             }
@@ -129,10 +129,10 @@ struct XzDecompressionSink : CompressionSink
     void finish() override
     {
         CompressionSink::flush();
-        write({});
+        write({}, "XzDecompressionSink");
     }
 
-    void write(std::string_view data) override
+    void write(std::string_view data, std::string_view source_identifier) override
     {
         strm.next_in = (const unsigned char *) data.data();
         strm.avail_in = data.size();
@@ -147,7 +147,7 @@ struct XzDecompressionSink : CompressionSink
             finished = ret == LZMA_STREAM_END;
 
             if (strm.avail_out < sizeof(outbuf) || strm.avail_in == 0) {
-                nextSink({(char *) outbuf, sizeof(outbuf) - strm.avail_out});
+                nextSink({(char *) outbuf, sizeof(outbuf) - strm.avail_out}, source_identifier);
                 strm.next_out = outbuf;
                 strm.avail_out = sizeof(outbuf);
             }
@@ -180,10 +180,10 @@ struct BzipDecompressionSink : ChunkedCompressionSink
     void finish() override
     {
         flush();
-        write({});
+        write({}, "BzipDecompressionSink");
     }
 
-    void writeInternal(std::string_view data) override
+    void writeInternal(std::string_view data, std::string_view source_identifier) override
     {
         assert(data.size() <= std::numeric_limits<decltype(strm.avail_in)>::max());
 
@@ -200,7 +200,7 @@ struct BzipDecompressionSink : ChunkedCompressionSink
             finished = ret == BZ_STREAM_END;
 
             if (strm.avail_out < sizeof(outbuf) || strm.avail_in == 0) {
-                nextSink({(char *) outbuf, sizeof(outbuf) - strm.avail_out});
+                nextSink({(char *) outbuf, sizeof(outbuf) - strm.avail_out}, source_identifier);
                 strm.next_out = (char *) outbuf;
                 strm.avail_out = sizeof(outbuf);
             }
@@ -229,10 +229,10 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     void finish() override
     {
         flush();
-        writeInternal({});
+        writeInternal({}, "BrotliDecompressionSink" );
     }
 
-    void writeInternal(std::string_view data) override
+    void writeInternal(std::string_view data, std::string_view source_identifier) override
     {
         auto next_in = (const uint8_t *) data.data();
         size_t avail_in = data.size();
@@ -249,7 +249,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
                 throw CompressionError("error while decompressing brotli file");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
-                nextSink({(char *) outbuf, sizeof(outbuf) - avail_out});
+                nextSink({(char *) outbuf, sizeof(outbuf) - avail_out}, source_identifier);
                 next_out = outbuf;
                 avail_out = sizeof(outbuf);
             }
@@ -263,7 +263,7 @@ ref<std::string> decompress(const std::string & method, const std::string & in)
 {
     StringSink ssink;
     auto sink = makeDecompressionSink(method, ssink);
-    (*sink)(in);
+    (*sink)(in, "compressed string");
     sink->finish();
     return ssink.s;
 }
@@ -337,10 +337,10 @@ struct XzCompressionSink : CompressionSink
     void finish() override
     {
         CompressionSink::flush();
-        write({});
+        write({}, "XzCompressionSink");
     }
 
-    void write(std::string_view data) override
+    void write(std::string_view data, std::string_view source_identifier) override
     {
         strm.next_in = (const unsigned char *) data.data();
         strm.avail_in = data.size();
@@ -355,7 +355,7 @@ struct XzCompressionSink : CompressionSink
             finished = ret == LZMA_STREAM_END;
 
             if (strm.avail_out < sizeof(outbuf) || strm.avail_in == 0) {
-                nextSink({(const char *) outbuf, sizeof(outbuf) - strm.avail_out});
+                nextSink({(const char *) outbuf, sizeof(outbuf) - strm.avail_out}, source_identifier);
                 strm.next_out = outbuf;
                 strm.avail_out = sizeof(outbuf);
             }
@@ -388,10 +388,10 @@ struct BzipCompressionSink : ChunkedCompressionSink
     void finish() override
     {
         flush();
-        writeInternal({});
+        writeInternal({}, "BzipCompressionSink");
     }
 
-    void writeInternal(std::string_view data) override
+    void writeInternal(std::string_view data, std::string_view source_identifier) override
     {
         assert(data.size() <= std::numeric_limits<decltype(strm.avail_in)>::max());
 
@@ -408,7 +408,7 @@ struct BzipCompressionSink : ChunkedCompressionSink
             finished = ret == BZ_STREAM_END;
 
             if (strm.avail_out < sizeof(outbuf) || strm.avail_in == 0) {
-                nextSink({(const char *) outbuf, sizeof(outbuf) - strm.avail_out});
+                nextSink({(const char *) outbuf, sizeof(outbuf) - strm.avail_out}, source_identifier);
                 strm.next_out = (char *) outbuf;
                 strm.avail_out = sizeof(outbuf);
             }
@@ -438,10 +438,10 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     void finish() override
     {
         flush();
-        writeInternal({});
+        writeInternal({}, "BrotliCompressionSink");
     }
 
-    void writeInternal(std::string_view data) override
+    void writeInternal(std::string_view data, std::string_view source_identifier) override
     {
         auto next_in = (const uint8_t *) data.data();
         size_t avail_in = data.size();
@@ -459,7 +459,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
                 throw CompressionError("error while compressing brotli compression");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
-                nextSink({(const char *) outbuf, sizeof(outbuf) - avail_out});
+                nextSink({(const char *) outbuf, sizeof(outbuf) - avail_out}, source_identifier);
                 next_out = outbuf;
                 avail_out = sizeof(outbuf);
             }
@@ -487,7 +487,7 @@ ref<std::string> compress(const std::string & method, const std::string & in, co
 {
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel);
-    (*sink)(in);
+    (*sink)(in, "uncompressed string");
     sink->finish();
     return ssink.s;
 }

@@ -412,7 +412,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
                 bucketName, path, res.data->size(), res.durationMs);
 
-            sink(*res.data);
+            sink(*res.data, path);
         } else
             throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
     }

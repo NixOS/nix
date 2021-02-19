@@ -64,7 +64,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             *sink.s = rewriteStrings(*sink.s, rewrites);
 
             HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-            hashModuloSink(*sink.s);
+            hashModuloSink(*sink.s, pathS);
 
             auto narHash = hashModuloSink.finish().first;
 
@@ -85,7 +85,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
             auto source = sinkToSource([&](Sink & nextSink) {
                 RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-                rsink2(*sink.s);
+                rsink2(*sink.s, pathS);
                 rsink2.flush();
             });
 

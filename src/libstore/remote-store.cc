@@ -871,7 +871,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         if (msg == STDERR_WRITE) {
             string s = readString(from);
             if (!sink) throw Error("no sink");
-            (*sink)(s);
+            (*sink)(s, from.source_identifier);
         }
 
         else if (msg == STDERR_READ) {

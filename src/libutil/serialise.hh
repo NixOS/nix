@@ -14,14 +14,14 @@ namespace nix {
 struct Sink
 {
     virtual ~Sink() { }
-    virtual void operator () (std::string_view data) = 0;
+    virtual void operator () (std::string_view data, std::string_view source_identifier) = 0;
     virtual bool good() { return true; }
 };
 
 /* Just throws away data. */
 struct NullSink : Sink
 {
-    void operator () (std::string_view data) override
+    void operator () (std::string_view data, std::string_view source_identifier) override
     { }
 };
 
@@ -35,11 +35,11 @@ struct BufferedSink : virtual Sink
     BufferedSink(size_t bufSize = 32 * 1024)
         : bufSize(bufSize), bufPos(0), buffer(nullptr) { }
 
-    void operator () (std::string_view data) override;
+    void operator () (std::string_view data, std::string_view source_identifier) override;
 
     void flush();
 
-    virtual void write(std::string_view data) = 0;
+    virtual void write(std::string_view data, std::string_view source_identifier) = 0;
 };
 
 
@@ -59,6 +59,8 @@ struct Source
     virtual size_t read(char * data, size_t len) = 0;
 
     virtual bool good() { return true; }
+
+    std::string source_identifier;
 
     void drainInto(Sink & sink);
 
@@ -109,7 +111,7 @@ struct FdSink : BufferedSink
 
     ~FdSink();
 
-    void write(std::string_view data) override;
+    void write(std::string_view data, std::string_view source_identifier) override;
 
     bool good() override;
 
@@ -153,7 +155,7 @@ struct StringSink : Sink
       s->reserve(reservedSize);
     };
     StringSink(ref<std::string> s) : s(s) { };
-    void operator () (std::string_view data) override;
+    void operator () (std::string_view data, std::string_view source_identifier = "") override;
 };
 
 
@@ -172,10 +174,10 @@ struct TeeSink : Sink
 {
     Sink & sink1, & sink2;
     TeeSink(Sink & sink1, Sink & sink2) : sink1(sink1), sink2(sink2) { }
-    virtual void operator () (std::string_view data)
+    virtual void operator () (std::string_view data, std::string_view source_identifier = "") override
     {
-        sink1(data);
-        sink2(data);
+        sink1(data, source_identifier);
+        sink2(data, source_identifier);
     }
 };
 
@@ -186,11 +188,13 @@ struct TeeSource : Source
     Source & orig;
     Sink & sink;
     TeeSource(Source & orig, Sink & sink)
-        : orig(orig), sink(sink) { }
+        : orig(orig), sink(sink) {
+          source_identifier = "TeeSource: " + orig.source_identifier;
+        }
     size_t read(char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        sink({data, n});
+        sink({data, n}, source_identifier);
         return n;
     }
 };
@@ -231,7 +235,7 @@ struct LengthSink : Sink
 {
     uint64_t length = 0;
 
-    void operator () (std::string_view data) override
+    void operator () (std::string_view data, std::string_view source_identifier = "") override
     {
         length += data.size();
     }
@@ -246,7 +250,7 @@ struct LambdaSink : Sink
 
     LambdaSink(const lambda_t & lambda) : lambda(lambda) { }
 
-    void operator () (std::string_view data) override
+    void operator () (std::string_view data, std::string_view source_identifier = "") override
     {
         lambda(data);
     }
@@ -305,7 +309,7 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     buf[5] = (n >> 40) & 0xff;
     buf[6] = (n >> 48) & 0xff;
     buf[7] = (unsigned char) (n >> 56) & 0xff;
-    sink({(char *) buf, sizeof(buf)});
+    sink({(char *) buf, sizeof(buf)}, "uint64_t");
     return sink;
 }
 
@@ -474,7 +478,7 @@ struct FramedSink : nix::BufferedSink
         }
     }
 
-    void write(std::string_view data) override
+    void write(std::string_view data, std::string_view source_identifier) override
     {
         /* Don't send more data if the remote has
             encountered an error. */
@@ -484,7 +488,7 @@ struct FramedSink : nix::BufferedSink
             std::rethrow_exception(ex2);
         }
         to << data.size();
-        to(data);
+        to(data, source_identifier);
     };
 };
 

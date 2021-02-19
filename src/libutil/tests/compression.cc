@@ -56,7 +56,7 @@ namespace nix {
         StringSink strSink;
         auto inputString = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
         auto sink = makeCompressionSink("none", strSink);
-        (*sink)(inputString);
+        (*sink)(inputString, "compression test string");
         sink->finish();
 
         ASSERT_STREQ((*strSink.s).c_str(), inputString);
@@ -68,7 +68,7 @@ namespace nix {
         auto decompressionSink = makeDecompressionSink("bzip2", strSink);
         auto sink = makeCompressionSink("bzip2", *decompressionSink);
 
-        (*sink)(inputString);
+        (*sink)(inputString, "compression test string");
         sink->finish();
         decompressionSink->finish();
 
