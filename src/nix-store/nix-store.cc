@@ -636,7 +636,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     FdSink sink(STDOUT_FILENO);
     string path = *opArgs.begin();
     dumpPath(path, sink);
-    sink.flush();
+    sink.flush(path);
 }
 
 
@@ -663,7 +663,7 @@ static void opExport(Strings opFlags, Strings opArgs)
 
     FdSink sink(STDOUT_FILENO);
     store->exportPaths(paths, sink);
-    sink.flush();
+    sink.flush("");  // TODO: build potentially giant path string?
 }
 
 
@@ -780,7 +780,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     unsigned int magic = readInt(in);
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
-    out.flush();
+    out.flush("stdin");
     unsigned int clientVersion = readInt(in);
 
     auto getBuildSettings = [&]() {
@@ -953,7 +953,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 throw Error("unknown serve command %1%", cmd);
         }
 
-        out.flush();
+        out.flush("stdin");
     }
 }
 

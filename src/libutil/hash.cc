@@ -349,7 +349,7 @@ void HashSink::write(std::string_view data, std::string_view source_identifier)
 
 HashResult HashSink::finish()
 {
-    flush();
+    flush("");
     Hash hash(ht);
     nix::finish(ht, *ctx, hash.hash);
     return HashResult(hash, bytes);
@@ -357,7 +357,7 @@ HashResult HashSink::finish()
 
 HashResult HashSink::currentHash()
 {
-    flush();
+    flush("");
     Ctx ctx2 = *ctx;
     Hash hash(ht);
     nix::finish(ht, ctx2, hash.hash);

@@ -39,7 +39,7 @@ struct NoneSink : CompressionSink
 {
     Sink & nextSink;
     NoneSink(Sink & nextSink) : nextSink(nextSink) { }
-    void finish() override { flush(); }
+    void finish() override { flush(""); }
     void write(std::string_view data, std::string_view source_identifier) override { nextSink(data, source_identifier); }
 };
 
@@ -73,7 +73,7 @@ struct GzipDecompressionSink : CompressionSink
 
     void finish() override
     {
-        CompressionSink::flush();
+        CompressionSink::flush("GzipDecompressionSink");
         write({}, "GzipDecompressionSink");
     }
 
@@ -128,7 +128,7 @@ struct XzDecompressionSink : CompressionSink
 
     void finish() override
     {
-        CompressionSink::flush();
+        CompressionSink::flush("XzDecompressionSink");
         write({}, "XzDecompressionSink");
     }
 
@@ -179,7 +179,7 @@ struct BzipDecompressionSink : ChunkedCompressionSink
 
     void finish() override
     {
-        flush();
+        flush("BzipDecompressionSink");
         write({}, "BzipDecompressionSink");
     }
 
@@ -228,7 +228,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
 
     void finish() override
     {
-        flush();
+        flush("BrotliDecompressionSink");
         writeInternal({}, "BrotliDecompressionSink" );
     }
 
@@ -336,7 +336,7 @@ struct XzCompressionSink : CompressionSink
 
     void finish() override
     {
-        CompressionSink::flush();
+        CompressionSink::flush("XzCompressionSink");
         write({}, "XzCompressionSink");
     }
 
@@ -387,7 +387,7 @@ struct BzipCompressionSink : ChunkedCompressionSink
 
     void finish() override
     {
-        flush();
+        flush("BzipCompressionSink");
         writeInternal({}, "BzipCompressionSink");
     }
 
@@ -437,7 +437,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
 
     void finish() override
     {
-        flush();
+        flush("BrotliCompressionSink");
         writeInternal({}, "BrotliCompressionSink");
     }
 

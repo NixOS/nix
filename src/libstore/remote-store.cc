@@ -121,7 +121,7 @@ void RemoteStore::initConnection(Connection & conn)
     /* Send the magic greeting, check for the reply. */
     try {
         conn.to << WORKER_MAGIC_1;
-        conn.to.flush();
+        conn.to.flush("");
         unsigned int magic = readInt(conn.from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
 
@@ -464,6 +464,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     const StorePathSet & references,
     RepairFlag repair)
 {
+    dump.source_identifier = name;
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
@@ -823,7 +824,7 @@ void RemoteStore::flushBadConnections()
 RemoteStore::Connection::~Connection()
 {
     try {
-        to.flush();
+        to.flush("");
     } catch (...) {
         ignoreException();
     }
@@ -862,7 +863,7 @@ static Logger::Fields readFields(Source & from)
 std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source, bool flush)
 {
     if (flush)
-        to.flush();
+        to.flush(from.source_identifier);
 
     while (true) {
 
@@ -879,7 +880,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
             size_t len = readNum<size_t>(from);
             auto buf = std::make_unique<char[]>(len);
             writeString({(const char *) buf.get(), source->read(buf.get(), len)}, to);
-            to.flush();
+            to.flush(from.source_identifier);
         }
 
         else if (msg == STDERR_ERROR) {
@@ -961,7 +962,7 @@ void ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun)
     {
         FramedSink sink((*this)->to, ex);
         fun(sink);
-        sink.flush();
+        sink.flush("");
     }
 
     stderrThread.join();

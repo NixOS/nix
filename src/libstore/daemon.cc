@@ -52,7 +52,7 @@ struct TunnelLogger : public Logger
             assert(state->pendingMsgs.empty());
             try {
                 to(s, "TunnelLogger");  // TODO better, or ""?
-                to.flush();
+                to.flush("TunnelLogger");
             } catch (...) {
                 /* Write failed; that means that the other side is
                    gone. */
@@ -96,7 +96,7 @@ struct TunnelLogger : public Logger
 
         state->pendingMsgs.clear();
 
-        to.flush();
+        to.flush("TunnelLogger::startWork");
     }
 
     /* stopWork() means that we're done; stop sending stderr to the
@@ -168,7 +168,7 @@ struct TunnelSource : BufferedSource
     size_t readUnbuffered(char * data, size_t len) override
     {
         to << STDERR_READ << len;
-        to.flush();
+        // to.flush(from.source_identifier);
         size_t n = readString(data, len, from);
         if (n == 0) throw EndOfFile("unexpected end-of-file");
         return n;
@@ -909,6 +909,7 @@ void processConnection(
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
     to << WORKER_MAGIC_2 << PROTOCOL_VERSION;
+    // to.flush(from.source_identifier);
     to.flush();
     unsigned int clientVersion = readInt(from);
 
@@ -945,6 +946,7 @@ void processConnection(
         authHook(*store);
 
         tunnelLogger->stopWork();
+        // to.flush(from.source_identifier);
         to.flush();
 
         /* Process client requests. */

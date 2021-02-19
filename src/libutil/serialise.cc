@@ -6,6 +6,10 @@
 #include <memory>
 
 #include <boost/coroutine2/coroutine.hpp>
+#define BOOST_STACKTRACE_USE_ADDR2LINE
+#include <boost/stacktrace.hpp>
+#include <iostream>
+
 
 
 namespace nix {
@@ -19,7 +23,7 @@ void BufferedSink::operator () (std::string_view data, std::string_view source_i
         /* Optimisation: bypass the buffer if the data exceeds the
            buffer size. */
         if (bufPos + data.size() >= bufSize) {
-            flush();
+            flush(source_identifier);
             write(data, source_identifier);
             break;
         }
@@ -28,23 +32,23 @@ void BufferedSink::operator () (std::string_view data, std::string_view source_i
         size_t n = bufPos + data.size() > bufSize ? bufSize - bufPos : data.size();
         memcpy(buffer.get() + bufPos, data.data(), n);
         data.remove_prefix(n); bufPos += n;
-        if (bufPos == bufSize) flush();
+        if (bufPos == bufSize) flush(source_identifier);
     }
 }
 
 
-void BufferedSink::flush()
+void BufferedSink::flush(std::string_view source_identifier)
 {
     if (bufPos == 0) return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
-    write({buffer.get(), n}, "BufferedSink::flush");
+    write({buffer.get(), n}, source_identifier);
 }
 
 
 FdSink::~FdSink()
 {
-    try { flush(); } catch (...) { ignoreException(); }
+    try { flush(""); } catch (...) { ignoreException(); }
 }
 
 
@@ -53,6 +57,7 @@ size_t threshold = 256 * 1024 * 1024;
 static void warnLargeDump(std::string_view source_identifier)
 {
     warn("dumping very large path (> 256 MiB); this may run out of memory\npath: %s", source_identifier);
+    std::cerr << boost::stacktrace::stacktrace() << std::endl;
 }
 
 

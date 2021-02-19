@@ -37,7 +37,7 @@ struct BufferedSink : virtual Sink
 
     void operator () (std::string_view data, std::string_view source_identifier) override;
 
-    void flush();
+    void flush(std::string_view source_identifier = "");
 
     virtual void write(std::string_view data, std::string_view source_identifier) = 0;
 };
@@ -101,7 +101,7 @@ struct FdSink : BufferedSink
 
     FdSink& operator=(FdSink && s)
     {
-        flush();
+        flush("");
         fd = s.fd;
         s.fd = -1;
         warn = s.warn;
@@ -472,7 +472,7 @@ struct FramedSink : nix::BufferedSink
     {
         try {
             to << 0;
-            to.flush();
+            to.flush("");
         } catch (...) {
             ignoreException();
         }

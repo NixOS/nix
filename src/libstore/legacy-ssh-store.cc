@@ -77,7 +77,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
         try {
             conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
-            conn->to.flush();
+            conn->to.flush(host);  // TODO: correct?
 
             unsigned int magic = readInt(conn->from);
             if (magic != SERVE_MAGIC_2)
@@ -108,9 +108,9 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
 
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
-
-            conn->to << cmdQueryPathInfos << PathSet{printStorePath(path)};
-            conn->to.flush();
+            auto pathS = printStorePath(path);
+            conn->to << cmdQueryPathInfos << PathSet{pathS};
+            conn->to.flush(pathS);
 
             auto p = readString(conn->from);
             if (p.empty()) return callback(nullptr);
@@ -170,7 +170,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 conn->good = false;
                 throw;
             }
-            conn->to.flush();
+            conn->to.flush(source.source_identifier);
 
         } else {
 
@@ -191,7 +191,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
                 << 0;
-            conn->to.flush();
+            conn->to.flush(source.source_identifier);
 
         }
 
@@ -203,8 +203,10 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     {
         auto conn(connections->get());
 
-        conn->to << cmdDumpStorePath << printStorePath(path);
-        conn->to.flush();
+        auto pathS = printStorePath(path); 
+
+        conn->to << cmdDumpStorePath << pathS;
+        conn->to.flush(pathS);
         copyNAR(conn->from, sink);
     }
 
@@ -243,14 +245,16 @@ public:
     {
         auto conn(connections->get());
 
+        auto pathS = printStorePath(drvPath);
+
         conn->to
             << cmdBuildDerivation
-            << printStorePath(drvPath);
+            << pathS;
         writeDerivation(conn->to, *this, drv);
 
         putBuildSettings(*conn);
 
-        conn->to.flush();
+        conn->to.flush(pathS);
 
         BuildResult status;
         status.status = (BuildResult::Status) readInt(conn->from);
@@ -274,7 +278,7 @@ public:
 
         putBuildSettings(*conn);
 
-        conn->to.flush();
+        conn->to.flush("");  // TODO put all the paths together?
 
         BuildResult result;
         result.status = (BuildResult::Status) readInt(conn->from);
@@ -303,7 +307,7 @@ public:
             << cmdQueryClosure
             << includeOutputs;
         worker_proto::write(*this, conn->to, paths);
-        conn->to.flush();
+        conn->to.flush("pathset");  // TODO: maybe "path1 path2 ..." with ellipsis?
 
         for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
             out.insert(i);
@@ -319,7 +323,7 @@ public:
             << false // lock
             << maybeSubstitute;
         worker_proto::write(*this, conn->to, paths);
-        conn->to.flush();
+        conn->to.flush("pathset");  // TODO: maybe "path1 path2 ..." with ellipsis?
 
         return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
     }
