@@ -165,10 +165,15 @@ bool Settings::isExperimentalFeatureEnabled(const std::string & name)
     return std::find(f.begin(), f.end(), name) != f.end();
 }
 
+MissingExperimentalFeature::MissingExperimentalFeature(std::string feature)
+    : Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", feature)
+    , missingFeature(feature)
+    {}
+
 void Settings::requireExperimentalFeature(const std::string & name)
 {
     if (!isExperimentalFeatureEnabled(name))
-        throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
+        throw MissingExperimentalFeature(name);
 }
 
 bool Settings::isWSL1()

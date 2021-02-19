@@ -794,8 +794,18 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             realisations.insert(*realisation);
     }
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
-    for (auto& realisation : realisations) {
-        dstStore->registerDrvOutput(realisation);
+    try {
+        for (auto& realisation : realisations) {
+            dstStore->registerDrvOutput(realisation);
+        }
+    } catch (MissingExperimentalFeature & e) {
+        // Don't fail if the remote doesn't support CA derivations is it might
+        // not be whithin our control to change that, and we might still want
+        // to at least copy the output paths.
+        if (e.missingFeature == "ca-derivations")
+            ignoreException();
+        else
+            throw;
     }
 
     return pathsMap;
