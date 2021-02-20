@@ -12,6 +12,7 @@
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include <iostream>
 
 namespace nix {
 
@@ -464,7 +465,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     const StorePathSet & references,
     RepairFlag repair)
 {
-    dump.source_identifier = name;
+    // dump.source_identifier = name;
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
@@ -546,6 +547,7 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
 {
     StorePathSet references;
+    // std::cout << "RemoteStore::addToStoreFromDump" << dump.source_identifier << std::endl;
     return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
 }
 

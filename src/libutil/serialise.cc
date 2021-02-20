@@ -19,6 +19,8 @@ void BufferedSink::operator () (std::string_view data, std::string_view source_i
 {
     if (!buffer) buffer = decltype(buffer)(new char[bufSize]);
 
+    // std::cout << "BufferedSink::operator" << source_identifier << std::endl;
+
     while (!data.empty()) {
         /* Optimisation: bypass the buffer if the data exceeds the
            buffer size. */
@@ -97,6 +99,8 @@ void Source::operator () (char * data, size_t len)
 
 void Source::drainInto(Sink & sink)
 {
+    // std::cout << "Source::drainInto " << source_identifier << std::endl;
+    
     std::string s;
     std::vector<char> buf(8192);
     while (true) {
