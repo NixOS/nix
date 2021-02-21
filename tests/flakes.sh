@@ -25,6 +25,7 @@ templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
+flakeGitBare=$TEST_ROOT/flakeGitBare
 
 for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
@@ -603,6 +604,11 @@ EOF
 nix flake update $flake3Dir
 [[ $(jq -c .nodes.flake2.inputs.flake1 $flake3Dir/flake.lock) =~ '["foo"]' ]]
 [[ $(jq .nodes.foo.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
+
+# Test git+file with bare repo.
+rm -rf $flakeGitBare
+git clone --bare $flake1Dir $flakeGitBare
+nix build -o $TEST_ROOT/result git+file://$flakeGitBare
 
 # Test Mercurial flakes.
 rm -rf $flake5Dir
