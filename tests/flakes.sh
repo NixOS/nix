@@ -23,6 +23,7 @@ flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
 templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
+badFlakeDir=$TEST_ROOT/badFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
@@ -722,3 +723,8 @@ git -C $flakeB commit -a -m 'Foo'
 
 # Test list-inputs with circular dependencies
 nix flake metadata $flakeA
+
+# Test flake in store does not evaluate
+mkdir $badFlakeDir
+echo INVALID > $badFlakeDir/flake.nix
+nix store delete $(nix store add-path $badFlakeDir)
