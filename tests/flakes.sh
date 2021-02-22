@@ -23,6 +23,7 @@ flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
 templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
+badFlakeDir=$TEST_ROOT/badFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
@@ -772,3 +773,8 @@ EOF
 git -C $flakeFollowsA add flake.nix
 
 nix flake lock $flakeFollowsA 2>&1 | grep 'this is a security violation'
+
+# Test flake in store does not evaluate
+mkdir $badFlakeDir
+echo INVALID > $badFlakeDir/flake.nix
+nix store delete $(nix store add-path $badFlakeDir)
