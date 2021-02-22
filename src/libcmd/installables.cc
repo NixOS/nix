@@ -647,41 +647,22 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     } else {
 
         for (auto & s : ss) {
-            std::exception_ptr ex;
-
-            try {
-                auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
-                result.push_back(std::make_shared<InstallableFlake>(
-                        this,
-                        getEvalState(),
-                        std::move(flakeRef),
-                        fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                        getDefaultFlakeAttrPathPrefixes(),
-                        lockFlags));
-                continue;
-            } catch (...) {
-                ex = std::current_exception();
-            }
-
             if (s.find('/') != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
-                } catch (BadStorePath &) {
                 } catch (...) {
-                    if (!ex)
-                        ex = std::current_exception();
                 }
             }
 
-            std::rethrow_exception(ex);
-
-            /*
-            throw Error(
-                pathExists(s)
-                ? "path '%s' is not a flake or a store path"
-                : "don't know how to handle argument '%s'", s);
-            */
+            auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
+            result.push_back(std::make_shared<InstallableFlake>(
+                    this,
+                    getEvalState(),
+                    std::move(flakeRef),
+                    fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
+                    getDefaultFlakeAttrPathPrefixes(),
+                    lockFlags));
         }
     }
 
