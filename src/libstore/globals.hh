@@ -831,6 +831,9 @@ public:
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
 
+          Warning! These APIs are inherently unstable and may change from
+          release to release.
+
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix
           running at the time (i.e. compiled against the same headers, not
