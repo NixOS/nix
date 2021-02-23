@@ -64,7 +64,7 @@ struct DerivationGoal : public Goal
     bool retrySubstitution;
 
     /* The derivation stored at drvPath. */
-    std::unique_ptr<BasicDerivation> drv;
+    std::unique_ptr<Derivation> drv;
 
     std::unique_ptr<ParsedDerivation> parsedDrv;
 
