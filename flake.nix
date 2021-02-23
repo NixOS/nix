@@ -91,7 +91,8 @@
             gmock
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional stdenv.isx86_64 libcpuid;
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
           (aws-sdk-cpp.override {
