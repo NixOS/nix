@@ -243,8 +243,17 @@ void MaxBuildJobsSetting::set(const std::string & str, bool append)
 }
 
 
+void PluginFilesSetting::set(const std::string & str, bool append)
+{
+    if (pluginsLoaded)
+        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
+    BaseSetting<Paths>::set(str, append);
+}
+
+
 void initPlugins()
 {
+    assert(!settings.pluginFiles.pluginsLoaded);
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {
@@ -270,6 +279,9 @@ void initPlugins()
        unknown settings. */
     globalConfig.reapplyUnknownSettings();
     globalConfig.warnUnknownSettings();
+
+    /* Tell the user if they try to set plugin-files after we've already loaded */
+    settings.pluginFiles.pluginsLoaded = true;
 }
 
 }

@@ -43,8 +43,6 @@ static int main_nix_copy_closure(int argc, char ** argv)
             return true;
         });
 
-        initPlugins();
-
         if (sshHost.empty())
             throw UsageError("no host name specified");
 

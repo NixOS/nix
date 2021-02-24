@@ -60,6 +60,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         verbosity = lvlError;
     }
 
+    bool argsSeen = false;
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
         auto arg = *pos;
@@ -88,6 +89,10 @@ void Args::parseCmdline(const Strings & _cmdline)
                 throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
+            if (!argsSeen) {
+                argsSeen = true;
+                initialFlagsProcessed();
+            }
             pos = rewriteArgs(cmdline, pos);
             pendingArgs.push_back(*pos++);
             if (processArgs(pendingArgs, false))
@@ -96,6 +101,9 @@ void Args::parseCmdline(const Strings & _cmdline)
     }
 
     processArgs(pendingArgs, true);
+
+    if (!argsSeen)
+        initialFlagsProcessed();
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -298,8 +306,8 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-MultiCommand::MultiCommand(const Commands & commands)
-    : commands(commands)
+MultiCommand::MultiCommand(const Commands & commands_)
+    : commands(commands_)
 {
     expectArgs({
         .label = "subcommand",

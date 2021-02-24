@@ -326,8 +326,6 @@ static int main_nix_daemon(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         runDaemon(stdio);
 
         return 0;

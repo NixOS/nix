@@ -7,10 +7,14 @@ namespace nix {
 //static constexpr auto commonArgsCategory = "Miscellaneous common options";
 static constexpr auto loggingCategory = "Logging-related options";
 
-struct MixCommonArgs : virtual Args
+class MixCommonArgs : public virtual Args
 {
+    void initialFlagsProcessed() override;
+public:
     string programName;
     MixCommonArgs(const string & programName);
+protected:
+    virtual void pluginsInited() {}
 };
 
 struct MixDryRun : virtual Args
