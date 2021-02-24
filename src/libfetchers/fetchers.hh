@@ -143,7 +143,8 @@ DownloadFileResult downloadFile(
     const std::string & url,
     const std::string & name,
     bool immutable,
-    const Headers & headers = {});
+    const Headers & headers = {},
+    bool addToCache = true);
 
 std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,

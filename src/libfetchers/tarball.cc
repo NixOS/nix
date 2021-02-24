@@ -9,12 +9,53 @@
 
 namespace nix::fetchers {
 
+static void cacheFile(
+    ref<Store> store,
+    const std::string & url,
+    const std::string & name,
+    bool immutable,
+    const StorePath & storePath,
+    const std::string & etag,
+    const std::string & effectiveUri)
+{
+    Attrs inAttrs({
+        {"type", "file"},
+        {"url", url},
+        {"name", name},
+    });
+
+    Attrs infoAttrs({
+        {"etag", etag},
+        {"url", effectiveUri},
+    });
+
+    getCache()->add(
+        store,
+        inAttrs,
+        infoAttrs,
+        storePath,
+        immutable);
+
+    if (url != effectiveUri)
+        getCache()->add(
+            store,
+            {
+                {"type", "file"},
+                {"url", effectiveUri},
+                {"name", name},
+            },
+            infoAttrs,
+            storePath,
+            immutable);
+}
+
 DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
     bool immutable,
-    const Headers & headers)
+    const Headers & headers,
+    bool addToCache)
 {
     // FIXME: check store
 
@@ -83,24 +124,16 @@ DownloadFileResult downloadFile(
         storePath = std::move(info.path);
     }
 
-    getCache()->add(
-        store,
-        inAttrs,
-        infoAttrs,
-        *storePath,
-        immutable);
-
-    if (url != res.effectiveUri)
-        getCache()->add(
+    if (addToCache) {
+        cacheFile(
             store,
-            {
-                {"type", "file"},
-                {"url", res.effectiveUri},
-                {"name", name},
-            },
-            infoAttrs,
+            url,
+            name,
+            immutable,
             *storePath,
-            immutable);
+            res.etag,
+            res.effectiveUri);
+    }
 
     return {
         .storePath = std::move(*storePath),
@@ -130,7 +163,9 @@ std::pair<Tree, time_t> downloadTarball(
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
-    auto res = downloadFile(store, url, name, immutable, headers);
+    // Do not cache the file before extracting the tarball,
+    // to avoid caching broken files due to network issue.
+    auto res = downloadFile(store, url, name, immutable, headers, /* addToCache */ false);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -150,15 +185,22 @@ std::pair<Tree, time_t> downloadTarball(
         unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
     }
 
-    Attrs infoAttrs({
-        {"lastModified", uint64_t(lastModified)},
-        {"etag", res.etag},
-    });
+    cacheFile(
+        store,
+        url,
+        name,
+        immutable,
+        res.storePath,
+        res.etag,
+        res.effectiveUrl);
 
     getCache()->add(
         store,
         inAttrs,
-        infoAttrs,
+        {
+            {"lastModified", uint64_t(lastModified)},
+            {"etag", res.etag},
+        },
         *unpackedStorePath,
         immutable);
 
