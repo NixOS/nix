@@ -460,10 +460,6 @@ void LocalDerivationGoal::startBuilder()
                 makeFallbackPath(status.known->path);
         scratchOutputs.insert_or_assign(outputName, scratchPath);
 
-        /* A non-removed corrupted path needs to be stored here, too */
-        if (buildMode == bmRepair && !status.known->isValid())
-            redirectedBadOutputs.insert(status.known->path);
-
         /* Substitute output placeholders with the scratch output paths.
            We'll use during the build. */
         inputRewrites[hashPlaceholder(outputName)] = worker.store.printStorePath(scratchPath);

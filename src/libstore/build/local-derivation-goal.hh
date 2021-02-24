@@ -85,11 +85,6 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     OutputPathMap scratchOutputs;
 
-    /* If we're repairing without a chroot, there may be outputs that
-       are valid but corrupt.  So we redirect these outputs to
-       temporary paths. */
-    StorePathSet redirectedBadOutputs;
-
     /* Path registration info from the previous round, if we're
        building multiple times. Since this contains the hash, it
        allows us to compare whether two rounds produced the same
