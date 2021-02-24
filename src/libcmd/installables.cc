@@ -111,13 +111,13 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`).",
+        .description = "override a specific flake input (e.g. `dwarffs/nixpkgs`) to a named flake, a URL, or a local path",
         .category = category,
-        .labels = {"input-path", "flake-url"},
+        .labels = {"input-path", "new-input"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath(".")));
+                parseFlakeRef(flakeRef, absPath("."), true));
         }}
     });
 

@@ -658,16 +658,78 @@ nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ
 
 # Test --override-input.
 git -C $flake3Dir reset --hard
-nix flake update $flake3Dir --override-input flake2/flake1 flake5 -vvvvv
+errf=$flake3Dir/ovrinp1.err
+nix flake update $flake3Dir --override-input flake2/flake1 flake5 -vvvvv 2>$errf
 [[ $(jq .nodes.flake1_2.locked.url $flake3Dir/flake.lock) =~ flake5 ]]
+cat $errf
+# fail if override was ignored
+grep -v "the flag '--override-input flake2/flake1 flake5' does not match any input" $errf
 
-nix flake update $flake3Dir --override-input flake2/flake1 flake1
+errf=$flake3Dir/ovrinp2.err
+nix flake update $flake3Dir --override-input flake2/flake1 flake1 2>$errf
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
+# fail if override was ignored
+grep -v "the flag '--override-input flake2/flake1 flake1' does not match any input" $errf
 
-nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
+errf=$flake3Dir/ovrinp3.err
+nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1 2>$errf
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
+# fail if override was ignored
+grep -v "the flag '--override-input flake2/flake1 flake1/master/$hash1' does not match any input" $errf
+
+# override to non-existent flake
+errf=$flake3Dir/ovrinp4.err
+! nix flake update $flake3Dir --override-input flake2/flake1 flake99 -vvvvv 2>$errf
+cat $errf
+grep "cannot find flake 'flake:flake99' in the flake registries" $errf
+
+# override to non-existent path
+errf=$flake3Dir/ovrinp5.err
+! nix flake update $flake3Dir --override-input flake2/flake1 $TEST_ROOT/flake99 -vvvvv 2>$errf
+cat $errf
+grep "No such file or directory" $errf
+
+# override of non-existent input is ignored, even if target is bogus flake
+errf=$flake3Dir/ovrinp6.err
+nix flake update $flake3Dir --override-input flake2/flake11 flake99 -vvvvv 2>$errf
+[[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
+cat $errf
+grep "warning: the flag '--override-input flake2/flake11 flake:flake99' does not match any input" $errf
+
+# fail if bogus target path, even if override is an unused/non-existent input
+errf=$flake3Dir/ovrinp7.err
+! nix flake update $flake3Dir --override-input flake2/flake11 $TEST_ROOT/flake99 -vvvvv 2>$errf
+cat $errf
+grep "No such file or directory" $errf
+
+# Test build with input override for non-flake dir
+mkdir $TEST_ROOT/ovrinp
+echo alternate input override > $TEST_ROOT/ovrinp/README.md
+git -C $TEST_ROOT/ovrinp init
+git -C $TEST_ROOT/ovrinp config user.email "foobar@example.com"
+git -C $TEST_ROOT/ovrinp config user.name "Foobar"
+git -C $TEST_ROOT/ovrinp add README.md
+git -C $TEST_ROOT/ovrinp commit -m 'README in ovrinp'
+errf=$flake3Dir/errnonovr
+nix build -o $TEST_ROOT/result $flake3Dir#fnord --override-input nonFlake $TEST_ROOT/ovrinp 2>$errf
+grep -v "the flag '--override-input nonFlake $TEST_ROOT/ovrinp' does not match any input" $errf
+
+# make sure override does not persist (in lockfile)
+rm -rf $TEST_ROOT/ovrinp
+nix build -o $TEST_ROOT/result $flake3Dir#fnord
+
+# Test build with override-input to plain directory (not a git repo)
+mkdir $TEST_ROOT/plainovr
+echo plain input override > $TEST_ROOT/plainovr/README.md
+errf=$flake3Dir/errplnovr
+nix build -o $TEST_ROOT/result $flake3Dir#fnord --override-input nonFlake $TEST_ROOT/plainovr 2>$errf
+grep -v "the flag '--override-input nonFlake $TEST_ROOT/plainovr' does not match any input" $errf
+
 
 # Test --update-input.
+git -C $flake3Dir reset --hard
+nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
+
 nix flake update $flake3Dir
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) = $hash1 ]]
 
