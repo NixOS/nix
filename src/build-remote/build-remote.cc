@@ -53,6 +53,9 @@ static int main_build_remote(int argc, char * * argv)
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
 
+        /* If we ever use the common args framework, make sure to
+           remove initPlugins below and initialize settings first.
+        */
         if (argc != 2)
             throw UsageError("called without required arguments");
 

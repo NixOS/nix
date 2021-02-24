@@ -41,7 +41,8 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   content-addressed.sh \
-  build.sh
+  build.sh \
+  compute-levels.sh
   # parallel.sh
   # build-remote-content-addressed-fixed.sh # problem with fixed output derivations
   # build-remote-trustless-should-pass-0.sh # problem with legacy ssh-store only

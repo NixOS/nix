@@ -3,6 +3,7 @@
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "compute-levels.hh"
 
 #include <algorithm>
 #include <map>
@@ -133,24 +134,29 @@ StringSet Settings::getDefaultSystemFeatures()
 
 StringSet Settings::getDefaultExtraPlatforms()
 {
+    StringSet extraPlatforms;
+
     if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
-        return StringSet{"i686-linux"};
-#if __APPLE__
+        extraPlatforms.insert("i686-linux");
+
+#if __linux__
+    StringSet levels = computeLevels();
+    for (auto iter = levels.begin(); iter != levels.end(); ++iter)
+        extraPlatforms.insert(*iter + "-linux");
+#elif __APPLE__
     // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    else if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
         if (std::string{SYSTEM} == "x86_64-darwin")
-            return StringSet{"aarch64-darwin"};
+            extraPlatforms.insert("aarch64-darwin");
         else if (std::string{SYSTEM} == "aarch64-darwin")
-            return StringSet{"x86_64-darwin"};
-        else
-            return StringSet{};
+            extraPlatforms.insert("x86_64-darwin");
     }
 #endif
-    else
-        return StringSet{};
+
+    return extraPlatforms;
 }
 
 bool Settings::isExperimentalFeatureEnabled(const std::string & name)
@@ -237,8 +243,17 @@ void MaxBuildJobsSetting::set(const std::string & str, bool append)
 }
 
 
+void PluginFilesSetting::set(const std::string & str, bool append)
+{
+    if (pluginsLoaded)
+        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
+    BaseSetting<Paths>::set(str, append);
+}
+
+
 void initPlugins()
 {
+    assert(!settings.pluginFiles.pluginsLoaded);
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {
@@ -264,6 +279,9 @@ void initPlugins()
        unknown settings. */
     globalConfig.reapplyUnknownSettings();
     globalConfig.warnUnknownSettings();
+
+    /* Tell the user if they try to set plugin-files after we've already loaded */
+    settings.pluginFiles.pluginsLoaded = true;
 }
 
 }

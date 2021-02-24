@@ -17,6 +17,10 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
+#if __linux__
+#include <sys/resource.h>
+#endif
+
 #include <nlohmann/json.hpp>
 
 extern std::string chrootHelperName;
@@ -61,6 +65,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
+    bool showVersion = false;
 
     NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
@@ -87,7 +92,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "version",
             .description = "Show version information.",
-            .handler = {[&]() { if (!completions) printVersion(programName); }},
+            .handler = {[&]() { showVersion = true; }},
         });
 
         addFlag({
@@ -153,6 +158,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         return
           #include "nix.md"
           ;
+    }
+
+    // Plugins may add new subcommands.
+    void pluginsInited() override
+    {
+        commands = RegisterCommand::getCommandsFor({});
     }
 };
 
@@ -278,7 +289,10 @@ void mainWrapped(int argc, char * * argv)
 
     if (completions) return;
 
-    initPlugins();
+    if (args.showVersion) {
+        printVersion(programName);
+        return;
+    }
 
     if (!args.command)
         throw UsageError("no subcommand specified");
@@ -319,6 +333,17 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    // Increase the default stack size for the evaluator and for
+    // libstdc++'s std::regex.
+    #if __linux__
+    rlim_t stackSize = 64 * 1024 * 1024;
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+        limit.rlim_cur = stackSize;
+        setrlimit(RLIMIT_STACK, &limit);
+    }
+    #endif
+
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);
     });

@@ -7,7 +7,10 @@ let
 
   showCommand =
     { command, def, filename }:
-    "# Name\n\n"
+    ''
+      **Warning**: This program is **experimental** and its interface is subject to change.
+    ''
+    + "# Name\n\n"
     + "`${command}` - ${def.description}\n\n"
     + "# Synopsis\n\n"
     + showSynopsis { inherit command; args = def.args; }

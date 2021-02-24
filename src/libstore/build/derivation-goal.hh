@@ -37,6 +37,7 @@ struct InitialOutputStatus {
 
 struct InitialOutput {
     bool wanted;
+    Hash outputHash;
     std::optional<InitialOutputStatus> known;
 };
 
@@ -47,6 +48,9 @@ struct DerivationGoal : public Goal
 
     /* The path of the derivation. */
     StorePath drvPath;
+
+    /* The path of the corresponding resolved derivation */
+    std::optional<BasicDerivation> resolvedDrv;
 
     /* The specific outputs that we need to build.  Empty means all of
        them. */

@@ -496,6 +496,23 @@ static std::string showAttrPaths(const std::vector<std::string> & paths)
     return s;
 }
 
+InstallableFlake::InstallableFlake(
+    SourceExprCommand * cmd,
+    ref<EvalState> state,
+    FlakeRef && flakeRef,
+    Strings && attrPaths,
+    Strings && prefixes,
+    const flake::LockFlags & lockFlags)
+    : InstallableValue(state),
+      flakeRef(flakeRef),
+      attrPaths(attrPaths),
+      prefixes(prefixes),
+      lockFlags(lockFlags)
+{
+    if (cmd && cmd->getAutoArgs(*state)->size())
+        throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
+}
+
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
     auto lockedFlake = getLockedFlake();
@@ -628,9 +645,12 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             try {
                 auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
                 result.push_back(std::make_shared<InstallableFlake>(
-                        getEvalState(), std::move(flakeRef),
+                        this,
+                        getEvalState(),
+                        std::move(flakeRef),
                         fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                        getDefaultFlakeAttrPathPrefixes(), lockFlags));
+                        getDefaultFlakeAttrPathPrefixes(),
+                        lockFlags));
                 continue;
             } catch (...) {
                 ex = std::current_exception();

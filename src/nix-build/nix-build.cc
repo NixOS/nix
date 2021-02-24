@@ -240,8 +240,6 @@ static void main_nix_build(int argc, char * * argv)
 
     myArgs.parseCmdline(args);
 
-    initPlugins();
-
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
@@ -518,9 +516,11 @@ static void main_nix_build(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryDerivationOutputMap(drvPath);
+            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath);
 
-            auto outputPath = builtOutputs.at(outputName);
+            auto maybeOutputPath = builtOutputs.at(outputName);
+            assert(maybeOutputPath);
+            auto outputPath = *maybeOutputPath;
 
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                 std::string symlink = drvPrefix;

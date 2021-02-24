@@ -745,7 +745,7 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 }
 
-std::optional<BasicDerivation> Derivation::tryResolveUncached(Store & store) {
+std::optional<BasicDerivation> Derivation::tryResolve(Store & store) {
     BasicDerivation resolved { *this };
 
     // Input paths that we'll want to rewrite in the derivation
@@ -756,8 +756,13 @@ std::optional<BasicDerivation> Derivation::tryResolveUncached(Store & store) {
         StringSet newOutputNames;
         for (auto & outputName : input.second) {
             auto actualPathOpt = inputDrvOutputs.at(outputName);
-            if (!actualPathOpt)
+            if (!actualPathOpt) {
+                warn("output %s of input %s missing, aborting the resolving",
+                    outputName,
+                    store.printStorePath(input.first)
+                );
                 return std::nullopt;
+            }
             auto actualPath = *actualPathOpt;
             inputRewrites.emplace(
                 downstreamPlaceholder(store, input.first, outputName),
@@ -769,36 +774,6 @@ std::optional<BasicDerivation> Derivation::tryResolveUncached(Store & store) {
     rewriteDerivation(store, resolved, inputRewrites);
 
     return resolved;
-}
-
-std::optional<BasicDerivation> Derivation::tryResolve(Store& store)
-{
-    auto drvPath = writeDerivation(store, *this, NoRepair, false);
-    return Derivation::tryResolve(store, drvPath);
-}
-
-std::optional<BasicDerivation> Derivation::tryResolve(Store& store, const StorePath& drvPath)
-{
-    // This is quite dirty and leaky, but will disappear once #4340 is merged
-    static Sync<std::map<StorePath, std::optional<Derivation>>> resolutionsCache;
-
-    {
-        auto resolutions = resolutionsCache.lock();
-        auto resolvedDrvIter = resolutions->find(drvPath);
-        if (resolvedDrvIter != resolutions->end()) {
-            auto & [_, resolvedDrv] = *resolvedDrvIter;
-                return *resolvedDrv;
-        }
-    }
-
-    /* Try resolve drv and use that path instead. */
-    auto drv = store.readDerivation(drvPath);
-    auto attempt = drv.tryResolveUncached(store);
-    if (!attempt)
-        return std::nullopt;
-    /* Store in memo table. */
-    resolutionsCache.lock()->insert_or_assign(drvPath, *attempt);
-    return *attempt;
 }
 
 }

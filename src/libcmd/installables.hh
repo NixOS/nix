@@ -104,11 +104,13 @@ struct InstallableFlake : InstallableValue
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
-    InstallableFlake(ref<EvalState> state, FlakeRef && flakeRef,
-        Strings && attrPaths, Strings && prefixes, const flake::LockFlags & lockFlags)
-        : InstallableValue(state), flakeRef(flakeRef), attrPaths(attrPaths),
-          prefixes(prefixes), lockFlags(lockFlags)
-    { }
+    InstallableFlake(
+        SourceExprCommand * cmd,
+        ref<EvalState> state,
+        FlakeRef && flakeRef,
+        Strings && attrPaths,
+        Strings && prefixes,
+        const flake::LockFlags & lockFlags);
 
     std::string what() override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
 

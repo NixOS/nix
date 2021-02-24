@@ -342,8 +342,6 @@ static int main_nix_daemon(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         runDaemon(stdio, isTrustedOpt);
 
         return 0;

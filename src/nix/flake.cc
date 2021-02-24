@@ -595,7 +595,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
-        auto installable = InstallableFlake(
+        auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef),
             Strings{templateName == "" ? "defaultTemplate" : templateName},
             Strings(attrsPathPrefixes), lockFlags);
@@ -880,7 +880,8 @@ struct CmdFlakeShow : FlakeCommand
                             || attrPath[0] == "nixosConfigurations"
                             || attrPath[0] == "nixosModules"
                             || attrPath[0] == "defaultApp"
-                            || attrPath[0] == "templates"))
+                            || attrPath[0] == "templates"
+                            || attrPath[0] == "overlays"))
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPath[0] == "checks"
                             || attrPath[0] == "packages"
@@ -943,7 +944,8 @@ struct CmdFlakeShow : FlakeCommand
                 else {
                     logger->cout("%s: %s",
                         headerPrefix,
-                        attrPath.size() == 1 && attrPath[0] == "overlay" ? "Nixpkgs overlay" :
+                        (attrPath.size() == 1 && attrPath[0] == "overlay")
+                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? "Nixpkgs overlay" :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
                         attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
                         ANSI_YELLOW "unknown" ANSI_NORMAL);

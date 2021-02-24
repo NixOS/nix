@@ -124,6 +124,17 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
+
+    auto outputHashes = staticOutputHashes(worker.store, drv);
+    for (auto &[outputName, outputHash] : outputHashes)
+      initialOutputs.insert({
+            outputName,
+            InitialOutput{
+                .wanted = true, // Will be refined later
+                .outputHash = outputHash
+            }
+          });
+
     state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
@@ -258,8 +269,20 @@ void DerivationGoal::loadDerivation()
 
     assert(worker.store.isValidPath(drvPath));
 
+    auto fullDrv = new Derivation(worker.store.derivationFromPath(drvPath));
+
+    auto outputHashes = staticOutputHashes(worker.store, *fullDrv);
+    for (auto &[outputName, outputHash] : outputHashes)
+      initialOutputs.insert({
+            outputName,
+            InitialOutput{
+                .wanted = true, // Will be refined later
+                .outputHash = outputHash
+            }
+          });
+
     /* Get the derivation. */
-    drv = std::unique_ptr<BasicDerivation>(new Derivation(worker.store.derivationFromPath(drvPath)));
+    drv = std::unique_ptr<BasicDerivation>(fullDrv);
 
     haveDerivation();
 }
@@ -506,6 +529,7 @@ void DerivationGoal::inputsRealised()
             Derivation drvResolved { *std::move(attempt) };
 
             auto pathResolved = writeDerivation(worker.store, drvResolved);
+            resolvedDrv = drvResolved;
 
             auto msg = fmt("Resolved derivation: '%s' -> '%s'",
                 worker.store.printStorePath(drvPath),
@@ -1019,7 +1043,37 @@ void DerivationGoal::buildDone()
 }
 
 void DerivationGoal::resolvedFinished() {
-    done(BuildResult::Built);
+    assert(resolvedDrv);
+
+    auto resolvedHashes = staticOutputHashes(worker.store, *resolvedDrv);
+
+    // `wantedOutputs` might be empty, which means “all the outputs”
+    auto realWantedOutputs = wantedOutputs;
+    if (realWantedOutputs.empty())
+        realWantedOutputs = resolvedDrv->outputNames();
+
+    for (auto & wantedOutput : realWantedOutputs) {
+        assert(initialOutputs.count(wantedOutput) != 0);
+        assert(resolvedHashes.count(wantedOutput) != 0);
+        auto realisation = worker.store.queryRealisation(
+                DrvOutput{resolvedHashes.at(wantedOutput), wantedOutput}
+        );
+        // We've just built it, but maybe the build failed, in which case the
+        // realisation won't be there
+        if (realisation) {
+            auto newRealisation = *realisation;
+            newRealisation.id = DrvOutput{initialOutputs.at(wantedOutput).outputHash, wantedOutput};
+            worker.store.registerDrvOutput(newRealisation);
+        } else {
+            // If we don't have a realisation, then it must mean that something
+            // failed when building the resolved drv
+            assert(!result.success());
+        }
+    }
+
+    // This is potentially a bit fishy in terms of error reporting. Not sure
+    // how to do it in a cleaner way
+    amDone(nrFailed == 0 ? ecSuccess : ecFailed, ex);
 }
 
 HookReply DerivationGoal::tryBuildHook()
@@ -3790,9 +3844,8 @@ void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
     for (auto & i : queryPartialDerivationOutputMap()) {
-        InitialOutput info {
-            .wanted = wantOutput(i.first, wantedOutputs),
-        };
+        InitialOutput & info = initialOutputs.at(i.first);
+        info.wanted = wantOutput(i.first, wantedOutputs);
         if (i.second) {
             auto outputPath = *i.second;
             info.known = {
@@ -3804,7 +3857,15 @@ void DerivationGoal::checkPathValidity()
                     : PathStatus::Corrupt,
             };
         }
-        initialOutputs.insert_or_assign(i.first, info);
+        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+            if (auto real = worker.store.queryRealisation(
+                    DrvOutput{initialOutputs.at(i.first).outputHash, i.first})) {
+                info.known = {
+                    .path = real->outPath,
+                    .status = PathStatus::Valid,
+                };
+            }
+        }
     }
 }
 
