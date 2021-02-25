@@ -28,7 +28,7 @@ public:
 
     LocalFSStore(const Params & params);
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
+    void narFromPath(StorePathOrDesc path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
 
     /* Register a permanent GC root. */

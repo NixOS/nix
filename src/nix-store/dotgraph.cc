@@ -58,7 +58,7 @@ void printDotGraph(ref<Store> store, StorePathSet && roots)
 
         cout << makeNode(std::string(path.to_string()), path.name(), "#ff0000");
 
-        for (auto & p : store->queryPathInfo(path)->references) {
+        for (auto & p : store->queryPathInfo(path)->referencesPossiblyToSelf()) {
             if (p != path) {
                 workList.insert(p);
                 cout << makeEdge(std::string(p.to_string()), std::string(path.to_string()));

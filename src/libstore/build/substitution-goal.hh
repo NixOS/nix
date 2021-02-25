@@ -11,11 +11,8 @@ class Worker;
 struct SubstitutionGoal : public Goal
 {
     /* The store path that should be realised through a substitute. */
+    // FIXME OwnedStorePathOrDesc storePath
     StorePath storePath;
-
-    /* The path the substituter refers to the path as. This will be
-     * different when the stores have different names. */
-    std::optional<StorePath> subPath;
 
     /* The remaining substituters. */
     std::list<ref<Store>> subs;
@@ -51,9 +48,10 @@ struct SubstitutionGoal : public Goal
     GoalState state;
 
     /* Content address for recomputing store path */
-    std::optional<ContentAddress> ca;
+    // TODO delete once `storePath` is variant.
+    std::optional<StorePathDescriptor> ca;
 
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);
     ~SubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };

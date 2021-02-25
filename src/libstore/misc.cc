@@ -34,7 +34,8 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
             state->pending++;
         }
 
-        queryPathInfo(parseStorePath(path), {[&, pathS(path)](std::future<ref<const ValidPathInfo>> fut) {
+        auto p = parseStorePath(path);
+        queryPathInfo(p, {[&, pathS(path)](std::future<ref<const ValidPathInfo>> fut) {
             // FIXME: calls to isValidPath() should be async
 
             try {
@@ -62,8 +63,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                 } else {
 
                     for (auto & ref : info->references)
-                        if (ref != path)
-                            enqueue(printStorePath(ref));
+                        enqueue(printStorePath(ref));
 
                     if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
@@ -109,12 +109,16 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
-std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
+std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
-    if (out != drv.outputs.end()) {
-        if (auto v = std::get_if<DerivationOutputCAFixed>(&out->second.output))
-            return v->hash;
+    if (out == drv.outputs.end())
+        return std::nullopt;
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
+        return StorePathDescriptor {
+            .name =  drv.name,
+            .info = FixedOutputInfo { dof->hash, {} },
+        };
     }
     return std::nullopt;
 }
@@ -168,7 +172,11 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
-        querySubstitutablePathInfos({{outPath, getDerivationCA(*drv)}}, infos);
+        auto caOpt = getDerivationCA(*drv);
+        if (caOpt)
+            querySubstitutablePathInfos({}, { *std::move(caOpt) }, infos);
+        else
+            querySubstitutablePathInfos({outPath}, {}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -232,7 +240,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (isValidPath(path.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({{path.path, std::nullopt}}, infos);
+            querySubstitutablePathInfos({path.path}, {}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());

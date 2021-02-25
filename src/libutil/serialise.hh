@@ -52,6 +52,7 @@ struct Source
        It blocks until all the requested data is available, or throws
        an error if it is not going to be available.   */
     void operator () (char * data, size_t len);
+    void operator () (std::string_view data);
 
     /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
        return the number of bytes stored.  It blocks until at least
@@ -194,6 +195,7 @@ struct TeeSource : Source
         return n;
     }
 };
+
 
 /* A reader that consumes the original Source until 'size'. */
 struct SizedSource : Source

@@ -5,6 +5,7 @@
 #include "path.hh"
 #include "attrs.hh"
 #include "url.hh"
+#include "content-address.hh"
 
 #include <memory>
 
@@ -15,8 +16,10 @@ namespace nix::fetchers {
 struct Tree
 {
     Path actualPath;
-    StorePath storePath;
-    Tree(Path && actualPath, StorePath && storePath) : actualPath(actualPath), storePath(std::move(storePath)) {}
+    StorePathDescriptor storePath;
+    Tree(Path && actualPath, StorePathDescriptor && storePath)
+        : actualPath(actualPath), storePath(std::move(storePath))
+    {}
 };
 
 struct InputScheme;
@@ -81,7 +84,7 @@ public:
         std::string_view file,
         std::optional<std::string> commitMsg) const;
 
-    StorePath computeStorePath(Store & store) const;
+    StorePathDescriptor computeStorePath(Store & store) const;
 
     // Convenience functions for common attributes.
     std::string getType() const;
@@ -133,7 +136,7 @@ void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
 
 struct DownloadFileResult
 {
-    StorePath storePath;
+    StorePathDescriptor storePath;
     std::string etag;
     std::string effectiveUrl;
 };
@@ -151,5 +154,8 @@ std::pair<Tree, time_t> downloadTarball(
     const std::string & name,
     bool immutable,
     const Headers & headers = {});
+
+std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
+    Hash hash, std::string_view name);
 
 }

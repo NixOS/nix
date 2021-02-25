@@ -332,10 +332,10 @@ void DerivationGoal::haveDerivation()
                 /* Nothing to wait for; tail call */
                 return DerivationGoal::gaveUpOnSubstitution();
             }
-            addWaitee(upcast_goal(worker.makeSubstitutionGoal(
-                status.known->path,
-                buildMode == bmRepair ? Repair : NoRepair,
-                getDerivationCA(*drv))));
+            auto optCA = getDerivationCA(*drv);
+            auto p = optCA ? StorePathOrDesc { *optCA } : status.known->path;
+            addWaitee(upcast_goal(
+                worker.makeSubstitutionGoal(p, buildMode == bmRepair ? Repair : NoRepair)));
         }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -2116,10 +2116,10 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         return paths;
     }
 
-    void queryPathInfoUncached(const StorePath & path,
+    void queryPathInfoUncached(StorePathOrDesc path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
-        if (goal.isAllowed(path)) {
+        if (goal.isAllowed(bakeCaIfNeeded(path))) {
             try {
                 /* Censor impure information. */
                 auto info = std::make_shared<ValidPathInfo>(*next->queryPathInfo(path));
@@ -2176,15 +2176,17 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         return path;
     }
 
-    void narFromPath(const StorePath & path, Sink & sink) override
+    void narFromPath(StorePathOrDesc pathOrDesc, Sink & sink) override
     {
+        auto path = bakeCaIfNeeded(pathOrDesc);
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot dump unknown path '%s' in recursive Nix", printStorePath(path));
-        LocalFSStore::narFromPath(path, sink);
+        LocalFSStore::narFromPath(pathOrDesc, sink);
     }
 
-    void ensurePath(const StorePath & path) override
+    void ensurePath(StorePathOrDesc pathOrDesc) override
     {
+        auto path = bakeCaIfNeeded(pathOrDesc);
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot substitute unknown path '%s' in recursive Nix", printStorePath(path));
         /* Nothing to be done; 'path' must already be valid. */
@@ -3179,27 +3181,26 @@ void DerivationGoal::registerOutputs()
             }
         };
 
-        auto rewriteRefs = [&]() -> std::pair<bool, StorePathSet> {
+        auto rewriteRefs = [&]() -> PathReferences<StorePath> {
             /* In the CA case, we need the rewritten refs to calculate the
                final path, therefore we look for a *non-rewritten
                self-reference, and use a bool rather try to solve the
                computationally intractable fixed point. */
-            std::pair<bool, StorePathSet> res {
-                false,
-                {},
+            PathReferences<StorePath> res {
+                .hasSelfReference = false,
             };
             for (auto & r : references) {
                 auto name = r.name();
                 auto origHash = std::string { r.hashPart() };
                 if (r == scratchPath)
-                    res.first = true;
+                    res.hasSelfReference = true;
                 else if (outputRewrites.count(origHash) == 0)
-                    res.second.insert(r);
+                    res.references.insert(r);
                 else {
                     std::string newRef = outputRewrites.at(origHash);
                     newRef += '-';
                     newRef += name;
-                    res.second.insert(StorePath { newRef });
+                    res.references.insert(StorePath { newRef });
                 }
             }
             return res;
@@ -3228,27 +3229,24 @@ void DerivationGoal::registerOutputs()
                 break;
             }
             auto got = caSink.finish().first;
-            auto refs = rewriteRefs();
             HashModuloSink narSink { htSHA256, oldHashPart };
             dumpPath(actualPath, narSink);
             auto narHashAndSize = narSink.finish();
             ValidPathInfo newInfo0 {
-                worker.store.makeFixedOutputPath(
-                    outputHash.method,
-                    got,
-                    outputPathName(drv->name, outputName),
-                    refs.second,
-                    refs.first),
+                worker.store,
+                {
+                    .name = outputPathName(drv->name, outputName),
+                    .info = FixedOutputInfo {
+                        {
+                            .method = outputHash.method,
+                            .hash = got,
+                        },
+                        rewriteRefs(),
+                    },
+                },
                 narHashAndSize.first,
             };
             newInfo0.narSize = narHashAndSize.second;
-            newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
-                .hash = got,
-            };
-            newInfo0.references = refs.second;
-            if (refs.first)
-                newInfo0.references.insert(newInfo0.path);
             if (scratchPath != newInfo0.path) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
@@ -3282,10 +3280,7 @@ void DerivationGoal::registerOutputs()
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
-                auto refs = rewriteRefs();
-                newInfo0.references = refs.second;
-                if (refs.first)
-                    newInfo0.references.insert(newInfo0.path);
+                static_cast<PathReferences<StorePath> &>(newInfo0) = rewriteRefs();
                 return newInfo0;
             },
             [&](DerivationOutputCAFixed dof) {
@@ -3561,12 +3556,12 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
-                    for (auto & ref : i->second.references)
+                    for (auto & ref : i->second.referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
                     closureSize += info->narSize;
-                    for (auto & ref : info->references)
+                    for (auto & ref : info->referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 }
             }
@@ -3605,7 +3600,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
                 auto used = recursive
                     ? getClosure(info.path).first
-                    : info.references;
+                    : info.referencesPossiblyToSelf();
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);

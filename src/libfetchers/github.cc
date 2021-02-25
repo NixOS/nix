@@ -200,7 +200,10 @@ struct GitArchiveInputScheme : InputScheme
         if (auto res = getCache()->lookup(store, immutableAttrs)) {
             input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
             return {
-                Tree(store->toRealPath(res->second), std::move(res->second)),
+                Tree {
+                    store->toRealPath(store->makeFixedOutputPathFromCA(res->second)),
+                    std::move(res->second),
+                },
                 input
             };
         }
@@ -249,9 +252,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
         Headers headers = makeHeadersWithAuthTokens(host);
 
         auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+            readFile(store->toRealPath(store->makeFixedOutputPathFromCA(
+                downloadFile(store, url, "source", false, headers).storePath))));
         auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
@@ -312,10 +314,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
-        auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+        auto json = nlohmann::json::parse(readFile(
+            store->toRealPath(store->makeFixedOutputPathFromCA(
+                downloadFile(store, url, "source", false, headers).storePath))));
         auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;

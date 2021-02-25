@@ -51,7 +51,8 @@ ref<Store> StoreCommand::createStore()
 
 void StoreCommand::run()
 {
-    run(getStore());
+    auto store = getStore();
+    run(store);
 }
 
 RealisedPathsCommand::RealisedPathsCommand(bool recursive)

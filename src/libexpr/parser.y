@@ -721,8 +721,15 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).first.storePath) };
+            res = {
+                true,
+                store->toRealPath(store->makeFixedOutputPathFromCA(
+                    fetchers::downloadTarball(
+                        store,
+                        resolveUri(elem.second),
+                        "source",
+                        false).first.storePath)),
+            };
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)

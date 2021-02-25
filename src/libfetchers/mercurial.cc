@@ -194,9 +194,15 @@ struct MercurialInputScheme : InputScheme
                 };
 
                 auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+                // it has the underlying information.
+                auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
                 return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
+                    Tree {
+                        store->toRealPath(storePath),
+                        std::move(storePathDesc),
+                    },
                     input
                 };
             }
@@ -213,14 +219,17 @@ struct MercurialInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
+        auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePath)
             -> std::pair<Tree, Input>
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             return {
-                Tree(store->toRealPath(storePath), std::move(storePath)),
+                Tree {
+                    store->toRealPath(store->makeFixedOutputPathFromCA(storePath)),
+                    std::move(storePath)
+                },
                 input
             };
         };
@@ -298,6 +307,9 @@ struct MercurialInputScheme : InputScheme
         deletePath(tmpDir + "/.hg_archival.txt");
 
         auto storePath = store->addToStore(name, tmpDir);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
@@ -309,17 +321,17 @@ struct MercurialInputScheme : InputScheme
                 store,
                 mutableAttrs,
                 infoAttrs,
-                storePath,
+                storePathDesc,
                 false);
 
         getCache()->add(
             store,
             getImmutableAttrs(),
             infoAttrs,
-            storePath,
+            storePathDesc,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
+        return makeResult(infoAttrs, std::move(storePathDesc));
     }
 };
 

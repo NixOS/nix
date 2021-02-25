@@ -86,6 +86,7 @@ namespace worker_proto {
 MAKE_WORKER_PROTO(, std::string);
 MAKE_WORKER_PROTO(, StorePath);
 MAKE_WORKER_PROTO(, ContentAddress);
+MAKE_WORKER_PROTO(, StorePathDescriptor);
 
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
 

@@ -186,7 +186,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
+        auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePathDesc)
             -> std::pair<Tree, Input>
         {
             assert(input.getRev());
@@ -195,7 +195,10 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
             return {
-                Tree(store->toRealPath(storePath), std::move(storePath)),
+                Tree {
+                    store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc)),
+                    std::move(storePathDesc),
+                },
                 input
             };
         };
@@ -268,6 +271,9 @@ struct GitInputScheme : InputScheme
                 };
 
                 auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+                // it has the underlying information.
+                auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
@@ -276,7 +282,10 @@ struct GitInputScheme : InputScheme
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
+                    Tree {
+                        store->toRealPath(storePath),
+                        std::move(storePathDesc),
+                    },
                     input
                 };
             }
@@ -452,6 +461,9 @@ struct GitInputScheme : InputScheme
         }
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
 
@@ -469,17 +481,17 @@ struct GitInputScheme : InputScheme
                 store,
                 mutableAttrs,
                 infoAttrs,
-                storePath,
+                storePathDesc,
                 false);
 
         getCache()->add(
             store,
             getImmutableAttrs(),
             infoAttrs,
-            storePath,
+            storePathDesc,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
+        return makeResult(infoAttrs, std::move(storePathDesc));
     }
 };
 

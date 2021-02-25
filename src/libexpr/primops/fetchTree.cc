@@ -21,7 +21,8 @@ void emitTreeAttrs(
 
     state.mkAttrs(v, 8);
 
-    auto storePath = state.store->printStorePath(tree.storePath);
+    auto storePath = state.store->printStorePath(
+        state.store->makeFixedOutputPathFromCA(tree.storePath));
 
     mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
 
@@ -201,12 +202,26 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
+    // try to substitute if we can
+    if (settings.useSubstitutes && expectedHash) {
+        auto substitutableStorePath = fetchers::trySubstitute(state.store,
+            unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat, *expectedHash, name);
+        if (substitutableStorePath) {
+            auto substitutablePath = state.store->toRealPath(*substitutableStorePath);
+            if (state.allowedPaths)
+                state.allowedPaths->insert(substitutablePath);
+
+            mkString(v, substitutablePath, PathSet({substitutablePath}));
+            return;
+        }
+    }
+
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(storePath);
+    auto path = state.store->toRealPath(state.store->makeFixedOutputPathFromCA(storePath));
 
     if (expectedHash) {
         auto hash = unpack

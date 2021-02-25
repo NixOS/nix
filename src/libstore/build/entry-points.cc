@@ -63,13 +63,13 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
 }
 
 
-void Store::ensurePath(const StorePath & path)
+void Store::ensurePath(StorePathOrDesc path)
 {
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
     Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path);
+    GoalPtr goal = worker.makeSubstitutionGoal(path, NoRepair);
     Goals goals = {goal};
 
     worker.run(goals);
@@ -78,8 +78,10 @@ void Store::ensurePath(const StorePath & path)
         if (goal->ex) {
             goal->ex->status = worker.exitStatus();
             throw *goal->ex;
-        } else
-            throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+        } else {
+            auto p = this->bakeCaIfNeeded(path);
+            throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(p));
+        }
     }
 }
 
