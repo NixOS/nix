@@ -786,13 +786,14 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set & paths,
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
-    settings.requireExperimentalFeature("ca-derivations");
     StorePathSet storePaths;
     std::set<Realisation> realisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
-        if (auto realisation = std::get_if<Realisation>(&path.raw))
+        if (auto realisation = std::get_if<Realisation>(&path.raw)) {
+            settings.requireExperimentalFeature("ca-derivations");
             realisations.insert(*realisation);
+        }
     }
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
     try {
