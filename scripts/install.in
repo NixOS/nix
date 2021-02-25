@@ -60,7 +60,7 @@ case "$(uname -s).$(uname -m)" in
 esac
 
 # Use this command-line option to fetch the tarballs using nar-serve or Cachix
-if "${1:---tarball-url-prefix}"; then
+if [ "${1:-}" = "--tarball-url-prefix" ]; then
     if [ -z "${2:-}" ]; then
         oops "missing argument for --tarball-url-prefix"
     fi
