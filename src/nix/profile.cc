@@ -144,6 +144,9 @@ struct ProfileManifest
         Packages pkgs;
         for (auto & element : elements) {
             for (auto & path : element.storePaths) {
+                if (std::find(references.begin(), references.end(), path) != references.end())
+                    throw Error("Cannot create profile with store path '%s' included more than once", store->printStorePath(path));
+
                 if (element.active)
                     pkgs.emplace_back(store->printStorePath(path), true, 5);
                 references.insert(path);
@@ -235,16 +238,6 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
         std::vector<StorePathWithOutputs> pathsToBuild;
 
-        // make sure we don’t have this store path already in the profile
-        auto checkForExistingPath = [&](Installable & installable, StorePath & outPath)
-        {
-            for (auto & element : manifest.elements) {
-                if (std::find(element.storePaths.begin(), element.storePaths.end(), outPath) != element.storePaths.end())
-                    throw Error("Cannot install '%s' when its store path (%s) is already installed through '%s'",
-                                installable.what(), store->printStorePath(outPath), element.describe());
-            }
-        };
-
         for (auto & installable : installables) {
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
@@ -252,8 +245,6 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 ProfileElement element;
                 if (!drv.outPath)
                     throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-
-                checkForExistingPath(*installable, *drv.outPath);
 
                 element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
@@ -273,14 +264,11 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                     std::visit(overloaded {
                         [&](BuildableOpaque bo) {
-                            checkForExistingPath(*installable, bo.path);
-
                             pathsToBuild.push_back({bo.path, {}});
                             element.storePaths.insert(bo.path);
                         },
                         [&](BuildableFromDrv bfd) {
                             for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
-                                checkForExistingPath(*installable, output.second);
                                 pathsToBuild.push_back({bfd.drvPath, {output.first}});
                                 element.storePaths.insert(output.second);
                             }
