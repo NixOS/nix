@@ -15,6 +15,7 @@ class SSHStore : public RemoteStore
 public:
 
     const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{(Store*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
     const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
 
     SSHStore(const std::string & host, const Params & params)
@@ -24,6 +25,7 @@ public:
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress)

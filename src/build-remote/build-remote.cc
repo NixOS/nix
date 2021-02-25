@@ -192,6 +192,8 @@ static int _main(int argc, char * * argv)
                         storeParams["log-fd"] = "4";
                         if (bestMachine->sshKey != "")
                             storeParams["ssh-key"] = bestMachine->sshKey;
+                        if (bestMachine->sshPublicHostKey != "")
+                            storeParams["base64-ssh-public-host-key"] = bestMachine->sshPublicHostKey;
                     }
 
                     sshStore = openStore(bestMachine->storeUri, storeParams);
