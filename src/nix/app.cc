@@ -12,11 +12,16 @@ App Installable::toApp(EvalState & state)
 
     auto type = cursor->getAttr("type")->getString();
 
+    auto checkProgram = [&](const Path & program)
+    {
+        if (!state.store->isInStore(program))
+            throw Error("app program '%s' is not in the Nix store", program);
+    };
+
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
-        if (!state.store->isInStore(program))
-            throw Error("app program '%s' is not in the Nix store", program);
+        checkProgram(program);
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
@@ -33,9 +38,17 @@ App Installable::toApp(EvalState & state)
         auto outPath = cursor->getAttr(state.sOutPath)->getString();
         auto outputName = cursor->getAttr(state.sOutputName)->getString();
         auto name = cursor->getAttr(state.sName)->getString();
+        auto aMeta = cursor->maybeGetAttr("meta");
+        auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
+        auto mainProgram =
+            aMainProgram
+            ? aMainProgram->getString()
+            : DrvName(name).name;
+        auto program = outPath + "/bin/" + mainProgram;
+        checkProgram(program);
         return App {
             .context = { { drvPath, {outputName} } },
-            .program = outPath + "/bin/" + DrvName(name).name,
+            .program = program,
         };
     }
 

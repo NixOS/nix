@@ -57,23 +57,7 @@ template<class N> N getIntArg(const string & opt,
 {
     ++i;
     if (i == end) throw UsageError("'%1%' requires an argument", opt);
-    string s = *i;
-    N multiplier = 1;
-    if (allowUnit && !s.empty()) {
-        char u = std::toupper(*s.rbegin());
-        if (std::isalpha(u)) {
-            if (u == 'K') multiplier = 1ULL << 10;
-            else if (u == 'M') multiplier = 1ULL << 20;
-            else if (u == 'G') multiplier = 1ULL << 30;
-            else if (u == 'T') multiplier = 1ULL << 40;
-            else throw UsageError("invalid unit specifier '%1%'", u);
-            s.resize(s.size() - 1);
-        }
-    }
-    N n;
-    if (!string2Int(s, n))
-        throw UsageError("'%1%' requires an integer argument", opt);
-    return n * multiplier;
+    return string2IntWithUnitPrefix<N>(*i);
 }
 
 

@@ -41,6 +41,19 @@ export _NIX_FORCE_HTTP=1
 path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
 
+# Fetch a rev from another branch
+git -C $repo checkout -b devtest
+echo "different file" >> $TEST_ROOT/git/differentbranch
+git -C $repo add differentbranch
+git -C $repo commit -m 'Test2'
+git -C $repo checkout master
+devrev=$(git -C $repo rev-parse devtest)
+out=$(nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }" 2>&1) || status=$?
+[[ $status == 1 ]]
+[[ $out =~ 'Cannot find Git revision' ]]
+
+[[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
+
 # In pure eval mode, fetchGit without a revision should fail.
 [[ $(nix eval --impure --raw --expr "builtins.readFile (fetchGit file://$repo + \"/hello\")") = world ]]
 (! nix eval --raw --expr "builtins.readFile (fetchGit file://$repo + \"/hello\")")
@@ -59,6 +72,7 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 
 [[ $(nix eval --impure --expr "(builtins.fetchGit file://$repo).revCount") = 2 ]]
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).shortRev") = ${rev2:0:7} ]]
 
 # Fetching with a explicit hash should succeed.
 path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
@@ -132,6 +146,7 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 # (check dirty-tree handling was used)
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).shortRev") = 0000000 ]]
 
 # Committing shouldn't change store path, or switch to using 'master'
 git -C $repo commit -m 'Bla5' -a

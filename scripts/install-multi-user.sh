@@ -71,11 +71,9 @@ uninstall_directions() {
     subheader "Uninstalling nix:"
     local step=0
 
-    if [ -e /run/systemd/system ] && poly_service_installed_check; then
+    if poly_service_installed_check; then
         step=$((step + 1))
         poly_service_uninstall_directions "$step"
-    else
-        step=$((step + 1))
     fi
 
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -255,40 +253,20 @@ function finish_success {
         echo "To try again later, run \"sudo -i nix-channel --update nixpkgs\"."
     fi
 
-    if [ -e /run/systemd/system ]; then
-        cat <<EOF
+    cat <<EOF
 
 Before Nix will work in your existing shells, you'll need to close
 them and open them again. Other than that, you should be ready to go.
 
 Try it! Open a new terminal, and type:
-
+$(poly_extra_try_me_commands)
   $ nix-shell -p nix-info --run "nix-info -m"
-
+$(poly_extra_setup_instructions)
 Thank you for using this installer. If you have any feedback, don't
 hesitate:
 
 $(contactme)
 EOF
-    else
-        cat <<EOF
-
-Before Nix will work in your existing shells, you'll need to close
-them and open them again. Other than that, you should be ready to go.
-
-Try it! Open a new terminal, and type:
-
-  $ sudo nix-daemon
-  $ nix-shell -p nix-info --run "nix-info -m"
-
-Additionally, you may want to add nix-daemon to your init-system.
-
-Thank you for using this installer. If you have any feedback, don't
-hesitate:
-
-$(contactme)
-EOF
-   fi
 
 }
 
@@ -630,24 +608,20 @@ EOF
 }
 
 configure_shell_profile() {
-    # If there is an /etc/profile.d directory, we want to ensure there
-    # is a nix.sh within it, so we can use the following loop to add
-    # the source lines to it. Note that I'm _not_ adding the source
-    # lines here, because we want to be using the regular machinery.
-    #
-    # If we go around that machinery, it becomes more complicated and
-    # adds complications to the uninstall instruction generator and
-    # old instruction sniffer as well.
-    if [ -d /etc/profile.d ]; then
-        _sudo "create a stub /etc/profile.d/nix.sh which will be updated" \
-              touch /etc/profile.d/nix.sh
-    fi
-
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
             _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
                   cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+        else
+            # try to create the file if its directory exists
+            target_dir="$(dirname "$profile_target")"
+            if [ -d "$target_dir" ]; then
+                _sudo "to create a stub $profile_target which will be updated" \
+                    touch "$profile_target"
+            fi
+        fi
 
+        if [ -e "$profile_target" ]; then
             shell_source_lines \
                 | _sudo "extend your $profile_target with nix-daemon settings" \
                         tee -a "$profile_target"
@@ -725,9 +699,7 @@ main() {
     setup_default_profile
     place_nix_configuration
 
-    if [ -e /run/systemd/system ]; then
-        poly_configure_nix_daemon_service
-    fi
+    poly_configure_nix_daemon_service
 
     trap finish_success EXIT
 }

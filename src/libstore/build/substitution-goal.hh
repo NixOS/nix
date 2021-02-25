@@ -8,11 +8,8 @@ namespace nix {
 
 class Worker;
 
-class SubstitutionGoal : public Goal
+struct SubstitutionGoal : public Goal
 {
-    friend class Worker;
-
-private:
     /* The store path that should be realised through a substitute. */
     StorePath storePath;
 
@@ -56,7 +53,6 @@ private:
     /* Content address for recomputing store path */
     std::optional<ContentAddress> ca;
 
-public:
     SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~SubstitutionGoal();
 
@@ -82,8 +78,6 @@ public:
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
-
-    StorePath getStorePath() { return storePath; }
 };
 
 }

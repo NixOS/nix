@@ -38,13 +38,14 @@ namespace nix {
    ErrorInfo structs are sent to the logger as part of an exception, or directly with the
    logError or logWarning macros.
 
-   See the error-demo.cc program for usage examples.
+   See libutil/tests/logging.cc for usage examples.
 
  */
 
 typedef enum {
     lvlError = 0,
     lvlWarn,
+    lvlNotice,
     lvlInfo,
     lvlTalkative,
     lvlChatty,
@@ -106,9 +107,8 @@ struct Trace {
 
 struct ErrorInfo {
     Verbosity level;
-    string name;
-    string description; // FIXME: remove? it seems to be barely used
-    std::optional<hintformat> hint;
+    string name; // FIXME: rename
+    hintformat msg;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
 
@@ -132,23 +132,17 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err {.level = lvlError,
-            .hint = hintfmt(args...)
-            }
+        : err { .level = lvlError, .msg = hintfmt(args...) }
         , status(status)
     { }
 
     template<typename... Args>
     BaseError(const std::string & fs, const Args & ... args)
-        : err {.level = lvlError,
-            .hint = hintfmt(fs, args...)
-            }
+        : err { .level = lvlError, .msg = hintfmt(fs, args...) }
     { }
 
     BaseError(hintformat hint)
-        : err {.level = lvlError,
-            .hint = hint
-            }
+        : err { .level = lvlError, .msg = hint }
     { }
 
     BaseError(ErrorInfo && e)
@@ -204,7 +198,7 @@ public:
         : Error(""), errNo(errno)
     {
         auto hf = hintfmt(args...);
-        err.hint = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+        err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
 
     virtual const char* sname() const override { return "SysError"; }
