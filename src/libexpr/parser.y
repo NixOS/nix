@@ -32,7 +32,7 @@ namespace nix {
         Path basePath;
         Symbol file;
         FileOrigin origin;
-        ErrorInfo error;
+        std::optional<ErrorInfo> error;
         Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
@@ -66,8 +66,8 @@ namespace nix {
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError({
-         .hint = hintfmt("attribute '%1%' already defined at %2%",
-            showAttrPath(attrPath), prevPos),
+         .msg = hintfmt("attribute '%1%' already defined at %2%",
+             showAttrPath(attrPath), prevPos),
          .errPos = pos
     });
 }
@@ -75,7 +75,7 @@ static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prev
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError({
-        .hint = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
+        .msg = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
         .errPos = pos
     });
 }
@@ -146,7 +146,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (!formals->argNames.insert(formal.name).second)
         throw ParseError({
-            .hint = hintfmt("duplicate formal function argument '%1%'",
+            .msg = hintfmt("duplicate formal function argument '%1%'",
                 formal.name),
             .errPos = pos
         });
@@ -258,7 +258,7 @@ static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
     data->error = {
-        .hint = hintfmt(error),
+        .msg = hintfmt(error),
         .errPos = makeCurPos(*loc, data)
     };
 }
@@ -338,7 +338,7 @@ expr_function
   | LET binds IN expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
-            .hint = hintfmt("dynamic attributes not allowed in let"),
+            .msg = hintfmt("dynamic attributes not allowed in let"),
             .errPos = CUR_POS
         });
       $$ = new ExprLet($2, $4);
@@ -418,7 +418,7 @@ expr_simple
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
       if (noURLLiterals)
           throw ParseError({
-              .hint = hintfmt("URL literals are disabled"),
+              .msg = hintfmt("URL literals are disabled"),
               .errPos = CUR_POS
           });
       $$ = new ExprString(data->symbols.create($1));
@@ -491,7 +491,7 @@ attrs
           delete str;
       } else
           throw ParseError({
-              .hint = hintfmt("dynamic attributes not allowed in inherit"),
+              .msg = hintfmt("dynamic attributes not allowed in inherit"),
               .errPos = makeCurPos(@2, data)
           });
     }
@@ -576,7 +576,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     ParseData data(*this);
     data.origin = origin;
     switch (origin) {
-        case foFile: 
+        case foFile:
             data.file = data.symbols.create(path);
             break;
         case foStdin:
@@ -593,7 +593,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
-    if (res) throw ParseError(data.error);
+    if (res) throw ParseError(data.error.value());
 
     data.result->bindVars(staticEnv);
 
@@ -698,8 +698,12 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
+
+    if (hasPrefix(path, "nix/"))
+        return corepkgsPrefix + path.substr(4);
+
     throw ThrownError({
-        .hint = hintfmt(evalSettings.pureEval
+        .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
@@ -728,8 +732,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             };
         } catch (FileTransferError & e) {
             logWarning({
-                .name = "Entry download",
-                .hint = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
             res = { false, "" };
         }
@@ -739,8 +742,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, path };
         else {
             logWarning({
-                .name = "Entry not found",
-                .hint = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }

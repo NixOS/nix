@@ -57,6 +57,10 @@ class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
     {
         debug("AWS: %s", chomp(statement));
     }
+
+#if !(AWS_VERSION_MAJOR <= 1 && AWS_VERSION_MINOR <= 7 && AWS_VERSION_PATCH <= 115)
+    void Flush() override {}
+#endif
 };
 
 static void initAWS()
@@ -162,7 +166,8 @@ S3Helper::FileTransferResult S3Helper::getObject(
             dynamic_cast<std::stringstream &>(result.GetBody()).str());
 
     } catch (S3Error & e) {
-        if (e.err != Aws::S3::S3Errors::NO_SUCH_KEY) throw;
+        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) &&
+            (e.err != Aws::S3::S3Errors::ACCESS_DENIED)) throw;
     }
 
     auto now2 = std::chrono::steady_clock::now();
@@ -171,6 +176,11 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
     return res;
 }
+
+S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
+    : BinaryCacheStoreConfig(params)
+    , BinaryCacheStore(params)
+{ }
 
 struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
@@ -190,7 +200,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     const std::string name() override { return "S3 Binary Cache Store"; }
 };
 
-struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCacheStoreConfig
+struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
 {
     std::string bucketName;
 
@@ -203,6 +213,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCache
         const std::string & bucketName,
         const Params & params)
         : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , S3BinaryCacheStoreConfig(params)
+        , Store(params)
+        , BinaryCacheStore(params)
         , S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
@@ -399,7 +413,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore, virtual S3BinaryCache
             printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
                 bucketName, path, res.data->size(), res.durationMs);
 
-            sink((unsigned char *) res.data->data(), res.data->size());
+            sink(*res.data);
         } else
             throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
     }

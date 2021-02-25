@@ -11,11 +11,11 @@ Attrs jsonToAttrs(const nlohmann::json & json)
 
     for (auto & i : json.items()) {
         if (i.value().is_number())
-            attrs.emplace(i.key(), i.value().get<int64_t>());
+            attrs.emplace(i.key(), i.value().get<uint64_t>());
         else if (i.value().is_string())
             attrs.emplace(i.key(), i.value().get<std::string>());
         else if (i.value().is_boolean())
-            attrs.emplace(i.key(), i.value().get<bool>());
+            attrs.emplace(i.key(), Explicit<bool> { i.value().get<bool>() });
         else
             throw Error("unsupported input attribute type in lock file");
     }
@@ -23,7 +23,7 @@ Attrs jsonToAttrs(const nlohmann::json & json)
     return attrs;
 }
 
-nlohmann::json attrsToJson(const Attrs & attrs)
+nlohmann::json attrsToJSON(const Attrs & attrs)
 {
     nlohmann::json json;
     for (auto & attr : attrs) {
@@ -44,7 +44,7 @@ std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::strin
     if (i == attrs.end()) return {};
     if (auto v = std::get_if<std::string>(&i->second))
         return *v;
-    throw Error("input attribute '%s' is not a string %s", name, attrsToJson(attrs).dump());
+    throw Error("input attribute '%s' is not a string %s", name, attrsToJSON(attrs).dump());
 }
 
 std::string getStrAttr(const Attrs & attrs, const std::string & name)

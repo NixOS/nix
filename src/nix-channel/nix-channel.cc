@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 #include "fetchers.hh"
 
 #include <fcntl.h>
@@ -204,8 +204,6 @@ static int main_nix_channel(int argc, char ** argv)
             }
             return true;
         });
-
-        initPlugins();
 
         switch (cmd) {
             case cNone:

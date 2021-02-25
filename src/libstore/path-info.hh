@@ -109,6 +109,6 @@ struct ValidPathInfo : PathReferences<StorePath>
     virtual ~ValidPathInfo() { }
 };
 
-typedef list<ValidPathInfo> ValidPathInfos;
+typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;
 
 }

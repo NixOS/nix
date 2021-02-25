@@ -12,6 +12,10 @@
 
 
 %{
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
+#endif
+
 #include <boost/lexical_cast.hpp>
 
 #include "nixexpr.hh"

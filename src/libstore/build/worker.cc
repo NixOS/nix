@@ -8,7 +8,7 @@
 
 namespace nix {
 
-Worker::Worker(LocalStore & store)
+Worker::Worker(Store & store)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
@@ -43,16 +43,13 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StringSet & wantedOutputs,
     std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
-    WeakGoalPtr & abstract_goal_weak = derivationGoals[drvPath];
-    GoalPtr abstract_goal = abstract_goal_weak.lock(); // FIXME
-    std::shared_ptr<DerivationGoal> goal;
-    if (!abstract_goal) {
+    std::weak_ptr<DerivationGoal> & goal_weak = derivationGoals[drvPath];
+    std::shared_ptr<DerivationGoal> goal = goal_weak.lock();
+    if (!goal) {
         goal = mkDrvGoal();
-        abstract_goal_weak = goal;
+        goal_weak = goal;
         wakeUp(goal);
     } else {
-        goal = std::dynamic_pointer_cast<DerivationGoal>(abstract_goal);
-        assert(goal);
         goal->addWantedOutputs(wantedOutputs);
     }
     return goal;
@@ -77,11 +74,11 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
+std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
 {
     auto p = store.bakeCaIfNeeded(path);
-    WeakGoalPtr & goal_weak = substitutionGoals[p];
-    GoalPtr goal = goal_weak.lock(); // FIXME
+    std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[p];
+    std::shared_ptr<SubstitutionGoal> goal = goal_weak.lock(); // FIXME
     if (!goal) {
         auto optCA = std::get_if<1>(&path);
         goal = std::make_shared<SubstitutionGoal>(
@@ -95,14 +92,14 @@ GoalPtr Worker::makeSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
     return goal;
 }
 
-
-static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
+template<typename G>
+static void removeGoal(std::shared_ptr<G> goal, std::map<StorePath, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
-    for (WeakGoalMap::iterator i = goalMap.begin();
+    for (auto i = goalMap.begin();
          i != goalMap.end(); )
         if (i->second.lock() == goal) {
-            WeakGoalMap::iterator j = i; ++j;
+            auto j = i; ++j;
             goalMap.erase(i);
             i = j;
         }
@@ -112,8 +109,12 @@ static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    nix::removeGoal(goal, derivationGoals);
-    nix::removeGoal(goal, substitutionGoals);
+    if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
+        nix::removeGoal(drvGoal, derivationGoals);
+    else if (auto subGoal = std::dynamic_pointer_cast<SubstitutionGoal>(goal))
+        nix::removeGoal(subGoal, substitutionGoals);
+    else
+        assert(false);
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
@@ -212,7 +213,21 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    for (auto & i : _topGoals) topGoals.insert(i);
+    std::vector<nix::StorePathWithOutputs> topPaths;
+
+    for (auto & i : _topGoals) {
+        topGoals.insert(i);
+        if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
+            topPaths.push_back({goal->drvPath, goal->wantedOutputs});
+        } else if (auto goal = dynamic_cast<SubstitutionGoal *>(i.get())) {
+            topPaths.push_back({goal->storePath});
+        }
+    }
+
+    /* Call queryMissing() efficiently query substitutes. */
+    StorePathSet willBuild, willSubstitute, unknown;
+    uint64_t downloadSize, narSize;
+    store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     debug("entered goal loop");
 
@@ -220,7 +235,9 @@ void Worker::run(const Goals & _topGoals)
 
         checkInterrupt();
 
-        store.autoGC(false);
+        // TODO GC interface?
+        if (auto localStore = dynamic_cast<LocalStore *>(&store))
+            localStore->autoGC(false);
 
         /* Call every wake goal (in the ordering established by
            CompareGoalPtrs). */
@@ -445,10 +462,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     }
     pathContentsGoodCache.insert_or_assign(path, res);
     if (!res)
-        logError({
-            .name = "Corrupted path",
-            .hint = hintfmt("path '%s' is corrupted or missing!", store.printStorePath(path))
-        });
+        printError("path '%s' is corrupted or missing!", store.printStorePath(path));
     return res;
 }
 
@@ -456,6 +470,11 @@ bool Worker::pathContentsGood(const StorePath & path)
 void Worker::markContentsGood(const StorePath & path)
 {
     pathContentsGoodCache.insert_or_assign(path, true);
+}
+
+
+GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
+    return subGoal;
 }
 
 }

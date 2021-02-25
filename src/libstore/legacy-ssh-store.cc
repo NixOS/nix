@@ -22,7 +22,7 @@ struct LegacySSHStoreConfig : virtual StoreConfig
     const std::string name() override { return "Legacy SSH Store"; }
 };
 
-struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
+struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
 {
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
@@ -48,6 +48,7 @@ struct LegacySSHStore : public Store, public virtual LegacySSHStoreConfig
 
     LegacySSHStore(const string & scheme, const string & host, const Params & params)
         : StoreConfig(params)
+        , LegacySSHStoreConfig(params)
         , Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
@@ -342,6 +343,10 @@ public:
         auto conn(connections->get());
         return conn->remoteVersion;
     }
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
+    // TODO: Implement
+    { unsupported("queryRealisation"); }
 };
 
 static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;

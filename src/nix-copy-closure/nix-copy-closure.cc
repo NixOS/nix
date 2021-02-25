@@ -1,6 +1,6 @@
 #include "shared.hh"
 #include "store-api.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 
@@ -42,8 +42,6 @@ static int main_nix_copy_closure(int argc, char ** argv)
                 storePaths.insert(*arg);
             return true;
         });
-
-        initPlugins();
 
         if (sshHost.empty())
             throw UsageError("no host name specified");

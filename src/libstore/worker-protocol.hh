@@ -1,12 +1,15 @@
 #pragma once
 
+#include "store-api.hh"
+#include "serialise.hh"
+
 namespace nix {
 
 
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x11a
+#define PROTOCOL_VERSION 0x11b
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -50,6 +53,8 @@ typedef enum {
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
     wopQueryDerivationOutputMap = 41,
+    wopRegisterDrvOutput = 42,
+    wopQueryRealisation = 43,
 } WorkerOp;
 
 

@@ -43,13 +43,13 @@ void RemoteFSAccessor::addToCache(std::string_view hashPart, const std::string &
     }
 }
 
-std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
+std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, bool requireValidPath)
 {
     auto path = canonPath(path_);
 
     auto [storePath, restPath] = store->toStorePath(path);
 
-    if (!store->isValidPath(storePath))
+    if (requireValidPath && !store->isValidPath(storePath))
         throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
 
     auto i = nars.find(std::string(storePath.hashPart()));
@@ -75,7 +75,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
                         throw SysError("seeking in '%s'", cacheFile);
 
                     std::string buf(length, 0);
-                    readFull(fd.get(), (unsigned char *) buf.data(), length);
+                    readFull(fd.get(), buf.data(), length);
 
                     return buf;
                 });
@@ -113,9 +113,9 @@ StringSet RemoteFSAccessor::readDirectory(const Path & path)
     return res.first->readDirectory(res.second);
 }
 
-std::string RemoteFSAccessor::readFile(const Path & path)
+std::string RemoteFSAccessor::readFile(const Path & path, bool requireValidPath)
 {
-    auto res = fetch(path);
+    auto res = fetch(path, requireValidPath);
     return res.first->readFile(res.second);
 }
 
