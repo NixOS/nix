@@ -45,7 +45,6 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     void set(const std::string & str, bool append = false) override;
 };
 
-/* MakeError(MissingExperimentalFeature, Error); */
 class MissingExperimentalFeature: public Error
 {
 public:
