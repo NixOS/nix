@@ -2,14 +2,18 @@
 
 namespace nix {
 
-SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD)
-    : host(host)
-    , fakeSSH(host == "localhost")
-    , keyFile(keyFile)
+SSHMaster::SSHMaster(const std::string & hostNport, const std::string & keyFile, bool useMaster, bool compress, int logFD)
+    : keyFile(keyFile)
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
     , logFD(logFD)
 {
+    auto res = tokenizeString<std::vector<string>>(hostNport, ":");
+    port = res.size() > 1 ? atoi(res[1].c_str()) : 0; // if we have a port, parse that
+    host = res[0];
+
+    fakeSSH = host == "localhost" && !port;
+
     if (host == "" || hasPrefix(host, "-"))
         throw Error("invalid SSH host name '%s'", host);
 }
@@ -22,6 +26,8 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
         args.insert(args.end(), {"-i", keyFile});
     if (compress)
         args.push_back("-C");
+    if (port != 0)
+        args.insert(args.end(), {"-p", std::to_string(port)});
 }
 
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)

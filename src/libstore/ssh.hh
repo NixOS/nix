@@ -9,12 +9,13 @@ class SSHMaster
 {
 private:
 
-    const std::string host;
+    std::string host;
     bool fakeSSH;
     const std::string keyFile;
     const bool useMaster;
     const bool compress;
     const int logFD;
+    int port;
 
     struct State
     {
