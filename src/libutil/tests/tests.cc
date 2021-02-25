@@ -1,6 +1,7 @@
 #include "util.hh"
 #include "types.hh"
 
+#include <limits.h>
 #include <gtest/gtest.h>
 
 namespace nix {
@@ -319,20 +320,15 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(string2Float, emptyString) {
-        double n;
-        ASSERT_EQ(string2Float("", n), false);
+        ASSERT_EQ(string2Float<double>(""), std::nullopt);
     }
 
     TEST(string2Float, trivialConversions) {
-        double n;
-        ASSERT_EQ(string2Float("1.0", n), true);
-        ASSERT_EQ(n, 1.0);
+        ASSERT_EQ(string2Float<double>("1.0"), 1.0);
 
-        ASSERT_EQ(string2Float("0.0", n), true);
-        ASSERT_EQ(n, 0.0);
+        ASSERT_EQ(string2Float<double>("0.0"), 0.0);
 
-        ASSERT_EQ(string2Float("-100.25", n), true);
-        ASSERT_EQ(n, (-100.25));
+        ASSERT_EQ(string2Float<double>("-100.25"), -100.25);
     }
 
     /* ----------------------------------------------------------------------------
@@ -340,20 +336,15 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(string2Int, emptyString) {
-        double n;
-        ASSERT_EQ(string2Int("", n), false);
+        ASSERT_EQ(string2Int<int>(""), std::nullopt);
     }
 
     TEST(string2Int, trivialConversions) {
-        double n;
-        ASSERT_EQ(string2Int("1", n), true);
-        ASSERT_EQ(n, 1);
+        ASSERT_EQ(string2Int<int>("1"), 1);
 
-        ASSERT_EQ(string2Int("0", n), true);
-        ASSERT_EQ(n, 0);
+        ASSERT_EQ(string2Int<int>("0"), 0);
 
-        ASSERT_EQ(string2Int("-100", n), true);
-        ASSERT_EQ(n, (-100));
+        ASSERT_EQ(string2Int<int>("-100"), -100);
     }
 
     /* ----------------------------------------------------------------------------
@@ -586,4 +577,14 @@ namespace nix {
 
         ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz" );
     }
+
+    TEST(filterANSIEscapes, utf8) {
+        ASSERT_EQ(filterANSIEscapes("foobar", true, 5), "fooba");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 6), "fóóbär");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 5), "fóóbä");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 3), "fóó");
+        ASSERT_EQ(filterANSIEscapes("f€€bär", true, 4), "f€€b");
+        ASSERT_EQ(filterANSIEscapes("f𐍈𐍈bär", true, 4), "f𐍈𐍈b");
+    }
+
 }

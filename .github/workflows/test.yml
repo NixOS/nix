@@ -8,10 +8,52 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      CACHIX_NAME: nix-ci
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2.3.4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v11
+    - uses: cachix/install-nix-action@v12
+    - uses: cachix/cachix-action@v8
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
     #- run: nix flake check
     - run: nix-build -A checks.$(if [[ `uname` = Linux ]]; then echo x86_64-linux; else echo x86_64-darwin; fi)
+  installer:
+    if: github.event_name == 'push'
+    needs: tests
+    runs-on: ubuntu-latest
+    env:
+      CACHIX_NAME: nix-ci
+    outputs:
+      installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
+    steps:
+    - uses: actions/checkout@v2.3.4
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v12
+    - uses: cachix/cachix-action@v8
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+    - id: prepare-installer
+      run: scripts/prepare-installer-for-github-actions
+  installer_test:
+    if: github.event_name == 'push'
+    needs: installer
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CACHIX_NAME: nix-ci
+    steps:
+    - uses: actions/checkout@v2.3.4
+    - uses: cachix/install-nix-action@master
+      with:
+        install_url: '${{needs.installer.outputs.installerURL}}'
+        install_options: '--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve'
+    - run: nix-instantiate -E 'builtins.currentTime' --eval
+    

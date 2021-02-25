@@ -18,6 +18,8 @@
 
 #include <openssl/crypto.h>
 
+#include <sodium.h>
+
 
 namespace nix {
 
@@ -126,6 +128,9 @@ void initNix()
     CRYPTO_set_locking_callback(opensslLockCallback);
 #endif
 
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
+
     loadConfFile();
 
     startSignalHandlerThread();
@@ -181,50 +186,64 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',
-        .description = "do not show build output",
+        .description = "Do not show build output.",
         .handler = {[&]() {setLogFormat(LogFormat::raw); }},
     });
 
     addFlag({
         .longName = "keep-failed",
         .shortName ='K',
-        .description = "keep temporary directories of failed builds",
+        .description = "Keep temporary directories of failed builds.",
         .handler = {&(bool&) settings.keepFailed, true},
     });
 
     addFlag({
         .longName = "keep-going",
         .shortName ='k',
-        .description = "keep going after a build fails",
+        .description = "Keep going after a build fails.",
         .handler = {&(bool&) settings.keepGoing, true},
     });
 
     addFlag({
         .longName = "fallback",
-        .description = "build from source if substitution fails",
+        .description = "Build from source if substitution fails.",
         .handler = {&(bool&) settings.tryFallback, true},
     });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
-        const std::string & description, const std::string & dest) {
-        mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
-            settings.set(dest, std::to_string(n));
+        const std::string & description, const std::string & dest)
+    {
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .labels = {"n"},
+            .handler = {[=](std::string s) {
+                auto n = string2IntWithUnitPrefix<uint64_t>(s);
+                settings.set(dest, std::to_string(n));
+            }}
         });
     };
 
-    intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
-    intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
-    intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
+    intSettingAlias(0, "cores", "Maximum number of CPU cores to use inside a build.", "cores");
+    intSettingAlias(0, "max-silent-time", "Number of seconds of silence before a build is killed.", "max-silent-time");
+    intSettingAlias(0, "timeout", "Number of seconds before a build is killed.", "timeout");
 
-    mkFlag(0, "readonly-mode", "do not write to the Nix store",
-        &settings.readOnlyMode);
+    addFlag({
+        .longName = "readonly-mode",
+        .description = "Do not write to the Nix store.",
+        .handler = {&settings.readOnlyMode, true},
+    });
 
-    mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
-        &gcWarning, false);
+    addFlag({
+        .longName = "no-gc-warning",
+        .description = "Disable warnings about not using `--add-root`.",
+        .handler = {&gcWarning, true},
+    });
 
     addFlag({
         .longName = "store",
-        .description = "URI of the Nix store to use",
+        .description = "The URL of the Nix store to use.",
         .labels = {"store-uri"},
         .handler = {&(std::string&) settings.storeUri},
     });
@@ -274,9 +293,7 @@ void printVersion(const string & programName)
 #if HAVE_BOEHMGC
         cfg.push_back("gc");
 #endif
-#if HAVE_SODIUM
         cfg.push_back("signed-caches");
-#endif
         std::cout << "System type: " << settings.thisSystem << "\n";
         std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";

@@ -61,9 +61,9 @@ struct FileTransferRequest
     bool decompress = true;
     std::shared_ptr<std::string> data;
     std::string mimeType;
-    std::function<void(char *, size_t)> dataCallback;
+    std::function<void(std::string_view data)> dataCallback;
 
-    FileTransferRequest(const std::string & uri)
+    FileTransferRequest(std::string_view uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
     std::string verb()

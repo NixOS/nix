@@ -41,29 +41,14 @@ struct CmdSearch : InstallableCommand, MixJSON
 
     std::string description() override
     {
-        return "query available packages";
+        return "search for packages";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show all packages in the flake in the current directory:",
-                "nix search"
-            },
-            Example{
-                "To show packages in the 'nixpkgs' flake containing 'blender' in its name or description:",
-                "nix search nixpkgs blender"
-            },
-            Example{
-                "To search for Firefox or Chromium:",
-                "nix search nixpkgs 'firefox|chromium'"
-            },
-            Example{
-                "To search for packages containing 'git' and either 'frontend' or 'gui':",
-                "nix search nixpkgs git 'frontend|gui'"
-            }
-        };
+        return
+          #include "search.md"
+          ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -96,9 +81,9 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath)
+        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
@@ -109,7 +94,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                         auto cursor2 = cursor.getAttr(attr);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*cursor2, attrPath2);
+                        visit(*cursor2, attrPath2, false);
                     }
                 };
 
@@ -147,13 +132,13 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("description", description);
                         } else {
                             auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
-                            if (results > 1) logger->stdout("");
-                            logger->stdout(
+                            if (results > 1) logger->cout("");
+                            logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
-                                logger->stdout(
+                                logger->cout(
                                     "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
@@ -163,6 +148,9 @@ struct CmdSearch : InstallableCommand, MixJSON
                     attrPath.size() == 0
                     || (attrPath[0] == "legacyPackages" && attrPath.size() <= 2)
                     || (attrPath[0] == "packages" && attrPath.size() <= 2))
+                    recurse();
+
+                else if (initialRecurse)
                     recurse();
 
                 else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
@@ -178,7 +166,7 @@ struct CmdSearch : InstallableCommand, MixJSON
         };
 
         for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix));
+            visit(*cursor, parseAttrPath(*state, prefix), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

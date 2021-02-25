@@ -11,6 +11,7 @@
 #include "finally.hh"
 #include "logging.hh"
 #include "callback.hh"
+#include "filetransfer.hh"
 
 namespace nix {
 
@@ -76,8 +77,8 @@ void write(const Store & store, Sink & out, const std::optional<ContentAddress> 
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
-    : Store(params)
-    , RemoteStoreConfig(params)
+    : RemoteStoreConfig(params)
+    , Store(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
             [this]() {
@@ -171,7 +172,8 @@ void RemoteStore::setOptions(Connection & conn)
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
         std::map<std::string, Config::SettingInfo> overrides;
-        globalConfig.getSettings(overrides, true);
+        settings.getSettings(overrides, true); // libstore settings
+        fileTransferSettings.getSettings(overrides, true);
         overrides.erase(settings.keepFailed.name);
         overrides.erase(settings.keepGoing.name);
         overrides.erase(settings.tryFallback.name);
@@ -257,6 +259,9 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
     } else {
         conn->to << wopQueryValidPaths;
         worker_proto::write(*this, conn->to, paths);
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
+            conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
+        }
         conn.processStderr();
         return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
     }
@@ -408,10 +413,10 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
-    auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0x16) {
+    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
         return Store::queryDerivationOutputs(path);
     }
+    auto conn(getConnection());
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
     return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
@@ -472,9 +477,14 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         worker_proto::write(*this, conn->to, references);
         conn->to << repair;
 
-        conn.withFramedSink([&](Sink & sink) {
-            dump.drainInto(sink);
-        });
+        // The dump source may invoke the store, so we need to make some room.
+        connections->incCapacity();
+        {
+            Finally cleanup([&]() { connections->decCapacity(); });
+            conn.withFramedSink([&](Sink & sink) {
+                dump.drainInto(sink);
+            });
+        }
 
         auto path = parseStorePath(readString(conn->from));
         return readValidPathInfo(conn, path);
@@ -598,6 +608,27 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
 {
     StringSource source(s);
     return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
+}
+
+void RemoteStore::registerDrvOutput(const Realisation & info)
+{
+    auto conn(getConnection());
+    conn->to << wopRegisterDrvOutput;
+    conn->to << info.id.to_string();
+    conn->to << std::string(info.outPath.to_string());
+    conn.processStderr();
+}
+
+std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput & id)
+{
+    auto conn(getConnection());
+    conn->to << wopQueryRealisation;
+    conn->to << id.to_string();
+    conn.processStderr();
+    auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
+    if (outPaths.empty())
+        return std::nullopt;
+    return {Realisation{.id = id, .outPath = *outPaths.begin()}};
 }
 
 
@@ -847,8 +878,8 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
             size_t len = readNum<size_t>(from);
-            auto buf = std::make_unique<unsigned char[]>(len);
-            writeString(buf.get(), source->read(buf.get(), len), to);
+            auto buf = std::make_unique<char[]>(len);
+            writeString({(const char *) buf.get(), source->read(buf.get(), len)}, to);
             to.flush();
         }
 
