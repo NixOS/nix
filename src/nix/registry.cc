@@ -17,6 +17,13 @@ struct CmdRegistryList : StoreCommand
         return "list available Nix flakes";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "registry-list.md"
+          ;
+    }
+
     void run(nix::ref<nix::Store> store) override
     {
         using namespace fetchers;
@@ -26,7 +33,7 @@ struct CmdRegistryList : StoreCommand
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
                 // FIXME: format nicely
-                logger->stdout("%s %s %s",
+                logger->cout("%s %s %s",
                     registry->type == Registry::Flag   ? "flags " :
                     registry->type == Registry::User   ? "user  " :
                     registry->type == Registry::System ? "system" :
@@ -45,6 +52,13 @@ struct CmdRegistryAdd : MixEvalArgs, Command
     std::string description() override
     {
         return "add/replace flake in user flake registry";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "registry-add.md"
+          ;
     }
 
     CmdRegistryAdd()
@@ -75,6 +89,13 @@ struct CmdRegistryRemove : virtual Args, MixEvalArgs, Command
         return "remove flake from user flake registry";
     }
 
+    std::string doc() override
+    {
+        return
+          #include "registry-remove.md"
+          ;
+    }
+
     CmdRegistryRemove()
     {
         expectArg("url", &url);
@@ -95,6 +116,13 @@ struct CmdRegistryPin : virtual Args, EvalCommand
     std::string description() override
     {
         return "pin a flake to its current version in user flake registry";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "registry-pin.md"
+          ;
     }
 
     CmdRegistryPin()
@@ -130,6 +158,13 @@ struct CmdRegistry : virtual NixMultiCommand
     std::string description() override
     {
         return "manage the flake registry";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "registry.md"
+          ;
     }
 
     Category category() override { return catSecondary; }

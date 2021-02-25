@@ -37,17 +37,20 @@ struct InitialOutputStatus {
 
 struct InitialOutput {
     bool wanted;
+    Hash outputHash;
     std::optional<InitialOutputStatus> known;
 };
 
-class DerivationGoal : public Goal
+struct DerivationGoal : public Goal
 {
-private:
     /* Whether to use an on-disk .drv file. */
     bool useDerivation;
 
     /* The path of the derivation. */
     StorePath drvPath;
+
+    /* The path of the corresponding resolved derivation */
+    std::optional<BasicDerivation> resolvedDrv;
 
     /* The specific outputs that we need to build.  Empty means all of
        them. */
@@ -246,7 +249,6 @@ private:
 
     friend struct RestrictedStore;
 
-public:
     DerivationGoal(const StorePath & drvPath,
         const StringSet & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
@@ -264,17 +266,11 @@ public:
 
     void work() override;
 
-    StorePath getDrvPath()
-    {
-        return drvPath;
-    }
-
     /* Add wanted outputs to an already existing derivation goal. */
     void addWantedOutputs(const StringSet & outputs);
 
     BuildResult getResult() { return result; }
 
-private:
     /* The states. */
     void getDerivation();
     void loadDerivation();
@@ -317,8 +313,6 @@ private:
 
     /* Run the builder's process. */
     void runChild();
-
-    friend int childEntry(void *);
 
     /* Check that the derivation outputs all exist and register them
        as valid. */

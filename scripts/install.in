@@ -25,16 +25,52 @@ require_util() {
 }
 
 case "$(uname -s).$(uname -m)" in
-    Linux.x86_64) system=x86_64-linux; hash=@binaryTarball_x86_64-linux@;;
-    Linux.i?86) system=i686-linux; hash=@binaryTarball_i686-linux@;;
-    Linux.aarch64) system=aarch64-linux; hash=@binaryTarball_aarch64-linux@;;
-    Darwin.x86_64) system=x86_64-darwin; hash=@binaryTarball_x86_64-darwin@;;
+    Linux.x86_64)
+        hash=@tarballHash_x86_64-linux@
+        path=@tarballPath_x86_64-linux@
+        system=x86_64-linux
+        ;;
+    Linux.i?86)
+        hash=@tarballHash_i686-linux@
+        path=@tarballPath_i686-linux@
+        system=i686-linux
+        ;;
+    Linux.aarch64)
+        hash=@tarballHash_aarch64-linux@
+        path=@tarballPath_aarch64-linux@
+        system=aarch64-linux
+        ;;
+    Darwin.x86_64)
+        hash=@tarballHash_x86_64-darwin@
+        path=@tarballPath_x86_64-darwin@
+        system=x86_64-darwin
+        ;;
+    Darwin.arm64|Darwin.aarch64)
+        # check for Rosetta 2 support
+        if ! [ -f /Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist ]; then
+          oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
+        fi
+
+        hash=@binaryTarball_x86_64-darwin@
+        path=@tarballPath_x86_64-darwin@
+        # eventually maybe: aarch64-darwin
+        system=x86_64-darwin
+        ;;
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
 
-url="https://releases.nixos.org/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz"
+# Use this command-line option to fetch the tarballs using nar-serve or Cachix
+if [ "${1:-}" = "--tarball-url-prefix" ]; then
+    if [ -z "${2:-}" ]; then
+        oops "missing argument for --tarball-url-prefix"
+    fi
+    url=${2}/${path}
+    shift 2
+else
+    url=https://releases.nixos.org/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz
+fi
 
-tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.xz")"
+tarball=$tmpDir/nix-@nixVersion@-$system.tar.xz
 
 require_util curl "download the binary tarball"
 require_util tar "unpack the binary tarball"
@@ -66,6 +102,7 @@ tar -xJf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
 script=$(echo "$unpack"/*/install)
 
 [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
+export INVOKED_FROM_INSTALL_IN=1
 "$script" "$@"
 
 } # End of wrapping

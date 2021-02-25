@@ -40,11 +40,7 @@ AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
 AC_MSG_RESULT($perllibdir)
 
 # Look for libsodium, an optional dependency.
-PKG_CHECK_MODULES([SODIUM], [libsodium],
-  [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
-   CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"
-   have_sodium=1], [have_sodium=])
-AC_SUBST(HAVE_SODIUM, [$have_sodium])
+PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Check for the required Perl dependencies (DBI and DBD::SQLite).
 perlFlags="-I$perllibdir"

@@ -14,6 +14,9 @@ builders=(
   "ssh-ng://localhost?remote-store=$TEST_ROOT/machine3?system-features=baz - - 1 1 baz"
 )
 
+chmod -R +w $TEST_ROOT/machine* || true
+rm -rf $TEST_ROOT/machine* || true
+
 # Note: ssh://localhost bypasses ssh, directly invoking nix-store as a
 # child process. This allows us to test LegacySSHStore::buildDerivation().
 # ssh-ng://... likewise allows us to test RemoteStore::buildDerivation().
