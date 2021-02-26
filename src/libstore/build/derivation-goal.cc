@@ -123,17 +123,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-    this->drv = std::make_unique<BasicDerivation>(BasicDerivation(drv));
-
-    auto outputHashes = staticOutputHashes(worker.store, drv);
-    for (auto &[outputName, outputHash] : outputHashes)
-      initialOutputs.insert({
-            outputName,
-            InitialOutput{
-                .wanted = true, // Will be refined later
-                .outputHash = outputHash
-            }
-          });
+    this->drv = std::make_unique<Derivation>(drv);
 
     state = &DerivationGoal::haveDerivation;
     name = fmt(
@@ -271,18 +261,8 @@ void DerivationGoal::loadDerivation()
 
     auto fullDrv = new Derivation(worker.store.derivationFromPath(drvPath));
 
-    auto outputHashes = staticOutputHashes(worker.store, *fullDrv);
-    for (auto &[outputName, outputHash] : outputHashes)
-      initialOutputs.insert({
-            outputName,
-            InitialOutput{
-                .wanted = true, // Will be refined later
-                .outputHash = outputHash
-            }
-          });
-
     /* Get the derivation. */
-    drv = std::unique_ptr<BasicDerivation>(fullDrv);
+    drv = std::unique_ptr<Derivation>(fullDrv);
 
     haveDerivation();
 }
@@ -300,6 +280,16 @@ void DerivationGoal::haveDerivation()
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
+
+    auto outputHashes = staticOutputHashes(worker.store, *drv);
+    for (auto &[outputName, outputHash] : outputHashes)
+      initialOutputs.insert({
+            outputName,
+            InitialOutput{
+                .wanted = true, // Will be refined later
+                .outputHash = outputHash
+            }
+          });
 
     /* Check what outputs paths are not already valid. */
     checkPathValidity();
@@ -3517,10 +3507,9 @@ void DerivationGoal::registerOutputs()
        but it's fine to do in all cases. */
 
     if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        auto outputHashes = staticOutputHashes(worker.store, *drv);
         for (auto& [outputName, newInfo] : infos)
             worker.store.registerDrvOutput(Realisation{
-                .id = DrvOutput{outputHashes.at(outputName), outputName},
+                .id = DrvOutput{initialOutputs.at(outputName).outputHash, outputName},
                 .outPath = newInfo.path});
     }
 }
