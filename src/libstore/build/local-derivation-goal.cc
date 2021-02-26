@@ -1,4 +1,4 @@
-#include "derivation-goal.hh"
+#include "local-derivation-goal.hh"
 #include "hook-instance.hh"
 #include "worker.hh"
 #include "builtins.hh"
@@ -75,7 +75,6 @@ void handleDiffHook(
             diffHookOptions.uid = uid;
             diffHookOptions.gid = gid;
             diffHookOptions.chdir = "/";
-
             auto diffRes = runProgram(diffHookOptions);
             if (!statusOk(diffRes.first))
                 throw ExecError(diffRes.first,
@@ -94,8 +93,9 @@ void handleDiffHook(
     }
 }
 
-const Path DerivationGoal::homeDir = "/homeless-shelter";
+const Path LocalDerivationGoal::homeDir = "/homeless-shelter";
 
+#if 0
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
@@ -138,19 +138,20 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
        garbage-collected. (See isActiveTempFile() in gc.cc.) */
     worker.store.addTempRoot(this->drvPath);
 }
+#endif
 
 
-DerivationGoal::~DerivationGoal()
+LocalDerivationGoal::~LocalDerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
+    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
     try { killChild(); } catch (...) { ignoreException(); }
     try { stopDaemon(); } catch (...) { ignoreException(); }
-    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
-    try { closeLogFile(); } catch (...) { ignoreException(); }
 }
 
 
+#if 0
 string DerivationGoal::key()
 {
     /* Ensure that derivations get built in order of their name,
@@ -159,9 +160,10 @@ string DerivationGoal::key()
        derivation goals (due to "b$"). */
     return "b$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
+#endif
 
 
-inline bool DerivationGoal::needsHashRewrite()
+inline bool LocalDerivationGoal::needsHashRewrite()
 {
 #if __linux__
     return !useChroot;
@@ -172,7 +174,15 @@ inline bool DerivationGoal::needsHashRewrite()
 }
 
 
-void DerivationGoal::killChild()
+LocalStore & LocalDerivationGoal::getLocalStore()
+{
+    auto p = dynamic_cast<LocalStore *>(&worker.store);
+    assert(p);
+    return *p;
+}
+
+
+void LocalDerivationGoal::killChild()
 {
     if (pid != -1) {
         worker.childTerminated(this);
@@ -193,17 +203,11 @@ void DerivationGoal::killChild()
         assert(pid == -1);
     }
 
-    hook.reset();
+    DerivationGoal::killChild();
 }
 
 
-void DerivationGoal::timedOut(Error && ex)
-{
-    killChild();
-    done(BuildResult::TimedOut, ex);
-}
-
-
+#if 0
 void DerivationGoal::work()
 {
     (this->*state)();
@@ -695,15 +699,9 @@ void DerivationGoal::tryToBuild()
     state = &DerivationGoal::tryLocalBuild;
     worker.wakeUp(shared_from_this());
 }
+#endif
 
-void DerivationGoal::tryLocalBuild() {
-    /* Make sure that we are allowed to start a build. */
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
-        throw Error(
-            "unable to build with a primary store that isn't a local store; "
-            "either pass a different '--store' or enable remote builds."
-            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
-    }
+void LocalDerivationGoal::tryLocalBuild() {
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
@@ -757,7 +755,6 @@ void DerivationGoal::tryLocalBuild() {
     started();
 }
 
-
 static void chmod_(const Path & path, mode_t mode)
 {
     if (chmod(path.c_str(), mode) == -1)
@@ -785,51 +782,125 @@ static void movePath(const Path & src, const Path & dst)
 }
 
 
-void replaceValidPath(const Path & storePath, const Path & tmpPath)
+extern void replaceValidPath(const Path & storePath, const Path & tmpPath);
+
+
+int LocalDerivationGoal::getChildStatus()
 {
-    /* We can't atomically replace storePath (the original) with
-       tmpPath (the replacement), so we have to move it out of the
-       way first.  We'd better not be interrupted here, because if
-       we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
-    if (pathExists(storePath))
-        movePath(storePath, oldPath);
+    return hook ? DerivationGoal::getChildStatus() : pid.kill();
+}
 
-    try {
-        movePath(tmpPath, storePath);
-    } catch (...) {
-        try {
-            // attempt to recover
-            movePath(oldPath, storePath);
-        } catch (...) {
-            ignoreException();
-        }
-        throw;
-    }
-
-    deletePath(oldPath);
+void LocalDerivationGoal::closeReadPipes()
+{
+    if (hook) {
+        DerivationGoal::closeReadPipes();
+    } else
+        builderOut.readSide = -1;
 }
 
 
-MakeError(NotDeterministic, BuildError);
+void LocalDerivationGoal::cleanupHookFinally()
+{
+    /* Release the build user at the end of this function. We don't do
+       it right away because we don't want another build grabbing this
+       uid and then messing around with our output. */
+    buildUser.reset();
+}
 
 
+void LocalDerivationGoal::cleanupPreChildKill()
+{
+    sandboxMountNamespace = -1;
+}
+
+
+void LocalDerivationGoal::cleanupPostChildKill()
+{
+    /* When running under a build user, make sure that all processes
+       running under that uid are gone.  This is to prevent a
+       malicious user from leaving behind a process that keeps files
+       open and modifies them after they have been chown'ed to
+       root. */
+    if (buildUser) buildUser->kill();
+
+    /* Terminate the recursive Nix daemon. */
+    stopDaemon();
+}
+
+
+bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
+{
+    bool diskFull = false;
+
+    /* Heuristically check whether the build failure may have
+       been caused by a disk full condition.  We have no way
+       of knowing whether the build actually got an ENOSPC.
+       So instead, check if the disk is (nearly) full now.  If
+       so, we don't mark this build as a permanent failure. */
+#if HAVE_STATVFS
+	{
+        auto & localStore = getLocalStore();
+        uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
+        struct statvfs st;
+        if (statvfs(localStore.realStoreDir.c_str(), &st) == 0 &&
+            (uint64_t) st.f_bavail * st.f_bsize < required)
+            diskFull = true;
+        if (statvfs(tmpDir.c_str(), &st) == 0 &&
+            (uint64_t) st.f_bavail * st.f_bsize < required)
+            diskFull = true;
+	}
+#endif
+
+    deleteTmpDir(false);
+
+    /* Move paths out of the chroot for easier debugging of
+       build failures. */
+    if (useChroot && buildMode == bmNormal)
+        for (auto & [_, status] : initialOutputs) {
+            if (!status.known) continue;
+            if (buildMode != bmCheck && status.known->isValid()) continue;
+            auto p = worker.store.printStorePath(status.known->path);
+            if (pathExists(chrootRootDir + p))
+                rename((chrootRootDir + p).c_str(), p.c_str());
+        }
+
+    return diskFull;
+}
+
+
+void LocalDerivationGoal::cleanupPostOutputsRegisteredModeCheck()
+{
+    deleteTmpDir(true);
+}
+
+
+void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
+{
+    /* Delete unused redirected outputs (when doing hash rewriting). */
+    for (auto & i : redirectedOutputs)
+        deletePath(worker.store.Store::toRealPath(i.second));
+
+    /* Delete the chroot (if we were using one). */
+    autoDelChroot.reset(); /* this runs the destructor */
+
+    cleanupPostOutputsRegisteredModeCheck();
+}
+
+
+#if 0
 void DerivationGoal::buildDone()
 {
     trace("build done");
 
-    /* Release the build user at the end of this function. We don't do
-       it right away because we don't want another build grabbing this
-       uid and then messing around with our output. */
-    Finally releaseBuildUser([&]() { buildUser.reset(); });
+    Finally releaseBuildUser([&](){ this->cleanupHookFinally(); });
 
-    sandboxMountNamespace = -1;
+    cleanupPreChildKill();
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = hook ? hook->pid.kill() : pid.kill();
+    int status = getChildStatus();
 
     debug("builder process for '%s' finished", worker.store.printStorePath(drvPath));
 
@@ -840,24 +911,12 @@ void DerivationGoal::buildDone()
     worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
-    if (hook) {
-        hook->builderOut.readSide = -1;
-        hook->fromHook.readSide = -1;
-    } else
-        builderOut.readSide = -1;
+    closeReadPipes();
 
     /* Close the log file. */
     closeLogFile();
 
-    /* When running under a build user, make sure that all processes
-       running under that uid are gone.  This is to prevent a
-       malicious user from leaving behind a process that keeps files
-       open and modifies them after they have been chown'ed to
-       root. */
-    if (buildUser) buildUser->kill();
-
-    /* Terminate the recursive Nix daemon. */
-    stopDaemon();
+    cleanupPostChildKill();
 
     bool diskFull = false;
 
@@ -866,36 +925,7 @@ void DerivationGoal::buildDone()
         /* Check the exit status. */
         if (!statusOk(status)) {
 
-            /* Heuristically check whether the build failure may have
-               been caused by a disk full condition.  We have no way
-               of knowing whether the build actually got an ENOSPC.
-               So instead, check if the disk is (nearly) full now.  If
-               so, we don't mark this build as a permanent failure. */
-#if HAVE_STATVFS
-            if (auto localStore = dynamic_cast<LocalStore *>(&worker.store)) {
-                uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
-                struct statvfs st;
-                if (statvfs(localStore->realStoreDir.c_str(), &st) == 0 &&
-                    (uint64_t) st.f_bavail * st.f_bsize < required)
-                    diskFull = true;
-                if (statvfs(tmpDir.c_str(), &st) == 0 &&
-                    (uint64_t) st.f_bavail * st.f_bsize < required)
-                    diskFull = true;
-            }
-#endif
-
-            deleteTmpDir(false);
-
-            /* Move paths out of the chroot for easier debugging of
-               build failures. */
-            if (useChroot && buildMode == bmNormal)
-                for (auto & [_, status] : initialOutputs) {
-                    if (!status.known) continue;
-                    if (buildMode != bmCheck && status.known->isValid()) continue;
-                    auto p = worker.store.printStorePath(status.known->path);
-                    if (pathExists(chrootRootDir + p))
-                        rename((chrootRootDir + p).c_str(), p.c_str());
-                }
+            diskFull |= cleanupDecideWhetherDiskFull();
 
             auto msg = fmt("builder for '%s' %s",
                 yellowtxt(worker.store.printStorePath(drvPath)),
@@ -975,19 +1005,12 @@ void DerivationGoal::buildDone()
         }
 
         if (buildMode == bmCheck) {
-            deleteTmpDir(true);
+            cleanupPostOutputsRegisteredModeCheck();
             done(BuildResult::Built);
             return;
         }
 
-        /* Delete unused redirected outputs (when doing hash rewriting). */
-        for (auto & i : redirectedOutputs)
-            deletePath(worker.store.Store::toRealPath(i.second));
-
-        /* Delete the chroot (if we were using one). */
-        autoDelChroot.reset(); /* this runs the destructor */
-
-        deleteTmpDir(true);
+        cleanupPostOutputsRegisteredModeNonCheck();
 
         /* Repeat the build if necessary. */
         if (curRound++ < nrRounds) {
@@ -1169,15 +1192,17 @@ HookReply DerivationGoal::tryBuildHook()
 
     return rpAccept;
 }
+#endif
 
 
 int childEntry(void * arg)
 {
-    ((DerivationGoal *) arg)->runChild();
+    ((LocalDerivationGoal *) arg)->runChild();
     return 1;
 }
 
 
+#if 0
 StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
 {
     StorePathSet paths;
@@ -1212,6 +1237,7 @@ StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
 
     return paths;
 }
+#endif
 
 static std::once_flag dns_resolve_flag;
 
@@ -1230,7 +1256,7 @@ static void preloadNSS() {
 }
 
 
-void linkOrCopy(const Path & from, const Path & to)
+static void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
         /* Hard-linking fails if we exceed the maximum link count on a
@@ -1247,7 +1273,7 @@ void linkOrCopy(const Path & from, const Path & to)
 }
 
 
-void DerivationGoal::startBuilder()
+void LocalDerivationGoal::startBuilder()
 {
     /* Right platform? */
     if (!parsedDrv->canBuildLocally(worker.store))
@@ -1285,15 +1311,13 @@ void DerivationGoal::startBuilder()
             useChroot = !(derivationIsImpure(derivationType)) && !noChroot;
     }
 
-    if (auto localStoreP = dynamic_cast<LocalStore *>(&worker.store)) {
-        auto & localStore = *localStoreP;
-        if (localStore.storeDir != localStore.realStoreDir) {
-            #if __linux__
-                useChroot = true;
-            #else
-                throw Error("building using a diverted store is not supported on this platform");
-            #endif
-        }
+    auto & localStore = getLocalStore();
+    if (localStore.storeDir != localStore.realStoreDir) {
+        #if __linux__
+            useChroot = true;
+        #else
+            throw Error("building using a diverted store is not supported on this platform");
+        #endif
     }
 
     /* Create a temporary directory where the build will take
@@ -1850,7 +1874,7 @@ void DerivationGoal::startBuilder()
 }
 
 
-void DerivationGoal::initTmpDir() {
+void LocalDerivationGoal::initTmpDir() {
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
@@ -1899,7 +1923,7 @@ void DerivationGoal::initTmpDir() {
 }
 
 
-void DerivationGoal::initEnv()
+void LocalDerivationGoal::initEnv()
 {
     env.clear();
 
@@ -1960,7 +1984,7 @@ void DerivationGoal::initEnv()
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 
-void DerivationGoal::writeStructuredAttrs()
+void LocalDerivationGoal::writeStructuredAttrs()
 {
     auto structuredAttrs = parsedDrv->getStructuredAttrs();
     if (!structuredAttrs) return;
@@ -2079,9 +2103,9 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 {
     ref<LocalStore> next;
 
-    DerivationGoal & goal;
+    LocalDerivationGoal & goal;
 
-    RestrictedStore(const Params & params, ref<LocalStore> next, DerivationGoal & goal)
+    RestrictedStore(const Params & params, ref<LocalStore> next, LocalDerivationGoal & goal)
         : StoreConfig(params)
         , LocalFSStoreConfig(params)
         , RestrictedStoreConfig(params)
@@ -2256,15 +2280,14 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 };
 
 
-void DerivationGoal::startDaemon()
+void LocalDerivationGoal::startDaemon()
 {
     settings.requireExperimentalFeature("recursive-nix");
 
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
-    if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
-        params["root"] = localStore->rootDir;
+    params["root"] = getLocalStore().rootDir;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
     auto store = make_ref<RestrictedStore>(params,
@@ -2322,7 +2345,7 @@ void DerivationGoal::startDaemon()
 }
 
 
-void DerivationGoal::stopDaemon()
+void LocalDerivationGoal::stopDaemon()
 {
     if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1)
         throw SysError("shutting down daemon socket");
@@ -2340,7 +2363,7 @@ void DerivationGoal::stopDaemon()
 }
 
 
-void DerivationGoal::addDependency(const StorePath & path)
+void LocalDerivationGoal::addDependency(const StorePath & path)
 {
     if (isAllowed(path)) return;
 
@@ -2397,8 +2420,7 @@ void DerivationGoal::addDependency(const StorePath & path)
     }
 }
 
-
-void DerivationGoal::chownToBuilder(const Path & path)
+void LocalDerivationGoal::chownToBuilder(const Path & path)
 {
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
@@ -2469,7 +2491,7 @@ void setupSeccomp()
 }
 
 
-void DerivationGoal::runChild()
+void LocalDerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
@@ -2977,7 +2999,7 @@ void DerivationGoal::runChild()
 }
 
 
-void DerivationGoal::registerOutputs()
+void LocalDerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -2987,14 +3009,8 @@ void DerivationGoal::registerOutputs()
        floating content-addressed derivations this isn't the case.
      */
     if (hook) {
-        bool allValid = true;
-        for (auto & [outputName, outputPath] : worker.store.queryPartialDerivationOutputMap(drvPath)) {
-            if (!outputPath || !worker.store.isValidPath(*outputPath))
-                allValid = false;
-            else
-                finalOutputs.insert_or_assign(outputName, *outputPath);
-        }
-        if (allValid) return;
+        DerivationGoal::registerOutputs();
+        return;
     }
 
     std::map<std::string, ValidPathInfo> infos;
@@ -3349,10 +3365,7 @@ void DerivationGoal::registerOutputs()
             }
         }
 
-        auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-        if (!localStoreP)
-            throw Unsupported("can only register outputs with local store, but this is %s", worker.store.getUri());
-        auto & localStore = *localStoreP;
+        auto & localStore = getLocalStore();
 
         if (buildMode == bmCheck) {
 
@@ -3481,10 +3494,7 @@ void DerivationGoal::registerOutputs()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     {
-        auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-        if (!localStoreP)
-            throw Unsupported("can only register outputs with local store, but this is %s", worker.store.getUri());
-        auto & localStore = *localStoreP;
+        auto & localStore = getLocalStore();
 
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
@@ -3513,7 +3523,7 @@ void DerivationGoal::registerOutputs()
 }
 
 
-void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
+void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 {
     std::map<Path, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
@@ -3678,6 +3688,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 }
 
 
+#if 0
 Path DerivationGoal::openLogFile()
 {
     logSize = 0;
@@ -3720,9 +3731,10 @@ void DerivationGoal::closeLogFile()
     logSink = logFileSink = 0;
     fdLogFile = -1;
 }
+#endif
 
 
-void DerivationGoal::deleteTmpDir(bool force)
+void LocalDerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
         /* Don't keep temporary directories for builtins because they
@@ -3738,10 +3750,17 @@ void DerivationGoal::deleteTmpDir(bool force)
 }
 
 
+bool LocalDerivationGoal::isReadDesc(int fd)
+{
+    return (hook && DerivationGoal::isReadDesc(fd)) ||
+        (!hook && fd == builderOut.readSide.get());
+}
+
+
+#if 0
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
-    if ((hook && fd == hook->builderOut.readSide.get()) ||
-        (!hook && fd == builderOut.readSide.get()))
+    if (isReadDesc(fd))
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
@@ -3855,9 +3874,10 @@ void DerivationGoal::checkPathValidity()
         }
     }
 }
+#endif
 
 
-StorePath DerivationGoal::makeFallbackPath(std::string_view outputName)
+StorePath LocalDerivationGoal::makeFallbackPath(std::string_view outputName)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),
@@ -3865,7 +3885,7 @@ StorePath DerivationGoal::makeFallbackPath(std::string_view outputName)
 }
 
 
-StorePath DerivationGoal::makeFallbackPath(const StorePath & path)
+StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
@@ -3873,6 +3893,7 @@ StorePath DerivationGoal::makeFallbackPath(const StorePath & path)
 }
 
 
+#if 0
 void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
 {
     result.status = status;
@@ -3897,6 +3918,7 @@ void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
 
     worker.updateProgress();
 }
+#endif
 
 
 }

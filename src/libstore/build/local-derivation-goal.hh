@@ -1,48 +1,15 @@
 #pragma once
 
-#include "parsed-derivations.hh"
-#include "lock.hh"
+#include "derivation-goal.hh"
 #include "local-store.hh"
-#include "goal.hh"
 
 namespace nix {
 
-using std::map;
-
-struct HookInstance;
-
-typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
-
-/* Unless we are repairing, we don't both to test validity and just assume it,
-   so the choices are `Absent` or `Valid`. */
-enum struct PathStatus {
-    Corrupt,
-    Absent,
-    Valid,
-};
-
-struct InitialOutputStatus {
-    StorePath path;
-    PathStatus status;
-    /* Valid in the store, and additionally non-corrupt if we are repairing */
-    bool isValid() const {
-        return status == PathStatus::Valid;
-    }
-    /* Merely present, allowed to be corrupt */
-    bool isPresent() const {
-        return status == PathStatus::Corrupt
-            || status == PathStatus::Valid;
-    }
-};
-
-struct InitialOutput {
-    bool wanted;
-    Hash outputHash;
-    std::optional<InitialOutputStatus> known;
-};
-
-struct DerivationGoal : public Goal
+struct LocalDerivationGoal : public DerivationGoal
 {
+    LocalStore & getLocalStore();
+
+#if 0
     /* Whether to use an on-disk .drv file. */
     bool useDerivation;
 
@@ -78,6 +45,7 @@ struct DerivationGoal : public Goal
     StorePathSet inputPaths;
 
     std::map<std::string, InitialOutput> initialOutputs;
+#endif
 
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
@@ -91,6 +59,7 @@ struct DerivationGoal : public Goal
     /* The path of the temporary directory in the sandbox. */
     Path tmpDirInSandbox;
 
+#if 0
     /* File descriptor for the log file. */
     AutoCloseFD fdLogFile;
     std::shared_ptr<BufferedSink> logFileSink, logSink;
@@ -105,6 +74,7 @@ struct DerivationGoal : public Goal
     size_t currentLogLinePos = 0; // to handle carriage return
 
     std::string currentHookLine;
+#endif
 
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
@@ -120,8 +90,10 @@ struct DerivationGoal : public Goal
        namespace. */
     bool usingUserNamespace = true;
 
+#if 0
     /* The build hook. */
     std::unique_ptr<HookInstance> hook;
+#endif
 
     /* Whether we're currently doing a chroot build. */
     bool useChroot = false;
@@ -131,14 +103,18 @@ struct DerivationGoal : public Goal
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 
+#if 0
     /* The sort of derivation we are building. */
     DerivationType derivationType;
+#endif
 
     /* Whether to run the build in a private network namespace. */
     bool privateNetwork = false;
 
+#if 0
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
+#endif
 
     /* Stuff we need to pass to initChild(). */
     struct ChrootPath {
@@ -179,6 +155,7 @@ struct DerivationGoal : public Goal
      */
     OutputPathMap scratchOutputs;
 
+#if 0
     /* The final output paths of the build.
 
        - For input-addressed derivations, always the precomputed paths
@@ -190,18 +167,21 @@ struct DerivationGoal : public Goal
     OutputPathMap finalOutputs;
 
     BuildMode buildMode;
+#endif
 
     /* If we're repairing without a chroot, there may be outputs that
        are valid but corrupt.  So we redirect these outputs to
        temporary paths. */
     StorePathSet redirectedBadOutputs;
 
+#if 0
     BuildResult result;
 
     /* The current round, if we're building multiple times. */
     size_t curRound = 1;
 
     size_t nrRounds;
+#endif
 
     /* Path registration info from the previous round, if we're
        building multiple times. Since this contains the hash, it
@@ -214,6 +194,7 @@ struct DerivationGoal : public Goal
 
     const static Path homeDir;
 
+#if 0
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
 
     std::unique_ptr<Activity> act;
@@ -225,6 +206,7 @@ struct DerivationGoal : public Goal
 
     /* The remote machine on which we're building. */
     std::string machineName;
+#endif
 
     /* The recursive Nix daemon socket. */
     AutoCloseFD daemonSocket;
@@ -249,17 +231,14 @@ struct DerivationGoal : public Goal
 
     friend struct RestrictedStore;
 
-    DerivationGoal(const StorePath & drvPath,
-        const StringSet & wantedOutputs, Worker & worker,
-        BuildMode buildMode = bmNormal);
-    DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const StringSet & wantedOutputs, Worker & worker,
-        BuildMode buildMode = bmNormal);
-    ~DerivationGoal();
+    using DerivationGoal::DerivationGoal;
+
+    virtual ~LocalDerivationGoal() override;
 
     /* Whether we need to perform hash rewriting if there are valid output paths. */
     bool needsHashRewrite();
 
+#if 0
     void timedOut(Error && ex) override;
 
     string key() override;
@@ -280,13 +259,16 @@ struct DerivationGoal : public Goal
     void closureRepaired();
     void inputsRealised();
     void tryToBuild();
-    void tryLocalBuild();
+#endif
+    void tryLocalBuild() override;
+#if 0
     void buildDone();
 
     void resolvedFinished();
 
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
+#endif
 
     /* Start building a derivation. */
     void startBuilder();
@@ -311,27 +293,46 @@ struct DerivationGoal : public Goal
     /* Make a file owned by the builder. */
     void chownToBuilder(const Path & path);
 
+    int getChildStatus() override;
+
     /* Run the builder's process. */
     void runChild();
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    void registerOutputs();
+    void registerOutputs() override;
 
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy
        '{allowed,disallowed}{References,Requisites}' attributes). */
     void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
 
+#if 0
     /* Open a log file and a pipe to it. */
     Path openLogFile();
 
     /* Close the log file. */
     void closeLogFile();
+#endif
+
+    /* Close the read side of the logger pipe. */
+    void closeReadPipes() override;
+
+    /* Cleanup hooks for buildDone() */
+    void cleanupHookFinally() override;
+    void cleanupPreChildKill() override;
+    void cleanupPostChildKill() override;
+    bool cleanupDecideWhetherDiskFull() override;
+    void cleanupPostOutputsRegisteredModeCheck() override;
+    void cleanupPostOutputsRegisteredModeNonCheck() override;
+
+    bool isReadDesc(int fd) override;
+
 
     /* Delete the temporary directory, if we have one. */
     void deleteTmpDir(bool force);
 
+#if 0
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
@@ -345,9 +346,10 @@ struct DerivationGoal : public Goal
 
     /* Return the set of (in)valid paths. */
     void checkPathValidity();
+#endif
 
     /* Forcibly kill the child process, if any. */
-    void killChild();
+    void killChild() override;
 
     /* Create alternative path calculated from but distinct from the
        input, so we can avoid overwriting outputs (or other store paths)
@@ -359,6 +361,7 @@ struct DerivationGoal : public Goal
        rewrites caught everything */
     StorePath makeFallbackPath(std::string_view outputName);
 
+#if 0
     void repairClosure();
 
     void started();
@@ -368,6 +371,7 @@ struct DerivationGoal : public Goal
         std::optional<Error> ex = {});
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
+#endif
 };
 
 }
