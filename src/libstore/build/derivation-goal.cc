@@ -1147,13 +1147,13 @@ HookReply DerivationGoal::tryBuildHook()
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
     {
-        StorePathSet missingPaths;
-        for (auto & [_, status] : initialOutputs) {
-            if (!status.known) continue;
-            if (buildMode != bmCheck && status.known->isValid()) continue;
-            missingPaths.insert(status.known->path);
+        StringSet missingOutputs;
+        for (auto & [outputName, status] : initialOutputs) {
+            // XXX: Does this include known CA outputs?
+            if (buildMode != bmCheck && status.known && status.known->isValid()) continue;
+            missingOutputs.insert(outputName);
         }
-        worker_proto::write(worker.store, hook->sink, missingPaths);
+        worker_proto::write(worker.store, hook->sink, missingOutputs);
     }
 
     hook->sink = FdSink();
@@ -2988,11 +2988,11 @@ void DerivationGoal::registerOutputs()
      */
     if (hook) {
         bool allValid = true;
-        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
-            if (!i.second.second || !worker.store.isValidPath(*i.second.second))
+        for (auto & [outputName, outputPath] : worker.store.queryPartialDerivationOutputMap(drvPath)) {
+            if (!outputPath || !worker.store.isValidPath(*outputPath))
                 allValid = false;
             else
-                finalOutputs.insert_or_assign(i.first, *i.second.second);
+                finalOutputs.insert_or_assign(outputName, *outputPath);
         }
         if (allValid) return;
     }
