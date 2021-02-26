@@ -283,7 +283,7 @@ connected:
 
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
