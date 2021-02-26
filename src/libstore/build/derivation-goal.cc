@@ -1164,7 +1164,6 @@ HookReply DerivationGoal::tryBuildHook()
             // XXX: Does this include known CA outputs?
             if (buildMode != bmCheck && status.known && status.known->isValid()) continue;
             missingOutputs.insert(outputName);
-            /* missingPaths.insert(status.known->path); */
         }
         worker_proto::write(worker.store, hook->sink, missingOutputs);
     }
