@@ -259,10 +259,8 @@ void DerivationGoal::loadDerivation()
 
     assert(worker.store.isValidPath(drvPath));
 
-    auto fullDrv = new Derivation(worker.store.derivationFromPath(drvPath));
-
     /* Get the derivation. */
-    drv = std::unique_ptr<Derivation>(fullDrv);
+    drv = std::make_unique<Derivation>(worker.store.derivationFromPath(drvPath));
 
     haveDerivation();
 }
