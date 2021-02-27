@@ -19,6 +19,14 @@ void Args::addFlag(Flag && flag_)
     if (flag->shortName) shortFlags[flag->shortName] = flag;
 }
 
+void Args::removeFlag(const std::string & longName)
+{
+    auto flag = longFlags.find(longName);
+    assert(flag != longFlags.end());
+    if (flag->second->shortName) shortFlags.erase(flag->second->shortName);
+    longFlags.erase(flag);
+}
+
 void Completions::add(std::string completion, std::string description)
 {
     assert(description.find('\n') == std::string::npos);
