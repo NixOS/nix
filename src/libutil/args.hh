@@ -140,6 +140,8 @@ public:
 
     void addFlag(Flag && flag);
 
+    void removeFlag(const std::string & longName);
+
     void expectArgs(ExpectedArg && arg)
     {
         expectedArgs.emplace_back(std::move(arg));
