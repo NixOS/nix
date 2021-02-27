@@ -814,6 +814,37 @@ void copyOrBuildStorePath(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set & paths,
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl)
+{
+    StorePathSet storePaths;
+    std::set<Realisation> realisations;
+    for (auto & path : paths) {
+        storePaths.insert(path.path());
+        if (auto realisation = std::get_if<Realisation>(&path.raw)) {
+            settings.requireExperimentalFeature("ca-derivations");
+            realisations.insert(*realisation);
+        }
+    }
+    auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute, copyStorePathImpl);
+    try {
+        for (auto & realisation : realisations) {
+            dstStore->registerDrvOutput(realisation);
+        }
+    } catch (MissingExperimentalFeature & e) {
+        // Don't fail if the remote doesn't support CA derivations is it might
+        // not be within our control to change that, and we might still want
+        // to at least copy the output paths.
+        if (e.missingFeature == "ca-derivations")
+            ignoreException();
+        else
+            throw;
+    }
+
+    return pathsMap;
+}
+
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute,
     std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl)
@@ -828,7 +859,6 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     for (auto & path : storePaths)
         pathsMap.insert_or_assign(path, path);
 
-    if (missing.empty()) return pathsMap;
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
@@ -903,20 +933,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             nrDone++;
             showProgress();
         });
-
     return pathsMap;
 }
-
-
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths, RepairFlag repair, CheckSigsFlag checkSigs,
-    SubstituteFlag substitute)
-{
-    StorePathSet closure;
-    srcStore->computeFSClosure(storePaths, closure);
-    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
-}
-
 
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {

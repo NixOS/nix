@@ -17,6 +17,8 @@ nix_tests = \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
+  build-remote-content-addressed-fixed.sh \
+  build-remote-content-addressed-floating.sh \
   build-remote-trustless-should-pass-1.sh \
   build-remote-trustless-should-pass-2.sh \
   build-remote-trustless-should-fail-0.sh \
@@ -41,6 +43,7 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   content-addressed.sh \
+  nix-copy-content-addressed.sh \
   build.sh \
   compute-levels.sh
   # parallel.sh

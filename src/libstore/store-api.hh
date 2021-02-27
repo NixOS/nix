@@ -162,6 +162,8 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
+    DrvOutputs builtOutputs;
+
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */
     time_t startTime = 0, stopTime = 0;
@@ -769,19 +771,17 @@ void copyOrBuildStorePath(ref<Store> srcStore, ref<Store> dstStore,
    isn't just the default that way `nix copy` etc. still can be relied upon to
    not build anything. */
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths,
+    const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute,
     std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl = copyStorePathAdapter);
-
-
-/* Copy the closure of the specified paths from one store to another. */
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths,
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const StorePathSet& paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
+    SubstituteFlag substitute = NoSubstitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl = copyStorePathAdapter);
 
 
 /* Remove the temporary roots file for this process.  Any temporary
