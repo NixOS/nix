@@ -103,17 +103,21 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const Store & store, Worke
 {
     BuildResult res;
     res.status = (BuildResult::Status) readInt(conn.from);
-    conn.from
-        >> res.errorMsg
-        >> res.timesBuilt
-        >> res.isNonDeterministic
-        >> res.startTime
-        >> res.stopTime;
-    auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
-    for (auto && [output, realisation] : builtOutputs)
-        res.builtOutputs.insert_or_assign(
-            std::move(output.outputName),
-            std::move(realisation));
+    conn.from >> res.errorMsg;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
+        conn.from
+            >> res.timesBuilt
+            >> res.isNonDeterministic
+            >> res.startTime
+            >> res.stopTime;
+    }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
+        for (auto && [output, realisation] : builtOutputs)
+            res.builtOutputs.insert_or_assign(
+                std::move(output.outputName),
+                std::move(realisation));
+    }
     return res;
 }
 
@@ -121,15 +125,20 @@ void WorkerProto::Serialise<BuildResult>::write(const Store & store, WorkerProto
 {
     conn.to
         << res.status
-        << res.errorMsg
-        << res.timesBuilt
-        << res.isNonDeterministic
-        << res.startTime
-        << res.stopTime;
-    DrvOutputs builtOutputs;
-    for (auto & [output, realisation] : res.builtOutputs)
-        builtOutputs.insert_or_assign(realisation.id, realisation);
-    WorkerProto::write(store, conn, builtOutputs);
+        << res.errorMsg;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
+        conn.to
+            << res.timesBuilt
+            << res.isNonDeterministic
+            << res.startTime
+            << res.stopTime;
+    }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+        DrvOutputs builtOutputs;
+        for (auto & [output, realisation] : res.builtOutputs)
+            builtOutputs.insert_or_assign(realisation.id, realisation);
+        WorkerProto::write(store, conn, builtOutputs);
+    }
 }
 
 

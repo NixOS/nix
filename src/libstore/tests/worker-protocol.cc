@@ -167,9 +167,77 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    buildResult,
-    "build-result",
-    defaultVersion,
+    buildResult_1_27,
+    "build-result-1.27",
+    1 << 8 | 27,
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t {
+            BuildResult {
+                .status = BuildResult::OutputRejected,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::NotDeterministic,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::Built,
+            },
+        };
+        t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_28,
+    "build-result-1.28",
+    1 << 8 | 28,
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t {
+            BuildResult {
+                .status = BuildResult::OutputRejected,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::NotDeterministic,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::Built,
+                .builtOutputs = {
+                    {
+                        "foo",
+                        {
+                            .id = DrvOutput {
+                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                .outputName = "foo",
+                            },
+                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+                        },
+                    },
+                    {
+                        "bar",
+                        {
+                            .id = DrvOutput {
+                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                .outputName = "bar",
+                            },
+                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar" },
+                        },
+                    },
+                },
+            },
+        };
+        t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_29,
+    "build-result-1.29",
+    1 << 8 | 29,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t {
@@ -226,9 +294,9 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    keyedBuildResult,
-    "keyed-build-result",
-    defaultVersion,
+    keyedBuildResult_1_29,
+    "keyed-build-result-1.29",
+    1 << 8 | 29,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<KeyedBuildResult, KeyedBuildResult/*, KeyedBuildResult*/> t {

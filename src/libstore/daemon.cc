@@ -635,16 +635,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
-        to << res.status << res.errorMsg;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
-            to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
-        }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
-            DrvOutputs builtOutputs;
-            for (auto & [output, realisation] : res.builtOutputs)
-                builtOutputs.insert_or_assign(realisation.id, realisation);
-            WorkerProto::write(*store, wconn, builtOutputs);
-        }
+        WorkerProto::write(*store, wconn, res);
         break;
     }
 
