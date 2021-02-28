@@ -574,13 +574,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
-        to << res.status << res.errorMsg;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
-            to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
-        }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
-            worker_proto::write(*store, to, res.builtOutputs);
-        }
+        if (GET_PROTOCOL_MINOR(clientVersion) < 29) {
+            to << res.status << res.errorMsg;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
+                worker_proto::write(*store, to, res.builtOutputs);
+            }
+        } else
+            worker_proto::write(*store, to, res);
         break;
     }
 
