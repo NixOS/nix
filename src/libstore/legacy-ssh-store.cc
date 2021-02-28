@@ -253,14 +253,15 @@ public:
         conn->to.flush();
 
         BuildResult status;
-        status.status = (BuildResult::Status) readInt(conn->from);
-        conn->from >> status.errorMsg;
 
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
-        }
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) < 6) {
+            status.status = (BuildResult::Status) readInt(conn->from);
+            conn->from >> status.errorMsg;
+
+            if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
+                conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
+        } else
+            status = worker_proto::read(*this, conn->from, Phantom<BuildResult> {});
         return status;
     }
 
