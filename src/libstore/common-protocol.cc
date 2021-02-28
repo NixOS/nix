@@ -107,5 +107,33 @@ void write(const Store & store, WriteConn conn, const std::optional<ContentAddre
     conn.to << (caOpt ? renderContentAddress(*caOpt) : "");
 }
 
+// Helpers for downstream
+
+BuildResult read0(const Store & store, ReadConn conn, Phantom<BuildResult> _)
+{
+    BuildResult res;
+    res.status = (BuildResult::Status) readInt(conn.from);
+    conn.from
+        >> res.errorMsg
+        >> res.timesBuilt
+        >> res.isNonDeterministic
+        >> res.startTime
+        >> res.stopTime;
+    res.builtOutputs = read(store, conn, Phantom<DrvOutputs> {});
+    return res;
+}
+
+void write0(const Store & store, WriteConn conn, const BuildResult & res)
+{
+    conn.to
+        << res.status
+        << res.errorMsg
+        << res.timesBuilt
+        << res.isNonDeterministic
+        << res.startTime
+        << res.stopTime;
+    write(store, conn, res.builtOutputs);
+}
+
 }
 }

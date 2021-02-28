@@ -297,16 +297,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult status;
-        status.status = (BuildResult::Status) readInt(conn->from);
-        conn->from >> status.errorMsg;
-
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            status.builtOutputs = serve_proto::read(*this, *conn, Phantom<DrvOutputs> {});
-        }
-        return status;
+        return serve_proto::read(*this, *conn, Phantom<BuildResult> {});
     }
 
     void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override

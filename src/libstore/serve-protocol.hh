@@ -28,6 +28,9 @@ typedef enum {
 class Store;
 struct Source;
 
+// items being serialized
+struct BuildResult;
+
 
 namespace serve_proto {
 
@@ -44,6 +47,8 @@ struct WriteConn : common_proto::WriteConn {
     unsigned int version;
 };
 
+MAKE_PROTO(, BuildResult);
+
 MAKE_PROTO(template<typename T>, std::vector<T>);
 MAKE_PROTO(template<typename T>, std::set<T>);
 
@@ -52,8 +57,6 @@ MAKE_PROTO(template<typename T>, std::set<T>);
 MAKE_PROTO(X_, Y_);
 #undef X_
 #undef Y_
-
-/* These are a non-standard form for historical reasons. */
 
 }
 

@@ -62,6 +62,12 @@ MAKE_PROTO(X_, Y_);
 MAKE_PROTO(, std::optional<StorePath>);
 MAKE_PROTO(, std::optional<ContentAddress>);
 
+/* N suffix indicates this is the nth version of them in common. Wrapped downstream
+   by protocol-specific functions which handle the previous versions too. */
+
+BuildResult read0(const Store & store, ReadConn conn, Phantom<BuildResult> _);
+void write0(const Store & store, WriteConn conn, const BuildResult & res);
+
 }
 
 }

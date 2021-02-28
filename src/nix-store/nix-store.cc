@@ -921,14 +921,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 MonitorFdHup monitor(in.fd);
                 auto status = store->buildDerivation(drvPath, drv);
 
-                out << status.status << status.errorMsg;
-
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
-                    out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
-                    serve_proto::write(*store, wconn, status.builtOutputs);
-                }
-
+                serve_proto::write(*store, wconn, status);
 
                 break;
             }

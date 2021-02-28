@@ -33,29 +33,28 @@ void write(const Store & store, WriteConn conn, const KeyedBuildResult & res)
 
 BuildResult read(const Store & store, ReadConn conn, Phantom<BuildResult> _)
 {
-    auto path = worker_proto::read(store, conn, Phantom<DerivedPath> {});
-    BuildResult res;
-    res.status = (BuildResult::Status) readInt(conn.from);
-    conn.from
-        >> res.errorMsg
-        >> res.timesBuilt
-        >> res.isNonDeterministic
-        >> res.startTime
-        >> res.stopTime;
-    res.builtOutputs = read(store, conn, Phantom<DrvOutputs> {});
-    return res;
+    if (GET_PROTOCOL_MINOR(conn.version) < 29) {
+        BuildResult res;
+        res.status = (BuildResult::Status) readInt(conn.from);
+        conn.from >> res.errorMsg;
+        if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+            auto builtOutputs = read(store, conn, Phantom<DrvOutputs> {});
+            res.builtOutputs = builtOutputs;
+        }
+        return res;
+    } else
+        return read0(store, conn, Phantom<BuildResult>{});
 }
 
 void write(const Store & store, WriteConn conn, const BuildResult & res)
 {
-    conn.to
-        << res.status
-        << res.errorMsg
-        << res.timesBuilt
-        << res.isNonDeterministic
-        << res.startTime
-        << res.stopTime;
-    write(store, conn, res.builtOutputs);
+    if (GET_PROTOCOL_MINOR(conn.version) < 29) {
+        conn.to << res.status << res.errorMsg;
+        if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+            write(store, conn, res.builtOutputs);
+        }
+    } else
+        write0(store, conn, res);
 }
 
 
