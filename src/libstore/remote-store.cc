@@ -679,7 +679,7 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
 }
 
 
-void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+std::map<StorePath, BuildResult> RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
     auto conn(getConnection());
     conn->to << wopBuildPaths;
@@ -696,7 +696,11 @@ void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths,
         if (buildMode != bmNormal)
             throw Error("repairing or checking is not supported when building through the Nix daemon");
     conn.processStderr();
+    std::map<StorePath, BuildResult> res;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 30)
+        res = worker_proto::read(*this, conn->from, Phantom<std::map<StorePath, BuildResult>>{});
     readInt(conn->from);
+    return res;
 }
 
 

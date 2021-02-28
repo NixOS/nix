@@ -265,7 +265,7 @@ public:
         return status;
     }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    std::map<StorePath, BuildResult> buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
     {
         auto conn(connections->get());
 
@@ -279,6 +279,10 @@ public:
 
         conn->to.flush();
 
+        std::map<StorePath, BuildResult> res;
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 7)
+            res = worker_proto::read(*this, conn->from, Phantom<std::map<StorePath, BuildResult>>{});
+
         BuildResult result;
         result.status = (BuildResult::Status) readInt(conn->from);
 
@@ -286,6 +290,8 @@ public:
             conn->from >> result.errorMsg;
             throw Error(result.status, result.errorMsg);
         }
+
+        return res;
     }
 
     void ensurePath(const StorePath & path) override

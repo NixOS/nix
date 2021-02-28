@@ -879,7 +879,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 try {
                     MonitorFdHup monitor(in.fd);
-                    store->buildPaths(paths);
+                    auto res = store->buildPaths(paths);
+                    if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
+                        worker_proto::write(*store, out, res);
                     out << 0;
                 } catch (Error & e) {
                     assert(e.status);

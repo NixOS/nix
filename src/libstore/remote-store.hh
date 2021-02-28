@@ -85,7 +85,7 @@ public:
 
     std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
+    std::map<StorePath, BuildResult> buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
