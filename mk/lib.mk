@@ -31,7 +31,6 @@ libdir ?= $(prefix)/lib
 bindir ?= $(prefix)/bin
 libexecdir ?= $(prefix)/libexec
 datadir ?= $(prefix)/share
-jardir ?= $(datadir)/java
 localstatedir ?= $(prefix)/var
 sysconfdir ?= $(prefix)/etc
 mandir ?= $(prefix)/share/man
@@ -74,7 +73,6 @@ BUILD_DEBUG ?= 1
 ifeq ($(BUILD_DEBUG), 1)
   GLOBAL_CFLAGS += -g
   GLOBAL_CXXFLAGS += -g
-  GLOBAL_JAVACFLAGS += -g
 endif
 
 
@@ -84,7 +82,6 @@ include mk/clean.mk
 include mk/install.mk
 include mk/libraries.mk
 include mk/programs.mk
-include mk/jars.mk
 include mk/patterns.mk
 include mk/templates.mk
 include mk/tests.mk
@@ -102,7 +99,6 @@ $(foreach mf, $(makefiles), $(eval $(call include-sub-makefile, $(mf))))
 # Instantiate stuff.
 $(foreach lib, $(libraries), $(eval $(call build-library,$(lib))))
 $(foreach prog, $(programs), $(eval $(call build-program,$(prog))))
-$(foreach jar, $(jars), $(eval $(call build-jar,$(jar))))
 $(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(bindir))))
 $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
 $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
@@ -113,7 +109,7 @@ $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/
 
 .PHONY: default all man help
 
-all: $(programs-list) $(libs-list) $(jars-list) $(man-pages)
+all: $(programs-list) $(libs-list) $(man-pages)
 
 man: $(man-pages)
 
@@ -137,12 +133,6 @@ ifdef libs-list
 	@echo "The following libraries can be built:"
 	@echo ""
 	@for i in $(libs-list); do echo "  $$i"; done
-endif
-ifdef jars-list
-	@echo ""
-	@echo "The following JARs can be built:"
-	@echo ""
-	@for i in $(jars-list); do echo "  $$i"; done
 endif
 	@echo ""
 	@echo "The following variables control the build:"
