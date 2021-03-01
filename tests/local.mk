@@ -38,11 +38,10 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
-  content-addressed.sh \
-  nix-copy-content-addressed.sh \
-  build.sh \
-  build-floating-ca-output.sh \
-  compute-levels.sh
+  new-cli/build/ia.sh \
+  new-cli/build/ca-float.sh \
+  ca/build.sh \
+  ca/nix-copy.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

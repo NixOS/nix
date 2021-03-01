@@ -1,4 +1,4 @@
-with import ./config.nix;
+with import ../config.nix;
 
 { seed ? 0 }:
 # A simple content-addressed derivation.

@@ -1,8 +1,6 @@
 source common.sh
 
-sed -i 's/experimental-features .*/& ca-derivations/' "$NIX_CONF_DIR"/nix.conf
-
-nix build -f multiple-outputs.nix --arg floatingCA true --json a.all b.all | jq --exit-status '
+nix build -f ../multiple-outputs.nix --json a.all b.all | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-a.drv")) and
     (.outputs |
