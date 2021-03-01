@@ -11,7 +11,7 @@ export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
-export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/daemon-socket
+export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
 unset NIX_USER_CONF_FILES
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
