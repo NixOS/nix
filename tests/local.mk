@@ -41,6 +41,7 @@ nix_tests = \
   content-addressed.sh \
   nix-copy-content-addressed.sh \
   build.sh \
+  build-floating-ca-output.sh \
   compute-levels.sh
   # parallel.sh
 
