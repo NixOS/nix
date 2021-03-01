@@ -143,4 +143,5 @@ endif
 	@echo "  CFLAGS: Flags for the C compiler"
 	@echo "  CXX ($(CXX)): C++ compiler to be used"
 	@echo "  CXXFLAGS: Flags for the C++ compiler"
+	@echo "  CPPFLAGS: C preprocessor flags, used for both CC and CXX"
 	@$(print-var-help)
