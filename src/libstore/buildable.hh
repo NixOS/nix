@@ -2,6 +2,7 @@
 
 #include "util.hh"
 #include "path.hh"
+#include "path.hh"
 
 #include <optional>
 
@@ -13,19 +14,37 @@ class Store;
 
 struct BuildableOpaque {
     StorePath path;
+
     nlohmann::json toJSON(ref<Store> store) const;
+    std::string to_string(const Store & store) const;
+    static BuildableOpaque parse(const Store & store, std::string_view);
 };
 
-struct BuildableFromDrv {
+template<typename Outputs>
+struct BuildableForFromDrv {
     StorePath drvPath;
-    std::map<std::string, std::optional<StorePath>> outputs;
+    Outputs outputs;
+
     nlohmann::json toJSON(ref<Store> store) const;
+    std::string to_string(const Store & store) const;
+    static BuildableForFromDrv<Outputs> parse(const Store & store, std::string_view);
 };
 
-typedef std::variant<
+template <typename Outputs>
+using BuildableFor = std::variant<
     BuildableOpaque,
-    BuildableFromDrv
-> Buildable;
+    BuildableForFromDrv<Outputs>
+>;
+
+typedef BuildableForFromDrv<std::set<std::string>> BuildableReqFromDrv;
+typedef BuildableFor<std::set<std::string>> BuildableReq;
+
+std::string to_string(const Store & store, const BuildableReq &);
+
+BuildableReq parseBuildableReq(const Store & store, std::string_view);
+
+typedef BuildableForFromDrv<std::map<std::string, std::optional<StorePath>>> BuildableFromDrv;
+typedef BuildableFor<std::map<std::string, std::optional<StorePath>>> Buildable;
 
 typedef std::vector<Buildable> Buildables;
 

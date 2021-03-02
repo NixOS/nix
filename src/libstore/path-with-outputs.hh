@@ -1,6 +1,9 @@
 #pragma once
 
+#include <variant>
+
 #include "path.hh"
+#include "buildable.hh"
 
 namespace nix {
 
@@ -10,7 +13,13 @@ struct StorePathWithOutputs
     std::set<std::string> outputs;
 
     std::string to_string(const Store & store) const;
+
+    BuildableReq toBuildableReq() const;
+
+    static std::variant<StorePathWithOutputs, StorePath> tryFromBuildableReq(const BuildableReq &);
 };
+
+std::vector<BuildableReq> toBuildableReqs(const std::vector<StorePathWithOutputs>);
 
 std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 

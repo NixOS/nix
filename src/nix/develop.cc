@@ -3,6 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "derivations.hh"
 #include "affinity.hh"
 #include "progress-bar.hh"
@@ -159,7 +160,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     auto shellDrvPath = writeDerivation(*store, drv);
 
     /* Build the derivation. */
-    store->buildPaths({{shellDrvPath}});
+    store->buildPaths({BuildableReqFromDrv{shellDrvPath}});
 
     for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
         auto & [_1, optPath] = outputAndOptPath;

@@ -679,19 +679,20 @@ Buildables build(ref<Store> store, Realise mode,
 
     Buildables buildables;
 
-    std::vector<StorePathWithOutputs> pathsToBuild;
+    std::vector<BuildableReq> pathsToBuild;
 
     for (auto & i : installables) {
         for (auto & b : i->toBuildables()) {
             std::visit(overloaded {
                 [&](BuildableOpaque bo) {
-                    pathsToBuild.push_back({bo.path});
+                    pathsToBuild.push_back(bo);
                 },
                 [&](BuildableFromDrv bfd) {
                     StringSet outputNames;
                     for (auto & output : bfd.outputs)
                         outputNames.insert(output.first);
-                    pathsToBuild.push_back({bfd.drvPath, outputNames});
+                    pathsToBuild.push_back(
+                        BuildableReqFromDrv{bfd.drvPath, outputNames});
                 },
             }, b);
             buildables.push_back(std::move(b));

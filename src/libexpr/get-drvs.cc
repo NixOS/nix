@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 
 #include <cstring>
 #include <regex>
