@@ -20,17 +20,17 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 }
 
 
-StorePathWithOutputs Store::parsePathWithOutputs(const std::string & s)
+StorePathWithOutputs parsePathWithOutputs(const Store & store, std::string_view pathWithOutputs)
 {
-    auto [path, outputs] = nix::parsePathWithOutputs(s);
-    return {parseStorePath(path), std::move(outputs)};
+    auto [path, outputs] = parsePathWithOutputs(pathWithOutputs);
+    return StorePathWithOutputs { store.parseStorePath(path), std::move(outputs) };
 }
 
 
-StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
+StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs)
 {
-    auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
+    auto [path, outputs] = parsePathWithOutputs(pathWithOutputs);
+    return StorePathWithOutputs { store.followLinksToStorePath(path), std::move(outputs) };
 }
 
 }

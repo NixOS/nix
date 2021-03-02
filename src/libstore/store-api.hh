@@ -262,11 +262,6 @@ public:
 
     PathSet printStorePathSet(const StorePathSet & path) const;
 
-    /* Split a string specifying a derivation and a set of outputs
-       (/nix/store/hash-foo!out1,out2,...) into the derivation path
-       and the outputs. */
-    StorePathWithOutputs parsePathWithOutputs(const string & s);
-
     /* Display a set of paths in human-readable form (i.e., between quotes
        and separated by commas). */
     std::string showPaths(const StorePathSet & paths);
@@ -289,8 +284,6 @@ public:
     /* Same as followLinksToStore(), but apply toStorePath() to the
        result. */
     StorePath followLinksToStorePath(std::string_view path) const;
-
-    StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
     StorePath makeStorePath(std::string_view type,

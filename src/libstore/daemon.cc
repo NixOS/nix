@@ -495,7 +495,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopBuildPaths: {
         std::vector<StorePathWithOutputs> drvs;
         for (auto & s : readStrings<Strings>(from))
-            drvs.push_back(store->parsePathWithOutputs(s));
+            drvs.push_back(parsePathWithOutputs(*store, s));
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -861,7 +861,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQueryMissing: {
         std::vector<StorePathWithOutputs> targets;
         for (auto & s : readStrings<Strings>(from))
-            targets.push_back(store->parsePathWithOutputs(s));
+            targets.push_back(parsePathWithOutputs(*store, s));
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;

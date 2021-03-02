@@ -128,7 +128,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     std::vector<StorePathWithOutputs> paths;
     for (auto & i : opArgs)
-        paths.push_back(store->followLinksToStorePathWithOutputs(i));
+        paths.push_back(followLinksToStorePathWithOutputs(*store, i));
 
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
@@ -873,7 +873,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 std::vector<StorePathWithOutputs> paths;
                 for (auto & s : readStrings<Strings>(in))
-                    paths.push_back(store->parsePathWithOutputs(s));
+                    paths.push_back(parsePathWithOutputs(*store, s));
 
                 getBuildSettings();
 
