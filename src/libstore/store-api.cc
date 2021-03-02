@@ -53,13 +53,6 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 }
 
 
-StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
-{
-    auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
-}
-
-
 /* Store paths have the following form:
 
    <realized-path> = <store>/<h>-<name>

@@ -2,6 +2,7 @@
 
 #include "util.hh"
 #include "path.hh"
+#include "path-with-outputs.hh"
 #include "buildable.hh"
 #include "eval.hh"
 #include "flake/flake.hh"
