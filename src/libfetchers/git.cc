@@ -5,9 +5,11 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
+#include "util.hh"
 
 #include "fetch-settings.hh"
 
+#include <regex>
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -19,7 +21,7 @@ namespace nix::fetchers {
 // The value itself does not matter, since we always fetch a specific revision or branch.
 // It is set with `-c init.defaultBranch=` instead of `--initial-branch=` to stay compatible with
 // old version of git, which will ignore unrecognized `-c` options.
-const std::string gitInitialBranch = "__nix_dummy_branch";
+static const std::string gitInitialBranch = "__nix_dummy_branch";
 
 static std::string getGitDir()
 {
@@ -30,9 +32,92 @@ static std::string getGitDir()
     return *gitDir;
 }
 
-static std::string readHead(const Path & path)
+static bool isCacheFileWithinTtl(const time_t now, const struct stat& st) {
+    return st.st_mtime + settings.tarballTtl > now;
+}
+
+static Path getCachePath(std::string key) {
+    return getCacheDir() + "/nix/gitv3/" +
+        hashString(htSHA256, key).to_string(Base32, false);
+}
+
+// Returns the name of the HEAD branch.
+//
+// Returns the head branch name as reported by git ls-remote --symref, e.g., if
+// ls-remote returns the output below, "main" is returned based on the ref line.
+//
+//   ref: refs/heads/main       HEAD
+//   ...
+static std::optional<std::string> readHead(const Path & path)
 {
-    return chomp(runProgram("git", true, { "-C", path, "--git-dir", ".git", "rev-parse", "--abbrev-ref", "HEAD" }));
+    auto [exit_code, output] = runProgram(RunOptions {
+        .program = "git",
+        .args = {"ls-remote", "--symref", path},
+    });
+    if (exit_code != 0) {
+      return std::nullopt;
+    }
+
+    // Matches the common case when HEAD points to a branch, e.g.:
+    //   "ref: refs/heads/main  HEAD".
+    const static std::regex head_ref_regex("^ref:\\s*([^\\s]+)\\s*HEAD$");
+    // Matches when HEAD points directly at a commit, e.g.:
+    //   "71abcd...  HEAD".
+    const static std::regex head_rev_regex("^([^\\s]+)\\s*HEAD$");
+
+    for (const auto & line : tokenizeString<std::vector<std::string>>(output, "\n")) {
+        std::smatch match;
+        if (std::regex_match(line, match, head_ref_regex)) {
+            debug("resolved HEAD ref '%s' for repo '%s'", match[1], path);
+            return match[1];
+        } else if (std::regex_match(line, match, head_rev_regex)) {
+            debug("resolved HEAD ref '%s' for repo '%s'", match[1], path);
+            return match[1];
+        }
+    }
+
+    return std::nullopt;
+}
+
+static std::optional<std::string> readHeadCached(std::string actualUrl)
+{
+    // Create a cache path to store the branch of the HEAD ref. Append something
+    // in front of the URL to prevent collision with the repository itself.
+    Path cachePath = getCachePath("<ref>|" + actualUrl);
+    time_t now = time(0);
+    struct stat st;
+    std::optional<std::string> cachedRef;
+    if (stat(cachePath.c_str(), &st) == 0 &&
+        // The file may be empty, because writeFile() is not atomic.
+        st.st_size > 0) {
+
+        // The cached ref is persisted unconditionally (see below).
+        cachedRef = readFile(cachePath);
+        if (isCacheFileWithinTtl(now, st)) {
+            debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
+            return cachedRef;
+        }
+    }
+
+    auto ref = readHead(actualUrl);
+
+    if (ref) {
+        debug("storing cached HEAD ref '%s' for repo '%s' at '%s'", *ref, actualUrl, cachePath);
+        createDirs(dirOf(cachePath));
+        writeFile(cachePath, *ref);
+        return ref;
+    }
+
+    if (cachedRef) {
+        // If the cached git ref is expired in fetch() below, and the 'git fetch'
+        // fails, it falls back to continuing with the most recent version.
+        // This function must behave the same way, so we return the expired
+        // cached ref here.
+        warn("could not get HEAD ref for repository '%s'; using expired cached ref '%s'", actualUrl, *cachedRef);
+        return *cachedRef;
+    }
+
+    return std::nullopt;
 }
 
 static bool isNotDotGitDirectory(const Path & path)
@@ -331,7 +416,14 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
+        if (!input.getRef()) {
+            auto head = isLocal ? readHead(actualUrl) : readHeadCached(actualUrl);
+            if (!head) {
+                warn("could not read HEAD ref from repo at '%s', using 'master'", actualUrl);
+                head = "master";
+            }
+            input.attrs.insert_or_assign("ref", *head);
+        }
 
         Attrs unlockedAttrs({
             {"type", cacheType},
@@ -360,7 +452,7 @@ struct GitInputScheme : InputScheme
                 }
             }
 
-            Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
+            Path cacheDir = getCachePath(actualUrl);
             repoDir = cacheDir;
             gitDir = ".";
 
@@ -400,7 +492,7 @@ struct GitInputScheme : InputScheme
                        git fetch to update the local ref to the remote ref. */
                     struct stat st;
                     doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-                        (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
+                        !isCacheFileWithinTtl(now, st);
                 }
             }
 
