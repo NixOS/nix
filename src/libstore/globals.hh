@@ -206,7 +206,17 @@ public:
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
-        "A semicolon-separated list of build machines, in the format of `nix.machines`."};
+        R"(
+          A semicolon-separated list of build machines, where each machine follows this format:
+
+          {protocol}://{user}@{host} [{comma sep. systems} - {maxJobs} {speedFactor} {comma sep. features}]
+
+          Examples:
+          
+          ssh://root@builder1.com
+          
+          ssh://root@builder2.com x86_64-linux,aarch64-linux - 40 20 nixos-test,benchmark,big-parallel,kvm
+        )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
