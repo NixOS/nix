@@ -25,8 +25,9 @@ templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
+flakeSubDir=$TEST_ROOT/flakeSubs
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeSubDir; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -652,6 +653,73 @@ url=$(nix flake info --json file://$TEST_ROOT/flake.tar.gz | jq -r .url)
 [[ $url =~ sha256- ]]
 
 nix build -o $TEST_ROOT/result $url
+
+# Test building multiple flake projects in a single git repo
+mkdir $flakeSubDir/sub1
+cat > $flakeSubDir/sub1/README <<EOF
+This is the sub1 README
+EOF
+cat > $flakeSubDir/sub1/builder.sh <<EOF
+mkdir \$out
+cp \$src/README \$out/sub1.out
+EOF
+cat > $flakeSubDir/sub1/flake.nix <<EOF
+{
+  description = "flake sub1";
+  outputs = { self }: rec {
+    defaultPackage.$system = packages.$system.sub1;
+    packages.$system.sub1 = with import ./config.nix;
+      mkDerivation {
+        name = "sub1";
+        builder = "\${self}/builder.sh";
+        src = self;
+      };
+  };
+}
+EOF
+cat $flakeSubDir/sub1/flake.nix
+cp ./config.nix $flakeSubDir/sub1
+git -C $flakeSubDir add sub1/README
+git -C $flakeSubDir add sub1/flake.nix
+git -C $flakeSubDir add sub1/builder.sh
+git -C $flakeSubDir add sub1/config.nix
+mkdir $flakeSubDir/sub2
+cat > $flakeSubDir/sub2/README <<EOF
+Followed by the sub2 README
+EOF
+cat > $flakeSubDir/sub2/build_it.sh <<EOF
+set -x
+mkdir \$out;
+ls \$sub1
+cat \$sub1/sub1.out | wc
+cat \$sub1/sub1.out \$src2/README > \$out/sub2
+EOF
+cat > $flakeSubDir/sub2/flake.nix <<EOF
+{
+  description = "flake sub1";
+  inputs.sub1.url = "$flakeSubDir/sub1";
+  outputs = { self, sub1 }: rec {
+    defaultPackage.$system = packages.$system.sub2;
+    packages.$system.sub2 = with import ./config.nix;
+      mkDerivation {
+        name = "sub2";
+        builder = "\${self.flakeDir}/build_it.sh";
+        sub1 = "\${sub1.packages.$system.sub1}";
+        src2 = self.flakeDir;
+      };
+  };
+}
+EOF
+cat $flakeSubDir/sub2/flake.nix
+cp ./config.nix $flakeSubDir/sub2
+git -C $flakeSubDir add sub2/README
+git -C $flakeSubDir add sub2/flake.nix
+git -C $flakeSubDir add sub2/build_it.sh
+git -C $flakeSubDir add sub2/config.nix
+git -C $flakeSubDir commit -m 'Setup sub1 and sub2'
+nix build -o $flakeSubDir/result $flakeSubDir/sub2 -vvvvv
+cat $flakeSubDir/sub2/flake.lock
+diff $flakeSubDir/result/sub2 <(cat $flakeSubDir/sub1/README $flakeSubDir/sub2/README)
 
 # Building with an incorrect SRI hash should fail.
 nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" 2>&1 | grep 'NAR hash mismatch'
