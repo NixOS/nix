@@ -485,6 +485,8 @@ public:
      */
     virtual void registerDrvOutput(const Realisation & output)
     { unsupported("registerDrvOutput"); }
+    virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
+    { return registerDrvOutput(output); }
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;

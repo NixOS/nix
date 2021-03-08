@@ -652,6 +652,14 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     }
 }
 
+void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs)
+{
+    settings.requireExperimentalFeature("ca-derivations");
+    if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
+        registerDrvOutput(info);
+    else
+        throw Error("cannot register realisation '%s' because it lacks a valid signature", info.outPath.to_string());
+}
 
 void LocalStore::registerDrvOutput(const Realisation & info)
 {

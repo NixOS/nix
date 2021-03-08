@@ -203,6 +203,7 @@ public:
     /* Register the store path 'output' as the output named 'outputName' of
        derivation 'deriver'. */
     void registerDrvOutput(const Realisation & info) override;
+    void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
 
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
