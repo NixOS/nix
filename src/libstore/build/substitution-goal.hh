@@ -117,7 +117,9 @@ public:
     /* Called by destructor, can't be overridden */
     void cleanup() override final;
 
-    JobCategory jobCategory() override { return JobCategory::Substitution; };
+    JobCategory jobCategory() const override {
+        return JobCategory::Substitution;
+    };
 };
 
 }

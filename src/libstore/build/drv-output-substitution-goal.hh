@@ -73,7 +73,9 @@ public:
     void work() override;
     void handleEOF(int fd) override;
 
-    JobCategory jobCategory() override { return JobCategory::Substitution; };
+    JobCategory jobCategory() const override {
+        return JobCategory::Substitution;
+    };
 };
 
 }
