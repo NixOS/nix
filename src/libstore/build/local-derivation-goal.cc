@@ -2620,10 +2620,15 @@ void LocalDerivationGoal::registerOutputs()
                 .id = DrvOutput{initialOutputs.at(outputName).outputHash,
                                 outputName},
                 .outPath = newInfo.path};
-            getLocalStore().signRealisation(thisRealisation);
+            signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
     }
+}
+
+void LocalDerivationGoal::signRealisation(Realisation & realisation)
+{
+    getLocalStore().signRealisation(realisation);
 }
 
 
