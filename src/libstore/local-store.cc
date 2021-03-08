@@ -310,13 +310,13 @@ LocalStore::LocalStore(const Params & params)
     if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
         state->stmts->RegisterRealisedOutput.create(state->db,
             R"(
-                insert or replace into Realisations (drvPath, outputName, outputPath)
-                values (?, ?, (select id from ValidPaths where path = ?))
+                insert or replace into Realisations (drvPath, outputName, outputPath, signatures)
+                values (?, ?, (select id from ValidPaths where path = ?), ?)
                 ;
             )");
         state->stmts->QueryRealisedOutput.create(state->db,
             R"(
-                select Output.path from Realisations
+                select Output.path, Realisations.signatures from Realisations
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ? and outputName = ?
                     ;
@@ -662,6 +662,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             (info.id.strHash())
             (info.id.outputName)
             (printStorePath(info.outPath))
+            (concatStringsSep(" ", info.signatures))
             .exec();
     });
 }
@@ -1105,6 +1106,11 @@ const PublicKeys & LocalStore::getPublicKeys()
 bool LocalStore::pathInfoIsTrusted(const ValidPathInfo & info)
 {
     return requireSigs && !info.checkSignatures(*this, getPublicKeys());
+}
+
+bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
+{
+    return requireSigs && !realisation.checkSignatures(getPublicKeys());
 }
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
@@ -1612,6 +1618,18 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
 }
 
 
+void LocalStore::signRealisation(Realisation & realisation)
+{
+    // FIXME: keep secret keys in memory.
+
+    auto secretKeyFiles = settings.secretKeyFiles;
+
+    for (auto & secretKeyFile : secretKeyFiles.get()) {
+        SecretKey secretKey(readFile(secretKeyFile));
+        realisation.sign(secretKey);
+    }
+}
+
 void LocalStore::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
@@ -1649,8 +1667,9 @@ std::optional<const Realisation> LocalStore::queryRealisation(
         if (!use.next())
             return std::nullopt;
         auto outputPath = parseStorePath(use.getStr(0));
-        return Ret{
-            Realisation{.id = id, .outPath = outputPath}};
+        auto signatures = tokenizeString<StringSet>(use.getStr(1));
+        return Ret{Realisation{
+            .id = id, .outPath = outputPath, .signatures = signatures}};
     });
 }
 }  // namespace nix

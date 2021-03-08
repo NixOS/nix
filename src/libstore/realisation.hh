@@ -3,6 +3,7 @@
 #include "path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"
+#include "crypto.hh"
 
 namespace nix {
 
@@ -25,8 +26,15 @@ struct Realisation {
     DrvOutput id;
     StorePath outPath;
 
+    StringSet signatures;
+
     nlohmann::json toJSON() const;
     static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
+
+    std::string fingerprint() const;
+    void sign(const SecretKey &);
+    bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
+    size_t checkSignatures(const PublicKeys & publicKeys) const;
 
     StorePath getPath() const { return outPath; }
 

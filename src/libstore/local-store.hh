@@ -137,6 +137,7 @@ public:
         SubstitutablePathInfos & infos) override;
 
     bool pathInfoIsTrusted(const ValidPathInfo &) override;
+    bool realisationIsUntrusted(const Realisation & ) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -272,9 +273,10 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /* Add signatures to a ValidPathInfo using the secret keys
+    /* Add signatures to a ValidPathInfo or Realisation using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
+    void signRealisation(Realisation &);
 
     Path getRealStoreDir() override { return realStoreDir; }
 

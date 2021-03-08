@@ -389,6 +389,11 @@ public:
         return true;
     }
 
+    virtual bool realisationIsUntrusted(const Realisation & )
+    {
+        return true;
+    }
+
 protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
