@@ -48,6 +48,8 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
     ref<EvalState> getEvalState();
 
     std::shared_ptr<EvalState> evalState;
+
+    ~EvalCommand();
 };
 
 struct MixFlakeOptions : virtual Args, EvalCommand
