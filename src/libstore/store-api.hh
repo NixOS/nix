@@ -384,7 +384,7 @@ public:
        we don't really want to add the dependencies listed in a nar info we
        don't trust anyyways.
        */
-    virtual bool pathInfoIsTrusted(const ValidPathInfo &)
+    virtual bool pathInfoIsUntrusted(const ValidPathInfo &)
     {
         return true;
     }

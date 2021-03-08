@@ -1103,7 +1103,7 @@ const PublicKeys & LocalStore::getPublicKeys()
     return *state->publicKeys;
 }
 
-bool LocalStore::pathInfoIsTrusted(const ValidPathInfo & info)
+bool LocalStore::pathInfoIsUntrusted(const ValidPathInfo & info)
 {
     return requireSigs && !info.checkSignatures(*this, getPublicKeys());
 }
@@ -1116,7 +1116,7 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (checkSigs && pathInfoIsTrusted(info))
+    if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
 
     addTempRoot(info.path);

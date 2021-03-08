@@ -136,7 +136,7 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
-    bool pathInfoIsTrusted(const ValidPathInfo &) override;
+    bool pathInfoIsUntrusted(const ValidPathInfo &) override;
     bool realisationIsUntrusted(const Realisation & ) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
