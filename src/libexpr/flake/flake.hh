@@ -16,6 +16,8 @@ namespace flake {
 struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
+void setOverride(FlakeInputs & overrides, const InputPath & path, const FlakeRef & ref);
+std::string printOverrides(const FlakeInputs & overrides, const InputPath & inputPathPrefix);
 
 /* FlakeInput is the 'Flake'-level parsed form of the "input" entries
  * in the flake file.
@@ -45,6 +47,7 @@ struct FlakeInput
     std::optional<InputPath> follows;
     bool absolute = false; // whether 'follows' is relative to the flake root
     FlakeInputs overrides;
+    void setOverrides(FlakeInputs && overrides);
 };
 
 struct ConfigFile

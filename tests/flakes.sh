@@ -25,8 +25,17 @@ templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
+flakeC=$TEST_ROOT/flakeC
+flakeC2=$TEST_ROOT/flakeC2
+flakeD=$TEST_ROOT/flakeD
+flakeD2=$TEST_ROOT/flakeD2
+flakeD3=$TEST_ROOT/flakeD3
+flakeE=$TEST_ROOT/flakeE
+flakeE2=$TEST_ROOT/flakeE2
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir \
+        $nonFlakeDir $flakeA $flakeB $flakeC $flakeC2 $flakeD $flakeD2 \
+        $flakeD3 $flakeE $flakeE2; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -713,6 +722,265 @@ sed -i $flakeB/flake.nix -e 's/456/789/'
 git -C $flakeB commit -a -m 'Foo'
 
 [[ $(nix eval --update-input b $flakeA#foo) = 1912 ]]
+
+# Test overrides
+
+# Test simple override
+# A(override B.C=C2) -> B -> C
+cat > $flakeA/flake.nix <<EOF
+{
+  inputs.b.url = git+file://$flakeB;
+  inputs.b.inputs.c.url = git+file://$flakeC2;
+  outputs = { self, b }: {
+    foo = 1 + b.foo;
+  };
+}
+EOF
+git -C $flakeA add flake.nix
+git -C $flakeA commit -a -m 'initial'
+
+cat > $flakeB/flake.nix <<EOF
+{
+  inputs.c.url = git+file://$flakeC;
+  outputs = { self, c }: {
+    foo = 1 + c.foo;
+  };
+}
+EOF
+git -C $flakeB add flake.nix
+git -C $flakeB commit -a -m 'initial'
+
+cat > $flakeC/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 1;
+  };
+}
+EOF
+git -C $flakeC add flake.nix
+git -C $flakeC commit -a -m 'initial'
+
+cat > $flakeC2/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 2;
+  };
+}
+EOF
+git -C $flakeC2 add flake.nix
+git -C $flakeC2 commit -a -m 'initial'
+
+# B + C = 2
+[[ $(nix eval $flakeB#foo --recreate-lock-file) = 2 ]]
+# A + B + C2 = 4
+[[ $(nix eval $flakeA#foo --recreate-lock-file) = 4 ]]
+
+# Test simple override from command line
+# A -> B -> C
+# --input-override a.b.c = C2
+cat > $flakeA/flake.nix <<EOF
+{
+  inputs.b.url = git+file://$flakeB;
+  outputs = { self, b }: {
+    foo = 1 + b.foo;
+  };
+}
+EOF
+git -C $flakeA add flake.nix
+git -C $flakeA commit -a -m 'initial'
+
+# B, C, and C2 same as previous test
+# A + B + C = 3
+[[ $(nix eval $flakeA#foo --recreate-lock-file) = 3 ]]
+# A + B + C2 = 4
+[[ $(nix eval $flakeA#foo --recreate-lock-file --override-input b/c git+file://$flakeC2) = 4 ]]
+
+# Test unused overrides detected
+# A(override B.X=A, B.X.X=B, B.Y=C, B.C.Z=D) -> B -> C
+cat > $flakeA/flake.nix <<EOF
+{
+  inputs.b.url = git+file://$flakeB;
+  inputs.b.inputs.x.url = git+file://$flakeA;
+  inputs.b.inputs.x.inputs.x.url = git+file://$flakeB;
+  inputs.b.inputs.y.url = git+file://$flakeC;
+  inputs.b.inputs.c.inputs.z.url = git+file://$flakeD;
+  outputs = { self, b }: {
+    foo = 1 + b.foo;
+  };
+}
+EOF
+git -C $flakeA add flake.nix
+git -C $flakeA commit -a -m 'initial'
+
+# B and C same as previous test
+[[ $(nix eval $flakeA#foo --recreate-lock-file) = 3 ]]
+expectedOutputRegex="warning:[[:space:]]unused[[:space:]]override\(s\):[[:space:]]b/c/z=git\+file:///.*flakeD
+warning:[[:space:]]unused[[:space:]]override\(s\):[[:space:]]b/x=git\+file:///.*flakeA,[[:space:]]b/x/x=git\+file:///.*flakeB,[[:space:]]b/y=git\+file:///.*flakeC"
+[[ $(nix eval $flakeA#foo --recreate-lock-file 2>&1 | grep "unused override(s)") =~ $expectedOutputRegex ]]
+
+
+# Test overriding an override
+# A(override B.C.D=D3) -> B (override C.D=D2)-> C -> D
+cat > $flakeA/flake.nix <<EOF
+{
+  inputs.b.url = git+file://$flakeB;
+  inputs.b.inputs.c.inputs.d.url = git+file://$flakeD3;
+  outputs = { self, b }: {
+    foo = 1 + b.foo;
+  };
+}
+EOF
+git -C $flakeA add flake.nix
+git -C $flakeA commit -a -m 'initial'
+
+cat > $flakeB/flake.nix <<EOF
+{
+  inputs.c.url = git+file://$flakeC;
+  inputs.c.inputs.d.url = git+file://$flakeD2;
+  outputs = { self, c }: {
+    foo = 1 + c.foo;
+  };
+}
+EOF
+git -C $flakeB add flake.nix
+git -C $flakeB commit -a -m 'initial'
+
+cat > $flakeC/flake.nix <<EOF
+{
+  inputs.d.url = git+file://$flakeD;
+  outputs = { self, d }: {
+    foo = 1 + d.foo;
+  };
+}
+EOF
+git -C $flakeC add flake.nix
+git -C $flakeC commit -a -m 'initial'
+
+cat > $flakeD/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 1;
+  };
+}
+EOF
+git -C $flakeD add flake.nix
+git -C $flakeD commit -a -m 'initial'
+
+cat > $flakeD2/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 2;
+  };
+}
+EOF
+git -C $flakeD2 add flake.nix
+git -C $flakeD2 commit -a -m 'initial'
+
+
+cat > $flakeD3/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 3;
+  };
+}
+EOF
+git -C $flakeD3 add flake.nix
+git -C $flakeD3 commit -a -m 'initial'
+
+# C + D = 2
+[[ $(nix eval $flakeC#foo --recreate-lock-file) = 2 ]]
+# B + C + D2 = 4
+[[ $(nix eval $flakeB#foo --recreate-lock-file) = 4 ]]
+# A + B + C + D3 = 6
+[[ $(nix eval $flakeA#foo --recreate-lock-file) = 6 ]]
+
+# Test overrides are merged
+# A(override B.C.D.E=E2) -> B (override C.D=D2)-> C -> D -> E
+
+cat > $flakeA/flake.nix <<EOF
+{
+  inputs.b.url = git+file://$flakeB;
+  inputs.b.inputs.c.inputs.d.inputs.e.url = git+file://$flakeE2;
+  outputs = { self, b }: {
+    foo = 1 + b.foo;
+  };
+}
+EOF
+git -C $flakeA add flake.nix
+git -C $flakeA commit -a -m 'initial'
+
+cat > $flakeB/flake.nix <<EOF
+{
+  inputs.c.url = git+file://$flakeC;
+  inputs.c.inputs.d.url = git+file://$flakeD2;
+  outputs = { self, c }: {
+    foo = 1 + c.foo;
+  };
+}
+EOF
+git -C $flakeB add flake.nix
+git -C $flakeB commit -a -m 'initial'
+
+cat > $flakeC/flake.nix <<EOF
+{
+  inputs.d.url = git+file://$flakeD;
+  outputs = { self, d }: {
+    foo = 1 + d.foo;
+  };
+}
+EOF
+git -C $flakeC add flake.nix
+git -C $flakeC commit -a -m 'initial'
+
+cat > $flakeD/flake.nix <<EOF
+{
+  inputs.e.url = git+file://$flakeE;
+  outputs = { self, e }: {
+    foo = 1 + e.foo;
+  };
+}
+EOF
+git -C $flakeD add flake.nix
+git -C $flakeD commit -a -m 'initial'
+
+cat > $flakeD2/flake.nix <<EOF
+{
+  inputs.e.url = git+file://$flakeE;
+  outputs = { self, e }: {
+    foo = 2 + e.foo;
+  };
+}
+EOF
+git -C $flakeD2 add flake.nix
+git -C $flakeD2 commit -a -m 'initial'
+
+
+cat > $flakeE/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 1;
+  };
+}
+EOF
+git -C $flakeE add flake.nix
+git -C $flakeE commit -a -m 'initial'
+
+cat > $flakeE2/flake.nix <<EOF
+{
+  outputs = { self }: {
+    foo = 2;
+  };
+}
+EOF
+git -C $flakeE2 add flake.nix
+git -C $flakeE2 commit -a -m 'initial'
+
+# C + D + E = 3
+[[ $(nix eval $flakeC#foo --recreate-lock-file) = 3 ]]
+# B + C + D2 + E = 5
+[[ $(nix eval $flakeB#foo --recreate-lock-file) = 5 ]]
+# A + B + C + D2 + E2 = 7
+[[ $(nix eval $flakeA#foo --recreate-lock-file) = 7 ]]
 
 # Test list-inputs with circular dependencies
 nix flake list-inputs $flakeA
