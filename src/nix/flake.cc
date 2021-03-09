@@ -104,6 +104,14 @@ struct CmdFlakeUpdate : FlakeCommand
         return "update flake lock file";
     }
 
+    CmdFlakeUpdate()
+    {
+        /* Remove flags that don't make sense. */
+        removeFlag("recreate-lock-file");
+        removeFlag("update-input");
+        removeFlag("no-update-lock-file");
+    }
+
     std::string doc() override
     {
         return
@@ -113,7 +121,30 @@ struct CmdFlakeUpdate : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        /* Use --refresh by default for 'nix flake update'. */
+        settings.tarballTtl = 0;
+
+        lockFlags.recreateLockFile = true;
+
+        lockFlake();
+    }
+};
+
+struct CmdFlakeLock : FlakeCommand
+{
+    std::string description() override
+    {
+        return "create missing lock file entries";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-lock.md"
+          ;
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
         settings.tarballTtl = 0;
 
         lockFlake();
@@ -595,7 +626,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
-        auto installable = InstallableFlake(
+        auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef),
             Strings{templateName == "" ? "defaultTemplate" : templateName},
             Strings(attrsPathPrefixes), lockFlags);
@@ -880,7 +911,8 @@ struct CmdFlakeShow : FlakeCommand
                             || attrPath[0] == "nixosConfigurations"
                             || attrPath[0] == "nixosModules"
                             || attrPath[0] == "defaultApp"
-                            || attrPath[0] == "templates"))
+                            || attrPath[0] == "templates"
+                            || attrPath[0] == "overlays"))
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPath[0] == "checks"
                             || attrPath[0] == "packages"
@@ -943,7 +975,8 @@ struct CmdFlakeShow : FlakeCommand
                 else {
                     logger->cout("%s: %s",
                         headerPrefix,
-                        attrPath.size() == 1 && attrPath[0] == "overlay" ? "Nixpkgs overlay" :
+                        (attrPath.size() == 1 && attrPath[0] == "overlay")
+                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? "Nixpkgs overlay" :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
                         attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
                         ANSI_YELLOW "unknown" ANSI_NORMAL);
@@ -1004,6 +1037,7 @@ struct CmdFlake : NixMultiCommand
     CmdFlake()
         : MultiCommand({
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
+                {"lock", []() { return make_ref<CmdFlakeLock>(); }},
                 {"info", []() { return make_ref<CmdFlakeInfo>(); }},
                 {"list-inputs", []() { return make_ref<CmdFlakeListInputs>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},

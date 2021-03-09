@@ -149,8 +149,6 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
-        initPlugins();
-
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 

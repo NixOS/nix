@@ -162,6 +162,8 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
+    DrvOutputs builtOutputs;
+
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */
     time_t startTime = 0, stopTime = 0;
@@ -414,12 +416,6 @@ public:
        outputs are mentioned so ones mising the mapping are mapped to
        `std::nullopt`.  */
     virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path);
-
-    /*
-     * Similar to `queryPartialDerivationOutputMap`, but doesn't try to resolve
-     * the derivation
-     */
-    virtual std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path);
 
     /* Query the mapping outputName=>outputPath for the given derivation.
        Assume every output has a mapping and throw an exception otherwise. */
@@ -758,15 +754,12 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
    that. Returns a map of what each path was copied to the dstStore
    as. */
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths,
+    const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
-
-
-/* Copy the closure of the specified paths from one store to another. */
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths,
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const StorePathSet& paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);

@@ -14,7 +14,17 @@ void Args::addFlag(Flag && flag_)
         assert(flag->handler.arity == flag->labels.size());
     assert(flag->longName != "");
     longFlags[flag->longName] = flag;
+    for (auto & alias : flag->aliases)
+        longFlags[alias] = flag;
     if (flag->shortName) shortFlags[flag->shortName] = flag;
+}
+
+void Args::removeFlag(const std::string & longName)
+{
+    auto flag = longFlags.find(longName);
+    assert(flag != longFlags.end());
+    if (flag->second->shortName) shortFlags.erase(flag->second->shortName);
+    longFlags.erase(flag);
 }
 
 void Completions::add(std::string completion, std::string description)
@@ -58,6 +68,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         verbosity = lvlError;
     }
 
+    bool argsSeen = false;
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
         auto arg = *pos;
@@ -86,6 +97,10 @@ void Args::parseCmdline(const Strings & _cmdline)
                 throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
+            if (!argsSeen) {
+                argsSeen = true;
+                initialFlagsProcessed();
+            }
             pos = rewriteArgs(cmdline, pos);
             pendingArgs.push_back(*pos++);
             if (processArgs(pendingArgs, false))
@@ -94,6 +109,9 @@ void Args::parseCmdline(const Strings & _cmdline)
     }
 
     processArgs(pendingArgs, true);
+
+    if (!argsSeen)
+        initialFlagsProcessed();
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -191,6 +209,7 @@ nlohmann::json Args::toJSON()
 
     for (auto & [name, flag] : longFlags) {
         auto j = nlohmann::json::object();
+        if (flag->aliases.count(name)) continue;
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
         if (flag->description != "")
@@ -295,8 +314,8 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-MultiCommand::MultiCommand(const Commands & commands)
-    : commands(commands)
+MultiCommand::MultiCommand(const Commands & commands_)
+    : commands(commands_)
 {
     expectArgs({
         .label = "subcommand",

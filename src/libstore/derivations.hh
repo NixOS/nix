@@ -94,6 +94,11 @@ bool derivationIsFixed(DerivationType);
    derivation is controlled separately. Never true for non-CA derivations. */
 bool derivationIsImpure(DerivationType);
 
+/* Does the derivation knows its own output paths?
+ * Only true when there's no floating-ca derivation involved in the closure.
+ */
+bool derivationHasKnownOutputPaths(DerivationType);
+
 struct BasicDerivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
@@ -138,14 +143,10 @@ struct Derivation : BasicDerivation
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);
-    static std::optional<BasicDerivation> tryResolve(Store & store, const StorePath & drvPath);
 
     Derivation() = default;
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
-
-private:
-    std::optional<BasicDerivation> tryResolveUncached(Store & store);
 };
 
 

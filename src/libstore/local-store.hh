@@ -127,7 +127,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -280,7 +280,7 @@ private:
 
     void createUser(const std::string & userName, uid_t userId) override;
 
-    friend struct DerivationGoal;
+    friend struct LocalDerivationGoal;
     friend struct SubstitutionGoal;
 };
 

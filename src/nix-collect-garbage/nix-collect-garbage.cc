@@ -74,8 +74,6 @@ static int main_nix_collect_garbage(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         auto profilesDir = settings.nixStateDir + "/profiles";
         if (removeOld) removeOldGenerations(profilesDir);
 

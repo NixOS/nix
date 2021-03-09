@@ -93,7 +93,8 @@
             gmock
           ]
           ++ lib.optional stdenv.isLinux libseccomp
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
           (aws-sdk-cpp.override {
@@ -110,6 +111,40 @@
             perlPackages.DBDSQLite
           ];
       };
+
+    installScriptFor = systems:
+      with nixpkgsFor.x86_64-linux;
+        runCommand "installer-script"
+          { buildInputs = [ nix ];
+          }
+          ''
+            mkdir -p $out/nix-support
+
+            # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
+            # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
+            tarballPath() {
+              # Remove the store prefix
+              local path=''${1#${builtins.storeDir}/}
+              # Get the path relative to the derivation root
+              local rest=''${path#*/}
+              # Get the derivation hash
+              local drvHash=''${path%%-*}
+              echo "$drvHash/$rest"
+            }
+
+            substitute ${./scripts/install.in} $out/install \
+              ${pkgs.lib.concatMapStrings
+                (system:
+                  '' \
+                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                  --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                  ''
+                )
+                systems
+              } --replace '@nixVersion@' ${version}
+
+            echo "file installer $out/install" >> $out/nix-support/hydra-build-products
+          '';
 
     in {
 
@@ -200,12 +235,12 @@
 
         };
 
-        lowdown = with final; stdenv.mkDerivation {
-          name = "lowdown-0.7.9";
+        lowdown = with final; stdenv.mkDerivation rec {
+          name = "lowdown-0.8.0";
 
           src = fetchurl {
-            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.9.tar.gz;
-            hash = "sha512-7GQrKFICyTI5T4SinATfohiCq9TC0OgN8NmVfG3B3BZJM9J00DT8llAco8kNykLIKtl/AXuS4X8fETiCFEWEUQ==";
+            url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
+            hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
 
           #src = lowdown-src;
@@ -318,40 +353,8 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript =
-          with nixpkgsFor.x86_64-linux;
-          runCommand "installer-script"
-            { buildInputs = [ nix ];
-            }
-            ''
-              mkdir -p $out/nix-support
-
-              # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
-              # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
-              tarballPath() {
-                # Remove the store prefix
-                local path=''${1#${builtins.storeDir}/}
-                # Get the path relative to the derivation root
-                local rest=''${path#*/}
-                # Get the derivation hash
-                local drvHash=''${path%%-*}
-                echo "$drvHash/$rest"
-              }
-
-              substitute ${./scripts/install.in} $out/install \
-                ${pkgs.lib.concatMapStrings
-                  (system:
-                    '' \
-                    --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                    --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                    ''
-                  )
-                  [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
-                } \
-                --replace '@nixVersion@' ${version}
-
-              echo "file installer $out/install" >> $out/nix-support/hydra-build-products
-            '';
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
 
         # Line coverage analysis.
         coverage =

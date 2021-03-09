@@ -97,6 +97,7 @@ protected:
         typedef std::shared_ptr<Flag> ptr;
 
         std::string longName;
+        std::set<std::string> aliases;
         char shortName = 0;
         std::string description;
         std::string category;
@@ -131,9 +132,15 @@ protected:
 
     std::set<std::string> hiddenCategories;
 
+    /* Called after all command line flags before the first non-flag
+       argument (if any) have been processed. */
+    virtual void initialFlagsProcessed() {}
+
 public:
 
     void addFlag(Flag && flag);
+
+    void removeFlag(const std::string & longName);
 
     void expectArgs(ExpectedArg && arg)
     {

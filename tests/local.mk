@@ -17,6 +17,7 @@ nix_tests = \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
+  build-remote-content-addressed-floating.sh \
   ssh-relay.sh \
   nar-access.sh \
   structured-attrs.sh \
@@ -37,10 +38,11 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
-  content-addressed.sh \
-  build.sh
+  build.sh \
+  compute-levels.sh \
+  ca/build.sh \
+  ca/nix-copy.sh
   # parallel.sh
-  # build-remote-content-addressed-fixed.sh \
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 

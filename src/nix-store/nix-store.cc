@@ -905,6 +905,10 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
+                if (GET_PROTOCOL_MINOR(clientVersion >= 5)) {
+                    worker_proto::write(*store, out, status.builtOutputs);
+                }
+
 
                 break;
             }
@@ -1066,8 +1070,6 @@ static int main_nix_store(int argc, char * * argv)
 
             return true;
         });
-
-        initPlugins();
 
         if (!op) throw UsageError("no operation specified");
 

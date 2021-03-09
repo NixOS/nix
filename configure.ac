@@ -218,6 +218,14 @@ LDFLAGS="-lz $LDFLAGS"
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
+# Look for libcpuid.
+if test "$machine_name" = "x86_64"; then
+  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"])
+  have_libcpuid=1
+  AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+fi
+AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
+
 
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then

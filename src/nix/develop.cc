@@ -59,7 +59,7 @@ BuildEnvironment readEnvironment(const Path & path)
         R"re((?:\$?"(?:[^"\\]|\\[$`"\\\n])*"))re";
 
     static std::string squotedStringRegex =
-        R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
+        R"re((?:\$?(?:'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'|\\')+))re";
 
     static std::string indexedArrayRegex =
         R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
@@ -443,6 +443,7 @@ struct CmdDevelop : Common, MixEnvironment
             auto state = getEvalState();
 
             auto bashInstallable = std::make_shared<InstallableFlake>(
+                this,
                 state,
                 installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
