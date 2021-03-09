@@ -52,7 +52,7 @@ protected:
         auto path2 = binaryCacheDir + "/" + path;
         Path tmp = path2 + ".tmp." + std::to_string(getpid());
         AutoDelete del(tmp, false);
-        StreamToSourceAdapter source(istream);
+        StreamToSourceAdapter source(istream, path);
         writeFile(tmp, source);
         if (rename(tmp.c_str(), path2.c_str()))
             throw SysError("renaming '%1%' to '%2%'", tmp, path2);

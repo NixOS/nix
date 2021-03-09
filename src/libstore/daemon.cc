@@ -173,6 +173,10 @@ struct TunnelSource : BufferedSource
         if (n == 0) throw EndOfFile("unexpected end-of-file");
         return n;
     }
+    std::string debugLabel() override
+    {
+        return from.debugLabel();
+    }
 };
 
 struct ClientSettings

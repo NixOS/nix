@@ -573,7 +573,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
         conn->to << wopImportPaths;
 
-        auto source2 = sinkToSource([&](Sink & sink) {
+        auto source2 = sinkToSource("remote:" + std::string(info.path.to_string()), [&](Sink & sink) {
             sink << 1 // == path follows
                 ;
             copyNAR(source, sink);

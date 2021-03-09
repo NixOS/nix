@@ -183,7 +183,7 @@ void exportPaths(int fd, ...)
 void importPaths(int fd, int dontCheckSigs)
     PPCODE:
         try {
-            FdSource source(fd);
+            FdSource source(fd, "");
             store()->importPaths(source, dontCheckSigs ? NoCheckSigs : CheckSigs);
         } catch (Error & e) {
             croak("%s", e.what());

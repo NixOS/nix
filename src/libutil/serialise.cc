@@ -50,21 +50,23 @@ FdSink::~FdSink()
 
 size_t threshold = 256 * 1024 * 1024;
 
-static void warnLargeDump()
+static void warnLargeDump(std::string_view debugLabel)
 {
-    warn("dumping very large path (> 256 MiB); this may run out of memory");
+    if (debugLabel.size() > 0) {
+        warn("dumping very large path (> 256 MiB); this may run out of memory\n"
+             "  while %s", debugLabel);
+    } else {
+        warn("dumping very large path (> 256 MiB); this may run out of memory");
+    }
 }
 
 
 void FdSink::write(std::string_view data)
 {
     written += data.size();
-    static bool warned = false;
-    if (warn && !warned) {
-        if (written > threshold) {
-            warnLargeDump();
-            warned = true;
-        }
+    if (warn && written > threshold && !alreadyWarned) {
+        warnLargeDump(debugLabel);
+        alreadyWarned = true;
     }
     try {
         writeFull(fd, data);
@@ -92,17 +94,27 @@ void Source::operator () (char * data, size_t len)
 
 void Source::drainInto(Sink & sink)
 {
-    std::string s;
-    std::vector<char> buf(8192);
-    while (true) {
-        size_t n;
-        try {
-            n = read(buf.data(), buf.size());
-            sink({buf.data(), n});
-        } catch (EndOfFile &) {
-            break;
+    try {
+        std::string dbg = debugLabel();
+        if (dbg.size() > 0) {
+            sink.setDebugLabel("dumping from source '" + dbg + "'");
         }
+        std::string s;
+        std::vector<char> buf(8192);
+        while (true) {
+            size_t n;
+            try {
+                n = read(buf.data(), buf.size());
+                sink({buf.data(), n});
+            } catch (EndOfFile &) {
+                break;
+            }
+        }
+    } catch (...) {
+        sink.removeDebugLabel();
+        throw;
     }
+    sink.removeDebugLabel();
 }
 
 
@@ -202,6 +214,7 @@ StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
 
 
 std::unique_ptr<Source> sinkToSource(
+    std::string debugLabel,
     std::function<void(Sink &)> fun,
     std::function<void()> eof)
 {
@@ -209,13 +222,14 @@ std::unique_ptr<Source> sinkToSource(
     {
         typedef boost::coroutines2::coroutine<std::string> coro_t;
 
+        std::string debugLabel_;
         std::function<void(Sink &)> fun;
         std::function<void()> eof;
         std::optional<coro_t::pull_type> coro;
         bool started = false;
 
-        SinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)
-            : fun(fun), eof(eof)
+        SinkToSource(std::string debugLabel, std::function<void(Sink &)> fun, std::function<void()> eof)
+            : debugLabel_(debugLabel), fun(fun), eof(eof)
         {
         }
 
@@ -246,9 +260,14 @@ std::unique_ptr<Source> sinkToSource(
 
             return n;
         }
+
+        std::string debugLabel() override
+        {
+            return debugLabel_;
+        }
     };
 
-    return std::make_unique<SinkToSource>(fun, eof);
+    return std::make_unique<SinkToSource>(debugLabel, fun, eof);
 }
 
 
@@ -394,10 +413,9 @@ Error readError(Source & source)
 
 void StringSink::operator () (std::string_view data)
 {
-    static bool warned = false;
-    if (!warned && s->size() > threshold) {
-        warnLargeDump();
-        warned = true;
+    if (s->size() > threshold && !alreadyWarned) {
+        warnLargeDump(debugLabel);
+        alreadyWarned = true;
     }
     s->append(data);
 }

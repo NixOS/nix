@@ -13,9 +13,18 @@ namespace nix {
 /* Abstract destination of binary data. */
 struct Sink
 {
+    std::string debugLabel;
+
     virtual ~Sink() { }
     virtual void operator () (std::string_view data) = 0;
     virtual bool good() { return true; }
+
+    void setDebugLabel(std::string newDebugLabel) {
+        debugLabel = newDebugLabel;
+    }
+    void removeDebugLabel() {
+        debugLabel = "";
+    }
 };
 
 /* Just throws away data. */
@@ -58,6 +67,9 @@ struct Source
        one byte is available. */
     virtual size_t read(char * data, size_t len) = 0;
 
+    /* Return a string that identifies the source */
+    virtual std::string debugLabel() = 0;
+
     virtual bool good() { return true; }
 
     void drainInto(Sink & sink);
@@ -91,6 +103,7 @@ struct FdSink : BufferedSink
 {
     int fd;
     bool warn = false;
+    bool alreadyWarned = false;
     size_t written = 0;
 
     FdSink() : fd(-1) { }
@@ -123,17 +136,24 @@ struct FdSource : BufferedSource
 {
     int fd;
     size_t read = 0;
+    std::string filename;
 
     FdSource() : fd(-1) { }
-    FdSource(int fd) : fd(fd) { }
+    FdSource(int fd, std::string filename) : fd(fd), filename(filename) { }
     FdSource(FdSource&&) = default;
 
     FdSource& operator=(FdSource && s)
     {
         fd = s.fd;
+        filename = s.filename;
         s.fd = -1;
         read = s.read;
         return *this;
+    }
+
+    std::string debugLabel() override
+    {
+        return "fd:" + filename;
     }
 
     bool good() override;
@@ -148,6 +168,8 @@ private:
 struct StringSink : Sink
 {
     ref<std::string> s;
+    bool alreadyWarned = false;
+
     StringSink() : s(make_ref<std::string>()) { };
     explicit StringSink(const size_t reservedSize) : s(make_ref<std::string>()) {
       s->reserve(reservedSize);
@@ -164,6 +186,10 @@ struct StringSource : Source
     size_t pos;
     StringSource(const string & _s) : s(_s), pos(0) { }
     size_t read(char * data, size_t len) override;
+    std::string debugLabel() override
+    {
+        return "<string>";
+    }
 };
 
 
@@ -193,6 +219,10 @@ struct TeeSource : Source
         sink({data, n});
         return n;
     }
+    std::string debugLabel() override
+    {
+        return orig.debugLabel();
+    }
 };
 
 /* A reader that consumes the original Source until 'size'. */
@@ -211,6 +241,10 @@ struct SizedSource : Source
         size_t n = this->orig.read(data, len);
         this->remain -= n;
         return n;
+    }
+    std::string debugLabel() override
+    {
+        return orig.debugLabel();
     }
 
     /* Consume the original source until no remain data is left to consume. */
@@ -266,6 +300,11 @@ struct LambdaSource : Source
     {
         return lambda(data, len);
     }
+
+    std::string debugLabel() override
+    {
+        return "{lambda}";
+    }
 };
 
 /* Chain two sources together so after the first is exhausted, the second is
@@ -279,12 +318,18 @@ struct ChainSource : Source
     { }
 
     size_t read(char * data, size_t len) override;
+
+    std::string debugLabel() override
+    {
+        return "chain:<" + source1.debugLabel() + ">, <" + source2.debugLabel() + ">";
+    }
 };
 
 
 /* Convert a function that feeds data into a Sink into a Source. The
    Source executes the function as a coroutine. */
 std::unique_ptr<Source> sinkToSource(
+    std::string debugLabel,
     std::function<void(Sink &)> fun,
     std::function<void()> eof = []() {
         throw EndOfFile("coroutine has finished");
@@ -381,9 +426,10 @@ Error readError(Source & source);
 struct StreamToSourceAdapter : Source
 {
     std::shared_ptr<std::basic_istream<char>> istream;
+    std::string debugLabel_;
 
-    StreamToSourceAdapter(std::shared_ptr<std::basic_istream<char>> istream)
-        : istream(istream)
+    StreamToSourceAdapter(std::shared_ptr<std::basic_istream<char>> istream, std::string debugLabel)
+        : istream(istream), debugLabel_(debugLabel)
     { }
 
     size_t read(char * data, size_t len) override
@@ -396,6 +442,11 @@ struct StreamToSourceAdapter : Source
                 throw Error("I/O error in StreamToSourceAdapter");
         }
         return istream->gcount();
+    }
+
+    std::string debugLabel() override
+    {
+        return "stream:" + debugLabel_;
     }
 };
 
@@ -448,6 +499,11 @@ struct FramedSource : Source
         memcpy(data, pending.data() + pos, n);
         pos += n;
         return n;
+    }
+
+    std::string debugLabel() override
+    {
+        return from.debugLabel();
     }
 };
 

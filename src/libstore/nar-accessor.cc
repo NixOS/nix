@@ -102,6 +102,11 @@ struct NarAccessor : public FSAccessor
             pos += n;
             return n;
         }
+
+        std::string debugLabel() override
+        {
+            return source.debugLabel();
+        }
     };
 
     NarAccessor(ref<const std::string> nar) : nar(nar)

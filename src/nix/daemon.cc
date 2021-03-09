@@ -239,7 +239,7 @@ static void daemonLoop()
                 }
 
                 //  Handle the connection.
-                FdSource from(remote.get());
+                FdSource from(remote.get(), "");
                 FdSink to(remote.get());
                 processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
 #if 0
@@ -297,7 +297,7 @@ static void runDaemon(bool stdio)
                 }
             }
         } else {
-            FdSource from(STDIN_FILENO);
+            FdSource from(STDIN_FILENO, "<stdin>");
             FdSink to(STDOUT_FILENO);
             /* Auth hook is empty because in this mode we blindly trust the
                standard streams. Limiting access to those is explicitly

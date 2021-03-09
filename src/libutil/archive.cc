@@ -120,8 +120,14 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
-    sink << narVersionMagic1;
-    dump(path, sink, filter);
+    sink.setDebugLabel("dumping path '" + path + "'");
+    try {
+        sink << narVersionMagic1;
+        dump(path, sink, filter);
+    } catch (...) {
+        sink.removeDebugLabel();
+        throw;
+    }
 }
 
 
@@ -377,7 +383,7 @@ void copyNAR(Source & source, Sink & sink)
 
 void copyPath(const Path & from, const Path & to)
 {
-    auto source = sinkToSource([&](Sink & sink) {
+    auto source = sinkToSource("path:" + from, [&](Sink & sink) {
         dumpPath(from, sink);
     });
     restorePath(to, *source);

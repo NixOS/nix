@@ -126,7 +126,7 @@ protected:
         const std::string & mimeType) override
     {
         auto req = makeRequest(path);
-        req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
+        req.data = std::make_shared<string>(StreamToSourceAdapter(istream, path).drain());
         req.mimeType = mimeType;
         try {
             getFileTransfer()->upload(req);

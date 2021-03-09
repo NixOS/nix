@@ -407,7 +407,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     }
     auto h = sink.finish().first;
 
-    auto source = sinkToSource([&](Sink & sink) {
+    auto source = sinkToSource("path:" + srcPath, [&](Sink & sink) {
         dumpPath(srcPath, sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {

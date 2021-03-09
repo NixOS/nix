@@ -646,7 +646,7 @@ static void opRestore(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
-    FdSource source(STDIN_FILENO);
+    FdSource source(STDIN_FILENO, "<stdin>");
     restorePath(*opArgs.begin(), source);
 }
 
@@ -674,7 +674,7 @@ static void opImport(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    FdSource source(STDIN_FILENO);
+    FdSource source(STDIN_FILENO, "<stdin>");
     auto paths = store->importPaths(source, NoCheckSigs);
 
     for (auto & i : paths)
@@ -773,7 +773,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    FdSource in(STDIN_FILENO);
+    FdSource in(STDIN_FILENO, "<stdin>");
     FdSink out(STDOUT_FILENO);
 
     /* Exchange the greeting. */

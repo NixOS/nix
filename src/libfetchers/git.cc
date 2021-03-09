@@ -442,7 +442,7 @@ struct GitInputScheme : InputScheme
         } else {
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
-            auto source = sinkToSource([&](Sink & sink) {
+            auto source = sinkToSource("git:" + repoDir, [&](Sink & sink) {
                 RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getRev()->gitRev() });
                 gitOptions.standardOut = &sink;
                 runProgram2(gitOptions);

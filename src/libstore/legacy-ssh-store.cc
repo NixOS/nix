@@ -75,7 +75,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             fmt("%s --serve --write", remoteProgram)
             + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
         conn->to = FdSink(conn->sshConn->in.get());
-        conn->from = FdSource(conn->sshConn->out.get());
+        conn->from = FdSource(conn->sshConn->out.get(), "<ssh>");
 
         try {
             conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
