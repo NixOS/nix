@@ -84,7 +84,8 @@ public:
      * `SingleDerivedPath::Built.drvPath` chain.
      */
     static DownstreamPlaceholder fromSingleDerivedPathBuilt(
-        const SingleDerivedPath::Built & built);
+        const SingleDerivedPath::Built & built,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
 
 }

@@ -156,8 +156,10 @@ static void mkOutputString(
 {
     state.mkOutputString(
         attrs.alloc(o.first),
-        drvPath,
-        o.first,
+        SingleDerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(drvPath),
+            .output = o.first,
+        },
         o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 

@@ -1027,24 +1027,67 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
 }
 
 
+std::string EvalState::mkOutputStringRaw(
+    const SingleDerivedPath::Built & b,
+    std::optional<StorePath> optStaticOutputPath,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    /* In practice, this is testing for the case of CA derivations, or
+       dynamic derivations. */
+    return optStaticOutputPath
+        ? store->printStorePath(*std::move(optStaticOutputPath))
+        /* Downstream we would substitute this for an actual path once
+           we build the floating CA derivation */
+        : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b, xpSettings).render();
+}
+
+
 void EvalState::mkOutputString(
     Value & value,
-    const StorePath & drvPath,
-    const std::string outputName,
+    const SingleDerivedPath::Built & b,
     std::optional<StorePath> optStaticOutputPath,
     const ExperimentalFeatureSettings & xpSettings)
 {
     value.mkString(
-        optStaticOutputPath
-            ? store->printStorePath(*std::move(optStaticOutputPath))
-            /* Downstream we would substitute this for an actual path once
-               we build the floating CA derivation */
-            : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName, xpSettings).render(),
+        mkOutputStringRaw(b, optStaticOutputPath, xpSettings),
+        NixStringContext { b });
+}
+
+
+std::string EvalState::mkSingleDerivedPathStringRaw(
+    const SingleDerivedPath & p)
+{
+    return std::visit(overloaded {
+        [&](const SingleDerivedPath::Opaque & o) {
+            return store->printStorePath(o.path);
+        },
+        [&](const SingleDerivedPath::Built & b) {
+            auto optStaticOutputPath = std::visit(overloaded {
+                [&](const SingleDerivedPath::Opaque & o) {
+                    auto drv = store->readDerivation(o.path);
+                    auto i = drv.outputs.find(b.output);
+                    if (i == drv.outputs.end())
+                        throw Error("derivation '%s' does not have output '%s'", b.drvPath->to_string(*store), b.output);
+                    return i->second.path(*store, drv.name, b.output);
+                },
+                [&](const SingleDerivedPath::Built & o) -> std::optional<StorePath> {
+                    return std::nullopt;
+                },
+            }, b.drvPath->raw());
+            return mkOutputStringRaw(b, optStaticOutputPath);
+        }
+    }, p.raw());
+}
+
+
+void EvalState::mkSingleDerivedPathString(
+    const SingleDerivedPath & p,
+    Value & v)
+{
+    v.mkString(
+        mkSingleDerivedPathStringRaw(p),
         NixStringContext {
-            NixStringContextElem::Built {
-                .drvPath = makeConstantStorePathRef(drvPath),
-                .output = outputName,
-            }
+            std::visit([](auto && v) -> NixStringContextElem { return v; }, p),
         });
 }
 
@@ -2333,39 +2376,25 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
 {
     auto [derivedPath, s_] = coerceToSingleDerivedPathUnchecked(pos, v, errorCtx);
     auto s = s_;
-    std::visit(overloaded {
-        [&](const SingleDerivedPath::Opaque & o) {
-            auto sExpected = store->printStorePath(o.path);
-            if (s != sExpected)
+    auto sExpected = mkSingleDerivedPathStringRaw(derivedPath);
+    if (s != sExpected) {
+        /* `std::visit` is used here just to provide a more precise
+           error message. */
+        std::visit(overloaded {
+            [&](const SingleDerivedPath::Opaque & o) {
                 error(
                     "path string '%s' has context with the different path '%s'",
                     s, sExpected)
                     .withTrace(pos, errorCtx).debugThrow<EvalError>();
-        },
-        [&](const SingleDerivedPath::Built & b) {
-            auto sExpected = std::visit(overloaded {
-                [&](const SingleDerivedPath::Opaque & o) {
-                    auto drv = store->readDerivation(o.path);
-                    auto i = drv.outputs.find(b.output);
-                    if (i == drv.outputs.end())
-                        throw Error("derivation '%s' does not have output '%s'", b.drvPath->to_string(*store), b.output);
-                    auto optStaticOutputPath = i->second.path(*store, drv.name, b.output);
-                    // This is testing for the case of CA derivations
-                    return optStaticOutputPath
-                        ? store->printStorePath(*optStaticOutputPath)
-                        : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b).render();
-                },
-                [&](const SingleDerivedPath::Built & o) {
-                    return DownstreamPlaceholder::fromSingleDerivedPathBuilt(b).render();
-                },
-            }, b.drvPath->raw());
-            if (s != sExpected)
+            },
+            [&](const SingleDerivedPath::Built & b) {
                 error(
                     "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",
                     s, b.output, b.drvPath->to_string(*store), sExpected)
                     .withTrace(pos, errorCtx).debugThrow<EvalError>();
-        }
-    }, derivedPath.raw());
+            }
+        }, derivedPath.raw());
+    }
     return derivedPath;
 }
 
