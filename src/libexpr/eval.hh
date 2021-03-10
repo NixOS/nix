@@ -430,7 +430,7 @@ std::string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<std::string, std::string> decodeContext(std::string_view s);
+NixStringContextElem decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
