@@ -101,7 +101,7 @@ private:
     SrcToStore srcToStore;
 
     /* A cache from path names to parse trees. */
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     typedef std::map<Path, Expr *, std::less<Path>, traceable_allocator<std::pair<const Path, Expr *> > > FileParseCache;
 #else
     typedef std::map<Path, Expr *> FileParseCache;
@@ -109,7 +109,7 @@ private:
     FileParseCache fileParseCache;
 
     /* A cache from path names to values. */
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
 #else
     typedef std::map<Path, Value> FileEvalCache;

@@ -20,7 +20,7 @@
 
 #include <sys/resource.h>
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
 
 #define GC_INCLUDE_NEW
 
@@ -39,7 +39,7 @@ namespace nix {
 static char * dupString(const char * s)
 {
     char * t;
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     t = GC_STRDUP(s);
 #else
     t = strdup(s);
@@ -52,7 +52,7 @@ static char * dupString(const char * s)
 static char * dupStringWithLen(const char * s, size_t size)
 {
     char * t;
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     t = GC_STRNDUP(s, size);
 #else
     t = strndup(s, size);
@@ -215,7 +215,7 @@ bool Value::isTrivial() const
 }
 
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
 {
@@ -269,7 +269,7 @@ void initGC()
 {
     if (gcInitialised) return;
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     /* Initialise the Boehm garbage collector. */
 
     /* Don't look for interior pointers. This reduces the odds of
@@ -1947,7 +1947,7 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
@@ -2000,7 +2000,7 @@ void EvalState::printStats()
         topObj.attr("nrLookups", nrLookups);
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
         {
             auto gc = topObj.object("gc");
             gc.attr("heapSize", heapSize);

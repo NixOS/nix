@@ -34,7 +34,7 @@ extern "C" {
 #include "finally.hh"
 #include "markdown.hh"
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
 #include <gc/gc_cpp.h>
 #endif
@@ -42,7 +42,7 @@ extern "C" {
 namespace nix {
 
 struct NixRepl
-    #if HAVE_BOEHMGC
+    #ifdef HAVE_BOEHMGC
     : gc
     #endif
 {

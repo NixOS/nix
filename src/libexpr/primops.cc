@@ -538,7 +538,7 @@ struct CompareValues
 };
 
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
 typedef list<Value *, gc_allocator<Value *> > ValueList;
 #else
 typedef list<Value *> ValueList;

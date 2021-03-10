@@ -86,7 +86,7 @@ inline void EvalState::forceList(Value & v, const Pos & pos)
 inline void * allocBytes(size_t n)
 {
     void * p;
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
     p = GC_MALLOC(n);
 #else
     p = calloc(n, 1);

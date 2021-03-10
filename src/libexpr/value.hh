@@ -2,7 +2,7 @@
 
 #include "symbol-table.hh"
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
 #endif
 
@@ -389,7 +389,7 @@ void mkString(Value & v, const char * s);
 void mkPath(Value & v, const char * s);
 
 
-#if HAVE_BOEHMGC
+#ifdef HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
 typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
 #else
