@@ -19,3 +19,6 @@
 
 - The JSON output for derived paths with are store paths is now a string, not an object with a single `path` field.
   This only affects `nix-build --json` when "building" non-derivation things like fetched sources, which is a no-op.
+
+- Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
+  It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.

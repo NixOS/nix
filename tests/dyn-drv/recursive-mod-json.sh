@@ -3,6 +3,8 @@ source common.sh
 # FIXME
 if [[ $(uname) != Linux ]]; then skipTest "Not running Linux"; fi
 
+export NIX_TESTS_CA_BY_DEFAULT=1
+
 enableFeatures 'recursive-nix'
 restartDaemon
 

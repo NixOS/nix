@@ -359,6 +359,7 @@ void mainWrapped(int argc, char * * argv)
         experimentalFeatureSettings.experimentalFeatures = {
             Xp::Flakes,
             Xp::FetchClosure,
+            Xp::DynamicDerivations,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
