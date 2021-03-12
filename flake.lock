@@ -2,17 +2,18 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1614309161,
-        "narHash": "sha256-93kRxDPyEW9QIpxU71kCaV1r+hgOgP6/aVgC7vvO8IU=",
-        "owner": "NixOS",
+        "lastModified": 1615581980,
+        "narHash": "sha256-pwsKq7gvTBabz3MdbBNJwynvpOUQQEORnJMMGFcPzPA=",
+        "owner": "matthewbauer",
         "repo": "nixpkgs",
-        "rev": "0e499fde7af3c28d63e9b13636716b86c3162b93",
+        "rev": "6255468c4e648f48ea49efc9ba598bce5ec768b8",
         "type": "github"
       },
       "original": {
-        "id": "nixpkgs",
-        "ref": "nixos-20.09-small",
-        "type": "indirect"
+        "owner": "matthewbauer",
+        "ref": "fix-aws-sdk-cpp-on-big-sur-2",
+        "repo": "nixpkgs",
+        "type": "github"
       }
     },
     "root": {
