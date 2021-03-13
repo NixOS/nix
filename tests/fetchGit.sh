@@ -180,6 +180,114 @@ path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; ur
 [[ $path3 = $path6 ]]
 [[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
 
+# Adding a git filter does not affect the contents
+#
+# Background
+# ==========
+#
+# Git filters allow the user to change how files are represented
+# in the worktree.
+# On checkout, the configured smudge converts blobs to files in the worktree.
+# On checkin, the configured clean command converts files back into blobs.
+#
+# Notable uses include
+#  - allow the user to work with a platform-specific representation, conveniently
+#  - git-crypt: only allow some users to see file contents, transparently
+#  - git-lfs: work with large files without inflating the repository
+#
+# See also https://git-scm.com/docs/gitattributes#_filter
+#
+# Why ignore filters
+# ==================
+#
+# To quote the git docs
+#
+# > the intent is that if someone unsets the filter driver definition, or
+# > does not have the appropriate filter program, the project should still
+# > be usable.
+#
+# So the feature was designed to be optional. This confirms that we have a
+# choice. Let's look at the individual use cases.
+#
+# Allow the user to work with a platform-specific representation
+# --------------------------------------------------------------
+#
+# While this might seem convenient, any such processing can also be done in
+# `postUnpack`, so it isn't necessary here.
+# Tarballs from GitHub and such don't apply the smudge filter either, so if
+# the project is going to be packaged in Nixpkgs, it will have to process its
+# files like this anyway.
+# The real kicker here is that running the smudge filter creates an
+# unreproducible dependency, because the filter does not come from a pinned
+# immutable source and it could inject information from arbitrary sources.
+#
+# Git-crypt
+# ---------
+#
+# The nix store can be read by any process on the system, or in some cases,
+# when using a cache, literally world-readable.
+# Running the filters in fetchGit would essentially make impossible the use of
+# git-crypt and Nix flakes in the same repository.
+# Even without flakes (or with changes to the flakes feature for that matter),
+# the software you want to build generally does not depend on credentials, so
+# not decrypting is not only a secure default, but a good one.
+# In a rare case where a build does not to decrypt a git-crypted file, one could
+# still pass the decrypted file or the git-crypt key explicitly (at the cost of
+# exposing it in the store, which is inevitable for nix-built paths).
+#
+# Git LFS
+# -------
+#
+# Git LFS was designed to prevent excessive bloat in a repository, so the
+# "smudged" versions of these files will be huge.
+#
+# If we were to include these directly in the `fetchGit` output, this creates
+# copies of all the large files for each commit we check out, or even for
+# each uncommitted but built local change (with fetchGit ./.).
+#
+# In many cases, those files may not even be used in the build process. If
+# they are required, it seems feasible to fetch them explicitly with a
+# fetcher that fetches from LFS based on the sha256 in the unsmudged files.
+# It is more fine grained than downloading all LFS files and it does not even
+# require IFD because it happens after fetchGit, which runs at evaluation time.
+#
+# If for some reason LFS support can not be achieved in Nix expressions, we
+# should add support for LFS itself, without running any other filters.
+#
+# Conclusion
+# ==========
+#
+# Not running the filters is more reproducible, secure and potentially more
+# efficient than running them.
+git -C $repo checkout master
+cat >>$repo/.git/config <<EOF
+# Edit quotes locally without the quotation bird tracks
+[filter "quote"]
+  clean = sed -e 's/^/> /'
+  smudge = sed -e 's/^> //'
+EOF
+cat >$repo/.gitattributes <<EOF
+*.q filter=quote
+EOF
+
+# Files are clean when fetching from a bare repo. This simulates a non-local repo.
+echo "Insanity is building the same thing over and over and expecting different results." >$repo/einstein.q
+git -C $repo add $repo/.gitattributes $repo/einstein.q
+git -C $repo commit -m 'Add Einstein quote'
+rev4=$(git -C $repo rev-parse HEAD)
+git clone --bare $repo $repo.bare
+path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo.bare; }).outPath")
+cmp $path7/einstein.q <(echo "> Insanity is building the same thing over and over and expecting different results.")
+
+# Files are clean when fetching from a local repo with ref.
+path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev4\"; }).outPath")
+[[ $path7 = $path8 ]]
+
+
+# Files are clean when fetching from a local repo with local changes without ref or rev.
+
+# TBD
+
 # Explicit ref = "HEAD" should work, and produce the same outPath as without ref
 path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
 path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
