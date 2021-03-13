@@ -8,14 +8,19 @@ fi
 clearStore
 
 repo=$TEST_ROOT/git
+submodule_upstream=$TEST_ROOT/submodule-upstream
 
 export _NIX_FORCE_HTTP=1
 
 rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow
 
-git init $repo
-git -C $repo config user.email "foobar@example.com"
-git -C $repo config user.name "Foobar"
+init_repo() {
+    git init $1
+    git -C $1 config user.email "foobar@example.com"
+    git -C $1 config user.name "Foobar"
+}
+
+init_repo $repo
 
 echo utrecht > $repo/hello
 touch $repo/.gitignore
@@ -283,17 +288,50 @@ cmp $path7/einstein.q <(echo "> Insanity is building the same thing over and ove
 path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev4\"; }).outPath")
 [[ $path7 = $path8 ]]
 
+# Files are clean when fetching from a local repo with local changes without ref or rev and submodules = true.
+echo "All impurity needs to gain a foothold is for people of good conscience to remain unaware of undeclared inputs." >$repo/jefferson.q
+git -C $repo add -N $repo/jefferson.q
+
+path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; submodules = true; }).outPath")
+cmp $path8/jefferson.q <(echo "> All impurity needs to gain a foothold is for people of good conscience to remain unaware of undeclared inputs.")
 
 # Files are clean when fetching from a local repo with local changes without ref or rev.
+path9=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
+cmp $path9/jefferson.q <(echo "> All impurity needs to gain a foothold is for people of good conscience to remain unaware of undeclared inputs.")
 
-# TBD
-
-# Explicit ref = "HEAD" should work, and produce the same outPath as without ref
-path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
-path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
-[[ $path7 = $path8 ]]
+# Changes in submodules are included
+init_repo $submodule_upstream
+echo "# Auxiliary quotes" >$submodule_upstream/README.md
+git -C $submodule_upstream add $submodule_upstream/README.md
+git -C $submodule_upstream commit -m 'First commit'
+git -C $repo submodule add $submodule_upstream aux-quotes
+echo > $repo/aux-quotes/wisdom "Teach a man to write hello and you'll confuse him for a day. Teach a man to write hello world, and you'll confuse him for a lifetime."
+echo > $repo/aux-quotes/actual-einstein "Nix doesn't play dice."
+git -C $repo/aux-quotes add -N $repo/aux-quotes/wisdom
+git -C $repo/aux-quotes add $repo/aux-quotes/actual-einstein
+# git -C $repo diff --submodule=diff
+path10=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; submodules = true; }).outPath")
+cmp $path10/aux-quotes/wisdom <(echo "Teach a man to write hello and you'll confuse him for a day. Teach a man to write hello world, and you'll confuse him for a lifetime.")
+cmp $path10/aux-quotes/actual-einstein <(echo "Nix doesn't play dice.")
 
 # ref = "HEAD" should fetch the HEAD revision
 rev4=$(git -C $repo rev-parse HEAD)
 rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).rev")
 [[ $rev4 = $rev4_nix ]]
+
+# Fetching "HEAD" results in the same paths as fetching the rev it points to
+path11=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
+path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"$rev4\"; }).outPath")
+[[ $path11 = $path12 ]]
+
+# Explicit ref = "HEAD" should work, and produce the same outPath as without ref, if no changes are present
+git -C $repo reset .
+git -C $repo stash -u
+git -C $repo status
+path13=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
+path14=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
+diff --color=always -U3 $path13 $path14
+[[ $path13 = $path14 ]]
+
+# Fetching a revision does not include uncommitted changes
+[[ $path11 = $path13 ]]
