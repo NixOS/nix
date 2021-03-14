@@ -1840,14 +1840,13 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : [&] {
               // show paths we're copying, unless they're already in the store.
+              std::unique_ptr<PushActivity> pact;
+              auto path_to_add = checkSourcePath(path);
               if (!store->isInStore(path)) {
-                auto path_to_add = checkSourcePath(path);
                 Activity act(*logger, lvlInfo, actCopyPath, fmt("copying path '%s'", path_to_add));
-                PushActivity pact(act.id);
-                return store->addToStore(std::string(baseNameOf(path)), path_to_add, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+                pact = std::unique_ptr<PushActivity>(new PushActivity(act.id));
               }
-              else
-                return store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+              return store->addToStore(std::string(baseNameOf(path)), path_to_add, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
             } ();
 
         dstPath = store->printStorePath(p);
