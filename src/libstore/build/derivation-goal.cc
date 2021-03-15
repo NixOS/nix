@@ -925,6 +925,8 @@ void DerivationGoal::resolvedFinished() {
         if (realisation) {
             auto newRealisation = *realisation;
             newRealisation.id = DrvOutput{initialOutputs.at(wantedOutput).outputHash, wantedOutput};
+            newRealisation.signatures.clear();
+            signRealisation(newRealisation);
             worker.store.registerDrvOutput(newRealisation);
         } else {
             // If we don't have a realisation, then it must mean that something

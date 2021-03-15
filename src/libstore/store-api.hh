@@ -384,7 +384,12 @@ public:
        we don't really want to add the dependencies listed in a nar info we
        don't trust anyyways.
        */
-    virtual bool pathInfoIsTrusted(const ValidPathInfo &)
+    virtual bool pathInfoIsUntrusted(const ValidPathInfo &)
+    {
+        return true;
+    }
+
+    virtual bool realisationIsUntrusted(const Realisation & )
     {
         return true;
     }
@@ -480,6 +485,8 @@ public:
      */
     virtual void registerDrvOutput(const Realisation & output)
     { unsupported("registerDrvOutput"); }
+    virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
+    { return registerDrvOutput(output); }
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;

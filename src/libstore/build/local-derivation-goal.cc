@@ -2615,11 +2615,20 @@ void LocalDerivationGoal::registerOutputs()
        but it's fine to do in all cases. */
 
     if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        for (auto& [outputName, newInfo] : infos)
-            worker.store.registerDrvOutput(Realisation{
-                .id = DrvOutput{initialOutputs.at(outputName).outputHash, outputName},
-                .outPath = newInfo.path});
+        for (auto& [outputName, newInfo] : infos) {
+            auto thisRealisation = Realisation{
+                .id = DrvOutput{initialOutputs.at(outputName).outputHash,
+                                outputName},
+                .outPath = newInfo.path};
+            signRealisation(thisRealisation);
+            worker.store.registerDrvOutput(thisRealisation);
+        }
     }
+}
+
+void LocalDerivationGoal::signRealisation(Realisation & realisation)
+{
+    getLocalStore().signRealisation(realisation);
 }
 
 
