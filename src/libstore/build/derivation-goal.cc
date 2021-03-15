@@ -1250,9 +1250,12 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
 void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
+    auto wantedOutputsLeft = wantedOutputs;
     for (auto & i : queryPartialDerivationOutputMap()) {
         InitialOutput & info = initialOutputs.at(i.first);
         info.wanted = wantOutput(i.first, wantedOutputs);
+        if (info.wanted)
+            wantedOutputsLeft.erase(i.first);
         if (i.second) {
             auto outputPath = *i.second;
             info.known = {
@@ -1274,6 +1277,13 @@ void DerivationGoal::checkPathValidity()
             }
         }
     }
+    // If we requested all the outputs via the empty set, we are always fine.
+    // If we requested specific elements, the loop above removes all the valid
+    // ones, so any that are left must be invalid.
+    if (!wantedOutputsLeft.empty())
+        throw Error("derivation '%s' does not have wanted outputs %s",
+            worker.store.printStorePath(drvPath),
+            concatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
 }
 
 
