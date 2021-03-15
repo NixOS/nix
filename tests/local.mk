@@ -17,6 +17,7 @@ nix_tests = \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
+  build-remote-content-addressed-fixed.sh \
   build-remote-content-addressed-floating.sh \
   ssh-relay.sh \
   nar-access.sh \
