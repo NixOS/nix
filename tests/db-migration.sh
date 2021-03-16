@@ -1,7 +1,8 @@
 # Test that we can successfully migrate from an older db schema
 
 # Only run this if we have an older Nix available
-if [[ -z "$OUTER_NIX" ]]; then
+# XXX: This assumes that the `daemon` package is older than the `client` one
+if [[ -z "$NIX_DAEMON_PACKAGE" ]]; then
     exit 0
 fi
 
@@ -9,7 +10,7 @@ source common.sh
 
 # Fill the db using the older Nix
 PATH_WITH_NEW_NIX="$PATH"
-export PATH="$OUTER_NIX/bin:$PATH"
+export PATH="$NIX_DAEMON_PACKAGE/bin:$PATH"
 clearStore
 nix-build simple.nix --no-out-link
 nix-store --generate-binary-cache-key cache1.example.org $TEST_ROOT/sk1 $TEST_ROOT/pk1
