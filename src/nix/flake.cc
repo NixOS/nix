@@ -110,6 +110,7 @@ struct CmdFlakeUpdate : FlakeCommand
         removeFlag("recreate-lock-file");
         removeFlag("update-input");
         removeFlag("no-update-lock-file");
+        removeFlag("no-write-lock-file");
     }
 
     std::string doc() override
@@ -124,6 +125,7 @@ struct CmdFlakeUpdate : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.recreateLockFile = true;
+        lockFlags.writeLockFile = true;
 
         lockFlake();
     }
@@ -136,6 +138,12 @@ struct CmdFlakeLock : FlakeCommand
         return "create missing lock file entries";
     }
 
+    CmdFlakeLock()
+    {
+        /* Remove flags that don't make sense. */
+        removeFlag("no-write-lock-file");
+    }
+
     std::string doc() override
     {
         return
@@ -146,6 +154,8 @@ struct CmdFlakeLock : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         settings.tarballTtl = 0;
+
+        lockFlags.writeLockFile = true;
 
         lockFlake();
     }
