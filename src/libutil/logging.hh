@@ -208,6 +208,8 @@ extern Verbosity verbosity; /* suppress msgs > this */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {
+    if (nix::verbosity < lvlWarn) return;
+
     boost::format f(fs);
     formatHelper(f, args...);
     logger->warn(f.str());
