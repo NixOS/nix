@@ -230,6 +230,15 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
     }
 };
 
+struct CmdFlakeInfo : CmdFlakeMetadata
+{
+    void run(nix::ref<nix::Store> store) override
+    {
+        warn("'nix flake info' is a deprecated alias for 'nix flake metadata'");
+        CmdFlakeMetadata::run(store);
+    }
+};
+
 struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
@@ -1024,6 +1033,7 @@ struct CmdFlake : NixMultiCommand
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
                 {"lock", []() { return make_ref<CmdFlakeLock>(); }},
                 {"metadata", []() { return make_ref<CmdFlakeMetadata>(); }},
+                {"info", []() { return make_ref<CmdFlakeInfo>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"new", []() { return make_ref<CmdFlakeNew>(); }},
