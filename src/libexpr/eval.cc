@@ -1842,7 +1842,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
               // show paths we're copying, unless they're already in the store.
               std::unique_ptr<PushActivity> pact;
               auto path_to_add = checkSourcePath(path);
-              if (!store->isInStore(path)) {
+              if (!store->isInStore(path) || repair) {
                 Activity act(*logger, lvlInfo, actCopyPath, fmt("copying path '%s'", path_to_add));
                 pact = std::unique_ptr<PushActivity>(new PushActivity(act.id));
               }
