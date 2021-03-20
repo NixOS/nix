@@ -117,22 +117,13 @@ poly_group_exists() {
     getent group "$1" > /dev/null 2>&1
 }
 
-poly_group_id_get() {
-    getent group "$1" | cut -d: -f3
-}
-
 poly_create_build_group() {
     _sudo "Create the Nix build group, $NIX_BUILD_GROUP_NAME" \
-          groupadd -g "$NIX_BUILD_GROUP_ID" --system \
-          "$NIX_BUILD_GROUP_NAME" >&2
+          groupadd --system "$NIX_BUILD_GROUP_NAME" >&2
 }
 
 poly_user_exists() {
     getent passwd "$1" > /dev/null 2>&1
-}
-
-poly_user_id_get() {
-    getent passwd "$1" | cut -d: -f3
 }
 
 poly_user_hidden_get() {
@@ -179,31 +170,18 @@ poly_user_in_group_set() {
           usermod --append --groups "$2" "$1"
 }
 
-poly_user_primary_group_get() {
-    getent passwd "$1" | cut -d: -f4
-}
-
-poly_user_primary_group_set() {
-    _sudo "to let the nix daemon use this user for builds (this might seem redundant, but there are two concepts of group membership)" \
-          usermod --gid "$2" "$1"
-
-}
-
 poly_create_build_user() {
     username=$1
-    uid=$2
-    builder_num=$3
+    builder_num=$2
 
     _sudo "Creating the Nix build user, $username" \
           useradd \
           --home-dir /var/empty \
           --comment "Nix build user $builder_num" \
-          --gid "$NIX_BUILD_GROUP_ID" \
-          --groups "$NIX_BUILD_GROUP_NAME" \
+          --gid "$NIX_BUILD_GROUP_NAME" \
           --no-user-group \
           --system \
           --shell /sbin/nologin \
-          --uid "$uid" \
           --password "!" \
           "$username"
 }

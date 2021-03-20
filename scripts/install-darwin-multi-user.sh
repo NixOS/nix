@@ -60,24 +60,23 @@ poly_group_exists() {
     /usr/bin/dscl . -read "/Groups/$1" > /dev/null 2>&1
 }
 
-poly_group_id_get() {
-    dsclattr "/Groups/$1" "PrimaryGroupID"
-}
-
 poly_create_build_group() {
+    last_gid=$(/usr/bin/dscl . -list /Groups PrimaryGroupID | awk '{print $2}' | sort -ug | tail -1)
+
+    if [ -z "$last_gid" ]; then
+        # Something bad has happened; try to recover
+        last_gid=29999
+    fi
+
     _sudo "Create the Nix build group, $NIX_BUILD_GROUP_NAME" \
           /usr/sbin/dseditgroup -o create \
           -r "Nix build group for nix-daemon" \
-          -i "$NIX_BUILD_GROUP_ID" \
+          -i "$(($last_gid+1))" \
           "$NIX_BUILD_GROUP_NAME" >&2
 }
 
 poly_user_exists() {
     /usr/bin/dscl . -read "/Users/$1" > /dev/null 2>&1
-}
-
-poly_user_id_get() {
-    dsclattr "/Users/$1" "UniqueID"
 }
 
 poly_user_hidden_get() {
@@ -131,21 +130,18 @@ poly_user_in_group_set() {
           -a "$username" "$group"
 }
 
-poly_user_primary_group_get() {
-    dsclattr "/Users/$1" "PrimaryGroupID"
-}
-
-poly_user_primary_group_set() {
-    _sudo "to let the nix daemon use this user for builds (this might seem redundant, but there are two concepts of group membership)" \
-          /usr/bin/dscl . -create "/Users/$1" "PrimaryGroupID" "$2"
-}
-
 poly_create_build_user() {
     username=$1
-    uid=$2
-    builder_num=$3
+    builder_num=$2
+
+    last_uid="$(/usr/bin/dscl . -list /Users UniqueID | awk '{print $2}' | sort -ug | tail -1)"
+
+    if [ -z "$last_uid" ]; then
+        # Something bad has happened in finding uid, try to recover
+        last_uid=30000
+    fi
 
     _sudo "Creating the Nix build user (#$builder_num), $username" \
           /usr/bin/dscl . create "/Users/$username" \
-          UniqueID "${uid}"
+          UniqueID "$(($last_uid+1))"
 }

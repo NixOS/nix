@@ -23,9 +23,7 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="30000"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
-readonly NIX_FIRST_BUILD_UID="30001"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
 readonly NIX_ROOT="/nix"
@@ -105,10 +103,6 @@ EOF
 
 nix_user_for_core() {
     printf "nixbld%d" "$1"
-}
-
-nix_uid_for_core() {
-    echo $((NIX_FIRST_BUILD_UID + $1 - 1))
 }
 
 _textout() {
@@ -315,7 +309,6 @@ setup_report() {
     row "        Temp Dir" "$SCRATCH"
     row "        Nix Root" "$NIX_ROOT"
     row "     Build Users" "$NIX_USER_COUNT"
-    row "  Build Group ID" "$NIX_BUILD_GROUP_ID"
     row "Build Group Name" "$NIX_BUILD_GROUP_NAME"
     if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" != "" ]; then
         row "Preexisting Install" "Allowed"
@@ -323,9 +316,9 @@ setup_report() {
 
     subheader "build users:"
 
-    row "    Username" "UID"
+    row "    Username"
     for i in $(seq 1 "$NIX_USER_COUNT"); do
-        row "     $(nix_user_for_core "$i")" "$(nix_uid_for_core "$i")"
+        row "     $(nix_user_for_core "$i")"
     done
     echo ""
 }
@@ -338,53 +331,24 @@ create_build_group() {
         poly_create_build_group
         row "            Created" "Yes"
     else
-        primary_group_id=$(poly_group_id_get "$NIX_BUILD_GROUP_NAME")
-        if [ "$primary_group_id" -ne "$NIX_BUILD_GROUP_ID" ]; then
-            failure <<EOF
-It seems the build group $NIX_BUILD_GROUP_NAME already exists, but
-with the UID $primary_group_id. This script can't really handle
-that right now, so I'm going to give up.
-
-You can fix this by editing this script and changing the
-NIX_BUILD_GROUP_ID variable near the top to from $NIX_BUILD_GROUP_ID
-to $primary_group_id and re-run.
-EOF
-        else
-            row "            Exists" "Yes"
-        fi
+        row "            Exists" "Yes"
     fi
 }
 
 create_build_user_for_core() {
     local coreid
     local username
-    local uid
 
     coreid="$1"
     username=$(nix_user_for_core "$coreid")
-    uid=$(nix_uid_for_core "$coreid")
 
     task "Setting up the build user $username"
 
     if ! poly_user_exists "$username"; then
-        poly_create_build_user "$username" "$uid" "$coreid"
+        poly_create_build_user "$username" "$coreid"
         row "           Created" "Yes"
     else
-        actual_uid=$(poly_user_id_get "$username")
-        if [ "$actual_uid" != "$uid" ]; then
-            failure <<EOF
-It seems the build user $username already exists, but with the UID
-with the UID '$actual_uid'. This script can't really handle that right
-now, so I'm going to give up.
-
-If you already created the users and you know they start from
-$actual_uid and go up from there, you can edit this script and change
-NIX_FIRST_BUILD_UID near the top of the file to $actual_uid and try
-again.
-EOF
-        else
-            row "            Exists" "Yes"
-        fi
+        row "            Exists" "Yes"
     fi
 
     if [ "$(poly_user_hidden_get "$username")" = "1" ]; then
@@ -424,13 +388,6 @@ EOF
     else
         poly_user_in_group_set "$username" "$NIX_BUILD_GROUP_NAME"
         row "  Member of $NIX_BUILD_GROUP_NAME" "Yes"
-    fi
-
-    if [ "$(poly_user_primary_group_get "$username")" = "$NIX_BUILD_GROUP_ID" ]; then
-        row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
-    else
-        poly_user_primary_group_set "$username" "$NIX_BUILD_GROUP_ID"
-        row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
     fi
 }
 
