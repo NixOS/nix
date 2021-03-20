@@ -255,18 +255,19 @@ public:
         conn->to.flush();
 
         BuildResult status;
-        status.status = (BuildResult::Status) readInt(conn->from);
-        conn->from >> status.errorMsg;
 
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
-        }
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) < 6) {
+            status.status = (BuildResult::Status) readInt(conn->from);
+            conn->from >> status.errorMsg;
+
+            if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
+                conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
+        } else
+            status = worker_proto::read(*this, conn->from, Phantom<BuildResult> {});
         return status;
     }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    std::map<StorePath, BuildResult> buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
     {
         auto conn(connections->get());
 
@@ -280,6 +281,10 @@ public:
 
         conn->to.flush();
 
+        std::map<StorePath, BuildResult> res;
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 7)
+            res = worker_proto::read(*this, conn->from, Phantom<std::map<StorePath, BuildResult>>{});
+
         BuildResult result;
         result.status = (BuildResult::Status) readInt(conn->from);
 
@@ -287,6 +292,8 @@ public:
             conn->from >> result.errorMsg;
             throw Error(result.status, result.errorMsg);
         }
+
+        return res;
     }
 
     void ensurePath(const StorePath & path) override

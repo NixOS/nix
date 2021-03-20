@@ -506,8 +506,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 throw Error("repairing is not allowed because you are not in 'trusted-users'");
         }
         logger->startWork();
-        store->buildPaths(drvs, mode);
+        auto res = store->buildPaths(drvs, mode);
         logger->stopWork();
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 30)
+            worker_proto::write(*store, to, res);
         to << 1;
         break;
     }
@@ -574,10 +576,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
-        to << res.status << res.errorMsg;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 0xc) {
-            worker_proto::write(*store, to, res.builtOutputs);
-        }
+        if (GET_PROTOCOL_MINOR(clientVersion) < 29) {
+            to << res.status << res.errorMsg;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
+                worker_proto::write(*store, to, res.builtOutputs);
+            }
+        } else
+            worker_proto::write(*store, to, res);
         break;
     }
 

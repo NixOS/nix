@@ -62,9 +62,41 @@ void write(const Store & store, Sink & out, const Realisation & realisation)
 { out << realisation.toJSON().dump(); }
 
 DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
-{ return DrvOutput::parse(readString(from)); }
+{
+    return DrvOutput::parse(readString(from));
+}
+
 void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
-{ out << drvOutput.to_string(); }
+{
+    out << drvOutput.to_string();
+}
+
+
+// BuildResult marshalliig is valid for daemon protocol >= 29 && legacy ssh >= 6
+
+BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+{
+    BuildResult res;
+    // all versions
+    res.status = (BuildResult::Status) readInt(from);
+    from >> res.errorMsg;
+    // legacy ssh >= 3 only before
+    from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
+    // daemon protocol >= 28 && legacy ssh >= 6 before
+    res.builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
+    return res;
+}
+
+void write(const Store & store, Sink & out, const BuildResult & res)
+{
+    // all versions
+    out << res.status << res.errorMsg;
+    // legacy ssh >= 3 only before
+    out << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
+    // daemon protocol >= 28 && legacy ssh >= 6 before
+    worker_proto::write(store, out, res.builtOutputs);
+}
+
 
 std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
 {
@@ -647,7 +679,7 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
 }
 
 
-void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+std::map<StorePath, BuildResult> RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
     auto conn(getConnection());
     conn->to << wopBuildPaths;
@@ -664,7 +696,11 @@ void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths,
         if (buildMode != bmNormal)
             throw Error("repairing or checking is not supported when building through the Nix daemon");
     conn.processStderr();
+    std::map<StorePath, BuildResult> res;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 30)
+        res = worker_proto::read(*this, conn->from, Phantom<std::map<StorePath, BuildResult>>{});
     readInt(conn->from);
+    return res;
 }
 
 
@@ -676,15 +712,17 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res;
-    unsigned int status;
-    conn->from >> status >> res.errorMsg;
-    res.status = (BuildResult::Status) status;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0xc) {
-        auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
-        res.builtOutputs = builtOutputs;
-    }
-    return res;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 29) {
+        BuildResult res;
+        res.status = (BuildResult::Status) readInt(conn->from);
+        conn->from >> res.errorMsg;
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
+            auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            res.builtOutputs = builtOutputs;
+        }
+        return res;
+    } else
+        return worker_proto::read(*this, conn->from, Phantom<BuildResult>{});
 }
 
 

@@ -39,8 +39,8 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
-  build.sh \
-  compute-levels.sh \
+  new-cli/build/ia.sh \
+  new-cli/build/ca-float.sh \
   ca/build.sh \
   ca/substitute.sh \
   ca/signatures.sh \

@@ -6,7 +6,31 @@
 
 namespace nix {
 
-void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+static void setResultRealizations(Store & store, const Derivation & drv, BuildResult & result) {
+    // XXX: Should use `goal->queryPartialDerivationOutputMap()` once it's
+    // extended to return the full realisation for each output
+    auto staticDrvOutputs = drv.outputsAndOptPaths(store);
+    auto outputHashes = staticOutputHashes(store, drv);
+    for (auto & [outputName, staticOutput] : staticDrvOutputs) {
+        auto outputId = DrvOutput{outputHashes.at(outputName), outputName};
+        if (staticOutput.second)
+            result.builtOutputs.insert_or_assign(
+                    outputId,
+                    Realisation{ outputId, *staticOutput.second}
+                    );
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+            auto realisation = store.queryRealisation(outputId);
+            if (realisation)
+                result.builtOutputs.insert_or_assign(
+                        outputId,
+                        *realisation
+                        );
+        }
+    }
+}
+
+
+std::map<StorePath, BuildResult> Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
 {
     Worker worker(*this);
 
@@ -42,7 +66,17 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, Build
         if (ex) logError(ex->info());
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
     }
+
+    std::map<StorePath, BuildResult> results;
+    for (auto & i0 : goals) {
+        auto i = dynamic_cast<DerivationGoal *>(i0.get());
+        if (!i) continue;
+        auto & result = results.insert_or_assign(i->drvPath, i->getResult()).first->second;
+        setResultRealizations(*this, *i->drv, result);
+    }
+    return results;
 }
+
 
 BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
@@ -59,26 +93,7 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         result.status = BuildResult::MiscFailure;
         result.errorMsg = e.msg();
     }
-    // XXX: Should use `goal->queryPartialDerivationOutputMap()` once it's
-    // extended to return the full realisation for each output
-    auto staticDrvOutputs = drv.outputsAndOptPaths(*this);
-    auto outputHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, staticOutput] : staticDrvOutputs) {
-        auto outputId = DrvOutput{outputHashes.at(outputName), outputName};
-        if (staticOutput.second)
-            result.builtOutputs.insert_or_assign(
-                    outputId,
-                    Realisation{ outputId, *staticOutput.second}
-                    );
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
-            auto realisation = this->queryRealisation(outputId);
-            if (realisation)
-                result.builtOutputs.insert_or_assign(
-                        outputId,
-                        *realisation
-                        );
-        }
-    }
+    setResultRealizations(*this, drv, result);
 
     return result;
 }

@@ -723,10 +723,40 @@ Buildables build(ref<Store> store, Realise mode,
         }
     }
 
+    std::map<StorePath, BuildResult> buildRes;
+
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild, bMode);
+        buildRes = store->buildPaths(pathsToBuild, bMode);
+
+    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+        for (auto & b0 : buildables) {
+            auto *bp = std::get_if<BuildableFromDrv>(&b0);
+            if (!bp)  continue;
+            auto & b = *bp;
+
+            auto i = buildRes.find(b.drvPath);
+            // shouldn't happen except for with remote store + older protocols
+            if (i == buildRes.end()) continue;
+            auto & [_, result] = *i;
+
+            // Don't necessarily have derivation, so we get hash modulo a different way.
+            // TODO: It would be better if the map keys were just output names,
+            // and stored the drv hash modulo once.
+            auto firstOutput = result.builtOutputs.begin();
+            // Can happen for input-addressed or old daemon protocol
+            if (firstOutput == result.builtOutputs.end()) continue;
+            auto & drvHashModulo = firstOutput->first.drvHash;
+
+            for (auto & [outputName, outputPath] : b.outputs) {
+                if (outputPath) continue;
+
+                auto i = result.builtOutputs.find(DrvOutput { drvHashModulo, outputName});
+                assert(i != result.builtOutputs.end());
+                outputPath = i->second.outPath;
+            }
+        }
 
     return buildables;
 }

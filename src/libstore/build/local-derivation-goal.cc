@@ -1312,7 +1312,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     // an allowed derivation
     { throw Error("queryRealisation"); }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
+    std::map<StorePath, BuildResult> buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
 
@@ -1323,7 +1323,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 throw InvalidPath("cannot build unknown path '%s' in recursive Nix", printStorePath(path.path));
         }
 
-        next->buildPaths(paths, buildMode);
+        auto res = next->buildPaths(paths, buildMode);
 
         for (auto & path : paths) {
             if (!path.path.isDerivation()) continue;
@@ -1337,6 +1337,8 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         next->computeFSClosure(newPaths, closure);
         for (auto & path : closure)
             goal.addDependency(path);
+
+        return res;
     }
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,

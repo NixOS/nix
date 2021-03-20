@@ -499,7 +499,7 @@ public:
        output paths can be created by running the builder, after
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
-    virtual void buildPaths(
+    virtual std::map<StorePath, BuildResult> buildPaths(
         const std::vector<StorePathWithOutputs> & paths,
         BuildMode buildMode = bmNormal);
 

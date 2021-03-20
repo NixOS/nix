@@ -1,9 +1,17 @@
+{ floatingCA ? false }:
+
 with import ./config.nix;
 
 rec {
 
+  mkDerivation' = args: mkDerivation ((if floatingCA then {
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+    __contentAddressed = true;
+  } else {}) // args);
+
   # Want to ensure that "out" doesn't get a suffix on it's path.
-  nameCheck = mkDerivation {
+  nameCheck = mkDerivation' {
     name = "multiple-outputs-a";
     outputs = [ "out" "dev" ];
     builder = builtins.toFile "builder.sh"
@@ -17,7 +25,7 @@ rec {
     helloString = "Hello, world!";
   };
 
-  a = mkDerivation {
+  a = mkDerivation' {
     name = "multiple-outputs-a";
     outputs = [ "first" "second" ];
     builder = builtins.toFile "builder.sh"
@@ -31,7 +39,7 @@ rec {
     helloString = "Hello, world!";
   };
 
-  b = mkDerivation {
+  b = mkDerivation' {
     defaultOutput = assert a.second.helloString == "Hello, world!"; a;
     firstOutput = assert a.outputName == "first"; a.first.first;
     secondOutput = assert a.second.outputName == "second"; a.second.first.first.second.second.first.second;
@@ -48,7 +56,7 @@ rec {
       '';
   };
 
-  c = mkDerivation {
+  c = mkDerivation' {
     name = "multiple-outputs-c";
     drv = b.drvPath;
     builder = builtins.toFile "builder.sh"
@@ -58,7 +66,7 @@ rec {
       '';
   };
 
-  d = mkDerivation {
+  d = mkDerivation' {
     name = "multiple-outputs-d";
     drv = builtins.unsafeDiscardOutputDependency b.drvPath;
     builder = builtins.toFile "builder.sh"
@@ -68,7 +76,7 @@ rec {
       '';
   };
 
-  cyclic = (mkDerivation {
+  cyclic = (mkDerivation' {
     name = "cyclic-outputs";
     outputs = [ "a" "b" "c" ];
     builder = builtins.toFile "builder.sh"
