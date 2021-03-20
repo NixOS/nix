@@ -868,8 +868,12 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         pkgObj.attr("system", i.querySystem());
 
         JSONObject metaObj = pkgObj.object("meta");
+
         StringSet metaNames = i.queryMetaNames();
         for (auto & j : metaNames) {
+            if (j == "outputsToInstall")
+                continue;
+
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
@@ -880,6 +884,11 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
                 printValueAsJSON(*globals.state, true, *v, placeholder, context);
             }
         }
+
+        DrvInfo::Outputs outputs = i.queryOutputs(true);
+        auto placeholder = metaObj.list("outputsToInstall");
+        for (auto & j : outputs)
+            placeholder.elem(j.first);
     }
 }
 
