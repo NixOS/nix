@@ -576,7 +576,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->stopWork();
         to << res.status << res.errorMsg;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
-            out << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
+            to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
             worker_proto::write(*store, to, res.builtOutputs);
