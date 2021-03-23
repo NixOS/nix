@@ -686,7 +686,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
-        from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
+        conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
     }
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
         auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
