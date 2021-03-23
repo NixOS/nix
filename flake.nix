@@ -233,6 +233,8 @@
 
           separateDebugInfo = true;
 
+          strictDeps = true;
+
           passthru.perl-bindings = with final; stdenv.mkDerivation {
             name = "nix-perl-${version}";
 
@@ -517,6 +519,8 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           stripAllList = ["bin"];
+
+          strictDeps = true;
         };
       });
 
