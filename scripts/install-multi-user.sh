@@ -31,7 +31,7 @@ readonly NIX_FIRST_BUILD_UID="30001"
 readonly NIX_ROOT="/nix"
 readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
-readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshenv")
+readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshenv" "/etc/bash.bashrc" "/etc/zsh/zshenv")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
