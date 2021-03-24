@@ -78,7 +78,8 @@
             buildPackages.git
             buildPackages.mercurial
             buildPackages.jq
-          ];
+          ]
+          ++ lib.optionals stdenv.isLinux [(pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)];
 
         buildDeps =
           [ curl
@@ -90,7 +91,7 @@
             lowdown
             gmock
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp (pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)]
+          ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.isx86_64 libcpuid;
 
