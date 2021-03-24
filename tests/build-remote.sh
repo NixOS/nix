@@ -1,5 +1,5 @@
-if ! canUseSandbox; then exit; fi
-if ! [[ $busybox =~ busybox ]]; then exit; fi
+if ! canUseSandbox; then exit 99; fi
+if ! [[ $busybox =~ busybox ]]; then exit 99; fi
 
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
