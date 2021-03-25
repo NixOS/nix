@@ -366,9 +366,11 @@ string readLine(int fd)
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading a line");
-        } else if (rd == 0)
-            throw EndOfFile("unexpected EOF reading a line");
-        else {
+        } else if (rd == 0) {
+            throw (s == "")
+                ? EndOfFile("no more lines left")
+                : EndOfFile("unexpected end-of-file while reading line");
+        } else {
             if (ch == '\n') return s;
             s += ch;
         }
