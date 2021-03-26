@@ -81,7 +81,7 @@ void loadConfFile()
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverriden();
+    globalConfig.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
