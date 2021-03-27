@@ -365,7 +365,9 @@ struct GitInputScheme : InputScheme
                         ? "refs/*"
                         : ref->compare(0, 5, "refs/") == 0
                             ? *ref
-                            : "refs/heads/" + *ref;
+                            : ref == "HEAD"
+                                ? *ref
+                                : "refs/heads/" + *ref;
                     runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
