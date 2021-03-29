@@ -90,7 +90,7 @@
             lowdown
             gmock
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+          ++ lib.optionals stdenv.isLinux [libseccomp (pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.isx86_64 libcpuid;
 
