@@ -143,16 +143,18 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             s += '/';
             while (i != end && *i != '/') s += *i++;
 
-            /* If s points to a symlink, resolve it and restart (since
-               the symlink target might contain new symlinks). */
+            /* If s points to a symlink, resolve it and continue from there */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = absPath(readLink(s), dirOf(s))
-                    + string(i, end);
-                i = temp.begin(); /* restart */
+                temp = readLink(s) + string(i, end);
+                i = temp.begin();
                 end = temp.end();
-                s = "";
+                if (!temp.empty() && temp[0] == '/') {
+                    s.clear();  /* restart for symlinks pointing to absolute path */
+                } else {
+                    s = dirOf(s);
+                }
             }
         }
     }
