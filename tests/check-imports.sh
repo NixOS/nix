@@ -47,10 +47,10 @@ testImportFile $TEST_ROOT/example/dir/subdir/alt-good.nix
 testImportFile $TEST_ROOT/example/dir/subdir
 
 # two-level relative import from path with symlink dir
-# FIXME: testImportFile $TEST_ROOT/example/dir/subdir/import-good.nix
+testImportFile $TEST_ROOT/example/dir/subdir/import-good.nix
 
 # relative traverse of symlink dir
 # FIXME: testImportFile $TEST_ROOT/example/dir/subdir/../good.nix
 
 # dir import with symlinked default.nix
-# FIXME: testImportFile $TEST_ROOT/example/alt-dir
+testImportFile $TEST_ROOT/example/alt-dir
