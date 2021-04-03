@@ -12,7 +12,7 @@ nix_tests = \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh \
   binary-cache-build-remote.sh \
-  nix-profile.sh repair.sh dump-db.sh case-hack.sh \
+  nix-profile.sh nix-profile.fish repair.sh dump-db.sh case-hack.sh \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
