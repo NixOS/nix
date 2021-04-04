@@ -311,6 +311,20 @@ fi
 AC_SUBST(tarFlags)
 
 
+# Do we have the JSON library?
+AC_ARG_VAR([nlohmann_json_include], [Path to the JSON includes])
+AC_LANG_PUSH(C++)
+    [if test -n "$nlohmann_json_include" ; then
+	CXXFLAGS="-I$nlohmann_json_include $CXXFLAGS" ;
+    fi]
+    AC_CHECK_HEADERS([nlohmann/json_fwd.hpp],[
+	AC_SUBST([CXXFLAGS],[$CXXFLAGS])
+    ],[
+	AC_MSG_ERROR([We need the JSON library from https://github.com/nlohmann/json!])
+    ])
+AC_LANG_POP(C++)
+
+
 AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
