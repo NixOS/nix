@@ -30,4 +30,3 @@ if test -n "$HOME"; and test -n "$USER"
     set -e NIX_LINK
 
 end
-
