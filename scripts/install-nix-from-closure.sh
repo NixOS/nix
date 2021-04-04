@@ -221,7 +221,7 @@ if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
 fi
 
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
-    # For bash-compatible shells: Bash, Zsh
+    # For bash-compatible shells like bash or zsh
     # Make the shell source nix.sh during login.
     p=$HOME/.nix-profile/etc/profile.d/nix.sh
     for i in .bash_profile .bash_login .profile; do
@@ -247,8 +247,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         fi
     done
 
-    # For Fish
-    # Make the shell source nix.fish during login.
+    # Make fish source nix.fish during login.
     p=$HOME/.nix-profile/etc/profile.d/nix.fish
     for i in .config/fish/config.fish; do
         fn="$HOME/$i"
@@ -284,4 +283,3 @@ variables are set, either log in again, or type
 in your shell.
 EOF
 fi
-
