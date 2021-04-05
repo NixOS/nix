@@ -2,7 +2,7 @@
 
 #include "realisation.hh"
 #include "path.hh"
-#include "buildable.hh"
+#include "derived-path.hh"
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"

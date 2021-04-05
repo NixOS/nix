@@ -4,7 +4,7 @@
 #include "args.hh"
 #include "common-args.hh"
 #include "path.hh"
-#include "buildable.hh"
+#include "derived-path.hh"
 
 #include <signal.h>
 

@@ -3,7 +3,7 @@
 #include <variant>
 
 #include "path.hh"
-#include "buildable.hh"
+#include "derived-path.hh"
 
 namespace nix {
 
