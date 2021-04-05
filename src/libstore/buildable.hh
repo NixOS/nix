@@ -20,31 +20,35 @@ struct BuildableOpaque {
     static BuildableOpaque parse(const Store & store, std::string_view);
 };
 
-template<typename Outputs>
-struct BuildableForFromDrv {
+struct BuildableReqFromDrv {
     StorePath drvPath;
-    Outputs outputs;
+    std::set<std::string> outputs;
 
-    nlohmann::json toJSON(ref<Store> store) const;
     std::string to_string(const Store & store) const;
-    static BuildableForFromDrv<Outputs> parse(const Store & store, std::string_view);
+    static BuildableReqFromDrv parse(const Store & store, std::string_view);
 };
 
-template <typename Outputs>
-using BuildableFor = std::variant<
+using BuildableReq = std::variant<
     BuildableOpaque,
-    BuildableForFromDrv<Outputs>
+    BuildableReqFromDrv
 >;
-
-typedef BuildableForFromDrv<std::set<std::string>> BuildableReqFromDrv;
-typedef BuildableFor<std::set<std::string>> BuildableReq;
 
 std::string to_string(const Store & store, const BuildableReq &);
 
 BuildableReq parseBuildableReq(const Store & store, std::string_view);
 
-typedef BuildableForFromDrv<std::map<std::string, std::optional<StorePath>>> BuildableFromDrv;
-typedef BuildableFor<std::map<std::string, std::optional<StorePath>>> Buildable;
+struct BuildableFromDrv {
+    StorePath drvPath;
+    std::map<std::string, std::optional<StorePath>> outputs;
+
+    nlohmann::json toJSON(ref<Store> store) const;
+    static BuildableFromDrv parse(const Store & store, std::string_view);
+};
+
+using Buildable = std::variant<
+    BuildableOpaque,
+    BuildableFromDrv
+>;
 
 typedef std::vector<Buildable> Buildables;
 

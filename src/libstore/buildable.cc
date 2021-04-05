@@ -11,7 +11,6 @@ nlohmann::json BuildableOpaque::toJSON(ref<Store> store) const {
     return res;
 }
 
-template<>
 nlohmann::json BuildableFromDrv::toJSON(ref<Store> store) const {
     nlohmann::json res;
     res["drvPath"] = store->printStorePath(drvPath);
@@ -36,7 +35,6 @@ std::string BuildableOpaque::to_string(const Store & store) const {
     return store.printStorePath(path);
 }
 
-template<>
 std::string BuildableReqFromDrv::to_string(const Store & store) const {
     return store.printStorePath(drvPath)
         + "!"
@@ -56,7 +54,6 @@ BuildableOpaque BuildableOpaque::parse(const Store & store, std::string_view s)
     return {store.parseStorePath(s)};
 }
 
-template<>
 BuildableReqFromDrv BuildableReqFromDrv::parse(const Store & store, std::string_view s)
 {
     size_t n = s.find("!");
