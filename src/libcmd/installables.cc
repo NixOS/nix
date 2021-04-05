@@ -20,31 +20,6 @@
 
 namespace nix {
 
-nlohmann::json BuildableOpaque::toJSON(ref<Store> store) const {
-    nlohmann::json res;
-    res["path"] = store->printStorePath(path);
-    return res;
-}
-
-nlohmann::json BuildableFromDrv::toJSON(ref<Store> store) const {
-    nlohmann::json res;
-    res["drvPath"] = store->printStorePath(drvPath);
-    for (const auto& [output, path] : outputs) {
-        res["outputs"][output] = path ? store->printStorePath(*path) : "";
-    }
-    return res;
-}
-
-nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store) {
-    auto res = nlohmann::json::array();
-    for (const Buildable & buildable : buildables) {
-        std::visit([&res, store](const auto & buildable) {
-            res.push_back(buildable.toJSON(store));
-        }, buildable);
-    }
-    return res;
-}
-
 void completeFlakeInputPath(
     ref<EvalState> evalState,
     const FlakeRef & flakeRef,
@@ -704,19 +679,20 @@ Buildables build(ref<Store> store, Realise mode,
 
     Buildables buildables;
 
-    std::vector<StorePathWithOutputs> pathsToBuild;
+    std::vector<BuildableReq> pathsToBuild;
 
     for (auto & i : installables) {
         for (auto & b : i->toBuildables()) {
             std::visit(overloaded {
                 [&](BuildableOpaque bo) {
-                    pathsToBuild.push_back({bo.path});
+                    pathsToBuild.push_back(bo);
                 },
                 [&](BuildableFromDrv bfd) {
                     StringSet outputNames;
                     for (auto & output : bfd.outputs)
                         outputNames.insert(output.first);
-                    pathsToBuild.push_back({bfd.drvPath, outputNames});
+                    pathsToBuild.push_back(
+                        BuildableReqFromDrv{bfd.drvPath, outputNames});
                 },
             }, b);
             buildables.push_back(std::move(b));

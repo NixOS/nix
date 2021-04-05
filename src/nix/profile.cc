@@ -242,7 +242,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<BuildableReq> pathsToBuild;
 
         for (auto & installable : installables) {
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
@@ -258,7 +258,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     attrPath,
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{drv.outputName}});
+                pathsToBuild.push_back(BuildableReqFromDrv{drv.drvPath, StringSet{drv.outputName}});
 
                 manifest.elements.emplace_back(std::move(element));
             } else {
@@ -269,12 +269,15 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                     std::visit(overloaded {
                         [&](BuildableOpaque bo) {
-                            pathsToBuild.push_back({bo.path, {}});
+                            pathsToBuild.push_back(bo);
                             element.storePaths.insert(bo.path);
                         },
                         [&](BuildableFromDrv bfd) {
+                            // TODO: Why are we querying if we know the output
+                            // names already? Is it just to figure out what the
+                            // default one is?
                             for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
-                                pathsToBuild.push_back({bfd.drvPath, {output.first}});
+                                pathsToBuild.push_back(BuildableReqFromDrv{bfd.drvPath, {output.first}});
                                 element.storePaths.insert(output.second);
                             }
                         },
@@ -397,7 +400,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         auto matchers = getMatchers(store);
 
         // FIXME: code duplication
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<BuildableReq> pathsToBuild;
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
@@ -432,7 +435,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     attrPath,
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
+                pathsToBuild.push_back(BuildableReqFromDrv{drv.drvPath, {"out"}}); // FIXME
             }
         }
 
