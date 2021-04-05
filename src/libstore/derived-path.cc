@@ -1,17 +1,17 @@
-#include "buildable.hh"
+#include "derived-path.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>
 
 namespace nix {
 
-nlohmann::json BuildableOpaque::toJSON(ref<Store> store) const {
+nlohmann::json DerivedPath::Opaque::toJSON(ref<Store> store) const {
     nlohmann::json res;
     res["path"] = store->printStorePath(path);
     return res;
 }
 
-nlohmann::json BuildableFromDrv::toJSON(ref<Store> store) const {
+nlohmann::json DerivedPathWithHints::Built::toJSON(ref<Store> store) const {
     nlohmann::json res;
     res["drvPath"] = store->printStorePath(drvPath);
     for (const auto& [output, path] : outputs) {
@@ -20,28 +20,28 @@ nlohmann::json BuildableFromDrv::toJSON(ref<Store> store) const {
     return res;
 }
 
-nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store) {
+nlohmann::json derivedPathsWithHintsToJSON(const DerivedPathsWithHints & buildables, ref<Store> store) {
     auto res = nlohmann::json::array();
-    for (const Buildable & buildable : buildables) {
+    for (const DerivedPathWithHints & buildable : buildables) {
         std::visit([&res, store](const auto & buildable) {
             res.push_back(buildable.toJSON(store));
-        }, buildable);
+        }, buildable.raw());
     }
     return res;
 }
 
 
-std::string BuildableOpaque::to_string(const Store & store) const {
+std::string DerivedPath::Opaque::to_string(const Store & store) const {
     return store.printStorePath(path);
 }
 
-std::string BuildableReqFromDrv::to_string(const Store & store) const {
+std::string DerivedPath::Built::to_string(const Store & store) const {
     return store.printStorePath(drvPath)
         + "!"
         + (outputs.empty() ? std::string { "*" } : concatStringsSep(",", outputs));
 }
 
-std::string BuildableReq::to_string(const Store & store) const
+std::string DerivedPath::to_string(const Store & store) const
 {
     return std::visit(
         [&](const auto & req) { return req.to_string(store); },
@@ -49,12 +49,12 @@ std::string BuildableReq::to_string(const Store & store) const
 }
 
 
-BuildableOpaque BuildableOpaque::parse(const Store & store, std::string_view s)
+DerivedPath::Opaque DerivedPath::Opaque::parse(const Store & store, std::string_view s)
 {
     return {store.parseStorePath(s)};
 }
 
-BuildableReqFromDrv BuildableReqFromDrv::parse(const Store & store, std::string_view s)
+DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_view s)
 {
     size_t n = s.find("!");
     assert(n != s.npos);
@@ -66,12 +66,12 @@ BuildableReqFromDrv BuildableReqFromDrv::parse(const Store & store, std::string_
     return {drvPath, outputs};
 }
 
-BuildableReq BuildableReq::parse(const Store & store, std::string_view s)
+DerivedPath DerivedPath::parse(const Store & store, std::string_view s)
 {
     size_t n = s.find("!");
     return n == s.npos
-        ? (BuildableReq) BuildableOpaque::parse(store, s)
-        : (BuildableReq) BuildableReqFromDrv::parse(store, s);
+        ? (DerivedPath) DerivedPath::Opaque::parse(store, s)
+        : (DerivedPath) DerivedPath::Built::parse(store, s);
 }
 
 }
