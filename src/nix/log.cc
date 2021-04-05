@@ -35,13 +35,13 @@ struct CmdLog : InstallableCommand
         RunPager pager;
         for (auto & sub : subs) {
             auto log = std::visit(overloaded {
-                [&](DerivedPathOpaque bo) {
+                [&](DerivedPathWithHints::Opaque bo) {
                     return sub->getBuildLog(bo.path);
                 },
-                [&](DerivedPathWithHintsBuilt bfd) {
+                [&](DerivedPathWithHints::Built bfd) {
                     return sub->getBuildLog(bfd.drvPath);
                 },
-            }, b);
+            }, b.raw());
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), sub->getUri());

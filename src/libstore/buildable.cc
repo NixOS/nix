@@ -11,7 +11,7 @@ nlohmann::json DerivedPath::Opaque::toJSON(ref<Store> store) const {
     return res;
 }
 
-nlohmann::json DerivedPathWithHintsBuilt::toJSON(ref<Store> store) const {
+nlohmann::json DerivedPathWithHints::Built::toJSON(ref<Store> store) const {
     nlohmann::json res;
     res["drvPath"] = store->printStorePath(drvPath);
     for (const auto& [output, path] : outputs) {
@@ -25,7 +25,7 @@ nlohmann::json derivedPathsWithHintsToJSON(const DerivedPathsWithHints & buildab
     for (const DerivedPathWithHints & buildable : buildables) {
         std::visit([&res, store](const auto & buildable) {
             res.push_back(buildable.toJSON(store));
-        }, buildable);
+        }, buildable.raw());
     }
     return res;
 }

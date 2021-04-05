@@ -259,11 +259,11 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     ProfileElement element;
 
                     std::visit(overloaded {
-                        [&](DerivedPathOpaque bo) {
+                        [&](DerivedPathWithHints::Opaque bo) {
                             pathsToBuild.push_back(bo);
                             element.storePaths.insert(bo.path);
                         },
-                        [&](DerivedPathWithHintsBuilt bfd) {
+                        [&](DerivedPathWithHints::Built bfd) {
                             // TODO: Why are we querying if we know the output
                             // names already? Is it just to figure out what the
                             // default one is?
@@ -272,7 +272,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                                 element.storePaths.insert(output.second);
                             }
                         },
-                    }, buildable);
+                    }, buildable.raw());
 
                     manifest.elements.emplace_back(std::move(element));
                 }

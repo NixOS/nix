@@ -56,10 +56,23 @@ struct DerivedPathWithHintsBuilt {
     static DerivedPathWithHintsBuilt parse(const Store & store, std::string_view);
 };
 
-using DerivedPathWithHints = std::variant<
+using _DerivedPathWithHintsRaw = std::variant<
     DerivedPath::Opaque,
     DerivedPathWithHintsBuilt
 >;
+
+struct DerivedPathWithHints : _DerivedPathWithHintsRaw {
+    using Raw = _DerivedPathWithHintsRaw;
+    using Raw::Raw;
+
+    using Opaque = DerivedPathOpaque;
+    using Built = DerivedPathWithHintsBuilt;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+
+};
 
 typedef std::vector<DerivedPathWithHints> DerivedPathsWithHints;
 

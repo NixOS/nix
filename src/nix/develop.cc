@@ -277,14 +277,14 @@ struct Common : InstallableCommand, MixProfile
                 }
             };
             std::visit(overloaded {
-                [&](const DerivedPathOpaque & bo) {
+                [&](const DerivedPathWithHints::Opaque & bo) {
                     doRedirect(bo.path);
                 },
-                [&](const DerivedPathWithHintsBuilt & bfd) {
+                [&](const DerivedPathWithHints::Built & bfd) {
                     for (auto & [outputName, path] : bfd.outputs)
                         if (path) doRedirect(*path);
                 },
-            }, buildable);
+            }, buildable.raw());
         }
 
         return rewriteStrings(script, rewrites);
