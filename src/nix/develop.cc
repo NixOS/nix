@@ -3,6 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "derivations.hh"
 #include "affinity.hh"
 #include "progress-bar.hh"
@@ -159,7 +160,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     auto shellDrvPath = writeDerivation(*store, drv);
 
     /* Build the derivation. */
-    store->buildPaths({{shellDrvPath}});
+    store->buildPaths({DerivedPath::Built{shellDrvPath}});
 
     for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
         auto & [_1, optPath] = outputAndOptPath;
@@ -264,7 +265,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto buildable = installable->toBuildable();
+            auto buildable = installable->toDerivedPathWithHints();
             auto doRedirect = [&](const StorePath & path)
             {
                 auto from = store->printStorePath(path);
@@ -276,14 +277,14 @@ struct Common : InstallableCommand, MixProfile
                 }
             };
             std::visit(overloaded {
-                [&](const BuildableOpaque & bo) {
+                [&](const DerivedPathWithHints::Opaque & bo) {
                     doRedirect(bo.path);
                 },
-                [&](const BuildableFromDrv & bfd) {
+                [&](const DerivedPathWithHints::Built & bfd) {
                     for (auto & [outputName, path] : bfd.outputs)
                         if (path) doRedirect(*path);
                 },
-            }, buildable);
+            }, buildable.raw());
         }
 
         return rewriteStrings(script, rewrites);

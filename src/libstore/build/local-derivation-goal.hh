@@ -116,6 +116,7 @@ struct LocalDerivationGoal : public DerivationGoal
     {
         return inputPaths.count(path) || addedPaths.count(path);
     }
+    bool isAllowed(const DerivedPath & req);
 
     friend struct RestrictedStore;
 

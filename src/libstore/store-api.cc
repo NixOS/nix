@@ -53,13 +53,6 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 }
 
 
-StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
-{
-    auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
-}
-
-
 /* Store paths have the following form:
 
    <realized-path> = <store>/<h>-<name>
@@ -536,10 +529,10 @@ void Store::queryPathInfo(const StorePath & storePath,
 
 void Store::substitutePaths(const StorePathSet & paths)
 {
-    std::vector<StorePathWithOutputs> paths2;
+    std::vector<DerivedPath> paths2;
     for (auto & path : paths)
         if (!path.isDerivation())
-            paths2.push_back({path});
+            paths2.push_back(DerivedPath::Opaque{path});
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     queryMissing(paths2,
@@ -547,8 +540,8 @@ void Store::substitutePaths(const StorePathSet & paths)
 
     if (!willSubstitute.empty())
         try {
-            std::vector<StorePathWithOutputs> subs;
-            for (auto & p : willSubstitute) subs.push_back({p});
+            std::vector<DerivedPath> subs;
+            for (auto & p : willSubstitute) subs.push_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());
