@@ -41,11 +41,11 @@ std::string BuildableReqFromDrv::to_string(const Store & store) const {
         + (outputs.empty() ? std::string { "*" } : concatStringsSep(",", outputs));
 }
 
-std::string to_string(const Store & store, const BuildableReq & req)
+std::string BuildableReq::to_string(const Store & store) const
 {
     return std::visit(
         [&](const auto & req) { return req.to_string(store); },
-        req);
+        this->raw());
 }
 
 
@@ -66,7 +66,7 @@ BuildableReqFromDrv BuildableReqFromDrv::parse(const Store & store, std::string_
     return {drvPath, outputs};
 }
 
-BuildableReq parseBuildableReq(const Store & store, std::string_view s)
+BuildableReq BuildableReq::parse(const Store & store, std::string_view s)
 {
     size_t n = s.find("!");
     return n == s.npos

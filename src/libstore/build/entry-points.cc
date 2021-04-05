@@ -19,7 +19,7 @@ void Store::buildPaths(const std::vector<BuildableReq> & reqs, BuildMode buildMo
             [&](BuildableOpaque bo) {
                 goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
             },
-        }, br);
+        }, br.raw());
     }
 
     worker.run(goals);

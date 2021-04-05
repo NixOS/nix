@@ -41,7 +41,7 @@ std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromBuild
         [&](BuildableReqFromDrv bfd) -> std::variant<StorePathWithOutputs, StorePath> {
             return StorePathWithOutputs { bfd.drvPath, bfd.outputs };
         },
-    }, p);
+    }, p.raw());
 }
 
 

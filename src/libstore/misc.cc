@@ -187,7 +187,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
 
         {
             auto state(state_.lock());
-            if (!state->done.insert(to_string(*this, req)).second) return;
+            if (!state->done.insert(req.to_string(*this)).second) return;
         }
 
         std::visit(overloaded {
@@ -250,7 +250,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
             for (auto & ref : info->second.references)
                 pool.enqueue(std::bind(doPath, BuildableOpaque { ref }));
           },
-        }, req);
+        }, req.raw());
     };
 
     for (auto & path : targets)

@@ -55,12 +55,12 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
 BuildableReq read(const Store & store, Source & from, Phantom<BuildableReq> _)
 {
     auto s = readString(from);
-    return parseBuildableReq(store, s);
+    return BuildableReq::parse(store, s);
 }
 
 void write(const Store & store, Sink & out, const BuildableReq & req)
 {
-    out << to_string(store, req);
+    out << req.to_string(store);
 }
 
 

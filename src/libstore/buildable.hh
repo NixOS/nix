@@ -28,14 +28,22 @@ struct BuildableReqFromDrv {
     static BuildableReqFromDrv parse(const Store & store, std::string_view);
 };
 
-using BuildableReq = std::variant<
+using _BuildableReqRaw = std::variant<
     BuildableOpaque,
     BuildableReqFromDrv
 >;
 
-std::string to_string(const Store & store, const BuildableReq &);
+struct BuildableReq : _BuildableReqRaw {
+    using Raw = _BuildableReqRaw;
+    using Raw::Raw;
 
-BuildableReq parseBuildableReq(const Store & store, std::string_view);
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+
+    std::string to_string(const Store & store) const;
+    static BuildableReq parse(const Store & store, std::string_view);
+};
 
 struct BuildableFromDrv {
     StorePath drvPath;

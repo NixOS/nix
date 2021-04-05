@@ -1200,7 +1200,7 @@ static StorePath pathPartOfReq(const BuildableReq & req)
         [&](BuildableReqFromDrv bfd)  {
             return bfd.drvPath;
         },
-    }, req);
+    }, req.raw());
 }
 
 
@@ -1340,7 +1340,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
         for (auto & req : paths) {
             if (!goal.isAllowed(req))
-                throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", to_string(*next, req));
+                throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", req.to_string(*next));
         }
 
         next->buildPaths(paths, buildMode);
