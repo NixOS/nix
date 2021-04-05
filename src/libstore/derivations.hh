@@ -52,7 +52,7 @@ struct DerivationOutput
         DerivationOutputCAFloating,
         DerivationOutputDeferred
     > output;
-    std::optional<HashType> hashAlgoOpt(const Store & store) const;
+
     /* Note, when you use this function you should make sure that you're passing
        the right derivation name. When in doubt, you should use the safer
        interface provided by BasicDerivation::outputsAndOptPaths */

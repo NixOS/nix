@@ -592,10 +592,8 @@ Value & EvalState::getBuiltin(const string & name)
 
 std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
-    if (v.isPrimOp() || v.isPrimOpApp()) {
+    if (v.isPrimOp()) {
         auto v2 = &v;
-        while (v2->isPrimOpApp())
-            v2 = v2->primOpApp.left;
         if (v2->primOp->doc)
             return Doc {
                 .pos = noPos,

@@ -70,7 +70,7 @@ Here are some examples of flake references in their URL-like representation:
 * `/home/alice/src/patchelf`: A flake in some other directory.
 * `nixpkgs`: The `nixpkgs` entry in the flake registry.
 * `nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: The `nixpkgs`
-  entry in the flake registry, with its Git revision overriden to a
+  entry in the flake registry, with its Git revision overridden to a
   specific value.
 * `github:NixOS/nixpkgs`: The `master` branch of the `NixOS/nixpkgs`
   repository on GitHub.
@@ -377,7 +377,7 @@ outputs = { self, nixpkgs, grcov }: {
 };
 ```
 
-Transitive inputs can be overriden from a `flake.nix` file. For
+Transitive inputs can be overridden from a `flake.nix` file. For
 example, the following overrides the `nixpkgs` input of the `nixops`
 input:
 

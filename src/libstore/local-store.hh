@@ -136,7 +136,8 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
-    bool pathInfoIsTrusted(const ValidPathInfo &) override;
+    bool pathInfoIsUntrusted(const ValidPathInfo &) override;
+    bool realisationIsUntrusted(const Realisation & ) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -202,6 +203,7 @@ public:
     /* Register the store path 'output' as the output named 'outputName' of
        derivation 'deriver'. */
     void registerDrvOutput(const Realisation & info) override;
+    void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
 
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
@@ -272,16 +274,19 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /* Add signatures to a ValidPathInfo using the secret keys
+    /* Add signatures to a ValidPathInfo or Realisation using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
+    void signRealisation(Realisation &);
 
     Path getRealStoreDir() override { return realStoreDir; }
 
     void createUser(const std::string & userName, uid_t userId) override;
 
     friend struct LocalDerivationGoal;
+    friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;
+    friend struct DerivationGoal;
 };
 
 
