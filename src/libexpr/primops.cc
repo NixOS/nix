@@ -35,7 +35,7 @@ InvalidPathError::InvalidPathError(const Path & path) :
 
 void EvalState::realiseContext(const PathSet & context)
 {
-    std::vector<BuildableReqFromDrv> drvs;
+    std::vector<DerivedPath::Built> drvs;
 
     for (auto & i : context) {
         auto [ctxS, outputName] = decodeContext(i);
@@ -56,8 +56,8 @@ void EvalState::realiseContext(const PathSet & context)
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
-    std::vector<BuildableReq> buildReqs;
-    for (auto & d : drvs) buildReqs.emplace_back(BuildableReq { d });
+    std::vector<DerivedPath> buildReqs;
+    for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     store->queryMissing(buildReqs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     store->buildPaths(buildReqs);

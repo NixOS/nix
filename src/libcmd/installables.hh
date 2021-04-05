@@ -3,7 +3,7 @@
 #include "util.hh"
 #include "path.hh"
 #include "path-with-outputs.hh"
-#include "buildable.hh"
+#include "derived-path.hh"
 #include "eval.hh"
 #include "flake/flake.hh"
 
@@ -29,9 +29,9 @@ struct Installable
 
     virtual std::string what() = 0;
 
-    virtual Buildables toBuildables() = 0;
+    virtual DerivedPathsWithHints toDerivedPathsWithHints() = 0;
 
-    Buildable toBuildable();
+    DerivedPathWithHints toDerivedPathWithHints();
 
     App toApp(EvalState & state);
 
@@ -74,7 +74,7 @@ struct InstallableValue : Installable
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
 
-    Buildables toBuildables() override;
+    DerivedPathsWithHints toDerivedPathsWithHints() override;
 };
 
 struct InstallableFlake : InstallableValue
