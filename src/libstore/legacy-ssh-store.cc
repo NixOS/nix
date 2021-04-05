@@ -15,6 +15,7 @@ struct LegacySSHStoreConfig : virtual StoreConfig
     using StoreConfig::StoreConfig;
     const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
     const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
     const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
@@ -59,6 +60,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress,

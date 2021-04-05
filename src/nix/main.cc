@@ -309,13 +309,13 @@ void mainWrapped(int argc, char * * argv)
 
     if (!args.useNet) {
         // FIXME: should check for command line overrides only.
-        if (!settings.useSubstitutes.overriden)
+        if (!settings.useSubstitutes.overridden)
             settings.useSubstitutes = false;
-        if (!settings.tarballTtl.overriden)
+        if (!settings.tarballTtl.overridden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!fileTransferSettings.tries.overriden)
+        if (!fileTransferSettings.tries.overridden)
             fileTransferSettings.tries = 0;
-        if (!fileTransferSettings.connectTimeout.overriden)
+        if (!fileTransferSettings.connectTimeout.overridden)
             fileTransferSettings.connectTimeout = 1;
     }
 

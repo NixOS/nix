@@ -90,7 +90,7 @@
             lowdown
             gmock
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+          ++ lib.optionals stdenv.isLinux [libseccomp (pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.isx86_64 libcpuid;
 
@@ -144,11 +144,45 @@
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
           '';
 
+      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; pkgs.stdenv.mkDerivation {
+        NIX_DAEMON_PACKAGE = daemon;
+        NIX_CLIENT_PACKAGE = client;
+        # Must keep this name short as OSX has a rather strict limit on the
+        # socket path length, and this name appears in the path of the
+        # nix-daemon socket used in the tests
+        name = "nix-tests";
+        inherit version;
+
+        src = self;
+
+        VERSION_SUFFIX = versionSuffix;
+
+        nativeBuildInputs = nativeBuildDeps;
+        buildInputs = buildDeps ++ awsDeps;
+        propagatedBuildInputs = propagatedDeps;
+
+        enableParallelBuilding = true;
+
+        dontBuild = true;
+        doInstallCheck = true;
+
+        installPhase = ''
+          mkdir -p $out
+        '';
+        installCheckPhase = "make installcheck";
+
+      };
+
     in {
 
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
+
+        # An older version of Nix to test against when using the daemon.
+        # Currently using `nixUnstable` as the stable one doesn't respect
+        # `NIX_DAEMON_SOCKET_PATH` which is needed for the tests.
+        nixStable = prev.nix;
 
         nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
           name = "nix-${version}";
@@ -434,6 +468,15 @@
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
+        installTests =
+          let pkgs = nixpkgsFor.${system}; in
+          pkgs.runCommand "install-tests" {
+            againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
+            againstCurrentUnstable = testNixVersions pkgs pkgs.nix pkgs.nixUnstable;
+            # Disabled because the latest stable version doesn't handle
+            # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
+            # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
+          } "touch $out";
       });
 
       packages = forAllSystems (system: {

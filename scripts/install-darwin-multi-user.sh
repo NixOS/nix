@@ -4,6 +4,8 @@ set -eu
 set -o pipefail
 
 readonly PLIST_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
+NIX_FIRST_BUILD_UID="301"
+NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 dsclattr() {
     /usr/bin/dscl . -read "$1" \

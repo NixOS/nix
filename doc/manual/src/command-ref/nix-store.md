@@ -79,7 +79,7 @@ paths. Realisation is a somewhat overloaded term:
     system). If the path is already valid, we are done immediately.
     Otherwise, the path and any missing paths in its closure may be
     produced through substitutes. If there are no (successful)
-    subsitutes, realisation fails.
+    substitutes, realisation fails.
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
