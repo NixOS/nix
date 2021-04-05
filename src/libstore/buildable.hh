@@ -12,54 +12,57 @@ namespace nix {
 
 class Store;
 
-struct BuildableOpaque {
+struct DerivedPathOpaque {
     StorePath path;
 
     nlohmann::json toJSON(ref<Store> store) const;
     std::string to_string(const Store & store) const;
-    static BuildableOpaque parse(const Store & store, std::string_view);
+    static DerivedPathOpaque parse(const Store & store, std::string_view);
 };
 
-struct BuildableReqFromDrv {
+struct DerivedPathBuilt {
     StorePath drvPath;
     std::set<std::string> outputs;
 
     std::string to_string(const Store & store) const;
-    static BuildableReqFromDrv parse(const Store & store, std::string_view);
+    static DerivedPathBuilt parse(const Store & store, std::string_view);
 };
 
-using _BuildableReqRaw = std::variant<
-    BuildableOpaque,
-    BuildableReqFromDrv
+using _DerivedPathRaw = std::variant<
+    DerivedPathOpaque,
+    DerivedPathBuilt
 >;
 
-struct BuildableReq : _BuildableReqRaw {
-    using Raw = _BuildableReqRaw;
+struct DerivedPath : _DerivedPathRaw {
+    using Raw = _DerivedPathRaw;
     using Raw::Raw;
+
+    using Opaque = DerivedPathOpaque;
+    using Built = DerivedPathBuilt;
 
     inline const Raw & raw() const {
         return static_cast<const Raw &>(*this);
     }
 
     std::string to_string(const Store & store) const;
-    static BuildableReq parse(const Store & store, std::string_view);
+    static DerivedPath parse(const Store & store, std::string_view);
 };
 
-struct BuildableFromDrv {
+struct DerivedPathWithHintsBuilt {
     StorePath drvPath;
     std::map<std::string, std::optional<StorePath>> outputs;
 
     nlohmann::json toJSON(ref<Store> store) const;
-    static BuildableFromDrv parse(const Store & store, std::string_view);
+    static DerivedPathWithHintsBuilt parse(const Store & store, std::string_view);
 };
 
-using Buildable = std::variant<
-    BuildableOpaque,
-    BuildableFromDrv
+using DerivedPathWithHints = std::variant<
+    DerivedPath::Opaque,
+    DerivedPathWithHintsBuilt
 >;
 
-typedef std::vector<Buildable> Buildables;
+typedef std::vector<DerivedPathWithHints> DerivedPathsWithHints;
 
-nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store);
+nlohmann::json derivedPathsWithHintsToJSON(const DerivedPathsWithHints & buildables, ref<Store> store);
 
 }

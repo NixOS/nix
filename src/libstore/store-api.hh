@@ -494,7 +494,7 @@ public:
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
     virtual void buildPaths(
-        const std::vector<BuildableReq> & paths,
+        const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
@@ -656,7 +656,7 @@ public:
     /* Given a set of paths that are to be built, return the set of
        derivations that will be built, and the set of output paths
        that will be substituted. */
-    virtual void queryMissing(const std::vector<BuildableReq> & targets,
+    virtual void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize);
 

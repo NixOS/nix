@@ -43,7 +43,7 @@ struct StorePathWithOutputs;
 
 void printMissing(
     ref<Store> store,
-    const std::vector<BuildableReq> & paths,
+    const std::vector<DerivedPath> & paths,
     Verbosity lvl = lvlInfo);
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,

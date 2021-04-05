@@ -36,7 +36,7 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const std::vector<BuildableReq> & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;

@@ -323,7 +323,7 @@ static void main_nix_build(int argc, char * * argv)
     state->printStats();
 
     auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths0) {
-        auto paths = toBuildableReqs(paths0);
+        auto paths = toDerivedPaths(paths0);
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         uint64_t downloadSize, narSize;
