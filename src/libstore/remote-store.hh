@@ -85,7 +85,7 @@ public:
 
     std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
+    void buildPaths(const std::vector<BuildableReq> & paths, BuildMode buildMode) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -108,7 +108,7 @@ public:
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    void queryMissing(const std::vector<BuildableReq> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
 
