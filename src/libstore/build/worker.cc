@@ -128,6 +128,7 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
     else
         assert(false);
+
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals

@@ -752,13 +752,13 @@ AutoCloseFD::AutoCloseFD() : fd{-1} {}
 AutoCloseFD::AutoCloseFD(int fd) : fd{fd} {}
 
 
-AutoCloseFD::AutoCloseFD(AutoCloseFD&& that) : fd{that.fd}
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
 {
     that.fd = -1;
 }
 
 
-AutoCloseFD& AutoCloseFD::operator =(AutoCloseFD&& that)
+AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
@@ -789,6 +789,7 @@ void AutoCloseFD::close()
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError("closing file descriptor %1%", fd);
+        fd = -1;
     }
 }
 
@@ -821,6 +822,12 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
+
+void Pipe::close()
+{
+    readSide.close();
+    writeSide.close();
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -1121,7 +1128,7 @@ void runProgram2(const RunOptions & options)
         throw SysError("executing '%1%'", options.program);
     }, processOptions);
 
-    out.writeSide = -1;
+    out.writeSide.close();
 
     std::thread writerThread;
 
@@ -1134,7 +1141,7 @@ void runProgram2(const RunOptions & options)
 
 
     if (source) {
-        in.readSide = -1;
+        in.readSide.close();
         writerThread = std::thread([&]() {
             try {
                 std::vector<char> buf(8 * 1024);
@@ -1151,7 +1158,7 @@ void runProgram2(const RunOptions & options)
             } catch (...) {
                 promise.set_exception(std::current_exception());
             }
-            in.writeSide = -1;
+            in.writeSide.close();
         });
     }
 
