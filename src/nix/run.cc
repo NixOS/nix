@@ -31,9 +31,7 @@ struct RunCommon : virtual Command
     {
         stopProgressBar();
 
-        restoreSignals();
-
-        restoreAffinity();
+        restoreProcessContext();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location

@@ -422,8 +422,6 @@ static void main_nix_build(int argc, char * * argv)
             } else
                 env[var.first] = var.second;
 
-        restoreAffinity();
-
         /* Run a shell using the derivation's environment.  For
            convenience, source $stdenv/setup to setup additional
            environment variables and shell functions.  Also don't
@@ -473,7 +471,7 @@ static void main_nix_build(int argc, char * * argv)
 
         auto argPtrs = stringsToCharPtrs(args);
 
-        restoreSignals();
+        restoreProcessContext();
 
         logger->stop();
 

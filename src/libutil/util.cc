@@ -1116,7 +1116,7 @@ void runProgram2(const RunOptions & options)
         Strings args_(options.args);
         args_.push_front(options.program);
 
-        restoreSignals();
+        restoreProcessContext();
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
@@ -1612,10 +1612,17 @@ void startSignalHandlerThread()
     std::thread(signalHandlerThread, set).detach();
 }
 
-void restoreSignals()
+static void restoreSignals()
 {
     if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
         throw SysError("restoring signals");
+}
+
+void restoreProcessContext()
+{
+    restoreSignals();
+
+    restoreAffinity();
 }
 
 /* RAII helper to automatically deregister a callback. */
@@ -1680,10 +1687,11 @@ string showBytes(uint64_t bytes)
 }
 
 
+// FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
     const static string pathNullDevice = "/dev/null";
-    restoreSignals();
+    restoreProcessContext();
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

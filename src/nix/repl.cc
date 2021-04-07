@@ -343,24 +343,6 @@ StringSet NixRepl::completePrefix(string prefix)
 }
 
 
-static int runProgram(const string & program, const Strings & args)
-{
-    Strings args2(args);
-    args2.push_front(program);
-
-    Pid pid;
-    pid = fork();
-    if (pid == -1) throw SysError("forking");
-    if (pid == 0) {
-        restoreAffinity();
-        execvp(program.c_str(), stringsToCharPtrs(args2).data());
-        _exit(1);
-    }
-
-    return pid.wait();
-}
-
-
 bool isVarName(const string & s)
 {
     if (s.size() == 0) return false;
@@ -462,7 +444,7 @@ bool NixRepl::processLine(string line)
         auto args = editorFor(pos);
         auto editor = args.front();
         args.pop_front();
-        runProgram(editor, args);
+        runProgram(editor, true, args);
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -481,7 +463,7 @@ bool NixRepl::processLine(string line)
         state->callFunction(f, v, result, Pos());
 
         StorePath drvPath = getDerivationPath(result);
-        runProgram(settings.nixBinDir + "/nix-shell", Strings{state->store->printStorePath(drvPath)});
+        runProgram(settings.nixBinDir + "/nix-shell", true, {state->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
@@ -494,16 +476,18 @@ bool NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPathRaw}) == 0) {
+            try {
+                runProgram(settings.nixBinDir + "/nix", true, {"build", "--no-link", drvPathRaw});
                 auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputsAndOptPaths(*state->store))
                     std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
+            } catch (ExecError &) {
             }
         } else if (command == ":i") {
-            runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPathRaw});
+            runProgram(settings.nixBinDir + "/nix-env", true, {"-i", drvPathRaw});
         } else {
-            runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPathRaw});
+            runProgram(settings.nixBinDir + "/nix-shell", true, {drvPathRaw});
         }
     }
 

@@ -462,8 +462,7 @@ struct CmdDevelop : Common, MixEnvironment
         auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
             : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
-        restoreAffinity();
-        restoreSignals();
+        restoreProcessContext();
 
         execvp(shell.c_str(), stringsToCharPtrs(args).data());
 

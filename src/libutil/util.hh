@@ -300,6 +300,11 @@ std::pair<int, std::string> runProgram(const RunOptions & options);
 void runProgram2(const RunOptions & options);
 
 
+/* Restore the original inherited Unix process context (such as signal
+   masks, stack size, CPU affinity). */
+void restoreProcessContext();
+
+
 class ExecError : public Error
 {
 public:
@@ -512,9 +517,6 @@ class Callback;
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
-
-/* Restore default signal handling. */
-void restoreSignals();
 
 struct InterruptCallback
 {
