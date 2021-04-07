@@ -34,14 +34,17 @@ struct CmdLog : InstallableCommand
 
         RunPager pager;
         for (auto & sub : subs) {
-            auto log = std::visit(overloaded {
+            // For compat with CLI today, TODO revisit
+            auto oneUp = std::visit(overloaded {
                 [&](DerivedPathWithHints::Opaque bo) {
-                    return sub->getBuildLog(bo.path);
+                    return std::make_shared<SingleDerivedPathWithHints>(bo);
                 },
                 [&](DerivedPathWithHints::Built bfd) {
-                    return sub->getBuildLog(bfd.drvPath);
+                    return bfd.drvPath;
                 },
-            }, b.raw());
+                }, b.raw());
+            auto path = resolveDerivedPathWithHints(*store, *oneUp);
+            auto log = sub->getBuildLog(path);
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), sub->getUri());

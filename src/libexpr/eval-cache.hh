@@ -52,7 +52,7 @@ struct misc_t {};
 struct failed_t {};
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
-typedef std::pair<std::string, std::vector<std::pair<Path, std::string>>> string_t;
+typedef std::pair<std::string, NixStringContext> string_t;
 
 typedef std::variant<
     std::vector<Symbol>,

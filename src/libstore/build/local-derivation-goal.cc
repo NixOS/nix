@@ -1191,6 +1191,19 @@ void LocalDerivationGoal::writeStructuredAttrs()
 }
 
 
+static StorePath pathPartOfReq(const SingleDerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](SingleDerivedPath::Opaque bo) {
+            return bo.path;
+        },
+        [&](SingleDerivedPath::Built bfd)  {
+            return pathPartOfReq(*bfd.drvPath);
+        },
+    }, req.raw());
+}
+
+
 static StorePath pathPartOfReq(const DerivedPath & req)
 {
     return std::visit(overloaded {
@@ -1198,7 +1211,7 @@ static StorePath pathPartOfReq(const DerivedPath & req)
             return bo.path;
         },
         [&](DerivedPath::Built bfd)  {
-            return bfd.drvPath;
+            return pathPartOfReq(*bfd.drvPath);
         },
     }, req.raw());
 }
@@ -1346,13 +1359,11 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         next->buildPaths(paths, buildMode);
 
         for (auto & path : paths) {
-            auto p =  std::get_if<DerivedPath::Built>(&path);
+            auto p = std::get_if<DerivedPath::Built>(&path);
             if (!p) continue;
             auto & bfd = *p;
-            auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
-            for (auto & [outputName, outputPath] : outputs)
-                if (wantOutput(outputName, bfd.outputs))
-                    newPaths.insert(outputPath);
+            for (auto & [_, output] : resolveDerivedPath(*next, bfd))
+                newPaths.insert(output);
         }
 
         StorePathSet closure;
@@ -2305,27 +2316,26 @@ void LocalDerivationGoal::registerOutputs()
             }
         };
 
-        auto rewriteRefs = [&]() -> std::pair<bool, StorePathSet> {
+        auto rewriteRefs = [&]() -> PathReferences<StorePath> {
             /* In the CA case, we need the rewritten refs to calculate the
                final path, therefore we look for a *non-rewritten
                self-reference, and use a bool rather try to solve the
                computationally intractable fixed point. */
-            std::pair<bool, StorePathSet> res {
-                false,
-                {},
+            PathReferences<StorePath> res {
+                .hasSelfReference = false,
             };
             for (auto & r : references) {
                 auto name = r.name();
                 auto origHash = std::string { r.hashPart() };
                 if (r == scratchPath)
-                    res.first = true;
+                    res.hasSelfReference = true;
                 else if (outputRewrites.count(origHash) == 0)
-                    res.second.insert(r);
+                    res.references.insert(r);
                 else {
                     std::string newRef = outputRewrites.at(origHash);
                     newRef += '-';
                     newRef += name;
-                    res.second.insert(StorePath { newRef });
+                    res.references.insert(StorePath { newRef });
                 }
             }
             return res;
@@ -2333,48 +2343,51 @@ void LocalDerivationGoal::registerOutputs()
 
         auto newInfoFromCA = [&](const DerivationOutputCAFloating outputHash) -> ValidPathInfo {
             auto & st = outputStats.at(outputName);
-            if (outputHash.method == FileIngestionMethod::Flat) {
+            if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
+                outputHash.method == ContentAddressMethod { TextHashMethod {} })
+            {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         "output path '%1%' should be a non-executable regular file "
-                        "since recursive hashing is not enabled (outputHashMode=flat)",
+                        "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
             }
             rewriteOutput();
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath.hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
-            switch (outputHash.method) {
-            case FileIngestionMethod::Recursive:
-                dumpPath(actualPath, caSink);
-                break;
-            case FileIngestionMethod::Flat:
-                readFile(actualPath, caSink);
-                break;
-            }
+            std::visit(overloaded {
+                [&](TextHashMethod _) {
+                    readFile(actualPath, caSink);
+                },
+                [&](FileIngestionMethod m2) {
+                    switch (m2) {
+                    case FileIngestionMethod::Recursive:
+                        dumpPath(actualPath, caSink);
+                        break;
+                    case FileIngestionMethod::Flat:
+                        readFile(actualPath, caSink);
+                        break;
+                    }
+                },
+            }, outputHash.method);
             auto got = caSink.finish().first;
-            auto refs = rewriteRefs();
             HashModuloSink narSink { htSHA256, oldHashPart };
             dumpPath(actualPath, narSink);
             auto narHashAndSize = narSink.finish();
             ValidPathInfo newInfo0 {
-                worker.store.makeFixedOutputPath(
-                    outputHash.method,
-                    got,
-                    outputPathName(drv->name, outputName),
-                    refs.second,
-                    refs.first),
+                worker.store,
+                {
+                    .name = outputPathName(drv->name, outputName),
+                    .info = contentAddressFromMethodHashAndRefs(
+                        outputHash.method,
+                        std::move(got),
+                        rewriteRefs()),
+                },
                 narHashAndSize.first,
             };
             newInfo0.narSize = narHashAndSize.second;
-            newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
-                .hash = got,
-            };
-            newInfo0.references = refs.second;
-            if (refs.first)
-                newInfo0.references.insert(newInfo0.path);
             if (scratchPath != newInfo0.path) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
@@ -2408,20 +2421,18 @@ void LocalDerivationGoal::registerOutputs()
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
-                auto refs = rewriteRefs();
-                newInfo0.references = refs.second;
-                if (refs.first)
-                    newInfo0.references.insert(newInfo0.path);
+                static_cast<PathReferences<StorePath> &>(newInfo0) = rewriteRefs();
                 return newInfo0;
             },
             [&](DerivationOutputCAFixed dof) {
+                auto wanted = getContentAddressHash(dof.ca);
+
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
-                    .method = dof.hash.method,
-                    .hashType = dof.hash.hash.type,
+                    .method = getContentAddressMethod(dof.ca),
+                    .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
-                Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
                 auto got = getContentAddressHash(*newInfo0.ca);
                 if (wanted != got) {
@@ -2434,6 +2445,11 @@ void LocalDerivationGoal::registerOutputs()
                             wanted.to_string(SRI, true),
                             got.to_string(SRI, true)));
                 }
+                if (static_cast<const PathReferences<StorePath> &>(newInfo0) != PathReferences<StorePath> {})
+                    delayedException = std::make_exception_ptr(
+                        BuildError("illegal path references in fixed-output derivation '%s'",
+                            worker.store.printStorePath(drvPath)));
+
                 return newInfo0;
             },
             [&](DerivationOutputCAFloating dof) {
@@ -2689,12 +2705,12 @@ void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & out
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
-                    for (auto & ref : i->second.references)
+                    for (auto & ref : i->second.referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
                     closureSize += info->narSize;
-                    for (auto & ref : info->references)
+                    for (auto & ref : info->referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 }
             }
@@ -2733,7 +2749,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & out
 
                 auto used = recursive
                     ? getClosure(info.path).first
-                    : info.references;
+                    : info.referencesPossiblyToSelf();
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);

@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "derived-path-map.hh"
 #include "sync.hh"
 
 #include <map>
@@ -25,7 +26,7 @@ struct DerivationOutputInputAddressed
    according to that fixed output. */
 struct DerivationOutputCAFixed
 {
-    FixedOutputHash hash; /* hash used for expected hash computation */
+    ContentAddressWithReferences ca; /* hash and refs used for validating output */
     StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
@@ -35,7 +36,7 @@ struct DerivationOutputCAFixed
 struct DerivationOutputCAFloating
 {
     /* information used for expected hash computation */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
     HashType hashType;
 };
 
@@ -130,16 +131,16 @@ struct BasicDerivation
 
 struct Derivation : BasicDerivation
 {
-    DerivationInputs inputDrvs; /* inputs that are sub-derivations */
+    DerivedPathMap<StringSet> inputDrvs; /* inputs that are sub-derivations */
 
     /* Print a derivation. */
     std::string unparse(const Store & store, bool maskOutputs,
-        std::map<std::string, StringSet> * actualInputs = nullptr) const;
+        DerivedPathMap<StringSet>::ChildMap * actualInputs = nullptr) const;
 
     /* Return the underlying basic derivation but with these changes:
 
-	   1. Input drvs are emptied, but the outputs of them that were used are
-	      added directly to input sources.
+       1. Input drvs are emptied, but the outputs of them that were used are
+          added directly to input sources.
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);
@@ -177,12 +178,17 @@ std::string outputPathName(std::string_view drvName, std::string_view outputName
 // whose output hashes are always known since they are fixed up-front.
 typedef std::map<std::string, Hash> CaOutputHashes;
 
-struct DeferredHash { Hash hash; };
+struct DrvHash {
+    Hash hash;
+    bool isDeferred;
+};
 
 typedef std::variant<
-    Hash, // regular DRV normalized hash
-    CaOutputHashes, // Fixed-output derivation hashes
-    DeferredHash // Deferred hashes for floating outputs drvs and their dependencies
+    // Regular normalized derivation hash, and whether it was deferred (because
+    // an ancestor derivation is a floating content addressed derivation).
+    DrvHash,
+    // Fixed-output derivation hashes
+    CaOutputHashes
 > DrvHashModulo;
 
 /* Returns hashes with the details of fixed-output subderivations
@@ -215,6 +221,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
    derivation (modulo the self-references).
  */
 std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& drv);
+std::map<std::string, DrvHash> staticOutputHashesWithDeferral(Store& store, const Derivation& drv);
 
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, DrvHashModulo> DrvHashes;
@@ -238,13 +245,32 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
    itself, making the hash near-impossible to calculate. */
 std::string hashPlaceholder(const std::string & outputName);
 
-/* This creates an opaque and almost certainly unique string
-   deterministically from a derivation path and output name.
+class DownstreamPlaceholder
+{
+    Hash hash;
 
-   It is used as a placeholder to allow derivations to refer to
-   content-addressed paths whose content --- and thus the path
-   themselves --- isn't yet known. This occurs when a derivation has a
-   dependency which is a CA derivation. */
-std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
+public:
+    /* This creates an opaque and almost certainly unique string
+       deterministically from a derivation path and output name.
+    
+       It is used as a placeholder to allow derivations to refer to
+       content-addressed paths whose content --- and thus the path
+       themselves --- isn't yet known. This occurs when a derivation has a
+       dependency which is a CA derivation. */
+    std::string render() const;
+
+    static DownstreamPlaceholder parse(std::string_view);
+
+    // For CA derivations
+    DownstreamPlaceholder(const StorePath & drvPath, std::string_view outputName);
+
+    // For computed derivations
+    DownstreamPlaceholder(const DownstreamPlaceholder & placeholder, std::string_view outputName);
+
+private:
+    DownstreamPlaceholder(Hash && h) : hash(std::move(h)) {}
+    static inline Hash worker1(const StorePath & drvPath, std::string_view outputName);
+    static inline Hash worker2(const DownstreamPlaceholder & placeholder, std::string_view outputName);
+};
 
 }

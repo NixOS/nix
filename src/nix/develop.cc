@@ -149,7 +149,9 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
         drv.env[output.first] = "";
     }
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
+    DrvHash h0 = std::get<0>(hashDerivationModulo(*store, drv, true));
+    assert(!h0.isDeferred);
+    Hash & h = h0.hash;
 
     for (auto & output : drv.outputs) {
         auto outPath = store->makeOutputPath(output.first, h, drv.name);
@@ -160,7 +162,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     auto shellDrvPath = writeDerivation(*store, drv);
 
     /* Build the derivation. */
-    store->buildPaths({DerivedPath::Built{shellDrvPath}});
+    store->buildPaths({DerivedPath::Built{staticDrvReq(shellDrvPath)}});
 
     for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
         auto & [_1, optPath] = outputAndOptPath;

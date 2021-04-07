@@ -155,7 +155,6 @@ struct DerivationGoal : public Goal
     BuildResult getResult() { return result; }
 
     /* The states. */
-    void getDerivation();
     void loadDerivation();
     void haveDerivation();
     void outputsSubstitutionTried();

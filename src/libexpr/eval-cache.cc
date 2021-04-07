@@ -254,7 +254,7 @@ struct AttrDb
                 return {{rowId, attrs}};
             }
             case AttrType::String: {
-                std::vector<std::pair<Path, std::string>> context;
+                NixStringContext context;
                 if (!queryAttribute.isNull(3))
                     for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
                         context.push_back(decodeContext(s));

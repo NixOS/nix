@@ -16,7 +16,9 @@ struct StorePathWithOutputs
 
     DerivedPath toDerivedPath() const;
 
-    static std::variant<StorePathWithOutputs, StorePath> tryFromDerivedPath(const DerivedPath &);
+    typedef std::variant<StorePathWithOutputs, StorePath, std::monostate> ParseResult;
+
+    static StorePathWithOutputs::ParseResult tryFromDerivedPath(const DerivedPath &);
 };
 
 std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs>);

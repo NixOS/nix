@@ -38,12 +38,17 @@ void EvalState::realiseContext(const PathSet & context)
     std::vector<DerivedPath::Built> drvs;
 
     for (auto & i : context) {
-        auto [ctxS, outputName] = decodeContext(i);
+        auto [ctxS, outputNames] = decodeContext(i);
         auto ctx = store->parseStorePath(ctxS);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
-        if (!outputName.empty() && ctx.isDerivation()) {
-            drvs.push_back({ctx, {outputName}});
+        if (!outputNames.empty() && ctx.isDerivation()) {
+            auto req = staticDrvReq(ctx);
+            auto lastOutput = outputNames.back();
+            outputNames.pop_back();
+            for (auto && outputName : std::move(outputNames))
+                req = std::make_shared<SingleDerivedPath>(SingleDerivedPath::Built { req, outputName });
+            drvs.push_back({ req, { lastOutput } });
         }
     }
 
@@ -51,7 +56,7 @@ void EvalState::realiseContext(const PathSet & context)
 
     if (!evalSettings.enableImportFromDerivation)
         throw EvalError("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false",
-            store->printStorePath(drvs.begin()->drvPath));
+            drvs.begin()->to_string(*store));
 
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
@@ -64,17 +69,10 @@ void EvalState::realiseContext(const PathSet & context)
 
     /* Add the output of this derivations to the allowed
        paths. */
-    if (allowedPaths) {
-        for (auto & [drvPath, outputs] : drvs) {
-            auto outputPaths = store->queryDerivationOutputMap(drvPath);
-            for (auto & outputName : outputs) {
-                if (outputPaths.count(outputName) == 0)
-                    throw Error("derivation '%s' does not have an output named '%s'",
-                            store->printStorePath(drvPath), outputName);
-                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
-            }
-        }
-    }
+    if (allowedPaths)
+        for (auto & drv : drvs)
+            for (auto & [_, output] : resolveDerivedPath(*store, drv))
+                allowedPaths->insert(store->printStorePath(output));
 }
 
 /* Add and attribute to the given attribute map from the output name to
@@ -102,7 +100,7 @@ static void mkOutputString(EvalState & state, Value & v,
                we build the floating CA derivation */
             /* FIXME: we need to depend on the basic derivation, not
                derivation */
-            : downstreamPlaceholder(*state.store, drvPath, o.first),
+            : DownstreamPlaceholder { drvPath, o.first }.render(),
         {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
 }
 
@@ -853,7 +851,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     bool contentAddressed = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    auto ingestionMethod = FileIngestionMethod::Flat;
+    ContentAddressMethod ingestionMethod = FileIngestionMethod::Flat;
 
     StringSet outputs;
     outputs.insert("out");
@@ -866,6 +864,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto handleHashMode = [&](const std::string & s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
+            else if (s == "text") ingestionMethod = TextHashMethod {};
             else
                 throw EvalError({
                     .msg = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
@@ -997,15 +996,24 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             state.store->computeFSClosure(state.store->parseStorePath(std::string_view(path).substr(1)), refs);
             for (auto & j : refs) {
                 drv.inputSrcs.insert(j);
-                if (j.isDerivation())
-                    drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                if (j.isDerivation()) {
+                    Derivation jDrv = state.store->readDerivation(j);
+                    if(jDrv.type() != DerivationType::CAFloating)
+                        drv.inputDrvs.map[j] = DerivedPathMap<StringSet>::Node { jDrv.outputNames() };
+                }
             }
         }
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(path);
-            drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(ctx.second);
+            auto [drvPath, outputNames] = decodeContext(path);
+            assert(!outputNames.empty());
+            auto lastOutput = outputNames.back();
+            outputNames.pop_back();
+            auto * node = &drv.inputDrvs.map[state.store->parseStorePath(drvPath)];
+            for (auto && outputName : std::move(outputNames))
+                node = &node->childMap[outputName];
+            node->value.insert(lastOutput);
         }
 
         /* Otherwise it's a source file. */
@@ -1027,9 +1035,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         });
 
     /* Check whether the derivation name is valid. */
-    if (isDerivation(drvName))
+    if (isDerivation(drvName) && ingestionMethod != ContentAddressMethod { TextHashMethod { } })
         throw EvalError({
-            .msg = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
+            .msg = hintfmt("derivation names are allowed to end in '%s' only if they produce a single derivation file", drvExtension),
             .errPos = posDrvName
         });
 
@@ -1047,16 +1055,16 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputCAFixed {
-                    .hash = FixedOutputHash {
-                        .method = ingestionMethod,
-                        .hash = std::move(h),
-                    },
-                },
-        });
+        // FIXME non-trivial fixed refs set
+        auto ca = contentAddressFromMethodHashAndRefs(
+            ingestionMethod,
+            std::move(h),
+            {});
+
+        DerivationOutputCAFixed dof { .ca = ca };
+
+        drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
+        drv.outputs.insert_or_assign("out", DerivationOutput { .output = dof });
     }
 
     else if (contentAddressed) {
@@ -1093,29 +1101,30 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         // hash per output.
         auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
         std::visit(overloaded {
-            [&](Hash h) {
-                for (auto & i : outputs) {
-                    auto outPath = state.store->makeOutputPath(i, h, drvName);
-                    drv.env[i] = state.store->printStorePath(outPath);
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputInputAddressed {
-                                .path = std::move(outPath),
-                            },
-                        });
-                }
+            [&](DrvHash drvHash) {
+                auto & h = drvHash.hash;
+                if (drvHash.isDeferred)
+                    for (auto & i : outputs) {
+                        drv.outputs.insert_or_assign(i,
+                            DerivationOutput {
+                                .output = DerivationOutputDeferred{},
+                            });
+                    }
+                else
+                    for (auto & i : outputs) {
+                        auto outPath = state.store->makeOutputPath(i, h, drvName);
+                        drv.env[i] = state.store->printStorePath(outPath);
+                        drv.outputs.insert_or_assign(i,
+                            DerivationOutput {
+                                .output = DerivationOutputInputAddressed {
+                                    .path = std::move(outPath),
+                                },
+                            });
+                    }
             },
             [&](CaOutputHashes) {
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
-            },
-            [&](DeferredHash _) {
-                for (auto & i : outputs) {
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputDeferred{},
-                        });
-                }
             },
         },
         hashModulo);
@@ -1480,6 +1489,50 @@ static RegisterPrimOp primop_readDir({
     .fun = prim_readDir,
 });
 
+/* Extend single element string context with another output. */
+static void prim_outputOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[0], context);
+
+    Path outputName = state.forceStringNoCtx(*args[1], pos);
+
+    Path path2;
+    try {
+        auto p = DownstreamPlaceholder::parse(path);
+        path2 = DownstreamPlaceholder { p, outputName }.render();
+    } catch (BadHash &) {
+        path2 = DownstreamPlaceholder { state.store->parseStorePath(path), outputName }.render();
+    }
+
+    if (context.size() != 1)
+        throw EvalError({
+            .msg = hintfmt("path '%s' should have exactly one item in string context, but has", context.size()),
+            .errPos = pos
+        });
+    auto [ctxS, outputNames] = decodeContext(*context.begin());
+    outputNames.push_back(outputName);
+    PathSet context2 = { "!" + concatStringsSep("!", outputNames) + "!" + ctxS };
+
+    mkString(v, path2, context2);
+}
+
+static RegisterPrimOp primop_outputOf({
+    .name = "__outputOf",
+    .args = {"drv path", "output name"},
+    .doc = R"(
+      Return path (actually placeholder path) to the output of the given drv.
+      The drv path may itself be a placeholder, which permits chaining this primop.
+
+      For instance, `builtins.outputOf (builtins.outputOf myDrv "out) "out"`
+      will return a placeholder for the output of the output of `myDrv`,
+      interpreted as a derivation.
+
+      It may help to compare to the `->` operator in C, which can also by
+      chained. E.g. compare the above example to `drv->out->out`.
+    )",
+    .fun = prim_outputOf,
+});
 
 /*************************************************************
  * Creating files
@@ -1789,7 +1842,13 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
+            {
+                .method = method,
+                .hash = *expectedHash,
+            },
+            {},
+        });
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode

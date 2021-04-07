@@ -174,6 +174,8 @@ struct BuildResult
     }
 };
 
+typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
+
 struct StoreConfig : public Config
 {
     using Config::Config;
@@ -294,17 +296,11 @@ public:
     StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(FileIngestionMethod method,
-        const Hash & hash, std::string_view name,
-        const StorePathSet & references = {},
-        bool hasSelfReference = false) const;
+    StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
-    StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references = {}) const;
+    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
 
-    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
-        const StorePathSet & references = {},
-        bool hasSelfReference = false) const;
+    StorePath makeFixedOutputPathFromCA(const StorePathDescriptor & info) const;
 
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
@@ -770,6 +766,23 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */
 void removeTempRoots();
+
+
+/* Attempt to recursively replace derivation outputs with produced paths as
+   much as possible, but where the derivation resolution doesn't exists, leave
+   as-is. */
+SingleDerivedPath tryResolveDerivedPath(Store &, const SingleDerivedPath &);
+SingleDerivedPathWithHints tryResolveDerivedPathWithHints(Store &, const SingleDerivedPathWithHints &);
+#if 0
+DerivedPath tryResolveDerivedPath(Store &, const DerivedPath &);
+#endif
+
+/* Resolve the buildable req completely, failing if any derivation output is
+   unknown. */
+StorePath resolveDerivedPath(Store &, const SingleDerivedPath &);
+StorePath resolveDerivedPathWithHints(Store &, const SingleDerivedPathWithHints &);
+std::map<std::string, StorePath> resolveDerivedPath(Store &, const DerivedPath::Built &);
+std::map<std::string, StorePath> resolveDerivedPathWithHints(Store &, const DerivedPathWithHints::Built &);
 
 
 /* Return a Store object to access the Nix store denoted by

@@ -2,6 +2,7 @@
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "drv-output-substitution-goal.hh"
+#include "outer-derivation-goal.hh"
 #include "local-derivation-goal.hh"
 #include "hook-instance.hh"
 
@@ -36,6 +37,24 @@ Worker::~Worker()
     assert(expectedSubstitutions == 0);
     assert(expectedDownloadSize == 0);
     assert(expectedNarSize == 0);
+}
+
+
+std::shared_ptr<OuterDerivationGoal> Worker::makeOuterDerivationGoal(
+    std::shared_ptr<SingleDerivedPath> drvReq,
+    const StringSet & wantedOutputs,
+    BuildMode buildMode)
+{
+    std::weak_ptr<OuterDerivationGoal> & goal_weak = outerDerivationGoals.ensureSlot(*drvReq).value;
+    std::shared_ptr<OuterDerivationGoal> goal = goal_weak.lock();
+    if (!goal) {
+        goal = std::make_shared<OuterDerivationGoal>(drvReq, wantedOutputs, *this, buildMode);
+        goal_weak = goal;
+        wakeUp(goal);
+    } else {
+        goal->addWantedOutputs(wantedOutputs);
+    }
+    return goal;
 }
 
 
@@ -91,6 +110,7 @@ std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const Sto
     return goal;
 }
 
+
 std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     std::weak_ptr<DrvOutputSubstitutionGoal> & goal_weak = drvOutputSubstitutionGoals[id];
@@ -103,24 +123,60 @@ std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal
     return goal;
 }
 
+
+GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
+{
+    return std::visit(overloaded {
+        [&](DerivedPath::Built bfd) -> GoalPtr {
+            return makeOuterDerivationGoal(bfd.drvPath, bfd.outputs, buildMode);
+        },
+        [&](DerivedPath::Opaque bo) -> GoalPtr {
+            return makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
+        },
+    }, req.raw());
+}
+
+
+template<typename K, typename V, typename F>
+static void filterMap(std::map<K, V> & goalMap, F f)
+{
+    for (auto i = goalMap.begin(); i != goalMap.end();)
+        if (!f(i->second))
+            i = goalMap.erase(i);
+        else ++i;
+}
+
+
 template<typename K, typename G>
 static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
-    for (auto i = goalMap.begin();
-         i != goalMap.end(); )
-        if (i->second.lock() == goal) {
-            auto j = i; ++j;
-            goalMap.erase(i);
-            i = j;
-        }
-        else ++i;
+    filterMap(goalMap, [&](const std::weak_ptr<G> & gp) -> bool {
+        return gp.lock() != goal;
+    });
+}
+
+template<typename K>
+static void removeGoal(std::shared_ptr<OuterDerivationGoal> goal, std::map<K, DerivedPathMap<std::weak_ptr<OuterDerivationGoal>>::Node> & goalMap);
+
+template<typename K>
+static void removeGoal(std::shared_ptr<OuterDerivationGoal> goal, std::map<K, DerivedPathMap<std::weak_ptr<OuterDerivationGoal>>::Node> & goalMap)
+{
+    /* !!! inefficient */
+    filterMap(goalMap, [&](DerivedPathMap<std::weak_ptr<OuterDerivationGoal>>::Node & node) -> bool {
+        if (node.value.lock() == goal)
+            node.value.reset();
+        removeGoal(goal, node.childMap);
+        return !node.value.expired() || !node.childMap.empty();
+    });
 }
 
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
+    if (auto drvGoal = std::dynamic_pointer_cast<OuterDerivationGoal>(goal))
+        nix::removeGoal(drvGoal, outerDerivationGoals.map);
+    else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, substitutionGoals);
@@ -231,8 +287,8 @@ void Worker::run(const Goals & _topGoals)
 
     for (auto & i : _topGoals) {
         topGoals.insert(i);
-        if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
-            topPaths.push_back(DerivedPath::Built{goal->drvPath, goal->wantedOutputs});
+        if (auto goal = dynamic_cast<OuterDerivationGoal *>(i.get())) {
+            topPaths.push_back(DerivedPath::Built{goal->drvReq, goal->wantedOutputs});
         } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
@@ -487,10 +543,18 @@ void Worker::markContentsGood(const StorePath & path)
 }
 
 
-GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
-GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal) {
+
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
     return subGoal;
 }
 

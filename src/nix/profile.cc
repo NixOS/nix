@@ -161,12 +161,21 @@ struct ProfileManifest
         auto narHash = hashString(htSHA256, *sink.s);
 
         ValidPathInfo info {
-            store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
+            *store,
+            StorePathDescriptor {
+                "profile",
+                FixedOutputInfo {
+                    {
+                        .method = FileIngestionMethod::Recursive,
+                        .hash = narHash,
+                    },
+                    { references },
+                },
+            },
             narHash,
         };
         info.references = std::move(references);
         info.narSize = sink.s->size();
-        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
         auto source = StringSource { *sink.s };
         store->addToStore(info, source);
@@ -249,7 +258,10 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     attrPath,
                 };
 
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, StringSet{drv.outputName}});
+                pathsToBuild.push_back(DerivedPath::Built {
+                    staticDrvReq(drv.drvPath),
+                    StringSet{drv.outputName},
+                });
 
                 manifest.elements.emplace_back(std::move(element));
             } else {
@@ -264,11 +276,15 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                             element.storePaths.insert(bo.path);
                         },
                         [&](DerivedPathWithHints::Built bfd) {
+                            auto drvPath = resolveDerivedPathWithHints(*store, *bfd.drvPath);
                             // TODO: Why are we querying if we know the output
                             // names already? Is it just to figure out what the
                             // default one is?
-                            for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
-                                pathsToBuild.push_back(DerivedPath::Built{bfd.drvPath, {output.first}});
+                            for (auto & output : resolveDerivedPathWithHints(*store, bfd)) {
+                                pathsToBuild.push_back(DerivedPath::Built {
+                                    staticDrvReq(drvPath),
+                                    {output.first},
+                                });
                                 element.storePaths.insert(output.second);
                             }
                         },
@@ -426,7 +442,10 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     attrPath,
                 };
 
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {"out"}}); // FIXME
+                pathsToBuild.push_back(DerivedPath::Built {
+                    staticDrvReq(drv.drvPath),
+                    {"out"}
+                }); // FIXME
             }
         }
 

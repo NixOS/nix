@@ -79,7 +79,10 @@ void PathSubstitutionGoal::tryNext()
     subs.pop_front();
 
     if (ca) {
-        subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+        subPath = sub->makeFixedOutputPathFromCA({
+            .name = std::string { storePath.name() },
+            .info = caWithoutRefs(*ca),
+        });
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {
@@ -109,7 +112,7 @@ void PathSubstitutionGoal::tryNext()
     }
 
     if (info->path != storePath) {
-        if (info->isContentAddressed(*sub) && info->references.empty()) {
+        if (info->isContentAddressed(*sub) && info->references.empty() && !info->hasSelfReference) {
             auto info2 = std::make_shared<ValidPathInfo>(*info);
             info2->path = storePath;
             info = info2;
@@ -147,8 +150,7 @@ void PathSubstitutionGoal::tryNext()
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            addWaitee(worker.makePathSubstitutionGoal(i));
+        addWaitee(worker.makePathSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
@@ -168,8 +170,7 @@ void PathSubstitutionGoal::referencesValid()
     }
 
     for (auto & i : info->references)
-        if (i != storePath) /* ignore self-references */
-            assert(worker.store.isValidPath(i));
+        assert(worker.store.isValidPath(i));
 
     state = &PathSubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());

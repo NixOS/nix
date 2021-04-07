@@ -1,6 +1,7 @@
 #include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
+#include "outer-derivation-goal.hh"
 #include "derivation-goal.hh"
 #include "local-store.hh"
 
@@ -11,20 +12,12 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     Worker worker(*this);
 
     Goals goals;
-    for (auto & br : reqs) {
-        std::visit(overloaded {
-            [&](DerivedPath::Built bfd) {
-                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
-            },
-            [&](DerivedPath::Opaque bo) {
-                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
-            },
-        }, br.raw());
-    }
+    for (auto & br : reqs)
+        goals.insert(worker.makeGoal(br, buildMode));
 
     worker.run(goals);
 
-    StorePathSet failed;
+    StringSet failed;
     std::optional<Error> ex;
     for (auto & i : goals) {
         if (i->ex) {
@@ -34,8 +27,10 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
                 ex = i->ex;
         }
         if (i->exitCode != Goal::ecSuccess) {
-            if (auto i2 = dynamic_cast<DerivationGoal *>(i.get())) failed.insert(i2->drvPath);
-            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
+            if (auto i2 = dynamic_cast<OuterDerivationGoal *>(i.get()))
+                failed.insert(i2->drvReq->to_string(*this));
+            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
+                failed.insert(printStorePath(i2->storePath));
         }
     }
 
@@ -44,7 +39,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         throw *ex;
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
-        throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
+        throw Error(worker.exitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
     }
 }
 
@@ -65,9 +60,9 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
     }
     // XXX: Should use `goal->queryPartialDerivationOutputMap()` once it's
     // extended to return the full realisation for each output
-    auto staticDrvOutputs = drv.outputsAndOptPaths(*this);
+    auto staticDrvReqOutputs = drv.outputsAndOptPaths(*this);
     auto outputHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, staticOutput] : staticDrvOutputs) {
+    for (auto & [outputName, staticOutput] : staticDrvReqOutputs) {
         auto outputId = DrvOutput{outputHashes.at(outputName), outputName};
         if (staticOutput.second)
             result.builtOutputs.insert_or_assign(
@@ -123,7 +118,7 @@ void LocalStore::repairPath(const StorePath & path)
         auto info = queryPathInfo(path);
         if (info->deriver && isValidPath(*info->deriver)) {
             goals.clear();
-            goals.insert(worker.makeDerivationGoal(*info->deriver, StringSet(), bmRepair));
+            goals.insert(worker.makeGoal(DerivedPath::Built { staticDrvReq(*info->deriver) }, bmRepair));
             worker.run(goals);
         } else
             throw Error(worker.exitStatus(), "cannot repair path '%s'", printStorePath(path));

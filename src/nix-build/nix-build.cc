@@ -322,8 +322,7 @@ static void main_nix_build(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths0) {
-        auto paths = toDerivedPaths(paths0);
+    auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         uint64_t downloadSize, narSize;
@@ -345,7 +344,7 @@ static void main_nix_build(int argc, char * * argv)
         auto & drvInfo = drvs.front();
         auto drv = store->derivationFromPath(store->parseStorePath(drvInfo.queryDrvPath()));
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<DerivedPath> pathsToBuild;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
            is not set, then build bashInteractive from
@@ -364,7 +363,10 @@ static void main_nix_build(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.push_back({store->parseStorePath(drv->queryDrvPath())});
+                pathsToBuild.push_back(DerivedPath::Built {
+                    staticDrvReq(store->parseStorePath(drv->queryDrvPath())),
+                    {},
+                });
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
@@ -375,13 +377,25 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
 
+        std::function<void(std::shared_ptr<SingleDerivedPath>, const DerivedPathMap<StringSet>::Node &)> accumDerivedPath;
+
+        accumDerivedPath = [&](std::shared_ptr<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::Node & inputNode) {
+            if (!inputNode.value.empty())
+                pathsToBuild.push_back(DerivedPath::Built { inputDrv, inputNode.value });
+            for (const auto & [outputName, childNode] : inputNode.childMap)
+                accumDerivedPath(
+                    std::make_shared<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
+                    childNode);
+        };
+
         // Build or fetch all dependencies of the derivation.
-        for (const auto & input : drv.inputDrvs)
+        for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map) {
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
-                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
-                pathsToBuild.push_back({input.first, input.second});
+                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude)); }))
+                accumDerivedPath(staticDrvReq(inputDrv), inputNode);
+        }
         for (const auto & src : drv.inputSrcs)
-            pathsToBuild.push_back({src});
+            pathsToBuild.push_back(DerivedPath::Opaque{src});
 
         buildPaths(pathsToBuild);
 
@@ -482,7 +496,7 @@ static void main_nix_build(int argc, char * * argv)
 
     else {
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<DerivedPath> pathsToBuild;
         std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
@@ -494,7 +508,7 @@ static void main_nix_build(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
-            pathsToBuild.push_back({drvPath, {outputName}});
+            pathsToBuild.push_back(DerivedPath::Built{staticDrvReq(drvPath), {outputName}});
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
 
             auto i = drvMap.find(drvPath);

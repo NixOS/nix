@@ -462,7 +462,7 @@ struct CmdFlakeCheck : FlakeCommand
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
                                     if ((std::string) attr.name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{drvPath});
+                                        drvPaths.push_back(DerivedPath::Built{staticDrvReq(drvPath)});
                                 }
                             }
                         }

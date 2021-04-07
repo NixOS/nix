@@ -82,9 +82,14 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
             drv = string(p, 1);
             path = &drv;
         } else if (p.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(p);
+            NixStringContextElem ctx = decodeContext(p);
             drv = ctx.first;
-            output = ctx.second;
+            if (ctx.second.size() != 1)
+                throw EvalError({
+                    .msg = hintfmt("Context element '%s' uses computed derivation which isn't yet supported by getContext", p),
+                    .errPos = pos,
+                });
+            output = *ctx.second.begin();
             path = &drv;
         }
         auto isPath = drv.empty();

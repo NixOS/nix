@@ -70,10 +70,10 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-    state = &DerivationGoal::getDerivation;
+    state = &DerivationGoal::loadDerivation;
     name = fmt(
         "building of '%s' from .drv file",
-        DerivedPath::Built { drvPath, wantedOutputs }.to_string(worker.store));
+        DerivedPath::Built { staticDrvReq(drvPath), wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -94,7 +94,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
-        DerivedPath::Built { drvPath, drv.outputNames() }.to_string(worker.store));
+        DerivedPath::Built { staticDrvReq(drvPath), drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -155,24 +155,6 @@ void DerivationGoal::addWantedOutputs(const StringSet & outputs)
         for (auto & i : outputs)
             if (wantedOutputs.insert(i).second)
                 needRestart = true;
-}
-
-
-void DerivationGoal::getDerivation()
-{
-    trace("init");
-
-    /* The first thing to do is to make sure that the derivation
-       exists.  If it doesn't, it may be created through a
-       substitute. */
-    if (buildMode == bmNormal && worker.store.isValidPath(drvPath)) {
-        loadDerivation();
-        return;
-    }
-
-    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-
-    state = &DerivationGoal::loadDerivation;
 }
 
 
@@ -334,8 +316,24 @@ void DerivationGoal::gaveUpOnSubstitution()
 
     /* The inputs must be built before we can build this goal. */
     if (useDerivation)
-        for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs)
-            addWaitee(worker.makeDerivationGoal(i.first, i.second, buildMode == bmRepair ? bmRepair : bmNormal));
+    {
+        std::function<void(std::shared_ptr<SingleDerivedPath>, const DerivedPathMap<StringSet>::Node &)> accumDerivedPath;
+
+        accumDerivedPath = [&](std::shared_ptr<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::Node & inputNode) {
+            if (!inputNode.value.empty())
+                addWaitee(worker.makeGoal(
+                    DerivedPath::Built { inputDrv, inputNode.value },
+                    buildMode == bmRepair ? bmRepair : bmNormal));
+            for (const auto & [outputName, childNode] : inputNode.childMap)
+                accumDerivedPath(
+                    std::make_shared<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
+                    childNode);
+        };
+
+        for (const auto & [inputDrv, inputNode] : drv->inputDrvs.map) {
+            accumDerivedPath(staticDrvReq(inputDrv), inputNode);
+        }
+    }
 
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i)) continue;
@@ -395,7 +393,7 @@ void DerivationGoal::repairClosure()
         if (drvPath2 == outputsToDrv.end())
             addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
-            addWaitee(worker.makeDerivationGoal(drvPath2->second, StringSet(), bmRepair));
+            addWaitee(worker.makeGoal(DerivedPath::Built { staticDrvReq(drvPath2->second) }, bmRepair));
     }
 
     if (waitees.empty()) {
@@ -445,7 +443,7 @@ void DerivationGoal::inputsRealised()
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
         if (settings.isExperimentalFeatureEnabled("ca-derivations") &&
-            ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
+            ((!fullDrv.inputDrvs.map.empty() && derivationIsCA(fullDrv.type()))
             || fullDrv.type() == DerivationType::DeferredInputAddressed)) {
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
@@ -466,34 +464,48 @@ void DerivationGoal::inputsRealised()
                        worker.store.printStorePath(pathResolved),
                    });
 
-            auto resolvedGoal = worker.makeDerivationGoal(
-                pathResolved, wantedOutputs, buildMode);
+            auto resolvedGoal = worker.makeGoal(
+                DerivedPath::Built { staticDrvReq(pathResolved), wantedOutputs },
+                buildMode);
             addWaitee(resolvedGoal);
 
             state = &DerivationGoal::resolvedFinished;
             return;
         }
 
-        for (auto & [depDrvPath, wantedDepOutputs] : fullDrv.inputDrvs) {
+        std::function<void(const StorePath &, const DerivedPathMap<StringSet>::Node &)> accumDerivedPath;
+
+        accumDerivedPath = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::Node & inputNode) {
             /* Add the relevant output closures of the input derivation
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
-            assert(worker.store.isValidPath(drvPath));
-            auto outputs = worker.store.queryPartialDerivationOutputMap(depDrvPath);
-            for (auto & j : wantedDepOutputs) {
-                if (outputs.count(j) > 0) {
-                    auto optRealizedInput = outputs.at(j);
-                    if (!optRealizedInput)
-                        throw Error(
-                            "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output",
-                            worker.store.printStorePath(drvPath), j, worker.store.printStorePath(depDrvPath));
-                    worker.store.computeFSClosure(*optRealizedInput, inputPaths);
-                } else
+            assert(worker.store.isValidPath(inputDrv));
+            auto outputs = worker.store.queryPartialDerivationOutputMap(inputDrv);
+
+            auto getOutput = [&](const std::string & outputName) -> auto & {
+                auto & optRealizedInput = outputs.at(outputName);
+                if (!optRealizedInput)
                     throw Error(
-                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath), j, worker.store.printStorePath(depDrvPath));
+                        "derivation '%s' requires output '%s' from input derivation '%s', which is supposedly realized already, yet we still don't know what path corresponds to that output",
+                        worker.store.printStorePath(drvPath),
+                        outputName,
+                        worker.store.printStorePath(inputDrv));
+                return *optRealizedInput;
+            };
+
+            for (auto & outputName : inputNode.value) {
+                auto & realizedInput = getOutput(outputName);
+                worker.store.computeFSClosure(realizedInput, inputPaths);
             }
-        }
+
+            for (auto & [outputName, childNode] : inputNode.childMap) {
+                auto & realizedInput = getOutput(outputName);
+                accumDerivedPath(realizedInput, childNode);
+            }
+        };
+
+        for (auto & [depDrvPath, depNode] : fullDrv.inputDrvs.map)
+            accumDerivedPath(depDrvPath, depNode);
     }
 
     /* Second, the input sources. */

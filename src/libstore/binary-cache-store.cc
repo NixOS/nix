@@ -192,8 +192,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
        reads, but typically they'll already be cached. */
     for (auto & ref : info.references)
         try {
-            if (ref != info.path)
-                queryPathInfo(ref);
+            queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
@@ -322,7 +321,17 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & nam
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name),
+            *this,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = nar.first,
+                    },
+                    {},
+                },
+            },
             nar.first,
         };
         info.narSize = nar.second;
@@ -412,14 +421,20 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name),
+            *this,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = h,
+                    },
+                    {},
+                },
+            },
             nar.first,
         };
         info.narSize = nar.second;
-        info.ca = FixedOutputHash {
-            .method = method,
-            .hash = h,
-        };
         return info;
     })->path;
 }
@@ -428,7 +443,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     const StorePathSet & references, RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
-    auto path = makeTextPath(name, textHash, references);
+    auto path = makeTextPath(name, TextInfo { textHash, references });
 
     if (!repair && isValidPath(path))
         return path;
@@ -437,10 +452,19 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     dumpString(s, sink);
     auto source = StringSource { *sink.s };
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info { path, nar.first };
+        ValidPathInfo info {
+            *this,
+            {
+                .name = name,
+                .info = TextInfo {
+                    { .hash = textHash },
+                    references,
+                },
+            },
+            nar.first,
+        };
         info.narSize = nar.second;
         info.ca = TextHash { textHash };
-        info.references = references;
         return info;
     })->path;
 }

@@ -14,7 +14,10 @@ std::string StorePathWithOutputs::to_string(const Store & store) const
 DerivedPath StorePathWithOutputs::toDerivedPath() const
 {
     if (!outputs.empty() || path.isDerivation())
-        return DerivedPath::Built { path, outputs };
+        return DerivedPath::Built {
+            std::make_shared<SingleDerivedPath>(SingleDerivedPath::Opaque { path }),
+            outputs,
+        };
     else
         return DerivedPath::Opaque { path };
 }
@@ -22,24 +25,31 @@ DerivedPath StorePathWithOutputs::toDerivedPath() const
 
 std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs> ss)
 {
-	std::vector<DerivedPath> reqs;
-	for (auto & s : ss) reqs.push_back(s.toDerivedPath());
-	return reqs;
+    std::vector<DerivedPath> reqs;
+    for (auto & s : ss) reqs.push_back(s.toDerivedPath());
+    return reqs;
 }
 
 
-std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromDerivedPath(const DerivedPath & p)
+StorePathWithOutputs::ParseResult StorePathWithOutputs::tryFromDerivedPath(const DerivedPath & p)
 {
     return std::visit(overloaded {
-        [&](DerivedPath::Opaque bo) -> std::variant<StorePathWithOutputs, StorePath> {
+        [&](DerivedPath::Opaque bo) -> StorePathWithOutputs::ParseResult {
             if (bo.path.isDerivation()) {
                 // drv path gets interpreted as "build", not "get drv file itself"
                 return bo.path;
             }
             return StorePathWithOutputs { bo.path };
         },
-        [&](DerivedPath::Built bfd) -> std::variant<StorePathWithOutputs, StorePath> {
-            return StorePathWithOutputs { bfd.drvPath, bfd.outputs };
+        [&](DerivedPath::Built bfd) -> StorePathWithOutputs::ParseResult {
+            return std::visit(overloaded {
+                [&](SingleDerivedPath::Opaque bo) -> StorePathWithOutputs::ParseResult {
+                    return StorePathWithOutputs { bo.path, bfd.outputs };
+                },
+                [&](SingleDerivedPath::Built) -> StorePathWithOutputs::ParseResult {
+                    return std::monostate {};
+                },
+            }, bfd.drvPath->raw());
         },
     }, p.raw());
 }

@@ -423,7 +423,9 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.push_back(DerivedPath::Built{state.store->parseStorePath(drvPath)});
+            targets.push_back(DerivedPath::Built {
+                staticDrvReq(state.store->parseStorePath(drvPath))
+            });
         else
             targets.push_back(DerivedPath::Opaque{state.store->parseStorePath(i.queryOutPath())});
     }
@@ -697,7 +699,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     std::vector<DerivedPath> paths {
         (drv.queryDrvPath() != "")
         ? (DerivedPath) (DerivedPath::Built {
-                globals.state->store->parseStorePath(drv.queryDrvPath())
+                staticDrvReq(globals.state->store->parseStorePath(drv.queryDrvPath()))
             })
         : (DerivedPath) (DerivedPath::Opaque {
                 globals.state->store->parseStorePath(drv.queryOutPath())

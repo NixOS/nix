@@ -354,7 +354,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info.setReferencesPossiblyToSelf(i.first, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
             infos.insert_or_assign(i.first, std::move(info));
@@ -373,11 +373,12 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
-            SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
+            auto path = parseStorePath(readString(conn->from));
+            SubstitutablePathInfo & info { infos[path] };
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info.setReferencesPossiblyToSelf(path, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -392,7 +393,7 @@ ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn,
     auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
     auto info = make_ref<ValidPathInfo>(path, narHash);
     if (deriver != "") info->deriver = parseStorePath(deriver);
-    info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+    info->setReferencesPossiblyToSelf(worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
     conn->from >> info->registrationTime >> info->narSize;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
         conn->from >> info->ultimate;
@@ -501,6 +502,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
     const string & name,
     ContentAddressMethod caMethod,
+    HashType hashType,
     const StorePathSet & references,
     RepairFlag repair)
 {
@@ -512,7 +514,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << wopAddToStore
             << name
-            << renderContentAddressMethod(caMethod);
+            << renderContentAddressMethodAndHash(caMethod, hashType);
         worker_proto::write(*this, conn->to, references);
         conn->to << repair;
 
@@ -533,18 +535,21 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
         std::visit(overloaded {
             [&](TextHashMethod thm) -> void {
+                if (hashType != htSHA256)
+                    throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
+                        printHashType(hashType));
                 std::string s = dump.drain();
                 conn->to << wopAddTextToStore << name << s;
                 worker_proto::write(*this, conn->to, references);
                 conn.processStderr();
             },
-            [&](FixedOutputHashMethod fohm) -> void {
+            [&](FileIngestionMethod fim) -> void {
                 conn->to
                     << wopAddToStore
                     << name
-                    << ((fohm.hashType == htSHA256 && fohm.fileIngestionMethod == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-                    << (fohm.fileIngestionMethod == FileIngestionMethod::Recursive ? 1 : 0)
-                    << printHashType(fohm.hashType);
+                    << ((hashType == htSHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+                    << (fim == FileIngestionMethod::Recursive ? 1 : 0)
+                    << printHashType(hashType);
 
                 try {
                     conn->to.written = 0;
@@ -552,7 +557,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                     connections->incCapacity();
                     {
                         Finally cleanup([&]() { connections->decCapacity(); });
-                        if (fohm.fileIngestionMethod == FileIngestionMethod::Recursive) {
+                        if (fim == FileIngestionMethod::Recursive) {
                             dump.drainInto(conn->to);
                         } else {
                             std::string contents = dump.drain();
@@ -585,7 +590,7 @@ StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method, HashType hashType, RepairFlag repair)
 {
     StorePathSet references;
-    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
+    return addCAToStore(dump, name, method, hashType, references, repair)->path;
 }
 
 
@@ -604,7 +609,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             sink
                 << exportMagic
                 << printStorePath(info.path);
-            worker_proto::write(*this, sink, info.references);
+            worker_proto::write(*this, sink, info.referencesPossiblyToSelf());
             sink
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0 // == no legacy signature
@@ -615,7 +620,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn.processStderr(0, source2.get());
 
         auto importedPaths = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-        assert(importedPaths.size() <= 1);
+        assert(importedPaths.empty() == 0); // doesn't include possible self reference
     }
 
     else {
@@ -623,7 +628,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
                  << info.narHash.to_string(Base16, false);
-        worker_proto::write(*this, conn->to, info.references);
+        worker_proto::write(*this, conn->to, info.referencesPossiblyToSelf());
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
@@ -646,7 +651,7 @@ StorePath RemoteStore::addTextToStore(const string & name, const string & s,
     const StorePathSet & references, RepairFlag repair)
 {
     StringSource source(s);
-    return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
+    return addCAToStore(source, name, TextHashMethod {}, htSHA256, references, repair)->path;
 }
 
 void RemoteStore::registerDrvOutput(const Realisation & info)
@@ -687,6 +692,9 @@ static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, cons
                         store.printStorePath(drvPath),
                         GET_PROTOCOL_MAJOR(conn->daemonVersion),
                         GET_PROTOCOL_MINOR(conn->daemonVersion));
+                },
+                [&](std::monostate) {
+                    throw Error("wanted build derivation that is itself a build product, but the legacy ssh protocol doesn't support that. Try using ssh-ng://");
                 },
             }, sOrDrvPath);
         }

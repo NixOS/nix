@@ -70,11 +70,12 @@ struct CmdShowDerivation : InstallablesCommand
                         },
                         [&](DerivationOutputCAFixed dof) {
                             outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
-                            outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
-                            outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
+                            outputObj.attr("hashAlgo", printMethodAlgo(dof.ca));
+                            outputObj.attr("hash", getContentAddressHash(dof.ca).to_string(Base16, false));
+                            // FIXME print refs?
                         },
                         [&](DerivationOutputCAFloating dof) {
-                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
+                            outputObj.attr("hashAlgo", makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType));
                         },
                         [&](DerivationOutputDeferred) {},
                     }, output.output);
@@ -88,11 +89,27 @@ struct CmdShowDerivation : InstallablesCommand
             }
 
             {
-                auto inputDrvsObj(drvObj.object("inputDrvs"));
-                for (auto & input : drv.inputDrvs) {
-                    auto inputList(inputDrvsObj.list(store->printStorePath(input.first)));
-                    for (auto & outputId : input.second)
-                        inputList.elem(outputId);
+                std::function<void(JSONList &, const DerivedPathMap<StringSet>::Node &)> doInput;
+                doInput = [&](JSONList & json, const auto & inputNode) {
+                    {
+                        auto inputList = json.list();
+                        for (auto & outputId : inputNode.value)
+                            inputList.elem(outputId);
+                    }
+                    {
+                        auto next = json.object();
+                        for (auto & [outputId, childNode] : inputNode.childMap) {
+                            auto j = next.list(outputId);
+                            doInput(j, childNode);
+                        }
+                    }
+                };
+                {
+                    auto inputDrvsObj(drvObj.object("inputDrvs"));
+                    for (auto & [inputDrv, inputNode] : drv.inputDrvs.map) {
+                        auto j = inputDrvsObj.list(store->printStorePath(inputDrv));
+                        doInput(j, inputNode);
+                    }
                 }
             }
 

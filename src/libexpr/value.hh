@@ -60,6 +60,8 @@ class JSONPlaceholder;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
+typedef std::pair<Path, std::vector<std::string>> NixStringContextElem;
+typedef std::vector<NixStringContextElem> NixStringContext;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
@@ -346,7 +348,7 @@ public:
        non-trivial. */
     bool isTrivial() const;
 
-    std::vector<std::pair<Path, std::string>> getContext();
+    NixStringContext getContext();
 };
 
 

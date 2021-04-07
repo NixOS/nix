@@ -60,8 +60,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                 } else {
 
                     for (auto & ref : info->references)
-                        if (ref != path)
-                            enqueue(ref);
+                        enqueue(ref);
 
                     if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
@@ -110,9 +109,21 @@ void Store::computeFSClosure(const StorePath & startPath,
 std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
-    if (out != drv.outputs.end()) {
-        if (auto v = std::get_if<DerivationOutputCAFixed>(&out->second.output))
-            return v->hash;
+    if (out == drv.outputs.end())
+        return std::nullopt;
+    if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
+        return std::visit(overloaded {
+            [&](TextInfo ti) -> std::optional<ContentAddress> {
+                if (!ti.references.empty())
+                    return std::nullopt;
+                return static_cast<TextHash>(ti);
+            },
+            [&](FixedOutputInfo fi) -> std::optional<ContentAddress> {
+                if (fi.references != PathReferences<StorePath> {})
+                    return std::nullopt;
+                return static_cast<FixedOutputHash>(fi);
+            },
+        }, dof->ca);
     }
     return std::nullopt;
 }
@@ -147,14 +158,26 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
     std::function<void(DerivedPath)> doPath;
 
+    std::function<void(std::shared_ptr<SingleDerivedPath>, const DerivedPathMap<StringSet>::Node &)> accumDerivedPath;
+
+    accumDerivedPath = [&](std::shared_ptr<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::Node & inputNode) {
+        if (!inputNode.value.empty())
+            pool.enqueue(std::bind(doPath, DerivedPath::Built { inputDrv, inputNode.value }));
+        for (const auto & [outputName, childNode] : inputNode.childMap)
+            accumDerivedPath(
+                std::make_shared<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
+                childNode);
+    };
+
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
             auto state(state_.lock());
             state->willBuild.insert(drvPath);
         }
 
-        for (auto & i : drv.inputDrvs)
-            pool.enqueue(std::bind(doPath, DerivedPath::Built { i.first, i.second }));
+        for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map) {
+            accumDerivedPath(staticDrvReq(inputDrv), inputNode);
+        }
     };
 
     auto checkOutput = [&](
@@ -192,10 +215,14 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
         std::visit(overloaded {
           [&](DerivedPath::Built bfd) {
-            if (!isValidPath(bfd.drvPath)) {
+            auto drvPathP = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath);
+            if (!drvPathP) return; // TODO make work in this case.
+            auto & drvPath = drvPathP->path;
+
+            if (!isValidPath(drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
-                state->unknown.insert(bfd.drvPath);
+                state->unknown.insert(drvPath);
                 return;
             }
 
@@ -203,7 +230,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             /* true for regular derivations, and CA derivations for which we
                have a trust mapping for all wanted outputs. */
             auto knownOutputPaths = true;
-            for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(bfd.drvPath)) {
+            for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(drvPath)) {
                 if (!pathOpt) {
                     knownOutputPaths = false;
                     break;
@@ -213,15 +240,15 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             }
             if (knownOutputPaths && invalid.empty()) return;
 
-            auto drv = make_ref<Derivation>(derivationFromPath(bfd.drvPath));
-            ParsedDerivation parsedDrv(StorePath(bfd.drvPath), *drv);
+            auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
+            ParsedDerivation parsedDrv(StorePath(drvPath), *drv);
 
             if (knownOutputPaths && settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
-                    pool.enqueue(std::bind(checkOutput, bfd.drvPath, drv, output, drvState));
+                    pool.enqueue(std::bind(checkOutput, drvPath, drv, output, drvState));
             } else
-                mustBuildDrv(bfd.drvPath, *drv);
+                mustBuildDrv(drvPath, *drv);
 
           },
           [&](DerivedPath::Opaque bo) {
@@ -279,5 +306,129 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }});
 }
 
+
+SingleDerivedPath tryResolveDerivedPath(Store & store, const SingleDerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](const SingleDerivedPath::Opaque & _) -> SingleDerivedPath {
+            return req;
+        },
+        [&](const SingleDerivedPath::Built & bfd0) -> SingleDerivedPath {
+            SingleDerivedPath::Built bfd {
+                std::make_shared<SingleDerivedPath>(tryResolveDerivedPath(store, *bfd0.drvPath)),
+                bfd0.outputs,
+            };
+            return std::visit(overloaded {
+                [&](const SingleDerivedPath::Opaque & bo) -> SingleDerivedPath {
+                    auto & drvPath = bo.path;
+                    auto outputPaths = store.queryPartialDerivationOutputMap(drvPath);
+                    if (outputPaths.count(bfd.outputs) == 0)
+                        throw Error("derivation '%s' does not have an output named '%s'",
+                            store.printStorePath(drvPath), bfd.outputs);
+                    auto & optPath = outputPaths.at(bfd.outputs);
+                    if (optPath)
+                        // Can resolve this step
+                        return DerivedPath::Opaque { *optPath };
+                    else
+                        // Can't resolve this step
+                        return bfd;
+                },
+                [&](const SingleDerivedPath::Built & _) -> SingleDerivedPath {
+                    // Can't resolve previous step, and thus all future steps.
+                    return bfd;
+                },
+            }, bfd.drvPath->raw());
+        },
+    }, req.raw());
+}
+
+#if 0
+DerivedPath tryResolveDerivedPath(Store &, const DerivedPath &)
+{
+    // TODO
+}
+#endif
+
+
+StorePath resolveDerivedPathWithHints(Store & store, const SingleDerivedPathWithHints & req)
+{
+    return std::visit(overloaded {
+        [&](SingleDerivedPathWithHints::Opaque bo) {
+            return bo.path;
+        },
+        [&](SingleDerivedPathWithHints::Built bfd) {
+            if (bfd.outputs.second)
+                return *bfd.outputs.second;
+            else
+                return resolveDerivedPath(store, SingleDerivedPath::Built {
+                    staticDrvReq(resolveDerivedPathWithHints(store, *bfd.drvPath)),
+                    bfd.outputs.first,
+                });
+        },
+    }, req.raw());
+}
+
+StorePath resolveDerivedPath(Store & store, const SingleDerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](SingleDerivedPath::Opaque bo) {
+            return bo.path;
+        },
+        [&](SingleDerivedPath::Built bfd) {
+            auto drvPath = resolveDerivedPath(store, *bfd.drvPath);
+            auto outputPaths = store.queryPartialDerivationOutputMap(drvPath);
+            if (outputPaths.count(bfd.outputs) == 0)
+                throw Error("derivation '%s' does not have an output named '%s'",
+                    store.printStorePath(drvPath), bfd.outputs);
+            auto & optPath = outputPaths.at(bfd.outputs);
+            if (!optPath)
+                throw Error("'%s' does not yet map to a known concrete store path",
+                    bfd.to_string(store));
+            return *optPath;
+        },
+    }, req.raw());
+}
+
+
+std::map<std::string, StorePath> resolveDerivedPathWithHints(Store & store, const DerivedPathWithHints::Built & bfd)
+{
+    std::map<std::string, StorePath> res;
+    for (auto & [outputName, optOutputPath] : bfd.outputs) {
+        if (optOutputPath)
+            res.insert_or_assign(outputName, *optOutputPath);
+        else {
+            // fallback on resolving anew
+            StringSet outputNames;
+            for (auto & [outputName, _] : bfd.outputs)
+                outputNames.insert(outputName);
+            return resolveDerivedPath(store, DerivedPath::Built {
+                staticDrvReq(resolveDerivedPathWithHints(store, *bfd.drvPath)),
+                outputNames,
+            });
+        }
+    }
+    return res;
+}
+
+std::map<std::string, StorePath> resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
+{
+    auto drvPath = resolveDerivedPath(store, *bfd.drvPath);
+    auto outputMap = store.queryDerivationOutputMap(drvPath);
+    auto outputsLefts = bfd.outputs;
+    for (auto iter = outputMap.begin(); iter != outputMap.end();) {
+        auto & outputName = iter->first;
+        if (wantOutput(outputName, outputsLefts)) {
+            outputsLefts.erase(outputName);
+            ++iter;
+        } else {
+            iter = outputMap.erase(iter);
+        }
+    }
+    if (!outputsLefts.empty())
+        throw Error("derivation '%s' does not have an outputs %s",
+            store.printStorePath(drvPath),
+            concatStringsSep(", ", quoteStrings(bfd.outputs)));
+    return outputMap;
+}
 
 }

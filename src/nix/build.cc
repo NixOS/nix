@@ -67,7 +67,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                             store2->addPermRoot(bo.path, absPath(symlink));
                         },
                         [&](DerivedPathWithHints::Built bfd) {
-                            auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
+                            auto builtOutputs = resolveDerivedPathWithHints(*store, bfd);
                             for (auto & output : builtOutputs) {
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);
@@ -80,7 +80,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         updateProfile(buildables);
 
-        if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
+        if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, *store).dump());
     }
 };
 
