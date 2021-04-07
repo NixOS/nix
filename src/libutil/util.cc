@@ -32,6 +32,7 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #endif
 
 
@@ -1618,11 +1619,37 @@ static void restoreSignals()
         throw SysError("restoring signals");
 }
 
+#if __linux__
+rlim_t savedStackSize = 0;
+#endif
+
+void setStackSize(size_t stackSize)
+{
+    #if __linux__
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+        savedStackSize = limit.rlim_cur;
+        limit.rlim_cur = stackSize;
+        setrlimit(RLIMIT_STACK, &limit);
+    }
+    #endif
+}
+
 void restoreProcessContext()
 {
     restoreSignals();
 
     restoreAffinity();
+
+    #if __linux__
+    if (savedStackSize) {
+        struct rlimit limit;
+        if (getrlimit(RLIMIT_STACK, &limit) == 0) {
+            limit.rlim_cur = savedStackSize;
+            setrlimit(RLIMIT_STACK, &limit);
+        }
+    }
+    #endif
 }
 
 /* RAII helper to automatically deregister a callback. */

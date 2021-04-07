@@ -300,6 +300,10 @@ std::pair<int, std::string> runProgram(const RunOptions & options);
 void runProgram2(const RunOptions & options);
 
 
+/* Change the stack size. */
+void setStackSize(size_t stackSize);
+
+
 /* Restore the original inherited Unix process context (such as signal
    masks, stack size, CPU affinity). */
 void restoreProcessContext();
