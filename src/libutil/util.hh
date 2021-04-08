@@ -128,6 +128,9 @@ std::string getUserName();
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 
+/* Expand a leading '~' in a path to the user's home directory. */
+Path expandTilde(const Path & path);
+
 /* Return $XDG_CACHE_HOME or $HOME/.cache. */
 Path getCacheDir();
 

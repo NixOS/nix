@@ -541,6 +541,14 @@ Path getHome()
     return homeDir;
 }
 
+Path expandTilde(const Path & path)
+{
+    if (path == "~")
+        return getHome();
+    if (path.compare(0, 2, "~/") == 0)
+        return getHome() + "/" + path.substr(2);
+    return path;
+}
 
 Path getCacheDir()
 {
