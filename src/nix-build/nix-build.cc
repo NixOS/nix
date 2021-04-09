@@ -263,10 +263,12 @@ static void main_nix_build(int argc, char * * argv)
 
     if (packages) {
         std::ostringstream joined;
-        joined << "with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
+        joined << "with import <nixpkgs> { }; let packages = [ ";
         for (const auto & i : left)
             joined << '(' << i << ") ";
-        joined << "]; } \"\"";
+        joined << "]; in (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = packages; ";
+        joined << "MANPATH = lib.makeSearchPath \"share/man\" (lib.flatten (builtins.map (p: [ (lib.getMan p) (lib.getOutput \"devman\" p) ]) packages)); ";
+        joined << "} \"\"";
         fromArgs = true;
         left = {joined.str()};
     } else if (!fromArgs) {
@@ -448,13 +450,15 @@ static void main_nix_build(int argc, char * * argv)
                 "shopt -u nullglob; "
                 "unset TZ; %6%"
                 "shopt -s execfail;"
-                "%7%",
+                "MANPATH=$MANPATH%7%; "
+                "%8%",
                 shellEscape(tmpDir),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 shellEscape(dirOf(*shell)),
                 shellEscape(*shell),
                 (getenv("TZ") ? (string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
+                ((pure || !getenv("MANPATH")) ? "" : (string(":") + getenv("MANPATH"))),
                 envCommand));
 
         Strings envStrs;
