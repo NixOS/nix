@@ -556,15 +556,29 @@ static Bindings::iterator extractAttrNameFromPrimopCall(
 ) {
     Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
     if (value == attrSet->end()) {
-        auto e = TypeError({
-            .msg = hintfmt("attribute '%s' missing for call to '%s'", attrName, funcName),
-            .errPos = *attrSet->pos,
-        });
+        hintformat errorMsg = hintfmt(
+            "attribute '%s' missing for call to '%s'",
+            attrName,
+            funcName
+        );
 
-        // Adding another trace for the function name to make it clear
-        // which call received wrong arguments.
-        e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
-        throw e;
+        Pos aPos = *attrSet->pos;
+        if (aPos == noPos) {
+            throw TypeError({
+                .msg = errorMsg,
+                .errPos = pos,
+            });
+        } else {
+            auto e = TypeError({
+                .msg = errorMsg,
+                .errPos = aPos,
+            });
+
+            // Adding another trace for the function name to make it clear
+            // which call received wrong arguments.
+            e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
+            throw e;
+        }
     }
 
     return value;
@@ -841,12 +855,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(state.sName);
-    if (attr == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("required attribute 'name' missing"),
-            .errPos = pos
-        });
+    Bindings::iterator attr = extractAttrNameFromPrimopCall(
+        state,
+        "derivationStrict",
+        state.sName,
+        args[0]->attrs,
+        pos
+    );
+
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
@@ -1394,12 +1410,13 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         if (i != v2.attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
-        i = v2.attrs->find(state.symbols.create("path"));
-        if (i == v2.attrs->end())
-            throw EvalError({
-                .msg = hintfmt("attribute 'path' missing"),
-                .errPos = pos
-            });
+        i = extractAttrNameFromPrimopCall(
+            state,
+            "findFile",
+            "path",
+            v2.attrs,
+            pos
+        );
 
         PathSet context;
         string path = state.coerceToString(pos, *i->value, context, false, false);
@@ -2041,12 +2058,13 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute '%1%' missing", attr),
-            .errPos = pos
-        });
+    Bindings::iterator i = extractAttrNameFromPrimopCall(
+        state,
+        "getAttr",
+        attr,
+        args[1]->attrs,
+        pos
+    );
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
