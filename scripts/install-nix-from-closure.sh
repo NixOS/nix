@@ -220,6 +220,7 @@ if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
     fi
 fi
 
+added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
     # For bash-compatible shells like bash or zsh
     # Make the shell source nix.sh during login.
