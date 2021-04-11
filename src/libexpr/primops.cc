@@ -547,18 +547,42 @@ typedef list<Value *> ValueList;
 #endif
 
 
+static Bindings::iterator extractAttrNameFromPrimopCall(
+        EvalState &state,
+        string funcName,
+        string attrName,
+        Bindings *attrSet,
+        const Pos &pos
+) {
+    Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
+    if (value == attrSet->end()) {
+        auto e = TypeError({
+            .msg = hintfmt("attribute '%s' missing for call to '%s'", attrName, funcName),
+            .errPos = *attrSet->pos,
+        });
+
+        // Adding another trace for the function name to make it clear
+        // which call received wrong arguments.
+        e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
+        throw e;
+    }
+
+    return value;
+}
+
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
-    Bindings::iterator startSet =
-        args[0]->attrs->find(state.symbols.create("startSet"));
-    if (startSet == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute 'startSet' required"),
-            .errPos = pos
-        });
+    Bindings::iterator startSet = extractAttrNameFromPrimopCall(
+        state,
+        "genericClosure",
+        "startSet",
+        args[0]->attrs,
+        pos
+    );
+
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
@@ -566,13 +590,14 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         workSet.push_back(startSet->value->listElems()[n]);
 
     /* Get the operator. */
-    Bindings::iterator op =
-        args[0]->attrs->find(state.symbols.create("operator"));
-    if (op == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute 'operator' required"),
-            .errPos = pos
-        });
+    Bindings::iterator op = extractAttrNameFromPrimopCall(
+        state,
+        "genericClosure",
+        "operator",
+        args[0]->attrs,
+        pos
+    );
+
     state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
@@ -2148,28 +2173,25 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Value & v2(*args[0]->listElems()[i]);
         state.forceAttrs(v2, pos);
 
-        Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end()) {
-            auto e = TypeError({
-                .msg = hintfmt("'name' attribute missing for 'listToAttrs'"),
-                .errPos = *v2.attrs->pos
-            });
-            e.addTrace(pos, hintfmt("while invoking '%s'", "listToAttrs"));
-            throw e;
-        }
+        Bindings::iterator j = extractAttrNameFromPrimopCall(
+            state,
+            "listToAttrs",
+            state.sName,
+            v2.attrs,
+            pos
+        );
+
         string name = state.forceStringNoCtx(*j->value, *j->pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
-            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end()) {
-                auto e = TypeError({
-                    .msg = hintfmt("'value' attribute missing for 'listToAttrs'"),
-                    .errPos = *v2.attrs->pos
-                });
-                e.addTrace(pos, hintfmt("while invoking '%s'", "listToAttrs"));
-                throw e;
-            }
+            Bindings::iterator j2 = extractAttrNameFromPrimopCall(
+                state,
+                "listToAttrs",
+                state.sValue,
+                v2.attrs,
+                pos
+            );
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
     }
