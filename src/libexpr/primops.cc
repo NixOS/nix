@@ -547,13 +547,13 @@ typedef list<Value *> ValueList;
 #endif
 
 
-static Bindings::iterator extractAttrNameFromPrimopCall(
-        EvalState &state,
-        string funcName,
-        string attrName,
-        Bindings *attrSet,
-        const Pos &pos
-) {
+static Bindings::iterator getAttr(
+    EvalState & state,
+    string funcName,
+    string attrName,
+    Bindings * attrSet,
+    const Pos & pos)
+{
     Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
     if (value == attrSet->end()) {
         hintformat errorMsg = hintfmt(
@@ -589,7 +589,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
-    Bindings::iterator startSet = extractAttrNameFromPrimopCall(
+    Bindings::iterator startSet = getAttr(
         state,
         "genericClosure",
         "startSet",
@@ -604,7 +604,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         workSet.push_back(startSet->value->listElems()[n]);
 
     /* Get the operator. */
-    Bindings::iterator op = extractAttrNameFromPrimopCall(
+    Bindings::iterator op = getAttr(
         state,
         "genericClosure",
         "operator",
@@ -855,7 +855,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = extractAttrNameFromPrimopCall(
+    Bindings::iterator attr = getAttr(
         state,
         "derivationStrict",
         state.sName,
@@ -1410,7 +1410,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         if (i != v2.attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
-        i = extractAttrNameFromPrimopCall(
+        i = getAttr(
             state,
             "findFile",
             "path",
@@ -2058,7 +2058,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = extractAttrNameFromPrimopCall(
+    Bindings::iterator i = getAttr(
         state,
         "getAttr",
         attr,
@@ -2191,7 +2191,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Value & v2(*args[0]->listElems()[i]);
         state.forceAttrs(v2, pos);
 
-        Bindings::iterator j = extractAttrNameFromPrimopCall(
+        Bindings::iterator j = getAttr(
             state,
             "listToAttrs",
             state.sName,
@@ -2203,7 +2203,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
-            Bindings::iterator j2 = extractAttrNameFromPrimopCall(
+            Bindings::iterator j2 = getAttr(
                 state,
                 "listToAttrs",
                 state.sValue,
