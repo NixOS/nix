@@ -887,7 +887,6 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto outputId = DrvOutput::parse(readString(from));
         auto outputPath = StorePath(readString(from));
-        auto resolvedDrv = StorePath(readString(from));
         store->registerDrvOutput(Realisation{
             .id = outputId, .outPath = outputPath});
         logger->stopWork();
