@@ -2091,9 +2091,12 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    add(getHome() + "/.nix-defexpr/channels");
-    add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
-    add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
+        add(getHome() + "/.nix-defexpr/channels");
+        add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
+        add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    }
+
     return res;
 }
 
