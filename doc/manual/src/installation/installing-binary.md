@@ -234,8 +234,9 @@ as a helpful reference if you run into trouble.
     without a reboot:
     
     ```console
-    $ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
+    $ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t
     ```
+    (note: use `-B` instead of `-t` on Catalina)
 
 3.  Create the new APFS volume with diskutil:
     
