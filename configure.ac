@@ -285,17 +285,6 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
-# Do we have GNU tar?
-AC_MSG_CHECKING([if you have a recent GNU tar])
-if $tar --version 2> /dev/null | grep -q GNU && tar cvf /dev/null --warning=no-timestamp ./config.log > /dev/null; then
-    AC_MSG_RESULT(yes)
-    tarFlags="--warning=no-timestamp"
-else
-    AC_MSG_RESULT(no)
-fi
-AC_SUBST(tarFlags)
-
-
 AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
