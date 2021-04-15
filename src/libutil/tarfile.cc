@@ -5,38 +5,41 @@
 #include "tarfile.hh"
 
 namespace nix {
-static int callback_open(struct archive *, void *self) {
+
+static int callback_open(struct archive *, void * self)
+{
     return ARCHIVE_OK;
 }
 
-static ssize_t callback_read(struct archive * archive, void * _self, const void * * buffer) {
-    TarArchive *self = (TarArchive *)_self;
+static ssize_t callback_read(struct archive * archive, void * _self, const void * * buffer)
+{
+    auto self = (TarArchive *) _self;
     *buffer = self->buffer.data();
 
     try {
         return self->source->read((char *) self->buffer.data(), 4096);
     } catch (EndOfFile &) {
         return 0;
-    } catch (std::exception &err) {
+    } catch (std::exception & err) {
         archive_set_error(archive, EIO, "Source threw exception: %s", err.what());
-
         return -1;
     }
 }
 
-static int callback_close(struct archive *, void *self) {
+static int callback_close(struct archive *, void * self)
+{
     return ARCHIVE_OK;
 }
 
-void TarArchive::check(int err, const char *reason)
+void TarArchive::check(int err, const std::string & reason)
 {
-        if (err == ARCHIVE_EOF)
-            throw EndOfFile("reached end of archive");
-        else if (err != ARCHIVE_OK)
-            throw Error(reason, archive_error_string(this->archive));
-    }
+    if (err == ARCHIVE_EOF)
+        throw EndOfFile("reached end of archive");
+    else if (err != ARCHIVE_OK)
+        throw Error(reason, archive_error_string(this->archive));
+}
 
-TarArchive::TarArchive(Source& source, bool raw) : buffer(4096)
+TarArchive::TarArchive(Source & source, bool raw) : buffer(4096)
 {
     this->archive = archive_read_new();
     this->source = &source;
@@ -53,7 +56,7 @@ TarArchive::TarArchive(Source& source, bool raw) : buffer(4096)
 }
 
 
-TarArchive::TarArchive(const Path &path)
+TarArchive::TarArchive(const Path & path)
 {
     this->archive = archive_read_new();
 
@@ -62,11 +65,13 @@ TarArchive::TarArchive(const Path &path)
     check(archive_read_open_filename(archive, path.c_str(), 16384), "failed to open archive: %s");
 }
 
-void TarArchive::close() {
+void TarArchive::close()
+{
     check(archive_read_close(this->archive), "Failed to close archive (%s)");
 }
 
-TarArchive::~TarArchive() {
+TarArchive::~TarArchive()
+{
     if (this->archive) archive_read_free(this->archive);
 }
 

@@ -82,7 +82,7 @@
 
         buildDeps =
           [ curl
-            bzip2 xz brotli zlib editline
+            bzip2 xz brotli editline
             openssl sqlite
             libarchive
             boost

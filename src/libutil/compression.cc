@@ -4,8 +4,6 @@
 #include "finally.hh"
 #include "logging.hh"
 
-#include <lzma.h>
-#include <bzlib.h>
 #include <archive.h>
 #include <archive_entry.h>
 #include <cstdio>
@@ -45,12 +43,13 @@ struct ArchiveDecompressionSource : Source
     ArchiveDecompressionSource(Source & src) : src(src) {}
     ~ArchiveDecompressionSource() override {}
     size_t read(char * data, size_t len) override {
-        struct archive_entry* ae;
+        struct archive_entry * ae;
         if (!archive) {
             archive = std::make_unique<TarArchive>(src, true);
-            this->archive->check(archive_read_next_header(this->archive->archive, &ae), "Failed to read header (%s)");
+            this->archive->check(archive_read_next_header(this->archive->archive, &ae),
+                "failed to read header (%s)");
             if (archive_filter_count(this->archive->archive) < 2) {
-                throw CompressionError("Input compression not recognized.");
+                throw CompressionError("input compression not recognized");
             }
         }
         ssize_t result = archive_read_data(this->archive->archive, data, len);
@@ -58,18 +57,20 @@ struct ArchiveDecompressionSource : Source
         if (result == 0) {
             throw EndOfFile("reached end of compressed file");
         }
-        this->archive->check(result, "Failed to read compressed data (%s)");
+        this->archive->check(result, "failed to read compressed data (%s)");
         return result;
     }
 };
+
 struct ArchiveCompressionSink : CompressionSink
 {
     Sink & nextSink;
-    struct archive* archive;
+    struct archive * archive;
+
     ArchiveCompressionSink(Sink & nextSink, std::string format, bool parallel) : nextSink(nextSink) {
         archive = archive_write_new();
         if (!archive) throw Error("failed to initialize libarchive");
-        check(archive_write_add_filter_by_name(archive, format.c_str()), "Couldn't initialize compression (%s)");
+        check(archive_write_add_filter_by_name(archive, format.c_str()), "couldn't initialize compression (%s)");
         check(archive_write_set_format_raw(archive));
         if (format == "xz" && parallel) {
             check(archive_write_set_filter_option(archive, format.c_str(), "threads", "0"));
@@ -80,34 +81,46 @@ struct ArchiveCompressionSink : CompressionSink
         check(archive_write_set_bytes_in_last_block(archive, 1));
         open();
     }
-    ~ArchiveCompressionSink() override {
+
+    ~ArchiveCompressionSink() override
+    {
         if (archive) archive_write_free(archive);
     }
-    void finish() override {
+
+    void finish() override
+    {
         flush();
         check(archive_write_close(archive));
     }
-    void check(int err, const char *reason="Failed to compress (%s)") {
+
+    void check(int err, const std::string & reason = "failed to compress (%s)")
+    {
         if (err == ARCHIVE_EOF)
             throw EndOfFile("reached end of archive");
         else if (err != ARCHIVE_OK)
             throw Error(reason, archive_error_string(this->archive));
     }
-    void write(std::string_view data) override {
+
+    void write(std::string_view data) override
+    {
         ssize_t result = archive_write_data(archive, data.data(), data.length());
         if (result <= 0) check(result);
     }
+
 private:
-    void open() {
-        check(archive_write_open(archive, this, NULL, ArchiveCompressionSink::callback_write, NULL));
-        struct archive_entry *ae = archive_entry_new();
+    void open()
+    {
+        check(archive_write_open(archive, this, nullptr, ArchiveCompressionSink::callback_write, nullptr));
+        auto ae = archive_entry_new();
         archive_entry_set_filetype(ae, AE_IFREG);
         check(archive_write_header(archive, ae));
         archive_entry_free(ae);
     }
-    static ssize_t callback_write(struct archive *archive, void *_self, const void *buffer, size_t length) {
-        ArchiveCompressionSink *self = (ArchiveCompressionSink *)_self;
-        self->nextSink({(const char*)buffer, length});
+
+    static ssize_t callback_write(struct archive * archive, void * _self, const void * buffer, size_t length)
+    {
+        auto self = (ArchiveCompressionSink *) _self;
+        self->nextSink({(const char *) buffer, length});
         return length;
     }
 };
@@ -193,17 +206,17 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
     else if (method == "br")
         return std::make_unique<BrotliDecompressionSink>(nextSink);
     else
-		return sourceToSink([&](Source & source) {
-			auto decompressionSource = makeDecompressionSource(source);
-			decompressionSource->drainInto(nextSink);
-		});
+        return sourceToSink([&](Source & source) {
+            auto decompressionSource = makeDecompressionSource(source);
+            decompressionSource->drainInto(nextSink);
+        });
 }
 
 struct BrotliCompressionSink : ChunkedCompressionSink
 {
     Sink & nextSink;
     uint8_t outbuf[BUFSIZ];
-    BrotliEncoderState *state;
+    BrotliEncoderState * state;
     bool finished = false;
 
     BrotliCompressionSink(Sink & nextSink) : nextSink(nextSink)
@@ -251,6 +264,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
         }
     }
 };
+
 std::unique_ptr<Source> makeDecompressionSource(Source & prev) {
     return std::unique_ptr<Source>(new ArchiveDecompressionSource(prev));
 }

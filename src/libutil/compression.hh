@@ -10,9 +10,9 @@ namespace nix {
 
 struct CompressionSink : BufferedSink, FinishSink
 {
-	using BufferedSink::operator ();
-	using BufferedSink::write;
-	using FinishSink::finish;
+    using BufferedSink::operator ();
+    using BufferedSink::write;
+    using FinishSink::finish;
 };
 
 std::unique_ptr<Source> makeDecompressionSource(Source & prev);

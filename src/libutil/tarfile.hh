@@ -4,18 +4,18 @@
 namespace nix {
 
 struct TarArchive {
-    struct archive *archive;
-    Source *source;
+    struct archive * archive;
+    Source * source;
     std::vector<unsigned char> buffer;
 
-    void check(int err, const char *reason = "Failed to extract archive (%s)");
+    void check(int err, const std::string & reason = "failed to extract archive (%s)");
 
-    TarArchive(Source& source, bool raw = false);
+    TarArchive(Source & source, bool raw = false);
 
-    TarArchive(const Path &path);
+    TarArchive(const Path & path);
 
     // disable copy constructor
-    TarArchive(const TarArchive&) = delete;
+    TarArchive(const TarArchive &) = delete;
 
     void close();
 

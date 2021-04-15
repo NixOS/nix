@@ -172,11 +172,6 @@ fi
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Look for libbz2, a required dependency.
-AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
-AC_CHECK_HEADERS([bzlib.h], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
@@ -204,16 +199,6 @@ PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLA
 
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
-
-# Look for liblzma, a required dependency.
-PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
-AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
-  [AC_DEFINE([HAVE_LZMA_MT], [1], [xz multithreaded compression support])])
-
-# Look for zlib, a required dependency.
-PKG_CHECK_MODULES([ZLIB], [zlib], [CXXFLAGS="$ZLIB_CFLAGS $CXXFLAGS"])
-AC_CHECK_HEADER([zlib.h],[:],[AC_MSG_ERROR([could not find the zlib.h header])])
-LDFLAGS="-lz $LDFLAGS"
 
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
