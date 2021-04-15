@@ -179,6 +179,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     narInfo->url = "nar/" + narInfo->fileHash->to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
+           compression == "zstd" ? ".zst" :
+           compression == "lzip" ? ".lzip" :
+           compression == "lz4" ? ".lz4" :
            compression == "br" ? ".br" :
            "");
 

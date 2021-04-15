@@ -30,6 +30,7 @@ nix_tests = \
   signing.sh \
   shell.sh \
   brotli.sh \
+  zstd.sh \
   pure-eval.sh \
   check.sh \
   plugins.sh \
