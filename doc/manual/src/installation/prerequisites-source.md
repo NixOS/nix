@@ -69,6 +69,3 @@
     `--disable-seccomp-sandboxing` option to the `configure` script (Not
     recommended unless your system doesn't support `libseccomp`). To get
     the library, visit <https://github.com/seccomp/libseccomp>.
- 
-  - Niels Lohmann's [JSON library](https://github.com/nlohmann/json).
-  
