@@ -503,7 +503,11 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
-        auto attr = root->findAlongAttrPath(parseAttrPath(*state, attrPath));
+        auto attr = root->findAlongAttrPath(
+            parseAttrPath(*state, attrPath),
+            true
+        );
+
         if (!attr) continue;
 
         if (!attr->isDerivation())
