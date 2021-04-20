@@ -6,6 +6,7 @@
 #include "url-parts.hh"
 
 #include <sys/time.h>
+#include <sys/wait.h>
 
 using namespace std::string_literals;
 
