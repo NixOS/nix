@@ -28,7 +28,7 @@ struct ChunkedCompressionSink : CompressionSink
         const size_t CHUNK_SIZE = sizeof(outbuf) << 2;
         while (!data.empty()) {
             size_t n = std::min(CHUNK_SIZE, data.size());
-            writeInternal(data);
+            writeInternal(data.substr(0, n));
             data.remove_prefix(n);
         }
     }
@@ -265,7 +265,8 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
-std::unique_ptr<Source> makeDecompressionSource(Source & prev) {
+std::unique_ptr<Source> makeDecompressionSource(Source & prev)
+{
     return std::unique_ptr<Source>(new ArchiveDecompressionSource(prev));
 }
 
