@@ -42,6 +42,8 @@ void EvalState::realiseContext(const PathSet & context)
         auto ctx = store->parseStorePath(ctxS);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
+        if (trackRealisedPaths)
+            realisedPaths.push_back(ctx);
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back({ctx, {outputName}});
         }
@@ -3496,6 +3498,41 @@ static RegisterPrimOp primop_splitVersion({
       [`nix-env -u`](../command-ref/nix-env.md#operation---upgrade).
     )",
     .fun = prim_splitVersion,
+});
+
+void prim_traceContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    bool oldTrackRealisedPaths = state.trackRealisedPaths;
+    state.trackRealisedPaths = true;
+
+    std::vector<StorePath> oldRealisedPaths = std::move(state.realisedPaths);
+    state.realisedPaths = {};
+
+    state.mkAttrs(v, 2);
+
+    state.forceValueDeep(*args[0]);
+    v.attrs->push_back(Attr(state.sValue, args[0]));
+
+    Value * paths = state.allocAttr(v, state.symbols.create("paths"));
+    state.mkList(*paths, state.realisedPaths.size());
+    int n = 0;
+    for (auto p : state.realisedPaths)
+        mkString(*(paths->listElems()[n++] = state.allocValue()), state.store->printStorePath(p));
+
+    state.trackRealisedPaths = oldTrackRealisedPaths;
+    state.realisedPaths.insert(state.realisedPaths.begin(), oldRealisedPaths.begin(), oldRealisedPaths.end());
+}
+
+static RegisterPrimOp primop_traceContext({
+    .name = "__traceContext",
+    .args = {"e"},
+    .doc = R"(
+      Evaluate expression *e*, recording what paths are realised.
+      Then return an attrset with the expression results under "value"
+      and the paths realised "paths". This function is useful for
+      finding what paths are needed for an expression to evaluation.
+    )",
+    .fun = prim_traceContext,
 });
 
 
