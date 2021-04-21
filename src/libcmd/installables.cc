@@ -754,10 +754,8 @@ std::set<RealisedPath> toRealisedPaths(
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
-        for (auto & i : installables)
-            for (auto & b : i->toDerivedPathsWithHints())
-                if (auto bfd = std::get_if<DerivedPathWithHints::Built>(&b))
-                    res.insert(bfd->drvPath);
+        auto drvPaths = toDerivations(store, installables, true);
+        res.insert(drvPaths.begin(), drvPaths.end());
     }
 
     return res;
