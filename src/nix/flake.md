@@ -395,7 +395,7 @@ the `nixpkgs` input of the top-level flake to be equal to the
 `nixpkgs` input of the `dwarffs` input of the top-level flake:
 
 ```nix
-inputs.nixops.follows = "dwarffs/nixpkgs";
+inputs.nixpkgs.follows = "dwarffs/nixpkgs";
 ```
 
 The value of the `follows` attribute is a `/`-separated sequence of
