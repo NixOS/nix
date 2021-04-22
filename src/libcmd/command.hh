@@ -290,4 +290,6 @@ void printClosureDiff(
     const StorePath & afterPath,
     std::string_view indent);
 
+std::string formatSize(uint64_t value);
+
 }

@@ -242,4 +242,18 @@ void MixEnvironment::setEnviron() {
     }
 }
 
+std::string formatSize(uint64_t value)
+{
+    static const std::array<char, 9> idents{{
+        ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
+    }};
+    size_t power = 0;
+    double res = value;
+    while (res > 1024 && power < idents.size()) {
+        ++power;
+        res /= 1024;
+    }
+    return fmt("%6.1f%c", res, idents.at(power));
+}
+
 }
