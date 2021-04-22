@@ -186,19 +186,11 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
 
 ref<std::string> decompress(const std::string & method, const std::string & in)
 {
-    if (method == "none" || method == "")
-        return make_ref<std::string>(in);
-    else if (method == "br") {
-        StringSink ssink;
-        auto sink = makeDecompressionSink(method, ssink);
-        (*sink)(in);
-        sink->finish();
-        return ssink.s;
-    } else {
-        StringSource ssrc(in);
-        auto src = makeDecompressionSource(ssrc);
-        return make_ref<std::string>(src->drain());
-    }
+    StringSink ssink;
+    auto sink = makeDecompressionSink(method, ssink);
+    (*sink)(in);
+    sink->finish();
+    return ssink.s;
 }
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
@@ -209,7 +201,7 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
         return std::make_unique<BrotliDecompressionSink>(nextSink);
     else
         return sourceToSink([&](Source & source) {
-            auto decompressionSource = makeDecompressionSource(source);
+            auto decompressionSource = std::make_unique<ArchiveDecompressionSource>(source);
             decompressionSource->drainInto(nextSink);
         });
 }
@@ -266,11 +258,6 @@ struct BrotliCompressionSink : ChunkedCompressionSink
         }
     }
 };
-
-std::unique_ptr<Source> makeDecompressionSource(Source & prev)
-{
-    return std::unique_ptr<Source>(new ArchiveDecompressionSource(prev));
-}
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
 {

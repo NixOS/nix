@@ -15,8 +15,6 @@ struct CompressionSink : BufferedSink, FinishSink
     using FinishSink::finish;
 };
 
-std::unique_ptr<Source> makeDecompressionSource(Source & prev);
-
 ref<std::string> decompress(const std::string & method, const std::string & in);
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
