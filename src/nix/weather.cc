@@ -10,7 +10,7 @@
 
 using namespace nix;
 
-struct CmdWeather : InstallableCommand
+struct CmdWeather : InstallablesCommand
 {
     bool noClosure = false;
 
@@ -94,8 +94,16 @@ struct CmdWeather : InstallableCommand
             }
         };
 
-        for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix), true);
+        for (auto & installable : installables) {
+            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
+                for (auto & [cursor, prefix] : installable2->getCursors(*state)) {
+                    visit(*cursor, parseAttrPath(*state, prefix), true);
+                }
+            } else {
+                auto drvPaths_ = toDerivations(store, {installable}, true);
+                drvPaths.insert(drvPaths_.begin(), drvPaths_.end());
+            }
+        }
 
         if (drvPaths.size() == 0)
             throw Error("no derivations found!");
