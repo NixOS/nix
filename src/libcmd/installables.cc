@@ -384,6 +384,13 @@ struct InstallableAttrPath : InstallableValue
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
+
+        if (attrPath == "") {
+            Value * vNew = state.allocValue();
+            state.autoCallFunction(*cmd.getAutoArgs(state), *vRes, *vNew);
+            vRes = vNew;
+        }
+
         state.forceValue(*vRes);
         return {vRes, pos};
     }
