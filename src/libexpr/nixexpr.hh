@@ -78,7 +78,7 @@ string showAttrPath(const AttrPath & attrPath);
 struct Expr
 {
     virtual ~Expr() { };
-    virtual void show(std::ostream & str) const;
+    virtual void showAsAterm(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
@@ -88,7 +88,7 @@ struct Expr
 std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
-    void show(std::ostream & str) const; \
+    void showAsAterm(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
     void bindVars(const StaticEnv & env);
 
@@ -295,7 +295,7 @@ struct ExprOpNot : Expr
         Expr * e1, * e2; \
         name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
         name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
-        void show(std::ostream & str) const \
+        void showAsAterm(std::ostream & str) const \
         { \
             str << "(" << *e1 << " " s " " << *e2 << ")";   \
         } \
