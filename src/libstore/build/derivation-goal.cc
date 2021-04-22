@@ -1269,12 +1269,23 @@ void DerivationGoal::checkPathValidity()
             };
         }
         if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-            if (auto real = worker.store.queryRealisation(
-                    DrvOutput{initialOutputs.at(i.first).outputHash, i.first})) {
+            auto drvOutput = DrvOutput{initialOutputs.at(i.first).outputHash, i.first};
+            if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
                     .path = real->outPath,
                     .status = PathStatus::Valid,
                 };
+            } else if (info.known && info.known->status == PathStatus::Valid) {
+                // We know the output because it' a static output of the
+                // derivation, and the output path is valid, but we don't have
+                // its realisation stored (probably because it has been built
+                // without the `ca-derivations` experimental flag)
+                worker.store.registerDrvOutput(
+                    Realisation{
+                        drvOutput,
+                        info.known->path,
+                    }
+                );
             }
         }
     }
