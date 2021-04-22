@@ -78,11 +78,23 @@ string showAttrPath(const AttrPath & attrPath);
 struct Expr
 {
     virtual ~Expr() { };
+    virtual void show(std::ostream & str) const;
     virtual void showAsAterm(std::ostream & str) const;
+    virtual void showAsJson(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
+};
+
+struct ExprAsAterm : Expr
+{
+    void show(std::ostream & str) const;
+};
+
+struct ExprAsJson : Expr
+{
+    void show(std::ostream & str) const;
 };
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
