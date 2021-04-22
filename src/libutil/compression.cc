@@ -186,7 +186,9 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
 
 ref<std::string> decompress(const std::string & method, const std::string & in)
 {
-    if (method == "br") {
+    if (method == "none" || method == "")
+        return make_ref<std::string>(in);
+    else if (method == "br") {
         StringSink ssink;
         auto sink = makeDecompressionSink(method, ssink);
         (*sink)(in);
