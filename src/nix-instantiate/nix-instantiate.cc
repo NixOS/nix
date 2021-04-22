@@ -31,7 +31,12 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
-        std::cout << format("%1%\n") % *e;
+        if (output == okJSON) {
+            std::cout << format("%1%\n") % (ExprAsJson *) *e;
+        }
+        else {
+            std::cout << format("%1%\n") % *e;
+        }
         return;
     }
 
