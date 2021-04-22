@@ -72,35 +72,26 @@ typedef std::vector<AttrName> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
 
-
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
 {
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
-    virtual void showAsAterm(std::ostream & str) const;
     virtual void showAsJson(std::ostream & str) const;
+    //virtual void showAsXml(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
 };
 
-struct ExprAsAterm : Expr
-{
-    void show(std::ostream & str) const;
-};
-
-struct ExprAsJson : Expr
-{
-    void show(std::ostream & str) const;
-};
-
 std::ostream & operator << (std::ostream & str, const Expr & e);
 
+//void showAsXml(std::ostream & str) const;
 #define COMMON_METHODS \
-    void showAsAterm(std::ostream & str) const; \
+    void show(std::ostream & str) const; \
+    void showAsJson(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
     void bindVars(const StaticEnv & env);
 
@@ -300,6 +291,8 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
+// sample: name ExprOpAnd -> jsonTypeName opAnd
+// TODO showAsJson: fix recursion: call e1->showAsJson(str), etc.
 #define MakeBinOp(name, s) \
     struct name : Expr \
     { \
@@ -307,9 +300,23 @@ struct ExprOpNot : Expr
         Expr * e1, * e2; \
         name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
         name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
-        void showAsAterm(std::ostream & str) const \
+        void show(std::ostream & str) const \
         { \
             str << "(" << *e1 << " " s " " << *e2 << ")";   \
+        } \
+        void showAsJson(std::ostream & str) const \
+        { \
+            std::string jsonTypeName = [] { \
+                std::string res = ((std::string) #name).substr(4); \
+                if (res.length() > 0 && 'A' <= res[0] && res[0] <= 'Z') \
+                    res[0] += 32; \
+                return res; \
+            }(); \
+            \
+            str << "{\"type\":\"" << jsonTypeName << "\"";   \
+            str << ",\"op1\":" << *e1 << "";   \
+            str << ",\"op2\":" << *e2 << "";   \
+            str << "}";   \
         } \
         void bindVars(const StaticEnv & env) \
         { \
