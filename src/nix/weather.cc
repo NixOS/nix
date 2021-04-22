@@ -154,18 +154,18 @@ struct CmdWeather : InstallableCommand
 
             logger->cout("Substituter %s", sub->getUri());
             logger->cout("  %6.1f%% of paths have substitutes available (%s of %s)", (float) 100 * pathsFound / outPaths.size(), pathsFound, outPaths.size());
-            logger->cout("  %s of nars (compressed)", formatSize(narSize));
             if (downloadSize)
-                logger->cout("  %s on disk (uncompressed)", formatSize(*downloadSize));
+                logger->cout("  %s downloaded (compressed)", formatSize(*downloadSize));
+            logger->cout("  %s downloaded (uncompressed)", formatSize(narSize));
             logger->cout("");
         }
 
         if (subs.size() > 1) {
             logger->cout("Total");
             logger->cout("  %6.0f%% of paths have substitutes available (%s of %s)", (float) 100 * totalPathsFound / outPaths.size(), totalPathsFound, outPaths.size());
-            logger->cout("  %s of nars (compressed)", formatSize(totalNarSize));
             if (totalDownloadSize)
-                logger->cout("  %s on disk (uncompressed)", formatSize(*totalDownloadSize));
+                logger->cout("  %s downloaded (compressed)", formatSize(*totalDownloadSize));
+            logger->cout("  %s downloaded (uncompressed)", formatSize(totalNarSize));
         }
     }
 };
