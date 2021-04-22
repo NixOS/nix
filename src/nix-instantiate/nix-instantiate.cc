@@ -11,6 +11,7 @@
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
 #include "legacy.hh"
+#include "nixexpr.hh" // TODO remove?
 
 #include <map>
 #include <iostream>
@@ -32,10 +33,13 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 {
     if (parseOnly) {
         if (output == okJSON) {
-            std::cout << format("%1%\n") % (ExprAsJson *) *e;
+            // TODO (optionally) add to json ast:
+            // * source locations (start char + end char)
+            // * parsed comments and whitespace
+            e->showAsJson(std::cout);
         }
         else {
-            std::cout << format("%1%\n") % *e;
+            e->show(std::cout);
         }
         return;
     }

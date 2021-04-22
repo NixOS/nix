@@ -66,6 +66,8 @@ std::ostream & operator << (std::ostream & str, const Symbol & sym)
 
 // format switch
 
+// aterm output format
+
 void Expr::show(std::ostream & str) const
 {
     this->showAsAterm(str); // default format
@@ -274,7 +276,7 @@ void ExprSelect::showAsJson(std::ostream & str) const
     str << ",\"attr\":\"" << showAttrPath(attrPath) << "\""; // TODO escape attrPath for json?
     if (def)
     str << ",\"default\":" << *def << "";
-    str << " }"
+    str << " }";
 }
 
 void ExprOpHasAttr::showAsJson(std::ostream & str) const
@@ -323,8 +325,10 @@ void ExprList::showAsJson(std::ostream & str) const
     str << ",\"items\":["; // TODO name? items, elements, values
     bool first = true;
     for (auto & i : elems)
+    {
         if (first) first = false; else str << ",";
         str << *i; // TODO format expr for json?
+    }
     str << "]}";
 }
 
@@ -358,7 +362,8 @@ void ExprLet::showAsJson(std::ostream & str) const
     str << "{\"type\":\"let\"";
     str << ",\"attrs\":[";
     bool first = true;
-    for (auto & i : attrs)
+    for (auto & i : attrs->attrs)
+    {
         if (first) first = false; else str << ",";
         str << "{\"type\":\"attr\"";
         str << ",\"inherited\":" << (i.second.inherited ? "true" : "false") << "";
@@ -367,6 +372,7 @@ void ExprLet::showAsJson(std::ostream & str) const
         else
             str << "\"name\":\"" << i.first << "\", \"value\":" << *i.second.e; // TODO escape name for json?
         str << "}";
+    }
     str << "]}";
     str << ",\"body\":" << *body;
     str << "}";
@@ -411,8 +417,10 @@ void ExprConcatStrings::showAsJson(std::ostream & str) const
     str << ",\"strings\":[";
     bool first = true;
     for (auto & i : attrs)
+    {
         if (first) first = false; else str << ",";
         str << *i;
+    }
     str << "]}";
 }
 
