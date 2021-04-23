@@ -144,6 +144,13 @@ struct CmdQuerySubstituters : InstallablesCommand, MixJSON
 
         auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
 
+        auto printSubStats = [&](ssize_t totalPaths, ssize_t pathsFound, uint64_t narSize, std::optional<uint64_t> downloadSize) {
+            logger->cout("  %6.1f%% of paths have substitutes available (%s of %s)", (float) 100 * pathsFound / totalPaths, pathsFound, outPaths.size());
+            if (downloadSize)
+                logger->cout("  %s compressed size", formatSize(*downloadSize));
+            logger->cout("  %s uncompressed size", formatSize(narSize));
+        };
+
         for (auto & sub : subs) {
             StorePathSet validPaths = sub->queryValidPaths(outPaths);
 
@@ -182,20 +189,14 @@ struct CmdQuerySubstituters : InstallablesCommand, MixJSON
                 jsonSub.attr("narSize", narSize);
             } else {
                 logger->cout("Substituter %s", sub->getUri());
-                logger->cout("  %6.1f%% of paths have substitutes available (%s of %s)", (float) 100 * pathsFound / outPaths.size(), pathsFound, outPaths.size());
-                if (downloadSize)
-                    logger->cout("  %s compressed size", formatSize(*downloadSize));
-                logger->cout("  %s uncompressed size", formatSize(narSize));
+                printSubStats(outPaths.size(), pathsFound, narSize, downloadSize);
                 logger->cout("");
             }
         }
 
         if (!json && subs.size() > 1) {
             logger->cout("Total");
-            logger->cout("  %6.0f%% of paths have substitutes available (%s of %s)", (float) 100 * totalPathsFound / outPaths.size(), totalPathsFound, outPaths.size());
-            if (totalDownloadSize)
-                logger->cout("  %s compressed size", formatSize(*totalDownloadSize));
-            logger->cout("  %s uncompressed size", formatSize(totalNarSize));
+            printSubStats(outPaths.size(), totalPathsFound, totalNarSize, totalDownloadSize);
         }
     }
 };
