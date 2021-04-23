@@ -736,18 +736,9 @@ std::set<RealisedPath> toRealisedPaths(
                                     output.first);
                             auto outputId = DrvOutput{outputHashes.at(output.first), output.first};
                             auto realisation = store->queryRealisation(outputId);
-                            if (!realisation) {
-                                // TODO: remove this check once #4725 is fixed
-                                // as we’ll have the guaranty that if
-                                // `output.second` exists, then the realisation
-                                // will be there too
-                                if (output.second)
-                                    res.insert(*output.second);
-                                else
-                                    throw Error("cannot operate on an output of unbuilt content-addresed derivation '%s'", outputId.to_string());
-                            } else {
-                                res.insert(RealisedPath{*realisation});
-                            }
+                            if (!realisation)
+                                throw Error("cannot operate on an output of unbuilt content-addresed derivation '%s'", outputId.to_string());
+                            res.insert(RealisedPath{*realisation});
                         }
                         else {
                             // If ca-derivations isn't enabled, behave as if
