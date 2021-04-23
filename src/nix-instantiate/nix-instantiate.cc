@@ -11,7 +11,6 @@
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
 #include "legacy.hh"
-#include "nixexpr.hh" // TODO remove?
 
 #include <map>
 #include <iostream>
