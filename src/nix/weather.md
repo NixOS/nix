@@ -8,8 +8,8 @@ R""(
   # nix weather nixpkgs --substituters https://cache.nixos.org
   Substituter https://cache.nixos.org
         96% of paths have substitutes available (93198 of 96902)
-     237.5G downloaded (compressed)
-     670.2G downloaded (uncompressed)
+     237.5G compressed size
+     670.2G uncompressed size
    ```
 
 # Description
