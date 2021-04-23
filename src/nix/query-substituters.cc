@@ -11,11 +11,11 @@
 
 using namespace nix;
 
-struct CmdWeather : InstallablesCommand, MixJSON
+struct CmdQuerySubstituters : InstallablesCommand, MixJSON
 {
     bool noClosure = false;
 
-    CmdWeather()
+    CmdQuerySubstituters()
     {
         addFlag({
             .longName = "no-closure",
@@ -32,7 +32,7 @@ struct CmdWeather : InstallablesCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "weather.md"
+          #include "query-substituters.md"
           ;
     }
 
@@ -200,4 +200,4 @@ struct CmdWeather : InstallablesCommand, MixJSON
     }
 };
 
-static auto rCmdWeather = registerCommand<CmdWeather>("weather");
+static auto rCmdQuerySubstituters = registerCommand<CmdQuerySubstituters>("query-substituters");
