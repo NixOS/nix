@@ -190,7 +190,8 @@ struct CmdQuerySubstituters : InstallablesCommand, MixJSON
             } else {
                 logger->cout("Substituter %s", sub->getUri());
                 printSubStats(outPaths.size(), pathsFound, narSize, downloadSize);
-                logger->cout("");
+                if (subs.size() > 1)
+                    logger->cout("");
             }
         }
 
