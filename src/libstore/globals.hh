@@ -701,7 +701,7 @@ public:
           send a series of commands to modify various settings to stdout. The
           currently recognized commands are:
 
-            - `extra-sandbox-paths`  
+            - `extra-sandbox-paths`\
               Pass a list of files and directories to be included in the
               sandbox for this build. One entry per line, terminated by an
               empty line. Entries have the same format as `sandbox-paths`.

@@ -303,17 +303,17 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url  
+        - url\
           The URL of the repo.
 
-        - name  
+        - name\
           The name of the directory the repo should be exported to in the
           store. Defaults to the basename of the URL.
 
-        - rev  
+        - rev\
           The git revision to fetch. Defaults to the tip of `ref`.
 
-        - ref  
+        - ref\
           The git ref to look for the requested revision under. This is
           often a branch or tag name. Defaults to `HEAD`.
 
@@ -321,11 +321,11 @@ static RegisterPrimOp primop_fetchGit({
           of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
           with `refs/`.
 
-        - submodules  
+        - submodules\
           A Boolean parameter that specifies whether submodules should be
           checked out. Defaults to `false`.
 
-        - allRefs  
+        - allRefs\
           Whether to fetch all refs of the repository. With this argument being
           true, it's possible to load a `rev` from *any* `ref` (by default only
           `rev`s from the specified `ref` are supported).
