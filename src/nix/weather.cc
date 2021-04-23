@@ -5,12 +5,13 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "nar-info-disk-cache.hh"
+#include "json.hh"
 
 #include <queue>
 
 using namespace nix;
 
-struct CmdWeather : InstallablesCommand
+struct CmdWeather : InstallablesCommand, MixJSON
 {
     bool noClosure = false;
 
@@ -141,6 +142,8 @@ struct CmdWeather : InstallablesCommand
         uint64_t totalNarSize = 0;
         std::optional<uint64_t> totalDownloadSize = 0;
 
+        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
+
         for (auto & sub : subs) {
             StorePathSet validPaths = sub->queryValidPaths(outPaths);
 
@@ -170,15 +173,24 @@ struct CmdWeather : InstallablesCommand
                 }
             }
 
-            logger->cout("Substituter %s", sub->getUri());
-            logger->cout("  %6.1f%% of paths have substitutes available (%s of %s)", (float) 100 * pathsFound / outPaths.size(), pathsFound, outPaths.size());
-            if (downloadSize)
-                logger->cout("  %s compressed size", formatSize(*downloadSize));
-            logger->cout("  %s uncompressed size", formatSize(narSize));
-            logger->cout("");
+            if (json) {
+                JSONObject jsonSub = jsonOut->object(sub->getUri());
+                jsonSub.attr("totalPaths", outPaths.size());
+                jsonSub.attr("pathsFound", pathsFound);
+                if (downloadSize)
+                    jsonSub.attr("downloadSize", *downloadSize);
+                jsonSub.attr("narSize", narSize);
+            } else {
+                logger->cout("Substituter %s", sub->getUri());
+                logger->cout("  %6.1f%% of paths have substitutes available (%s of %s)", (float) 100 * pathsFound / outPaths.size(), pathsFound, outPaths.size());
+                if (downloadSize)
+                    logger->cout("  %s compressed size", formatSize(*downloadSize));
+                logger->cout("  %s uncompressed size", formatSize(narSize));
+                logger->cout("");
+            }
         }
 
-        if (subs.size() > 1) {
+        if (!json && subs.size() > 1) {
             logger->cout("Total");
             logger->cout("  %6.0f%% of paths have substitutes available (%s of %s)", (float) 100 * totalPathsFound / outPaths.size(), totalPathsFound, outPaths.size());
             if (totalDownloadSize)
