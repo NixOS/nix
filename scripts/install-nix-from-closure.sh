@@ -67,7 +67,7 @@ while [ $# -gt 0 ]; do
             export NIX_USER_COUNT=$2
             shift;;
         --no-modify-profile)
-            NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
+            export NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
             CREATE_DARWIN_VOLUME=1;;
         --nix-extra-conf-file)

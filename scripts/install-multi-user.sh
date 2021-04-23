@@ -292,9 +292,10 @@ $(uninstall_directions)
 EOF
     fi
 
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-            failure <<EOF
+    if [ -z "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+        for profile_target in "${PROFILE_TARGETS[@]}"; do
+            if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+                failure <<EOF
 When this script runs, it backs up the current $profile_target to
 $profile_target$PROFILE_BACKUP_SUFFIX. This backup file already exists, though.
 
@@ -307,8 +308,9 @@ in case.
 it has anything nix-related in it. If it does, something is probably
 quite wrong. Please open an issue or get in touch immediately.
 EOF
-        fi
-    done
+            fi
+        done
+    fi
 
 }
 
@@ -474,21 +476,29 @@ welcome_to_nix() {
 This installation tool will set up your computer with the Nix package
 manager. This will happen in a few stages:
 
-1. Make sure your computer doesn't already have Nix. If it does, I
-   will show you instructions on how to clean up your old one.
+- Make sure your computer doesn't already have Nix. If it does, I
+  will show you instructions on how to clean up your old one.
 
-2. Show you what we are going to install and where. Then we will ask
-   if you are ready to continue.
+- Show you what we are going to install and where. Then we will ask
+  if you are ready to continue.
 
-3. Create the system users and groups that the Nix daemon uses to run
-   builds.
+- Create the system users and groups that the Nix daemon uses to run
+  builds.
 
-4. Perform the basic installation of the Nix files daemon.
+- Perform the basic installation of the Nix files daemon.
 
-5. Configure your shell to import special Nix Profile files, so you
-   can use Nix.
+EOF
 
-6. Start the Nix daemon.
+    if [ -z "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+        cat <<EOF
+- Configure your shell to import special Nix Profile files, so you
+  can use Nix.
+
+EOF
+    fi
+
+    cat <<EOF
+- Start the Nix daemon.
 
 EOF
 
@@ -503,18 +513,24 @@ We will:
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT
  - create a configuration file in /etc/nix
+EOF
+        if [ -z "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+            cat <<EOF
  - set up the "default profile" by creating some Nix-related files in
    $ROOT_HOME
 EOF
-        for profile_target in "${PROFILE_TARGETS[@]}"; do
-            if [ -e "$profile_target" ]; then
-                cat <<EOF
+            for profile_target in "${PROFILE_TARGETS[@]}"; do
+                if [ -e "$profile_target" ]; then
+                    cat <<EOF
  - back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
  - update $profile_target to include some Nix configuration
 EOF
-            fi
-        done
+                fi
+            done
+        fi
+
         poly_service_setup_note
+
         if ! ui_confirm "Ready to continue?"; then
             failure <<EOF
 Okay, maybe you would like to talk to the team.
@@ -610,25 +626,27 @@ EOF
 }
 
 configure_shell_profile() {
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ]; then
-            _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
-                  cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
-        else
-            # try to create the file if its directory exists
-            target_dir="$(dirname "$profile_target")"
-            if [ -d "$target_dir" ]; then
-                _sudo "to create a stub $profile_target which will be updated" \
-                    touch "$profile_target"
+    if [ -z "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+        for profile_target in "${PROFILE_TARGETS[@]}"; do
+            if [ -e "$profile_target" ]; then
+                _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+                      cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+            else
+                # try to create the file if its directory exists
+                target_dir="$(dirname "$profile_target")"
+                if [ -d "$target_dir" ]; then
+                    _sudo "to create a stub $profile_target which will be updated" \
+                        touch "$profile_target"
+                fi
             fi
-        fi
 
-        if [ -e "$profile_target" ]; then
-            shell_source_lines \
-                | _sudo "extend your $profile_target with nix-daemon settings" \
-                        tee -a "$profile_target"
-        fi
-    done
+            if [ -e "$profile_target" ]; then
+                shell_source_lines \
+                    | _sudo "extend your $profile_target with nix-daemon settings" \
+                            tee -a "$profile_target"
+            fi
+        done
+    fi
 }
 
 setup_default_profile() {
