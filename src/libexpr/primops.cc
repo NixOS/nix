@@ -3510,7 +3510,7 @@ void prim_traceContext(EvalState & state, const Pos & pos, Value * * args, Value
 
     state.mkAttrs(v, 2);
 
-    state.forceValueDeep(*args[0]);
+    state.forceValue(*args[0]);
     v.attrs->push_back(Attr(state.sValue, args[0]));
 
     Value * paths = state.allocAttr(v, state.symbols.create("paths"));
