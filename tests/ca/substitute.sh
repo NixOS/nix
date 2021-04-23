@@ -36,7 +36,12 @@ nix build --file ../simple.nix -L --no-link --post-build-hook ../push-to-store.s
 clearStore
 rm -r "$REMOTE_STORE_DIR/realisations"
 nix build --file ../simple.nix -L --no-link --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0
-if [[ $(sqlite3 "$NIX_STATE_DIR/db/db.sqlite" 'select count(*) from Realisations') -eq 0 ]]; then
+# There's no easy way to check whether a realisation is present on the local
+# store − short of manually querying the db, but the build environment doesn't
+# have the sqlite binary − so we instead push things again, and check that the
+# realisations have correctly been pushed to the remote store
+nix copy --to "$REMOTE_STORE" --file ../simple.nix
+if [[ -z "$(ls "$REMOTE_STORE_DIR/realisations")" ]]; then
     echo "Realisations not rebuilt"
     exit 1
 fi
