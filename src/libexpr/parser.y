@@ -478,7 +478,7 @@ binds
           $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data));
       }
     }
-  | { $$ = new ExprAttrs; }
+  | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
   ;
 
 attrs

@@ -201,6 +201,15 @@ string showType(const Value & v)
     }
 }
 
+Pos Value::determinePos(const Pos &pos) const
+{
+    switch (internalType) {
+        case tAttrs: return *attrs->pos;
+        case tLambda: return lambda.fun->pos;
+        case tApp: return app.left->determinePos(pos);
+        default: return pos;
+    }
+}
 
 bool Value::isTrivial() const
 {
@@ -1060,6 +1069,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
         v.attrs->sort(); // FIXME: inefficient
     }
+
+    v.attrs->pos = &pos;
 }
 
 
