@@ -2,9 +2,9 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
-  #inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, lowdown-src }:
 
     let
 
@@ -271,14 +271,16 @@
         };
 
         lowdown = with final; stdenv.mkDerivation rec {
-          name = "lowdown-0.8.0";
+          name = "lowdown-0.8.4";
 
+          /*
           src = fetchurl {
             url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
             hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
+          */
 
-          #src = lowdown-src;
+          src = lowdown-src;
 
           outputs = [ "out" "bin" "dev" ];
 
