@@ -80,7 +80,7 @@ install: $(d)/src/command-ref/new-cli
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
 	  cat $$i >> $$i.tmp; \
-	  lowdown -sT man $$i.tmp -o $(mandir)/man1/$$name.1; \
+	  lowdown -sT man -M section=1 $$i.tmp -o $(mandir)/man1/$$name.1; \
 	done
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
