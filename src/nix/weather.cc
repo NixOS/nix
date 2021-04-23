@@ -25,7 +25,7 @@ struct CmdWeather : InstallablesCommand
 
     std::string description() override
     {
-        return "show why a package has another package in its closure";
+        return "find how many store paths are available to substitute";
     }
 
     std::string doc() override
