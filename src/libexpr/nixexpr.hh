@@ -70,6 +70,7 @@ typedef std::vector<AttrName> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
 
+
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
@@ -305,8 +306,78 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
-// sample: name ExprOpAnd -> jsonTypeName opAnd
+// https://nixos.wiki/wiki/Nix_Expression_Language#Types
+// https://nixos.org/manual/nix/stable/#ssec-values
+// note. we use `enum class` to keep the enum-items local
+enum class NodeTypeId {
+    Whitespace = 0, // TODO
+    Comment, // TODO
+
+    ExprLambda, // aka Function
+    ExprLambdaFormal, // aka Function
+
+    // complex values
+    ExprSet,
+    ExprList,
+    ExprAttrs,
+    ExprAttr,
+    ExprAttrPath,
+    ExprAttrPathComponent,
+
+    // scalar values
+    ExprString,
+    ExprInt,
+    ExprFloat,
+    ExprPath,
+    ExprBoolean,
+    ExprNull,
+
+    ExprLet,
+    ExprWith,
+    ExprIf,
+    ExprAssert,
+
+    ExprVar, // TODO whats this?
+
+    // operators https://nixos.org/manual/nix/stable/#sec-language-operators
+    ExprSelect,
+    ExprApp,
+    ExprConcatStrings,
+
+    ExprOpEq,
+    ExprOpNEq,
+    ExprOpAnd,
+    ExprOpOr,
+    ExprOpImpl,
+    ExprOpUpdate,
+    ExprOpConcatLists,
+    ExprOpHasAttr,
+    ExprOpNot,
+
+    ExprPos, // TODO what is Pos?
+
+/* TODO
+Arithmetic Negation	- e	none	Arithmetic negation.	3
+Multiplication	e1 * e2,	left	Arithmetic multiplication.	6
+Division	e1 / e2	left	Arithmetic division.	6
+Addition	e1 + e2	left	Arithmetic addition.	7
+Subtraction	e1 - e2	left	Arithmetic subtraction.	7
+*/
+
+};
+
+// jsonTypeName sample: name ExprOpAnd -> jsonTypeName opAnd
 // TODO showAsJson: fix recursion: call e1->showAsJson(str), etc.
+/*
+            std::string jsonTypeName = [] { \
+                std::string res = ((std::string) #name).substr(4); \
+                if (res.length() > 0 && 'A' <= res[0] && res[0] <= 'Z') \
+                    res[0] += 32; \
+                return res; \
+            }(); \
+            \
+            str << "{\"type\":\"" << jsonTypeName << "\"";   \
+*/
 #define MakeBinOp(name, s) \
     struct name : Expr \
     { \
@@ -320,16 +391,9 @@ struct ExprOpNot : Expr
         } \
         void showAsJson(std::ostream & str) const \
         { \
-            std::string jsonTypeName = [] { \
-                std::string res = ((std::string) #name).substr(4); \
-                if (res.length() > 0 && 'A' <= res[0] && res[0] <= 'Z') \
-                    res[0] += 32; \
-                return res; \
-            }(); \
-            \
-            str << "{\"type\":\"" << jsonTypeName << "\"";   \
-            str << ",\"op1\":" << *e1 << "";   \
-            str << ",\"op2\":" << *e2 << "";   \
+            str << "{\"type\":" << (int) NodeTypeId::name;   \
+            str << ",\"op1\":"; e1->showAsJson(str);   \
+            str << ",\"op2\":"; e2->showAsJson(str);   \
             str << "}";   \
         } \
         void bindVars(const StaticEnv & env) \
@@ -357,6 +421,7 @@ struct ExprConcatStrings : Expr
     COMMON_METHODS
 };
 
+// TODO what is Pos?
 struct ExprPos : Expr
 {
     Pos pos;
@@ -396,5 +461,6 @@ struct StaticEnv
     }
 };
 
+void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath);
 
 }

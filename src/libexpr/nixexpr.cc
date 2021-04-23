@@ -233,200 +233,202 @@ void ExprPos::showAsAterm(std::ostream & str) const
 
 
 // json output format
+// TODO fix recursion: call expr.showAsJson(str)
+
+void Expr::showAsJson(std::ostream & str) const
+{
+    abort();
+}
 
 void ExprInt::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"int\"";
-    str << ",\"value\":" << n << "";
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprInt;
+    str << ",\"value\":" << n;
+    str << "}\n";
 }
 
 void ExprFloat::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"float\"";
-    str << ",\"value\":" << nf << "";
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprFloat;
+    str << ",\"value\":" << nf;
+    str << "}\n";
 }
 
 void ExprString::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"string\"";
-    str << ",\"value\":\"" << s << "\""; // TODO escape string for json -> showString(str, s);
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprString;
+    str << ",\"value\":\""; String_showAsJson(str, s); str << "\"";
+    str << "}\n";
 }
 
 void ExprPath::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"path\"";
-    str << ",\"value\":\"" << s << "\""; // TODO escape string for json?
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprPath;
+    str << ",\"value\":\""; String_showAsJson(str, s); str << "\"";
+    str << "}\n";
 }
 
 void ExprVar::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"var\"";
-    str << ",\"name\":\"" << name << "\"";
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprVar;
+    str << ",\"name\":\""; String_showAsJson(str, name); str << "\"";
+    str << "}\n";
 }
 
 void ExprSelect::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"select\"";
-    str << ",\"set\":" << *e << "";
-    str << ",\"attr\":\"" << showAttrPath(attrPath) << "\""; // TODO escape attrPath for json?
-    if (def)
-    str << ",\"default\":" << *def << "";
+    str << "{\"type\":" << (int) NodeTypeId::ExprSelect;
+    str << ",\"set\":"; e->showAsJson(str);
+    str << ",\"attr\":"; AttrPath_showAsJson(str, attrPath);
+    if (def) {
+        str << ",\"default\":"; def->showAsJson(str);
+    }
     str << " }";
 }
 
 void ExprOpHasAttr::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"opHasAttr\"";
-    str << ",\"op\":" << *e << "";
-    str << ",\"attr\":\"" << showAttrPath(attrPath) << "\""; // TODO escape attrPath for json?
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprOpHasAttr;
+    str << ",\"op\":"; e->showAsJson(str);
+    str << ",\"attr\":"; AttrPath_showAsJson(str, attrPath);
+    str << "}\n";
 }
 
 void ExprAttrs::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"attrs\"";
-    str << ",\"recursive\":" << (recursive ? "true" : "false") << "";
+    str << "{\"type\":" << (int) NodeTypeId::ExprAttrs;
+    str << ",\"recursive\":" << (recursive ? "true" : "false");
     str << ",\"attrs\":[";
     bool first = true;
-    for (auto & i : attrs)
-    {
+    for (auto & i : attrs) {
         if (first) first = false; else str << ",";
         str << "{\"type\":\"attr\"";
-        str << ",\"inherited\":" << (i.second.inherited ? "true" : "false") << "";
-        if (i.second.inherited)
-            str << ",\"name\":\"" << i.first << "\""; // TODO format name for json?
-        else
-            str << ",\"name\":\"" << i.first << "\""; // TODO format name for json?
-            str << ",\"value\":" << *i.second.e;
+        str << ",\"inherited\":" << (i.second.inherited ? "true" : "false");
+        str << ",\"name\":\""; String_showAsJson(str, i.first); str << "\"";
+        if (!i.second.inherited) {
+            str << ",\"value\":"; i.second.e->showAsJson(str);
+        }
         str << "}";
     }
-    str << "]}";
+    str << "]";
     str << ",\"dynamicAttrs\":[";
     first = true;
-    for (auto & i : dynamicAttrs)
-    {
+    for (auto & i : dynamicAttrs) {
         if (first) first = false; else str << ",";
         str << "{\"type\":\"attr\"";
-        str << ",\"nameExpr\":\"" << *i.nameExpr << "\""; // TODO format expr for json?
-        str << ",\"valueExpr\":" << *i.valueExpr; // TODO format expr for json?
+        str << ",\"nameExpr\":\""; i.nameExpr->showAsJson(str);
+        str << ",\"valueExpr\":"; i.valueExpr->showAsJson(str);
         str << "}";
     }
-    str << "]}";
+    str << "]}\n";
 }
 
 void ExprList::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"list\"";
+    str << "{\"type\":" << (int) NodeTypeId::ExprList;
     str << ",\"items\":["; // TODO name? items, elements, values
     bool first = true;
-    for (auto & i : elems)
-    {
+    for (auto & i : elems) {
         if (first) first = false; else str << ",";
-        str << *i; // TODO format expr for json?
+        i->showAsJson(str);
     }
     str << "]}";
 }
 
 void ExprLambda::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"lambda\"";
+    str << "{\"type\":" << (int) NodeTypeId::ExprLambda;
     str << ",\"matchAttrs\":" << (matchAttrs ? "true" : "false");
     if (matchAttrs) {
         str << ",\"formals\":[";
         bool first = true;
         for (auto & i : formals->formals) {
             if (first) first = false; else str << ",";
-            str << "{\"type\":\"formal\"";
-            str << ",\"name\":\"" << i.name << "\"";
-            if (i.def)
-            str << ",\"default\":" << *i.def;
+            str << "{\"type\":" << (int) NodeTypeId::ExprLambdaFormal;
+            str << ",\"name\":\""; String_showAsJson(str, i.name); str << "\"";
+            if (i.def) {
+                str << ",\"default\":"; i.def->showAsJson(str);
+            }
             str << "}";
         }
         str << "]";
         str << ",\"ellipsis\":" << (formals->ellipsis ? "true" : "false");
     }
     if (!arg.empty())
-    str << ",\"arg\":" << arg;
-    str << ",\"body\":" << *body;
-    str << "}";
+        str << ",\"arg\":\"" << arg << "\"";
+    str << ",\"body\":"; body->showAsJson(str);
+    str << "}\n";
 }
 
 // https://nixos.wiki/wiki/Nix_Expression_Language#let_..._in_statement
 void ExprLet::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"let\"";
+    str << "{\"type\":" << (int) NodeTypeId::ExprLet;
     str << ",\"attrs\":[";
     bool first = true;
-    for (auto & i : attrs->attrs)
-    {
+    for (auto & i : attrs->attrs) {
         if (first) first = false; else str << ",";
-        str << "{\"type\":\"attr\"";
-        str << ",\"inherited\":" << (i.second.inherited ? "true" : "false") << "";
-        if (i.second.inherited)
-            str << "\"name\":\"" << i.first << "\""; // TODO escape name for json?
-        else
-            str << "\"name\":\"" << i.first << "\", \"value\":" << *i.second.e; // TODO escape name for json?
+        str << "{\"type\":" << (int) NodeTypeId::ExprAttr;
+        str << ",\"inherited\":" << (i.second.inherited ? "true" : "false");
+        str << ",\"name\":\""; String_showAsJson(str, i.first); str << "\"";
+        if (!i.second.inherited) {
+            str << ",\"value\":"; i.second.e->showAsJson(str);
+        }
         str << "}";
     }
-    str << "]}";
-    str << ",\"body\":" << *body;
-    str << "}";
+    str << "]";
+    str << ",\"body\":"; body->showAsJson(str);
+    str << "}\n";
 }
 
 // https://nixos.wiki/wiki/Nix_Expression_Language#with_statement
 void ExprWith::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"with\"";
-    str << ",\"set\":" << *attrs;
-    str << ",\"body\":" << *body;
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprWith;
+    str << ",\"set\":"; attrs->showAsJson(str);
+    str << ",\"body\":"; body->showAsJson(str);
+    str << "}\n";
 }
 
 void ExprIf::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"if\"";
-    str << ",\"cond\":" << *cond;
-    str << ",\"then\":" << *then;
-    str << ",\"else\":" << *else_;
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprIf;
+    str << ",\"cond\":"; cond->showAsJson(str);
+    str << ",\"then\":"; then->showAsJson(str);
+    str << ",\"else\":"; else_->showAsJson(str);
+    str << "}\n";
 }
 
 void ExprAssert::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"assert\"";
-    str << ",\"cond\":" << *cond;
-    str << ",\"body\":" << *body;
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprAssert;
+    str << ",\"cond\":"; cond->showAsJson(str);
+    str << ",\"body\":"; body->showAsJson(str);
+    str << "}\n";
 }
 
 void ExprOpNot::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"opNot\"";
-    str << ",\"expr\":" << *e;
-    str << "}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprOpNot;
+    str << ",\"expr\":"; e->showAsJson(str);
+    str << "}\n";
 }
 
 void ExprConcatStrings::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"concatStrings\"";
+    str << "{\"type\":" << (int) NodeTypeId::ExprConcatStrings;
     str << ",\"strings\":[";
     bool first = true;
-    for (auto & i : attrs)
-    {
+    for (auto & i : *es) {
         if (first) first = false; else str << ",";
-        str << *i;
+        i->showAsJson(str);
     }
     str << "]}";
 }
 
 void ExprPos::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"pos\"}";
+    str << "{\"type\":" << (int) NodeTypeId::ExprPos << "}";
 }
 
 
@@ -455,6 +457,26 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     return str;
 }
 
+
+void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath)
+{
+    out << "{\"type\":" << (int) NodeTypeId::ExprAttrPath;
+    out << ",\"attrpath\":[";
+    bool first = true;
+    for (auto & i : attrPath) {
+        if (!first) out << ','; else first = false;
+        out << "{\"type\":" << (int) NodeTypeId::ExprAttrPathComponent;
+        if (i.symbol.set()) {
+            // symbol can contain double quotes (etc?)
+            out << ",\"symbol\":\""; String_showAsJson(out, i.symbol); out << "\"";
+        }
+        else {
+            out << ",\"expr\":"; i.expr->showAsJson(out);
+        }
+        out << "}";
+    }
+    out << "]}";
+}
 
 string showAttrPath(const AttrPath & attrPath)
 {
