@@ -2,9 +2,9 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
-  #inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, lowdown-src }:
 
     let
 
@@ -78,11 +78,12 @@
             buildPackages.git
             buildPackages.mercurial
             buildPackages.jq
-          ];
+          ]
+          ++ lib.optionals stdenv.isLinux [(pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)];
 
         buildDeps =
           [ curl
-            bzip2 xz brotli zlib editline
+            bzip2 xz brotli editline
             openssl sqlite
             libarchive
             boost
@@ -90,8 +91,9 @@
             lowdown
             gmock
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+          ++ lib.optionals stdenv.isLinux [libseccomp]
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional stdenv.isx86_64 libcpuid;
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
           (aws-sdk-cpp.override {
@@ -109,13 +111,81 @@
           ];
       };
 
+    installScriptFor = systems:
+      with nixpkgsFor.x86_64-linux;
+        runCommand "installer-script"
+          { buildInputs = [ nix ];
+          }
+          ''
+            mkdir -p $out/nix-support
+
+            # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
+            # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
+            tarballPath() {
+              # Remove the store prefix
+              local path=''${1#${builtins.storeDir}/}
+              # Get the path relative to the derivation root
+              local rest=''${path#*/}
+              # Get the derivation hash
+              local drvHash=''${path%%-*}
+              echo "$drvHash/$rest"
+            }
+
+            substitute ${./scripts/install.in} $out/install \
+              ${pkgs.lib.concatMapStrings
+                (system:
+                  '' \
+                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                  --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                  ''
+                )
+                systems
+              } --replace '@nixVersion@' ${version}
+
+            echo "file installer $out/install" >> $out/nix-support/hydra-build-products
+          '';
+
+      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; pkgs.stdenv.mkDerivation {
+        NIX_DAEMON_PACKAGE = daemon;
+        NIX_CLIENT_PACKAGE = client;
+        # Must keep this name short as OSX has a rather strict limit on the
+        # socket path length, and this name appears in the path of the
+        # nix-daemon socket used in the tests
+        name = "nix-tests";
+        inherit version;
+
+        src = self;
+
+        VERSION_SUFFIX = versionSuffix;
+
+        nativeBuildInputs = nativeBuildDeps;
+        buildInputs = buildDeps ++ awsDeps;
+        propagatedBuildInputs = propagatedDeps;
+
+        enableParallelBuilding = true;
+
+        dontBuild = true;
+        doInstallCheck = true;
+
+        installPhase = ''
+          mkdir -p $out
+        '';
+        installCheckPhase = "make installcheck";
+
+      };
+
     in {
 
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
 
-        nix = with final; with commonDeps pkgs; (stdenv.mkDerivation {
+        # An older version of Nix to test against when using the daemon.
+        # Currently using `nixUnstable` as the stable one doesn't respect
+        # `NIX_DAEMON_SOCKET_PATH` which is needed for the tests.
+        nixStable = prev.nix;
+
+        nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
           name = "nix-${version}";
           inherit version;
 
@@ -163,9 +233,10 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           separateDebugInfo = true;
-        }) // {
 
-          perl-bindings = with final; stdenv.mkDerivation {
+          strictDeps = true;
+
+          passthru.perl-bindings = with final; stdenv.mkDerivation {
             name = "nix-perl-${version}";
 
             src = self;
@@ -199,15 +270,17 @@
 
         };
 
-        lowdown = with final; stdenv.mkDerivation {
-          name = "lowdown-0.7.9";
+        lowdown = with final; stdenv.mkDerivation rec {
+          name = "lowdown-0.8.4";
 
+          /*
           src = fetchurl {
-            url = https://kristaps.bsd.lv/lowdown/snapshots/lowdown-0.7.9.tar.gz;
-            hash = "sha512-7GQrKFICyTI5T4SinATfohiCq9TC0OgN8NmVfG3B3BZJM9J00DT8llAco8kNykLIKtl/AXuS4X8fETiCFEWEUQ==";
+            url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
+            hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
+          */
 
-          #src = lowdown-src;
+          src = lowdown-src;
 
           outputs = [ "out" "bin" "dev" ];
 
@@ -314,40 +387,8 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript =
-          with nixpkgsFor.x86_64-linux;
-          runCommand "installer-script"
-            { buildInputs = [ nix ];
-            }
-            ''
-              mkdir -p $out/nix-support
-
-              # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
-              # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
-              tarballPath() {
-                # Remove the store prefix
-                local path=''${1#${builtins.storeDir}/}
-                # Get the path relative to the derivation root
-                local rest=''${path#*/}
-                # Get the derivation hash
-                local drvHash=''${path%%-*}
-                echo "$drvHash/$rest"
-              }
-
-              substitute ${./scripts/install.in} $out/install \
-                ${pkgs.lib.concatMapStrings
-                  (system:
-                    '' \
-                    --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                    --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                    ''
-                  )
-                  [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
-                } \
-                --replace '@nixVersion@' ${version}
-
-              echo "file installer $out/install" >> $out/nix-support/hydra-build-products
-            '';
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
 
         # Line coverage analysis.
         coverage =
@@ -432,6 +473,15 @@
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
+        installTests =
+          let pkgs = nixpkgsFor.${system}; in
+          pkgs.runCommand "install-tests" {
+            againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
+            againstCurrentUnstable = testNixVersions pkgs pkgs.nix pkgs.nixUnstable;
+            # Disabled because the latest stable version doesn't handle
+            # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
+            # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
+          } "touch $out";
       });
 
       packages = forAllSystems (system: {
@@ -472,6 +522,8 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           stripAllList = ["bin"];
+
+          strictDeps = true;
         };
       });
 

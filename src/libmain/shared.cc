@@ -36,7 +36,7 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
@@ -310,7 +310,7 @@ void printVersion(const string & programName)
 
 void showManPage(const string & name)
 {
-    restoreSignals();
+    restoreProcessContext();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
@@ -373,7 +373,7 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
-        restoreSignals();
+        restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
         execlp("pager", "pager", nullptr);

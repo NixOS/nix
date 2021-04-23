@@ -55,7 +55,7 @@ void StoreCommand::run()
     run(getStore());
 }
 
-StorePathsCommand::StorePathsCommand(bool recursive)
+RealisedPathsCommand::RealisedPathsCommand(bool recursive)
     : recursive(recursive)
 {
     if (recursive)
@@ -96,77 +96,76 @@ StorePathsCommand::StorePathsCommand(bool recursive)
     });
 }
 
-void StorePathsCommand::run(ref<Store> store)
+void RealisedPathsCommand::run(ref<Store> store)
 {
-    StorePaths storePaths;
-
+    std::vector<RealisedPath> paths;
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
+        // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            storePaths.push_back(p);
-    }
+            paths.push_back(p);
+    } else {
+        if (!recursive && includeBuildRefs)
+            throw UsageError("--include-build-refs require --recursive");
 
-    else {
-        if (!recursive && (includeBuildRefs || includeEvalRefs))
-            throw UsageError("--include-build-refs and --include-eval-refs require --recursive");
+        auto pathSet = toRealisedPaths(store, realiseMode, operateOn, installables);
 
-        for (auto & p : toStorePaths(store, realiseMode, operateOn, installables))
-            storePaths.push_back(p);
+        if (includeEvalRefs) {
+            auto state = getEvalState();
+
+            for (auto & i : installables) {
+                state->realisedPaths = std::set<StorePath>();
+
+                // force evaluation of package argument
+                i->toValue(*state);
+
+                for (auto & path : *state->realisedPaths)
+                    pathSet.insert(path);
+            }
+
+            state->realisedPaths = std::nullopt;
+        }
 
         if (recursive) {
-            if (includeEvalRefs) {
-                auto state = getEvalState();
-
-                for (auto & i : installables) {
-                    for (auto & b : i->toBuildables()) {
-                        if (std::holds_alternative<BuildableOpaque>(b))
-                            throw UsageError("Cannot find eval references without a derivation path");
-                    }
-
-                    // force evaluation of package argument
-                    i->toValue(*state);
-
-                    for (auto & path : state->realisedPaths)
-                        storePaths.push_back(path);
-                }
-            }
-
             if (includeBuildRefs) {
-                for (auto & i : installables) {
-                    for (auto & b : i->toBuildables()) {
-                        std::visit(overloaded {
-                                [&](BuildableOpaque bo) {
-                                    auto info = store->queryPathInfo(bo.path);
-                                    if (info->deriver)
-                                        storePaths.push_back(*info->deriver);
-                                    else
-                                        throw UsageError("Cannot find build references for '%s' without a derivation path", store->printStorePath(bo.path));
-                                },
-                                [&](BuildableFromDrv bfd) {
-                                    storePaths.push_back(bfd.drvPath);
-                                },
-                            }, b);
-                    }
-                }
+                auto drvs = toDerivations(store, installables);
+                StorePathSet paths;
+                store->computeFSClosure(drvs, paths, false, true);
+                pathSet = {};
+                for (auto & path : paths)
+                    if (!path.isDerivation())
+                        pathSet.insert(path);
+            } else {
+                auto roots = std::move(pathSet);
+                pathSet = {};
+                RealisedPath::closure(*store, roots, pathSet);
             }
 
-            StorePathSet closure;
-            store->computeFSClosure(StorePathSet(storePaths.begin(), storePaths.end()), closure, false, includeBuildRefs);
-            storePaths.clear();
-            for (auto & p : closure)
-                if (!p.isDerivation())
-                    storePaths.push_back(p);
         }
+        for (auto & path : pathSet)
+            paths.push_back(path);
     }
+
+    run(store, std::move(paths));
+}
+
+StorePathsCommand::StorePathsCommand(bool recursive)
+    : RealisedPathsCommand(recursive)
+{
+}
+
+void StorePathsCommand::run(ref<Store> store, std::vector<RealisedPath> paths)
+{
+    StorePaths storePaths;
+    for (auto & p : paths)
+        storePaths.push_back(p.path());
 
     run(store, std::move(storePaths));
 }
 
-void StorePathCommand::run(ref<Store> store)
+void StorePathCommand::run(ref<Store> store, std::vector<StorePath> storePaths)
 {
-    auto storePaths = toStorePaths(store, Realise::Nothing, operateOn, installables);
-
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
 
@@ -209,7 +208,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
             profile2, storePath));
 }
 
-void MixProfile::updateProfile(const Buildables & buildables)
+void MixProfile::updateProfile(const DerivedPathsWithHints & buildables)
 {
     if (!profile) return;
 
@@ -217,10 +216,10 @@ void MixProfile::updateProfile(const Buildables & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuildableOpaque bo) {
+            [&](DerivedPathWithHints::Opaque bo) {
                 result.push_back(bo.path);
             },
-            [&](BuildableFromDrv bfd) {
+            [&](DerivedPathWithHints::Built bfd) {
                 for (auto & output : bfd.outputs) {
                     /* Output path should be known because we just tried to
                        build it. */
@@ -228,7 +227,7 @@ void MixProfile::updateProfile(const Buildables & buildables)
                     result.push_back(*output.second);
                 }
             },
-        }, buildable);
+        }, buildable.raw());
     }
 
     if (result.size() != 1)

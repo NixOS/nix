@@ -97,7 +97,7 @@ public:
     const ref<Store> store;
 
     /* List of paths that got realised. */
-    std::vector<StorePath> realisedPaths;
+    std::optional<std::set<StorePath>> realisedPaths;
 
 private:
     SrcToStore srcToStore;

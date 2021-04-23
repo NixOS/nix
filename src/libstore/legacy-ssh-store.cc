@@ -3,6 +3,7 @@
 #include "remote-store.hh"
 #include "serve-protocol.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "worker-protocol.hh"
 #include "ssh.hh"
 #include "derivations.hh"
@@ -15,6 +16,7 @@ struct LegacySSHStoreConfig : virtual StoreConfig
     using StoreConfig::StoreConfig;
     const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
     const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
     const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
@@ -59,6 +61,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress,
@@ -258,18 +261,29 @@ public:
 
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
+            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+        }
         return status;
     }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode) override
     {
         auto conn(connections->get());
 
         conn->to << cmdBuildPaths;
         Strings ss;
-        for (auto & p : drvPaths)
-            ss.push_back(p.to_string(*this));
+        for (auto & p : drvPaths) {
+            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
+            std::visit(overloaded {
+                [&](StorePathWithOutputs s) {
+                    ss.push_back(s.to_string(*this));
+                },
+                [&](StorePath drvPath) {
+                    throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
+                },
+            }, sOrDrvPath);
+        }
         conn->to << ss;
 
         putBuildSettings(*conn);

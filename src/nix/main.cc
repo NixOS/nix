@@ -61,6 +61,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
+    bool showVersion = false;
 
     NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
@@ -87,11 +88,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "version",
             .description = "Show version information.",
-            .handler = {[&]() { if (!completions) printVersion(programName); }},
+            .handler = {[&]() { showVersion = true; }},
         });
 
         addFlag({
-            .longName = "no-net",
+            .longName = "offline",
+            .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .handler = {[&]() { useNet = false; }},
         });
@@ -152,6 +154,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         return
           #include "nix.md"
           ;
+    }
+
+    // Plugins may add new subcommands.
+    void pluginsInited() override
+    {
+        commands = RegisterCommand::getCommandsFor({});
     }
 };
 
@@ -277,7 +285,10 @@ void mainWrapped(int argc, char * * argv)
 
     if (completions) return;
 
-    initPlugins();
+    if (args.showVersion) {
+        printVersion(programName);
+        return;
+    }
 
     if (!args.command)
         throw UsageError("no subcommand specified");
@@ -294,13 +305,13 @@ void mainWrapped(int argc, char * * argv)
 
     if (!args.useNet) {
         // FIXME: should check for command line overrides only.
-        if (!settings.useSubstitutes.overriden)
+        if (!settings.useSubstitutes.overridden)
             settings.useSubstitutes = false;
-        if (!settings.tarballTtl.overriden)
+        if (!settings.tarballTtl.overridden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!fileTransferSettings.tries.overriden)
+        if (!fileTransferSettings.tries.overridden)
             fileTransferSettings.tries = 0;
-        if (!fileTransferSettings.connectTimeout.overriden)
+        if (!fileTransferSettings.connectTimeout.overridden)
             fileTransferSettings.connectTimeout = 1;
     }
 
@@ -318,6 +329,10 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    // Increase the default stack size for the evaluator and for
+    // libstdc++'s std::regex.
+    nix::setStackSize(64 * 1024 * 1024);
+
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);
     });

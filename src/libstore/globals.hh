@@ -28,6 +28,32 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     void set(const std::string & str, bool append = false) override;
 };
 
+struct PluginFilesSetting : public BaseSetting<Paths>
+{
+    bool pluginsLoaded = false;
+
+    PluginFilesSetting(Config * options,
+        const Paths & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<Paths>(def, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str, bool append = false) override;
+};
+
+class MissingExperimentalFeature: public Error
+{
+public:
+    std::string missingFeature;
+
+    MissingExperimentalFeature(std::string feature);
+    virtual const char* sname() const override { return "MissingExperimentalFeature"; }
+};
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
@@ -180,7 +206,10 @@ public:
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
-        "A semicolon-separated list of build machines, in the format of `nix.machines`."};
+        R"(
+          A semicolon-separated list of build machines.
+          For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
+        )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
@@ -615,7 +644,7 @@ public:
           is `root`.
 
           > **Warning**
-          > 
+          >
           > Adding a user to `trusted-users` is essentially equivalent to
           > giving that user root access to the system. For example, the user
           > can set `sandbox-paths` and thereby obtain read access to
@@ -672,7 +701,7 @@ public:
           send a series of commands to modify various settings to stdout. The
           currently recognized commands are:
 
-            - `extra-sandbox-paths`  
+            - `extra-sandbox-paths`\
               Pass a list of files and directories to be included in the
               sandbox for this build. One entry per line, terminated by an
               empty line. Entries have the same format as `sandbox-paths`.
@@ -705,13 +734,13 @@ public:
           The program executes with no arguments. The program's environment
           contains the following environment variables:
 
-            - `DRV_PATH`  
+            - `DRV_PATH`
               The derivation for the built paths.
 
               Example:
               `/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv`
 
-            - `OUT_PATHS`  
+            - `OUT_PATHS`
               Output paths of the built derivation, separated by a space
               character.
 
@@ -742,7 +771,7 @@ public:
           documentation](https://ec.haxx.se/usingcurl-netrc.html).
 
           > **Note**
-          > 
+          >
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.
@@ -819,7 +848,7 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
-    Setting<Paths> pluginFiles{
+    PluginFilesSetting pluginFiles{
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
@@ -830,6 +859,9 @@ public:
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
+
+          Warning! These APIs are inherently unstable and may change from
+          release to release.
 
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix

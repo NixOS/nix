@@ -12,6 +12,7 @@
 #include "affinity.hh"
 #include "util.hh"
 #include "shared.hh"
+#include "path-with-outputs.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "get-drvs.hh"
@@ -240,8 +241,6 @@ static void main_nix_build(int argc, char * * argv)
 
     myArgs.parseCmdline(args);
 
-    initPlugins();
-
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
@@ -323,7 +322,8 @@ static void main_nix_build(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths) {
+    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths0) {
+        auto paths = toDerivedPaths(paths0);
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         uint64_t downloadSize, narSize;
@@ -422,8 +422,6 @@ static void main_nix_build(int argc, char * * argv)
             } else
                 env[var.first] = var.second;
 
-        restoreAffinity();
-
         /* Run a shell using the derivation's environment.  For
            convenience, source $stdenv/setup to setup additional
            environment variables and shell functions.  Also don't
@@ -449,6 +447,7 @@ static void main_nix_build(int argc, char * * argv)
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
                 "unset TZ; %6%"
+                "shopt -s execfail;"
                 "%7%",
                 shellEscape(tmpDir),
                 (pure ? "" : "p=$PATH; "),
@@ -472,7 +471,7 @@ static void main_nix_build(int argc, char * * argv)
 
         auto argPtrs = stringsToCharPtrs(args);
 
-        restoreSignals();
+        restoreProcessContext();
 
         logger->stop();
 
@@ -518,9 +517,11 @@ static void main_nix_build(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryDerivationOutputMap(drvPath);
+            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath);
 
-            auto outputPath = builtOutputs.at(outputName);
+            auto maybeOutputPath = builtOutputs.at(outputName);
+            assert(maybeOutputPath);
+            auto outputPath = *maybeOutputPath;
 
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                 std::string symlink = drvPrefix;

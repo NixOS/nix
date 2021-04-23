@@ -201,6 +201,15 @@ string showType(const Value & v)
     }
 }
 
+Pos Value::determinePos(const Pos &pos) const
+{
+    switch (internalType) {
+        case tAttrs: return *attrs->pos;
+        case tLambda: return lambda.fun->pos;
+        case tApp: return app.left->determinePos(pos);
+        default: return pos;
+    }
+}
 
 bool Value::isTrivial() const
 {
@@ -592,10 +601,8 @@ Value & EvalState::getBuiltin(const string & name)
 
 std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
-    if (v.isPrimOp() || v.isPrimOpApp()) {
+    if (v.isPrimOp()) {
         auto v2 = &v;
-        while (v2->isPrimOpApp())
-            v2 = v2->primOpApp.left;
         if (v2->primOp->doc)
             return Doc {
                 .pos = noPos,
@@ -1062,6 +1069,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
         v.attrs->sort(); // FIXME: inefficient
     }
+
+    v.attrs->pos = &pos;
 }
 
 
@@ -1381,10 +1390,10 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             } else if (!i.def) {
                 throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
 
-nix attempted to evaluate a function as a top level expression; in this case it must have its
-arguments supplied either by default values, or passed explicitly with --arg or --argstr.
-
-https://nixos.org/manual/nix/stable/#ss-functions)", i.name);
+Nix attempted to evaluate a function as a top level expression; in
+this case it must have its arguments supplied either by default
+values, or passed explicitly with '--arg' or '--argstr'. See
+https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
 
             }
         }
@@ -2093,9 +2102,12 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    add(getHome() + "/.nix-defexpr/channels");
-    add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
-    add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
+        add(getHome() + "/.nix-defexpr/channels");
+        add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
+        add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    }
+
     return res;
 }
 

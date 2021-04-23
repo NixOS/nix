@@ -2,12 +2,12 @@
 
 #include "util.hh"
 #include "path.hh"
+#include "path-with-outputs.hh"
+#include "derived-path.hh"
 #include "eval.hh"
 #include "flake/flake.hh"
 
 #include <optional>
-
-#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -15,29 +15,6 @@ struct DrvInfo;
 struct SourceExprCommand;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }
-
-struct BuildableOpaque {
-    StorePath path;
-    nlohmann::json toJSON(ref<Store> store) const;
-};
-
-struct BuildableFromDrv {
-    StorePath drvPath;
-    std::map<std::string, std::optional<StorePath>> outputs;
-    nlohmann::json toJSON(ref<Store> store) const;
-
-    std::string what() {
-        return fmt("%s", outputs.at("out") ? outputs.at("out")->name() : "unknown");
-    }
-};
-
-typedef std::variant<
-    BuildableOpaque,
-    BuildableFromDrv
-> Buildable;
-
-typedef std::vector<Buildable> Buildables;
-nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store);
 
 struct App
 {
@@ -52,9 +29,9 @@ struct Installable
 
     virtual std::string what() = 0;
 
-    virtual Buildables toBuildables() = 0;
+    virtual DerivedPathsWithHints toDerivedPathsWithHints() = 0;
 
-    Buildable toBuildable();
+    DerivedPathWithHints toDerivedPathWithHints();
 
     App toApp(EvalState & state);
 
@@ -97,7 +74,7 @@ struct InstallableValue : Installable
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
 
-    Buildables toBuildables() override;
+    DerivedPathsWithHints toDerivedPathsWithHints() override;
 };
 
 struct InstallableFlake : InstallableValue
@@ -108,11 +85,13 @@ struct InstallableFlake : InstallableValue
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
-    InstallableFlake(ref<EvalState> state, FlakeRef && flakeRef,
-        Strings && attrPaths, Strings && prefixes, const flake::LockFlags & lockFlags)
-        : InstallableValue(state), flakeRef(flakeRef), attrPaths(attrPaths),
-          prefixes(prefixes), lockFlags(lockFlags)
-    { }
+    InstallableFlake(
+        SourceExprCommand * cmd,
+        ref<EvalState> state,
+        FlakeRef && flakeRef,
+        Strings && attrPaths,
+        Strings && prefixes,
+        const flake::LockFlags & lockFlags);
 
     std::string what() override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
 

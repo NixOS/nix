@@ -32,6 +32,7 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #endif
 
 
@@ -143,16 +144,18 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             s += '/';
             while (i != end && *i != '/') s += *i++;
 
-            /* If s points to a symlink, resolve it and restart (since
-               the symlink target might contain new symlinks). */
+            /* If s points to a symlink, resolve it and continue from there */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = absPath(readLink(s), dirOf(s))
-                    + string(i, end);
-                i = temp.begin(); /* restart */
+                temp = readLink(s) + string(i, end);
+                i = temp.begin();
                 end = temp.end();
-                s = "";
+                if (!temp.empty() && temp[0] == '/') {
+                    s.clear();  /* restart for symlinks pointing to absolute path */
+                } else {
+                    s = dirOf(s);
+                }
             }
         }
     }
@@ -752,13 +755,13 @@ AutoCloseFD::AutoCloseFD() : fd{-1} {}
 AutoCloseFD::AutoCloseFD(int fd) : fd{fd} {}
 
 
-AutoCloseFD::AutoCloseFD(AutoCloseFD&& that) : fd{that.fd}
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
 {
     that.fd = -1;
 }
 
 
-AutoCloseFD& AutoCloseFD::operator =(AutoCloseFD&& that)
+AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
@@ -789,6 +792,7 @@ void AutoCloseFD::close()
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError("closing file descriptor %1%", fd);
+        fd = -1;
     }
 }
 
@@ -821,6 +825,12 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
+
+void Pipe::close()
+{
+    readSide.close();
+    writeSide.close();
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -946,7 +956,7 @@ void killUser(uid_t uid)
 #else
             if (kill(-1, SIGKILL) == 0) break;
 #endif
-            if (errno == ESRCH) break; /* no more processes */
+            if (errno == ESRCH || errno == EPERM) break; /* no more processes */
             if (errno != EINTR)
                 throw SysError("cannot kill processes for uid '%1%'", uid);
         }
@@ -1109,7 +1119,7 @@ void runProgram2(const RunOptions & options)
         Strings args_(options.args);
         args_.push_front(options.program);
 
-        restoreSignals();
+        restoreProcessContext();
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
@@ -1121,7 +1131,7 @@ void runProgram2(const RunOptions & options)
         throw SysError("executing '%1%'", options.program);
     }, processOptions);
 
-    out.writeSide = -1;
+    out.writeSide.close();
 
     std::thread writerThread;
 
@@ -1134,7 +1144,7 @@ void runProgram2(const RunOptions & options)
 
 
     if (source) {
-        in.readSide = -1;
+        in.readSide.close();
         writerThread = std::thread([&]() {
             try {
                 std::vector<char> buf(8 * 1024);
@@ -1151,7 +1161,7 @@ void runProgram2(const RunOptions & options)
             } catch (...) {
                 promise.set_exception(std::current_exception());
             }
-            in.writeSide = -1;
+            in.writeSide.close();
         });
     }
 
@@ -1590,7 +1600,7 @@ void startSignalHandlerThread()
     updateWindowSize();
 
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
-        throw SysError("quering signal mask");
+        throw SysError("querying signal mask");
 
     sigset_t set;
     sigemptyset(&set);
@@ -1605,10 +1615,43 @@ void startSignalHandlerThread()
     std::thread(signalHandlerThread, set).detach();
 }
 
-void restoreSignals()
+static void restoreSignals()
 {
     if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
         throw SysError("restoring signals");
+}
+
+#if __linux__
+rlim_t savedStackSize = 0;
+#endif
+
+void setStackSize(size_t stackSize)
+{
+    #if __linux__
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+        savedStackSize = limit.rlim_cur;
+        limit.rlim_cur = stackSize;
+        setrlimit(RLIMIT_STACK, &limit);
+    }
+    #endif
+}
+
+void restoreProcessContext()
+{
+    restoreSignals();
+
+    restoreAffinity();
+
+    #if __linux__
+    if (savedStackSize) {
+        struct rlimit limit;
+        if (getrlimit(RLIMIT_STACK, &limit) == 0) {
+            limit.rlim_cur = savedStackSize;
+            setrlimit(RLIMIT_STACK, &limit);
+        }
+    }
+    #endif
 }
 
 /* RAII helper to automatically deregister a callback. */
@@ -1673,10 +1716,11 @@ string showBytes(uint64_t bytes)
 }
 
 
+// FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
     const static string pathNullDevice = "/dev/null";
-    restoreSignals();
+    restoreProcessContext();
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

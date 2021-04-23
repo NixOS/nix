@@ -53,13 +53,6 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 }
 
 
-StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
-{
-    auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
-}
-
-
 /* Store paths have the following form:
 
    <realized-path> = <store>/<h>-<name>
@@ -366,7 +359,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
-std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapNoResolve(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     auto drv = readInvalidDerivation(path);
@@ -374,19 +367,6 @@ std::map<std::string, std::optional<StorePath>> Store::queryDerivationOutputMapN
         outputs.emplace(outputName, output.second);
     }
     return outputs;
-}
-
-std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
-{
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        auto resolvedDrv = Derivation::tryResolve(*this, path);
-        if (resolvedDrv) {
-            auto resolvedDrvPath = writeDerivation(*this, *resolvedDrv, NoRepair, true);
-            if (isValidPath(resolvedDrvPath))
-                return queryDerivationOutputMapNoResolve(resolvedDrvPath);
-        }
-    }
-    return queryDerivationOutputMapNoResolve(path);
 }
 
 OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
@@ -549,10 +529,10 @@ void Store::queryPathInfo(const StorePath & storePath,
 
 void Store::substitutePaths(const StorePathSet & paths)
 {
-    std::vector<StorePathWithOutputs> paths2;
+    std::vector<DerivedPath> paths2;
     for (auto & path : paths)
         if (!path.isDerivation())
-            paths2.push_back({path});
+            paths2.push_back(DerivedPath::Opaque{path});
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     queryMissing(paths2,
@@ -560,8 +540,8 @@ void Store::substitutePaths(const StorePathSet & paths)
 
     if (!willSubstitute.empty())
         try {
-            std::vector<StorePathWithOutputs> subs;
-            for (auto & p : willSubstitute) subs.push_back({p});
+            std::vector<DerivedPath> subs;
+            for (auto & p : willSubstitute) subs.push_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());
@@ -796,6 +776,36 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
+std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set & paths,
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+{
+    StorePathSet storePaths;
+    std::set<Realisation> realisations;
+    for (auto & path : paths) {
+        storePaths.insert(path.path());
+        if (auto realisation = std::get_if<Realisation>(&path.raw)) {
+            settings.requireExperimentalFeature("ca-derivations");
+            realisations.insert(*realisation);
+        }
+    }
+    auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+    try {
+        for (auto & realisation : realisations) {
+            dstStore->registerDrvOutput(realisation, checkSigs);
+        }
+    } catch (MissingExperimentalFeature & e) {
+        // Don't fail if the remote doesn't support CA derivations is it might
+        // not be within our control to change that, and we might still want
+        // to at least copy the output paths.
+        if (e.missingFeature == "ca-derivations")
+            ignoreException();
+        else
+            throw;
+    }
+
+    return pathsMap;
+}
+
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
@@ -809,7 +819,6 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     for (auto & path : storePaths)
         pathsMap.insert_or_assign(path, path);
 
-    if (missing.empty()) return pathsMap;
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
@@ -884,20 +893,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             nrDone++;
             showProgress();
         });
-
     return pathsMap;
 }
-
-
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths, RepairFlag repair, CheckSigsFlag checkSigs,
-    SubstituteFlag substitute)
-{
-    StorePathSet closure;
-    srcStore->computeFSClosure(storePaths, closure);
-    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
-}
-
 
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {

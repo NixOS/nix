@@ -35,6 +35,7 @@ class Bindings
 {
 public:
     typedef uint32_t size_t;
+    Pos *pos;
 
 private:
     size_t size_, capacity_;

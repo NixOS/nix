@@ -17,7 +17,7 @@ MakeError(ThrownError, AssertionError);
 MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
-MakeError(MissingArgumentError, Error);
+MakeError(MissingArgumentError, EvalError);
 MakeError(RestrictedPathError, Error);
 
 
@@ -180,6 +180,7 @@ struct ExprOpHasAttr : Expr
 struct ExprAttrs : Expr
 {
     bool recursive;
+    Pos pos;
     struct AttrDef {
         bool inherited;
         Expr * e;
@@ -199,7 +200,8 @@ struct ExprAttrs : Expr
     };
     typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
-    ExprAttrs() : recursive(false) { };
+    ExprAttrs(const Pos &pos) : recursive(false), pos(pos) { };
+    ExprAttrs() : recursive(false), pos(noPos) { };
     COMMON_METHODS
 };
 

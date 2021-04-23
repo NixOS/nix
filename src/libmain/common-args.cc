@@ -79,4 +79,11 @@ MixCommonArgs::MixCommonArgs(const string & programName)
     hiddenCategories.insert(cat);
 }
 
+void MixCommonArgs::initialFlagsProcessed()
+{
+    initPlugins();
+    pluginsInited();
+}
+
+
 }
