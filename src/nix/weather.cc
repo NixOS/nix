@@ -49,6 +49,17 @@ struct CmdWeather : InstallablesCommand
     {
         StorePathSet drvPaths;
 
+        std::list<ref<Store>> subs;
+        for (auto sub : getDefaultSubstituters()) {
+            if (sub->wantMassQuery)
+                subs.push_back(sub);
+            else
+                printInfo("ignoring substituter '%s' because WantMassQuery = false", sub->getUri());
+        }
+
+        if (subs.size() == 0)
+            throw Error("No substituters provided (or all substituters have WantMassQuery set to false or unset)");
+
         auto state = getEvalState();
 
         // from search.cc
@@ -130,7 +141,6 @@ struct CmdWeather : InstallablesCommand
         uint64_t totalNarSize = 0;
         std::optional<uint64_t> totalDownloadSize = 0;
 
-        auto subs = getDefaultSubstituters();
         for (auto & sub : subs) {
             StorePathSet validPaths = sub->queryValidPaths(outPaths);
 
