@@ -2,13 +2,31 @@
 
 #include "types.hh"
 #include "lock.hh"
-#include "local-store.hh"
+#include "store-api.hh"
 #include "goal.hh"
+#include "realisation.hh"
+
+#include <future>
+#include <thread>
 
 namespace nix {
 
 /* Forward definition. */
-class DerivationGoal;
+struct DerivationGoal;
+struct PathSubstitutionGoal;
+class DrvOutputSubstitutionGoal;
+
+/* Workaround for not being able to declare a something like
+
+     class PathSubstitutionGoal : public Goal;
+
+   even when Goal is a complete type.
+
+   This is still a static cast. The purpose of exporting it is to define it in
+   a place where `PathSubstitutionGoal` is concrete, and use it in a place where it
+   is opaque. */
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -56,8 +74,9 @@ private:
 
     /* Maps used to prevent multiple instantiations of a goal for the
        same derivation / path. */
-    WeakGoalMap derivationGoals;
-    WeakGoalMap substitutionGoals;
+    std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+    std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
+    std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
@@ -90,7 +109,7 @@ public:
     /* Set if at least one derivation is not deterministic in check mode. */
     bool checkMismatch;
 
-    LocalStore & store;
+    Store & store;
 
     std::unique_ptr<HookInstance> hook;
 
@@ -112,7 +131,7 @@ public:
        it answers with "decline-permanently", we don't try again. */
     bool tryBuildHook = true;
 
-    Worker(LocalStore & store);
+    Worker(Store & store);
     ~Worker();
 
     /* Make a goal (with caching). */
@@ -131,7 +150,8 @@ public:
         const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    GoalPtr makeSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);

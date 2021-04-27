@@ -122,6 +122,7 @@ public:
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
+        if (lvl > verbosity) return;
         auto state(state_.lock());
         log(*state, lvl, fs.s);
     }
@@ -465,6 +466,17 @@ public:
         } else {
             Logger::writeToStdout(s);
         }
+    }
+
+    std::optional<char> ask(std::string_view msg) override
+    {
+        auto state(state_.lock());
+        if (!state->active || !isatty(STDIN_FILENO)) return {};
+        std::cerr << fmt("\r\e[K%s ", msg);
+        auto s = trim(readLine(STDIN_FILENO));
+        if (s.size() != 1) return {};
+        draw(*state);
+        return s[0];
     }
 };
 

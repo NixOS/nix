@@ -1,0 +1,9 @@
+prefix=@prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: Nix
+Description: Nix Package Manager
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lnixcmd
+Cflags: -I${includedir}/nix -std=c++17

@@ -7,14 +7,19 @@ nix_tests = \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
   gc-runtime.sh check-refs.sh filter-source.sh \
   local-store.sh remote-store.sh export.sh export-graph.sh \
+  db-migration.sh \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
-  binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh \
+  binary-cache.sh \
+  binary-cache-build-remote.sh \
+  nix-profile.sh repair.sh dump-db.sh case-hack.sh \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-dry.sh \
   build-remote-input-addressed.sh \
+  build-remote-content-addressed-fixed.sh \
+  build-remote-content-addressed-floating.sh \
   ssh-relay.sh \
   nar-access.sh \
   structured-attrs.sh \
@@ -35,9 +40,13 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
-  content-addressed.sh
+  build.sh \
+  compute-levels.sh \
+  ca/build.sh \
+  ca/substitute.sh \
+  ca/signatures.sh \
+  ca/nix-copy.sh
   # parallel.sh
-  # build-remote-content-addressed-fixed.sh \
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 

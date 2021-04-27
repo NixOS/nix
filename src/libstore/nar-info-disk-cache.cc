@@ -109,8 +109,10 @@ public:
                 SQLiteStmt(state->db,
                     "delete from NARs where ((present = 0 and timestamp < ?) or (present = 1 and timestamp < ?))")
                     .use()
-                    (now - settings.ttlNegativeNarInfoCache)
-                    (now - settings.ttlPositiveNarInfoCache)
+                    // Use a minimum TTL to prevent --refresh from
+                    // nuking the entire disk cache.
+                    (now - std::max(settings.ttlNegativeNarInfoCache.get(), 3600U))
+                    (now - std::max(settings.ttlPositiveNarInfoCache.get(), 30 * 24 * 3600U))
                     .exec();
 
                 debug("deleted %d entries from the NAR info disk cache", sqlite3_changes(state->db));

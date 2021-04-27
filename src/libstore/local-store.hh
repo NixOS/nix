@@ -43,7 +43,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 };
 
 
-class LocalStore : public LocalFSStore, public virtual LocalStoreConfig
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore
 {
 private:
 
@@ -55,19 +55,8 @@ private:
         /* The SQLite database object. */
         SQLite db;
 
-        /* Some precompiled SQLite statements. */
-        SQLiteStmt stmtRegisterValidPath;
-        SQLiteStmt stmtUpdatePathInfo;
-        SQLiteStmt stmtAddReference;
-        SQLiteStmt stmtQueryPathInfo;
-        SQLiteStmt stmtQueryReferences;
-        SQLiteStmt stmtQueryReferrers;
-        SQLiteStmt stmtInvalidatePath;
-        SQLiteStmt stmtAddDerivationOutput;
-        SQLiteStmt stmtQueryValidDerivers;
-        SQLiteStmt stmtQueryDerivationOutputs;
-        SQLiteStmt stmtQueryPathFromHashPart;
-        SQLiteStmt stmtQueryValidPaths;
+        struct Stmts;
+        std::unique_ptr<Stmts> stmts;
 
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
@@ -90,7 +79,7 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    Sync<State, std::recursive_mutex> _state;
+    Sync<State> _state;
 
 public:
 
@@ -147,6 +136,9 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    bool pathInfoIsUntrusted(const ValidPathInfo &) override;
+    bool realisationIsUntrusted(const Realisation & ) override;
+
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
@@ -155,15 +147,6 @@ public:
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
-
-    void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
-        BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
-
-    void ensurePath(const StorePath & path) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -209,15 +192,21 @@ public:
 
     void vacuumDB();
 
-    /* Repair the contents of the given path by redownloading it using
-       a substituter (if available). */
-    void repairPath(const StorePath & path);
+    void repairPath(const StorePath & path) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     /* If free disk space in /nix/store if below minFree, delete
        garbage until it exceeds maxFree. */
     void autoGC(bool sync = true);
+
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
+    void registerDrvOutput(const Realisation & info) override;
+    void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
+    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
 
 private:
 
@@ -238,6 +227,8 @@ private:
 
     void verifyPath(const Path & path, const StringSet & store,
         PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
+    std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
@@ -283,21 +274,19 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /* Add signatures to a ValidPathInfo using the secret keys
+    /* Add signatures to a ValidPathInfo or Realisation using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
-
-    /* Register the store path 'output' as the output named 'outputName' of
-       derivation 'deriver'. */
-    void linkDeriverToPath(const StorePath & deriver, const string & outputName, const StorePath & output);
-    void linkDeriverToPath(State & state, uint64_t deriver, const string & outputName, const StorePath & output);
+    void signRealisation(Realisation &);
 
     Path getRealStoreDir() override { return realStoreDir; }
 
     void createUser(const std::string & userName, uid_t userId) override;
 
-    friend class DerivationGoal;
-    friend class SubstitutionGoal;
+    friend struct LocalDerivationGoal;
+    friend struct PathSubstitutionGoal;
+    friend struct SubstitutionGoal;
+    friend struct DerivationGoal;
 };
 
 

@@ -7,7 +7,7 @@ namespace nix {
 
 /* Forward definition. */
 struct Goal;
-struct Worker;
+class Worker;
 
 /* A pointer to a goal. */
 typedef std::shared_ptr<Goal> GoalPtr;
@@ -46,7 +46,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
     unsigned int nrNoSubstituters;
 
     /* Number of substitution goals we are/were waiting for that
-       failed because othey had unsubstitutable references. */
+       failed because they had unsubstitutable references. */
     unsigned int nrIncompleteClosure;
 
     /* Name of this goal for debugging purposes. */
@@ -100,6 +100,8 @@ struct Goal : public std::enable_shared_from_this<Goal>
     virtual string key() = 0;
 
     void amDone(ExitCode result, std::optional<Error> ex = {});
+
+    virtual void cleanup() { }
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

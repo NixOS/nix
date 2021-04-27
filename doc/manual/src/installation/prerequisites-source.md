@@ -30,7 +30,7 @@
     have bzip2 installed, including development headers and libraries.
     If your distribution does not provide these, you can obtain bzip2
     from
-    <https://web.archive.org/web/20180624184756/http://www.bzip.org/>.
+    <https://sourceware.org/bzip2/>.
 
   - `liblzma`, which is provided by XZ Utils. If your distribution does
     not provide this, you can get it from <https://tukaani.org/xz/>.
@@ -69,3 +69,6 @@
     `--disable-seccomp-sandboxing` option to the `configure` script (Not
     recommended unless your system doesn't support `libseccomp`). To get
     the library, visit <https://github.com/seccomp/libseccomp>.
+ 
+  - Niels Lohmann's [JSON library](https://github.com/nlohmann/json).
+  

@@ -29,7 +29,7 @@ struct RemoteStoreConfig : virtual StoreConfig
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual Store, public virtual RemoteStoreConfig
+class RemoteStore : public virtual RemoteStoreConfig, public virtual Store
 {
 public:
 
@@ -81,7 +81,11 @@ public:
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
+    void registerDrvOutput(const Realisation & info) override;
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
+
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -104,7 +108,7 @@ public:
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
 

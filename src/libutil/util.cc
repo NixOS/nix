@@ -32,6 +32,7 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #endif
 
 
@@ -320,7 +321,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, const string & s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -340,13 +341,13 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::vector<unsigned char> buf(64 * 1024);
+    std::vector<char> buf(64 * 1024);
 
     try {
         while (true) {
             try {
                 auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), (unsigned char *) buf.data(), n);
+                writeFull(fd.get(), {buf.data(), n});
             } catch (EndOfFile &) { break; }
         }
     } catch (Error & e) {
@@ -632,11 +633,11 @@ void replaceSymlink(const Path & target, const Path & link,
 }
 
 
-void readFull(int fd, unsigned char * buf, size_t count)
+void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
-        ssize_t res = read(fd, (char *) buf, count);
+        ssize_t res = read(fd, buf, count);
         if (res == -1) {
             if (errno == EINTR) continue;
             throw SysError("reading from file");
@@ -648,24 +649,16 @@ void readFull(int fd, unsigned char * buf, size_t count)
 }
 
 
-void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
+void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
-    while (count) {
+    while (!s.empty()) {
         if (allowInterrupts) checkInterrupt();
-        ssize_t res = write(fd, (char *) buf, count);
+        ssize_t res = write(fd, s.data(), s.size());
         if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
-        if (res > 0) {
-            count -= res;
-            buf += res;
-        }
+        if (res > 0)
+            s.remove_prefix(res);
     }
-}
-
-
-void writeFull(int fd, const string & s, bool allowInterrupts)
-{
-    writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
 }
 
 
@@ -705,7 +698,7 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else sink(buf.data(), rd);
+        else sink({(char *) buf.data(), (size_t) rd});
     }
 }
 
@@ -760,13 +753,13 @@ AutoCloseFD::AutoCloseFD() : fd{-1} {}
 AutoCloseFD::AutoCloseFD(int fd) : fd{fd} {}
 
 
-AutoCloseFD::AutoCloseFD(AutoCloseFD&& that) : fd{that.fd}
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
 {
     that.fd = -1;
 }
 
 
-AutoCloseFD& AutoCloseFD::operator =(AutoCloseFD&& that)
+AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
@@ -797,6 +790,7 @@ void AutoCloseFD::close()
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError("closing file descriptor %1%", fd);
+        fd = -1;
     }
 }
 
@@ -829,6 +823,12 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
+
+void Pipe::close()
+{
+    readSide.close();
+    writeSide.close();
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -954,7 +954,7 @@ void killUser(uid_t uid)
 #else
             if (kill(-1, SIGKILL) == 0) break;
 #endif
-            if (errno == ESRCH) break; /* no more processes */
+            if (errno == ESRCH || errno == EPERM) break; /* no more processes */
             if (errno != EINTR)
                 throw SysError("cannot kill processes for uid '%1%'", uid);
         }
@@ -1117,7 +1117,7 @@ void runProgram2(const RunOptions & options)
         Strings args_(options.args);
         args_.push_front(options.program);
 
-        restoreSignals();
+        restoreProcessContext();
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
@@ -1129,7 +1129,7 @@ void runProgram2(const RunOptions & options)
         throw SysError("executing '%1%'", options.program);
     }, processOptions);
 
-    out.writeSide = -1;
+    out.writeSide.close();
 
     std::thread writerThread;
 
@@ -1142,10 +1142,10 @@ void runProgram2(const RunOptions & options)
 
 
     if (source) {
-        in.readSide = -1;
+        in.readSide.close();
         writerThread = std::thread([&]() {
             try {
-                std::vector<unsigned char> buf(8 * 1024);
+                std::vector<char> buf(8 * 1024);
                 while (true) {
                     size_t n;
                     try {
@@ -1153,13 +1153,13 @@ void runProgram2(const RunOptions & options)
                     } catch (EndOfFile &) {
                         break;
                     }
-                    writeFull(in.writeSide.get(), buf.data(), n);
+                    writeFull(in.writeSide.get(), {buf.data(), n});
                 }
                 promise.set_value();
             } catch (...) {
                 promise.set_exception(std::current_exception());
             }
-            in.writeSide = -1;
+            in.writeSide.close();
         });
     }
 
@@ -1257,7 +1257,7 @@ template StringSet tokenizeString(std::string_view s, const string & separators)
 template vector<string> tokenizeString(std::string_view s, const string & separators);
 
 
-string chomp(const string & s)
+string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
     return i == string::npos ? "" : string(s, 0, i + 1);
@@ -1273,11 +1273,11 @@ string trim(const string & s, const string & whitespace)
 }
 
 
-string replaceStrings(const std::string & s,
+string replaceStrings(std::string_view s,
     const std::string & from, const std::string & to)
 {
-    if (from.empty()) return s;
-    string res = s;
+    string res(s);
+    if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
         res.replace(pos, from.size(), to);
@@ -1409,7 +1409,28 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             i++;
 
         else {
-            t += *i++; w++;
+            w++;
+            // Copy one UTF-8 character.
+            if ((*i & 0xe0) == 0xc0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+            } else if ((*i & 0xf0) == 0xe0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                    t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                }
+            } else if ((*i & 0xf8) == 0xf0) {
+                t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                    t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80)) {
+                        t += *i++;
+                        if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                    }
+                }
+            } else
+                t += *i++;
         }
     }
 
@@ -1577,7 +1598,7 @@ void startSignalHandlerThread()
     updateWindowSize();
 
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
-        throw SysError("quering signal mask");
+        throw SysError("querying signal mask");
 
     sigset_t set;
     sigemptyset(&set);
@@ -1592,10 +1613,43 @@ void startSignalHandlerThread()
     std::thread(signalHandlerThread, set).detach();
 }
 
-void restoreSignals()
+static void restoreSignals()
 {
     if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
         throw SysError("restoring signals");
+}
+
+#if __linux__
+rlim_t savedStackSize = 0;
+#endif
+
+void setStackSize(size_t stackSize)
+{
+    #if __linux__
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+        savedStackSize = limit.rlim_cur;
+        limit.rlim_cur = stackSize;
+        setrlimit(RLIMIT_STACK, &limit);
+    }
+    #endif
+}
+
+void restoreProcessContext()
+{
+    restoreSignals();
+
+    restoreAffinity();
+
+    #if __linux__
+    if (savedStackSize) {
+        struct rlimit limit;
+        if (getrlimit(RLIMIT_STACK, &limit) == 0) {
+            limit.rlim_cur = savedStackSize;
+            setrlimit(RLIMIT_STACK, &limit);
+        }
+    }
+    #endif
 }
 
 /* RAII helper to automatically deregister a callback. */
@@ -1660,10 +1714,11 @@ string showBytes(uint64_t bytes)
 }
 
 
+// FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
     const static string pathNullDevice = "/dev/null";
-    restoreSignals();
+    restoreProcessContext();
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

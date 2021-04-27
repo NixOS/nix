@@ -82,7 +82,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
         visit(v, parser(tomlStream).parse());
     } catch (std::runtime_error & e) {
         throw EvalError({
-            .hint = hintfmt("while parsing a TOML string: %s", e.what()),
+            .msg = hintfmt("while parsing a TOML string: %s", e.what()),
             .errPos = pos
         });
     }

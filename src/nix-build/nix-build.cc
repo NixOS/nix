@@ -12,12 +12,13 @@
 #include "affinity.hh"
 #include "util.hh"
 #include "shared.hh"
+#include "path-with-outputs.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -217,9 +218,9 @@ static void main_nix_build(int argc, char * * argv)
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
                 // in ruby -e 'load' which ignores the shebangs.
-                envCommand = (format("exec %1% %2% -e 'load(\"%3%\")' -- %4%") % execArgs % interpreter % script % joined.str()).str();
+                envCommand = (format("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%") % execArgs % interpreter % shellEscape(script) % joined.str()).str();
             } else {
-                envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % script % joined.str()).str();
+                envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % shellEscape(script) % joined.str()).str();
             }
         }
 
@@ -239,8 +240,6 @@ static void main_nix_build(int argc, char * * argv)
     });
 
     myArgs.parseCmdline(args);
-
-    initPlugins();
 
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
@@ -323,7 +322,8 @@ static void main_nix_build(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths) {
+    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths0) {
+        auto paths = toDerivedPaths(paths0);
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         uint64_t downloadSize, narSize;
@@ -369,11 +369,8 @@ static void main_nix_build(int argc, char * * argv)
                 shell = drv->queryOutPath() + "/bin/bash";
 
             } catch (Error & e) {
-                logWarning({
-                    .name = "bashInteractive",
-                    .hint = hintfmt("%s; will use bash from your environment",
-                        (e.info().hint ? e.info().hint->str() : ""))
-                });
+                logError(e.info());
+                notice("will use bash from your environment");
                 shell = "bash";
             }
         }
@@ -425,8 +422,6 @@ static void main_nix_build(int argc, char * * argv)
             } else
                 env[var.first] = var.second;
 
-        restoreAffinity();
-
         /* Run a shell using the derivation's environment.  For
            convenience, source $stdenv/setup to setup additional
            environment variables and shell functions.  Also don't
@@ -452,6 +447,7 @@ static void main_nix_build(int argc, char * * argv)
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
                 "unset TZ; %6%"
+                "shopt -s execfail;"
                 "%7%",
                 shellEscape(tmpDir),
                 (pure ? "" : "p=$PATH; "),
@@ -475,7 +471,7 @@ static void main_nix_build(int argc, char * * argv)
 
         auto argPtrs = stringsToCharPtrs(args);
 
-        restoreSignals();
+        restoreProcessContext();
 
         logger->stop();
 
@@ -487,6 +483,7 @@ static void main_nix_build(int argc, char * * argv)
     else {
 
         std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
@@ -498,6 +495,7 @@ static void main_nix_build(int argc, char * * argv)
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
             pathsToBuild.push_back({drvPath, {outputName}});
+            pathsToBuildOrdered.push_back({drvPath, {outputName}});
 
             auto i = drvMap.find(drvPath);
             if (i != drvMap.end())
@@ -513,25 +511,25 @@ static void main_nix_build(int argc, char * * argv)
 
         std::vector<StorePath> outPaths;
 
-        for (auto & [drvPath, info] : drvMap) {
-            auto & [counter, wantedOutputs] = info;
+        for (auto & [drvPath, outputName] : pathsToBuildOrdered) {
+            auto & [counter, _wantedOutputs] = drvMap.at({drvPath});
             std::string drvPrefix = outLink;
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryDerivationOutputMap(drvPath);
+            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath);
 
-            for (auto & outputName : wantedOutputs) {
-                auto outputPath = builtOutputs.at(outputName);
+            auto maybeOutputPath = builtOutputs.at(outputName);
+            assert(maybeOutputPath);
+            auto outputPath = *maybeOutputPath;
 
-                if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-                    std::string symlink = drvPrefix;
-                    if (outputName != "out") symlink += "-" + outputName;
-                    store2->addPermRoot(outputPath, absPath(symlink));
-                }
-
-                outPaths.push_back(outputPath);
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+                std::string symlink = drvPrefix;
+                if (outputName != "out") symlink += "-" + outputName;
+                store2->addPermRoot(outputPath, absPath(symlink));
             }
+
+            outPaths.push_back(outputPath);
         }
 
         logger->stop();

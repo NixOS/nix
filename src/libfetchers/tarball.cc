@@ -64,7 +64,6 @@ DownloadFileResult downloadFile(
 
     if (res.cached) {
         assert(cached);
-        assert(request.expectedETag == res.etag);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
@@ -110,7 +109,7 @@ DownloadFileResult downloadFile(
     };
 }
 
-std::pair<Tree, time_t> downloadTarball(
+std::pair<Tree, DownloadTarballMeta> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
@@ -128,7 +127,10 @@ std::pair<Tree, time_t> downloadTarball(
     if (cached && !cached->expired)
         return {
             Tree(store->toRealPath(cached->storePath), std::move(cached->storePath)),
-            getIntAttr(cached->infoAttrs, "lastModified")
+            {
+                .lastModified = time_t(getIntAttr(cached->infoAttrs, "lastModified")),
+                .effectiveUrl = maybeGetStrAttr(cached->infoAttrs, "effectiveUrl").value_or(url),
+            },
         };
 
     auto res = downloadFile(store, url, name, immutable, headers);
@@ -152,7 +154,8 @@ std::pair<Tree, time_t> downloadTarball(
     }
 
     Attrs infoAttrs({
-        {"lastModified", lastModified},
+        {"lastModified", uint64_t(lastModified)},
+        {"effectiveUrl", res.effectiveUrl},
         {"etag", res.etag},
     });
 
@@ -165,7 +168,10 @@ std::pair<Tree, time_t> downloadTarball(
 
     return {
         Tree(store->toRealPath(*unpackedStorePath), std::move(*unpackedStorePath)),
-        lastModified,
+        {
+            .lastModified = lastModified,
+            .effectiveUrl = res.effectiveUrl,
+        },
     };
 }
 
@@ -224,9 +230,11 @@ struct TarballInputScheme : InputScheme
         return true;
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
+        Input input(_input);
+        auto [tree, meta] = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false);
+        input.attrs.insert_or_assign("url", meta.effectiveUrl);
         return {std::move(tree), input};
     }
 };

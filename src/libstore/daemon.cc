@@ -2,6 +2,7 @@
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "finally.hh"
 #include "affinity.hh"
 #include "archive.hh"
@@ -153,10 +154,10 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    virtual void operator () (const unsigned char * data, size_t len)
+    void operator () (std::string_view data)
     {
         to << STDERR_WRITE;
-        writeString(data, len, to);
+        writeString(data, to);
     }
 };
 
@@ -165,7 +166,7 @@ struct TunnelSource : BufferedSource
     Source & from;
     BufferedSink & to;
     TunnelSource(Source & from, BufferedSink & to) : from(from), to(to) { }
-    size_t readUnbuffered(unsigned char * data, size_t len) override
+    size_t readUnbuffered(char * data, size_t len) override
     {
         to << STDERR_READ << len;
         to.flush();
@@ -215,6 +216,8 @@ struct ClientSettings
                 for (auto & s : ss)
                     if (trusted.count(s))
                         subs.push_back(s);
+                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
+                        subs.push_back(s + "/");
                     else
                         warn("ignoring untrusted substituter '%s'", s);
                 res = subs;
@@ -230,8 +233,6 @@ struct ClientSettings
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
-                    ;
-                else if (setSubstituters(settings.extraSubstituters))
                     ;
                 else
                     debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
@@ -259,6 +260,18 @@ static void writeValidPathInfo(
     }
 }
 
+static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
+{
+    std::vector<DerivedPath> reqs;
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+        reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
+    } else {
+        for (auto & s : readStrings<Strings>(from))
+            reqs.push_back(parsePathWithOutputs(store, s).toDerivedPath());
+    }
+    return reqs;
+}
+
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
@@ -276,8 +289,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopQueryValidPaths: {
         auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+
+        SubstituteFlag substitute = NoSubstitute;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 27) {
+            substitute = readInt(from) ? Substitute : NoSubstitute;
+        }
+
         logger->startWork();
-        auto res = store->queryValidPaths(paths);
+        if (substitute) {
+            store->substitutePaths(paths);
+        }
+        auto res = store->queryValidPaths(paths, substitute);
         logger->stopWork();
         worker_proto::write(*store, to, res);
         break;
@@ -484,9 +506,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopBuildPaths: {
-        std::vector<StorePathWithOutputs> drvs;
-        for (auto & s : readStrings<Strings>(from))
-            drvs.push_back(store->parsePathWithOutputs(s));
+        auto drvs = readDerivedPaths(*store, clientVersion, from);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -566,6 +586,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+            to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
+        }
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
+            worker_proto::write(*store, to, res.builtOutputs);
+        }
         break;
     }
 
@@ -844,9 +870,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQueryMissing: {
-        std::vector<StorePathWithOutputs> targets;
-        for (auto & s : readStrings<Strings>(from))
-            targets.push_back(store->parsePathWithOutputs(s));
+        auto targets = readDerivedPaths(*store, clientVersion, from);
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;
@@ -856,6 +880,28 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         worker_proto::write(*store, to, willSubstitute);
         worker_proto::write(*store, to, unknown);
         to << downloadSize << narSize;
+        break;
+    }
+
+    case wopRegisterDrvOutput: {
+        logger->startWork();
+        auto outputId = DrvOutput::parse(readString(from));
+        auto outputPath = StorePath(readString(from));
+        auto resolvedDrv = StorePath(readString(from));
+        store->registerDrvOutput(Realisation{
+            .id = outputId, .outPath = outputPath});
+        logger->stopWork();
+        break;
+    }
+
+    case wopQueryRealisation: {
+        logger->startWork();
+        auto outputId = DrvOutput::parse(readString(from));
+        auto info = store->queryRealisation(outputId);
+        logger->stopWork();
+        std::set<StorePath> outPaths;
+        if (info) outPaths.insert(info->outPath);
+        worker_proto::write(*store, to, outPaths);
         break;
     }
 

@@ -9,7 +9,8 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
+#include "path-with-outputs.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -18,10 +19,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
-#if HAVE_SODIUM
-#include <sodium.h>
-#endif
 
 
 namespace nix_store {
@@ -66,7 +63,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
     auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
 
     if (path.path.isDerivation()) {
-        if (build) store->buildPaths({path});
+        if (build) store->buildPaths({path.toDerivedPath()});
         auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
@@ -132,11 +129,13 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     std::vector<StorePathWithOutputs> paths;
     for (auto & i : opArgs)
-        paths.push_back(store->followLinksToStorePathWithOutputs(i));
+        paths.push_back(followLinksToStorePathWithOutputs(*store, i));
 
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
-    store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    store->queryMissing(
+        toDerivedPaths(paths),
+        willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (ignoreUnknown) {
         std::vector<StorePathWithOutputs> paths2;
@@ -152,7 +151,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     if (dryRun) return;
 
     /* Build all paths at the same time to exploit parallelism. */
-    store->buildPaths(paths, buildMode);
+    store->buildPaths(toDerivedPaths(paths), buildMode);
 
     if (!ignoreUnknown)
         for (auto & i : paths) {
@@ -516,7 +515,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
-            infos.push_back(std::move(*info));
+            infos.insert_or_assign(info->path, *info);
         }
     }
 
@@ -712,10 +711,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", i);
 
     if (store->verifyStore(checkContents, repair)) {
-        logWarning({
-            .name = "Store consistency",
-            .description = "not all errors were fixed"
-            });
+        warn("not all store errors were fixed");
         throw Exit(1);
     }
 }
@@ -737,14 +733,10 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            logError({
-                .name = "Hash mismatch",
-                .hint = hintfmt(
-                    "path '%s' was modified! expected hash '%s', got '%s'",
+            printError("path '%s' was modified! expected hash '%s', got '%s'",
                     store->printStorePath(path),
                     info->narHash.to_string(Base32, true),
-                    current.first.to_string(Base32, true))
-            });
+                current.first.to_string(Base32, true));
             status = 1;
         }
     }
@@ -761,7 +753,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
         throw UsageError("no flags expected");
 
     for (auto & i : opArgs)
-        ensureLocalStore()->repairPath(store->followLinksToStorePath(i));
+        store->repairPath(store->followLinksToStorePath(i));
 }
 
 /* Optimise the disk space usage of the Nix store by hard-linking
@@ -830,29 +822,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                     for (auto & path : paths)
                         store->addTempRoot(path);
 
-                /* If requested, substitute missing paths. This
-                   implements nix-copy-closure's --use-substitutes
-                   flag. */
                 if (substitute && writeAllowed) {
-                    /* Filter out .drv files (we don't want to build anything). */
-                    std::vector<StorePathWithOutputs> paths2;
-                    for (auto & path : paths)
-                        if (!path.isDerivation())
-                            paths2.push_back({path});
-                    uint64_t downloadSize, narSize;
-                    StorePathSet willBuild, willSubstitute, unknown;
-                    store->queryMissing(paths2,
-                        willBuild, willSubstitute, unknown, downloadSize, narSize);
-                    /* FIXME: should use ensurePath(), but it only
-                       does one path at a time. */
-                    if (!willSubstitute.empty())
-                        try {
-                            std::vector<StorePathWithOutputs> subs;
-                            for (auto & p : willSubstitute) subs.push_back({p});
-                            store->buildPaths(subs);
-                        } catch (Error & e) {
-                            logWarning(e.info());
-                        }
+                    store->substitutePaths(paths);
                 }
 
                 worker_proto::write(*store, out, store->queryValidPaths(paths));
@@ -905,13 +876,13 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 std::vector<StorePathWithOutputs> paths;
                 for (auto & s : readStrings<Strings>(in))
-                    paths.push_back(store->parsePathWithOutputs(s));
+                    paths.push_back(parsePathWithOutputs(*store, s));
 
                 getBuildSettings();
 
                 try {
                     MonitorFdHup monitor(in.fd);
-                    store->buildPaths(paths);
+                    store->buildPaths(toDerivedPaths(paths));
                     out << 0;
                 } catch (Error & e) {
                     assert(e.status);
@@ -937,6 +908,10 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
+                if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
+                    worker_proto::write(*store, out, status.builtOutputs);
+                }
+
 
                 break;
             }
@@ -1001,21 +976,11 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     string secretKeyFile = *i++;
     string publicKeyFile = *i++;
 
-#if HAVE_SODIUM
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
+    auto secretKey = SecretKey::generate(keyName);
 
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    unsigned char sk[crypto_sign_SECRETKEYBYTES];
-    if (crypto_sign_keypair(pk, sk) != 0)
-        throw Error("key generation failed");
-
-    writeFile(publicKeyFile, keyName + ":" + base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)));
+    writeFile(publicKeyFile, secretKey.toPublicKey().to_string());
     umask(0077);
-    writeFile(secretKeyFile, keyName + ":" + base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)));
-#else
-    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
+    writeFile(secretKeyFile, secretKey.to_string());
 }
 
 
@@ -1108,8 +1073,6 @@ static int main_nix_store(int argc, char * * argv)
 
             return true;
         });
-
-        initPlugins();
 
         if (!op) throw UsageError("no operation specified");
 

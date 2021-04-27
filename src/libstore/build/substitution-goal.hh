@@ -8,16 +8,13 @@ namespace nix {
 
 class Worker;
 
-class SubstitutionGoal : public Goal
+struct PathSubstitutionGoal : public Goal
 {
-    friend class Worker;
-
-private:
     /* The store path that should be realised through a substitute. */
     StorePath storePath;
 
     /* The path the substituter refers to the path as. This will be
-     * different when the stores have different names. */
+       different when the stores have different names. */
     std::optional<StorePath> subPath;
 
     /* The remaining substituters. */
@@ -50,15 +47,15 @@ private:
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
-    typedef void (SubstitutionGoal::*GoalState)();
+    typedef void (PathSubstitutionGoal::*GoalState)();
     GoalState state;
 
     /* Content address for recomputing store path */
     std::optional<ContentAddress> ca;
 
 public:
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    ~SubstitutionGoal();
+    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    ~PathSubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
 
@@ -83,7 +80,7 @@ public:
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
 
-    StorePath getStorePath() { return storePath; }
+    void cleanup() override;
 };
 
 }

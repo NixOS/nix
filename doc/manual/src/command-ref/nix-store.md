@@ -79,7 +79,7 @@ paths. Realisation is a somewhat overloaded term:
     system). If the path is already valid, we are done immediately.
     Otherwise, the path and any missing paths in its closure may be
     produced through substitutes. If there are no (successful)
-    subsitutes, realisation fails.
+    substitutes, realisation fails.
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
@@ -226,7 +226,7 @@ control what gets deleted and in what order:
     or TiB units.
 
 The behaviour of the collector is also influenced by the
-`keep-outputs` and `keep-derivations` variables in the Nix
+`keep-outputs` and `keep-derivations` settings in the Nix
 configuration file.
 
 By default, the collector prints the total number of freed bytes when it

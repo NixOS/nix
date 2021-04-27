@@ -1,6 +1,6 @@
 #include "shared.hh"
 #include "store-api.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 
@@ -43,8 +43,6 @@ static int main_nix_copy_closure(int argc, char ** argv)
             return true;
         });
 
-        initPlugins();
-
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
@@ -52,12 +50,12 @@ static int main_nix_copy_closure(int argc, char ** argv)
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
 
-        StorePathSet storePaths2;
+        RealisedPath::Set storePaths2;
         for (auto & path : storePaths)
             storePaths2.insert(from->followLinksToStorePath(path));
 
-        StorePathSet closure;
-        from->computeFSClosure(storePaths2, closure, false, includeOutputs);
+        RealisedPath::Set closure;
+        RealisedPath::closure(*from, storePaths2, closure);
 
         copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
 

@@ -53,7 +53,10 @@ void destroyCgroup(const Path & cgroup)
 
         for (auto & pid_s : pids) {
             pid_t pid;
-            if (!string2Int(pid_s, pid)) throw Error("invalid pid '%s'", pid);
+            if (auto o = string2Int<pid_t>(pid_s))
+                pid = *o;
+            else
+                throw Error("invalid pid '%s'", pid);
             if (pidsShown.insert(pid).second) {
                 try {
                     auto cmdline = readFile(fmt("/proc/%d/cmdline", pid));
