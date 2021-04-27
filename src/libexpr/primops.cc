@@ -1251,7 +1251,10 @@ static RegisterPrimOp primop_toPath({
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     if (evalSettings.pureEval)
-        throw EvalError("builtins.storePath' is not allowed in pure evaluation mode");
+        throw EvalError({
+            .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
+            .errPos = pos
+        });
 
     PathSet context;
     Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
