@@ -109,8 +109,10 @@ public:
                 SQLiteStmt(state->db,
                     "delete from NARs where ((present = 0 and timestamp < ?) or (present = 1 and timestamp < ?))")
                     .use()
-                    (now - settings.ttlNegativeNarInfoCache)
-                    (now - settings.ttlPositiveNarInfoCache)
+                    // Use a minimum TTL to prevent --refresh from
+                    // nuking the entire disk cache.
+                    (now - std::max(settings.ttlNegativeNarInfoCache.get(), 3600U))
+                    (now - std::max(settings.ttlPositiveNarInfoCache.get(), 30 * 24 * 3600U))
                     .exec();
 
                 debug("deleted %d entries from the NAR info disk cache", sqlite3_changes(state->db));
@@ -189,13 +191,14 @@ public:
                 return {oInvalid, 0};
 
             auto namePart = queryNAR.getStr(1);
-            auto narInfo = make_ref<NarInfo>(StorePath(hashPart + "-" + namePart));
+            auto narInfo = make_ref<NarInfo>(
+                StorePath(hashPart + "-" + namePart),
+                Hash::parseAnyPrefixed(queryNAR.getStr(6)));
             narInfo->url = queryNAR.getStr(2);
             narInfo->compression = queryNAR.getStr(3);
             if (!queryNAR.isNull(4))
                 narInfo->fileHash = Hash::parseAnyPrefixed(queryNAR.getStr(4));
             narInfo->fileSize = queryNAR.getInt(5);
-            narInfo->narHash = Hash::parseAnyPrefixed(queryNAR.getStr(6));
             narInfo->narSize = queryNAR.getInt(7);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
                 narInfo->references.insert(StorePath(r));
@@ -232,7 +235,7 @@ public:
                     (narInfo ? narInfo->compression : "", narInfo != 0)
                     (narInfo && narInfo->fileHash ? narInfo->fileHash->to_string(Base32, true) : "", narInfo && narInfo->fileHash)
                     (narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)
-                    (info->narHash->to_string(Base32, true))
+                    (info->narHash.to_string(Base32, true))
                     (info->narSize)
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)

@@ -94,22 +94,26 @@ StringSet ParsedDerivation::getRequiredSystemFeatures() const
     return res;
 }
 
-bool ParsedDerivation::canBuildLocally() const
+bool ParsedDerivation::canBuildLocally(Store & localStore) const
 {
     if (drv.platform != settings.thisSystem.get()
         && !settings.extraPlatforms.get().count(drv.platform)
         && !drv.isBuiltin())
         return false;
 
+    if (settings.maxBuildJobs.get() == 0
+        && !drv.isBuiltin())
+        return false;
+
     for (auto & feature : getRequiredSystemFeatures())
-        if (!settings.systemFeatures.get().count(feature)) return false;
+        if (!localStore.systemFeatures.get().count(feature)) return false;
 
     return true;
 }
 
-bool ParsedDerivation::willBuildLocally() const
+bool ParsedDerivation::willBuildLocally(Store & localStore) const
 {
-    return getBoolAttr("preferLocalBuild") && canBuildLocally();
+    return getBoolAttr("preferLocalBuild") && canBuildLocally(localStore);
 }
 
 bool ParsedDerivation::substitutesAllowed() const

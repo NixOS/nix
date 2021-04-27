@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "fs-accessor.hh"
 
 using namespace nix;
@@ -15,7 +16,7 @@ struct CmdBundle : InstallableCommand
     {
         addFlag({
             .longName = "bundler",
-            .description = "use custom bundler",
+            .description = fmt("Use a custom bundler instead of the default (`%s`).", bundler),
             .labels = {"flake-url"},
             .handler = {&bundler},
             .completer = {[&](size_t, std::string_view prefix) {
@@ -26,11 +27,12 @@ struct CmdBundle : InstallableCommand
         addFlag({
             .longName = "out-link",
             .shortName = 'o',
-            .description = "path of the symlink to the build result",
+            .description = "Override the name of the symlink to the build result. It defaults to the base name of the app.",
             .labels = {"path"},
             .handler = {&outLink},
             .completer = completePath
         });
+
     }
 
     std::string description() override
@@ -38,14 +40,11 @@ struct CmdBundle : InstallableCommand
         return "bundle an application so that it works outside of the Nix store";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To bundle Hello:",
-                "nix bundle hello"
-            },
-        };
+        return
+          #include "bundle.md"
+          ;
     }
 
     Category category() override { return catSecondary; }
@@ -71,11 +70,11 @@ struct CmdBundle : InstallableCommand
         auto evalState = getEvalState();
 
         auto app = installable->toApp(*evalState);
-        store->buildPaths(app.context);
+        store->buildPaths(toDerivedPaths(app.context));
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
-        auto bundler = InstallableFlake(
+        auto bundler = InstallableFlake(this,
             evalState, std::move(bundlerFlakeRef),
             Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
             Strings({"bundlers."}), lockFlags);
@@ -91,38 +90,34 @@ struct CmdBundle : InstallableCommand
         mkString(*evalState->allocAttr(*arg, evalState->symbols.create("system")), settings.thisSystem.get());
 
         arg->attrs->sort();
- 
+
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        auto attr1 = vRes->attrs->find(evalState->sDrvPath);
+        auto attr1 = vRes->attrs->get(evalState->sDrvPath);
         if (!attr1)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         PathSet context2;
         StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*attr1->pos, *attr1->value, context2));
 
-        auto attr2 = vRes->attrs->find(evalState->sOutPath);
+        auto attr2 = vRes->attrs->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
 
-        store->buildPaths({{drvPath}});
+        store->buildPaths({ DerivedPath::Built { drvPath } });
 
         auto outPathS = store->printStorePath(outPath);
-
-        auto info = store->queryPathInfo(outPath);
-        if (!info->references.empty())
-            throw Error("'%s' has references; a bundler must not leave any references", outPathS);
 
         if (!outLink)
             outLink = baseNameOf(app.program);
 
-        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink), true);
+        store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink));
     }
 };
 

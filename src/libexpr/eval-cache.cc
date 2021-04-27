@@ -390,13 +390,14 @@ Value & AttrCursor::forceValue()
     }
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
-        if (v.type == tString)
-            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context), v.string.s};
-        else if (v.type == tPath)
-            cachedValue = {root->db->setString(getKey(), v.path), v.path};
-        else if (v.type == tBool)
+        if (v.type() == nString)
+            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
+                           string_t{v.string.s, {}}};
+        else if (v.type() == nPath)
+            cachedValue = {root->db->setString(getKey(), v.path), string_t{v.path, {}}};
+        else if (v.type() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
-        else if (v.type == tAttrs)
+        else if (v.type() == nAttrs)
             ; // FIXME: do something?
         else
             cachedValue = {root->db->setMisc(getKey()), misc_t()};
@@ -405,7 +406,7 @@ Value & AttrCursor::forceValue()
     return v;
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
+std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErrors)
 {
     if (root->db) {
         if (!cachedValue)
@@ -422,9 +423,12 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
                 if (attr) {
                     if (std::get_if<missing_t>(&attr->second))
                         return nullptr;
-                    else if (std::get_if<failed_t>(&attr->second))
-                        throw EvalError("cached failure of attribute '%s'", getAttrPathStr(name));
-                    else
+                    else if (std::get_if<failed_t>(&attr->second)) {
+                        if (forceErrors)
+                            debug("reevaluating failed cached attribute '%s'");
+                        else
+                            throw CachedEvalError("cached failure of attribute '%s'", getAttrPathStr(name));
+                    } else
                         return std::make_shared<AttrCursor>(root,
                             std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
                 }
@@ -438,7 +442,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
 
     auto & v = forceValue();
 
-    if (v.type != tAttrs)
+    if (v.type() != nAttrs)
         return nullptr;
         //throw TypeError("'%s' is not an attribute set", getAttrPathStr());
 
@@ -469,9 +473,9 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name)
     return maybeGetAttr(root->state.symbols.create(name));
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::getAttr(Symbol name)
+std::shared_ptr<AttrCursor> AttrCursor::getAttr(Symbol name, bool forceErrors)
 {
-    auto p = maybeGetAttr(name);
+    auto p = maybeGetAttr(name, forceErrors);
     if (!p)
         throw Error("attribute '%s' does not exist", getAttrPathStr(name));
     return p;
@@ -482,11 +486,11 @@ std::shared_ptr<AttrCursor> AttrCursor::getAttr(std::string_view name)
     return getAttr(root->state.symbols.create(name));
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath)
+std::shared_ptr<AttrCursor> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force)
 {
     auto res = shared_from_this();
     for (auto & attr : attrPath) {
-        res = res->maybeGetAttr(attr);
+        res = res->maybeGetAttr(attr, force);
         if (!res) return {};
     }
     return res;
@@ -508,10 +512,10 @@ std::string AttrCursor::getString()
 
     auto & v = forceValue();
 
-    if (v.type != tString && v.type != tPath)
-        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
+    if (v.type() != nString && v.type() != nPath)
+        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
 
-    return v.type == tString ? v.string.s : v.path;
+    return v.type() == nString ? v.string.s : v.path;
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -521,8 +525,17 @@ string_t AttrCursor::getStringWithContext()
             cachedValue = root->db->getAttr(getKey(), root->state.symbols);
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
-                debug("using cached string attribute '%s'", getAttrPathStr());
-                return *s;
+                bool valid = true;
+                for (auto & c : s->second) {
+                    if (!root->state.store->isValidPath(root->state.store->parseStorePath(c.first))) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) {
+                    debug("using cached string attribute '%s'", getAttrPathStr());
+                    return *s;
+                }
             } else
                 throw TypeError("'%s' is not a string", getAttrPathStr());
         }
@@ -530,12 +543,12 @@ string_t AttrCursor::getStringWithContext()
 
     auto & v = forceValue();
 
-    if (v.type == tString)
+    if (v.type() == nString)
         return {v.string.s, v.getContext()};
-    else if (v.type == tPath)
+    else if (v.type() == nPath)
         return {v.path, {}};
     else
-        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type));
+        throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
 }
 
 bool AttrCursor::getBool()
@@ -554,7 +567,7 @@ bool AttrCursor::getBool()
 
     auto & v = forceValue();
 
-    if (v.type != tBool)
+    if (v.type() != nBool)
         throw TypeError("'%s' is not a Boolean", getAttrPathStr());
 
     return v.boolean;
@@ -576,7 +589,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
 
     auto & v = forceValue();
 
-    if (v.type != tAttrs)
+    if (v.type() != nAttrs)
         throw TypeError("'%s' is not an attribute set", getAttrPathStr());
 
     std::vector<Symbol> attrs;
@@ -600,7 +613,7 @@ bool AttrCursor::isDerivation()
 
 StorePath AttrCursor::forceDerivation()
 {
-    auto aDrvPath = getAttr(root->state.sDrvPath);
+    auto aDrvPath = getAttr(root->state.sDrvPath, true);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has

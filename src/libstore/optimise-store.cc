@@ -17,9 +17,7 @@ namespace nix {
 
 static void makeWritable(const Path & path)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError("changing writability of '%1%'", path);
 }
@@ -94,9 +92,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path '%1%'", path);
+    auto st = lstat(path);
 
 #if __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
@@ -130,16 +126,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        logWarning({
-            .name = "Suspicious file",
-            .hint = hintfmt("skipping suspicious writable file '%1%'", path)
-        });
+        warn("skipping suspicious writable file '%1%'", path);
         return;
     }
 
     /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        debug(format("'%1%' is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
+        debug("'%s' is already linked, with %d other file(s)", path, st.st_nlink - 2);
         return;
     }
 
@@ -187,9 +180,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    struct stat stLink;
-    if (lstat(linkPath.c_str(), &stLink))
-        throw SysError("getting attributes of path '%1%'", linkPath);
+    auto stLink = lstat(linkPath);
 
     if (st.st_ino == stLink.st_ino) {
         debug(format("'%1%' is already linked to '%2%'") % path % linkPath);
@@ -197,10 +188,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     if (st.st_size != stLink.st_size) {
-        logWarning({
-            .name = "Corrupted link",
-            .hint = hintfmt("removing corrupted link '%1%'", linkPath)
-        });
+        warn("removing corrupted link '%s'", linkPath);
         unlink(linkPath.c_str());
         goto retry;
     }
@@ -235,10 +223,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
-            logError({
-                .name = "Unlink error",
-                .hint = hintfmt("unable to unlink '%1%'", tempLink)
-            });
+            printError("unable to unlink '%1%'", tempLink);
         if (errno == EMLINK) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
@@ -282,21 +267,15 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     }
 }
 
-static string showBytes(uint64_t bytes)
-{
-    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
-}
-
 void LocalStore::optimiseStore()
 {
     OptimiseStats stats;
 
     optimiseStore(stats);
 
-    printInfo(
-        format("%1% freed by hard-linking %2% files")
-        % showBytes(stats.bytesFreed)
-        % stats.filesLinked);
+    printInfo("%s freed by hard-linking %d files",
+        showBytes(stats.bytesFreed),
+        stats.filesLinked);
 }
 
 void LocalStore::optimisePath(const Path & path)

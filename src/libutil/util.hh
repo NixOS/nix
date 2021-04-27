@@ -12,13 +12,9 @@
 #include <signal.h>
 
 #include <functional>
-#include <limits>
-#include <cstdio>
 #include <map>
 #include <sstream>
 #include <optional>
-#include <future>
-#include <iterator>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -110,7 +106,7 @@ string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, mode_t mode = 0666);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
 
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
 
@@ -159,9 +155,8 @@ void replaceSymlink(const Path & target, const Path & link,
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
-void readFull(int fd, unsigned char * buf, size_t count);
-void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
-void writeFull(int fd, const string & s, bool allowInterrupts = true);
+void readFull(int fd, char * buf, size_t count);
+void writeFull(int fd, std::string_view s, bool allowInterrupts = true);
 
 MakeError(EndOfFile, Error);
 
@@ -193,7 +188,6 @@ public:
 class AutoCloseFD
 {
     int fd;
-    void close();
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
@@ -205,6 +199,7 @@ public:
     int get() const;
     explicit operator bool() const;
     int release();
+    void close();
 };
 
 
@@ -221,6 +216,7 @@ class Pipe
 public:
     AutoCloseFD readSide, writeSide;
     void create();
+    void close();
 };
 
 
@@ -304,6 +300,15 @@ std::pair<int, std::string> runProgram(const RunOptions & options);
 void runProgram2(const RunOptions & options);
 
 
+/* Change the stack size. */
+void setStackSize(size_t stackSize);
+
+
+/* Restore the original inherited Unix process context (such as signal
+   masks, stack size, CPU affinity). */
+void restoreProcessContext();
+
+
 class ExecError : public Error
 {
 public:
@@ -378,8 +383,9 @@ template<class C> Strings quoteStrings(const C & c)
 }
 
 
-/* Remove trailing whitespace from a string. */
-string chomp(const string & s);
+/* Remove trailing whitespace from a string. FIXME: return
+   std::string_view. */
+string chomp(std::string_view s);
 
 
 /* Remove whitespace from the start and end of a string. */
@@ -387,7 +393,7 @@ string trim(const string & s, const string & whitespace = " \n\r\t");
 
 
 /* Replace all occurrences of a string inside another string. */
-string replaceStrings(const std::string & s,
+string replaceStrings(std::string_view s,
     const std::string & from, const std::string & to);
 
 
@@ -402,21 +408,49 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
-template<class N> bool string2Int(const string & s, N & n)
+template<class N>
+std::optional<N> string2Int(const std::string & s)
 {
-    if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return false;
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return std::nullopt;
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return std::nullopt;
+}
+
+/* Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
+   'T' denoting a binary unit prefix. */
+template<class N>
+N string2IntWithUnitPrefix(std::string s)
+{
+    N multiplier = 1;
+    if (!s.empty()) {
+        char u = std::toupper(*s.rbegin());
+        if (std::isalpha(u)) {
+            if (u == 'K') multiplier = 1ULL << 10;
+            else if (u == 'M') multiplier = 1ULL << 20;
+            else if (u == 'G') multiplier = 1ULL << 30;
+            else if (u == 'T') multiplier = 1ULL << 40;
+            else throw UsageError("invalid unit specifier '%1%'", u);
+            s.resize(s.size() - 1);
+        }
+    }
+    if (auto n = string2Int<N>(s))
+        return *n * multiplier;
+    throw UsageError("'%s' is not an integer", s);
 }
 
 /* Parse a string into a float. */
-template<class N> bool string2Float(const string & s, N & n)
+template<class N>
+std::optional<N> string2Float(const string & s)
 {
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return std::nullopt;
 }
 
 
@@ -464,6 +498,12 @@ string base64Encode(std::string_view s);
 string base64Decode(std::string_view s);
 
 
+/* Remove common leading whitespace from the lines in the string
+   's'. For example, if every line is indented by at least 3 spaces,
+   then we remove 3 spaces from the start of every line. */
+std::string stripIndentation(std::string_view s);
+
+
 /* Get a value for the specified key from an associate container. */
 template <class T>
 std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
@@ -474,51 +514,13 @@ std::optional<typename T::mapped_type> get(const T & map, const typename T::key_
 }
 
 
-/* A callback is a wrapper around a lambda that accepts a valid of
-   type T or an exception. (We abuse std::future<T> to pass the value or
-   exception.) */
 template<typename T>
-class Callback
-{
-    std::function<void(std::future<T>)> fun;
-    std::atomic_flag done = ATOMIC_FLAG_INIT;
-
-public:
-
-    Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
-
-    Callback(Callback && callback) : fun(std::move(callback.fun))
-    {
-        auto prev = callback.done.test_and_set();
-        if (prev) done.test_and_set();
-    }
-
-    void operator()(T && t) noexcept
-    {
-        auto prev = done.test_and_set();
-        assert(!prev);
-        std::promise<T> promise;
-        promise.set_value(std::move(t));
-        fun(promise.get_future());
-    }
-
-    void rethrow(const std::exception_ptr & exc = std::current_exception()) noexcept
-    {
-        auto prev = done.test_and_set();
-        assert(!prev);
-        std::promise<T> promise;
-        promise.set_exception(exc);
-        fun(promise.get_future());
-    }
-};
+class Callback;
 
 
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
-
-/* Restore default signal handling. */
-void restoreSignals();
 
 struct InterruptCallback
 {
@@ -569,6 +571,8 @@ typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 
+/* Common initialisation performed in child processes. */
+void commonChildInit(Pipe & logPipe);
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
@@ -604,6 +608,9 @@ constexpr auto enumerate(T && iterable)
 // C++17 std::visit boilerplate
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+
+std::string showBytes(uint64_t bytes);
 
 
 }

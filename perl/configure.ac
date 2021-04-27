@@ -40,11 +40,7 @@ AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
 AC_MSG_RESULT($perllibdir)
 
 # Look for libsodium, an optional dependency.
-PKG_CHECK_MODULES([SODIUM], [libsodium],
-  [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
-   CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"
-   have_sodium=1], [have_sodium=])
-AC_SUBST(HAVE_SODIUM, [$have_sodium])
+PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Check for the required Perl dependencies (DBI and DBD::SQLite).
 perlFlags="-I$perllibdir"
@@ -69,19 +65,6 @@ AC_SUBST(perlFlags)
 PKG_CHECK_MODULES([NIX], [nix-store])
 
 NEED_PROG([NIX], [nix])
-
-# Get nix configure values
-export NIX_REMOTE=daemon
-nixbindir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixBinDir)
-nixlibexecdir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixLibexecDir)
-nixlocalstatedir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixLocalstateDir)
-nixsysconfdir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixSysconfDir)
-nixstoredir=$("$NIX" --experimental-features nix-command eval --raw -f '<nix/config.nix>' nixStoreDir)
-AC_SUBST(nixbindir)
-AC_SUBST(nixlibexecdir)
-AC_SUBST(nixlocalstatedir)
-AC_SUBST(nixsysconfdir)
-AC_SUBST(nixstoredir)
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix

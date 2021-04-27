@@ -4,6 +4,8 @@ set -eu
 set -o pipefail
 
 readonly PLIST_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
+NIX_FIRST_BUILD_UID="301"
+NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 dsclattr() {
     /usr/bin/dscl . -read "$1" \
@@ -35,6 +37,13 @@ poly_service_setup_note() {
  - load and start a LaunchDaemon (at $PLIST_DEST) for nix-daemon
 
 EOF
+}
+
+poly_extra_try_me_commands(){
+  :
+}
+poly_extra_setup_instructions(){
+  :
 }
 
 poly_configure_nix_daemon_service() {

@@ -35,6 +35,7 @@ class Bindings
 {
 public:
     typedef uint32_t size_t;
+    Pos *pos;
 
 private:
     size_t size_, capacity_;
@@ -77,7 +78,7 @@ public:
         auto a = get(name);
         if (!a)
             throw Error({
-                .hint = hintfmt("attribute '%s' missing", name),
+                .msg = hintfmt("attribute '%s' missing", name),
                 .errPos = pos
             });
 

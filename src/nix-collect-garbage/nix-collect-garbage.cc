@@ -2,7 +2,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <iostream>
 #include <cerrno>
@@ -49,7 +49,7 @@ void removeOldGenerations(std::string dir)
     }
 }
 
-static int _main(int argc, char * * argv)
+static int main_nix_collect_garbage(int argc, char * * argv)
 {
     {
         bool removeOld = false;
@@ -74,8 +74,6 @@ static int _main(int argc, char * * argv)
             return true;
         });
 
-        initPlugins();
-
         auto profilesDir = settings.nixStateDir + "/profiles";
         if (removeOld) removeOldGenerations(profilesDir);
 
@@ -92,4 +90,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-collect-garbage", _main);
+static RegisterLegacyCommand r_nix_collect_garbage("nix-collect-garbage", main_nix_collect_garbage);

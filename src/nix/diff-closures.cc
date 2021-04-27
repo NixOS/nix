@@ -81,7 +81,7 @@ void printClosureDiff(
         auto beforeSize = totalSize(beforeVersions);
         auto afterSize = totalSize(afterVersions);
         auto sizeDelta = (int64_t) afterSize - (int64_t) beforeSize;
-        auto showDelta = abs(sizeDelta) >= 8 * 1024;
+        auto showDelta = std::abs(sizeDelta) >= 8 * 1024;
 
         std::set<std::string> removed, unchanged;
         for (auto & [version, _] : beforeVersions)
@@ -121,16 +121,11 @@ struct CmdDiffClosures : SourceExprCommand
         return "show what packages and versions were added and removed between two closures";
     }
 
-    Category category() override { return catSecondary; }
-
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            {
-                "To show what got added and removed between two versions of the NixOS system profile:",
-                "nix diff-closures /nix/var/nix/profiles/system-655-link /nix/var/nix/profiles/system-658-link",
-            },
-        };
+        return
+          #include "diff-closures.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -143,4 +138,4 @@ struct CmdDiffClosures : SourceExprCommand
     }
 };
 
-static auto r1 = registerCommand<CmdDiffClosures>("diff-closures");
+static auto rCmdDiffClosures = registerCommand2<CmdDiffClosures>({"store", "diff-closures"});

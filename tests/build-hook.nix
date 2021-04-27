@@ -23,6 +23,17 @@ let
     shell = busybox;
     name = "build-remote-input-2";
     buildCommand = "echo BAR > $out";
+    requiredSystemFeatures = ["bar"];
+  };
+
+  input3 = mkDerivation {
+    shell = busybox;
+    name = "build-remote-input-3";
+    buildCommand = ''
+      read x < ${input2}
+      echo $x BAZ > $out
+    '';
+    requiredSystemFeatures = ["baz"];
   };
 
 in
@@ -33,7 +44,7 @@ in
     buildCommand =
       ''
         read x < ${input1}
-        read y < ${input2}
-        echo $x$y > $out
+        read y < ${input3}
+        echo "$x $y" > $out
       '';
   }

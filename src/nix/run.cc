@@ -22,15 +22,16 @@ std::string chrootHelperName = "__run_in_chroot";
 
 struct RunCommon : virtual Command
 {
+
+    using Command::run;
+
     void runProgram(ref<Store> store,
         const std::string & program,
         const Strings & args)
     {
         stopProgressBar();
 
-        restoreSignals();
-
-        restoreAffinity();
+        restoreProcessContext();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location
@@ -59,6 +60,9 @@ struct RunCommon : virtual Command
 
 struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 {
+
+    using InstallablesCommand::run;
+
     std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
 
     CmdShell()
@@ -66,7 +70,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         addFlag({
             .longName = "command",
             .shortName = 'c',
-            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
             .labels = {"command", "args"},
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
@@ -80,26 +84,11 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         return "run a shell in which the specified packages are available";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To start a shell providing GNU Hello from NixOS 20.03:",
-                "nix shell nixpkgs/nixos-20.03#hello"
-            },
-            Example{
-                "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix shell nixpkgs#youtube-dl"
-            },
-            Example{
-                "To run GNU Hello:",
-                "nix shell nixpkgs#hello -c hello --greeting 'Hi everybody!'"
-            },
-            Example{
-                "To run GNU Hello in a chroot store:",
-                "nix shell --store ~/my-nix nixpkgs#hello -c hello"
-            },
-        };
+        return
+          #include "shell.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -140,10 +129,12 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
     }
 };
 
-static auto r1 = registerCommand<CmdShell>("shell");
+static auto rCmdShell = registerCommand<CmdShell>("shell");
 
 struct CmdRun : InstallableCommand, RunCommon
 {
+    using InstallableCommand::run;
+
     std::vector<std::string> args;
 
     CmdRun()
@@ -160,14 +151,11 @@ struct CmdRun : InstallableCommand, RunCommon
         return "run a Nix application";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To run Blender:",
-                "nix run blender-bin"
-            },
-        };
+        return
+          #include "run.md"
+          ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -192,7 +180,7 @@ struct CmdRun : InstallableCommand, RunCommon
 
         auto app = installable->toApp(*state);
 
-        state->store->buildPaths(app.context);
+        state->store->buildPaths(toDerivedPaths(app.context));
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
@@ -201,7 +189,7 @@ struct CmdRun : InstallableCommand, RunCommon
     }
 };
 
-static auto r2 = registerCommand<CmdRun>("run");
+static auto rCmdRun = registerCommand<CmdRun>("run");
 
 void chrootHelper(int argc, char * * argv)
 {
@@ -242,14 +230,16 @@ void chrootHelper(int argc, char * * argv)
 
         for (auto entry : readDirectory("/")) {
             auto src = "/" + entry.name;
-            auto st = lstat(src);
-            if (!S_ISDIR(st.st_mode)) continue;
             Path dst = tmpDir + "/" + entry.name;
             if (pathExists(dst)) continue;
-            if (mkdir(dst.c_str(), 0700) == -1)
-                throw SysError("creating directory '%s'", dst);
-            if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                throw SysError("mounting '%s' on '%s'", src, dst);
+            auto st = lstat(src);
+            if (S_ISDIR(st.st_mode)) {
+                if (mkdir(dst.c_str(), 0700) == -1)
+                    throw SysError("creating directory '%s'", dst);
+                if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                    throw SysError("mounting '%s' on '%s'", src, dst);
+            } else if (S_ISLNK(st.st_mode))
+                createSymlink(readLink(src), dst);
         }
 
         char * cwd = getcwd(0, 0);

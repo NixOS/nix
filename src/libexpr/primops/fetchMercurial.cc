@@ -3,8 +3,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "url.hh"
-
-#include <regex>
+#include "url-parts.hh"
 
 namespace nix {
 
@@ -18,7 +17,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
 
     state.forceValue(*args[0]);
 
-    if (args[0]->type == tAttrs) {
+    if (args[0]->type() == nAttrs) {
 
         state.forceAttrs(*args[0], pos);
 
@@ -39,14 +38,14 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError({
-                    .hint = hintfmt("unsupported argument '%s' to 'fetchMercurial'", attr.name),
+                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", attr.name),
                     .errPos = *attr.pos
                 });
         }
 
         if (url.empty())
             throw EvalError({
-                .hint = hintfmt("'url' argument required"),
+                .msg = hintfmt("'url' argument required"),
                 .errPos = pos
             });
 
@@ -88,6 +87,6 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         state.allowedPaths->insert(tree.actualPath);
 }
 
-static RegisterPrimOp r("fetchMercurial", 1, prim_fetchMercurial);
+static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);
 
 }

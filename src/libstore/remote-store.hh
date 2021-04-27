@@ -16,18 +16,22 @@ struct FdSource;
 template<typename T> class Pool;
 struct ConnectionHandle;
 
+struct RemoteStoreConfig : virtual StoreConfig
+{
+    using StoreConfig::StoreConfig;
+
+    const Setting<int> maxConnections{(StoreConfig*) this, 1,
+            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
+
+    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this, std::numeric_limits<unsigned int>::max(),
+            "max-connection-age", "number of seconds to reuse a connection"};
+};
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual Store
+class RemoteStore : public virtual RemoteStoreConfig, public virtual Store
 {
 public:
-
-    const Setting<int> maxConnections{(Store*) this, 1,
-            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
-
-    const Setting<unsigned int> maxConnectionAge{(Store*) this, std::numeric_limits<unsigned int>::max(),
-            "max-connection-age", "number of seconds to reuse a connection"};
 
     virtual bool sameMachine() = 0;
 
@@ -51,7 +55,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    OutputPathMap queryDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
@@ -59,17 +63,29 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    /* Add a content-addressable store path. `dump` will be drained. */
+    ref<const ValidPathInfo> addCAToStore(
+        Source & dump,
+        const string & name,
+        ContentAddressMethod caMethod,
+        const StorePathSet & references,
+        RepairFlag repair);
+
+    /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
-
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override;
+    void registerDrvOutput(const Realisation & info) override;
+
+    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
+
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -92,7 +108,7 @@ public:
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
 
@@ -101,8 +117,6 @@ public:
     unsigned int getProtocol() override;
 
     void flushBadConnections();
-
-protected:
 
     struct Connection
     {
@@ -114,10 +128,12 @@ protected:
 
         virtual ~Connection();
 
-        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0);
+        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };
 
     ref<Connection> openConnectionWrapper();
+
+protected:
 
     virtual ref<Connection> openConnection() = 0;
 
@@ -131,28 +147,16 @@ protected:
 
     friend struct ConnectionHandle;
 
+    virtual ref<FSAccessor> getFSAccessor() override;
+
+    virtual void narFromPath(const StorePath & path, Sink & sink) override;
+
+    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
+
 private:
 
     std::atomic_bool failed{false};
 
-};
-
-class UDSRemoteStore : public LocalFSStore, public RemoteStore
-{
-public:
-
-    UDSRemoteStore(const Params & params);
-    UDSRemoteStore(std::string path, const Params & params);
-
-    std::string getUri() override;
-
-    bool sameMachine() override
-    { return true; }
-
-private:
-
-    ref<RemoteStore::Connection> openConnection() override;
-    std::optional<std::string> path;
 };
 
 

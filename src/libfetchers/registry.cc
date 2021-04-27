@@ -3,6 +3,7 @@
 #include "util.hh"
 #include "globals.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -59,10 +60,10 @@ void Registry::write(const Path & path)
     nlohmann::json arr;
     for (auto & entry : entries) {
         nlohmann::json obj;
-        obj["from"] = attrsToJson(entry.from.toAttrs());
-        obj["to"] = attrsToJson(entry.to.toAttrs());
+        obj["from"] = attrsToJSON(entry.from.toAttrs());
+        obj["to"] = attrsToJSON(entry.to.toAttrs());
         if (!entry.extraAttrs.empty())
-            obj["to"].update(attrsToJson(entry.extraAttrs));
+            obj["to"].update(attrsToJSON(entry.extraAttrs));
         if (entry.exact)
             obj["exact"] = true;
         arr.emplace_back(std::move(obj));
@@ -113,7 +114,7 @@ static std::shared_ptr<Registry> getSystemRegistry()
 
 Path getUserRegistryPath()
 {
-    return getHome() + "/.config/nix/registry.json";
+    return getConfigDir() + "/nix/registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry()
@@ -147,7 +148,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
         if (!hasPrefix(path, "/")) {
             auto storePath = downloadFile(store, path, "flake-registry.json", false).storePath;
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(storePath, getCacheDir() + "/nix/flake-registry.json", true);
+                store2->addPermRoot(storePath, getCacheDir() + "/nix/flake-registry.json");
             path = store->toRealPath(storePath);
         }
 

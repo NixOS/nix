@@ -122,6 +122,7 @@ public:
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
+        if (lvl > verbosity) return;
         auto state(state_.lock());
         log(*state, lvl, fs.s);
     }
@@ -256,7 +257,7 @@ public:
         }
 
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
-            auto lastLine = trim(getS(fields, 0));
+            auto lastLine = chomp(getS(fields, 0));
             if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
@@ -362,7 +363,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
+        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
     }
 
     std::string getStatus(State & state)
@@ -465,6 +466,17 @@ public:
         } else {
             Logger::writeToStdout(s);
         }
+    }
+
+    std::optional<char> ask(std::string_view msg) override
+    {
+        auto state(state_.lock());
+        if (!state->active || !isatty(STDIN_FILENO)) return {};
+        std::cerr << fmt("\r\e[K%s ", msg);
+        auto s = trim(readLine(STDIN_FILENO));
+        if (s.size() != 1) return {};
+        draw(*state);
+        return s[0];
     }
 };
 
