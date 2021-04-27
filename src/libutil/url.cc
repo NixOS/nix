@@ -1,4 +1,5 @@
 #include "url.hh"
+#include "url-parts.hh"
 #include "util.hh"
 
 namespace nix {

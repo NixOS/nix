@@ -2,6 +2,8 @@
 
 set -e
 
+umask 0022
+
 dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
@@ -24,9 +26,20 @@ fi
 
 # macOS support for 10.12.6 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
-    macos_major=$(sw_vers -productVersion | cut -d '.' -f 2)
-    macos_minor=$(sw_vers -productVersion | cut -d '.' -f 3)
-    if [ "$macos_major" -lt 12 ] || { [ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]; }; then
+    IFS='.' read macos_major macos_minor macos_patch << EOF
+$(sw_vers -productVersion)
+EOF
+    # TODO: this is a temporary speed-bump to keep people from naively installing Nix
+    # on macOS Big Sur (11.0+, 10.16+) until nixpkgs updates are ready for them.
+    # *Ideally* this is gone before next Nix release. If you're intentionally working on
+    # Nix + Big Sur, just comment out this block and be on your way :)
+    if [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 15 ]; }; then
+        echo "$0: nixpkgs isn't quite ready to support macOS $(sw_vers -productVersion) yet"
+        exit 1
+    fi
+
+    if [ "$macos_major" -lt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -lt 12 ]; } || { [ "$macos_minor" -eq 12 ] && [ "$macos_patch" -lt 6 ]; }; then
+        # patch may not be present; command substitution for simplicity
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
         exit 1
     fi
@@ -35,7 +48,7 @@ fi
 # Determine if we could use the multi-user installer or not
 if [ "$(uname -s)" = "Darwin" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+elif [ "$(uname -s)" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
 
@@ -85,10 +98,13 @@ while [ $# -gt 0 ]; do
                 echo ""
                 echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix.conf"
                 echo ""
+                if [ -n "${INVOKED_FROM_INSTALL_IN:-}" ]; then
+                    echo " --tarball-url-prefix URL: Base URL to download the Nix tarball from."
+                fi
             ) >&2
 
             # darwin and Catalina+
-            if [ "$(uname -s)" = "Darwin" ] && [ "$macos_major" -gt 14 ]; then
+            if [ "$(uname -s)" = "Darwin" ] && { [ "$macos_major" -gt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -gt 14 ]; }; }; then
                 (
                     echo " --darwin-use-unencrypted-nix-store-volume: Create an APFS volume for the Nix"
                     echo "              store and mount it at /nix. This is the recommended way to create"
@@ -108,8 +124,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
         "$self/create-darwin-volume.sh"
     fi
 
-    info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
-    if ! [ -e $dest ] && [ -n "$info" ] && [ "$macos_major" -gt 14 ]; then
+    writable="$(diskutil info -plist / | xmllint --xpath "name(/plist/dict/key[text()='Writable']/following-sibling::*[1])" -)"
+    if ! [ -e $dest ] && [ "$writable" = "false" ]; then
         (
             echo ""
             echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
@@ -122,7 +138,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
-    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
+    printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
     exec "$self/install-multi-user"
     exit 0
 fi
@@ -150,9 +166,15 @@ fi
 mkdir -p $dest/store
 
 printf "copying Nix to %s..." "${dest}/store" >&2
+# Insert a newline if no progress is shown.
+if [ ! -t 0 ]; then
+  echo ""
+fi
 
 for i in $(cd "$self/store" >/dev/null && echo ./*); do
-    printf "." >&2
+    if [ -t 0 ]; then
+      printf "." >&2
+    fi
     i_tmp="$dest/store/$i.$$"
     if [ -e "$i_tmp" ]; then
         rm -rf "$i_tmp"
@@ -207,7 +229,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
             fi
             added=1
             break
@@ -218,7 +240,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
             fi
             added=1
             break

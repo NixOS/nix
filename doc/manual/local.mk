@@ -1,42 +1,6 @@
-
 ifeq ($(doc_generate),yes)
 
-XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
-  --param section.autolabel 1 \
-  --param section.label.includes.component.label 1 \
-  --param xref.with.number.and.title 1 \
-  --param toc.section.depth 3 \
-  --param admon.style \'\' \
-  --param callout.graphics 0 \
-  --param contrib.inline.enabled 0 \
-  --stringparam generate.toc "book toc" \
-  --param keep.relative.image.uris 0
-
-docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/current
-docbookrng = http://docbook.org/xml/5.0/rng/docbook.rng
-
-MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
-
-
-# Do XInclude processing / RelaxNG validation
-$(d)/manual.xmli: $(d)/manual.xml $(MANUAL_SRCS) $(d)/version.txt
-	$(trace-gen) $(xmllint) --nonet --xinclude $< -o $@.tmp
-	@mv $@.tmp $@
-
-$(d)/version.txt:
-	$(trace-gen) echo -n $(PACKAGE_VERSION) > $@
-
-# Note: RelaxNG validation requires xmllint >= 2.7.4.
-$(d)/manual.is-valid: $(d)/manual.xmli
-	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manual \
-	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  $(xmllint) --nonet --noout --relaxng $(docbookrng) -
-	@touch $@
-
-clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
-
-dist-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
-
+MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
 
 # Generate man pages.
 man-pages := $(foreach n, \
@@ -47,38 +11,80 @@ man-pages := $(foreach n, \
   nix.conf.5 nix-daemon.8, \
   $(d)/$(n))
 
-$(firstword $(man-pages)): $(d)/manual.xmli $(d)/manual.is-valid
-	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manpage \
-	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  (cd doc/manual && $(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl -)
-
-$(wordlist 2, $(words $(man-pages)), $(man-pages)): $(firstword $(man-pages))
-
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
-dist-files += $(man-pages)
+# Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
+dummy-env = env -i \
+	HOME=/dummy \
+	NIX_CONF_DIR=/dummy \
+	NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt \
+	NIX_STATE_DIR=/dummy
 
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+
+$(d)/%.1: $(d)/src/command-ref/%.md
+	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
+	@cat $^ >> $^.tmp
+	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	@rm $^.tmp
+
+$(d)/%.8: $(d)/src/command-ref/%.md
+	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
+	@cat $^ >> $^.tmp
+	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	@rm $^.tmp
+
+$(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
+	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
+	@cat $^ >> $^.tmp
+	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	@rm $^.tmp
+
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
+	$(trace-gen) cat doc/manual/src/SUMMARY.md.in | while IFS= read line; do if [[ $$line = @manpages@ ]]; then cat doc/manual/src/command-ref/new-cli/SUMMARY.md; else echo "$$line"; fi; done > $@.tmp
+	@mv $@.tmp $@
+
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+	@rm -rf $@
+	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))'
+
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
+	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@mv $@.tmp $@
+
+$(d)/nix.json: $(bindir)/nix
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-args > $@.tmp
+	@mv $@.tmp $@
+
+$(d)/conf-file.json: $(bindir)/nix
+	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	@mv $@.tmp $@
+
+$(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
+	@cat doc/manual/src/expressions/builtins-prefix.md > $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@mv $@.tmp $@
+
+$(d)/builtins.json: $(bindir)/nix
+	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
+	@mv $@.tmp $@
 
 # Generate the HTML manual.
-$(d)/manual.html: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
-	$(trace-gen) $(XSLTPROC) --xinclude --stringparam profile.condition manual \
-	  $(docbookxsl)/profiling/profile.xsl $< | \
-	  $(XSLTPROC) --output $@ $(docbookxsl)/xhtml/docbook.xsl -
+install: $(docdir)/manual/index.html
 
-$(foreach file, $(d)/manual.html, $(eval $(call install-data-in, $(file), $(docdir)/manual)))
+# Generate 'nix' manpages.
+install: $(d)/src/command-ref/new-cli
+	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
+	  name=$$(basename $$i .md); \
+	  if [[ $$name = SUMMARY ]]; then continue; fi; \
+	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
+	  cat $$i >> $$i.tmp; \
+	  lowdown -sT man $$i.tmp -o $(mandir)/man1/$$name.1; \
+	done
 
-$(foreach file, $(wildcard $(d)/figures/*.png), $(eval $(call install-data-in, $(file), $(docdir)/manual/figures)))
-
-$(eval $(call install-symlink, manual.html, $(docdir)/manual/index.html))
-
-
-all: $(d)/manual.html
-
-
-
-clean-files += $(d)/manual.html
-
-dist-files += $(d)/manual.html
-
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
+	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
+	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
 endif

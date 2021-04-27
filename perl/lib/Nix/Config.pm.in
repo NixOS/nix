@@ -4,14 +4,8 @@ use MIME::Base64;
 
 $version = "@PACKAGE_VERSION@";
 
-$binDir = $ENV{"NIX_BIN_DIR"} || "@nixbindir@";
-$libexecDir = $ENV{"NIX_LIBEXEC_DIR"} || "@nixlibexecdir@";
-$stateDir = $ENV{"NIX_STATE_DIR"} || "@nixlocalstatedir@/nix";
-$logDir = $ENV{"NIX_LOG_DIR"} || "@nixlocalstatedir@/log/nix";
-$confDir = $ENV{"NIX_CONF_DIR"} || "@nixsysconfdir@/nix";
-$storeDir = $ENV{"NIX_STORE_DIR"} || "@nixstoredir@";
-
-$useBindings = 1;
+$binDir = Nix::Store::getBinDir;
+$storeDir = Nix::Store::getStoreDir;
 
 %config = ();
 

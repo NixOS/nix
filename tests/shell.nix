@@ -24,6 +24,7 @@ let pkgs = rec {
     VAR_FROM_NIX = "bar";
     TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
+    outputs = ["dev" "out"];
   };
 
   # Used by nix-shell -p
@@ -49,7 +50,7 @@ let pkgs = rec {
   # ruby "interpreter" that outputs "$@"
   ruby = runCommand "ruby" {} ''
     mkdir -p $out/bin
-    echo 'printf -- "$*"' > $out/bin/ruby
+    echo 'printf %s "$*"' > $out/bin/ruby
     chmod a+rx $out/bin/ruby
   '';
 

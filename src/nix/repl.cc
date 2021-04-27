@@ -32,13 +32,19 @@ extern "C" {
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
+#include "markdown.hh"
 
+#if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
 #include <gc/gc_cpp.h>
+#endif
 
 namespace nix {
 
-struct NixRepl : gc
+struct NixRepl
+    #if HAVE_BOEHMGC
+    : gc
+    #endif
 {
     string curDir;
     std::unique_ptr<EvalState> state;
@@ -59,7 +65,7 @@ struct NixRepl : gc
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
     bool getLine(string & input, const std::string &prompt);
-    Path getDerivationPath(Value & v);
+    StorePath getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
     void initEnv();
@@ -206,7 +212,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
-            if (e.msg().find("unexpected $end") != std::string::npos) {
+            if (e.msg().find("unexpected end of file") != std::string::npos) {
                 // For parse errors on incomplete input, we continue waiting for the next line of
                 // input without clearing the input so far.
                 continue;
@@ -214,9 +220,9 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
               printMsg(lvlError, e.msg());
             }
         } catch (Error & e) {
-          printMsg(lvlError, e.msg());
+            printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
-          printMsg(lvlError, e.msg());
+            printMsg(lvlError, e.msg());
         }
 
         // We handled the current input fully, so we should clear it
@@ -337,24 +343,6 @@ StringSet NixRepl::completePrefix(string prefix)
 }
 
 
-static int runProgram(const string & program, const Strings & args)
-{
-    Strings args2(args);
-    args2.push_front(program);
-
-    Pid pid;
-    pid = fork();
-    if (pid == -1) throw SysError("forking");
-    if (pid == 0) {
-        restoreAffinity();
-        execvp(program.c_str(), stringsToCharPtrs(args2).data());
-        _exit(1);
-    }
-
-    return pid.wait();
-}
-
-
 bool isVarName(const string & s)
 {
     if (s.size() == 0) return false;
@@ -370,13 +358,16 @@ bool isVarName(const string & s)
 }
 
 
-Path NixRepl::getDerivationPath(Value & v) {
+StorePath NixRepl::getDerivationPath(Value & v) {
     auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    Path drvPath = drvInfo->queryDrvPath();
-    if (drvPath == "" || !state->store->isValidPath(state->store->parseStorePath(drvPath)))
-        throw Error("expression did not evaluate to a valid derivation");
+    Path drvPathRaw = drvInfo->queryDrvPath();
+    if (drvPathRaw == "")
+        throw Error("expression did not evaluate to a valid derivation (no drv path)");
+    StorePath drvPath = state->store->parseStorePath(drvPathRaw);
+    if (!state->store->isValidPath(drvPath))
+        throw Error("expression did not evaluate to a valid derivation (invalid drv path)");
     return drvPath;
 }
 
@@ -396,6 +387,7 @@ bool NixRepl::processLine(string line)
     }
 
     if (command == ":?" || command == ":help") {
+        // FIXME: convert to Markdown, include in the 'nix repl' manpage.
         std::cout
              << "The following commands are available:\n"
              << "\n"
@@ -411,7 +403,8 @@ bool NixRepl::processLine(string line)
              << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n";
+             << "  :u <expr>     Build derivation, then start nix-shell\n"
+             << "  :doc <expr>   Show documentation of a builtin function\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -436,11 +429,11 @@ bool NixRepl::processLine(string line)
 
         Pos pos;
 
-        if (v.type == tPath || v.type == tString) {
+        if (v.type() == nPath || v.type() == nString) {
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
             pos.file = state->symbols.create(filename);
-        } else if (v.type == tLambda) {
+        } else if (v.isLambda()) {
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
@@ -451,7 +444,7 @@ bool NixRepl::processLine(string line)
         auto args = editorFor(pos);
         auto editor = args.front();
         args.pop_front();
-        runProgram(editor, args);
+        runProgram(editor, true, args);
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -469,29 +462,32 @@ bool NixRepl::processLine(string line)
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
         state->callFunction(f, v, result, Pos());
 
-        Path drvPath = getDerivationPath(result);
-        runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
+        StorePath drvPath = getDerivationPath(result);
+        runProgram(settings.nixBinDir + "/nix-shell", true, {state->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
         Value v;
         evalString(arg, v);
-        Path drvPath = getDerivationPath(v);
+        StorePath drvPath = getDerivationPath(v);
+        Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b") {
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
-                auto drv = readDerivation(*state->store, drvPath);
+            try {
+                runProgram(settings.nixBinDir + "/nix", true, {"build", "--no-link", drvPathRaw});
+                auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputs)
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(i.second.path));
+                for (auto & i : drv.outputsAndOptPaths(*state->store))
+                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
+            } catch (ExecError &) {
             }
         } else if (command == ":i") {
-            runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
+            runProgram(settings.nixBinDir + "/nix-env", true, {"-i", drvPathRaw});
         } else {
-            runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
+            runProgram(settings.nixBinDir + "/nix-shell", true, {drvPathRaw});
         }
     }
 
@@ -503,6 +499,29 @@ bool NixRepl::processLine(string line)
 
     else if (command == ":q" || command == ":quit")
         return false;
+
+    else if (command == ":doc") {
+        Value v;
+        evalString(arg, v);
+        if (auto doc = state->getDoc(v)) {
+            std::string markdown;
+
+            if (!doc->args.empty() && doc->name) {
+                auto args = doc->args;
+                for (auto & arg : args)
+                    arg = "*" + arg + "*";
+
+                markdown +=
+                    "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
+                    + concatStringsSep(" ", args) + "\n\n";
+            }
+
+            markdown += trim(stripIndentation(doc->doc));
+
+            std::cout << renderMarkdownToTerminal(markdown);
+        } else
+            throw Error("value does not have documentation");
+    }
 
     else if (command != "")
         throw Error("unknown command '%1%'", command);
@@ -517,9 +536,7 @@ bool NixRepl::processLine(string line)
         {
             Expr * e = parseString(string(line, p + 1));
             Value & v(*state->allocValue());
-            v.type = tThunk;
-            v.thunk.env = env;
-            v.thunk.expr = e;
+            v.mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
         } else {
             Value v;
@@ -635,31 +652,31 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     state->forceValue(v);
 
-    switch (v.type) {
+    switch (v.type()) {
 
-    case tInt:
+    case nInt:
         str << ANSI_CYAN << v.integer << ANSI_NORMAL;
         break;
 
-    case tBool:
+    case nBool:
         str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
         break;
 
-    case tString:
+    case nString:
         str << ANSI_YELLOW;
         printStringValue(str, v.string.s);
         str << ANSI_NORMAL;
         break;
 
-    case tPath:
+    case nPath:
         str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
         break;
 
-    case tNull:
+    case nNull:
         str << ANSI_CYAN "null" ANSI_NORMAL;
         break;
 
-    case tAttrs: {
+    case nAttrs: {
         seen.insert(&v);
 
         bool isDrv = state->isDerivation(v);
@@ -704,9 +721,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
     }
 
-    case tList1:
-    case tList2:
-    case tListN:
+    case nList:
         seen.insert(&v);
 
         str << "[ ";
@@ -727,22 +742,21 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << "]";
         break;
 
-    case tLambda: {
-        std::ostringstream s;
-        s << v.lambda.fun->pos;
-        str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
+    case nFunction:
+        if (v.isLambda()) {
+            std::ostringstream s;
+            s << v.lambda.fun->pos;
+            str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
+        } else if (v.isPrimOp()) {
+            str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
+        } else if (v.isPrimOpApp()) {
+            str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
+        } else {
+            abort();
+        }
         break;
-    }
 
-    case tPrimOp:
-        str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
-        break;
-
-    case tPrimOpApp:
-        str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
-        break;
-
-    case tFloat:
+    case nFloat:
         str << v.fpoint;
         break;
 
@@ -760,7 +774,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     CmdRepl()
     {
-        expectArgs("files", &files);
+        expectArgs({
+            .label = "files",
+            .handler = {&files},
+            .completer = completePath
+        });
     }
 
     std::string description() override
@@ -768,24 +786,22 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         return "start an interactive environment for evaluating Nix expressions";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-          Example{
-            "Display all special commands within the REPL:",
-              "nix repl\n  nix-repl> :?"
-          }
-        };
+        return
+          #include "repl.md"
+          ;
     }
 
     void run(ref<Store> store) override
     {
+        evalSettings.pureEval = false;
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop(files);
     }
 };
 
-static auto r1 = registerCommand<CmdRepl>("repl");
+static auto rCmdRepl = registerCommand<CmdRepl>("repl");
 
 }

@@ -72,24 +72,45 @@ poly_service_setup_note() {
 EOF
 }
 
+poly_extra_try_me_commands(){
+    if [ -e /run/systemd/system ]; then
+        :
+    else
+        cat <<EOF
+  $ sudo nix-daemon
+EOF
+    fi
+}
+poly_extra_setup_instructions(){
+    if [ -e /run/systemd/system ]; then
+        :
+    else
+        cat <<EOF
+Additionally, you may want to add nix-daemon to your init-system.
+
+EOF
+    fi
+}
+
 poly_configure_nix_daemon_service() {
-    _sudo "to set up the nix-daemon service" \
-          systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
+    if [ -e /run/systemd/system ]; then
+        _sudo "to set up the nix-daemon service" \
+              systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
 
-    _sudo "to set up the nix-daemon socket service" \
-          systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
+        _sudo "to set up the nix-daemon socket service" \
+              systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
 
-    handle_network_proxy
+        handle_network_proxy
 
-    _sudo "to load the systemd unit for nix-daemon" \
-          systemctl daemon-reload
+        _sudo "to load the systemd unit for nix-daemon" \
+              systemctl daemon-reload
 
-    _sudo "to start the nix-daemon.socket" \
-          systemctl start nix-daemon.socket
+        _sudo "to start the nix-daemon.socket" \
+              systemctl start nix-daemon.socket
 
-    _sudo "to start the nix-daemon.service" \
-          systemctl restart nix-daemon.service
-
+        _sudo "to start the nix-daemon.service" \
+              systemctl restart nix-daemon.service
+    fi
 }
 
 poly_group_exists() {

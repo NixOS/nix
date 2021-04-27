@@ -55,8 +55,8 @@ struct CacheImpl : Cache
         bool immutable) override
     {
         _state.lock()->add.use()
-            (attrsToJson(inAttrs).dump())
-            (attrsToJson(infoAttrs).dump())
+            (attrsToJSON(inAttrs).dump())
+            (attrsToJSON(infoAttrs).dump())
             (store->printStorePath(storePath))
             (immutable)
             (time(0)).exec();
@@ -70,7 +70,7 @@ struct CacheImpl : Cache
             if (!res->expired)
                 return std::make_pair(std::move(res->infoAttrs), std::move(res->storePath));
             debug("ignoring expired cache entry '%s'",
-                attrsToJson(inAttrs).dump());
+                attrsToJSON(inAttrs).dump());
         }
         return {};
     }
@@ -81,15 +81,15 @@ struct CacheImpl : Cache
     {
         auto state(_state.lock());
 
-        auto inAttrsJson = attrsToJson(inAttrs).dump();
+        auto inAttrsJSON = attrsToJSON(inAttrs).dump();
 
-        auto stmt(state->lookup.use()(inAttrsJson));
+        auto stmt(state->lookup.use()(inAttrsJSON));
         if (!stmt.next()) {
-            debug("did not find cache entry for '%s'", inAttrsJson);
+            debug("did not find cache entry for '%s'", inAttrsJSON);
             return {};
         }
 
-        auto infoJson = stmt.getStr(0);
+        auto infoJSON = stmt.getStr(0);
         auto storePath = store->parseStorePath(stmt.getStr(1));
         auto immutable = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
@@ -97,16 +97,16 @@ struct CacheImpl : Cache
         store->addTempRoot(storePath);
         if (!store->isValidPath(storePath)) {
             // FIXME: we could try to substitute 'storePath'.
-            debug("ignoring disappeared cache entry '%s'", inAttrsJson);
+            debug("ignoring disappeared cache entry '%s'", inAttrsJSON);
             return {};
         }
 
         debug("using cache entry '%s' -> '%s', '%s'",
-            inAttrsJson, infoJson, store->printStorePath(storePath));
+            inAttrsJSON, infoJSON, store->printStorePath(storePath));
 
         return Result {
             .expired = !immutable && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
-            .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJson)),
+            .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
             .storePath = std::move(storePath)
         };
     }

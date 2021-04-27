@@ -13,7 +13,7 @@ let
     builder = ./user-envs.builder.sh;
   } // {
     meta = {
-      description = "A silly test package";
+      description = "A silly test package with some \${escaped anti-quotation} in it";
     };
   });
 

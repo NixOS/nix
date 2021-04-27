@@ -79,7 +79,6 @@ define build-program
 
   programs-list += $$($(1)_PATH)
   clean-files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
-  dist-files += $$(_srcs)
 
   # Phony target to run this program (typically as a dependency of 'check').
   .PHONY: $(1)_RUN

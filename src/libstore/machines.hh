@@ -4,6 +4,8 @@
 
 namespace nix {
 
+class Store;
+
 struct Machine {
 
     const string storeUri;
@@ -28,6 +30,8 @@ struct Machine {
         decltype(supportedFeatures) supportedFeatures,
         decltype(mandatoryFeatures) mandatoryFeatures,
         decltype(sshPublicHostKey) sshPublicHostKey);
+
+    ref<Store> openStore() const;
 };
 
 typedef std::vector<Machine> Machines;

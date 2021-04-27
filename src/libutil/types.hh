@@ -4,6 +4,7 @@
 
 #include <list>
 #include <set>
+#include <string>
 #include <map>
 #include <vector>
 
@@ -24,11 +25,25 @@ typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
+typedef vector<std::pair<string, string>> Headers;
+
 /* Helper class to run code at startup. */
 template<typename T>
 struct OnStartup
 {
     OnStartup(T && t) { t(); }
+};
+
+/* Wrap bools to prevent string literals (i.e. 'char *') from being
+   cast to a bool in Attr. */
+template<typename T>
+struct Explicit {
+    T t;
+
+    bool operator ==(const Explicit<T> & other) const
+    {
+        return t == other.t;
+    }
 };
 
 }

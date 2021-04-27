@@ -4,6 +4,8 @@
   <dict>
     <key>EnvironmentVariables</key>
     <dict>
+      <key>NIX_SSL_CERT_FILE</key>
+      <string>/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt</string>
       <key>OBJC_DISABLE_INITIALIZE_FORK_SAFETY</key>
       <string>YES</string>
     </dict>

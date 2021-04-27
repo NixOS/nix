@@ -61,30 +61,30 @@ nix-build check.nix -A nondeterministic --no-out-link --repeat 1 2> $TEST_ROOT/l
 [ "$status" = "1" ]
 grep 'differs from previous round' $TEST_ROOT/log
 
-path=$(nix-build check.nix -A fetchurl --no-out-link --hashed-mirrors '')
+path=$(nix-build check.nix -A fetchurl --no-out-link)
 
 chmod +w $path
 echo foo > $path
 chmod -w $path
 
-nix-build check.nix -A fetchurl --no-out-link --check --hashed-mirrors ''
+nix-build check.nix -A fetchurl --no-out-link --check
 # Note: "check" doesn't repair anything, it just compares to the hash stored in the database.
 [[ $(cat $path) = foo ]]
 
-nix-build check.nix -A fetchurl --no-out-link --repair --hashed-mirrors ''
+nix-build check.nix -A fetchurl --no-out-link --repair
 [[ $(cat $path) != foo ]]
 
-nix-build check.nix -A hashmismatch --no-out-link --hashed-mirrors '' || status=$?
+nix-build check.nix -A hashmismatch --no-out-link || status=$?
 [ "$status" = "102" ]
 
 echo -n > ./dummy
-nix-build check.nix -A hashmismatch --no-out-link --hashed-mirrors ''
+nix-build check.nix -A hashmismatch --no-out-link
 echo 'Hello World' > ./dummy
 
-nix-build check.nix -A hashmismatch --no-out-link --check --hashed-mirrors '' || status=$?
+nix-build check.nix -A hashmismatch --no-out-link --check || status=$?
 [ "$status" = "102" ]
 
 # Multiple failures with --keep-going
 nix-build check.nix -A nondeterministic --no-out-link
-nix-build check.nix -A nondeterministic -A hashmismatch --no-out-link --check --keep-going --hashed-mirrors '' || status=$?
+nix-build check.nix -A nondeterministic -A hashmismatch --no-out-link --check --keep-going || status=$?
 [ "$status" = "110" ]

@@ -66,7 +66,7 @@ private:
         *buffer = self->buffer.data();
 
         try {
-            return self->source->read(self->buffer.data(), 4096);
+            return self->source->read((char *) self->buffer.data(), 4096);
         } catch (EndOfFile &) {
             return 0;
         } catch (std::exception & err) {

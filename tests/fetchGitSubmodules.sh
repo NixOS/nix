@@ -38,18 +38,18 @@ git -C $rootRepo commit -m "Add submodule"
 
 rev=$(git -C $rootRepo rev-parse HEAD)
 
-r1=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
-r2=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = false; }).outPath")
-r3=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+r1=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
+r2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = false; }).outPath")
+r3=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
 
 [[ $r1 == $r2 ]]
 [[ $r2 != $r3 ]]
 
-r4=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; }).outPath")
-r5=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = false; }).outPath")
-r6=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
-r7=$(nix eval --raw "(builtins.fetchGit { url = $rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
-r8=$(nix eval --raw "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+r4=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; }).outPath")
+r5=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = false; }).outPath")
+r6=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
+r7=$(nix eval --raw --expr "(builtins.fetchGit { url = $rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
+r8=$(nix eval --raw --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
 
 [[ $r1 == $r4 ]]
 [[ $r4 == $r5 ]]
@@ -57,19 +57,19 @@ r8=$(nix eval --raw "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submo
 [[ $r6 == $r7 ]]
 [[ $r7 == $r8 ]]
 
-have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; }).submodules")
+have_submodules=$(nix eval --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; }).submodules")
 [[ $have_submodules == false ]]
 
-have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = false; }).submodules")
+have_submodules=$(nix eval --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = false; }).submodules")
 [[ $have_submodules == false ]]
 
-have_submodules=$(nix eval "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).submodules")
+have_submodules=$(nix eval --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).submodules")
 [[ $have_submodules == true ]]
 
-pathWithoutSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
-pathWithSubmodules=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
-pathWithSubmodulesAgain=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
-pathWithSubmodulesAgainWithRef=$(nix eval --raw "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithoutSubmodules=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
+pathWithSubmodules=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgain=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgainWithRef=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
 
 # The resulting store path cannot be the same.
 [[ $pathWithoutSubmodules != $pathWithSubmodules ]]
@@ -91,7 +91,7 @@ test "$(find "$pathWithSubmodules" -name .git)" = ""
 
 # Git repos without submodules can be fetched with submodules = true.
 subRev=$(git -C $subRepo rev-parse HEAD)
-noSubmoduleRepoBaseline=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; }).outPath")
-noSubmoduleRepo=$(nix eval --raw "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; submodules = true; }).outPath")
+noSubmoduleRepoBaseline=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; }).outPath")
+noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; submodules = true; }).outPath")
 
 [[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]

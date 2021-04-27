@@ -25,7 +25,14 @@ public:
 
     virtual StringSet readDirectory(const Path & path) = 0;
 
-    virtual std::string readFile(const Path & path) = 0;
+    /**
+     * Read a file inside the store.
+     *
+     * If `requireValidPath` is set to `true` (the default), the path must be
+     * inside a valid store path, otherwise it just needs to be physically
+     * present (but not necessarily properly registered)
+     */
+    virtual std::string readFile(const Path & path, bool requireValidPath = true) = 0;
 
     virtual std::string readLink(const Path & path) = 0;
 };

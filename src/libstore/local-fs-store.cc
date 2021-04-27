@@ -1,6 +1,7 @@
 #include "archive.hh"
 #include "fs-accessor.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "compression.hh"
 #include "derivations.hh"
@@ -18,11 +19,11 @@ struct LocalStoreAccessor : public FSAccessor
 
     LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
 
-    Path toRealPath(const Path & path)
+    Path toRealPath(const Path & path, bool requireValidPath = true)
     {
-        Path storePath = store->toStorePath(path);
-        if (!store->isValidPath(store->parseStorePath(storePath)))
-            throw InvalidPath("path '%1%' is not a valid store path", storePath);
+        auto storePath = store->toStorePath(path).first;
+        if (requireValidPath && !store->isValidPath(storePath))
+            throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
         return store->getRealStoreDir() + std::string(path, store->storeDir.size());
     }
 
@@ -60,9 +61,9 @@ struct LocalStoreAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path) override
+    std::string readFile(const Path & path, bool requireValidPath = true) override
     {
-        return nix::readFile(toRealPath(path));
+        return nix::readFile(toRealPath(path, requireValidPath));
     }
 
     std::string readLink(const Path & path) override

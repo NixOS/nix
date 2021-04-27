@@ -284,7 +284,7 @@ void ExprVar::bindVars(const StaticEnv & env)
        "undefined variable" error now. */
     if (withLevel == -1)
         throw UndefinedVarError({
-            .hint = hintfmt("undefined variable '%1%'", name),
+            .msg = hintfmt("undefined variable '%1%'", name),
             .errPos = pos
         });
     fromWith = true;

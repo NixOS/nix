@@ -3,9 +3,10 @@
 #include <memory>
 
 #include "types.hh"
-#include <regex>
 
 namespace nix {
+
+struct Regex;
 
 struct DrvName
 {
@@ -16,10 +17,12 @@ struct DrvName
 
     DrvName();
     DrvName(std::string_view s);
+    ~DrvName();
+
     bool matches(DrvName & n);
 
 private:
-    std::unique_ptr<std::regex> regex;
+    std::unique_ptr<Regex> regex;
 };
 
 typedef list<DrvName> DrvNames;
