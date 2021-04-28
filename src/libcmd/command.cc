@@ -54,6 +54,7 @@ void StoreCommand::run()
     run(getStore());
 }
 
+/*
 EvalCommand::EvalCommand()
 {
     addFlag({
@@ -77,6 +78,42 @@ ref<EvalState> EvalCommand::getEvalState()
     }
     return ref<EvalState>(evalState);
 }
+*/
+EvalCommand::EvalCommand()
+{
+    addFlag({
+        .longName = "debugger",
+        .description = "start an interactive environment if evaluation fails",
+        .handler = {&startReplOnEvalErrors, true},
+    });
+}
+// ref<EvalState> EvalCommand::getEvalState()
+// {
+//     if (!evalState)
+//         evalState = std::make_shared<EvalState>(searchPath, getStore());
+//     return ref<EvalState>(evalState);
+// }
+extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
+
+ref<EvalState> EvalCommand::getEvalState()
+{
+    if (!evalState) {
+        evalState = std::make_shared<EvalState>(searchPath, getStore());
+        if (startReplOnEvalErrors)
+            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const std::map<std::string, Value *> & env) {
+                printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
+                runRepl(evalState, env);
+            };
+    }
+    return ref<EvalState>(evalState);
+}
+
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
+}
+
 
 RealisedPathsCommand::RealisedPathsCommand(bool recursive)
     : recursive(recursive)
