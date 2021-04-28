@@ -114,7 +114,7 @@ your Nix store and a "synthetic" empty directory to mount it over at
 > additional encryption makes this more likely.
 
 If you're using a recent Mac with a [T2
-chip](https://www.apple.com/euro/mac/shared/docs/Apple_T2_Security_Chip_Overview.pdf),
+chip](https://support.apple.com/en-us/HT208862),
 your drive will still be encrypted at rest (in which case "unencrypted"
 is a bit of a misnomer). To use this approach, just install Nix with:
 
