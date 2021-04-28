@@ -1278,7 +1278,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     if (!fun.isLambda()) {
         auto error = TypeError({
             // .hint = hintfmt("attempt to call something which is not a function but %1%", showType(fun)),
-            .hint = hintfmt("attempt to call something which is not a function but %1%", fun),
+            .msg = hintfmt("attempt to call something which is not a function but %1%", fun),
             .errPos = pos
         });
         if (debuggerHook)

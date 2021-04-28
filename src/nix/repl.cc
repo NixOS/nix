@@ -537,8 +537,8 @@ bool NixRepl::processLine(string line)
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
             Expr * e = parseString(string(line, p + 1));
-            Value & v(*state->allocValue());
-            v.mkThunk(env, e);
+            Value *v = new Value(*state->allocValue());
+            v->mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
         } else {
             Value v;
