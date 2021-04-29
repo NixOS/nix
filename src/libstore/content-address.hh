@@ -2,13 +2,47 @@
 
 #include <variant>
 #include "hash.hh"
+#include "path.hh"
 
 namespace nix {
+
+/*
+ * Content addressing method
+ */
 
 enum struct FileIngestionMethod : uint8_t {
     Flat = false,
     Recursive = true
 };
+
+/*
+  We only have one way to hash text with references, so this is single-value
+  type is only useful in std::variant.
+*/
+struct TextHashMethod { };
+
+struct FixedOutputHashMethod {
+  FileIngestionMethod fileIngestionMethod;
+  HashType hashType;
+};
+
+/* Compute the prefix to the hash algorithm which indicates how the files were
+   ingested. */
+std::string makeFileIngestionPrefix(const FileIngestionMethod m);
+
+
+typedef std::variant<
+    TextHashMethod,
+    FixedOutputHashMethod
+  > ContentAddressMethod;
+
+ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
+
+std::string renderContentAddressMethod(ContentAddressMethod caMethod);
+
+/*
+ * Mini content address
+ */
 
 struct TextHash {
     Hash hash;
@@ -37,14 +71,6 @@ typedef std::variant<
     FixedOutputHash // for path computed by makeFixedOutputPath
 > ContentAddress;
 
-/* Compute the prefix to the hash algorithm which indicates how the files were
-   ingested. */
-std::string makeFileIngestionPrefix(const FileIngestionMethod m);
-
-/* Compute the content-addressability assertion (ValidPathInfo::ca)
-   for paths created by makeFixedOutputPath() / addToStore(). */
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash);
-
 std::string renderContentAddress(ContentAddress ca);
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);
@@ -56,22 +82,95 @@ std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 Hash getContentAddressHash(const ContentAddress & ca);
 
 /*
-  We only have one way to hash text with references, so this is single-value
-  type is only useful in std::variant.
-*/
-struct TextHashMethod { };
-struct FixedOutputHashMethod {
-  FileIngestionMethod fileIngestionMethod;
-  HashType hashType;
+ * References set
+ */
+
+template<typename Ref>
+struct PathReferences
+{
+    std::set<Ref> references;
+    bool hasSelfReference = false;
+
+    bool operator == (const PathReferences<Ref> & other) const
+    {
+        return references == other.references
+            && hasSelfReference == other.hasSelfReference;
+    }
+
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf(const Ref & self) const;
+    void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
+    void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
+};
+
+template<typename Ref>
+StorePathSet PathReferences<Ref>::referencesPossiblyToSelf(const Ref & self) const
+{
+    StorePathSet refs { references };
+    if (hasSelfReference)
+        refs.insert(self);
+    return refs;
+}
+
+template<typename Ref>
+void PathReferences<Ref>::insertReferencePossiblyToSelf(const Ref & self, Ref && ref)
+{
+    if (ref == self)
+        hasSelfReference = true;
+    else
+        references.insert(std::move(ref));
+}
+
+template<typename Ref>
+void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs)
+{
+    if (refs.count(self))
+        hasSelfReference = true;
+        refs.erase(self);
+
+    references = refs;
+}
+
+/*
+ * Full content address
+ *
+ * See the schema for store paths in store-api.cc
+ */
+
+// This matches the additional info that we need for makeTextPath
+struct TextInfo : TextHash {
+    // References for the paths, self references disallowed
+    StorePathSet references;
+};
+
+struct FixedOutputInfo : FixedOutputHash {
+    // References for the paths
+    PathReferences<StorePath> references;
 };
 
 typedef std::variant<
-    TextHashMethod,
-    FixedOutputHashMethod
-  > ContentAddressMethod;
+    TextInfo,
+    FixedOutputInfo
+> ContentAddressWithReferences;
 
-ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
+ContentAddressWithReferences caWithoutRefs(const ContentAddress &);
 
-std::string renderContentAddressMethod(ContentAddressMethod caMethod);
+struct StorePathDescriptor {
+    std::string name;
+    ContentAddressWithReferences info;
+
+    bool operator == (const StorePathDescriptor & other) const
+    {
+        return name == other.name;
+        // FIXME second field
+    }
+
+    bool operator < (const StorePathDescriptor & other) const
+    {
+        return name < other.name;
+        // FIXME second field
+    }
+};
 
 }

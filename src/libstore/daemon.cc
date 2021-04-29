@@ -251,7 +251,7 @@ static void writeValidPathInfo(
 {
     to << (info->deriver ? store->printStorePath(*info->deriver) : "")
        << info->narHash.to_string(Base16, false);
-    worker_proto::write(*store, to, info->references);
+    worker_proto::write(*store, to, info->referencesPossiblyToSelf());
     to << info->registrationTime << info->narSize;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
         to << info->ultimate
@@ -342,7 +342,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         StorePathSet paths;
         if (op == wopQueryReferences)
-            for (auto & i : store->queryPathInfo(path)->references)
+            for (auto & i : store->queryPathInfo(path)->referencesPossiblyToSelf())
                 paths.insert(i);
         else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
@@ -720,7 +720,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             to << 1
                << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
-            worker_proto::write(*store, to, i->second.references);
+            worker_proto::write(*store, to, i->second.referencesPossiblyToSelf(path));
             to << i->second.downloadSize
                << i->second.narSize;
         }
@@ -743,7 +743,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         for (auto & i : infos) {
             to << store->printStorePath(i.first)
                << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
-            worker_proto::write(*store, to, i.second.references);
+            worker_proto::write(*store, to, i.second.referencesPossiblyToSelf(i.first));
             to << i.second.downloadSize << i.second.narSize;
         }
         break;
@@ -825,7 +825,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        info.setReferencesPossiblyToSelf(worker_proto::read(*store, from, Phantom<StorePathSet> {}));
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
         info.ca = parseContentAddressOpt(readString(from));

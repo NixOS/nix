@@ -14,24 +14,20 @@ namespace nix {
 class Store;
 
 
-struct SubstitutablePathInfo
+struct SubstitutablePathInfo : PathReferences<StorePath>
 {
     std::optional<StorePath> deriver;
-    StorePathSet references;
     uint64_t downloadSize; /* 0 = unknown or inapplicable */
     uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
-
-struct ValidPathInfo
+struct ValidPathInfo : PathReferences<StorePath>
 {
     StorePath path;
     std::optional<StorePath> deriver;
-    // TODO document this
     Hash narHash;
-    StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
@@ -65,6 +61,7 @@ struct ValidPathInfo
         return
             path == i.path
             && narHash == i.narHash
+            && hasSelfReference == i.hasSelfReference
             && references == i.references;
     }
 
@@ -77,6 +74,8 @@ struct ValidPathInfo
     std::string fingerprint(const Store & store) const;
 
     void sign(const Store & store, const SecretKey & secretKey);
+
+    std::optional<StorePathDescriptor> fullStorePathDescriptorOpt() const;
 
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
@@ -103,6 +102,9 @@ struct ValidPathInfo
 
     ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
     ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
+
+    ValidPathInfo(const Store & store,
+        StorePathDescriptor && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
 };

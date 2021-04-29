@@ -67,7 +67,13 @@ std::tuple<StorePath, Hash> prefetchFile(
        the store. */
     if (expectedHash) {
         hashType = expectedHash->type;
-        storePath = store->makeFixedOutputPath(ingestionMethod, *expectedHash, *name);
+        storePath = store->makeFixedOutputPath(*name, FixedOutputInfo {
+            {
+                .method = ingestionMethod,
+                .hash = *expectedHash,
+            },
+            {},
+        });
         if (store->isValidPath(*storePath))
             hash = expectedHash;
         else

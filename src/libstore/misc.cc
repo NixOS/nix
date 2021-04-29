@@ -60,8 +60,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                 } else {
 
                     for (auto & ref : info->references)
-                        if (ref != path)
-                            enqueue(ref);
+                        enqueue(ref);
 
                     if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))

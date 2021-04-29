@@ -9,6 +9,7 @@ std::string FixedOutputHash::printMethodAlgo() const
     return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
+
 std::string makeFileIngestionPrefix(const FileIngestionMethod m)
 {
     switch (m) {
@@ -16,9 +17,8 @@ std::string makeFileIngestionPrefix(const FileIngestionMethod m)
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
-    default:
-        throw Error("impossible, caught both cases");
     }
+    assert(false);
 }
 
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
@@ -32,10 +32,13 @@ std::string renderContentAddress(ContentAddress ca)
 {
     return std::visit(overloaded {
         [](TextHash th) {
-            return "text:" + th.hash.to_string(Base32, true);
+            return "text:"
+                + th.hash.to_string(Base32, true);
         },
         [](FixedOutputHash fsh) {
-            return makeFixedOutputCA(fsh.method, fsh.hash);
+            return "fixed:"
+                + makeFileIngestionPrefix(fsh.method)
+                + fsh.hash.to_string(Base32, true);
         }
     }, ca);
 }
@@ -142,7 +145,18 @@ Hash getContentAddressHash(const ContentAddress & ca)
         },
         [](FixedOutputHash fsh) {
             return fsh.hash;
-        }
+        },
+    }, ca);
+}
+
+ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
+    return std::visit(overloaded {
+        [&](TextHash h) -> ContentAddressWithReferences {
+            return TextInfo { h, {}};
+        },
+        [&](FixedOutputHash h) -> ContentAddressWithReferences {
+            return FixedOutputInfo { h, {}};
+        },
     }, ca);
 }
 
