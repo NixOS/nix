@@ -4,6 +4,7 @@
 #include "path.hh"
 
 #include <optional>
+#include <variant>
 
 #include <nlohmann/json_fwd.hpp>
 

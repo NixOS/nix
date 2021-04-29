@@ -25,7 +25,7 @@ struct DerivationOutputInputAddressed
    according to that fixed output. */
 struct DerivationOutputCAFixed
 {
-    FixedOutputHash hash; /* hash used for expected hash computation */
+    ContentAddressWithReferences ca; /* hash and refs used for validating output */
     StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
@@ -35,7 +35,7 @@ struct DerivationOutputCAFixed
 struct DerivationOutputCAFloating
 {
     /* information used for expected hash computation */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
     HashType hashType;
 };
 
@@ -138,8 +138,8 @@ struct Derivation : BasicDerivation
 
     /* Return the underlying basic derivation but with these changes:
 
-	   1. Input drvs are emptied, but the outputs of them that were used are
-	      added directly to input sources.
+       1. Input drvs are emptied, but the outputs of them that were used are
+          added directly to input sources.
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);

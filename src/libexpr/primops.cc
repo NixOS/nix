@@ -894,7 +894,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     bool contentAddressed = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    auto ingestionMethod = FileIngestionMethod::Flat;
+    ContentAddressMethod ingestionMethod = FileIngestionMethod::Flat;
 
     StringSet outputs;
     outputs.insert("out");
@@ -907,6 +907,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         auto handleHashMode = [&](const std::string & s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
+            else if (s == "text") ingestionMethod = TextHashMethod {};
             else
                 throw EvalError({
                     .msg = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
@@ -1038,8 +1039,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             state.store->computeFSClosure(state.store->parseStorePath(std::string_view(path).substr(1)), refs);
             for (auto & j : refs) {
                 drv.inputSrcs.insert(j);
-                if (j.isDerivation())
-                    drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                if (j.isDerivation()) {
+                    Derivation jDrv = state.store->readDerivation(j);
+                    if(jDrv.type() != DerivationType::CAFloating)
+                        drv.inputDrvs[j] = jDrv.outputNames();
+                }
             }
         }
 
@@ -1068,9 +1072,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         });
 
     /* Check whether the derivation name is valid. */
-    if (isDerivation(drvName))
+    if (isDerivation(drvName) && ingestionMethod != ContentAddressMethod { TextHashMethod { } })
         throw EvalError({
-            .msg = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
+            .msg = hintfmt("derivation names are allowed to end in '%s' only if they produce a single derivation file", drvExtension),
             .errPos = posDrvName
         });
 
@@ -1088,16 +1092,16 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
-        drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputCAFixed {
-                    .hash = FixedOutputHash {
-                        .method = ingestionMethod,
-                        .hash = std::move(h),
-                    },
-                },
-        });
+        // FIXME non-trivial fixed refs set
+        auto ca = contentAddressFromMethodHashAndRefs(
+            ingestionMethod,
+            std::move(h),
+            {});
+
+        DerivationOutputCAFixed dof { .ca = ca };
+
+        drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
+        drv.outputs.insert_or_assign("out", DerivationOutput { .output = dof });
     }
 
     else if (contentAddressed) {
@@ -1834,7 +1838,13 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
+        expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
+            {
+                .method = method,
+                .hash = *expectedHash,
+            },
+            {},
+        });
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
