@@ -137,7 +137,7 @@ void ExprAttrs::showAsAterm(std::ostream & str) const
     if (recursive) str << "rec ";
     str << "{ ";
     for (auto & i : attrs)
-        if (i.second.inherited)
+        if (i.second.inherited) // NOTE inherited is always false. { inherit (scope) attr; } -> { attr = scope.attr; }
             str << "inherit " << i.first << " " << "; ";
         else
             str << i.first << " = " << *i.second.e << "; ";

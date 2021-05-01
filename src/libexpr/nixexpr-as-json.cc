@@ -116,13 +116,13 @@ void ExprSelect::showAsJson(std::ostream & str) const
     if (def) {
         str << ",\"default\":"; def->showAsJson(str);
     }
-    str << " }";
+    str << "}";
 }
 
 void ExprOpHasAttr::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprOpHasAttr << "\"";
-    str << ",\"op\":"; e->showAsJson(str);
+    str << ",\"set\":"; e->showAsJson(str);
     str << ",\"attr\":"; AttrPath_showAsJson(str, attrPath);
     str << '}';
 }
@@ -135,7 +135,7 @@ void ExprAttrs::showAsJson(std::ostream & str) const
     bool first = true;
     for (auto & i : attrs) {
         if (first) first = false; else str << ",";
-        str << "{\"inherited\":" << (i.second.inherited ? "true" : "false");
+        str << "{\"inherited\":" << (i.second.inherited ? "true" : "false"); // NOTE inherited is always false. { inherit (scope) attr; } -> { attr = scope.attr; }
         str << ",\"name\":\""; String_showAsJson(str, i.first); str << "\"";
         if (!i.second.inherited) {
             str << ",\"value\":"; i.second.e->showAsJson(str);
@@ -266,8 +266,7 @@ void ExprPos::showAsJson(std::ostream & str) const
 
 void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath)
 {
-    out << "{\"type\":\"" << NodeTypeName::ExprAttrPath << "\"";
-    out << ",\"attrpath\":[";
+    out << "[";
     bool first = true;
     for (auto & i : attrPath) {
         if (!first) out << ','; else first = false;
@@ -280,7 +279,7 @@ void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath)
         }
         out << "}";
     }
-    out << "]}";
+    out << "]";
 }
 
 }
