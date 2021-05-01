@@ -1,0 +1,43 @@
+ADD_TYPE(ExprLambda) // aka Function
+ADD_TYPE(ExprSet) // complex values ...
+ADD_TYPE(ExprList)
+ADD_TYPE(ExprAttrs)
+ADD_TYPE(ExprAttrPath)
+ADD_TYPE(ExprString) // scalar values ...
+ADD_TYPE(ExprInt)
+ADD_TYPE(ExprFloat)
+ADD_TYPE(ExprPath)
+ADD_TYPE(ExprBoolean)
+ADD_TYPE(ExprNull)
+ADD_TYPE(ExprLet)
+ADD_TYPE(ExprWith)
+ADD_TYPE(ExprIf)
+ADD_TYPE(ExprAssert)
+ADD_TYPE(ExprVar) // TODO whats this? for example `null`
+ADD_TYPE(ExprSelect) // operators ... https://nixos.org/manual/nix/stable/#sec-language-operators
+ADD_TYPE(ExprApp)
+ADD_TYPE(ExprConcatStrings)
+ADD_TYPE(ExprOpEq)
+ADD_TYPE(ExprOpNEq)
+ADD_TYPE(ExprOpAnd)
+ADD_TYPE(ExprOpOr)
+ADD_TYPE(ExprOpImpl)
+ADD_TYPE(ExprOpUpdate)
+ADD_TYPE(ExprOpConcatLists)
+ADD_TYPE(ExprOpHasAttr)
+ADD_TYPE(ExprOpNot)
+ADD_TYPE(ExprOpNeg) // Arithmetic operators ... // not used
+ADD_TYPE(ExprOpAdd) // not used
+ADD_TYPE(ExprOpSub) // not used
+ADD_TYPE(ExprOpMul) // not used
+ADD_TYPE(ExprOpDiv) // not used
+ADD_TYPE(ExprPos) // TODO what is Pos?
+ADD_TYPE(Comment) // not used // TODO implement?
+
+/* NOTE Arithmetic operators are converted:
+Arithmetic Negation	(- e) -> __sub 0 e
+Multiplication	(e1 * e2) -> __mul e1 e2
+Division	(e1 / e2) -> __div e1 e2
+Addition	(e1 + e2) -> ExprConcatStrings ?? FIXME should be: __add e1 e2
+Subtraction	(e1 - e2) -> __sub e1 e2
+*/

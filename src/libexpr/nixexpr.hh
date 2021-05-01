@@ -292,65 +292,47 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
+
+
+// define NodeTypeId::ExprLambda etc.
+// similar: value.hh: typedef enum { ... } InternalType;
+enum class NodeTypeId {
+    NotUsed = 0, // make IDs one-based -> sync with line numbers in *.def file
+    // https://stackoverflow.com/a/320888/10440128
+#   define ADD_TYPE(t) t,
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
+    NodeTypeCount
+};
+
+// define NodeTypeName::ExprLambda etc.
+struct NodeTypeName {
+#   define ADD_TYPE(t) static std::string t;
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
+    // values are defined in nixexpr.cc
+};
+
+/*
+// define NodeTypeNameOfId[NodeTypeId::ExprLambda] etc.
+char const* const NodeTypeNameOfId[] = {
+    "NotUsed",
+#   define ADD_TYPE(t) #t,
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
+    0
+};
+*/
+
+
+
 // https://nixos.wiki/wiki/Nix_Expression_Language#Types
 // https://nixos.org/manual/nix/stable/#ssec-values
 // note. we use `enum class` to keep the enum-items local
-enum class NodeTypeId {
-    Whitespace = 0, // TODO
-    Comment, // TODO
 
-    ExprLambda, // aka Function
-    ExprLambdaFormal, // aka Function
 
-    // complex values
-    ExprSet,
-    ExprList,
-    ExprAttrs,
-    ExprAttr,
-    ExprAttrPath,
-    ExprAttrPathComponent,
 
-    // scalar values
-    ExprString,
-    ExprInt,
-    ExprFloat,
-    ExprPath,
-    ExprBoolean,
-    ExprNull,
 
-    ExprLet,
-    ExprWith,
-    ExprIf,
-    ExprAssert,
-
-    ExprVar, // TODO whats this?
-
-    // operators https://nixos.org/manual/nix/stable/#sec-language-operators
-    ExprSelect,
-    ExprApp,
-    ExprConcatStrings,
-
-    ExprOpEq,
-    ExprOpNEq,
-    ExprOpAnd,
-    ExprOpOr,
-    ExprOpImpl,
-    ExprOpUpdate,
-    ExprOpConcatLists,
-    ExprOpHasAttr,
-    ExprOpNot,
-
-    ExprPos, // TODO what is Pos?
-
-/* TODO
-Arithmetic Negation	- e	none	Arithmetic negation.	3
-Multiplication	e1 * e2,	left	Arithmetic multiplication.	6
-Division	e1 / e2	left	Arithmetic division.	6
-Addition	e1 + e2	left	Arithmetic addition.	7
-Subtraction	e1 - e2	left	Arithmetic subtraction.	7
-*/
-
-};
 
 // jsonTypeName sample: name ExprOpAnd -> jsonTypeName opAnd
 // TODO showAsJson: fix recursion: call e1->showAsJson(str), etc.
@@ -377,7 +359,7 @@ Subtraction	e1 - e2	left	Arithmetic subtraction.	7
         } \
         void showAsJson(std::ostream & str) const \
         { \
-            str << "{\"type\":" << (int) NodeTypeId::name;   \
+            str << "{\"type\":\"" << NodeTypeName::name << "\"";   \
             str << ",\"op1\":"; e1->showAsJson(str);   \
             str << ",\"op2\":"; e2->showAsJson(str);   \
             str << "}";   \

@@ -7,6 +7,10 @@
 
 namespace nix {
 
+// define NodeTypeName::ExprLambda etc.
+#   define ADD_TYPE(t) std::string NodeTypeName::t = #t;
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
 
 /* Displaying abstract syntax trees. */
 
