@@ -581,7 +581,9 @@ void LocalDerivationGoal::startBuilder()
                 throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
                     worker.store.printStorePath(drvPath), i);
 
-            dirsInChroot[i] = i;
+            /* Allow files in __impureHostDeps to be missing; e.g.
+               macOS 11+ has no /usr/lib/libSystem*.dylib */
+            dirsInChroot[i] = {i, true};
         }
 
 #if __linux__
