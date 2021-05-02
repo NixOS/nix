@@ -263,7 +263,7 @@ static void writeValidPathInfo(
 static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
 {
     std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
         reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
     } else {
         for (auto & s : readStrings<Strings>(from))
