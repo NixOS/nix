@@ -23,7 +23,7 @@ static Path gcRoot;
 static int rootNr = 0;
 
 
-enum OutputKind { okPlain, okXML, okJSON, okJSONArrays };
+enum OutputKind { okPlain, okXML, okJSON, okJSONArrays, okJSONNumtypes };
 
 
 void processExpr(EvalState & state, const Strings & attrPaths,
@@ -39,6 +39,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         }
         else if (output == okJSONArrays) {
             e->showAsJsonArrays(std::cout);
+        }
+        else if (output == okJSONNumtypes) {
+            e->showAsJsonNumtypes(std::cout);
         }
         else {
             e->show(std::cout);
@@ -143,8 +146,12 @@ static int main_nix_instantiate(int argc, char * * argv)
                 outputKind = okXML;
             else if (*arg == "--json")
                 outputKind = okJSON;
+            // test
             else if (*arg == "--json-arrays")
                 outputKind = okJSONArrays;
+            // test
+            else if (*arg == "--json-numtypes")
+                outputKind = okJSONNumtypes;
             else if (*arg == "--no-location")
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")

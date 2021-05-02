@@ -45,6 +45,15 @@ struct MixJSON : virtual Args
             .handler = {&json, true},
         });
 
+        // test
+        addFlag({
+            .longName = "json-numtypes",
+            .description = "Produce output in JSONNumtypes format, suitable for consumption by another program.",
+            //.category = commonArgsCategory,
+            .handler = {&json, true},
+        });
+
+        // test
         addFlag({
             .longName = "json-arrays",
             .description = "Produce output in JSONArrays format, suitable for consumption by another program.",

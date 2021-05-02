@@ -9,14 +9,24 @@ const printResult = 0;
 const writeResult = 1;
 const showTodoImplement = 1;
 const inputFile = '/nix/store/v0xwj556c69yppjzylz2diqk66vliswb-nixos-20.09.3857.b2a189a8618/nixos/nixpkgs/pkgs/top-level/all-packages.nix';
+
 const showJson = 1;
+const showJsonArrays = 1;
+const showJsonNumtypes = 1;
+
+const numRounds = 10; // benchmark samples
+const validateSyntax = 0;
+
+var execOptions = { encoding: 'utf8', maxBuffer: 1/0 };
 
 const maxLen = {
-  format: 12,
+  format: 14,
   label: 12,
 }
 
-const dtObj = {};
+const filesWritten = {};
+
+var dtObj = {};
 function dt(t1, t2, label) {
   // global: outputFormat
   var dtSec = t2[0] - t1[0];
@@ -27,7 +37,7 @@ function dt(t1, t2, label) {
   dtObj[outputFormat].push(dt);
 }
 
-const stObj = {};
+var stObj = {};
 function st() {
   // global: outputFormat
   var dt = dtObj[outputFormat].reduce((sum, dt) => sum + dt, 0);
@@ -148,6 +158,120 @@ function walkJson(node) {
 
 
 
+function showAttrPathNumtypes(path) {
+  // TODO build double quoted string with dollar curly exprs
+  // expected: bionic = assert stdenv.hostPlatform.useAndroidPrebuilt; pkgs."androidndkPkgs_${stdenv.hostPlatform.ndkVer}".libraries;
+  // actual: bionic = (assert ((stdenv)."hostPlatform"."useAndroidPrebuilt"); ((pkgs).(("androidndkPkgs_") + ((stdenv)."hostPlatform"."ndkVer"))."libraries"));
+  //                                                                                  ^ syntax error: unexpected '(', expecting ID or OR_KW or DOLLAR_CURLY or '"'
+  // maybe syntax rules should be relaxed? -> result of expr must be string
+  return path.map(p => {
+    if (p.expr == undefined) return JSON.stringify(p.symbol);
+    else return `(${walkJsonNumtypes(p.expr)})`;
+  }).join('.');
+}
+const walkJsonNumtypesHandler = Object.values({ // assert: preserves order of values
+  NotUsed: node => null,
+  ExprLambda: node => {
+    res = '';
+    if (node.matchAttrs) {
+      res += '{ ';
+      var first = true;
+      for (const formal of node.formals) {
+        if (first) first = false; else res += ', ';
+        res += formal.name;
+        if (formal.default) res += `? (${walkJsonNumtypes(formal.default)})`;
+      }
+      if (node.ellipsis) {
+        if (!first) res += ', ';
+        res += '...';
+      }
+      res += ' }';
+    }
+    if (node.arg) {
+      if (node.matchAttrs) res += ' @ ';
+      res += node.arg;
+    }
+    res += `: (${walkJsonNumtypes(node.body)})`;
+    return res;
+  },
+  ExprSet: node => {},
+  ExprList: node => { return '[\n' + node.items.map(i => `(${walkJsonNumtypes(i)})`).join('\n') + '\n]'; },
+  ExprAttrs: node => {
+    let res = '';
+    if (node.recursive) res += 'rec ';
+    res += '{';
+    // same as ExprLet
+    for (const attr of node.attrs) {
+      if (attr.inherited) res += `\ninherit ${attr.name};`;
+      else res += `\n${attr.name} = (${walkJsonNumtypes(attr.value)});`;
+    }
+    if (node.attrs.length > 0) res += '\n';
+    res += '}';
+    return res;
+  },
+  ExprString: node => { return JSON.stringify(node.value); },
+  ExprInt: node => { return node.value; },
+  ExprFloat: node => { return node.value; },
+  ExprPath: node => { return JSON.stringify(node.value).slice(1, -1); },
+  ExprBoolean: node => {},
+  ExprNull: node => {},
+  ExprLet: node => {
+    let res = 'let';
+    for (const attr of node.attrs) {
+      if (attr.inherited) res += `\ninherit ${attr.name}; `;
+      else res += `\n${attr.name} = ${walkJsonNumtypes(attr.value)}; `;
+    }
+    res += `\nin (${walkJsonNumtypes(node.body)})`;
+    return res;
+  },
+  ExprWith: node => {
+    return `with ${walkJsonNumtypes(node.set)}; (${walkJsonNumtypes(node.body)})`
+  },
+  ExprIf: node => { return `if (${walkJsonNumtypes(node.cond)}) then (${walkJsonNumtypes(node.then)}) else (${walkJsonNumtypes(node.else)})`; },
+  ExprAssert: node => { return `assert (${walkJsonNumtypes(node.cond)}); (${walkJsonNumtypes(node.body)})`; },
+  ExprVar: node => { return node.name; },
+  ExprSelect: node => { return `${walkJsonNumtypes(node.set)}.${showAttrPathNumtypes(node.attr)}` + (node.default == undefined ? '' : ` or (${walkJsonNumtypes(node.default)})`); },
+  ExprApp: node => { return `(${walkJsonNumtypes(node.op1)}) (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpNeg: node => {}, // not used
+  ExprOpHasAttr: node => { return `(${walkJsonNumtypes(node.set)}) ? ${showAttrPathNumtypes(node.attr)}`; },
+  ExprOpConcatLists: node => { return `(${walkJsonNumtypes(node.op1)}) ++ (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpMul: node => {}, // not used
+  ExprOpDiv: node => {}, // not used
+  ExprConcatStrings: node => { return node.strings.map(s => walkJsonNumtypes(s)).join(' + '); },
+  ExprOpAdd: node => {}, // not used
+  ExprOpSub: node => {}, // not used
+  ExprOpNot: node => { return `!(${walkJsonNumtypes(node.expr)})`; },
+  ExprOpUpdate: node => { return `(${walkJsonNumtypes(node.op1)}) // (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpLt: node => {}, // not used
+  ExprOpLte: node => {}, // not used
+  ExprOpGt: node => {}, // not used
+  ExprOpGte: node => {}, // not used
+  ExprOpEq: node => { return `(${walkJsonNumtypes(node.op1)}) == (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpNEq: node => { return `(${walkJsonNumtypes(node.op1)}) != (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpAnd: node => { return `(${walkJsonNumtypes(node.op1)}) && (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpOr: node => { return `(${walkJsonNumtypes(node.op1)}) || (${walkJsonNumtypes(node.op2)})`; },
+  ExprOpImpl: node => { return `(${walkJsonNumtypes(node.op1)}) -> (${walkJsonNumtypes(node.op2)})`; },
+  ExprPos: node => {},
+  Comment: node => {}, // not used
+});
+function walkJsonNumtypes(node) {
+  if (walkJsonNumtypesHandler[node.type] == undefined) {
+    console.log(`FIXME missing type ${node.type}. did you confuse walkJsonNumtypes and walkJsonNumtypesArrays?`);
+    console.log(new Error().stack);
+    //console.log(`node:`); console.dir(node);
+    return '';
+  }
+  const res = walkJsonNumtypesHandler[node.type](node);
+  if (res == undefined && showTodoImplement) {
+    console.log(`TODO implement type ${node.type}`);
+  }
+  return res;
+}
+
+
+
+
+
 function showAttrPathArrays(path) {
   // TODO build double quoted string with dollar curly exprs
   return path.map(p => {
@@ -254,40 +378,15 @@ function walkJsonArrays(node) {
   return res;
 }
 
-///////////////////
+////////////////
 
-var outputFormat = 'json-arrays';
+for (let benchRound = 1; benchRound <= numRounds; benchRound++) {
 
-var execOptions = { encoding: 'utf8', maxBuffer: 1/0 };
+console.log(`\nbenchmark round ${benchRound}\n`)
 
-var t1 = process.hrtime();
-var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
-var t2 = process.hrtime();
-dt(t1, t2, `generate`);
+dtObj = {};
+stObj = {};
 
-var t1 = process.hrtime();
-var obj = JSON.parse(json);
-var t2 = process.hrtime();
-dt(t1, t2, `JSON.parse`);
-//console.dir(obj);
-
-var t1 = process.hrtime();
-var res = walkJsonArrays(obj);
-var t2 = process.hrtime();
-dt(t1, t2, `walkJson`);
-if (printResult) console.log(res);
-if (writeResult) {
-  var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
-  fs.writeFileSync(of, res, 'utf8');
-  console.log(`done ${of}`);
-  // validate syntax
-  cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
-}
-
-st();
-
-/////////////////
-console.log();
 /////////////////
 
 if (showJson) {
@@ -313,17 +412,88 @@ if (printResult) console.log(res);
 if (writeResult) {
   var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
   fs.writeFileSync(of, res, 'utf8');
-  console.log(`done ${of}`);
-  // validate syntax
-  cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
+  filesWritten[of] = true;
+  if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
 }
 
 st();
+console.log();
 
 }
+/////////////////
 
+if (showJsonNumtypes) {
+
+var outputFormat = 'json-numtypes';
+
+var t1 = process.hrtime();
+var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
+var t2 = process.hrtime();
+dt(t1, t2, `generate`);
+
+var t1 = process.hrtime();
+var obj = JSON.parse(json);
+var t2 = process.hrtime();
+dt(t1, t2, 'JSON.parse');
+//console.dir(obj);
+
+var t1 = process.hrtime();
+var res = walkJsonNumtypes(obj);
+var t2 = process.hrtime();
+dt(t1, t2, `walkJson`);
+if (printResult) console.log(res);
+if (writeResult) {
+  var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
+  fs.writeFileSync(of, res, 'utf8');
+  filesWritten[of] = true;
+  if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
+}
+
+st();
+console.log();
+console.log(`time of json vs json-numtypes: +${((stObj['json'] / stObj['json-numtypes'] - 1)*100).toFixed(1)} %`)
+console.log(`time of json-numtypes vs json: -${((1 - stObj['json-numtypes'] / stObj['json'])*100).toFixed(1)} %`)
+console.log();
+}
+
+
+///////////////////
+
+if (showJsonArrays) {
+
+var outputFormat = 'json-arrays';
+
+var t1 = process.hrtime();
+var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
+var t2 = process.hrtime();
+dt(t1, t2, `generate`);
+
+var t1 = process.hrtime();
+var obj = JSON.parse(json);
+var t2 = process.hrtime();
+dt(t1, t2, `JSON.parse`);
+//console.dir(obj);
+
+var t1 = process.hrtime();
+var res = walkJsonArrays(obj);
+var t2 = process.hrtime();
+dt(t1, t2, `walkJson`);
+if (printResult) console.log(res);
+if (writeResult) {
+  var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
+  fs.writeFileSync(of, res, 'utf8');
+  filesWritten[of] = true;
+  if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
+}
+
+st();
+console.log();
 console.log(`time of json vs json-arrays: +${((stObj['json'] / stObj['json-arrays'] - 1)*100).toFixed(1)} %`)
 console.log(`time of json-arrays vs json: -${((1 - stObj['json-arrays'] / stObj['json'])*100).toFixed(1)} %`)
+console.log();
+}
+
+}
 
 // low-res timer
 /*
@@ -333,3 +503,5 @@ var t2 = new Date().getTime();
 var dt = t2 - t1;
 console.log(`${outputFormat.padEnd(12, ' ')} JSON.parse: dt = ${dt / 1000} sec`)
 */
+
+Object.keys(filesWritten).forEach(of => console.log(`done ${of}`));
