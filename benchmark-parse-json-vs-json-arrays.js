@@ -10,9 +10,13 @@ const writeResult = 1;
 const showTodoImplement = 1;
 const inputFile = '/nix/store/v0xwj556c69yppjzylz2diqk66vliswb-nixos-20.09.3857.b2a189a8618/nixos/nixpkgs/pkgs/top-level/all-packages.nix';
 
+/*
 const showJson = 1;
 const showJsonArrays = 1;
 const showJsonNumtypes = 1;
+const showJsonArraysFmt = 1;
+*/
+const outputFormatList = ['json', 'json-numtypes', 'json-arrays', 'json-arrays-fmt'];
 
 const numRounds = 10; // benchmark samples
 const validateSyntax = 0;
@@ -155,7 +159,6 @@ function walkJson(node) {
   }
   return res;
 }
-
 
 
 function showAttrPathNumtypes(path) {
@@ -380,6 +383,15 @@ function walkJsonArrays(node) {
 
 ////////////////
 
+var outputFormat;
+
+const handlerFn = {
+  'json': walkJson,
+  'json-arrays': walkJsonArrays,
+  'json-arrays-fmt': walkJsonArrays,
+  'json-numtypes': walkJsonNumtypes,
+};
+
 for (let benchRound = 1; benchRound <= numRounds; benchRound++) {
 
 console.log(`\nbenchmark round ${benchRound}\n`)
@@ -387,113 +399,44 @@ console.log(`\nbenchmark round ${benchRound}\n`)
 dtObj = {};
 stObj = {};
 
-/////////////////
+for (let formatId = 0; formatId < outputFormatList.length; formatId++) {
+  outputFormat = outputFormatList[formatId];
 
-if (showJson) {
+  var t1 = process.hrtime();
+  var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
+  var t2 = process.hrtime();
+  dt(t1, t2, `generate`);
+  
+  var t1 = process.hrtime();
+  var obj = JSON.parse(json);
+  var t2 = process.hrtime();
+  dt(t1, t2, `JSON.parse`);
+  //console.dir(obj);
 
-var outputFormat = 'json';
+  var t1 = process.hrtime();
+  var res = handlerFn[outputFormat](obj);
+  var t2 = process.hrtime();
+  dt(t1, t2, `walkJson`);
+  if (printResult) console.log(res);
+  if (writeResult) {
+    var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
+    fs.writeFileSync(of, res, 'utf8');
+    filesWritten[of] = true;
+    if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
+  }
+  
+  st();
+  console.log();
+  if (outputFormat != 'json') {
+    console.log(`time of json vs ${outputFormat}: +${((stObj['json'] / stObj[outputFormat] - 1)*100).toFixed(1)} %`)
+    console.log(`time of ${outputFormat} vs json: -${((1 - stObj[outputFormat] / stObj['json'])*100).toFixed(1)} %`)
+    console.log();
+  }
 
-var t1 = process.hrtime();
-var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
-var t2 = process.hrtime();
-dt(t1, t2, `generate`);
-
-var t1 = process.hrtime();
-var obj = JSON.parse(json);
-var t2 = process.hrtime();
-dt(t1, t2, 'JSON.parse');
-//console.dir(obj);
-
-var t1 = process.hrtime();
-var res = walkJson(obj);
-var t2 = process.hrtime();
-dt(t1, t2, `walkJson`);
-if (printResult) console.log(res);
-if (writeResult) {
-  var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
-  fs.writeFileSync(of, res, 'utf8');
-  filesWritten[of] = true;
-  if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
-}
-
-st();
-console.log();
-
-}
-/////////////////
-
-if (showJsonNumtypes) {
-
-var outputFormat = 'json-numtypes';
-
-var t1 = process.hrtime();
-var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
-var t2 = process.hrtime();
-dt(t1, t2, `generate`);
-
-var t1 = process.hrtime();
-var obj = JSON.parse(json);
-var t2 = process.hrtime();
-dt(t1, t2, 'JSON.parse');
-//console.dir(obj);
-
-var t1 = process.hrtime();
-var res = walkJsonNumtypes(obj);
-var t2 = process.hrtime();
-dt(t1, t2, `walkJson`);
-if (printResult) console.log(res);
-if (writeResult) {
-  var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
-  fs.writeFileSync(of, res, 'utf8');
-  filesWritten[of] = true;
-  if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
-}
-
-st();
-console.log();
-console.log(`time of json vs json-numtypes: +${((stObj['json'] / stObj['json-numtypes'] - 1)*100).toFixed(1)} %`)
-console.log(`time of json-numtypes vs json: -${((1 - stObj['json-numtypes'] / stObj['json'])*100).toFixed(1)} %`)
-console.log();
-}
+} // loop formats
+} // loop rounds
 
 
-///////////////////
-
-if (showJsonArrays) {
-
-var outputFormat = 'json-arrays';
-
-var t1 = process.hrtime();
-var json = cp.execSync(`./nix-instantiate --parse --${outputFormat} ${inputFile}`, execOptions);
-var t2 = process.hrtime();
-dt(t1, t2, `generate`);
-
-var t1 = process.hrtime();
-var obj = JSON.parse(json);
-var t2 = process.hrtime();
-dt(t1, t2, `JSON.parse`);
-//console.dir(obj);
-
-var t1 = process.hrtime();
-var res = walkJsonArrays(obj);
-var t2 = process.hrtime();
-dt(t1, t2, `walkJson`);
-if (printResult) console.log(res);
-if (writeResult) {
-  var of = `benchmark-parse-json-vs-json-arrays.js.out.${outputFormat}.nix`;
-  fs.writeFileSync(of, res, 'utf8');
-  filesWritten[of] = true;
-  if (validateSyntax) cp.execSync(`./nix-instantiate --parse ${of}`, { stdio: 'inherit' });
-}
-
-st();
-console.log();
-console.log(`time of json vs json-arrays: +${((stObj['json'] / stObj['json-arrays'] - 1)*100).toFixed(1)} %`)
-console.log(`time of json-arrays vs json: -${((1 - stObj['json-arrays'] / stObj['json'])*100).toFixed(1)} %`)
-console.log();
-}
-
-}
 
 // low-res timer
 /*

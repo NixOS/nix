@@ -79,6 +79,7 @@ struct Expr
     virtual void show(std::ostream & str) const;
     virtual void showAsJson(std::ostream & str) const;
     virtual void showAsJsonArrays(std::ostream & str) const;
+    virtual void showAsJsonArraysFmt(std::ostream & str) const;
     virtual void showAsJsonNumtypes(std::ostream & str) const;
     //virtual void showAsXml(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
@@ -94,6 +95,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
     void show(std::ostream & str) const; \
     void showAsJson(std::ostream & str) const; \
     void showAsJsonArrays(std::ostream & str) const; \
+    void showAsJsonArraysFmt(std::ostream & str) const; \
     void showAsJsonNumtypes(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
     void bindVars(const StaticEnv & env);
@@ -396,6 +398,13 @@ char const* const NodeTypeNameOfId[] = {
             str << ','; e2->showAsJsonArrays(str);   \
             str << ']';   \
         } \
+        void showAsJsonArraysFmt(std::ostream & str) const \
+        { \
+            str << '[' << (int) NodeTypeId::name;   \
+            str << ','; e1->showAsJsonArraysFmt(str);   \
+            str << ','; e2->showAsJsonArraysFmt(str);   \
+            str << ']';   \
+        } \
         void bindVars(const StaticEnv & env) \
         { \
             e1->bindVars(env); e2->bindVars(env); \
@@ -463,6 +472,7 @@ struct StaticEnv
 
 void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath);
 void AttrPath_showAsJsonArrays(std::ostream & out, const AttrPath & attrPath);
+void AttrPath_showAsJsonArraysFmt(std::ostream & out, const AttrPath & attrPath);
 void AttrPath_showAsJsonNumtypes(std::ostream & out, const AttrPath & attrPath);
 
 }
