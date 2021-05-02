@@ -695,6 +695,8 @@ public:
 
     const Stats & getStats();
 
+    StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
+
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
     virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)

@@ -1,6 +1,8 @@
 #include "parsed-derivations.hh"
 
 #include <nlohmann/json.hpp>
+#include <regex>
+#include "json.hh"
 
 namespace nix {
 
@@ -121,4 +123,112 @@ bool ParsedDerivation::substitutesAllowed() const
     return getBoolAttr("allowSubstitutes", true);
 }
 
+static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+std::optional<StructuredAttrsWithShellRC> ParsedDerivation::generateStructuredAttrs(
+    std::optional<StringMap> inputRewrites, Store & store, const StorePathSet & inputPaths)
+{
+    auto structuredAttrs = getStructuredAttrs();
+    if (!structuredAttrs) return std::nullopt;
+
+    auto json = *structuredAttrs;
+
+    /* Add an "outputs" object containing the output paths. */
+    nlohmann::json outputs;
+    for (auto & i : drv.outputs) {
+        if (inputRewrites) {
+            /* The placeholder must have a rewrite, so we use it to cover both the
+               cases where we know or don't know the output path ahead of time. */
+            outputs[i.first] = rewriteStrings(hashPlaceholder(i.first), inputRewrites.value());
+        } else {
+            /* This case is only relevant for the nix-shell */
+            outputs[i.first] = hashPlaceholder(i.first);
+        }
+    }
+    json["outputs"] = outputs;
+
+    /* Handle exportReferencesGraph. */
+    auto e = json.find("exportReferencesGraph");
+    if (e != json.end() && e->is_object()) {
+        for (auto i = e->begin(); i != e->end(); ++i) {
+            std::ostringstream str;
+            {
+                JSONPlaceholder jsonRoot(str, true);
+                StorePathSet storePaths;
+                for (auto & p : *i)
+                    storePaths.insert(store.parseStorePath(p.get<std::string>()));
+                store.pathInfoToJSON(jsonRoot,
+                    store.exportReferences(storePaths, inputPaths), false, true);
+            }
+            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
+        }
+    }
+
+    /* As a convenience to bash scripts, write a shell file that
+       maps all attributes that are representable in bash -
+       namely, strings, integers, nulls, Booleans, and arrays and
+       objects consisting entirely of those values. (So nested
+       arrays or objects are not supported.) */
+
+    auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
+        if (value.is_string())
+            return shellEscape(value);
+
+        if (value.is_number()) {
+            auto f = value.get<float>();
+            if (std::ceil(f) == f)
+                return std::to_string(value.get<int>());
+        }
+
+        if (value.is_null())
+            return std::string("''");
+
+        if (value.is_boolean())
+            return value.get<bool>() ? std::string("1") : std::string("");
+
+        return {};
+    };
+
+    std::string jsonSh;
+
+    for (auto i = json.begin(); i != json.end(); ++i) {
+
+        if (!std::regex_match(i.key(), shVarName)) continue;
+
+        auto & value = i.value();
+
+        auto s = handleSimpleType(value);
+        if (s)
+            jsonSh += fmt("declare %s=%s\n", i.key(), *s);
+
+        else if (value.is_array()) {
+            std::string s2;
+            bool good = true;
+
+            for (auto i = value.begin(); i != value.end(); ++i) {
+                auto s3 = handleSimpleType(i.value());
+                if (!s3) { good = false; break; }
+                s2 += *s3; s2 += ' ';
+            }
+
+            if (good)
+                jsonSh += fmt("declare -a %s=(%s)\n", i.key(), s2);
+        }
+
+        else if (value.is_object()) {
+            std::string s2;
+            bool good = true;
+
+            for (auto i = value.begin(); i != value.end(); ++i) {
+                auto s3 = handleSimpleType(i.value());
+                if (!s3) { good = false; break; }
+                s2 += fmt("[%s]=%s ", shellEscape(i.key()), *s3);
+            }
+
+            if (good)
+                jsonSh += fmt("declare -A %s=(%s)\n", i.key(), s2);
+        }
+    }
+
+    return std::make_pair(jsonSh, json);
+}
 }

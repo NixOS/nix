@@ -1,10 +1,15 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <filesystem>
 #include <regex>
 #include <sstream>
 #include <vector>
+#include <map>
 
+#include <nlohmann/json.hpp>
+
+#include "parsed-derivations.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
@@ -422,12 +427,41 @@ static void main_nix_build(int argc, char * * argv)
             } else
                 env[var.first] = var.second;
 
+        std::string structuredAttrsRC;
+        std::string exitCmd;
+
+        if (env.count("__json")) {
+            StorePathSet inputs;
+            for (auto & [depDrvPath, wantedDepOutputs] : drv.inputDrvs) {
+                auto outputs = store->queryPartialDerivationOutputMap(depDrvPath);
+                for (auto & i : wantedDepOutputs) {
+                    auto o = outputs.at(i);
+                    store->computeFSClosure(*o, inputs);
+                }
+            }
+
+            ParsedDerivation parsedDrv(
+                StorePath(store->parseStorePath(drvInfo.queryDrvPath())),
+                drv
+            );
+
+            if (auto structAttrs = parsedDrv.generateStructuredAttrs(std::nullopt, *store, inputs)) {
+                auto val = structAttrs.value();
+                structuredAttrsRC = val.first;
+                auto attrsJSON = std::filesystem::current_path().string() + "/.attrs.json";
+                writeFile(attrsJSON, val.second.dump());
+                exitCmd = "\n_rm_attrs_json() { rm -f " + attrsJSON + "; }"
+                    + "\nexitHooks+=(_rm_attrs_json)"
+                    + "\nfailureHooks+=(_rm_attrs_json)\n";
+            }
+        }
+
         /* Run a shell using the derivation's environment.  For
            convenience, source $stdenv/setup to setup additional
            environment variables and shell functions.  Also don't
            lose the current $PATH directories. */
         auto rcfile = (Path) tmpDir + "/rc";
-        writeFile(rcfile, fmt(
+        std::string rc = fmt(
                 R"(_nix_shell_clean_tmpdir() { rm -rf %1%; }; )"s +
                 (keepTmp ?
                     "trap _nix_shell_clean_tmpdir EXIT; "
@@ -436,8 +470,9 @@ static void main_nix_build(int argc, char * * argv)
                     "_nix_shell_clean_tmpdir; ") +
                 (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
-                "dontAddDisableDepTrack=1; "
-                "[ -e $stdenv/setup ] && source $stdenv/setup; "
+                "dontAddDisableDepTrack=1;\n"
+                + structuredAttrsRC + exitCmd +
+                "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
                 "PATH=%4%:\"$PATH\"; "
                 "SHELL=%5%; "
@@ -455,7 +490,9 @@ static void main_nix_build(int argc, char * * argv)
                 shellEscape(dirOf(*shell)),
                 shellEscape(*shell),
                 (getenv("TZ") ? (string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
-                envCommand));
+                envCommand);
+        vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
+        writeFile(rcfile, rc);
 
         Strings envStrs;
         for (auto & i : env)

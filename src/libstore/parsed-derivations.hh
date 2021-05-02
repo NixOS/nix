@@ -6,6 +6,8 @@
 
 namespace nix {
 
+typedef std::pair<std::string, nlohmann::json> StructuredAttrsWithShellRC;
+
 class ParsedDerivation
 {
     StorePath drvPath;
@@ -36,6 +38,8 @@ public:
     bool willBuildLocally(Store & localStore) const;
 
     bool substitutesAllowed() const;
+
+    std::optional<StructuredAttrsWithShellRC> generateStructuredAttrs(std::optional<StringMap> inputRewrites, Store & store, const StorePathSet & inputPaths);
 };
 
 }
