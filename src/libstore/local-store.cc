@@ -529,9 +529,16 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
             throw SysError("querying extended attributes of '%s'", path);
 
         for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            /* Ignore SELinux security labels since these cannot be
-               removed even by root. */
-            if (eaName == "security.selinux") continue;
+            bool ignore =  false;
+            std::list<std::string>::iterator it;
+            std::list<std::string> ignoredAcls = settings.ignoredAcls.get();
+            for (it = ignoredAcls.begin(); it != ignoredAcls.end(); ++it) {
+                if (eaName == *it) {
+                    ignore = true;
+                    break;
+                }
+            }
+            if (ignore) continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
