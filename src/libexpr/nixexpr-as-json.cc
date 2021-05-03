@@ -106,6 +106,10 @@ void ExprPath::showAsJson(std::ostream & str) const
 void ExprVar::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprVar << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"name\":\""; String_showAsJson(str, name); str << "\"";
     str << '}';
 }
@@ -113,6 +117,10 @@ void ExprVar::showAsJson(std::ostream & str) const
 void ExprSelect::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprSelect << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"set\":"; e->showAsJson(str);
     str << ",\"attr\":"; AttrPath_showAsJson(str, attrPath);
     if (def) {
@@ -137,7 +145,14 @@ void ExprAttrs::showAsJson(std::ostream & str) const
     bool first = true;
     for (auto & i : attrs) {
         if (first) first = false; else str << ",";
-        str << "{\"inherited\":" << (i.second.inherited ? "true" : "false"); // NOTE inherited is always false. { inherit (scope) attr; } -> { attr = scope.attr; }
+        if (i.second.pos.line > 0) {
+            str << "{\"line\":" << i.second.pos.line;
+            str << ",\"column\":" << i.second.pos.column << ',';
+        }
+        else {
+            str << '{';
+        }
+        str << "\"inherited\":" << (i.second.inherited ? "true" : "false"); // NOTE inherited is always false. { inherit (scope) attr; } -> { attr = scope.attr; }
         str << ",\"name\":\""; String_showAsJson(str, i.first); str << "\"";
         if (!i.second.inherited) {
             str << ",\"value\":"; i.second.e->showAsJson(str);
@@ -149,8 +164,14 @@ void ExprAttrs::showAsJson(std::ostream & str) const
     first = true;
     for (auto & i : dynamicAttrs) {
         if (first) first = false; else str << ",";
-        str << "{";
-        str << ",\"name\":\""; i.nameExpr->showAsJson(str);
+        if (i.pos.line > 0) {
+            str << "{\"line\":" << i.pos.line;
+            str << ",\"column\":" << i.pos.column << ',';
+        }
+        else {
+            str << '{';
+        }
+        str << "\"name\":\""; i.nameExpr->showAsJson(str);
         str << ",\"value\":"; i.valueExpr->showAsJson(str);
         str << '}';
     }
@@ -173,13 +194,23 @@ void ExprList::showAsJson(std::ostream & str) const
 void ExprLambda::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprLambda << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"matchAttrs\":" << (matchAttrs ? "true" : "false");
     if (matchAttrs) {
         str << ",\"formals\":[";
         bool first = true;
         for (auto & i : formals->formals) {
             if (first) first = false; else str << ",";
-            str << "{";
+            if (i.pos.line > 0) {
+                str << "{\"line\":" << i.pos.line;
+                str << ",\"column\":" << i.pos.column << ',';
+            }
+            else {
+                str << '{';
+            }
             str << "\"name\":\""; String_showAsJson(str, i.name); str << "\"";
             if (i.def) {
                 str << ",\"default\":"; i.def->showAsJson(str);
@@ -219,6 +250,10 @@ void ExprLet::showAsJson(std::ostream & str) const
 void ExprWith::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprWith << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"set\":"; attrs->showAsJson(str);
     str << ",\"body\":"; body->showAsJson(str);
     str << '}';
@@ -227,6 +262,10 @@ void ExprWith::showAsJson(std::ostream & str) const
 void ExprIf::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprIf << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"cond\":"; cond->showAsJson(str);
     str << ",\"then\":"; then->showAsJson(str);
     str << ",\"else\":"; else_->showAsJson(str);
@@ -236,6 +275,10 @@ void ExprIf::showAsJson(std::ostream & str) const
 void ExprAssert::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprAssert << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"cond\":"; cond->showAsJson(str);
     str << ",\"body\":"; body->showAsJson(str);
     str << '}';
@@ -251,6 +294,10 @@ void ExprOpNot::showAsJson(std::ostream & str) const
 void ExprConcatStrings::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprConcatStrings << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
     str << ",\"strings\":[";
     bool first = true;
     for (auto & i : *es) {
@@ -262,9 +309,13 @@ void ExprConcatStrings::showAsJson(std::ostream & str) const
 
 void ExprPos::showAsJson(std::ostream & str) const
 {
-    str << "{\"type\":\"" << NodeTypeName::ExprPos << "\"" << "}";
+    str << "{\"type\":\"" << NodeTypeName::ExprPos << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
+    str << "}";
 }
-
 
 void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath)
 {

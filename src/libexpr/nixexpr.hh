@@ -387,6 +387,8 @@ char const* const NodeTypeNameOfId[] = {
         void showAsJson(std::ostream & str) const \
         { \
             str << "{\"type\":\"" << NodeTypeName::name << "\"";   \
+            str << ",\"line\":" << pos.line;   \
+            str << ",\"column\":" << pos.column;   \
             str << ",\"op1\":"; e1->showAsJson(str);   \
             str << ",\"op2\":"; e2->showAsJson(str);   \
             str << "}";   \
