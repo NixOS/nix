@@ -6,11 +6,13 @@
 
 // debug
 #include <iostream>
+#include <sys/select.h>
 
 // https://github.com/fmtlib/fmt
-#include "include/fmt/include/fmt/core.h"
+#define FMT_HEADER_ONLY
+#include "libfmt/core.h" // libfmt::print
 
-#include "nixexpr-node-types.h"
+#include "nixexpr-node-types.h" // TYPEIDSTR
 
 namespace nix {
 
@@ -65,249 +67,245 @@ char String_showAsJsonArraysFmt_replace_array[93][7] = {
   "Z", "[", "\\\\", // 90 - 92
 };
 
-void String_showAsJsonArraysFmt(std::ostream & o, const std::string & s) {
+void String_showAsJsonArraysFmt(FILE *fd, const std::string & s) {
   for (auto c = s.cbegin(); c != s.cend(); c++) {
     if ((std::uint8_t) *c <= 92)
-      o << String_showAsJsonArraysFmt_replace_array[(std::uint8_t) *c];
+      libfmt::print(fd, "{}", String_showAsJsonArraysFmt_replace_array[(std::uint8_t) *c]);
     else
-      o << *c;
+      libfmt::print(fd, "{}", *c);
   }
 }
 
-void Expr::showAsJsonArraysFmt(std::ostream & str) const
+void Expr::showAsJsonArraysFmt(FILE *fd) const
 {
     abort();
 }
 
-void ExprInt::showAsJsonArraysFmt(std::ostream & str) const
+void ExprInt::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprInt) "," << n << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprInt) ",{}]", n);
 }
 
-void ExprFloat::showAsJsonArraysFmt(std::ostream & str) const
+void ExprFloat::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprFloat) "," << nf << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprFloat) ",{}]", nf);
 }
 
-void ExprString::showAsJsonArraysFmt(std::ostream & str) const
+void ExprString::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprString) ",\"";
-    String_showAsJsonArraysFmt(str, s);
-    str << "\"]";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprString) ",\"");
+    String_showAsJsonArraysFmt(fd, s);
+    libfmt::print(fd, "\"]");
 }
 
 // TODO stop parser from transforming relative to absolute paths
 // parsed path should be exactly as declared in the nix file
-void ExprPath::showAsJsonArraysFmt(std::ostream & str) const
+void ExprPath::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprPath) ",\"";
-    String_showAsJsonArraysFmt(str, s);
-    str << "\"]";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprPath) ",\"");
+    String_showAsJsonArraysFmt(fd, s);
+    libfmt::print(fd, "\"]");
 }
 
-void ExprVar::showAsJsonArraysFmt(std::ostream & str) const
+void ExprVar::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprVar) ",\"";
-    String_showAsJsonArraysFmt(str, name);
-    str << "\"]";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprVar) ",\"");
+    String_showAsJsonArraysFmt(fd, name);
+    libfmt::print(fd, "\"]");
 }
 
-void ExprSelect::showAsJsonArraysFmt(std::ostream & str) const
+void ExprSelect::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprSelect);
-    str << ','; e->showAsJsonArraysFmt(str);
-    str << ','; AttrPath_showAsJsonArraysFmt(str, attrPath);
+    libfmt::print(fd, "[" TYPEIDSTR(ExprSelect) ",");
+    e->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, ",");
+    AttrPath_showAsJsonArraysFmt(fd, attrPath);
     if (def) {
-        str << ','; def->showAsJsonArraysFmt(str);
+        libfmt::print(fd, ",");
+        def->showAsJsonArraysFmt(fd);
     }
-    str << ']';
+    libfmt::print(fd, "]");
 }
 
-void ExprOpHasAttr::showAsJsonArraysFmt(std::ostream & str) const
+void ExprOpHasAttr::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprOpHasAttr);
-    str << ','; e->showAsJsonArraysFmt(str);
-    str << ','; AttrPath_showAsJsonArraysFmt(str, attrPath);
-    str << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprOpHasAttr) ",");
+    e->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, ",");
+    AttrPath_showAsJsonArraysFmt(fd, attrPath);
+    libfmt::print(fd, "]");
 }
 
-void ExprAttrs::showAsJsonArraysFmt(std::ostream & str) const
+void ExprAttrs::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprAttrs);
-    str << ',' << (recursive ? '1' : '0');
-    str << ",[";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprAttrs) ",{},[", (recursive ? '1' : '0'));
+
     bool first = true;
     for (auto & i : attrs) {
-        if (first) first = false; else str << ',';
-        str << '[' << (i.second.inherited ? '1' : '0');
-        str << ",\""; String_showAsJsonArraysFmt(str, i.first); str << '"';
+        if (first) first = false; else libfmt::print(fd, ",");
+        libfmt::print(fd, "[{},\"", (i.second.inherited ? '1' : '0'));
+        String_showAsJsonArraysFmt(fd, i.first);
+        libfmt::print(fd, "\"");
         if (!i.second.inherited) {
-            str << ','; i.second.e->showAsJsonArraysFmt(str);
+            libfmt::print(fd, ",");
+            i.second.e->showAsJsonArraysFmt(fd);
         }
-        str << ']';
+        libfmt::print(fd, "]");
     }
-    str << ']';
-    str << ",[";
+    libfmt::print(fd, "],[");
     first = true;
     for (auto & i : dynamicAttrs) {
-        if (first) first = false; else str << ',';
-        str << '[';
-        str << ",\""; i.nameExpr->showAsJsonArraysFmt(str); str << '"';
-        str << ','; i.valueExpr->showAsJsonArraysFmt(str);
-        str << ']';
+        if (first) first = false; else libfmt::print(fd, ",");
+        libfmt::print(fd, "[\"");
+        i.nameExpr->showAsJsonArraysFmt(fd);
+        libfmt::print(fd, "\",");
+        i.valueExpr->showAsJsonArraysFmt(fd);
+        libfmt::print(fd, "]");
     }
-    str << "]]";
+    libfmt::print(fd, "]]");
 }
 
-void ExprList::showAsJsonArraysFmt(std::ostream & str) const
+void ExprList::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprList);
-    str << ",[";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprList) ",[");
     bool first = true;
     for (auto & i : elems) {
-        if (first) first = false; else str << ',';
-        i->showAsJsonArraysFmt(str);
+        if (first) first = false; else libfmt::print(fd, ",");
+        i->showAsJsonArraysFmt(fd);
     }
-    str << "]]";
+    libfmt::print(fd, "]]");
 }
 
 // https://nixos.wiki/wiki/Nix_Expression_Language#Functions
-void ExprLambda::showAsJsonArraysFmt(std::ostream & str) const
+void ExprLambda::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprLambda);
-    str << ',' << (matchAttrs ? '1' : '0');
+    libfmt::print(fd, "[" TYPEIDSTR(ExprLambda) ",{}", (matchAttrs ? '1' : '0'));
 
     if (matchAttrs) {
-        str << ",[";
+        libfmt::print(fd, ",[");
         bool first = true;
         for (auto & i : formals->formals) {
-            if (first) first = false; else str << ',';
-            str << '[';
-            str << "\""; String_showAsJsonArraysFmt(str, i.name); str << '"';
+            if (first) first = false; else libfmt::print(fd, ",");
+            libfmt::print(fd, "[\"");
+            String_showAsJsonArraysFmt(fd, i.name);
+            libfmt::print(fd, "\"");
             if (i.def) {
-                str << ','; i.def->showAsJsonArraysFmt(str);
+                libfmt::print(fd, ",");
+                i.def->showAsJsonArraysFmt(fd);
             }
-            str << ']';
+            libfmt::print(fd, "]");
         }
-        str << ']';
-        str << ',' << (formals->ellipsis ? '1' : '0');
+        libfmt::print(fd, "],{}", (formals->ellipsis ? '1' : '0'));
     }
     else {
-        str << ",0,0";
+        libfmt::print(fd, ",0,0");
     }
 
     if (!arg.empty()) {
-        str << ",\"" << arg << '"'; // FIXME this causes segfault
-        ////////////////////str << ",\"" << "foo_arg" << '"';
-        // input: (lambda_arg: null)
+        libfmt::print(fd, ",\"{}\",", arg);
     }
     else {
-        str << ",0";
+        libfmt::print(fd, ",0,");
     }
 
-    /* showAsJson:
-    if (!arg.empty())
-        str << ",\"arg\":\"" << arg << "\"";
-    */
-    // body is last index
-
-    // debug
-    /*
-    std::cout << "<<< lambda body = ";
-    body->showAsJsonArraysFmt(std::cout); // #include <iostream>
-    std::cout << " >>>";
-    */
-
-    str << ','; body->showAsJsonArraysFmt(str); // FIXME segfault
-    str << ']';
+    body->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, "]");
 }
 
 // https://nixos.wiki/wiki/Nix_Expression_Language#let_..._in_statement
-void ExprLet::showAsJsonArraysFmt(std::ostream & str) const
+void ExprLet::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprLet);
-    str << ",[";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprLet) ",[");
     bool first = true;
     for (auto & i : attrs->attrs) {
-        if (first) first = false; else str << ',';
-        str << '[' << (i.second.inherited ? '1' : '0');
-        str << ",\""; String_showAsJsonArraysFmt(str, i.first); str << '"';
+        if (first) first = false; else libfmt::print(fd, ",");
+        libfmt::print(fd, "[{},\"", (i.second.inherited ? '1' : '0'));
+        String_showAsJsonArraysFmt(fd, i.first);
+        libfmt::print(fd, "\"");
         if (!i.second.inherited) {
-            str << ','; i.second.e->showAsJsonArraysFmt(str);
+            libfmt::print(fd, ",");
+            i.second.e->showAsJsonArraysFmt(fd);
         }
-        str << ']';
+        libfmt::print(fd, "]");
     }
-    str << ']';
-    str << ','; body->showAsJsonArraysFmt(str);
-    str << ']';
+    libfmt::print(fd, "],");
+    body->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, "]");
 }
 
 // https://nixos.wiki/wiki/Nix_Expression_Language#with_statement
-void ExprWith::showAsJsonArraysFmt(std::ostream & str) const
+void ExprWith::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprWith);
-    str << ','; attrs->showAsJsonArraysFmt(str);
-    str << ','; body->showAsJsonArraysFmt(str);
-    str << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprWith) ",");
+    attrs->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, ",");
+    body->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, "]");
 }
 
-void ExprIf::showAsJsonArraysFmt(std::ostream & str) const
+void ExprIf::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprIf);
-    str << ','; cond->showAsJsonArraysFmt(str);
-    str << ','; then->showAsJsonArraysFmt(str);
-    str << ','; else_->showAsJsonArraysFmt(str);
-    str << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprIf) ",");
+    cond->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, ",");
+    then->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, ",");
+    else_->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, "]");
 }
 
-void ExprAssert::showAsJsonArraysFmt(std::ostream & str) const
+void ExprAssert::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprAssert);
-    str << ','; cond->showAsJsonArraysFmt(str);
-    str << ','; body->showAsJsonArraysFmt(str);
-    str << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprAssert) ",");
+    cond->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, ",");
+    body->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, "]");
 }
 
-void ExprOpNot::showAsJsonArraysFmt(std::ostream & str) const
+void ExprOpNot::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprOpNot);
-    str << ','; e->showAsJsonArraysFmt(str);
-    str << ']';
+    libfmt::print(fd, "[" TYPEIDSTR(ExprOpNot) ",");
+    e->showAsJsonArraysFmt(fd);
+    libfmt::print(fd, "]");
 }
 
-void ExprConcatStrings::showAsJsonArraysFmt(std::ostream & str) const
+void ExprConcatStrings::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprConcatStrings);
-    str << ",[";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprConcatStrings) ",[");
     bool first = true;
     for (auto & i : *es) {
-        if (first) first = false; else str << ',';
-        i->showAsJsonArraysFmt(str);
+        if (first) first = false; else libfmt::print(fd, ",");
+        i->showAsJsonArraysFmt(fd);
     }
-    str << "]]";
+    libfmt::print(fd, "]]");
 }
 
-void ExprPos::showAsJsonArraysFmt(std::ostream & str) const
+void ExprPos::showAsJsonArraysFmt(FILE *fd) const
 {
-    str << "[" TYPEIDSTR(ExprPos) "]";
+    libfmt::print(fd, "[" TYPEIDSTR(ExprPos) "]");
 }
 
 
-void AttrPath_showAsJsonArraysFmt(std::ostream & out, const AttrPath & attrPath)
+void AttrPath_showAsJsonArraysFmt(FILE *fd, const AttrPath & attrPath)
 {
-    out << '[';
+    libfmt::print(fd, "[");
     bool first = true;
     for (auto & i : attrPath) {
-        if (!first) out << ','; else first = false;
+        if (first) first = false; else libfmt::print(fd, ",");
         if (i.symbol.set()) {
             // index 0: isExpr
-            out << "[0,\""; String_showAsJsonArraysFmt(out, i.symbol); out << "\"]";
+            libfmt::print(fd, "[0,\"");
+            String_showAsJsonArraysFmt(fd, i.symbol);
+            libfmt::print(fd, "\"]");
         }
         else {
-            out << "[1,"; i.expr->showAsJsonArraysFmt(out); out << ']';
+            libfmt::print(fd, "[1,");
+            i.expr->showAsJsonArraysFmt(fd);
+            libfmt::print(fd, "]");
         }
     }
-    out << ']';
+    libfmt::print(fd, "]");
 }
 
 }

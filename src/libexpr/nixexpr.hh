@@ -4,6 +4,12 @@
 #include "symbol-table.hh"
 #include "error.hh"
 
+#include <map>
+
+#define FMT_HEADER_ONLY
+#include "libfmt/core.h" // libfmt::print
+
+#include "nixexpr-node-types.h" // TYPEIDSTR
 
 namespace nix {
 
@@ -79,7 +85,7 @@ struct Expr
     virtual void show(std::ostream & str) const;
     virtual void showAsJson(std::ostream & str) const;
     virtual void showAsJsonArrays(std::ostream & str) const;
-    virtual void showAsJsonArraysFmt(std::ostream & str) const;
+    virtual void showAsJsonArraysFmt(FILE *fd) const;
     virtual void showAsJsonNumtypes(std::ostream & str) const;
     //virtual void showAsXml(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
@@ -95,7 +101,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
     void show(std::ostream & str) const; \
     void showAsJson(std::ostream & str) const; \
     void showAsJsonArrays(std::ostream & str) const; \
-    void showAsJsonArraysFmt(std::ostream & str) const; \
+    void showAsJsonArraysFmt(FILE *fd) const; \
     void showAsJsonNumtypes(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
     void bindVars(const StaticEnv & env);
@@ -244,6 +250,7 @@ struct ExprLambda : Expr
     Pos pos;
     Symbol name;
     Symbol arg;
+    bool matchAttrs;
     Formals * formals;
     Expr * body;
     ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
@@ -398,12 +405,13 @@ char const* const NodeTypeNameOfId[] = {
             str << ','; e2->showAsJsonArrays(str);   \
             str << ']';   \
         } \
-        void showAsJsonArraysFmt(std::ostream & str) const \
+        void showAsJsonArraysFmt(FILE *fd) const \
         { \
-            str << '[' << (int) NodeTypeId::name;   \
-            str << ','; e1->showAsJsonArraysFmt(str);   \
-            str << ','; e2->showAsJsonArraysFmt(str);   \
-            str << ']';   \
+            libfmt::print(fd, "[" TYPEIDSTR(name) ","); \
+            e1->showAsJsonArraysFmt(fd);   \
+            libfmt::print(fd, ","); \
+            e2->showAsJsonArraysFmt(fd);   \
+            libfmt::print(fd, "]"); \
         } \
         void bindVars(const StaticEnv & env) \
         { \
@@ -412,6 +420,7 @@ char const* const NodeTypeNameOfId[] = {
         void eval(EvalState & state, Env & env, Value & v); \
     };
 
+MakeBinOp(ExprApp, "")
 MakeBinOp(ExprOpEq, "==")
 MakeBinOp(ExprOpNEq, "!=")
 MakeBinOp(ExprOpAnd, "&&")
@@ -472,7 +481,7 @@ struct StaticEnv
 
 void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath);
 void AttrPath_showAsJsonArrays(std::ostream & out, const AttrPath & attrPath);
-void AttrPath_showAsJsonArraysFmt(std::ostream & out, const AttrPath & attrPath);
+void AttrPath_showAsJsonArraysFmt(FILE *fd, const AttrPath & attrPath);
 void AttrPath_showAsJsonNumtypes(std::ostream & out, const AttrPath & attrPath);
 
 }
