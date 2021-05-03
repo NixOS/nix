@@ -151,7 +151,7 @@ void ExprAttrs::showAsJsonArrays(std::ostream & str) const
     for (auto & i : dynamicAttrs) {
         if (first) first = false; else str << ',';
         str << '[';
-        str << ",\""; i.nameExpr->showAsJsonArrays(str); str << '"';
+        str << '"'; i.nameExpr->showAsJsonArrays(str); str << '"';
         str << ','; i.valueExpr->showAsJsonArrays(str);
         str << ']';
     }
