@@ -672,7 +672,7 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
 
 static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
 {
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 30) {
         worker_proto::write(store, conn->to, reqs);
     } else {
         Strings ss;
