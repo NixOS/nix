@@ -14,6 +14,7 @@
 
 #include <map>
 #include <iostream>
+#include <cstdio> // stdout
 
 
 using namespace nix;
@@ -41,7 +42,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             e->showAsJsonArrays(std::cout);
         }
         else if (output == okJSONArraysFmt) {
-            e->showAsJsonArraysFmt(std::cout);
+            // https://stackoverflow.com/questions/18688763/why-is-istream-ostream-slow
+            e->showAsJsonArraysFmt(stdout);
         }
         else if (output == okJSONNumtypes) {
             e->showAsJsonNumtypes(std::cout);
