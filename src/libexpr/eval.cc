@@ -1398,12 +1398,28 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             if (j != args.end()) {
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
-                throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
+                auto error = MissingArgumentError({
+                            .msg = hintfmt(R"(cannot evaluate a function that has an argument without a value ('%1%')
 
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
+https://nixos.org/manual/nix/stable/#ss-functions.)", i.name),
+                            .errPos = i.pos
+                        });
+                
+//                 throwMissingArgumentError(i.pos
+//                                           , R"(cannot evaluate a function that has an argument without a value ('%1%')
+
+// Nix attempted to evaluate a function as a top level expression; in
+// this case it must have its arguments supplied either by default
+// values, or passed explicitly with '--arg' or '--argstr'. See
+// https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
+
+                if (debuggerHook)
+                    debuggerHook(error, {{"fun", &fun}});
+
+                throw error;
 
             }
         }

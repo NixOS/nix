@@ -79,24 +79,28 @@ ref<EvalState> EvalCommand::getEvalState()
     return ref<EvalState>(evalState);
 }
 */
-EvalCommand::EvalCommand()
-{
-    addFlag({
-        .longName = "debugger",
-        .description = "start an interactive environment if evaluation fails",
-        .handler = {&startReplOnEvalErrors, true},
-    });
-}
 // ref<EvalState> EvalCommand::getEvalState()
 // {
 //     if (!evalState)
 //         evalState = std::make_shared<EvalState>(searchPath, getStore());
 //     return ref<EvalState>(evalState);
 // }
+
+
+EvalCommand::EvalCommand()
+{
+    // std::cout << "EvalCommand::EvalCommand()" << std::endl;
+    addFlag({
+        .longName = "debugger",
+        .description = "start an interactive environment if evaluation fails",
+        .handler = {&startReplOnEvalErrors, true},
+    });
+}
 extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
 
 ref<EvalState> EvalCommand::getEvalState()
 {
+    std::cout << " EvalCommand::getEvalState()" << startReplOnEvalErrors << std::endl;
     if (!evalState) {
         evalState = std::make_shared<EvalState>(searchPath, getStore());
         if (startReplOnEvalErrors)
