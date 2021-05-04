@@ -51,7 +51,7 @@ case "$(uname -s).$(uname -m)" in
           oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
         fi
 
-        hash=@binaryTarball_x86_64-darwin@
+        hash=@tarballHash_x86_64-darwin@
         path=@tarballPath_x86_64-darwin@
         # eventually maybe: arm64-darwin
         system=x86_64-darwin
