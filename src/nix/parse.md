@@ -1,13 +1,17 @@
 R""(
 
-TODO ... based on eval.cc
-
 # Examples
 
 * Parse a Nix file:
 
   ```console
   # nix parse some-file.nix
+  ```
+
+* Parse a Nix file to JSON format:
+
+  ```console
+  # nix parse --output-format json some-file.nix
   ```
 
 # Description
