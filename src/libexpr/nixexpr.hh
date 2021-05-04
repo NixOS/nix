@@ -88,7 +88,6 @@ struct Expr
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
 
-//void showAsXml(std::ostream & str) const;
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
     void showAsJson(std::ostream & str) const; \
@@ -343,8 +342,10 @@ struct NodeTypeName {
         void showAsJson(std::ostream & str) const \
         { \
             str << "{\"type\":\"" << NodeTypeName::name << "\"";   \
-            str << ",\"line\":" << pos.line;   \
-            str << ",\"column\":" << pos.column;   \
+            if (pos.line > 0) {   \
+                str << ",\"line\":" << pos.line;   \
+                str << ",\"column\":" << pos.column;   \
+            }   \
             str << ",\"op1\":"; e1->showAsJson(str);   \
             str << ",\"op2\":"; e2->showAsJson(str);   \
             str << "}";   \
