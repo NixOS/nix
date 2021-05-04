@@ -6,37 +6,12 @@
 
 namespace nix {
 
-// json output format
-
 // binary operators are implemented in nixexpr.hh MakeBinOp
-
-// TODO use NodeTypeId not NodeTypeName
-
-// TODO reduce number of types
-
-// TODO `json-arrays` format
-// = positional json schema
-// = scalar attributes first (type id, name), complex attributes last (body, expr)
-
-// FIXME segfaults on large nix files, e.g. nixpkgs/pkgs/top-level/all-packages.nix -> buffer limit? segfault after exactly 1568768 bytes of output = 1532 * 1024
-// -> TODO: compile with `-g` and run in `gdb`
-// FIXME:
-// ./nix-instantiate --parse --json <( echo null )
-// workaround:
-// echo '{}: { foo = "bar"; }' >test.nix; ./nix-instantiate --parse --json test.nix | jq
-// error: getting status of '/dev/fd/pipe:[15897656]': No such file or directory
-// TODO move to separate file?
-// TODO remove \n (only for debug)
-// TODO support 2 json schemas? json-array (fast) and json-object (verbose)
-// TEST valid json:
-// make -j $NIX_BUILD_CORES && ./nix-instantiate --parse --json /nix/store/*nix*/*/nixpkgs/pkgs/top-level/all-packages.nix >test.all-packages.nix.json ; cat test.all-packages.nix.json | jq
-// TEST simple test for balanced braces:
-// for c in '{' '}' '[' ']'; do echo $c $(fgrep -o "$c" test.all-packages.nix.json | wc -l); done
 
 // https://stackoverflow.com/questions/7724448
 // note: we use full jump table to make this as fast as possible
 // note: we assume valid input. errors should be handled by the nix parser
-// 93 * 7 = 651 byte / 4096 page = 16%
+// 93 * 7 = 651 byte
 char String_showAsJson_replace_array[93][7] = {
   "\\u0000", "\\u0001", "\\u0002", "\\u0003", "\\u0004", // 0 - 4
   "\\u0005", "\\u0006", "\\u0007", "\\b", "\\t", // 5 - 9
@@ -94,8 +69,6 @@ void ExprString::showAsJson(std::ostream & str) const
     str << '}';
 }
 
-// TODO stop parser from transforming relative to absolute paths
-// parsed path should be exactly as declared in the nix file
 void ExprPath::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprPath << "\"";
@@ -181,7 +154,7 @@ void ExprAttrs::showAsJson(std::ostream & str) const
 void ExprList::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprList << "\"";
-    str << ",\"items\":["; // TODO name? items, elements, values
+    str << ",\"items\":[";
     bool first = true;
     for (auto & i : elems) {
         if (first) first = false; else str << ",";
@@ -190,7 +163,6 @@ void ExprList::showAsJson(std::ostream & str) const
     str << "]}";
 }
 
-// https://nixos.wiki/wiki/Nix_Expression_Language#Functions
 void ExprLambda::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprLambda << "\"";
@@ -226,7 +198,6 @@ void ExprLambda::showAsJson(std::ostream & str) const
     str << '}';
 }
 
-// https://nixos.wiki/wiki/Nix_Expression_Language#let_..._in_statement
 void ExprLet::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprLet << "\"";
@@ -246,7 +217,6 @@ void ExprLet::showAsJson(std::ostream & str) const
     str << '}';
 }
 
-// https://nixos.wiki/wiki/Nix_Expression_Language#with_statement
 void ExprWith::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprWith << "\"";

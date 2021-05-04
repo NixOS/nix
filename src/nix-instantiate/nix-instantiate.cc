@@ -15,6 +15,11 @@
 #include <map>
 #include <iostream>
 
+// FIXME:
+// ./nix-instantiate --parse <( echo null )
+// error: getting status of '/dev/fd/pipe:[15897656]': No such file or directory
+// workaround:
+// echo null >test.nix; ./nix-instantiate --parse test.nix
 
 using namespace nix;
 
