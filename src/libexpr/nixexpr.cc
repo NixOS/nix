@@ -4,9 +4,6 @@
 
 #include <cstdlib>
 
-// TODO remove? or fix linking errors
-#define FMT_HEADER_ONLY
-#include "libfmt/core.h" // libfmt::print
 
 namespace nix {
 

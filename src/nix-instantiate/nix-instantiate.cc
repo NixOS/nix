@@ -14,7 +14,6 @@
 
 #include <map>
 #include <iostream>
-#include <cstdio> // stdout
 
 
 using namespace nix;
@@ -24,7 +23,7 @@ static Path gcRoot;
 static int rootNr = 0;
 
 
-enum OutputKind { okPlain, okXML, okJSON, okJSONArrays, okJSONNumtypes, okJSONArraysFmt };
+enum OutputKind { okPlain, okXML, okJSON };
 
 
 void processExpr(EvalState & state, const Strings & attrPaths,
@@ -33,20 +32,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 {
     if (parseOnly) {
         if (output == okJSON) {
-            // TODO (optionally) add to json ast:
-            // * source locations (start char + end char)
-            // * parsed comments and whitespace
             e->showAsJson(std::cout);
-        }
-        else if (output == okJSONArrays) {
-            e->showAsJsonArrays(std::cout);
-        }
-        else if (output == okJSONArraysFmt) {
-            // https://stackoverflow.com/questions/18688763/why-is-istream-ostream-slow
-            e->showAsJsonArraysFmt(stdout);
-        }
-        else if (output == okJSONNumtypes) {
-            e->showAsJsonNumtypes(std::cout);
         }
         else {
             e->show(std::cout);
@@ -151,15 +137,6 @@ static int main_nix_instantiate(int argc, char * * argv)
                 outputKind = okXML;
             else if (*arg == "--json")
                 outputKind = okJSON;
-            // test
-            else if (*arg == "--json-arrays")
-                outputKind = okJSONArrays;
-            // test
-            else if (*arg == "--json-arrays-fmt")
-                outputKind = okJSONArraysFmt;
-            // test
-            else if (*arg == "--json-numtypes")
-                outputKind = okJSONNumtypes;
             else if (*arg == "--no-location")
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
