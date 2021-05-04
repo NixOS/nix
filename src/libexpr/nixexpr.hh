@@ -6,10 +6,6 @@
 
 #include <map>
 
-#define FMT_HEADER_ONLY
-#include "libfmt/core.h" // libfmt::print
-
-#include "nixexpr-node-types.h" // TYPEIDSTR
 
 namespace nix {
 
@@ -84,10 +80,6 @@ struct Expr
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
     virtual void showAsJson(std::ostream & str) const;
-    virtual void showAsJsonArrays(std::ostream & str) const;
-    virtual void showAsJsonArraysFmt(FILE *fd) const;
-    virtual void showAsJsonNumtypes(std::ostream & str) const;
-    //virtual void showAsXml(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
@@ -100,9 +92,6 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
     void showAsJson(std::ostream & str) const; \
-    void showAsJsonArrays(std::ostream & str) const; \
-    void showAsJsonArraysFmt(FILE *fd) const; \
-    void showAsJsonNumtypes(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
     void bindVars(const StaticEnv & env);
 
@@ -323,39 +312,6 @@ struct NodeTypeName {
     // values are defined in nixexpr.cc
 };
 
-/*
-// define NodeTypeNameOfId[NodeTypeId::ExprLambda] etc.
-char const* const NodeTypeNameOfId[] = {
-    "NotUsed",
-#   define ADD_TYPE(t) #t,
-#   include "nixexpr-node-types.def"
-#   undef ADD_TYPE
-    0
-};
-*/
-
-
-
-// https://nixos.wiki/wiki/Nix_Expression_Language#Types
-// https://nixos.org/manual/nix/stable/#ssec-values
-// note. we use `enum class` to keep the enum-items local
-
-
-
-
-
-// jsonTypeName sample: name ExprOpAnd -> jsonTypeName opAnd
-// TODO showAsJson: fix recursion: call e1->showAsJson(str), etc.
-/*
-            std::string jsonTypeName = [] { \
-                std::string res = ((std::string) #name).substr(4); \
-                if (res.length() > 0 && 'A' <= res[0] && res[0] <= 'Z') \
-                    res[0] += 32; \
-                return res; \
-            }(); \
-            \
-            str << "{\"type\":\"" << jsonTypeName << "\"";   \
-*/
 #define MakeBinOp(name, s) \
     struct name : Expr \
     { \
@@ -375,28 +331,6 @@ char const* const NodeTypeNameOfId[] = {
             str << ",\"op1\":"; e1->showAsJson(str);   \
             str << ",\"op2\":"; e2->showAsJson(str);   \
             str << "}";   \
-        } \
-        void showAsJsonNumtypes(std::ostream & str) const \
-        { \
-            str << "{\"type\":" << (int) NodeTypeId::name;   \
-            str << ",\"op1\":"; e1->showAsJsonNumtypes(str);   \
-            str << ",\"op2\":"; e2->showAsJsonNumtypes(str);   \
-            str << "}";   \
-        } \
-        void showAsJsonArrays(std::ostream & str) const \
-        { \
-            str << '[' << (int) NodeTypeId::name;   \
-            str << ','; e1->showAsJsonArrays(str);   \
-            str << ','; e2->showAsJsonArrays(str);   \
-            str << ']';   \
-        } \
-        void showAsJsonArraysFmt(FILE *fd) const \
-        { \
-            libfmt::print(fd, "[" TYPEIDSTR(name) ","); \
-            e1->showAsJsonArraysFmt(fd);   \
-            libfmt::print(fd, ","); \
-            e2->showAsJsonArraysFmt(fd);   \
-            libfmt::print(fd, "]"); \
         } \
         void bindVars(const StaticEnv & env) \
         { \
@@ -424,7 +358,6 @@ struct ExprConcatStrings : Expr
     COMMON_METHODS
 };
 
-// TODO what is Pos?
 struct ExprPos : Expr
 {
     Pos pos;
@@ -446,8 +379,5 @@ struct StaticEnv
 };
 
 void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath);
-void AttrPath_showAsJsonArrays(std::ostream & out, const AttrPath & attrPath);
-void AttrPath_showAsJsonArraysFmt(FILE *fd, const AttrPath & attrPath);
-void AttrPath_showAsJsonNumtypes(std::ostream & out, const AttrPath & attrPath);
 
 }

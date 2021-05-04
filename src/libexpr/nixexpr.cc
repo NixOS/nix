@@ -4,9 +4,6 @@
 
 #include <cstdlib>
 
-// TODO remove? or fix linking errors
-#define FMT_HEADER_ONLY
-#include "libfmt/core.h" // libfmt::print
 
 namespace nix {
 
@@ -66,8 +63,7 @@ std::ostream & operator << (std::ostream & str, const Symbol & sym)
 }
 
 
-
-// aterm output format
+// default output format ("aterm")
 
 void Expr::show(std::ostream & str) const
 {
@@ -203,7 +199,6 @@ void ExprPos::show(std::ostream & str) const
 }
 
 
-
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
     if (!pos)
@@ -227,6 +222,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 
     return str;
 }
+
 
 string showAttrPath(const AttrPath & attrPath)
 {
