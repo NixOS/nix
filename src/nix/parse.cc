@@ -5,7 +5,7 @@
 
 using namespace nix;
 
-enum OutputFormat {
+enum class OutputFormat {
     ATerm,
     XML,
     JSON,
@@ -13,7 +13,7 @@ enum OutputFormat {
 
 struct CmdParse : Command
 {
-    uint outputFormat = OutputFormat::ATerm;
+    OutputFormat outputFormat = OutputFormat::ATerm;
     Path inputFile;
 
     CmdParse()
@@ -21,7 +21,7 @@ struct CmdParse : Command
         expectArgs({
             .label = "input-file",
             .handler = {&inputFile},
-            .completer = completePath // ./src/libutil/args.hh:232
+            .completer = completePath // libutil/args.hh
         });
 
         addFlag({
@@ -34,12 +34,6 @@ struct CmdParse : Command
                     outputFormat = OutputFormat::JSON;
                     return;
                 }
-                /*
-                if (formatName == "xml") {
-                    outputFormat = OutputFormat::XML;
-                    return;
-                }
-                */
                 if (formatName == "aterm") {
                     outputFormat = OutputFormat::ATerm;
                     return;
@@ -89,14 +83,12 @@ struct CmdParse : Command
         //e = state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, inputFile))));
         e = state->parseExprFromFile(lookupFileArg(*state, inputFile));
 
-        if (outputFormat == OutputFormat::JSON)
+        if (outputFormat == OutputFormat::JSON) {
             e->showAsJson(std::cout);
-        /*
-        else if (outputFormat == OutputFormat::XML)
-            e->showAsXml(std::cout);
-        */
-        else
+        }
+        else {
             e->show(std::cout);
+        }
     }
 };
 
