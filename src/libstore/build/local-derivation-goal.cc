@@ -2300,10 +2300,6 @@ void LocalDerivationGoal::registerOutputs()
                 sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
                 StringSource source(*sink.s);
                 restorePath(actualPath, source);
-
-                /* FIXME: set proper permissions in restorePath() so
-                   we don't have to do another traversal. */
-                canonicalisePathMetaData(actualPath, -1, inodesSeen);
             }
         };
 
@@ -2451,6 +2447,10 @@ void LocalDerivationGoal::registerOutputs()
                 return *(ValidPathInfo*)0;
             },
         }, output.output);
+
+        /* FIXME: set proper permissions in restorePath() so
+            we don't have to do another traversal. */
+        canonicalisePathMetaData(actualPath, -1, inodesSeen);
 
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
