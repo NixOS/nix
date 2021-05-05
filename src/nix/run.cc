@@ -31,9 +31,7 @@ struct RunCommon : virtual Command
     {
         stopProgressBar();
 
-        restoreSignals();
-
-        restoreAffinity();
+        restoreProcessContext();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location
@@ -182,7 +180,7 @@ struct CmdRun : InstallableCommand, RunCommon
 
         auto app = installable->toApp(*state);
 
-        state->store->buildPaths(app.context);
+        state->store->buildPaths(toDerivedPaths(app.context));
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);

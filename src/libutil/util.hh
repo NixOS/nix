@@ -188,7 +188,6 @@ public:
 class AutoCloseFD
 {
     int fd;
-    void close();
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
@@ -200,6 +199,7 @@ public:
     int get() const;
     explicit operator bool() const;
     int release();
+    void close();
 };
 
 
@@ -216,6 +216,7 @@ class Pipe
 public:
     AutoCloseFD readSide, writeSide;
     void create();
+    void close();
 };
 
 
@@ -297,6 +298,15 @@ struct RunOptions
 std::pair<int, std::string> runProgram(const RunOptions & options);
 
 void runProgram2(const RunOptions & options);
+
+
+/* Change the stack size. */
+void setStackSize(size_t stackSize);
+
+
+/* Restore the original inherited Unix process context (such as signal
+   masks, stack size, CPU affinity). */
+void restoreProcessContext();
 
 
 class ExecError : public Error
@@ -511,9 +521,6 @@ class Callback;
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
-
-/* Restore default signal handling. */
-void restoreSignals();
 
 struct InterruptCallback
 {

@@ -1,23 +1,40 @@
 {
   "nodes": {
-    "nixpkgs": {
+    "lowdown-src": {
+      "flake": false,
       "locked": {
-        "lastModified": 1615581980,
-        "narHash": "sha256-pwsKq7gvTBabz3MdbBNJwynvpOUQQEORnJMMGFcPzPA=",
-        "owner": "matthewbauer",
-        "repo": "nixpkgs",
-        "rev": "6255468c4e648f48ea49efc9ba598bce5ec768b8",
+        "lastModified": 1617481909,
+        "narHash": "sha256-SqnfOFuLuVRRNeVJr1yeEPJue/qWoCp5N6o5Kr///p4=",
+        "owner": "kristapsdz",
+        "repo": "lowdown",
+        "rev": "148f9b2f586c41b7e36e73009db43ea68c7a1a4d",
         "type": "github"
       },
       "original": {
-        "owner": "matthewbauer",
-        "ref": "fix-aws-sdk-cpp-on-big-sur-2",
+        "owner": "kristapsdz",
+        "ref": "VERSION_0_8_4",
+        "repo": "lowdown",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1620185490,
+        "narHash": "sha256-IU00bsXFtXh54Nh9ulY9fRZEJs0t8xopRTAeHYRc3Dk=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "8b51a45a551ce23cd1e3fc64b49769b599081c26",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
         "repo": "nixpkgs",
         "type": "github"
       }
     },
     "root": {
       "inputs": {
+        "lowdown-src": "lowdown-src",
         "nixpkgs": "nixpkgs"
       }
     }

@@ -100,6 +100,8 @@ struct Goal : public std::enable_shared_from_this<Goal>
     virtual string key() = 0;
 
     void amDone(ExitCode result, std::optional<Error> ex = {});
+
+    virtual void cleanup() { }
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

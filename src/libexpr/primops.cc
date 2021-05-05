@@ -35,7 +35,7 @@ InvalidPathError::InvalidPathError(const Path & path) :
 
 void EvalState::realiseContext(const PathSet & context)
 {
-    std::vector<StorePathWithOutputs> drvs;
+    std::vector<DerivedPath::Built> drvs;
 
     for (auto & i : context) {
         auto [ctxS, outputName] = decodeContext(i);
@@ -43,7 +43,7 @@ void EvalState::realiseContext(const PathSet & context)
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
+            drvs.push_back({ctx, {outputName}});
         }
     }
 
@@ -51,14 +51,16 @@ void EvalState::realiseContext(const PathSet & context)
 
     if (!evalSettings.enableImportFromDerivation)
         throw EvalError("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false",
-            store->printStorePath(drvs.begin()->path));
+            store->printStorePath(drvs.begin()->drvPath));
 
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
-    store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    std::vector<DerivedPath> buildReqs;
+    for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
+    store->queryMissing(buildReqs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
-    store->buildPaths(drvs);
+    store->buildPaths(buildReqs);
 
     /* Add the output of this derivations to the allowed
        paths. */
@@ -545,18 +547,56 @@ typedef list<Value *> ValueList;
 #endif
 
 
+static Bindings::iterator getAttr(
+    EvalState & state,
+    string funcName,
+    string attrName,
+    Bindings * attrSet,
+    const Pos & pos)
+{
+    Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
+    if (value == attrSet->end()) {
+        hintformat errorMsg = hintfmt(
+            "attribute '%s' missing for call to '%s'",
+            attrName,
+            funcName
+        );
+
+        Pos aPos = *attrSet->pos;
+        if (aPos == noPos) {
+            throw TypeError({
+                .msg = errorMsg,
+                .errPos = pos,
+            });
+        } else {
+            auto e = TypeError({
+                .msg = errorMsg,
+                .errPos = aPos,
+            });
+
+            // Adding another trace for the function name to make it clear
+            // which call received wrong arguments.
+            e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
+            throw e;
+        }
+    }
+
+    return value;
+}
+
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
-    Bindings::iterator startSet =
-        args[0]->attrs->find(state.symbols.create("startSet"));
-    if (startSet == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute 'startSet' required"),
-            .errPos = pos
-        });
+    Bindings::iterator startSet = getAttr(
+        state,
+        "genericClosure",
+        "startSet",
+        args[0]->attrs,
+        pos
+    );
+
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
@@ -564,13 +604,14 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         workSet.push_back(startSet->value->listElems()[n]);
 
     /* Get the operator. */
-    Bindings::iterator op =
-        args[0]->attrs->find(state.symbols.create("operator"));
-    if (op == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute 'operator' required"),
-            .errPos = pos
-        });
+    Bindings::iterator op = getAttr(
+        state,
+        "genericClosure",
+        "operator",
+        args[0]->attrs,
+        pos
+    );
+
     state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
@@ -814,12 +855,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(state.sName);
-    if (attr == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("required attribute 'name' missing"),
-            .errPos = pos
-        });
+    Bindings::iterator attr = getAttr(
+        state,
+        "derivationStrict",
+        state.sName,
+        args[0]->attrs,
+        pos
+    );
+
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
@@ -951,7 +994,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     }
 
                 } else {
-                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    auto s = state.coerceToString(*i->pos, *i->value, context, true);
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = s;
                     else if (i->name == state.sSystem) drv.platform = s;
@@ -1208,7 +1251,10 @@ static RegisterPrimOp primop_toPath({
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     if (evalSettings.pureEval)
-        throw EvalError("builtins.storePath' is not allowed in pure evaluation mode");
+        throw EvalError({
+            .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
+            .errPos = pos
+        });
 
     PathSet context;
     Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
@@ -1367,12 +1413,13 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         if (i != v2.attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
-        i = v2.attrs->find(state.symbols.create("path"));
-        if (i == v2.attrs->end())
-            throw EvalError({
-                .msg = hintfmt("attribute 'path' missing"),
-                .errPos = pos
-            });
+        i = getAttr(
+            state,
+            "findFile",
+            "path",
+            v2.attrs,
+            pos
+        );
 
         PathSet context;
         string path = state.coerceToString(pos, *i->value, context, false, false);
@@ -1918,26 +1965,26 @@ static RegisterPrimOp primop_path({
       An enrichment of the built-in path type, based on the attributes
       present in *args*. All are optional except `path`:
 
-        - path  
+        - path\
           The underlying path.
 
-        - name  
+        - name\
           The name of the path when added to the store. This can used to
           reference paths that have nix-illegal characters in their names,
           like `@`.
 
-        - filter  
+        - filter\
           A function of the type expected by `builtins.filterSource`,
           with the same semantics.
 
-        - recursive  
+        - recursive\
           When `false`, when `path` is added to the store it is with a
           flat hash, rather than a hash of the NAR serialization of the
           file. Thus, `path` must refer to a regular file, not a
           directory. This allows similar behavior to `fetchurl`. Defaults
           to `true`.
 
-        - sha256  
+        - sha256\
           When provided, this is the expected hash of the file at the
           path. Evaluation will fail if the hash is incorrect, and
           providing a hash allows `builtins.path` to be used even when the
@@ -2014,12 +2061,13 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute '%1%' missing", attr),
-            .errPos = pos
-        });
+    Bindings::iterator i = getAttr(
+        state,
+        "getAttr",
+        attr,
+        args[1]->attrs,
+        pos
+    );
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
@@ -2146,22 +2194,25 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Value & v2(*args[0]->listElems()[i]);
         state.forceAttrs(v2, pos);
 
-        Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end())
-            throw TypeError({
-                .msg = hintfmt("'name' attribute missing in a call to 'listToAttrs'"),
-                .errPos = pos
-            });
-        string name = state.forceStringNoCtx(*j->value, pos);
+        Bindings::iterator j = getAttr(
+            state,
+            "listToAttrs",
+            state.sName,
+            v2.attrs,
+            pos
+        );
+
+        string name = state.forceStringNoCtx(*j->value, *j->pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
-            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end())
-                throw TypeError({
-                    .msg = hintfmt("'value' attribute missing in a call to 'listToAttrs'"),
-                    .errPos = pos
-                });
+            Bindings::iterator j2 = getAttr(
+                state,
+                "listToAttrs",
+                state.sValue,
+                v2.attrs,
+                pos
+            );
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
     }
@@ -2802,7 +2853,12 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], pos);
+        try {
+            state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)));
+        } catch (TypeError &e) {
+            e.addTrace(pos, hintfmt("while invoking '%s'", "concatMap"));
+            throw e;
+        }
         len += lists[n].listSize();
     }
 

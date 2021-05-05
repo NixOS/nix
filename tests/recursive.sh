@@ -1,7 +1,7 @@
 source common.sh
 
 # FIXME
-if [[ $(uname) != Linux ]]; then exit; fi
+if [[ $(uname) != Linux ]]; then exit 99; fi
 
 clearStore
 

@@ -50,7 +50,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
     options.dieWithParent = false;
 
     conn->sshPid = startProcess([&]() {
-        restoreSignals();
+        restoreProcessContext();
 
         close(in.writeSide.get());
         close(out.readSide.get());
@@ -110,7 +110,7 @@ Path SSHMaster::startMaster()
     options.dieWithParent = false;
 
     state->sshMaster = startProcess([&]() {
-        restoreSignals();
+        restoreProcessContext();
 
         close(out.readSide.get());
 

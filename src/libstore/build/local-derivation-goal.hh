@@ -116,6 +116,7 @@ struct LocalDerivationGoal : public DerivationGoal
     {
         return inputPaths.count(path) || addedPaths.count(path);
     }
+    bool isAllowed(const DerivedPath & req);
 
     friend struct RestrictedStore;
 
@@ -160,6 +161,8 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Check that the derivation outputs all exist and register them
        as valid. */
     void registerOutputs() override;
+
+    void signRealisation(Realisation &) override;
 
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy

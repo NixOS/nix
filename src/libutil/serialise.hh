@@ -25,6 +25,13 @@ struct NullSink : Sink
     { }
 };
 
+
+struct FinishSink : virtual Sink
+{
+    virtual void finish() = 0;
+};
+
+
 /* A buffered abstract sink. Warning: a BufferedSink should not be
    used from multiple threads concurrently. */
 struct BufferedSink : virtual Sink
@@ -281,6 +288,7 @@ struct ChainSource : Source
     size_t read(char * data, size_t len) override;
 };
 
+std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun);
 
 /* Convert a function that feeds data into a Sink into a Source. The
    Source executes the function as a coroutine. */
