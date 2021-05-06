@@ -426,7 +426,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     attrPath,
                 };
 
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {"out"}}); // FIXME
+                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {drv.outputName}});
             }
         }
 
