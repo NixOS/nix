@@ -3,6 +3,7 @@
 #include "util.hh"
 
 #include <cstdlib>
+#include <iomanip>
 
 
 namespace nix {
@@ -70,7 +71,7 @@ void ExprInt::show(std::ostream & str) const
 
 void ExprFloat::show(std::ostream & str) const
 {
-    str << nf;
+    str << std::setprecision(std::numeric_limits<double>::max_digits10) << nf;
 }
 
 void ExprString::show(std::ostream & str) const

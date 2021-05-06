@@ -10,4 +10,5 @@ builtins.toJSON
     i = 1 + 2;
     j = 1.44;
     k = { __toString = self: self.a; a = "foo"; };
+    l = 50.03125;
   }

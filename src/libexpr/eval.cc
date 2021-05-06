@@ -16,6 +16,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 
 #include <sys/resource.h>
@@ -138,7 +139,7 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << *v.external;
         break;
     case tFloat:
-        str << v.fpoint;
+        str << std::setprecision(std::numeric_limits<double>::max_digits10) << v.fpoint;
         break;
     default:
         throw Error("invalid value");
