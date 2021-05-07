@@ -885,10 +885,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopRegisterDrvOutput: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(from));
-        auto outputPath = StorePath(readString(from));
-        store->registerDrvOutput(Realisation{
-            .id = outputId, .outPath = outputPath});
+        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+            auto outputId = DrvOutput::parse(readString(from));
+            auto outputPath = StorePath(readString(from));
+            store->registerDrvOutput(Realisation{
+                .id = outputId, .outPath = outputPath});
+        } else {
+            auto realisation = worker_proto::read(*store, from, Phantom<Realisation>());
+            store->registerDrvOutput(realisation);
+        }
         logger->stopWork();
         break;
     }
@@ -898,9 +903,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto outputId = DrvOutput::parse(readString(from));
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
-        std::set<StorePath> outPaths;
-        if (info) outPaths.insert(info->outPath);
-        worker_proto::write(*store, to, outPaths);
+        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+            std::set<StorePath> outPaths;
+            if (info) outPaths.insert(info->outPath);
+            worker_proto::write(*store, to, outPaths);
+        } else {
+            std::set<Realisation> realisations;
+            if (info) realisations.insert(*info);
+            worker_proto::write(*store, to, realisations);
+        }
         break;
     }
 

@@ -653,8 +653,12 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << wopRegisterDrvOutput;
-    conn->to << info.id.to_string();
-    conn->to << std::string(info.outPath.to_string());
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+        conn->to << info.id.to_string();
+        conn->to << std::string(info.outPath.to_string());
+    } else {
+        worker_proto::write(*this, conn->to, info);
+    }
     conn.processStderr();
 }
 
@@ -664,10 +668,17 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
     conn->to << wopQueryRealisation;
     conn->to << id.to_string();
     conn.processStderr();
-    auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
-    if (outPaths.empty())
-        return std::nullopt;
-    return {Realisation{.id = id, .outPath = *outPaths.begin()}};
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+        auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
+        if (outPaths.empty())
+            return std::nullopt;
+        return {Realisation{.id = id, .outPath = *outPaths.begin()}};
+    } else {
+        auto realisations = worker_proto::read(*this, conn->from, Phantom<std::set<Realisation>>{});
+        if (realisations.empty())
+            return std::nullopt;
+        return *realisations.begin();
+    }
 }
 
 static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
