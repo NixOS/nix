@@ -59,6 +59,8 @@ struct LocalStore::State::Stmts {
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
+    SQLiteStmt QueryRealisationRealisationReferences;
+    SQLiteStmt AddRealisationRealisationReference;
 };
 
 int getSchema(Path schemaPath)
@@ -316,7 +318,7 @@ LocalStore::LocalStore(const Params & params)
             )");
         state->stmts->QueryRealisedOutput.create(state->db,
             R"(
-                select Output.path, Realisations.signatures from Realisations
+                select Realisations.id, Output.path, Realisations.signatures from Realisations
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ? and outputName = ?
                     ;
@@ -327,6 +329,19 @@ LocalStore::LocalStore(const Params & params)
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ?
                     ;
+            )");
+        state->stmts->QueryRealisationRealisationReferences.create(state->db,
+            R"(
+                select drvPath, outputName from Realisations
+                    join RealisationsRefs on realisationReference = Realisations.id
+                    where referrer = ?;
+            )");
+        state->stmts->AddRealisationRealisationReference.create(state->db,
+            R"(
+                insert or replace into RealisationsRefs (referrer, realisationReference)
+                values (
+                    ?,
+                    (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
 }
@@ -666,13 +681,17 @@ void LocalStore::registerDrvOutput(const Realisation & info)
     settings.requireExperimentalFeature("ca-derivations");
     auto state(_state.lock());
     retrySQLite<void>([&]() {
-        state->stmts->RegisterRealisedOutput.use()
-            (info.id.strHash())
-            (info.id.outputName)
-            (printStorePath(info.outPath))
-            (concatStringsSep(" ", info.signatures))
+        state->stmts->RegisterRealisedOutput
+            .use()(info.id.strHash())(info.id.outputName)(printStorePath(
+                info.outPath))(concatStringsSep(" ", info.signatures))
             .exec();
     });
+    uint64_t myId = state->db.getLastInsertedRowId();
+    for (auto& outputId : info.drvOutputDeps) {
+        state->stmts->AddRealisationRealisationReference
+            .use()(myId)(outputId.strHash())(outputId.outputName)
+            .exec();
+    }
 }
 
 void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output)
@@ -1670,14 +1689,32 @@ std::optional<const Realisation> LocalStore::queryRealisation(
     typedef std::optional<const Realisation> Ret;
     return retrySQLite<Ret>([&]() -> Ret {
         auto state(_state.lock());
-        auto use(state->stmts->QueryRealisedOutput.use()(id.strHash())(
-            id.outputName));
-        if (!use.next())
+        auto useQueryRealisedOutput(state->stmts->QueryRealisedOutput.use()(
+            id.strHash())(id.outputName));
+        if (!useQueryRealisedOutput.next())
             return std::nullopt;
-        auto outputPath = parseStorePath(use.getStr(0));
-        auto signatures = tokenizeString<StringSet>(use.getStr(1));
+        auto realisationDbId = useQueryRealisedOutput.getInt(0);
+        auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
+        auto signatures =
+            tokenizeString<StringSet>(useQueryRealisedOutput.getStr(2));
+
+        std::set<DrvOutput> drvOutputDeps;
+        auto useRealisationRefs(
+            state->stmts->QueryRealisationRealisationReferences.use()(
+                realisationDbId));
+        while (useRealisationRefs.next())
+            drvOutputDeps.insert(DrvOutput{
+                    Hash::parseAnyPrefixed(useRealisationRefs.getStr(0)),
+                useRealisationRefs.getStr(1),
+            }
+        );
+
         return Ret{Realisation{
-            .id = id, .outPath = outputPath, .signatures = signatures}};
+            .id = id,
+            .outPath = outputPath,
+            .signatures = signatures,
+            .drvOutputDeps = drvOutputDeps,
+        }};
     });
 }
 }  // namespace nix
