@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "json.hh"
 #include "common-args.hh"
+#include "progress-bar.hh"
 
 #include <algorithm>
 #include <array>
@@ -94,6 +95,8 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         }
 
         else {
+
+            stopProgressBar();
 
             for (auto & storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);

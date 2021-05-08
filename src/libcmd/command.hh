@@ -150,6 +150,9 @@ private:
     bool recursive = false;
     bool all = false;
 
+    bool includeBuildRefs = false;
+    bool includeEvalRefs = false;
+
 protected:
 
     Realise realiseMode = Realise::Derivation;

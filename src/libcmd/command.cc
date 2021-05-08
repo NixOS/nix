@@ -3,6 +3,7 @@
 #include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
+#include "eval.hh"
 #include "profiles.hh"
 
 #include <nlohmann/json.hpp>
@@ -79,6 +80,20 @@ RealisedPathsCommand::RealisedPathsCommand(bool recursive)
         .category = installablesCategory,
         .handler = {&all, true},
     });
+
+    addFlag({
+        .longName = "include-build-refs",
+        .description = "Include build-time references of specified closure.",
+        .category = installablesCategory,
+        .handler = {&includeBuildRefs, true},
+    });
+
+    addFlag({
+        .longName = "include-eval-refs",
+        .description = "Include eval-time references of specified closure.",
+        .category = installablesCategory,
+        .handler = {&includeEvalRefs, true},
+    });
 }
 
 void RealisedPathsCommand::run(ref<Store> store)
@@ -91,11 +106,42 @@ void RealisedPathsCommand::run(ref<Store> store)
         for (auto & p : store->queryAllValidPaths())
             paths.push_back(p);
     } else {
+        if (!recursive && includeBuildRefs)
+            throw UsageError("--include-build-refs require --recursive");
+
         auto pathSet = toRealisedPaths(store, realiseMode, operateOn, installables);
+
+        if (includeEvalRefs) {
+            auto state = getEvalState();
+
+            for (auto & i : installables) {
+                state->realisedPaths = std::set<StorePath>();
+
+                // force evaluation of package argument
+                i->toValue(*state);
+
+                for (auto & path : *state->realisedPaths)
+                    pathSet.insert(path);
+            }
+
+            state->realisedPaths = std::nullopt;
+        }
+
         if (recursive) {
-            auto roots = std::move(pathSet);
-            pathSet = {};
-            RealisedPath::closure(*store, roots, pathSet);
+            if (includeBuildRefs) {
+                auto drvs = toDerivations(store, installables);
+                StorePathSet paths;
+                store->computeFSClosure(drvs, paths, false, true);
+                pathSet = {};
+                for (auto & path : paths)
+                    if (!path.isDerivation())
+                        pathSet.insert(path);
+            } else {
+                auto roots = std::move(pathSet);
+                pathSet = {};
+                RealisedPath::closure(*store, roots, pathSet);
+            }
+
         }
         for (auto & path : pathSet)
             paths.push_back(path);
