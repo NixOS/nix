@@ -1093,8 +1093,10 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");
+        env["ATTRS_SH_FILE"] = tmpDir + "/.attrs.sh";
         writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.json");
+        env["ATTRS_JSON_FILE"] = tmpDir + "/.attrs.json";
     }
 }
 

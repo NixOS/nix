@@ -428,7 +428,6 @@ static void main_nix_build(int argc, char * * argv)
                 env[var.first] = var.second;
 
         std::string structuredAttrsRC;
-        std::string exitCmd;
 
         if (env.count("__json")) {
             StorePathSet inputs;
@@ -448,11 +447,13 @@ static void main_nix_build(int argc, char * * argv)
             if (auto structAttrs = parsedDrv.generateStructuredAttrs(std::nullopt, *store, inputs)) {
                 auto val = structAttrs.value();
                 structuredAttrsRC = val.first;
-                auto attrsJSON = std::filesystem::current_path().string() + "/.attrs.json";
+                auto attrsJSON = (Path) tmpDir + "/.attrs.json";
                 writeFile(attrsJSON, val.second.dump());
-                exitCmd = "\n_rm_attrs_json() { rm -f " + attrsJSON + "; }"
-                    + "\nexitHooks+=(_rm_attrs_json)"
-                    + "\nfailureHooks+=(_rm_attrs_json)\n";
+                auto attrsSH = (Path) tmpDir + "/.attrs.sh";
+                writeFile(attrsSH, val.first);
+                env["ATTRS_SH_FILE"] = attrsSH;
+                env["ATTRS_JSON_FILE"] = attrsJSON;
+                keepTmp = true;
             }
         }
 
@@ -471,7 +472,7 @@ static void main_nix_build(int argc, char * * argv)
                 (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
                 "dontAddDisableDepTrack=1;\n"
-                + structuredAttrsRC + exitCmd +
+                + structuredAttrsRC +
                 "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
                 "PATH=%4%:\"$PATH\"; "
