@@ -17,6 +17,12 @@ let
     };
   });
 
+  danglingLink = mkDerivation {
+    name = "dangling-link";
+    target = builtins.getEnv "TEST_ROOT" + "/somefile";
+    builder = ./user-envs-link.builder.sh;
+  };
+
 in
 
   [
@@ -26,4 +32,5 @@ in
     (makeDrv "foo-2.0" "foo")
     (makeDrv "bar-0.1.1" "bar")
     (makeDrv "foo-0.1" "foo" // { meta.priority = 10; })
+    danglingLink
   ]
