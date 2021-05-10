@@ -21,7 +21,7 @@
 #include <regex>
 #include <dlfcn.h>
 
-#include <math.h>
+#include <cmath>
 
 
 namespace nix {
