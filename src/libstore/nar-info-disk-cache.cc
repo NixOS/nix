@@ -42,9 +42,8 @@ create table if not exists NARs (
 create table if not exists Realisations (
     cache integer not null,
     outputId text not null,
-    content blob, -- Json serialisation of the realisation, or empty if present is true
+    content blob, -- Json serialisation of the realisation, or null if the realisation is absent
     timestamp        integer not null,
-    present          integer not null,
     primary key (cache, outputId),
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
@@ -113,22 +112,22 @@ public:
 
         state->insertRealisation.create(state->db,
             R"(
-                insert or replace into Realisations(cache, outputId, content, timestamp, present)
-                    values (?, ?, ?, ?, 1)
+                insert or replace into Realisations(cache, outputId, content, timestamp)
+                    values (?, ?, ?, ?)
             )");
 
         state->insertMissingRealisation.create(state->db,
             R"(
-                insert or replace into Realisations(cache, outputId, timestamp, present)
-                    values (?, ?, ?, 0)
+                insert or replace into Realisations(cache, outputId, timestamp)
+                    values (?, ?, ?)
             )");
 
         state->queryRealisation.create(state->db,
             R"(
-                select present, content from Realisations
+                select content from Realisations
                     where cache = ? and outputId = ?  and
-                        ((present = 0 and timestamp > ?) or
-                         (present = 1 and timestamp > ?))
+                        ((content is null and timestamp > ?) or
+                         (content is not null and timestamp > ?))
             )");
 
         /* Periodically purge expired entries from the database. */
@@ -265,12 +264,12 @@ public:
             if (!queryRealisation.next())
                 return {oUnknown, 0};
 
-            if (queryRealisation.getInt(0) == 0)
+            if (queryRealisation.isNull(0))
                 return {oInvalid, 0};
 
             auto realisation =
                 std::make_shared<Realisation>(Realisation::fromJSON(
-                    nlohmann::json::parse(queryRealisation.getStr(1)),
+                    nlohmann::json::parse(queryRealisation.getStr(0)),
                     "Local disk cache"));
 
             return {oValid, realisation};
