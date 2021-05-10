@@ -21,6 +21,8 @@
 #include <regex>
 #include <dlfcn.h>
 
+#include <cmath>
+
 
 namespace nix {
 
@@ -712,6 +714,44 @@ static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
     .name = "__addErrorContext",
     .arity = 2,
     .fun = prim_addErrorContext,
+});
+
+static void prim_ceil(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
+    mkInt(v, ceil(value));
+}
+
+static RegisterPrimOp primop_ceil({
+    .name = "__ceil",
+    .args = {"double"},
+    .doc = R"(
+        Converts an IEEE-754 double-precision floating-point number (*double*) to
+        the next higher integer.
+
+        If the datatype is neither an integer nor a "float", an evaluation error will be
+        thrown.
+    )",
+    .fun = prim_ceil,
+});
+
+static void prim_floor(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
+    mkInt(v, floor(value));
+}
+
+static RegisterPrimOp primop_floor({
+    .name = "__floor",
+    .args = {"double"},
+    .doc = R"(
+        Converts an IEEE-754 double-precision floating-point number (*double*) to
+        the next lower integer.
+
+        If the datatype is neither an integer nor a "float", an evaluation error will be
+        thrown.
+    )",
+    .fun = prim_floor,
 });
 
 /* Try evaluating the argument. Success => {success=true; value=something;},
