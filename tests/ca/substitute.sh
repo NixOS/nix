@@ -45,3 +45,16 @@ if [[ -z "$(ls "$REMOTE_STORE_DIR/realisations")" ]]; then
     echo "Realisations not rebuilt"
     exit 1
 fi
+
+# Test the local realisation disk cache
+buildDrvs --post-build-hook ../push-to-store.sh
+clearStore
+# Add the realisations of rootCA to the cachecache
+clearCacheCache
+export _NIX_FORCE_HTTP=1
+buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0
+# Try rebuilding, but remove the realisations from the remote cache to force
+# using the cachecache
+clearStore
+rm $REMOTE_STORE_DIR/realisations/*
+buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0

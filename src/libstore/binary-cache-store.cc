@@ -450,18 +450,43 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
 
 std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
 {
+    if (diskCache) {
+        auto [cacheOutcome, maybeCachedRealisation] =
+            diskCache->lookupRealisation(getUri(), id);
+        switch (cacheOutcome) {
+            case NarInfoDiskCache::oValid:
+                debug("Returning a cached realisation for %s", id.to_string());
+                return *maybeCachedRealisation;
+            case NarInfoDiskCache::oInvalid:
+                debug("Returning a cached missing realisation for %s", id.to_string());
+                return {};
+            case NarInfoDiskCache::oUnknown:
+                break;
+        }
+    }
+
     auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
     auto rawOutputInfo = getFile(outputInfoFilePath);
 
     if (rawOutputInfo) {
-        return {Realisation::fromJSON(
-            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath)};
+        auto realisation = Realisation::fromJSON(
+            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath);
+
+        if (diskCache)
+            diskCache->upsertRealisation(
+                getUri(), realisation);
+
+        return {realisation};
     } else {
+        if (diskCache)
+            diskCache->upsertAbsentRealisation(getUri(), id);
         return std::nullopt;
     }
 }
 
 void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
+    if (diskCache)
+        diskCache->upsertRealisation(getUri(), info);
     auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
     upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
