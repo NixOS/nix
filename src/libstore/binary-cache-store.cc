@@ -454,13 +454,13 @@ std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOut
         auto [cacheOutcome, maybeCachedRealisation] =
             diskCache->lookupRealisation(getUri(), id);
         switch (cacheOutcome) {
-            case (NarInfoDiskCache::oValid):
+            case NarInfoDiskCache::oValid:
                 debug("Returning a cached realisation for %s", id.to_string());
                 return *maybeCachedRealisation;
-            case (NarInfoDiskCache::oInvalid):
+            case NarInfoDiskCache::oInvalid:
                 debug("Returning a cached missing realisation for %s", id.to_string());
                 return {};
-            case (NarInfoDiskCache::oUnknown):
+            case NarInfoDiskCache::oUnknown:
                 break;
         }
     }
