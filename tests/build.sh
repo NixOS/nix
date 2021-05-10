@@ -10,3 +10,10 @@ nix build -f multiple-outputs.nix --json a.all b.all | jq --exit-status '
     (.drvPath | match(".*multiple-outputs-b.drv")) and
     (.outputs.out | match(".*multiple-outputs-b")))
 '
+
+testNormalization () {
+    clearStore
+    outPath=$(nix-build ./simple.nix)
+    test "$(stat -c %Y $outPath)" -eq 1
+}
+testNormalization
