@@ -17,6 +17,7 @@
 #include <sys/resource.h>
 #include <iostream>
 #include <fstream>
+#include <optional>
 
 #include <sys/resource.h>
 
@@ -35,6 +36,7 @@
 
 namespace nix {
 
+std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
 
 static char * dupString(const char * s)
 {
@@ -615,7 +617,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     return {};
 }
 
-
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
@@ -656,21 +657,45 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
+// #define valmap(x) std::optional<const std::map<std::string, Value *>>
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const std::optional<const std::map<std::string, Value *>> & env))
 {
-    throw TypeError({
+    auto error = TypeError({
         .msg = hintfmt(s),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, const std::optional<const std::map<std::string, Value *>> & env))
 {
-    throw TypeError({
+    auto error = TypeError({
+        .msg = hintfmt(s, v),
+        .errPos = pos
+    });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
+}
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, const std::optional<const std::map<std::string, Value *>> & env))
+{
+    auto error = TypeError({
         .msg = hintfmt(s, fun.showNamePos(), s2),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
+
+
 
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
@@ -688,12 +713,16 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 }
 
-LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1))
+LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, const std::optional<const std::map<std::string, Value *>> & env))
 {
-    throw MissingArgumentError({
+    auto error = MissingArgumentError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
 LocalNoInline(void addErrorTrace(Error & e, const char * s, const string & s2))
@@ -1246,7 +1275,6 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     }
 }
 
-std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
@@ -1276,14 +1304,20 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     }
 
     if (!fun.isLambda()) {
-        auto error = TypeError({
-            // .hint = hintfmt("attempt to call something which is not a function but %1%", showType(fun)),
-            .msg = hintfmt("attempt to call something which is not a function but %1%", fun),
-            .errPos = pos
-        });
-        if (debuggerHook)
-            debuggerHook(error, {{"fun", &fun}, {"arg", &arg}});
-        throw error;
+        throwTypeError(
+          pos,
+          "attempt to call something which is not a function but %1%",
+          fun,
+          std::optional<const std::map<std::string, Value *>>({{"fun", &fun}, {"arg", &arg}}));
+
+        // auto error = TypeError({
+        //     // .hint = hintfmt("attempt to call something which is not a function but %1%", showType(fun)),
+        //     .msg = hintfmt("attempt to call something which is not a function but %1%", fun),
+        //     .errPos = pos
+        // });
+        // if (debuggerHook)
+        //     debuggerHook(error, {{"fun", &fun}, {"arg", &arg}});
+        // throw error;
     }
 
     ExprLambda & lambda(*fun.lambda.fun);
@@ -1312,8 +1346,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         for (auto & i : lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
-                if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
-                    lambda, i.name);
+                if (!i.def)
+                    throwTypeError(
+                        pos,
+                        "%1% called without required argument '%2%'",
+                        lambda,
+                        i.name,
+                        std::optional<const std::map<std::string, Value *>>({{"fun", &fun}, {"arg", &arg}}));
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -1328,7 +1367,11 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                user. */
             for (auto & i : *arg.attrs)
                 if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                    throwTypeError(pos,
+                        "%1% called with unexpected argument '%2%'",
+                        lambda,
+                        i.name,
+                        std::optional<const std::map<std::string, Value *>>({{"fun", &fun}, {"arg", &arg}}));
             abort(); // can't happen
         }
     }
@@ -1398,16 +1441,14 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             if (j != args.end()) {
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
-                auto error = MissingArgumentError({
-                            .msg = hintfmt(R"(cannot evaluate a function that has an argument without a value ('%1%')
+                throwMissingArgumentError(i.pos,  R"(cannot evaluate a function that has an argument without a value ('%1%')
 
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", i.name),
-                            .errPos = i.pos
-                        });
-                
+https://nixos.org/manual/nix/stable/#ss-functions.)", i.name,
+            std::optional<const std::map<std::string, Value *>>({{"fun", &fun}}));  // todo add bindings.
+
 //                 throwMissingArgumentError(i.pos
 //                                           , R"(cannot evaluate a function that has an argument without a value ('%1%')
 
@@ -1416,10 +1457,11 @@ https://nixos.org/manual/nix/stable/#ss-functions.)", i.name),
 // values, or passed explicitly with '--arg' or '--argstr'. See
 // https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
 
-                if (debuggerHook)
-                    debuggerHook(error, {{"fun", &fun}});
+                // if (debuggerHook)
+                //     // debuggerHook(error, args);
+                //     debuggerHook(error, {{"fun", &fun}});
 
-                throw error;
+                // throw error;
 
             }
         }
@@ -1673,7 +1715,8 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nInt)
-        throwTypeError(pos, "value is %1% while an integer was expected", v);
+        throwTypeError(pos, "value is %1% while an integer was expected", v,
+            std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
     return v.integer;
 }
 
@@ -1684,7 +1727,8 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
     if (v.type() == nInt)
         return v.integer;
     else if (v.type() != nFloat)
-        throwTypeError(pos, "value is %1% while a float was expected", v);
+        throwTypeError(pos, "value is %1% while a float was expected", v,
+            std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
     return v.fpoint;
 }
 
@@ -1693,7 +1737,8 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v,
+            std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
     return v.boolean;
 }
 
@@ -1708,7 +1753,8 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nFunction && !isFunctor(v))
-        throwTypeError(pos, "value is %1% while a function was expected", v);
+        throwTypeError(pos, "value is %1% while a function was expected", v,
+            std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
 }
 
 
@@ -1716,10 +1762,8 @@ string EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nString) {
-        if (pos)
-            throwTypeError(pos, "value is %1% while a string was expected", v);
-        else
-            throwTypeError("value is %1% while a string was expected", v);
+        throwTypeError(pos, "value is %1% while a string was expected", v,
+            std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
     }
     return string(v.string.s);
 }
@@ -1826,7 +1870,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
             return *maybeString;
         }
         auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
+        if (i == v.attrs->end())
+            throwTypeError(pos, "cannot coerce a set to a string",
+                std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -1857,7 +1903,8 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
     }
 
-    throwTypeError(pos, "cannot coerce %1% to a string", v);
+    throwTypeError(pos, "cannot coerce %1% to a string", v,
+        std::optional<const std::map<std::string, Value *>>({{"value", &v}}));
 }
 
 
