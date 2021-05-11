@@ -82,6 +82,7 @@ perl/Makefile.config
 /tests/shell
 /tests/shell.drv
 /tests/config.nix
+/tests/ca/config.nix
 
 # /tests/lang/
 /tests/lang/*.out

@@ -46,6 +46,7 @@ nix_tests = \
   ca/build.sh \
   ca/substitute.sh \
   ca/signatures.sh \
+  ca/nix-run.sh \
   ca/nix-copy.sh
   # parallel.sh
 
@@ -53,6 +54,6 @@ install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
 tests-environment = NIX_REMOTE= $(bash) -e
 
-clean-files += $(d)/common.sh $(d)/config.nix
+clean-files += $(d)/common.sh $(d)/config.nix $(d)/ca/config.nix
 
-test-deps += tests/common.sh tests/config.nix tests/plugins/libplugintest.$(SO_EXT)
+test-deps += tests/common.sh tests/config.nix tests/ca/config.nix tests/plugins/libplugintest.$(SO_EXT)
