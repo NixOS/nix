@@ -617,8 +617,10 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. The default
-          is `https://cache.nixos.org`.
+          A list of URLs of substituters, separated by whitespace. Substituters
+          are tried based on their Priority value, which each substituter can set
+          independently. Lower value means higher priority.
+          The default is `https://cache.nixos.org`, with a Priority of 40.
         )",
         {"binary-caches"}};
 
