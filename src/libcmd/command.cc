@@ -162,7 +162,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
             profile2, storePath));
 }
 
-void MixProfile::updateProfile(const DerivedPathsWithHints & buildables)
+void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
@@ -170,10 +170,10 @@ void MixProfile::updateProfile(const DerivedPathsWithHints & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](DerivedPathWithHints::Opaque bo) {
+            [&](BuiltPath::Opaque bo) {
                 result.push_back(bo.path);
             },
-            [&](DerivedPathWithHints::Built bfd) {
+            [&](BuiltPath::Built bfd) {
                 for (auto & output : bfd.outputs) {
                     /* Output path should be known because we just tried to
                        build it. */

@@ -79,19 +79,19 @@ struct DerivedPath : _DerivedPathRaw {
 /**
  * A built derived path with hints in the form of optional concrete output paths.
  *
- * See 'DerivedPathWithHints' for more an explanation.
+ * See 'BuiltPath' for more an explanation.
  */
-struct DerivedPathWithHintsBuilt {
+struct BuiltPathBuilt {
     StorePath drvPath;
     std::map<std::string, std::optional<StorePath>> outputs;
 
     nlohmann::json toJSON(ref<Store> store) const;
-    static DerivedPathWithHintsBuilt parse(const Store & store, std::string_view);
+    static BuiltPathBuilt parse(const Store & store, std::string_view);
 };
 
-using _DerivedPathWithHintsRaw = std::variant<
+using _BuiltPathRaw = std::variant<
     DerivedPath::Opaque,
-    DerivedPathWithHintsBuilt
+    BuiltPathBuilt
 >;
 
 /**
@@ -109,12 +109,12 @@ using _DerivedPathWithHintsRaw = std::variant<
  * paths.
  */
 // FIXME Stop using and delete this, or if that is not possible move out of libstore to libcmd.
-struct DerivedPathWithHints : _DerivedPathWithHintsRaw {
-    using Raw = _DerivedPathWithHintsRaw;
+struct BuiltPath : _BuiltPathRaw {
+    using Raw = _BuiltPathRaw;
     using Raw::Raw;
 
     using Opaque = DerivedPathOpaque;
-    using Built = DerivedPathWithHintsBuilt;
+    using Built = BuiltPathBuilt;
 
     inline const Raw & raw() const {
         return static_cast<const Raw &>(*this);
@@ -122,8 +122,8 @@ struct DerivedPathWithHints : _DerivedPathWithHintsRaw {
 
 };
 
-typedef std::vector<DerivedPathWithHints> DerivedPathsWithHints;
+typedef std::vector<BuiltPath> BuiltPaths;
 
-nlohmann::json derivedPathsWithHintsToJSON(const DerivedPathsWithHints & buildables, ref<Store> store);
+nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
 
 }

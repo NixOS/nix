@@ -30,15 +30,15 @@ struct CmdLog : InstallableCommand
 
         subs.push_front(store);
 
-        auto b = installable->toDerivedPathWithHints();
+        auto b = installable->toBuiltPath();
 
         RunPager pager;
         for (auto & sub : subs) {
             auto log = std::visit(overloaded {
-                [&](DerivedPathWithHints::Opaque bo) {
+                [&](BuiltPath::Opaque bo) {
                     return sub->getBuildLog(bo.path);
                 },
-                [&](DerivedPathWithHints::Built bfd) {
+                [&](BuiltPath::Built bfd) {
                     return sub->getBuildLog(bfd.drvPath);
                 },
             }, b.raw());

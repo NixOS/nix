@@ -29,9 +29,9 @@ struct Installable
 
     virtual std::string what() = 0;
 
-    virtual DerivedPathsWithHints toDerivedPathsWithHints() = 0;
+    virtual BuiltPaths toBuiltPaths() = 0;
 
-    DerivedPathWithHints toDerivedPathWithHints();
+    BuiltPath toBuiltPath();
 
     App toApp(EvalState & state);
 
@@ -74,7 +74,7 @@ struct InstallableValue : Installable
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
 
-    DerivedPathsWithHints toDerivedPathsWithHints() override;
+    BuiltPaths toBuiltPaths() override;
 };
 
 struct InstallableFlake : InstallableValue

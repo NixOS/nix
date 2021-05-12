@@ -265,7 +265,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto buildable = installable->toDerivedPathWithHints();
+            auto buildable = installable->toBuiltPath();
             auto doRedirect = [&](const StorePath & path)
             {
                 auto from = store->printStorePath(path);
@@ -277,10 +277,10 @@ struct Common : InstallableCommand, MixProfile
                 }
             };
             std::visit(overloaded {
-                [&](const DerivedPathWithHints::Opaque & bo) {
+                [&](const BuiltPath::Opaque & bo) {
                     doRedirect(bo.path);
                 },
-                [&](const DerivedPathWithHints::Built & bfd) {
+                [&](const BuiltPath::Built & bfd) {
                     for (auto & [outputName, path] : bfd.outputs)
                         if (path) doRedirect(*path);
                 },
