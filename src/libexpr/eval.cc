@@ -616,17 +616,21 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     return {};
 }
 
-static std::optional<const std::map<std::string, Value *>> map1(const char *name, Value *v) __attribute__((noinline)); 
-std::optional<const std::map<std::string, Value *>> map1(const char *name, Value *v)
+// typedef std::optional<const std::map<std::string, Value *>> valmap;
+typedef const std::map<std::string, Value *> valmap;
+
+static std::unique_ptr<valmap> map1(const char *name, Value *v) __attribute__((noinline)); 
+std::unique_ptr<valmap> map1(const char *name, Value *v)
 {
-    return std::optional<const std::map<std::string, Value *>>({{name, v}}); 
+    // return new valmap({{name, v}}); 
+    return std::unique_ptr<valmap>(new valmap({{name, v}})); 
 }
 
 
-static std::optional<const std::map<std::string, Value *>> map2(const char *name1, Value *v1, const char *name2, Value *v2) __attribute__((noinline)); 
-std::optional<const std::map<std::string, Value *>> map2(const char *name1, Value *v1, const char *name2, Value *v2)
+static std::unique_ptr<valmap> map2(const char *name1, Value *v1, const char *name2, Value *v2) __attribute__((noinline)); 
+std::unique_ptr<valmap> map2(const char *name1, Value *v1, const char *name2, Value *v2)
 {
-    return std::optional<const std::map<std::string, Value *>>({{name1, v1},{name2, v2}}); 
+    return std::unique_ptr<valmap>(new valmap({{name1, v1}, {name2, v2}})); 
 }
 
 /* Every "format" object (even temporary) takes up a few hundred bytes
@@ -669,7 +673,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const std::optional<const std::map<std::string, Value *>> & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, std::unique_ptr<valmap> env))
 {
     auto error = TypeError({
         .msg = hintfmt(s),
@@ -681,7 +685,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, const std::optional<const std::map<std::string, Value *>> & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, std::unique_ptr<valmap> env))
 {
     auto error = TypeError({
         .msg = hintfmt(s, v),
@@ -693,7 +697,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, const std::optional<const std::map<std::string, Value *>> & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, std::unique_ptr<valmap> env))
 {
     auto error = TypeError({
         .msg = hintfmt(s, fun.showNamePos(), s2),
@@ -723,7 +727,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 }
 
-LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, const std::optional<const std::map<std::string, Value *>> & env))
+LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, std::unique_ptr<valmap> env))
 {
     auto error = MissingArgumentError({
         .msg = hintfmt(s, s1),
