@@ -256,6 +256,11 @@ struct Common : InstallableCommand, MixProfile
         // FIXME: properly unquote 'outputs'.
         StringMap rewrites;
         for (auto & outputName : tokenizeString<std::vector<std::string>>(replaceStrings(outputs->second.quoted, "'", ""))) {
+            std::regex ptrn(R"re(\[([A-z0-9]+)\]=.*)re");
+            std::smatch match;
+            if (std::regex_match(outputName, match, ptrn)) {
+                outputName = match[1];
+            }
             auto from = buildEnvironment.env.find(outputName);
             assert(from != buildEnvironment.env.end());
             // FIXME: unquote

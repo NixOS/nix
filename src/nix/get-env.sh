@@ -8,7 +8,13 @@ if [[ -n $stdenv ]]; then
     source $stdenv/setup
 fi
 
-for __output in $outputs; do
+if [ -e .attrs.sh ]; then
+    __olist="${!outputs[@]}"
+else
+    __olist=$outputs
+fi
+
+for __output in $__olist; do
     if [[ -z $__done ]]; then
         export > ${!__output}
         set >> ${!__output}
