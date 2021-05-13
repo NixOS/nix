@@ -124,8 +124,7 @@ bool ParsedDerivation::substitutesAllowed() const
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
-std::optional<StructuredAttrsWithShellRC> ParsedDerivation::generateStructuredAttrs(
-    std::optional<StringMap> inputRewrites, Store & store, const StorePathSet & inputPaths)
+std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(std::optional<StringMap> inputRewrites, Store & store, const StorePathSet & inputPaths)
 {
     auto structuredAttrs = getStructuredAttrs();
     if (!structuredAttrs) return std::nullopt;
@@ -163,6 +162,11 @@ std::optional<StructuredAttrsWithShellRC> ParsedDerivation::generateStructuredAt
         }
     }
 
+    return json;
+}
+
+std::string ParsedDerivation::writeStructuredAttrsShell(nlohmann::json & json)
+{
     /* As a convenience to bash scripts, write a shell file that
        maps all attributes that are representable in bash -
        namely, strings, integers, nulls, Booleans, and arrays and
@@ -229,6 +233,6 @@ std::optional<StructuredAttrsWithShellRC> ParsedDerivation::generateStructuredAt
         }
     }
 
-    return std::make_pair(jsonSh, json);
+    return jsonSh;
 }
 }

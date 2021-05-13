@@ -444,13 +444,16 @@ static void main_nix_build(int argc, char * * argv)
                 drv
             );
 
-            if (auto structAttrs = parsedDrv.generateStructuredAttrs(std::nullopt, *store, inputs)) {
-                auto val = structAttrs.value();
-                structuredAttrsRC = val.first;
+            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(std::nullopt, *store, inputs)) {
+                auto json = structAttrs.value();
+                structuredAttrsRC = parsedDrv.writeStructuredAttrsShell(json);
+
                 auto attrsJSON = (Path) tmpDir + "/.attrs.json";
-                writeFile(attrsJSON, val.second.dump());
+                writeFile(attrsJSON, json.dump());
+
                 auto attrsSH = (Path) tmpDir + "/.attrs.sh";
-                writeFile(attrsSH, val.first);
+                writeFile(attrsSH, structuredAttrsRC);
+
                 env["ATTRS_SH_FILE"] = attrsSH;
                 env["ATTRS_JSON_FILE"] = attrsJSON;
                 keepTmp = true;

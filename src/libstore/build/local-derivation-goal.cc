@@ -1086,10 +1086,9 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrs = parsedDrv->generateStructuredAttrs(inputRewrites, worker.store, inputPaths)) {
-        auto value = structAttrs.value();
-        auto jsonSh = value.first;
-        auto json = value.second;
+    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(inputRewrites, worker.store, inputPaths)) {
+        auto json = structAttrsJson.value();
+        auto jsonSh = parsedDrv->writeStructuredAttrsShell(json);
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");
