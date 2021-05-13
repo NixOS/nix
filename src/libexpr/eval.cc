@@ -617,20 +617,43 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 }
 
 // typedef std::optional<const std::map<std::string, Value *>> valmap;
-typedef const std::map<std::string, Value *> valmap;
+typedef std::map<std::string, Value *> valmap;
 
-static valmap* map1(const char *name, Value *v) __attribute__((noinline)); 
-valmap* map1(const char *name, Value *v)
+static valmap * map0() __attribute__((noinline));
+valmap * map0()
 {
-    // return new valmap({{name, v}}); 
-    return new valmap({{name, v}}); 
+    return new valmap();
+}
+
+static valmap * map1(const char *name, Value *v) __attribute__((noinline));
+valmap * map1(const char *name, Value *v)
+{
+    // return new valmap({{name, v}});
+    return new valmap({{name, v}});
 }
 
 
-static valmap* map2(const char *name1, Value *v1, const char *name2, Value *v2) __attribute__((noinline)); 
-valmap* map2(const char *name1, Value *v1, const char *name2, Value *v2)
+static valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2) __attribute__((noinline));
+valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2)
 {
-    return new valmap({{name1, v1}, {name2, v2}}); 
+    return new valmap({{name1, v1}, {name2, v2}});
+}
+
+static valmap * mapBindings(Bindings *b) __attribute__((noinline));
+valmap * mapBindings(Bindings *b)
+{
+    auto map = new valmap();
+
+    // auto v = new Value;
+
+    for (auto i = b->begin(); i != b->end(); ++i) 
+    {
+        std::string s = i->name; 
+        (*map)[s] = i->value;
+        // map->insert({std::string("wat"), v});
+    }
+
+    return map;
 }
 
 /* Every "format" object (even temporary) takes up a few hundred bytes
@@ -638,17 +661,27 @@ valmap* map2(const char *name1, Value *v1, const char *name2, Value *v2)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, valmap * env))
 {
-    throw EvalError(s, s2);
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = EvalError(s, s2);
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, valmap * env))
 {
-    throw EvalError({
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = EvalError({
         .msg = hintfmt(s, s2),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
@@ -673,7 +706,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, valmap* env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, valmap * env))
 {
     auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -686,7 +719,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, valma
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, valmap* env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, valmap * env))
 {
     auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -699,7 +732,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, valmap* env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, valmap * env))
 {
     auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -730,7 +763,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 }
 
-LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, valmap* env))
+LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, valmap * env))
 {
     auto error = MissingArgumentError({
         .msg = hintfmt(s, s1),
@@ -1198,7 +1231,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
+                    throwEvalError(pos, "attribute '%1%' missing", name, mapBindings(vAttrs->attrs));
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1463,7 +1496,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", 
+https://nixos.org/manual/nix/stable/#ss-functions.)",
                 i.name,
                 map1("fun", &fun));  // todo add bindings.
             }
@@ -1651,14 +1684,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp));
+                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), map0());
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
+                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp), map0());
         } else
             s << state.coerceToString(pos, vTmp, context, false, firstType == nString);
     }
@@ -1914,7 +1947,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
-        throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
+        throwEvalError("file names are not allowed to end in '%1%'",
+            drvExtension,
+            map0());
 
     Path dstPath;
     auto i = srcToStore.find(path);
@@ -1938,7 +1973,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
+        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path, map1("value", &v));
     return path;
 }
 
