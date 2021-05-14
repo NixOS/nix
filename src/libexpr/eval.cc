@@ -760,26 +760,35 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
-
-
-LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
+LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1, valmap * env))
 {
-    throw AssertionError({
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = AssertionError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, valmap * env))
 {
-    throw UndefinedVarError({
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
 LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, valmap * env))
 {
+    auto delenv = std::unique_ptr<valmap>(env);
     auto error = MissingArgumentError({
         .msg = hintfmt(s, s1),
         .errPos = pos
@@ -848,7 +857,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, map0()); // TODO: env.attrs?
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -1548,7 +1557,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError(pos, "assertion '%1%' failed", out.str());
+        throwAssertionError(pos, "assertion '%1%' failed", out.str(), map0());
     }
     body->eval(state, env, v);
 }
