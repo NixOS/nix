@@ -707,13 +707,18 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2, valmap * env))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
-    throw EvalError({
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = EvalError({
         .msg = hintfmt(s, sym, p2),
         .errPos = p1
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, valmap * env))
@@ -1151,7 +1156,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos);
+            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos, 
+              map1("value", &v)); // TODO dynamicAttrs to env?
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
