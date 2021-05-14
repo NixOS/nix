@@ -684,9 +684,14 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, valmap * env))
 {
-    throw EvalError(s, s2, s3);
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = EvalError(s, s2, s3);
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
@@ -1498,7 +1503,7 @@ this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/#ss-functions.)",
                 i.name,
-                map1("fun", &fun));  // todo add bindings.
+                map1("fun", &fun));  // todo add bindings + fun
             }
         }
     }
@@ -1850,10 +1855,10 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0]);
+                v.string.s,  v.string.context[0]);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0]);
+                v.string.s,  v.string.context[0], map1("value", &v));
     }
     return s;
 }
@@ -2052,7 +2057,8 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return v1.fpoint == v2.fpoint;
 
         default:
-            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));
+            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2), 
+            map2("value1", &v1, "value2", &v2));
     }
 }
 
