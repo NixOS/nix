@@ -619,28 +619,24 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 // typedef std::optional<const std::map<std::string, Value *>> valmap;
 typedef std::map<std::string, Value *> valmap;
 
-static valmap * map0() __attribute__((noinline));
-valmap * map0()
+LocalNoInline(valmap * map0())
 {
     return new valmap();
 }
 
-static valmap * map1(const char *name, Value *v) __attribute__((noinline));
-valmap * map1(const char *name, Value *v)
+LocalNoInline(valmap * map1(const char *name, Value *v))
 {
     // return new valmap({{name, v}});
     return new valmap({{name, v}});
 }
 
 
-static valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2) __attribute__((noinline));
-valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2)
+LocalNoInline(valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2))
 {
     return new valmap({{name1, v1}, {name2, v2}});
 }
 
-static valmap * mapBindings(Bindings *b) __attribute__((noinline));
-valmap * mapBindings(Bindings *b)
+LocalNoInline(valmap * mapBindings(Bindings *b))
 {
     auto map = new valmap();
 
