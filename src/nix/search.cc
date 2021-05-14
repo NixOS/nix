@@ -25,8 +25,17 @@ struct CmdSearch : InstallableCommand, MixJSON
 {
     std::vector<std::string> res;
 
+    bool all = false;
+
     CmdSearch()
     {
+        addFlag({
+            .longName = "all",
+            .shortName = 'a',
+            .description = "Show all packages for a flake.",
+            .handler = {&all, true},
+        });
+
         expectArgs("regex", &res);
     }
 
@@ -55,11 +64,17 @@ struct CmdSearch : InstallableCommand, MixJSON
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);
 
-        // Empty search string should match all packages
-        // Use "^" here instead of ".*" due to differences in resulting highlighting
-        // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
-        if (res.empty())
-            res.push_back("^");
+        if (all) {
+            // Use "^" here instead of ".*" due to differences in resulting highlighting
+            // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
+            if (res.empty())
+                res.push_back("^");
+            else
+                throw Error("'--all' does not expect a search term");
+        } else {
+            if (res.empty())
+                throw Error("search term cannot be empty");
+        }
 
         std::vector<std::regex> regexes;
         regexes.reserve(res.size());

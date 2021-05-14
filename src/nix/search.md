@@ -5,7 +5,7 @@ R""(
 * Show all packages in the `nixpkgs` flake:
 
   ```console
-  # nix search nixpkgs
+  # nix search -a nixpkgs
   * legacyPackages.x86_64-linux.AMB-plugins (0.8.1)
     A set of ambisonics ladspa plugins
 
@@ -34,7 +34,7 @@ R""(
 * Show all packages in the flake in the current directory:
 
   ```console
-  # nix search
+  # nix search -a
   ```
 
 * Search for Firefox or Chromium:
@@ -56,8 +56,7 @@ flake) for packages whose name or description matches all of the
 regular expressions *regex*.  For each matching package, It prints the
 full attribute name (from the root of the installable), the version
 and the `meta.description` field, highlighting the substrings that
-were matched by the regular expressions. If no regular expressions are
-specified, all packages are shown.
+were matched by the regular expressions.
 
 # Flake output attributes
 

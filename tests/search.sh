@@ -19,10 +19,10 @@ clearCache
 
 ## Search expressions
 
-# Check that empty search string matches all
-nix search -f search.nix '' |grep -q foo
-nix search -f search.nix '' |grep -q bar
-nix search -f search.nix '' |grep -q hello
+# Check that '--all' flag matches all
+nix search -af search.nix |grep -q foo
+nix search --all -f search.nix |grep -q bar
+nix search -af search.nix |grep -q hello
 
 ## Tests for multiple regex/match highlighting
 
