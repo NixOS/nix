@@ -464,7 +464,10 @@ public:
             Logger::writeToStdout(s);
             draw(*state);
         } else {
-            Logger::writeToStdout(s);
+            if (isTTY)
+                Logger::writeToStdout(s);
+            else
+                Logger::writeToStdout(filterANSIEscapes(std::string(s), true));
         }
     }
 
@@ -484,7 +487,7 @@ Logger * makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+        isatty(STDERR_FILENO) && isatty(STDOUT_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
     );
 }
 
