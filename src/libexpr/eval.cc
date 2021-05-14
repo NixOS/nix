@@ -694,12 +694,17 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3, valmap * env))
 {
-    throw EvalError({
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = EvalError({
         .msg = hintfmt(s, s2, s3),
         .errPos = pos
     });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
@@ -1855,7 +1860,7 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s,  v.string.context[0]);
+                v.string.s,  v.string.context[0], map1("value", &v));
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s,  v.string.context[0], map1("value", &v));
