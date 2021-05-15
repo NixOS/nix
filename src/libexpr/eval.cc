@@ -1378,17 +1378,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         throwTypeError(
           pos,
           "attempt to call something which is not a function but %1%",
-          fun,
+          showType(fun),
           map2("fun", &fun, "arg", &arg));
-
-        // auto error = TypeError({
-        //     // .hint = hintfmt("attempt to call something which is not a function but %1%", showType(fun)),
-        //     .msg = hintfmt("attempt to call something which is not a function but %1%", fun),
-        //     .errPos = pos
-        // });
-        // if (debuggerHook)
-        //     debuggerHook(error, {{"fun", &fun}, {"arg", &arg}});
-        // throw error;
     }
 
     ExprLambda & lambda(*fun.lambda.fun);
