@@ -9,7 +9,7 @@ libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
 libstore_LIBS = libutil
 
 libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
-ifneq ($(OS), FreeBSD)
+ifeq ($(OS), Linux)
  libstore_LDFLAGS += -ldl
 endif
 

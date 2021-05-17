@@ -9,7 +9,7 @@ libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexe
 libexpr_LIBS = libutil libstore
 
 libexpr_LDFLAGS =
-ifneq ($(OS), FreeBSD)
+ifeq ($(OS), Linux)
  libexpr_LDFLAGS += -ldl
 endif
 
