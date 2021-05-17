@@ -285,9 +285,9 @@ void completeFlakeRef(ref<Store> store, std::string_view prefix)
     }
 }
 
-DerivedPathWithHints Installable::toDerivedPathWithHints()
+DerivedPath Installable::toDerivedPath()
 {
-    auto buildables = toDerivedPathsWithHints();
+    auto buildables = toDerivedPaths();
     if (buildables.size() != 1)
         throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), buildables.size());
     return std::move(buildables[0]);
@@ -321,22 +321,19 @@ struct InstallableStorePath : Installable
 
     std::string what() override { return store->printStorePath(storePath); }
 
-    DerivedPathsWithHints toDerivedPathsWithHints() override
+    DerivedPaths toDerivedPaths() override
     {
         if (storePath.isDerivation()) {
-            std::map<std::string, std::optional<StorePath>> outputs;
             auto drv = store->readDerivation(storePath);
-            for (auto & [name, output] : drv.outputsAndOptPaths(*store))
-                outputs.emplace(name, output.second);
             return {
-                DerivedPathWithHints::Built {
+                DerivedPath::Built {
                     .drvPath = storePath,
-                    .outputs = std::move(outputs)
+                    .outputs = drv.outputNames(),
                 }
             };
         } else {
             return {
-                DerivedPathWithHints::Opaque {
+                DerivedPath::Opaque {
                     .path = storePath,
                 }
             };
@@ -349,22 +346,22 @@ struct InstallableStorePath : Installable
     }
 };
 
-DerivedPathsWithHints InstallableValue::toDerivedPathsWithHints()
+DerivedPaths InstallableValue::toDerivedPaths()
 {
-    DerivedPathsWithHints res;
+    DerivedPaths res;
 
-    std::map<StorePath, std::map<std::string, std::optional<StorePath>>> drvsToOutputs;
+    std::map<StorePath, std::set<std::string>> drvsToOutputs;
 
     // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
         auto outputName = drv.outputName;
         if (outputName == "")
             throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(drv.drvPath));
-        drvsToOutputs[drv.drvPath].insert_or_assign(outputName, drv.outPath);
+        drvsToOutputs[drv.drvPath].insert(outputName);
     }
 
     for (auto & i : drvsToOutputs)
-        res.push_back(DerivedPathWithHints::Built { i.first, i.second });
+        res.push_back(DerivedPath::Built { i.first, i.second });
 
     return res;
 }
@@ -675,32 +672,67 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-DerivedPathsWithHints build(ref<Store> store, Realise mode,
+BuiltPaths getBuiltPaths(ref<Store> store, DerivedPaths hopefullyBuiltPaths)
+{
+    BuiltPaths res;
+    for (auto& b : hopefullyBuiltPaths)
+        std::visit(
+            overloaded{
+                [&](DerivedPath::Opaque bo) {
+                    res.push_back(BuiltPath::Opaque{bo.path});
+                },
+                [&](DerivedPath::Built bfd) {
+                    OutputPathMap outputs;
+                    auto drv = store->readDerivation(bfd.drvPath);
+                    auto outputHashes = staticOutputHashes(*store, drv);
+                    auto drvOutputs = drv.outputsAndOptPaths(*store);
+                    for (auto& output : bfd.outputs) {
+                        if (!outputHashes.count(output))
+                            throw Error(
+                                "the derivation '%s' doesn't have an output "
+                                "named '%s'",
+                                store->printStorePath(bfd.drvPath), output);
+                        if (settings.isExperimentalFeatureEnabled(
+                                "ca-derivations")) {
+                            auto outputId =
+                                DrvOutput{outputHashes.at(output), output};
+                            auto realisation =
+                                store->queryRealisation(outputId);
+                            if (!realisation)
+                                throw Error(
+                                    "cannot operate on an output of unbuilt "
+                                    "content-addresed derivation '%s'",
+                                    outputId.to_string());
+                            outputs.insert_or_assign(
+                                output, realisation->outPath);
+                        } else {
+                            // If ca-derivations isn't enabled, assume that
+                            // the output path is statically known.
+                            assert(drvOutputs.count(output));
+                            assert(drvOutputs.at(output).second);
+                            outputs.insert_or_assign(
+                                output, *drvOutputs.at(output).second);
+                        }
+                    }
+                    res.push_back(BuiltPath::Built{bfd.drvPath, outputs});
+                },
+            },
+            b.raw());
+
+    return res;
+}
+
+BuiltPaths build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
 {
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
 
-    DerivedPathsWithHints buildables;
-
     std::vector<DerivedPath> pathsToBuild;
 
     for (auto & i : installables) {
-        for (auto & b : i->toDerivedPathsWithHints()) {
-            std::visit(overloaded {
-                [&](DerivedPathWithHints::Opaque bo) {
-                    pathsToBuild.push_back(bo);
-                },
-                [&](DerivedPathWithHints::Built bfd) {
-                    StringSet outputNames;
-                    for (auto & output : bfd.outputs)
-                        outputNames.insert(output.first);
-                    pathsToBuild.push_back(
-                        DerivedPath::Built{bfd.drvPath, outputNames});
-                },
-            }, b.raw());
-            buildables.push_back(std::move(b));
-        }
+        auto b = i->toDerivedPaths();
+        pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
     }
 
     if (mode == Realise::Nothing)
@@ -708,57 +740,26 @@ DerivedPathsWithHints build(ref<Store> store, Realise mode,
     else if (mode == Realise::Outputs)
         store->buildPaths(pathsToBuild, bMode);
 
-    return buildables;
+    return getBuiltPaths(store, pathsToBuild);
 }
 
-std::set<RealisedPath> toRealisedPaths(
+BuiltPaths toBuiltPaths(
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables)
 {
-    std::set<RealisedPath> res;
     if (operateOn == OperateOn::Output) {
-        for (auto & b : build(store, mode, installables))
-            std::visit(overloaded {
-                [&](DerivedPathWithHints::Opaque bo) {
-                    res.insert(bo.path);
-                },
-                [&](DerivedPathWithHints::Built bfd) {
-                    auto drv = store->readDerivation(bfd.drvPath);
-                    auto outputHashes = staticOutputHashes(*store, drv);
-                    for (auto & output : bfd.outputs) {
-                        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-                            if (!outputHashes.count(output.first))
-                                throw Error(
-                                    "the derivation '%s' doesn't have an output named '%s'",
-                                    store->printStorePath(bfd.drvPath),
-                                    output.first);
-                            auto outputId = DrvOutput{outputHashes.at(output.first), output.first};
-                            auto realisation = store->queryRealisation(outputId);
-                            if (!realisation)
-                                throw Error("cannot operate on an output of unbuilt content-addresed derivation '%s'", outputId.to_string());
-                            res.insert(RealisedPath{*realisation});
-                        }
-                        else {
-                            // If ca-derivations isn't enabled, behave as if
-                            // all the paths are opaque to keep the default
-                            // behavior
-                            assert(output.second);
-                            res.insert(*output.second);
-                        }
-                    }
-                },
-            }, b.raw());
+        return build(store, mode, installables);
     } else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
-        auto drvPaths = toDerivations(store, installables, true);
-        res.insert(drvPaths.begin(), drvPaths.end());
+        BuiltPaths res;
+        for (auto & drvPath : toDerivations(store, installables, true))
+            res.push_back(BuiltPath::Opaque{drvPath});
+        return res;
     }
-
-    return res;
 }
 
 StorePathSet toStorePaths(ref<Store> store,
@@ -766,8 +767,10 @@ StorePathSet toStorePaths(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables)
 {
     StorePathSet outPaths;
-    for (auto & path : toRealisedPaths(store, mode, operateOn, installables))
-            outPaths.insert(path.path());
+    for (auto & path : toBuiltPaths(store, mode, operateOn, installables)) {
+        auto thisOutPaths = path.outPaths();
+        outPaths.insert(thisOutPaths.begin(), thisOutPaths.end());
+    }
     return outPaths;
 }
 
@@ -789,9 +792,9 @@ StorePathSet toDerivations(ref<Store> store,
     StorePathSet drvPaths;
 
     for (auto & i : installables)
-        for (auto & b : i->toDerivedPathsWithHints())
+        for (auto & b : i->toDerivedPaths())
             std::visit(overloaded {
-                [&](DerivedPathWithHints::Opaque bo) {
+                [&](DerivedPath::Opaque bo) {
                     if (!useDeriver)
                         throw Error("argument '%s' did not evaluate to a derivation", i->what());
                     auto derivers = store->queryValidDerivers(bo.path);
@@ -800,7 +803,7 @@ StorePathSet toDerivations(ref<Store> store,
                     // FIXME: use all derivers?
                     drvPaths.insert(*derivers.begin());
                 },
-                [&](DerivedPathWithHints::Built bfd) {
+                [&](DerivedPath::Built bfd) {
                     drvPaths.insert(bfd.drvPath);
                 },
             }, b.raw());

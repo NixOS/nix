@@ -265,9 +265,9 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto buildable = installable->toDerivedPathWithHints();
-            auto doRedirect = [&](const StorePath & path)
-            {
+            auto builtPaths = toStorePaths(
+                store, Realise::Nothing, OperateOn::Output, {installable});
+            for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
                 if (script.find(from) == std::string::npos)
                     warn("'%s' (path '%s') is not used by this build environment", installable->what(), from);
@@ -275,16 +275,7 @@ struct Common : InstallableCommand, MixProfile
                     printInfo("redirecting '%s' to '%s'", from, dir);
                     rewrites.insert({from, dir});
                 }
-            };
-            std::visit(overloaded {
-                [&](const DerivedPathWithHints::Opaque & bo) {
-                    doRedirect(bo.path);
-                },
-                [&](const DerivedPathWithHints::Built & bfd) {
-                    for (auto & [outputName, path] : bfd.outputs)
-                        if (path) doRedirect(*path);
-                },
-            }, buildable.raw());
+            }
         }
 
         return rewriteStrings(script, rewrites);

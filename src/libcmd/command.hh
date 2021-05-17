@@ -143,7 +143,7 @@ private:
 };
 
 /* A command that operates on zero or more store paths. */
-struct RealisedPathsCommand : public InstallablesCommand
+struct BuiltPathsCommand : public InstallablesCommand
 {
 private:
 
@@ -156,26 +156,26 @@ protected:
 
 public:
 
-    RealisedPathsCommand(bool recursive = false);
+    BuiltPathsCommand(bool recursive = false);
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, std::vector<RealisedPath> paths) = 0;
+    virtual void run(ref<Store> store, BuiltPaths paths) = 0;
 
     void run(ref<Store> store) override;
 
     bool useDefaultInstallables() override { return !all; }
 };
 
-struct StorePathsCommand : public RealisedPathsCommand
+struct StorePathsCommand : public BuiltPathsCommand
 {
     StorePathsCommand(bool recursive = false);
 
-    using RealisedPathsCommand::run;
+    using BuiltPathsCommand::run;
 
     virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
 
-    void run(ref<Store> store, std::vector<RealisedPath> paths) override;
+    void run(ref<Store> store, BuiltPaths paths) override;
 };
 
 /* A command that operates on exactly one store path. */
@@ -216,7 +216,7 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-DerivedPathsWithHints build(ref<Store> store, Realise mode,
+BuiltPaths build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
 
 std::set<StorePath> toStorePaths(ref<Store> store,
@@ -231,7 +231,7 @@ std::set<StorePath> toDerivations(ref<Store> store,
     std::vector<std::shared_ptr<Installable>> installables,
     bool useDeriver = false);
 
-std::set<RealisedPath> toRealisedPaths(
+BuiltPaths toBuiltPaths(
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
@@ -252,7 +252,7 @@ struct MixProfile : virtual StoreCommand
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const DerivedPathsWithHints & buildables);
+    void updateProfile(const BuiltPaths & buildables);
 };
 
 struct MixDefaultProfile : MixProfile
