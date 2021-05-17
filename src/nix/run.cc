@@ -178,9 +178,7 @@ struct CmdRun : InstallableCommand, RunCommon
     {
         auto state = getEvalState();
 
-        auto app = installable->toApp(*state);
-
-        state->store->buildPaths(toDerivedPaths(app.context));
+        auto app = installable->toApp(*state).resolve(store);
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
