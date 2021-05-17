@@ -15,9 +15,24 @@ nlohmann::json BuiltPath::Built::toJSON(ref<Store> store) const {
     nlohmann::json res;
     res["drvPath"] = store->printStorePath(drvPath);
     for (const auto& [output, path] : outputs) {
-        res["outputs"][output] = path ? store->printStorePath(*path) : "";
+        res["outputs"][output] = store->printStorePath(path);
     }
     return res;
+}
+
+StorePathSet BuiltPath::outPaths() const
+{
+    return std::visit(
+        overloaded{
+            [](BuiltPath::Opaque p) { return StorePathSet{p.path}; },
+            [](BuiltPath::Built b) {
+                StorePathSet res;
+                for (auto & [_, path] : b.outputs)
+                    res.insert(path);
+                return res;
+            },
+        }, raw()
+    );
 }
 
 nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store) {
@@ -74,4 +89,30 @@ DerivedPath DerivedPath::parse(const Store & store, std::string_view s)
         : (DerivedPath) DerivedPath::Built::parse(store, s);
 }
 
+RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
+{
+    RealisedPath::Set res;
+    std::visit(
+        overloaded{
+            [&](BuiltPath::Opaque p) { res.insert(p.path); },
+            [&](BuiltPath::Built p) {
+                auto drvHashes =
+                    staticOutputHashes(store, store.readDerivation(p.drvPath));
+                for (auto& [outputName, outputPath] : p.outputs) {
+                    if (settings.isExperimentalFeatureEnabled(
+                            "ca-derivations")) {
+                        auto thisRealisation = store.queryRealisation(
+                            DrvOutput{drvHashes.at(outputName), outputName});
+                        assert(thisRealisation);  // We’ve built it, so we must h
+                                                  // ve the realisation
+                        res.insert(*thisRealisation);
+                    } else {
+                        res.insert(outputPath);
+                    }
+                }
+            },
+        },
+        raw());
+    return res;
+}
 }

@@ -2,6 +2,7 @@
 
 #include "util.hh"
 #include "path.hh"
+#include "realisation.hh"
 
 #include <optional>
 
@@ -83,7 +84,7 @@ struct DerivedPath : _DerivedPathRaw {
  */
 struct BuiltPathBuilt {
     StorePath drvPath;
-    std::map<std::string, std::optional<StorePath>> outputs;
+    std::map<std::string, StorePath> outputs;
 
     nlohmann::json toJSON(ref<Store> store) const;
     static BuiltPathBuilt parse(const Store & store, std::string_view);
@@ -95,20 +96,9 @@ using _BuiltPathRaw = std::variant<
 >;
 
 /**
- * A derived path with hints in the form of optional concrete output paths in the built case.
- *
- * This type is currently just used by the CLI. The paths are filled in
- * during evaluation for derivations that know what paths they will
- * produce in advanced, i.e. input-addressed or fixed-output content
- * addressed derivations.
- *
- * That isn't very good, because it puts floating content-addressed
- * derivations "at a disadvantage". It would be better to never rely on
- * the output path of unbuilt derivations, and exclusively use the
- * realizations types to work with built derivations' concrete output
- * paths.
+ * A built path. Similar to a `DerivedPath`, but enriched with the corresponding
+ * output path(s).
  */
-// FIXME Stop using and delete this, or if that is not possible move out of libstore to libcmd.
 struct BuiltPath : _BuiltPathRaw {
     using Raw = _BuiltPathRaw;
     using Raw::Raw;
@@ -120,8 +110,12 @@ struct BuiltPath : _BuiltPathRaw {
         return static_cast<const Raw &>(*this);
     }
 
+    StorePathSet outPaths() const;
+    RealisedPath::Set toRealisedPaths(Store & store) const;
+
 };
 
+typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
 
 nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
