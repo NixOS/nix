@@ -39,15 +39,13 @@ class SimpleLogger : public Logger
 {
 public:
 
-    bool systemd, stderrTty, stdoutTty;
+    bool systemd;
     bool printBuildLogs;
 
     SimpleLogger(bool printBuildLogs)
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        stderrTty = isatty(STDERR_FILENO);
-        stdoutTty = isatty(STDOUT_FILENO);
     }
 
     bool isVerbose() override {
@@ -72,7 +70,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !stderrTty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(fs.s, loggerSettings.filterStderrAnsi.get()) + "\n");
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -105,7 +103,10 @@ public:
 
     void writeToStdout(std::string_view s) override
     {
-        Logger::writeToStdout(stdoutTty ? s : filterANSIEscapes(std::string(s), true));
+        if (loggerSettings.filterStdoutAnsi.get())
+            Logger::writeToStdout(filterANSIEscapes(std::string(s), true));
+        else
+            Logger::writeToStdout(s);
     }
 
 };

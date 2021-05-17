@@ -140,11 +140,11 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
+            writeToStderr("\r\e[K" + filterANSIEscapes(s, loggerSettings.filterStderrAnsi.get()) + ANSI_NORMAL "\n");
             draw(state);
         } else {
             auto s2 = s + ANSI_NORMAL "\n";
-            if (!isTTY) s2 = filterANSIEscapes(s2, true);
+            if (loggerSettings.filterStderrAnsi.get()) s2 = filterANSIEscapes(s2, true);
             writeToStderr(s2);
         }
     }
@@ -464,10 +464,10 @@ public:
             Logger::writeToStdout(s);
             draw(*state);
         } else {
-            if (isTTY)
-                Logger::writeToStdout(s);
-            else
+            if (loggerSettings.filterStdoutAnsi.get())
                 Logger::writeToStdout(filterANSIEscapes(std::string(s), true));
+            else
+                Logger::writeToStdout(s);
         }
     }
 
@@ -487,7 +487,7 @@ Logger * makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && isatty(STDOUT_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
     );
 }
 
