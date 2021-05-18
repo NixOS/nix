@@ -6,8 +6,6 @@
 
 namespace nix {
 
-typedef std::pair<std::string, nlohmann::json> StructuredAttrsWithShellRC;
-
 class ParsedDerivation
 {
     StorePath drvPath;
