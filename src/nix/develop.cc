@@ -256,6 +256,9 @@ struct Common : InstallableCommand, MixProfile
         // FIXME: properly unquote 'outputs'.
         StringMap rewrites;
         for (auto & outputName : tokenizeString<std::vector<std::string>>(replaceStrings(outputs->second.quoted, "'", ""))) {
+            // Hacky way to obtain the key of an associate array. This is needed for strctured attrs where
+            // `outputs` is an associative array. If the regex isn't matched, the non-structured-attrs behavior will
+            // be used.
             std::regex ptrn(R"re(\[([A-z0-9]+)\]=.*)re");
             std::smatch match;
             if (std::regex_match(outputName, match, ptrn)) {
