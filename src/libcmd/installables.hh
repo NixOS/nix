@@ -23,6 +23,12 @@ struct App
     // FIXME: add args, sandbox settings, metadata, ...
 };
 
+struct UnresolvedApp
+{
+    App unresolved;
+    App resolve(ref<Store>);
+};
+
 struct Installable
 {
     virtual ~Installable() { }
@@ -33,7 +39,7 @@ struct Installable
 
     DerivedPath toDerivedPath();
 
-    App toApp(EvalState & state);
+    UnresolvedApp toApp(EvalState & state);
 
     virtual std::pair<Value *, Pos> toValue(EvalState & state)
     {
