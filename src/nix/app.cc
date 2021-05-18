@@ -112,7 +112,7 @@ App UnresolvedApp::resolve(ref<Store> store)
 
     auto builtContext = build(store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);
-    if (store->isInStore(res.program))
+    if (!store->isInStore(res.program))
         throw Error("app program '%s' is not in the Nix store", res.program);
 
     return res;
