@@ -53,6 +53,12 @@ void DrvOutputSubstitutionGoal::tryNext()
         return;
     }
 
+    for (const auto & [drvOutputDep, _] : outputInfo->dependentRealisations) {
+        if (drvOutputDep != id) {
+            addWaitee(worker.makeDrvOutputSubstitutionGoal(drvOutputDep));
+        }
+    }
+
     addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
     if (waitees.empty()) outPathValid();
