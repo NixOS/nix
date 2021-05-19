@@ -1,5 +1,6 @@
 #include "realisation.hh"
 #include "store-api.hh"
+#include "closure.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -19,6 +20,43 @@ DrvOutput DrvOutput::parse(const std::string &strRep) {
 
 std::string DrvOutput::to_string() const {
     return strHash() + "!" + outputName;
+}
+
+std::set<Realisation> Realisation::closure(Store & store, std::set<Realisation> startOutputs)
+{
+    std::set<Realisation> res;
+    Realisation::closure(store, startOutputs, res);
+    return res;
+}
+
+void Realisation::closure(Store & store, std::set<Realisation> startOutputs, std::set<Realisation> & res)
+{
+    auto getDeps = [&](const Realisation& current) -> std::set<Realisation> {
+        std::set<Realisation> res;
+        for (auto& currentDep : current.drvOutputDeps) {
+            if (auto currentRealisation = store.queryRealisation(currentDep))
+                res.insert(*currentRealisation);
+            else
+                throw Error(
+                    "Unrealised derivation '%s'", currentDep.to_string());
+        }
+        return res;
+    };
+
+    computeClosure<Realisation>(
+        startOutputs, res,
+        [&](const Realisation& current,
+            std::function<void(std::promise<std::set<Realisation>>&)>
+                processEdges) {
+            std::promise<std::set<Realisation>> promise;
+            try {
+                auto res = getDeps(current);
+                promise.set_value(res);
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+            return processEdges(promise);
+        });
 }
 
 nlohmann::json Realisation::toJSON() const {
