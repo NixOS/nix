@@ -78,7 +78,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 1;
+    const int nixCASchemaVersion = 2;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -96,7 +96,39 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
               #include "ca-specific-schema.sql.gen.hh"
                 ;
             db.exec(schema);
+            curCASchema = nixCASchemaVersion;
         }
+
+        if (curCASchema < 2) {
+            SQLiteTxn txn(db);
+            // Ugly little sql dance to add a new `id` column and make it the primary key
+            db.exec(R"(
+                create table Realisations2 (
+                    id integer primary key autoincrement not null,
+                    drvPath text not null,
+                    outputName text not null, -- symbolic output id, usually "out"
+                    outputPath integer not null,
+                    signatures text, -- space-separated list
+                    foreign key (outputPath) references ValidPaths(id) on delete cascade
+                );
+                insert into Realisations2 (drvPath, outputName, outputPath, signatures)
+                    select drvPath, outputName, outputPath, signatures from Realisations;
+                drop table Realisations;
+                alter table Realisations2 rename to Realisations;
+            )");
+            db.exec(R"(
+                create index if not exists IndexRealisations on Realisations(drvPath, outputName);
+
+                create table if not exists RealisationsRefs (
+                    referrer integer not null,
+                    realisationReference integer,
+                    foreign key (referrer) references Realisations(id) on delete cascade,
+                    foreign key (realisationReference) references Realisations(id) on delete restrict
+                );
+            )");
+            txn.commit();
+        }
+
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
         lockFile(lockFd.get(), ltRead, true);
     }
