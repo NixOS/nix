@@ -47,6 +47,7 @@ nix_tests = \
   compute-levels.sh \
   ca/build.sh \
   ca/build-with-garbage-path.sh \
+  ca/duplicate-realisation-in-closure.sh \
   ca/substitute.sh \
   ca/signatures.sh \
   ca/nix-run.sh \
