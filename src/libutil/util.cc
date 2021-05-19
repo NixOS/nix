@@ -155,6 +155,9 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                     s.clear();  /* restart for symlinks pointing to absolute path */
                 } else {
                     s = dirOf(s);
+                    if (s == "/") {  // we don’t want trailing slashes here, which dirOf only produces if s = /
+                        s.clear();
+                    }
                 }
             }
         }
