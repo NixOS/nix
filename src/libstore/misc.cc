@@ -254,5 +254,47 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }});
 }
 
+std::set<DrvOutput> drvOutputReferences(
+    const std::set<Realisation> inputRealisations,
+    const StorePathSet pathReferences)
+{
+    std::set<DrvOutput> res;
 
+    std::map<StorePath, std::set<DrvOutput>> inputsByOutputPath;
+    for (const auto & input : inputRealisations)
+        inputsByOutputPath[input.outPath].insert(input.id);
+
+    for (const auto & path : pathReferences) {
+        auto theseInputs = inputsByOutputPath[path];
+        res.insert(theseInputs.begin(), theseInputs.end());
+    }
+
+    return res;
+}
+
+std::set<DrvOutput> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath)
+{
+    std::set<Realisation> inputRealisations;
+
+    for (const auto& [inputDrv, outputNames] : drv.inputDrvs) {
+        auto outputHashes =
+            staticOutputHashes(store, store.readDerivation(inputDrv));
+        for (const auto& outputName : outputNames) {
+            auto thisRealisation = store.queryRealisation(
+                DrvOutput{outputHashes.at(outputName), outputName});
+            if (!thisRealisation)
+                throw Error(
+                    "output '%s' of derivation '%s' isn’t built", outputName,
+                    store.printStorePath(inputDrv));
+            inputRealisations.insert(*thisRealisation);
+        }
+    }
+
+    auto info = store.queryPathInfo(outputPath);
+
+    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
+}
 }

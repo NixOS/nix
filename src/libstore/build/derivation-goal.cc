@@ -927,6 +927,7 @@ void DerivationGoal::resolvedFinished() {
             auto newRealisation = *realisation;
             newRealisation.id = DrvOutput{initialOutputs.at(wantedOutput).outputHash, wantedOutput};
             newRealisation.signatures.clear();
+            newRealisation.drvOutputDeps = drvOutputReferences(worker.store, *drv, realisation->outPath);
             signRealisation(newRealisation);
             worker.store.registerDrvOutput(newRealisation);
         } else {
