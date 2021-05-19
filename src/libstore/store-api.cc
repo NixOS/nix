@@ -780,20 +780,40 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
     StorePathSet storePaths;
-    std::set<Realisation> realisations;
+    std::set<Realisation> toplevelRealisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
         if (auto realisation = std::get_if<Realisation>(&path.raw)) {
             settings.requireExperimentalFeature("ca-derivations");
-            realisations.insert(*realisation);
+            toplevelRealisations.insert(*realisation);
         }
     }
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+
+    ThreadPool pool;
+
     try {
-        for (auto & realisation : realisations) {
-            dstStore->registerDrvOutput(realisation, checkSigs);
-        }
-    } catch (MissingExperimentalFeature & e) {
+        // Copy the realisation closure
+        processGraph<Realisation>(
+            pool, Realisation::closure(*srcStore, toplevelRealisations),
+            [&](const Realisation& current) -> std::set<Realisation> {
+                std::set<Realisation> children;
+                for (const auto& drvOutput : current.drvOutputDeps) {
+                    auto currentChild = srcStore->queryRealisation(drvOutput);
+                    if (!currentChild)
+                        throw Error(
+                            "Incomplete realisation closure: '%s' is a "
+                            "dependency "
+                            "of '%s' but isn’t registered",
+                            drvOutput.to_string(), current.id.to_string());
+                    children.insert(*currentChild);
+                }
+                return children;
+            },
+            [&](const Realisation& current) -> void {
+                dstStore->registerDrvOutput(current, checkSigs);
+            });
+    } catch (MissingExperimentalFeature& e) {
         // Don't fail if the remote doesn't support CA derivations is it might
         // not be within our control to change that, and we might still want
         // to at least copy the output paths.
