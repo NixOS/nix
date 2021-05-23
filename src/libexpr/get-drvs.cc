@@ -58,6 +58,36 @@ string DrvInfo::queryName() const
 }
 
 
+std::optional<string> DrvInfo::queryPname() const
+{
+    if (!attrs) {
+        pname = std::optional<string>{std::nullopt};
+    } else if (!pname.has_value()) {
+        auto i = attrs->find(state->symbols.create("pname"));
+        if (i != attrs->end() && i->value->type() == nString)
+            pname = state->forceStringNoCtx(*i->value);
+        else
+            pname = std::optional<string>{std::nullopt};
+    }
+    return *pname;
+}
+
+
+std::optional<string> DrvInfo::queryVersion() const
+{
+    if (!attrs) {
+        version = std::optional<string>{std::nullopt};
+    } else if (!version.has_value()) {
+        auto i = attrs->find(state->symbols.create("version"));
+        if (i != attrs->end() && i->value->type() == nString)
+            version = state->forceStringNoCtx(*i->value);
+        else
+            version = std::optional<string>{std::nullopt};
+    }
+    return *version;
+}
+
+
 string DrvInfo::querySystem() const
 {
     if (system == "" && attrs) {
