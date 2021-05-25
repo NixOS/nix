@@ -558,7 +558,7 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
     if (state.dead.count(path)) return false;
 
     if (state.roots.count(path)) {
-        debug("cannot delete '%1%' because it's a root", printStorePath(path));
+        printInfo("need '%1%' because it's a root", printStorePath(path));
         state.alive.insert(path);
         return true;
     }
@@ -594,6 +594,7 @@ bool LocalStore::canReachRoot(GCState & state, StorePathSet & visited, const Sto
     for (auto & i : incoming)
         if (i != path)
             if (canReachRoot(state, visited, i)) {
+                printInfo("need '%1%' for '%2%'", printStorePath(path), printStorePath(i));
                 state.alive.insert(path);
                 return true;
             }
@@ -760,9 +761,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             tryToDelete(state, printStorePath(i));
             if (state.dead.find(i) == state.dead.end())
                 throw Error(
-                    "cannot delete path '%1%' since it is still alive. "
-                    "To find out why use: "
-                    "nix-store --query --roots",
+                    "cannot delete path '%1%' since it is still alive",
                     printStorePath(i));
         }
 
