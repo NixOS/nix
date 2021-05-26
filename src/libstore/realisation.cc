@@ -33,7 +33,7 @@ void Realisation::closure(Store & store, std::set<Realisation> startOutputs, std
 {
     auto getDeps = [&](const Realisation& current) -> std::set<Realisation> {
         std::set<Realisation> res;
-        for (auto& currentDep : current.drvOutputDeps) {
+        for (auto& [currentDep, _] : current.dependentRealisations) {
             if (auto currentRealisation = store.queryRealisation(currentDep))
                 res.insert(*currentRealisation);
             else
@@ -60,14 +60,14 @@ void Realisation::closure(Store & store, std::set<Realisation> startOutputs, std
 }
 
 nlohmann::json Realisation::toJSON() const {
-    nlohmann::json jsonDrvOutputDeps;
-    for (auto & dep : drvOutputDeps)
-        jsonDrvOutputDeps.push_back(dep.to_string());
+    auto jsonDependentRealisations = nlohmann::json::object();
+    for (auto & [depId, depOutPath] : dependentRealisations)
+        jsonDependentRealisations.emplace(depId.to_string(), depOutPath.to_string());
     return nlohmann::json{
         {"id", id.to_string()},
         {"outPath", outPath.to_string()},
         {"signatures", signatures},
-        {"drvOutputDeps", jsonDrvOutputDeps},
+        {"dependentRealisations", jsonDependentRealisations},
     };
 }
 
@@ -93,16 +93,16 @@ Realisation Realisation::fromJSON(
     if (auto signaturesIterator = json.find("signatures"); signaturesIterator != json.end())
         signatures.insert(signaturesIterator->begin(), signaturesIterator->end());
 
-    std::set <DrvOutput> drvOutputDeps;
-    if (auto jsonDependencies = json.find("drvOutputDeps"); jsonDependencies != json.end())
-        for (auto & jsonDep : *jsonDependencies)
-            drvOutputDeps.insert(DrvOutput::parse(jsonDep.get<std::string>()));
+    std::map <DrvOutput, StorePath> dependentRealisations;
+    if (auto jsonDependencies = json.find("dependentRealisations"); jsonDependencies != json.end())
+        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<std::map<std::string, std::string>>())
+            dependentRealisations.insert({DrvOutput::parse(jsonDepId), StorePath(jsonDepOutPath)});
 
     return Realisation{
         .id = DrvOutput::parse(getField("id")),
         .outPath = StorePath(getField("outPath")),
         .signatures = signatures,
-        .drvOutputDeps = drvOutputDeps,
+        .dependentRealisations = dependentRealisations,
     };
 }
 

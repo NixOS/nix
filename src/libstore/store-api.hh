@@ -864,7 +864,7 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri)
 
 std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
 
-std::set<DrvOutput> drvOutputReferences(
+std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,
     const Derivation & drv,
     const StorePath & outputPath);

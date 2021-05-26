@@ -254,25 +254,22 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }});
 }
 
-std::set<DrvOutput> drvOutputReferences(
+std::map<DrvOutput, StorePath> drvOutputReferences(
     const std::set<Realisation> inputRealisations,
     const StorePathSet pathReferences)
 {
-    std::set<DrvOutput> res;
+    std::map<DrvOutput, StorePath> res;
 
-    std::map<StorePath, std::set<DrvOutput>> inputsByOutputPath;
-    for (const auto & input : inputRealisations)
-        inputsByOutputPath[input.outPath].insert(input.id);
-
-    for (const auto & path : pathReferences) {
-        auto theseInputs = inputsByOutputPath[path];
-        res.insert(theseInputs.begin(), theseInputs.end());
+    for (const auto & input : inputRealisations) {
+        if (pathReferences.count(input.outPath)) {
+            res.insert({input.id, input.outPath});
+        }
     }
 
     return res;
 }
 
-std::set<DrvOutput> drvOutputReferences(
+std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,
     const Derivation & drv,
     const StorePath & outputPath)

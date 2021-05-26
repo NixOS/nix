@@ -711,19 +711,19 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
 void LocalStore::registerDrvOutput(const Realisation & info)
 {
     settings.requireExperimentalFeature("ca-derivations");
-    auto state(_state.lock());
     retrySQLite<void>([&]() {
+        auto state(_state.lock());
         state->stmts->RegisterRealisedOutput
             .use()(info.id.strHash())(info.id.outputName)(printStorePath(
                 info.outPath))(concatStringsSep(" ", info.signatures))
             .exec();
+        uint64_t myId = state->db.getLastInsertedRowId();
+        for (auto & [outputId, _] : info.dependentRealisations) {
+            state->stmts->AddRealisationRealisationReference
+                .use()(myId)(outputId.strHash())(outputId.outputName)
+                .exec();
+        }
     });
-    uint64_t myId = state->db.getLastInsertedRowId();
-    for (auto& outputId : info.drvOutputDeps) {
-        state->stmts->AddRealisationRealisationReference
-            .use()(myId)(outputId.strHash())(outputId.outputName)
-            .exec();
-    }
 }
 
 void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output)
@@ -1730,22 +1730,26 @@ std::optional<const Realisation> LocalStore::queryRealisation(
         auto signatures =
             tokenizeString<StringSet>(useQueryRealisedOutput.getStr(2));
 
-        std::set<DrvOutput> drvOutputDeps;
+        std::map<DrvOutput, StorePath> dependentRealisations;
         auto useRealisationRefs(
             state->stmts->QueryRealisationRealisationReferences.use()(
                 realisationDbId));
-        while (useRealisationRefs.next())
-            drvOutputDeps.insert(DrvOutput{
-                    Hash::parseAnyPrefixed(useRealisationRefs.getStr(0)),
-                useRealisationRefs.getStr(1),
-            }
-        );
+        while (useRealisationRefs.next()) {
+            auto depHash = useRealisationRefs.getStr(0);
+            auto depOutputName = useRealisationRefs.getStr(1);
+            auto useQueryRealisedOutput(
+                state->stmts->QueryRealisedOutput.use()(depHash)(depOutputName));
+            assert(useQueryRealisedOutput.next());
+            auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
+            auto depId = DrvOutput { Hash::parseAnyPrefixed(depHash), depOutputName };
+            dependentRealisations.insert({depId, outputPath});
+        }
 
         return Ret{Realisation{
             .id = id,
             .outPath = outputPath,
             .signatures = signatures,
-            .drvOutputDeps = drvOutputDeps,
+            .dependentRealisations = dependentRealisations,
         }};
     });
 }
