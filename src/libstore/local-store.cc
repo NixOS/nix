@@ -1436,14 +1436,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
-                std::unique_ptr<AbstractHashSink> hashSink;
-                if (!info->ca || !info->references.count(info->path))
-                    hashSink = std::make_unique<HashSink>(info->narHash.type);
-                else
-                    hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                auto hashSink = HashSink(info->narHash.type);
 
-                dumpPath(Store::toRealPath(i), *hashSink);
-                auto current = hashSink->finish();
+                dumpPath(Store::toRealPath(i), hashSink);
+                auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError("path '%s' was modified! expected hash '%s', got '%s'",
