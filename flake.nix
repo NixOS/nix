@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
+  inputs.nixpkgs.url = "nixpkgs/nixos-21.05-small";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
@@ -286,8 +286,8 @@
 
           nativeBuildInputs = [ which ];
 
-          configurePhase =
-            ''
+          configurePhase = ''
+              ${if (stdenv.isDarwin && stdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
               ./configure \
                 PREFIX=${placeholder "dev"} \
                 BINDIR=${placeholder "bin"}/bin
