@@ -295,8 +295,14 @@ private:
 
     void createUser(const std::string & userName, uid_t userId) override;
 
-    friend class DerivationGoal;
-    friend class SubstitutionGoal;
+    std::string hashCAPath(
+        bool recursive,
+        const HashType & hashType,
+        const Path & path
+    );
+
+    friend struct DerivationGoal;
+    friend struct SubstitutionGoal;
 };
 
 
