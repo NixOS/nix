@@ -1168,6 +1168,31 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narSize, hashResult.second);
 
+            if (info.ca) {
+                if (auto foHash = std::get_if<FixedOutputHash>(&*info.ca)) {
+                    auto actualFoHash = hashCAPath(
+                        foHash->method,
+                        foHash->hash.type,
+                        info.path
+                    );
+                    if (foHash->hash != actualFoHash.hash) {
+                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                            printStorePath(info.path),
+                            foHash->hash.to_string(Base32, true),
+                            actualFoHash.hash.to_string(Base32, true));
+                    }
+                }
+                if (auto textHash = std::get_if<TextHash>(&*info.ca)) {
+                    auto actualTextHash = hashString(htSHA256, readFile(realPath));
+                    if (textHash->hash != actualTextHash) {
+                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                            printStorePath(info.path),
+                            textHash->hash.to_string(Base32, true),
+                            actualTextHash.to_string(Base32, true));
+                    }
+                }
+            }
+
             autoGC();
 
             canonicalisePathMetaData(realPath, -1);
@@ -1672,4 +1697,36 @@ std::optional<const Realisation> LocalStore::queryRealisation(
             .id = id, .outPath = outputPath, .signatures = signatures}};
     });
 }
+
+
+FixedOutputHash LocalStore::hashCAPath(
+    const FileIngestionMethod & method, const HashType & hashType,
+    const StorePath & path)
+{
+    return hashCAPath(method, hashType, Store::toRealPath(path), path.hashPart());
+}
+
+FixedOutputHash LocalStore::hashCAPath(
+    const FileIngestionMethod & method,
+    const HashType & hashType,
+    const Path & path,
+    const std::string_view pathHash
+)
+{
+    HashModuloSink caSink ( hashType, std::string(pathHash) );
+    switch (method) {
+    case FileIngestionMethod::Recursive:
+        dumpPath(path, caSink);
+        break;
+    case FileIngestionMethod::Flat:
+        readFile(path, caSink);
+        break;
+    }
+    auto hash = caSink.finish().first;
+    return FixedOutputHash{
+        .method = method,
+        .hash = hash,
+    };
+}
+
 }  // namespace nix

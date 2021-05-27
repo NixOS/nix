@@ -11,6 +11,7 @@ nix_tests = \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh \
+  substitute-with-invalid-ca.sh \
   binary-cache-build-remote.sh \
   nix-profile.sh repair.sh dump-db.sh case-hack.sh \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \

@@ -283,6 +283,19 @@ private:
 
     void createUser(const std::string & userName, uid_t userId) override;
 
+    // XXX: Make a generic `Store` method
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const StorePath & path);
+
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const Path & path,
+        const std::string_view pathHash
+    );
+
     friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;
