@@ -63,7 +63,8 @@ contact_us() {
     echo "You can open an issue at https://github.com/nixos/nix/issues"
     echo ""
     echo "Or feel free to contact the team:"
-    echo " - IRC: in #nixos on irc.freenode.net"
+    echo " - Matrix: #nix:nixos.org"
+    echo " - IRC: in #nixos on irc.libera.chat"
     echo " - twitter: @nixos_org"
     echo " - forum: https://discourse.nixos.org"
 }
