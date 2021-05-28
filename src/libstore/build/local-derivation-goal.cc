@@ -2354,32 +2354,19 @@ void LocalDerivationGoal::registerOutputs()
             }
             auto got = caSink.finish().first;
             auto refs = rewriteRefs();
-            HashModuloSink narSink { htSHA256, oldHashPart };
-            dumpPath(actualPath, narSink);
-            auto narHashAndSize = narSink.finish();
-            ValidPathInfo newInfo0 {
-                worker.store.makeFixedOutputPath(
+
+            auto finalPath = worker.store.makeFixedOutputPath(
                     outputHash.method,
                     got,
                     outputPathName(drv->name, outputName),
                     refs.second,
-                    refs.first),
-                narHashAndSize.first,
-            };
-            newInfo0.narSize = narHashAndSize.second;
-            newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
-                .hash = got,
-            };
-            newInfo0.references = refs.second;
-            if (refs.first)
-                newInfo0.references.insert(newInfo0.path);
-            if (scratchPath != newInfo0.path) {
+                    refs.first);
+            if (scratchPath != finalPath) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
                     StringSink sink;
                     dumpPath(actualPath, sink);
-                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
+                    RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
                     rsink2(*sink.s);
                     rsink2.flush();
                 });
@@ -2388,6 +2375,21 @@ void LocalDerivationGoal::registerOutputs()
                 deletePath(actualPath);
                 movePath(tmpPath, actualPath);
             }
+
+            HashResult narHashAndSize = hashPath(htSHA256, actualPath);
+            ValidPathInfo newInfo0 {
+                finalPath,
+                narHashAndSize.first,
+            };
+
+            newInfo0.narSize = narHashAndSize.second;
+            newInfo0.ca = FixedOutputHash {
+                .method = outputHash.method,
+                .hash = got,
+            };
+            newInfo0.references = refs.second;
+            if (refs.first)
+                newInfo0.references.insert(newInfo0.path);
 
             assert(newInfo0.ca);
             return newInfo0;
