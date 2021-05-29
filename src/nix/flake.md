@@ -186,8 +186,8 @@ Currently the `type` attribute can be one of the following:
   attribute `url`.
 
   In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`
-  or `.tar.bz2`.
+  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`,
+  `.tar.bz2` or `.tar.zst`.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:

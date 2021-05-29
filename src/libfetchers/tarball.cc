@@ -178,7 +178,8 @@ struct TarballInputScheme : InputScheme
             && !hasSuffix(url.path, ".tar")
             && !hasSuffix(url.path, ".tar.gz")
             && !hasSuffix(url.path, ".tar.xz")
-            && !hasSuffix(url.path, ".tar.bz2"))
+            && !hasSuffix(url.path, ".tar.bz2")
+            && !hasSuffix(url.path, ".tar.zst"))
             return {};
 
         Input input;
