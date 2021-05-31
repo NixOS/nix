@@ -179,3 +179,22 @@ nix-env --set $outPath10
 [ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
 nix-env --set $drvPath10
 [ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
+
+# This tests behavior of the daemon, and as such only needs to run
+# when the daemon is the self version
+if [[ -z "${NIX_CLIENT_PACKAGE}" && -z "${NIX_DAEMON_PACKAGE}"
+    || -n "${NIX_CLIENT_PACKAGE:-}" && -n "${NIX_DAEMON_PACKAGE:-}"
+    && "$NIX_CLIENT_PACKAGE" == "$NIX_DAEMON_PACKAGE" ]]; then
+
+    nix-env -e '*'
+
+    # A cutoff of 0 should make /bin be a symlink
+    nix-env -i foo-0.1 --option min-profile-symlink-cutoff 0
+    [ -h "$profiles/test/bin" ]
+
+    # But a cutoff of 1 should make /bin not be a symlink
+    # This also makes sure that the cutoff influences the derivation so it
+    # doesn't reuse the previous one
+    nix-env -i foo-0.1 --option min-profile-symlink-cutoff 1
+    [ ! -h "$profiles/test/bin" ]
+fi

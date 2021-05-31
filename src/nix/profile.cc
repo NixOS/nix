@@ -150,7 +150,7 @@ struct ProfileManifest
             }
         }
 
-        buildProfile(tempDir, std::move(pkgs));
+        buildProfile(tempDir, std::move(pkgs), settings.minProfileSymlinkCutoff);
 
         writeFile(tempDir + "/manifest.json", toJSON(*store));
 

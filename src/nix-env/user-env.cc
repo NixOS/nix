@@ -118,11 +118,13 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
-    Value args, topLevel;
+    Value args, topLevel, cutoff;
     state.mkAttrs(args, 3);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         state.store->printStorePath(manifestFile), {state.store->printStorePath(manifestFile)});
     args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
+    mkInt(cutoff, settings.minProfileSymlinkCutoff);
+    args.attrs->push_back(Attr(state.symbols.create("minProfileSymlinkCutoff"), &cutoff));
     args.attrs->sort();
     mkApp(topLevel, envBuilder, args);
 

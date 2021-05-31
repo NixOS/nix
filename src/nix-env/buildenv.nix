@@ -1,11 +1,11 @@
-{ derivations, manifest }:
+{ derivations, manifest, minProfileSymlinkCutoff }:
 
 derivation {
   name = "user-environment";
   system = "builtin";
   builder = "builtin:buildenv";
 
-  inherit manifest;
+  inherit manifest minProfileSymlinkCutoff;
 
   # !!! grmbl, need structured data for passing this in a clean way.
   derivations =
