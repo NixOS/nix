@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
