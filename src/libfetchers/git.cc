@@ -12,6 +12,8 @@ using namespace std::string_literals;
 
 namespace nix::fetchers {
 
+const std::string gitInitialBranch = "__nix_dummy_branch";
+
 static std::string readHead(const Path & path)
 {
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
@@ -319,7 +321,7 @@ struct GitInputScheme : InputScheme
 
             if (!pathExists(cacheDir)) {
                 createDirs(dirOf(cacheDir));
-                runProgram("git", true, { "init", "--bare", repoDir });
+                runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
             }
 
             Path localRefFile =
@@ -432,7 +434,7 @@ struct GitInputScheme : InputScheme
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
-            runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
             // TODO: repoDir might lack the ref (it only checks if rev
             // exists, see FIXME above) so use a big hammer and fetch
             // everything to ensure we get the rev.
