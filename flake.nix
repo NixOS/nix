@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
+  inputs.nixpkgs.url = "nixpkgs/nixos-21.05-small";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
@@ -286,8 +286,8 @@
 
           nativeBuildInputs = [ which ];
 
-          configurePhase =
-            ''
+          configurePhase = ''
+              ${if (stdenv.isDarwin && stdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
               ./configure \
                 PREFIX=${placeholder "dev"} \
                 BINDIR=${placeholder "bin"}/bin
@@ -387,7 +387,7 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
         installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
 
         # Line coverage analysis.
