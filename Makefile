@@ -12,6 +12,7 @@ makefiles = \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
   misc/bash/local.mk \
+  misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
