@@ -387,7 +387,7 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
         installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
 
         # Line coverage analysis.
