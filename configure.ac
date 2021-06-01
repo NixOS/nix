@@ -1,4 +1,4 @@
-AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
+AC_INIT([nix],[m4_esyscmd(bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX")])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
@@ -9,8 +9,7 @@ AC_PROG_SED
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
 
-AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
-  [Platform identifier (e.g., `i686-linux').]),
+AC_ARG_WITH(system, AS_HELP_STRING([--with-system=SYSTEM],[Platform identifier (e.g., `i686-linux').]),
   [system=$withval],
   [case "$host_cpu" in
      i*86)
@@ -127,8 +126,7 @@ NEED_PROG(jq, jq)
 AC_SUBST(coreutils, [$(dirname $(type -p cat))])
 
 
-AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
-  [path of the Nix store (defaults to /nix/store)]),
+AC_ARG_WITH(store-dir, AS_HELP_STRING([--with-store-dir=PATH],[path of the Nix store (defaults to /nix/store)]),
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
@@ -157,8 +155,7 @@ fi
 
 PKG_PROG_PKG_CONFIG
 
-AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
-  [Build shared libraries for Nix [default=yes]]),
+AC_ARG_ENABLE(shared, AS_HELP_STRING([--enable-shared],[Build shared libraries for Nix [default=yes]]),
   shared=$enableval, shared=yes)
 if test "$shared" = yes; then
   AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
@@ -215,9 +212,8 @@ AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then
   AC_ARG_ENABLE([seccomp-sandboxing],
-                AC_HELP_STRING([--disable-seccomp-sandboxing],
-                               [Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)]
-                              ))
+                AS_HELP_STRING([--disable-seccomp-sandboxing],[Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)
+                              ]))
   if test "x$enable_seccomp_sandboxing" != "xno"; then
     PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
                       [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
@@ -249,8 +245,7 @@ fi
 
 
 # Whether to use the Boehm garbage collector.
-AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
-  [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=yes]]),
+AC_ARG_ENABLE(gc, AS_HELP_STRING([--enable-gc],[enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=yes]]),
   gc=$enableval, gc=yes)
 if test "$gc" = yes; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
@@ -264,8 +259,7 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 
 # documentation generation switch
-AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
-  [disable documentation generation]),
+AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
@@ -285,8 +279,7 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
-AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
-  [path of a statically-linked shell to use as /bin/sh in sandboxes]),
+AC_ARG_WITH(sandbox-shell, AS_HELP_STRING([--with-sandbox-shell=PATH],[path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
 
@@ -301,6 +294,6 @@ done
 
 rm -f Makefile.config
 
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([])
 AC_OUTPUT
