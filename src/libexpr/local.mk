@@ -16,7 +16,7 @@ libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/lib
 libexpr_LIBS = libutil libstore libfetchers
 
 libexpr_LDFLAGS = -lboost_context
-ifneq ($(OS), FreeBSD)
+ifeq ($(OS), Linux)
  libexpr_LDFLAGS += -ldl
 endif
 
