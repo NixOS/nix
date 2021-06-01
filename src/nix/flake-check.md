@@ -24,7 +24,7 @@ built successfully.
 
 # Evaluation checks
 
-This following flake output attributes must be derivations:
+The following flake output attributes must be derivations:
 
 * `checks.`*system*`.`*name*
 * `defaultPackage.`*system*`
