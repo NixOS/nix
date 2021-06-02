@@ -1154,7 +1154,34 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         selector.push_back(getName(i, state, env));
 
     try {
-        state.getAttrField(vTmp, selector, pos, v);
+        Pos * pos2 = 0;
+
+        Value * vAttrs = &vTmp;
+        try {
+            for (auto & name : selector) {
+                nrLookups++;
+                Bindings::iterator j;
+                state.forceValue(*vAttrs, pos);
+                if (vAttrs->type() != nAttrs ||
+                        (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    throw MissingField("attribute '%s' missing", name);
+                }
+                vAttrs = j->value;
+                pos2 = j->pos;
+                if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+            }
+
+            state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : pos ) );
+
+        } catch (Error & e) {
+            if (pos2 && pos2->file != state.sDerivationNix) {
+                vector<string> strSelector;
+                addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'", concatStringsSep(".", selector));
+            }
+            throw;
+        }
+
+        v = *vAttrs;
     } catch (MissingField & field) {
         if (def) {
             def->eval(state, env, v);
