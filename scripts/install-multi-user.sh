@@ -63,8 +63,10 @@ contactme() {
     echo "If you can, open an issue at https://github.com/nixos/nix/issues"
     echo ""
     echo "Or feel free to contact the team,"
-    echo " - on IRC #nixos on irc.freenode.net"
+    echo " - on Matrix #nix:nixos.org"
+    echo " - on IRC #nixos on irc.libera.chat"
     echo " - on twitter @nixos_org"
+    echo " - on our forum https://discourse.nixos.org/"
 }
 
 uninstall_directions() {
