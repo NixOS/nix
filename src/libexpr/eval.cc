@@ -1153,43 +1153,38 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrPath)
         selector.push_back(getName(i, state, env));
 
+    Pos * pos2 = 0;
+
+    Value * vAttrs = &vTmp;
     try {
-        Pos * pos2 = 0;
-
-        Value * vAttrs = &vTmp;
-        try {
-            for (auto & name : selector) {
-                nrLookups++;
-                Bindings::iterator j;
-                state.forceValue(*vAttrs, pos);
-                if (vAttrs->type() != nAttrs ||
-                        (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
-                    throw MissingField("attribute '%s' missing", name);
+        for (auto & name : selector) {
+            nrLookups++;
+            Bindings::iterator j;
+            state.forceValue(*vAttrs, pos);
+            if (vAttrs->type() != nAttrs ||
+                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                if (def) {
+                    def->eval(state, env, v);
+                    return;
                 }
-                vAttrs = j->value;
-                pos2 = j->pos;
-                if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+                throwEvalError(pos, "attribute '%s' missing", name);
             }
-
-            state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : pos ) );
-
-        } catch (Error & e) {
-            if (pos2 && pos2->file != state.sDerivationNix) {
-                vector<string> strSelector;
-                addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'", concatStringsSep(".", selector));
-            }
-            throw;
+            vAttrs = j->value;
+            pos2 = j->pos;
+            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
 
-        v = *vAttrs;
-    } catch (MissingField & field) {
-        if (def) {
-            def->eval(state, env, v);
-            return;
-        } else {
-            throwEvalError(pos, field.what());
+        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : pos ) );
+
+    } catch (Error & e) {
+        if (pos2 && pos2->file != state.sDerivationNix) {
+            vector<string> strSelector;
+            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'", concatStringsSep(".", selector));
         }
+        throw;
     }
+
+    v = *vAttrs;
 
 }
 
