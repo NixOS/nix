@@ -1107,68 +1107,63 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
     v = *v2;
 }
 
-
-static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPath)
-{
-    std::ostringstream out;
-    bool first = true;
-    for (auto & i : attrPath) {
-        if (!first) out << '.'; else first = false;
-        try {
-            out << getName(i, state, env);
-        } catch (Error & e) {
-            assert(!i.symbol.set());
-            out << "\"${" << *i.expr << "}\"";
-        }
-    }
-    return out.str();
-}
-
-
 unsigned long nrLookups = 0;
+
+MakeError(MissingField, Error);
+
+void EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+{
+    Pos * pos2 = 0;
+
+    Value * vAttrs = &attrs;
+    try {
+        for (auto & name : selector) {
+            nrLookups++;
+            Bindings::iterator j;
+            forceValue(*vAttrs, pos);
+            if (vAttrs->type() != nAttrs ||
+                (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                throw MissingField("attribute '%s' missing", name);
+            }
+            vAttrs = j->value;
+            pos2 = j->pos;
+            if (countCalls && pos2) attrSelects[*pos2]++;
+        }
+
+        forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : pos ) );
+
+    } catch (Error & e) {
+        if (pos2 && pos2->file != sDerivationNix) {
+            vector<string> strSelector;
+            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'", concatStringsSep(".", selector));
+        }
+        throw;
+    }
+
+    dest = *vAttrs;
+}
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos2 = 0;
-    Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
 
+    std::vector<Symbol> selector;
+    for (auto & i : attrPath)
+        selector.push_back(getName(i, state, env));
+
     try {
-
-        for (auto & i : attrPath) {
-            nrLookups++;
-            Bindings::iterator j;
-            Symbol name = getName(i, state, env);
-            if (def) {
-                state.forceValue(*vAttrs, pos);
-                if (vAttrs->type() != nAttrs ||
-                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                {
-                    def->eval(state, env, v);
-                    return;
-                }
-            } else {
-                state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
-            }
-            vAttrs = j->value;
-            pos2 = j->pos;
-            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+        state.getAttrField(vTmp, selector, pos, v);
+    } catch (MissingField & field) {
+        if (def) {
+            def->eval(state, env, v);
+            return;
+        } else {
+            throwEvalError(pos, field.what());
         }
-
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
-
-    } catch (Error & e) {
-        if (pos2 && pos2->file != state.sDerivationNix)
-            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
-                showAttrPath(state, env, attrPath));
-        throw;
     }
 
-    v = *vAttrs;
 }
 
 

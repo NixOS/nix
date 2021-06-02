@@ -343,6 +343,8 @@ private:
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+    void getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
 };
 
 
