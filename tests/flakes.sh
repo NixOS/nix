@@ -535,6 +535,21 @@ EOF
 
 (! nix flake check $flake3Dir)
 
+cat > $flake3Dir/flake.nix <<EOF
+{
+  outputs = { flake1, self }: {
+    defaultPackage = {
+        system-1 = "foo";
+        system-2 = "bar";
+    };
+  };
+}
+EOF
+
+checkRes=$(nix flake check --keep-going $flake3Dir 2>&1 && fail "nix flake check should have failed" || true)
+echo "$checkRes" | grep -q "defaultPackage.system-1"
+echo "$checkRes" | grep -q "defaultPackage.system-2"
+
 # Test 'follows' inputs.
 cat > $flake3Dir/flake.nix <<EOF
 {

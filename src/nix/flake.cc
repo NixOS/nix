@@ -272,25 +272,40 @@ struct CmdFlakeCheck : FlakeCommand
         auto state = getEvalState();
         auto flake = lockFlake();
 
+        bool hasErrors = false;
+        auto throw_ = [&](const Error & e) {
+            try {
+                throw e;
+            } catch (Error & e) {
+                if (settings.keepGoing) {
+                    ignoreException();
+                    hasErrors = true;
+                }
+                else
+                    throw;
+            }
+        };
+
         // FIXME: rewrite to use EvalCache.
 
         auto checkSystemName = [&](const std::string & system, const Pos & pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
-                throw Error("'%s' is not a valid system type, at %s", system, pos);
+                throw_(Error("'%s' is not a valid system type, at %s", system, pos));
         };
 
-        auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+        auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) -> std::optional<StorePath> {
             try {
                 auto drvInfo = getDerivation(*state, v, false);
                 if (!drvInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return store->parseStorePath(drvInfo->queryDrvPath());
+                return std::make_optional(store->parseStorePath(drvInfo->queryDrvPath()));
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the derivation '%s'", attrPath));
-                throw;
+                throw_(e);
             }
+            return std::nullopt;
         };
 
         std::vector<DerivedPath> drvPaths;
@@ -307,7 +322,7 @@ struct CmdFlakeCheck : FlakeCommand
                 #endif
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the app definition '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -323,7 +338,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // evaluate the overlay.
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the overlay '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -347,7 +362,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // check the module.
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the NixOS module '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -369,7 +384,7 @@ struct CmdFlakeCheck : FlakeCommand
 
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the Hydra jobset '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -384,7 +399,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the NixOS configuration '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -418,7 +433,7 @@ struct CmdFlakeCheck : FlakeCommand
                 }
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -433,7 +448,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("bundler must take formal arguments 'program' and 'system'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
-                throw;
+                throw_(e);
             }
         };
 
@@ -461,8 +476,8 @@ struct CmdFlakeCheck : FlakeCommand
                                     auto drvPath = checkDerivation(
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
-                                    if ((std::string) attr.name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{drvPath});
+                                    if (drvPath && (std::string) attr.name == settings.thisSystem.get())
+                                        drvPaths.push_back(DerivedPath::Built{*drvPath});
                                 }
                             }
                         }
@@ -574,7 +589,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                     } catch (Error & e) {
                         e.addTrace(pos, hintfmt("while checking flake output '%s'", name));
-                        throw;
+                        throw_(e);
                     }
                 });
         }
@@ -583,6 +598,8 @@ struct CmdFlakeCheck : FlakeCommand
             Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
             store->buildPaths(drvPaths);
         }
+        if (hasErrors)
+            throw Error("Some errors were encountered during the evaluation");
     }
 };
 
