@@ -1,6 +1,7 @@
 #pragma once
 
 #include "attr-set.hh"
+#include "context.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
@@ -348,10 +349,6 @@ private:
 /* Return a string representing the type of the value `v'. */
 string showType(ValueType type);
 string showType(const Value & v);
-
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-std::pair<string, string> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
