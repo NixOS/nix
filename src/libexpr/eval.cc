@@ -1109,9 +1109,7 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 
 unsigned long nrLookups = 0;
 
-MakeError(MissingField, Error);
-
-void EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
 {
     Pos * pos2 = 0;
 
@@ -1123,7 +1121,7 @@ void EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
             forceValue(*vAttrs, pos);
             if (vAttrs->type() != nAttrs ||
                 (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
-                throw MissingField("attribute '%s' missing", name);
+                return false;
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1141,6 +1139,7 @@ void EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
     }
 
     dest = *vAttrs;
+    return true;
 }
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
@@ -1153,38 +1152,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrPath)
         selector.push_back(getName(i, state, env));
 
-    Pos * pos2 = 0;
-
-    Value * vAttrs = &vTmp;
-    try {
-        for (auto & name : selector) {
-            nrLookups++;
-            Bindings::iterator j;
-            state.forceValue(*vAttrs, pos);
-            if (vAttrs->type() != nAttrs ||
-                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
-                if (def) {
-                    def->eval(state, env, v);
-                    return;
-                }
-                throwEvalError(pos, "attribute '%s' missing", name);
-            }
-            vAttrs = j->value;
-            pos2 = j->pos;
-            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+    bool gotField = state.getAttrField(vTmp, selector, pos, v);
+    if (!gotField) {
+        if (def) {
+            def->eval(state, env, v);
+            return;
+        } else {
+            throwEvalError(pos, "Missing field");
         }
-
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : pos ) );
-
-    } catch (Error & e) {
-        if (pos2 && pos2->file != state.sDerivationNix) {
-            vector<string> strSelector;
-            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'", concatStringsSep(".", selector));
-        }
-        throw;
     }
-
-    v = *vAttrs;
 
 }
 
