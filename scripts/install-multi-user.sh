@@ -66,6 +66,7 @@ contactme() {
     echo " - on Matrix #nix:nixos.org"
     echo " - on IRC #nixos on irc.libera.chat"
     echo " - on twitter @nixos_org"
+    echo " - on our forum https://discourse.nixos.org/"
 }
 
 uninstall_directions() {
