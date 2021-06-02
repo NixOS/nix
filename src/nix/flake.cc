@@ -273,7 +273,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto flake = lockFlake();
 
         bool hasErrors = false;
-        auto throw_ = [&](const Error & e) {
+        auto reportError = [&](const Error & e) {
             try {
                 throw e;
             } catch (Error & e) {
@@ -291,7 +291,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkSystemName = [&](const std::string & system, const Pos & pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
-                throw_(Error("'%s' is not a valid system type, at %s", system, pos));
+                reportError(Error("'%s' is not a valid system type, at %s", system, pos));
         };
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) -> std::optional<StorePath> {
@@ -303,7 +303,7 @@ struct CmdFlakeCheck : FlakeCommand
                 return std::make_optional(store->parseStorePath(drvInfo->queryDrvPath()));
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the derivation '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
             return std::nullopt;
         };
@@ -322,7 +322,7 @@ struct CmdFlakeCheck : FlakeCommand
                 #endif
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the app definition '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -338,7 +338,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // evaluate the overlay.
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the overlay '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -362,7 +362,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // check the module.
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the NixOS module '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -384,7 +384,7 @@ struct CmdFlakeCheck : FlakeCommand
 
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the Hydra jobset '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -399,7 +399,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the NixOS configuration '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -433,7 +433,7 @@ struct CmdFlakeCheck : FlakeCommand
                 }
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -448,7 +448,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("bundler must take formal arguments 'program' and 'system'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
-                throw_(e);
+                reportError(e);
             }
         };
 
@@ -589,7 +589,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                     } catch (Error & e) {
                         e.addTrace(pos, hintfmt("while checking flake output '%s'", name));
-                        throw_(e);
+                        reportError(e);
                     }
                 });
         }
