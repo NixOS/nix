@@ -397,7 +397,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
             auto & element(manifest.elements[i]);
             if (element.source
                 && !element.source->originalRef.input.isImmutable()
-                && matches(*store, element, i, matchers))
+                && (matches(*store, element, i, matchers) || matchers.empty()))
             {
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
@@ -571,7 +571,7 @@ struct CmdProfile : NixMultiCommand
     void run() override
     {
         if (!command)
-            throw UsageError("'nix profile' requires a sub-command.");
+            command = std::pair("info", make_ref<CmdProfileInfo>());
         command->second->prepare();
         command->second->run();
     }
