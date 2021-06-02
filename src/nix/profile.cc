@@ -144,6 +144,9 @@ struct ProfileManifest
         Packages pkgs;
         for (auto & element : elements) {
             for (auto & path : element.storePaths) {
+                if (std::find(references.begin(), references.end(), path) != references.end())
+                    throw Error("Cannot create profile with store path '%s' included more than once", store->printStorePath(path));
+
                 if (element.active)
                     pkgs.emplace_back(store->printStorePath(path), true, 5);
                 references.insert(path);
@@ -242,6 +245,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 ProfileElement element;
                 if (!drv.outPath)
                     throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
+
                 element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
                     installable2->flakeRef,
