@@ -2,7 +2,7 @@
 
 #include "nixexpr.hh"
 #include "symbol-table.hh"
-#include "tree-cache.hh"
+#include "value-cache.hh"
 
 #include <algorithm>
 #include <optional>
@@ -37,7 +37,7 @@ class Bindings
 public:
     typedef uint32_t size_t;
     Pos *pos;
-    std::shared_ptr<tree_cache::Cursor> eval_cache;
+    ValueCache eval_cache;
 
 private:
     size_t size_, capacity_;

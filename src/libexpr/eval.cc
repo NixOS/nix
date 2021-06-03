@@ -8,6 +8,7 @@
 #include "filetransfer.hh"
 #include "json.hh"
 #include "function-trace.hh"
+#include "value-cache.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -1109,9 +1110,78 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 
 unsigned long nrLookups = 0;
 
+std::pair<ValueCache::CacheResult, ValueCache> ValueCache::getValue(EvalState & state, const std::vector<Symbol> & selector, Value & dest)
+{
+    if (!rawCache)
+        return { {NoCacheKey}, ValueCache(nullptr) };
+    auto resultingCursor = rawCache->findAlongAttrPath(selector);
+    if (!resultingCursor)
+        return { {CacheMiss}, ValueCache(nullptr) };
+
+    auto cachedValue = resultingCursor->getCachedValue();
+    auto cacheResult = std::visit(
+        overloaded{
+            [&](tree_cache::attributeSet_t) { return ValueCache::CacheResult{ Forward }; },
+            [&](tree_cache::unknown_t) { return ValueCache::CacheResult{ UnCacheable }; },
+            [&](tree_cache::thunk_t) { return ValueCache::CacheResult{ CacheMiss }; },
+            [&](tree_cache::failed_t x) -> ValueCache::CacheResult {throw EvalError(x.error); },
+            [&](tree_cache::missing_t x) {
+                return ValueCache::CacheResult{
+                    .returnCode = CacheHit,
+                    .lastQueriedSymbolIfMissing = x.attrName
+                };
+            },
+            [&](tree_cache::string_t s) {
+                PathSet context;
+                for (auto& [pathName, outputName] : s.second) {
+                    // If the cached value depends on some non-existent
+                    // path, we need to discard it and force the evaluation
+                    // to bring back the context in the store
+                    if (!state.store->isValidPath(
+                            state.store->parseStorePath(pathName)))
+                        return ValueCache::CacheResult{UnCacheable};
+                    context.insert("!" + outputName + "!" + pathName);
+                }
+                mkString(dest, s.first, context);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<bool> b) {
+                dest.mkBool(b.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<int64_t> i) {
+                dest.mkInt(i.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+            [&](tree_cache::wrapped_basetype<double> d) {
+                dest.mkFloat(d.value);
+                return ValueCache::CacheResult{CacheHit};
+            },
+        },
+        cachedValue);
+
+    return { cacheResult, ValueCache(resultingCursor) };
+}
+
 bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
 {
     Pos * pos2 = 0;
+
+    forceValue(attrs, pos);
+    if (attrs.type() == nAttrs) {
+        auto eval_cache = attrs.attrs->eval_cache;
+        auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
+        switch (cacheResult.returnCode) {
+            case ValueCache::CacheHit:
+                return true;
+            case ValueCache::CacheMiss:
+                return false;
+            case ValueCache::Forward: // Fixme: Handle properly
+            case ValueCache::NoCacheKey:
+            case ValueCache::UnCacheable:
+                ;
+        }
+    }
 
     Value * vAttrs = &attrs;
     try {
