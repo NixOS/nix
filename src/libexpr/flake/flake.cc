@@ -620,6 +620,11 @@ void callFlake(EvalState & state,
     state.callFunction(**vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
+    state.forceAttrs(vRes); // FIXME: Make more robust and lazy
+    auto fingerprint = lockedFlake.getFingerprint();
+    auto evalCache = state.openTreeCache(fingerprint);
+    auto cacheRoot = evalCache ? evalCache->getRoot() : nullptr;
+    vRes.attrs->eval_cache = ValueCache(cacheRoot);
 }
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)

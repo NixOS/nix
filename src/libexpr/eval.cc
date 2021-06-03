@@ -1173,10 +1173,11 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
         auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
         switch (cacheResult.returnCode) {
             case ValueCache::CacheHit:
+                if (cacheResult.lastQueriedSymbolIfMissing)
+                    return false;
                 return true;
-            case ValueCache::CacheMiss:
-                return false;
-            case ValueCache::Forward: // Fixme: Handle properly
+            case ValueCache::CacheMiss: // FIXME: Handle properly
+            case ValueCache::Forward: // FIXME: Handle properly
             case ValueCache::NoCacheKey:
             case ValueCache::UnCacheable:
                 ;
@@ -2160,6 +2161,21 @@ Strings EvalSettings::getDefaultNixPath()
     }
 
     return res;
+}
+
+std::shared_ptr<tree_cache::Cache> EvalState::openTreeCache(Hash cacheKey)
+{
+    if (auto iter = evalCache.find(cacheKey); iter != evalCache.end())
+        return iter->second;
+
+    if (!(evalSettings.useEvalCache && evalSettings.pureEval))
+        return nullptr;
+    auto thisCache = tree_cache::Cache::tryCreate(
+            cacheKey,
+            symbols
+    );
+    evalCache.insert({cacheKey, thisCache});
+    return thisCache;
 }
 
 EvalSettings evalSettings;

@@ -116,6 +116,7 @@ private:
     typedef std::map<Path, Value> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
+    std::map<Hash, std::shared_ptr<tree_cache::Cache>> evalCache;
 
     SearchPath searchPath;
 
@@ -131,6 +132,8 @@ public:
 
     EvalState(const Strings & _searchPath, ref<Store> store);
     ~EvalState();
+
+    std::shared_ptr<tree_cache::Cache> openTreeCache(Hash);
 
     void addToSearchPath(const string & s);
 
