@@ -73,11 +73,14 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
-            Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end())
+            auto v2 = state.allocValue();
+            auto gotField = state.getAttrField(*v, {state.symbols.create(attr)}, pos, *v2);
+            if (!gotField)
                 throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
-            v = &*a->value;
-            pos = *a->pos;
+            v = v2;
+            /* Bindings::iterator a = v->attrs->find(state.symbols.create(attr)); */
+            /* v = &*a->value; */
+            /* pos = *a->pos; */
         }
 
         else {

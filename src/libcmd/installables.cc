@@ -428,12 +428,10 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
 
     callFlake(state, lockedFlake, *vFlake);
 
-    auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
-    assert(aOutputs);
-
-    state.forceValue(*aOutputs->value);
-
-    return aOutputs->value;
+    auto vRes = state.allocValue();
+    auto gotField = state.getAttrField(*vFlake, {state.symbols.create("outputs")}, noPos, *vRes);
+    assert(gotField);
+    return vRes;
 }
 
 ref<eval_cache::EvalCache> openEvalCache(
