@@ -1813,6 +1813,13 @@ ValueCache & Value::getEvalCache()
 
 ValueCache ValueCache::empty = ValueCache(nullptr);
 
+void Value::setEvalCache(ValueCache & newCache)
+{
+    if (internalType == tAttrs) {
+        attrs->eval_cache = newCache;
+    }
+}
+
 string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {
     string s = forceString(v, pos);

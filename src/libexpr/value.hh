@@ -353,6 +353,7 @@ public:
     std::vector<std::pair<Path, std::string>> getContext();
 
     ValueCache & getEvalCache();
+    void setEvalCache(ValueCache &);
 };
 
 
