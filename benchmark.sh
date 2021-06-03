@@ -45,7 +45,9 @@ run_all () {
         --export-json "$out/result.json" \
         --export-markdown "$out/result.md" \
         --style basic \
-        --prepare '' "bash $0 noCache callBuild"
+        --prepare '' "bash $0 noCache callBuild" \
+        --prepare 'rm -rf ~/.cache/nix/' "bash $0 coldCache callBuild" \
+        --prepare '' "bash $0 callBuild"
 }
 
 "$@"
