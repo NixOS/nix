@@ -444,6 +444,9 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
 EvalState::~EvalState()
 {
+    for (auto [_, cache] : evalCache) {
+        cache->commit();
+    }
 }
 
 
