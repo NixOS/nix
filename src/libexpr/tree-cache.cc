@@ -209,7 +209,7 @@ Cache::Cache(const Hash & useCache,
         SymbolTable & symbols)
     : db(std::make_shared<AttrDb>(useCache))
     , symbols(symbols)
-    , rootSymbol(symbols.create(""))
+    , rootSymbol(symbols.create("%root%"))
 {
 }
 
