@@ -35,7 +35,7 @@ public:
     };
     std::pair<CacheResult, ValueCache> getValue(EvalState & state, const std::vector<Symbol> & selector, Value & dest);
 
-    ValueCache addChild(const Symbol & attrName, const Value & value);
+    ValueCache addChild(const Symbol & attrName, Value & value);
     ValueCache addFailedChild(const Symbol & attrName, const Error & error);
     ValueCache addNumChild(SymbolTable & symbols, int idx, const Value & value);
     void addAttrSetChilds(Bindings & children);

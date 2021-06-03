@@ -1219,6 +1219,10 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
             vAttrs = j->value;
             pos2 = j->pos;
             forceValue(*vAttrs, pos2 != NULL ? *pos2 : pos );
+            if (cacheResult.returnCode == ValueCache::CacheMiss) {
+                resultingCursor = resultingCursor.addChild(name, *vAttrs);
+                vAttrs->setEvalCache(resultingCursor);
+            }
             if (countCalls && pos2) attrSelects[*pos2]++;
         }
 
@@ -1812,6 +1816,74 @@ ValueCache & Value::getEvalCache()
 }
 
 ValueCache ValueCache::empty = ValueCache(nullptr);
+
+tree_cache::AttrValue cachedValueFor(Value& v)
+{
+    tree_cache::AttrValue valueToCache;
+    switch (v.type()) {
+        case nThunk:
+            valueToCache = tree_cache::thunk_t{};
+            break;
+        case nNull:
+        case nList:
+        case nFunction:
+        case nExternal:
+            valueToCache = tree_cache::unknown_t{};
+            break;
+        case nBool:
+            valueToCache = tree_cache::wrapped_basetype<bool>{v.boolean};
+            break;
+        case nString:
+            valueToCache = tree_cache::string_t{
+                v.string.s,
+                v.getContext()
+            };
+            break;
+        case nPath:
+            valueToCache = tree_cache::string_t{
+                v.path,
+                {}
+            };
+            break;
+        case nAttrs:
+            valueToCache = tree_cache::attributeSet_t{};
+            break;
+        case nInt:
+            valueToCache = tree_cache::wrapped_basetype<int64_t>{v.integer};
+            break;
+        case nFloat:
+            valueToCache = tree_cache::wrapped_basetype<double>{v.fpoint};
+            break;
+    };
+    return valueToCache;
+}
+
+ValueCache ValueCache::addChild(const Symbol& name, Value& value)
+{
+    if (!rawCache)
+        return ValueCache::empty;
+
+    auto cachedValue = cachedValueFor(value);
+    auto ret = ValueCache(rawCache->addChild(name, cachedValue));
+    if (value.type() == nAttrs)
+        ret.addAttrSetChilds(*value.attrs);
+    return ret;
+}
+
+void ValueCache::addAttrSetChilds(Bindings & children)
+{
+    if (!rawCache) return;
+    for (auto & attr : children) {
+        // We could in theory directly store the value, but that would cause
+        // an infinite recursion in case of a cyclic attrset.
+        // So in a first time, just store a thunk
+        if (attr.value->type() == nAttrs)
+            rawCache->addChild(attr.name, tree_cache::thunk_t{});
+        else
+            addChild(attr.name, *attr.value);
+    }
+
+}
 
 void Value::setEvalCache(ValueCache & newCache)
 {
