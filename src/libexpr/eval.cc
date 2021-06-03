@@ -1199,7 +1199,9 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
             if (cacheResult.lastQueriedSymbolIfMissing)
                 return false;
             return true;
-        case ValueCache::CacheMiss: // FIXME: Handle properly
+        case ValueCache::CacheMiss:
+            resultingCursor = eval_cache;
+            break;
         case ValueCache::Forward: // FIXME: Handle properly
         case ValueCache::NoCacheKey:
         case ValueCache::UnCacheable:
@@ -1233,6 +1235,9 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
         }
         throw;
     }
+
+    if (cacheResult.returnCode == ValueCache::Forward)
+        vAttrs->setEvalCache(resultingCursor);
 
     dest = *vAttrs;
     return true;
