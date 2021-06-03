@@ -1212,17 +1212,15 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
         for (auto & name : selector) {
             nrLookups++;
             Bindings::iterator j;
-            forceValue(*vAttrs, pos);
             if (vAttrs->type() != nAttrs ||
                 (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
                 return false;
             }
             vAttrs = j->value;
             pos2 = j->pos;
+            forceValue(*vAttrs, pos2 != NULL ? *pos2 : pos );
             if (countCalls && pos2) attrSelects[*pos2]++;
         }
-
-        forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : pos ) );
 
     } catch (Error & e) {
         if (pos2 && pos2->file != sDerivationNix) {
