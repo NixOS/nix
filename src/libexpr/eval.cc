@@ -1,4 +1,5 @@
 #include "eval.hh"
+#include "value-cache.hh"
 #include "hash.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -1190,22 +1191,21 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
     Pos * pos2 = 0;
 
     forceValue(attrs, pos);
-    if (attrs.type() == nAttrs) {
-        auto eval_cache = attrs.attrs->eval_cache;
-        auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
-        updateCacheStats(cacheResult);
-        switch (cacheResult.returnCode) {
-            case ValueCache::CacheHit:
-                if (cacheResult.lastQueriedSymbolIfMissing)
-                    return false;
-                return true;
-            case ValueCache::CacheMiss: // FIXME: Handle properly
-            case ValueCache::Forward: // FIXME: Handle properly
-            case ValueCache::NoCacheKey:
-            case ValueCache::UnCacheable:
-                ;
-        }
+    auto eval_cache = attrs.getEvalCache();
+    auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
+    updateCacheStats(cacheResult);
+    switch (cacheResult.returnCode) {
+        case ValueCache::CacheHit:
+            if (cacheResult.lastQueriedSymbolIfMissing)
+                return false;
+            return true;
+        case ValueCache::CacheMiss: // FIXME: Handle properly
+        case ValueCache::Forward: // FIXME: Handle properly
+        case ValueCache::NoCacheKey:
+        case ValueCache::UnCacheable:
+            ;
     }
+
 
     Value * vAttrs = &attrs;
     try {
@@ -1802,6 +1802,16 @@ std::vector<std::pair<Path, std::string>> Value::getContext()
     return res;
 }
 
+ValueCache & Value::getEvalCache()
+{
+    if (internalType == tAttrs) {
+        return attrs->eval_cache;
+    } else {
+        return ValueCache::empty;
+    }
+}
+
+ValueCache ValueCache::empty = ValueCache(nullptr);
 
 string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {

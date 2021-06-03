@@ -13,7 +13,7 @@ public:
 
     ValueCache(tree_cache::Cursor::Ref rawCache) : rawCache(rawCache) {}
 
-    const static ValueCache empty;
+    static ValueCache empty;
 
     bool isEmpty () { return rawCache == nullptr; }
 

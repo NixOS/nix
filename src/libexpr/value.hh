@@ -57,6 +57,8 @@ class EvalState;
 class XMLWriter;
 class JSONPlaceholder;
 
+class ValueCache;
+
 
 typedef int64_t NixInt;
 typedef double NixFloat;
@@ -349,6 +351,8 @@ public:
     bool isTrivial() const;
 
     std::vector<std::pair<Path, std::string>> getContext();
+
+    ValueCache & getEvalCache();
 };
 
 
