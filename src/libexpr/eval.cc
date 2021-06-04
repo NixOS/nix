@@ -124,6 +124,7 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << "]";
         break;
     case tThunk:
+    case tCachedThunk:
     case tApp:
         str << "<CODE>";
         break;
@@ -195,7 +196,7 @@ string showType(const Value & v)
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tThunk: return "a thunk";
+        case tThunk: case tCachedThunk: return "a thunk";
         case tApp: return "a function application";
         case tBlackhole: return "a black hole";
     default:
@@ -218,7 +219,7 @@ bool Value::isTrivial() const
     return
         internalType != tApp
         && internalType != tPrimOpApp
-        && (internalType != tThunk
+        && ((internalType != tThunk && internalType != tCachedThunk)
             || (dynamic_cast<ExprAttrs *>(thunk.expr)
                 && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
             || dynamic_cast<ExprLambda *>(thunk.expr)
@@ -1818,6 +1819,8 @@ ValueCache & Value::getEvalCache()
 {
     if (internalType == tAttrs) {
         return attrs->eval_cache;
+    } else if (internalType == tCachedThunk) {
+        return *cachedThunk.cache;
     } else {
         return ValueCache::empty;
     }
@@ -1897,6 +1900,8 @@ void Value::setEvalCache(ValueCache & newCache)
 {
     if (internalType == tAttrs) {
         attrs->eval_cache = newCache;
+    } else if (internalType == tCachedThunk) {
+        cachedThunk.cache = &newCache;
     }
 }
 

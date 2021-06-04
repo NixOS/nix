@@ -46,6 +46,10 @@ void EvalState::forceValue(Value & v, const Pos & pos)
     }
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
+    else if (v.isCachedThunk()) {
+        v.mkThunk(v.cachedThunk.thunk->env, v.cachedThunk.thunk->expr);
+        forceValue(v, pos);
+    }
     else if (v.isBlackhole())
         throwEvalError(pos, "infinite recursion encountered");
 }

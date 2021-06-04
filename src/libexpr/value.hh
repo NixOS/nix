@@ -23,6 +23,7 @@ typedef enum {
     tApp,
     tLambda,
     tBlackhole,
+    tCachedThunk,
     tPrimOp,
     tPrimOpApp,
     tExternal,
@@ -56,7 +57,6 @@ struct Pos;
 class EvalState;
 class XMLWriter;
 class JSONPlaceholder;
-
 class ValueCache;
 
 
@@ -105,6 +105,10 @@ class ExternalValueBase
 
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
+struct Thunk {
+    Env * env;
+    Expr * expr;
+};
 
 struct Value
 {
@@ -124,6 +128,7 @@ public:
     inline bool isThunk() const { return internalType == tThunk; };
     inline bool isApp() const { return internalType == tApp; };
     inline bool isBlackhole() const { return internalType == tBlackhole; };
+    inline bool isCachedThunk() const { return internalType == tCachedThunk; };
 
     // type() == nFunction
     inline bool isLambda() const { return internalType == tLambda; };
@@ -167,10 +172,13 @@ public:
             Value * * elems;
         } bigList;
         Value * smallList[2];
+        Thunk thunk;
         struct {
-            Env * env;
-            Expr * expr;
-        } thunk;
+            Thunk * thunk;
+            // This is a pointer only to prevent a recursive import as
+            // `EvalCache` is already a pointer so would fit very nicely here.
+            ValueCache * cache;
+        } cachedThunk;
         struct {
             Value * left, * right;
         } app;
@@ -201,7 +209,7 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: case tBlackhole: return nThunk;
+            case tThunk: case tApp: case tBlackhole: case tCachedThunk: return nThunk;
         }
         abort();
     }
@@ -272,6 +280,13 @@ public:
         internalType = tThunk;
         thunk.env = e;
         thunk.expr = ex;
+    }
+
+    inline void mkCachedThunk(Thunk * t, ValueCache * cache)
+    {
+        internalType = tCachedThunk;
+        cachedThunk.thunk = t;
+        cachedThunk.cache = cache;
     }
 
     inline void mkApp(Value * l, Value * r)
