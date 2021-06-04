@@ -506,31 +506,20 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
                 *emptyArgs,
                 *getFlakeOutputs(*state, *lockedFlake)
             );
-            auto drvPath = state->forceString(
-                *findAlongAttrPath(
-                    *state,
-                    "drvPath",
-                    *emptyArgs,
-                    *drvValue).first
-                );
-            auto outPath = state->forceString(
-                *findAlongAttrPath(
-                    *state,
-                    "outPath",
-                    *emptyArgs,
-                    *drvValue).first
-                );
-            auto outputName = state->forceString(
-                *findAlongAttrPath(
-                    *state,
-                    "outputName",
-                    *emptyArgs,
-                    *drvValue).first
-                );
+            Value * v = state->allocValue();
+            if (!state->getAttrField(*drvValue, {state->sDrvPath}, pos, *v))
+                break;
+            auto drvPath = state->forceString(*v);
+            if (!state->getAttrField(*drvValue, {state->sOutPath}, pos, *v))
+                break;
+            auto outPath = state->forceString(*v);
+            if (!state->getAttrField(*drvValue, {state->sOutputName}, pos, *v))
+                break;
+            auto outputName = state->forceString(*v);
 
             auto drvInfo = DerivationInfo{
                 state->store->parseStorePath(drvPath),
-                state->store->maybeParseStorePath(outPath), // FIXME: set to something when relevant?
+                state->store->maybeParseStorePath(outPath),
                 outputName
             };
 
