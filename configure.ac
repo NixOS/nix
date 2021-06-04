@@ -65,7 +65,7 @@ AC_SYS_LARGEFILE
 AC_STRUCT_DIRENT_D_TYPE
 if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
-    LIBS="-lsocket -lnsl $LIBS"
+    LDFLAGS="-lsocket -lnsl $LDFLAGS"
 fi
 
 
@@ -150,7 +150,7 @@ int main() {
 }]])], GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=no, GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=yes)
 AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC)
 if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
-    LIBS="-latomic $LIBS"
+    LDFLAGS="-latomic $LDFLAGS"
 fi
 
 PKG_PROG_PKG_CONFIG
