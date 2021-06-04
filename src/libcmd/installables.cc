@@ -499,36 +499,39 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
     for (auto & attrPath : getActualAttrPaths()) {
         auto emptyArgs = state->allocBindings(0);
-        auto drvPathAttrPath = attrPath + ".drvPath";
-        auto drvOutputNameAttrPath = attrPath + ".outputName";
-        auto drvOutputPathAttrPath = attrPath + ".outPath";
         try {
-            auto [drvPathValue, pos] = findAlongAttrPath(
+            auto [drvValue, pos] = findAlongAttrPath(
                 *state,
-                drvPathAttrPath,
+                attrPath,
                 *emptyArgs,
                 *getFlakeOutputs(*state, *lockedFlake)
             );
-            auto drvPath = state->forceString(*drvPathValue);
-            auto drvOutputNameValue = findAlongAttrPath(
-                *state,
-                drvOutputNameAttrPath,
-                *emptyArgs,
-                *getFlakeOutputs(*state, *lockedFlake)
-            ).first;
-            auto drvOutputName = state->forceString(*drvOutputNameValue);
-            auto drvOutputPathValue = findAlongAttrPath(
-                *state,
-                drvOutputPathAttrPath,
-                *emptyArgs,
-                *getFlakeOutputs(*state, *lockedFlake)
-            ).first;
-            auto drvOutputPath = state->forceString(*drvOutputPathValue);
+            auto drvPath = state->forceString(
+                *findAlongAttrPath(
+                    *state,
+                    "drvPath",
+                    *emptyArgs,
+                    *drvValue).first
+                );
+            auto outPath = state->forceString(
+                *findAlongAttrPath(
+                    *state,
+                    "outPath",
+                    *emptyArgs,
+                    *drvValue).first
+                );
+            auto outputName = state->forceString(
+                *findAlongAttrPath(
+                    *state,
+                    "outputName",
+                    *emptyArgs,
+                    *drvValue).first
+                );
 
             auto drvInfo = DerivationInfo{
                 state->store->parseStorePath(drvPath),
-                state->store->maybeParseStorePath(drvOutputPath), // FIXME: set to something when relevant?
-                drvOutputName
+                state->store->maybeParseStorePath(outPath), // FIXME: set to something when relevant?
+                outputName
             };
 
             return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
