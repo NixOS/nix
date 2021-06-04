@@ -1189,6 +1189,54 @@ void EvalState::updateCacheStats(ValueCache::CacheResult cacheResult)
     };
 }
 
+struct ExprCastedVar : Expr
+{
+    Value * v;
+    ExprCastedVar(Value * v) : v(v) {};
+    void show(std::ostream & str) const override {
+        std::set<const Value*> active;
+        printValue(str, active, *v);
+    }
+
+    void bindVars(const StaticEnv & env) override {}
+    void eval(EvalState & state, Env & env, Value & v) override {
+        v = std::move(*this->v);
+    }
+    Value * maybeThunk(EvalState & state, Env & env) override {
+        return v;
+    }
+};
+
+bool EvalState::lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+{
+    forceValue(attrs, pos);
+    auto eval_cache = attrs.getEvalCache();
+    auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
+    updateCacheStats(cacheResult);
+    switch (cacheResult.returnCode) {
+        case ValueCache::CacheHit:
+            if (cacheResult.lastQueriedSymbolIfMissing)
+                return false;
+            return true;
+        case ValueCache::Forward: {
+            auto recordAsVar = new ExprCastedVar(&attrs);
+            auto accessExpr = new ExprSelect(pos, recordAsVar, selector);
+            auto thunk = (Thunk*)allocBytes(sizeof(Thunk));
+            thunk->expr = accessExpr;
+            thunk->env = &baseEnv;
+
+            dest.mkCachedThunk(
+                thunk,
+                new ValueCache(resultingCursor)
+            );
+            return true;
+                                  }
+        default:
+            return getAttrField(attrs, selector, pos, dest);
+            ;
+    }
+
+}
 
 bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
 {
@@ -1449,9 +1497,24 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
     functionCalls[fun]++;
 }
 
+std::optional<tree_cache::AttrValue> ValueCache::getRawValue()
+{
+    if (!rawCache)
+        return std::nullopt;
+    return rawCache->getCachedValue();
+}
 
 void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
+    if (auto evalCache = fun.getEvalCache(); !evalCache.isEmpty()) {
+        if (auto cacheValue = evalCache.getRawValue()) {
+            if (std::holds_alternative<tree_cache::attributeSet_t>(*cacheValue)) {
+                res = fun;
+                return;
+            }
+        }
+    }
+
     forceValue(fun);
 
     if (fun.type() == nAttrs) {

@@ -58,23 +58,17 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
 
         if (!attrIndex) {
 
-            if (v->type() != nAttrs)
-                throw TypeError(
-                    "the expression selected by the selection path '%1%' should be a set but is %2%",
-                    attrPath,
-                    showType(*v));
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
             auto v2 = state.allocValue();
-            auto gotField = state.getAttrField(*v, {state.symbols.create(attr)}, pos, *v2);
+            auto gotField = state.lazyGetAttrField(*v, {state.symbols.create(attr)}, pos, *v2);
             if (!gotField)
                 throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             v = v2;
