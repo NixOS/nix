@@ -498,25 +498,42 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
-        auto attr = root->findAlongAttrPath(
-            parseAttrPath(*state, attrPath),
-            true
-        );
+        auto emptyArgs = state->allocBindings(0);
+        auto drvPathAttrPath = attrPath + ".drvPath";
+        auto drvOutputNameAttrPath = attrPath + ".outputName";
+        auto drvOutputPathAttrPath = attrPath + ".outPath";
+        try {
+            auto [drvPathValue, pos] = findAlongAttrPath(
+                *state,
+                drvPathAttrPath,
+                *emptyArgs,
+                *getFlakeOutputs(*state, *lockedFlake)
+            );
+            auto drvPath = state->forceString(*drvPathValue);
+            auto drvOutputNameValue = findAlongAttrPath(
+                *state,
+                drvOutputNameAttrPath,
+                *emptyArgs,
+                *getFlakeOutputs(*state, *lockedFlake)
+            ).first;
+            auto drvOutputName = state->forceString(*drvOutputNameValue);
+            auto drvOutputPathValue = findAlongAttrPath(
+                *state,
+                drvOutputPathAttrPath,
+                *emptyArgs,
+                *getFlakeOutputs(*state, *lockedFlake)
+            ).first;
+            auto drvOutputPath = state->forceString(*drvOutputPathValue);
 
-        if (!attr) continue;
+            auto drvInfo = DerivationInfo{
+                state->store->parseStorePath(drvPath),
+                state->store->maybeParseStorePath(drvOutputPath), // FIXME: set to something when relevant?
+                drvOutputName
+            };
 
-        if (!attr->isDerivation())
-            throw Error("flake output attribute '%s' is not a derivation", attrPath);
-
-        auto drvPath = attr->forceDerivation();
-
-        auto drvInfo = DerivationInfo{
-            std::move(drvPath),
-            state->store->maybeParseStorePath(attr->getAttr(state->sOutPath)->getString()),
-            attr->getAttr(state->sOutputName)->getString()
-        };
-
-        return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
+            return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
+        } catch (AttrPathNotFound & e) {
+        }
     }
 
     throw Error("flake '%s' does not provide attribute %s",
