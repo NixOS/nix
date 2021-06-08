@@ -48,7 +48,8 @@ nix_tests = \
   ca/substitute.sh \
   ca/signatures.sh \
   ca/nix-run.sh \
-  ca/nix-copy.sh
+  ca/nix-copy.sh \
+  list-to-attrs-nullptr.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
