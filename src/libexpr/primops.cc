@@ -564,29 +564,21 @@ static Bindings::iterator getAttr(
             funcName
         );
 
-        if (attrSet->pos == nullptr) {
+        if (attrSet->pos && *attrSet->pos != noPos) {
+            auto e = TypeError({
+                .msg = errorMsg,
+                .errPos = *attrSet->pos,
+            });
+
+            // Adding another trace for the function name to make it clear
+            // which call received wrong arguments.
+            e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
+            throw e;
+        } else {
             throw TypeError({
                 .msg = errorMsg,
                 .errPos = pos,
             });
-        } else {
-            Pos aPos = *attrSet->pos;
-            if (aPos == noPos) {
-                throw TypeError({
-                    .msg = errorMsg,
-                    .errPos = pos,
-                });
-            } else {
-                auto e = TypeError({
-                    .msg = errorMsg,
-                    .errPos = aPos,
-                });
-
-                // Adding another trace for the function name to make it clear
-                // which call received wrong arguments.
-                e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
-                throw e;
-            }
         }
     }
 
