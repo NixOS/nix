@@ -743,6 +743,19 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const char * t, valmap * env))
+{
+    auto delenv = std::unique_ptr<valmap>(env);
+    auto error = TypeError({
+        .msg = hintfmt(s, t),
+        .errPos = pos
+    });
+
+    if (debuggerHook)
+        debuggerHook(error, *env);
+    throw error;
+}
+
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, valmap * env))
 {
     auto delenv = std::unique_ptr<valmap>(env);
@@ -1378,7 +1391,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         throwTypeError(
           pos,
           "attempt to call something which is not a function but %1%",
-          showType(fun),
+          showType(fun).c_str(),
           map2("fun", &fun, "arg", &arg));
     }
 
