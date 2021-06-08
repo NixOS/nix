@@ -339,6 +339,14 @@ struct ExprPos : Expr
     COMMON_METHODS
 };
 
+struct ExprCastedVar : Expr
+{
+    Value * v;
+    ExprCastedVar(Value * v) : v(v) {};
+    Value * maybeThunk(EvalState & state, Env & env);
+    COMMON_METHODS
+};
+
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at

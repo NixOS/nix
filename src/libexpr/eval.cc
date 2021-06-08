@@ -1189,28 +1189,13 @@ void EvalState::updateCacheStats(ValueCache::CacheResult cacheResult)
     };
 }
 
-struct ExprCastedVar : Expr
-{
-    Value * v;
-    ExprCastedVar(Value * v) : v(v) {};
-    void show(std::ostream & str) const override {
-        std::set<const Value*> active;
-        printValue(str, active, *v);
-    }
-
-    void bindVars(const StaticEnv & env) override {}
-    void eval(EvalState & state, Env & env, Value & v) override {
-        v = std::move(*this->v);
-    }
-    Value * maybeThunk(EvalState & state, Env & env) override {
-        return v;
-    }
-};
-
 bool EvalState::lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
 {
-    forceValue(attrs, pos);
     auto eval_cache = attrs.getEvalCache();
+    if (eval_cache.isEmpty()) {
+        forceValue(attrs, pos);
+        eval_cache = attrs.getEvalCache();
+    }
     auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
     updateCacheStats(cacheResult);
     switch (cacheResult.returnCode) {
@@ -1242,8 +1227,11 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
 {
     Pos * pos2 = 0;
 
-    forceValue(attrs, pos);
     auto eval_cache = attrs.getEvalCache();
+    if (eval_cache.isEmpty()) {
+        forceValue(attrs, pos);
+        eval_cache = attrs.getEvalCache();
+    }
     auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
     updateCacheStats(cacheResult);
     switch (cacheResult.returnCode) {
@@ -1260,6 +1248,7 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
             ;
     }
 
+    forceValue(attrs, pos);
 
     Value * vAttrs = &attrs;
     try {

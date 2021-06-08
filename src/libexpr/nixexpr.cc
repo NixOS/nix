@@ -440,6 +440,18 @@ string ExprLambda::showNamePos() const
     return (format("%1% at %2%") % (name.set() ? "'" + (string) name + "'" : "anonymous function") % pos).str();
 }
 
+void ExprCastedVar::show(std::ostream & str) const {
+    std::set<const Value*> active;
+    printValue(str, active, *v);
+}
+
+void ExprCastedVar::bindVars(const StaticEnv & env) {}
+void ExprCastedVar::eval(EvalState & state, Env & env, Value & v) {
+    v = std::move(*this->v);
+}
+Value * ExprCastedVar::maybeThunk(EvalState & state, Env & env) {
+    return v;
+}
 
 
 /* Symbol table. */

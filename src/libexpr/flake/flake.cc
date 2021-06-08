@@ -596,36 +596,44 @@ void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
 {
-    auto vLocks = state.allocValue();
+    auto lockExpr = new ExprString(
+        state.symbols.create(lockedFlake.lockFile.to_string())
+    );
+    auto subdirExpr = new ExprString(
+        state.symbols.create(lockedFlake.flake.lockedRef.subdir)
+    );
+
     auto vRootSrc = state.allocValue();
-    auto vRootSubdir = state.allocValue();
-    auto vTmp1 = state.allocValue();
-    auto vTmp2 = state.allocValue();
-
-    mkString(*vLocks, lockedFlake.lockFile.to_string());
-
     emitTreeAttrs(state, *lockedFlake.flake.sourceInfo, lockedFlake.flake.lockedRef.input, *vRootSrc);
 
-    mkString(*vRootSubdir, lockedFlake.flake.lockedRef.subdir);
-
-    static RootValue vCallFlake = nullptr;
-
-    if (!vCallFlake) {
-        vCallFlake = allocRootValue(state.allocValue());
-        state.eval(state.parseExprFromString(
+    static Expr * callFlakeExpr = nullptr;
+    if (!callFlakeExpr) {
+        callFlakeExpr = state.parseExprFromString(
             #include "call-flake.nix.gen.hh"
-            , "/"), **vCallFlake);
+            , "/");
     }
 
-    state.callFunction(**vCallFlake, *vLocks, *vTmp1, noPos);
-    state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
-    state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
-    state.forceValue(vRes);
+    auto resExpr = new ExprApp(
+        new ExprApp(
+            new ExprApp(
+                callFlakeExpr,
+                lockExpr
+            ),
+            new ExprCastedVar(vRootSrc)
+        ),
+        subdirExpr
+    );
+    auto thunk = (Thunk*)allocBytes(sizeof(Thunk));
+    thunk->expr = resExpr;
+    thunk->env = &state.baseEnv;
     auto fingerprint = lockedFlake.getFingerprint();
     auto treeCache = state.openTreeCache(fingerprint);
     auto cacheRoot = treeCache ? treeCache->getRoot() : nullptr;
-    auto evalCache = ValueCache(cacheRoot);
-    vRes.setEvalCache(evalCache);
+    auto evalCache = new ValueCache(cacheRoot);
+    vRes.mkCachedThunk(
+        thunk,
+        evalCache
+    );
 }
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)

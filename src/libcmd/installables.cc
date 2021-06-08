@@ -429,7 +429,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     callFlake(state, lockedFlake, *vFlake);
 
     auto vRes = state.allocValue();
-    auto gotField = state.getAttrField(*vFlake, {state.symbols.create("outputs")}, noPos, *vRes);
+    auto gotField = state.lazyGetAttrField(*vFlake, {state.symbols.create("outputs")}, noPos, *vRes);
     assert(gotField);
     return vRes;
 }
