@@ -785,7 +785,7 @@ void runRepl(
         repl->addVarToScope(repl->state->symbols.create(name), value);
     }
 
-    printError("The following extra variables are in scope: %s\n", concatStringsSep(", ", names));
+    printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
 
     repl->mainLoop({});
 }
