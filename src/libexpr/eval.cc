@@ -1316,8 +1316,15 @@ std::vector<Attr> EvalState::getFields(Value & attrs, const Pos & pos)
                 everythingCached = false;
                 break;
             }
-            } catch (Error &) {
-                everythingCached = false;
+            } catch (EvalError & e) {
+                // XXX: Ugly hack to hide the error
+                newValue->mkThunk(
+                    &baseEnv,
+                    new ExprApp(
+                        parseExprFromString("throw", "/"),
+                        new ExprString(symbols.create(e.what()))
+                    )
+                );
             }
         }
         if (everythingCached) return res;
