@@ -302,6 +302,14 @@ Installable::getCursors(EvalState & state)
     return {{evalCache->getRoot(), ""}};
 }
 
+std::pair<Value*, Pos> Installable::toValue(EvalState & state)
+{
+    auto values = toValues(state);
+    if (values.empty())
+        throw Error("cannot find flake attribute '%s'", what());
+    return {std::get<0>(values[0]), std::get<1>(values[0])};
+}
+
 std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
 Installable::getCursor(EvalState & state)
 {
@@ -378,11 +386,11 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() override { return attrPath; }
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override
+    std::vector<std::tuple<Value *, Pos, std::string>> toValues(EvalState & state) override
     {
         auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
         state.forceValue(*vRes);
-        return {vRes, pos};
+        return {{vRes, pos, attrPath}};
     }
 
     virtual std::vector<InstallableValue::DerivationInfo> toDerivations() override;
@@ -539,25 +547,22 @@ std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
     return res;
 }
 
-std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
+std::vector<std::tuple<Value *, Pos, std::string>>
+InstallableFlake::toValues(EvalState & state)
 {
-    auto lockedFlake = getLockedFlake();
-
-    auto vOutputs = getFlakeOutputs(state, *lockedFlake);
-
+    auto vOutputs = getFlakeOutputs(state, *getLockedFlake());
     auto emptyArgs = state.allocBindings(0);
+
+    std::vector<std::tuple<Value *, Pos, std::string>> res;
 
     for (auto & attrPath : getActualAttrPaths()) {
         try {
             auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
-            state.forceValue(*v);
-            return {v, pos};
-        } catch (AttrPathNotFound & e) {
-        }
+            res.push_back({v, pos, attrPath});
+        } catch (Error &) {}
     }
 
-    throw Error("flake '%s' does not provide attribute %s",
-        flakeRef, showAttrPaths(getActualAttrPaths()));
+    return res;
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>

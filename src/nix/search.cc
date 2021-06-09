@@ -82,6 +82,87 @@ struct CmdSearch : InstallableCommand, MixJSON
         uint64_t results = 0;
 
         std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
+        std::function<void(Value & current, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit2;
+
+        Value * vTmp = state->allocValue();
+
+        visit2 = [&](Value & current, const std::vector<Symbol> & attrPath, bool initialRecurse)
+        {
+            Activity act(*logger, lvlInfo, actUnknown,
+                fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
+            auto recurse = [&]()
+            {
+                for (auto & attr : state->getFields(current, noPos)) {
+                    auto attrPath2(attrPath);
+                    attrPath2.push_back(attr.name);
+                    visit2(*attr.value, attrPath2, false);
+                }
+            };
+
+            try {
+                if (state->isDerivation(current)) {
+                    size_t found = 0;
+
+                    state->getAttrFieldThrow(current, {state->sName}, noPos, *vTmp);
+                    DrvName name(state->forceString(*vTmp));
+
+                    auto hasDescription = state->getAttrField(current, {state->sMeta, state->sDescription}, noPos, *vTmp);
+                    auto description = hasDescription ? state->forceString(*vTmp) : "";
+                    std::replace(description.begin(), description.end(), '\n', ' ');
+                    auto attrPath2 = concatStringsSep(".", attrPath);
+
+                    std::smatch attrPathMatch;
+                    std::smatch descriptionMatch;
+                    std::smatch nameMatch;
+
+                    for (auto & regex : regexes) {
+                        std::regex_search(attrPath2, attrPathMatch, regex);
+                        std::regex_search(name.name, nameMatch, regex);
+                        std::regex_search(description, descriptionMatch, regex);
+                        if (!attrPathMatch.empty()
+                                || !nameMatch.empty()
+                                || !descriptionMatch.empty())
+                            found++;
+                    }
+
+                    if (found == res.size()) {
+                        results++;
+                        if (json) {
+                            auto jsonElem = jsonOut->object(attrPath2);
+                            jsonElem.attr("pname", name.name);
+                            jsonElem.attr("version", name.version);
+                            jsonElem.attr("description", description);
+                        } else {
+                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
+                            if (results > 1) logger->cout("");
+                            logger->cout(
+                                    "* %s%s",
+                                    wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
+                                    name.version != "" ? " (" + name.version + ")" : "");
+                            if (description != "")
+                                logger->cout(
+                                        "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
+                        }
+                    }
+                } else if (
+                        attrPath.size() == 0
+                        || (attrPath[0] == "legacyPackages" && attrPath.size() <= 2)
+                        || (attrPath[0] == "packages" && attrPath.size() <= 2))
+                    recurse();
+
+                else if (initialRecurse)
+                    recurse();
+
+                else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
+                    auto hasRecurse = state->getAttrField(current, {state->sRecurseForDerivations}, noPos, *vTmp);
+                    if (hasRecurse && state->forceBool(*vTmp, noPos))
+                        recurse();
+                }
+            } catch (EvalError & e) {
+                if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
+                    throw;
+            }
+        };
 
         visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
@@ -165,8 +246,8 @@ struct CmdSearch : InstallableCommand, MixJSON
             }
         };
 
-        for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix), true);
+        for (auto & [value, pos, prefix] : installable->toValues(*state))
+            visit2(*value, parseAttrPath(*state, prefix), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

@@ -1284,6 +1284,43 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
     return true;
 }
 
+void EvalState::getAttrFieldThrow(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+{
+    if (!getAttrField(attrs, selector, pos, dest))
+        throw Error("Missing attribute path '%s'", "ImTooLazyToImplementThisRightNow");
+}
+
+std::vector<Attr> EvalState::getFields(Value & attrs, const Pos & pos)
+{
+    auto eval_cache = attrs.getEvalCache();
+    if (eval_cache.isEmpty()) {
+        forceValue(attrs, pos);
+        eval_cache = attrs.getEvalCache();
+    }
+    if (auto attrNames = eval_cache.listChildren(symbols)) {
+        bool everythingCached = true;
+        std::vector<Attr> res;
+        for (auto & attrName : *attrNames) {
+            auto newValue = allocValue();
+            try {
+            if (lazyGetAttrField(attrs, {attrName}, pos, *newValue)) {
+                res.push_back(Attr(attrName, newValue));
+            } else {
+                everythingCached = false;
+                break;
+            }
+            } catch (Error &) {
+                everythingCached = false;
+            }
+        }
+        if (everythingCached) return res;
+    }
+
+    forceValue(attrs);
+    auto attrsStart = attrs.attrs->attrs;
+    return std::vector<Attr>(attrsStart, attrsStart + attrs.attrs->size());
+}
+
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
@@ -1491,6 +1528,20 @@ std::optional<tree_cache::AttrValue> ValueCache::getRawValue()
     if (!rawCache)
         return std::nullopt;
     return rawCache->getCachedValue();
+}
+
+std::optional<std::vector<Symbol>> ValueCache::listChildren(SymbolTable& symbols)
+{
+    auto ret = std::vector<Symbol>();
+    if (rawCache) {
+        auto cachedValue = rawCache->getCachedValue();
+            if (std::get_if<tree_cache::attributeSet_t>(&cachedValue)) {
+                for (auto & fieldStr : rawCache->getChildren())
+                    ret.push_back(symbols.create(fieldStr));
+            }
+            return ret;
+    }
+    return std::nullopt;
 }
 
 void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)

@@ -41,10 +41,11 @@ struct Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
+    virtual std::vector<std::tuple<Value *, Pos, std::string>> toValues(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
+    std::pair<Value *, Pos> toValue(EvalState & state);
 
     /* Return a value only if this installable is a store path or a
        symlink to it. */
@@ -109,7 +110,7 @@ struct InstallableFlake : InstallableValue
 
     std::vector<DerivationInfo> toDerivations() override;
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
+    std::vector<std::tuple<Value *, Pos, std::string>> toValues(EvalState & state) override;
 
     std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
     getCursors(EvalState & state) override;

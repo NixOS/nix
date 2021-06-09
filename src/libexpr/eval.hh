@@ -359,6 +359,12 @@ public:
     // Similar to `getAttrField`, but if the cache says that the result is an
     // attribute set, just return a thunk to it rather than forcing it.
     bool lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
+
+    // Similar to `getAttrField`, but throws an `Error` if the field can’t be
+    // found
+    void getAttrFieldThrow(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
+
+    std::vector<Attr> getFields(Value & attrs, const Pos & pos);
 };
 
 
