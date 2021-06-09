@@ -743,11 +743,11 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const char * t, valmap * env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const string &s2, valmap * env))
 {
     auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
-        .msg = hintfmt(s, t),
+        .msg = hintfmt(s, s2),
         .errPos = pos
     });
 
@@ -1516,7 +1516,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
             if (j != args.end()) {
                 actualArgs->attrs->push_back(*j);
             } else if (!i.def) {
-                throwMissingArgumentError(i.pos,  R"(cannot evaluate a function that has an argument without a value ('%1%')
+                throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
 
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
@@ -1965,7 +1965,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     throwTypeError(pos, "cannot coerce %1% to a string", v,
-            map1("value", &v));
+        map1("value", &v));
 }
 
 
@@ -2077,8 +2077,10 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return v1.fpoint == v2.fpoint;
 
         default:
-            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2),
-            map2("value1", &v1, "value2", &v2));
+            throwEvalError("cannot compare %1% with %2%",
+                showType(v1),
+                showType(v2),
+                map2("value1", &v1, "value2", &v2));
     }
 }
 
