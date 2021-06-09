@@ -642,9 +642,9 @@ LocalNoInline(valmap * mapBindings(Bindings *b))
 
     // auto v = new Value;
 
-    for (auto i = b->begin(); i != b->end(); ++i) 
+    for (auto i = b->begin(); i != b->end(); ++i)
     {
-        std::string s = i->name; 
+        std::string s = i->name;
         (*map)[s] = i->value;
         // map->insert({std::string("wat"), v});
     }
@@ -1174,7 +1174,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos, 
+            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos,
               map1("value", &v)); // TODO dynamicAttrs to env?
 
         i.valueExpr->setName(nameSym);
@@ -2077,7 +2077,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return v1.fpoint == v2.fpoint;
 
         default:
-            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2), 
+            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2),
             map2("value1", &v1, "value2", &v2));
     }
 }
