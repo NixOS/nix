@@ -1297,7 +1297,7 @@ void EvalState::getAttrFieldThrow(Value & attrs, const std::vector<Symbol> & sel
         throw Error("Missing attribute path '%s'", "ImTooLazyToImplementThisRightNow");
 }
 
-std::vector<Attr> EvalState::getFields(Value & attrs, const Pos & pos)
+std::vector<Symbol> EvalState::getFields(Value & attrs, const Pos & pos)
 {
     auto eval_cache = attrs.getEvalCache();
     if (eval_cache.isEmpty()) {
@@ -1305,34 +1305,14 @@ std::vector<Attr> EvalState::getFields(Value & attrs, const Pos & pos)
         eval_cache = attrs.getEvalCache();
     }
     if (auto attrNames = eval_cache.listChildren(symbols)) {
-        bool everythingCached = true;
-        std::vector<Attr> res;
-        for (auto & attrName : *attrNames) {
-            auto newValue = allocValue();
-            try {
-            if (lazyGetAttrField(attrs, {attrName}, pos, *newValue) != LazyValueType::Missing) {
-                res.push_back(Attr(attrName, newValue));
-            } else {
-                everythingCached = false;
-                break;
-            }
-            } catch (EvalError & e) {
-                // XXX: Ugly hack to hide the error
-                newValue->mkThunk(
-                    &baseEnv,
-                    new ExprApp(
-                        parseExprFromString("throw", "/"),
-                        new ExprString(symbols.create(e.what()))
-                    )
-                );
-            }
-        }
-        if (everythingCached) return res;
+        return *attrNames;
     }
 
     forceValue(attrs);
-    auto attrsStart = attrs.attrs->attrs;
-    return std::vector<Attr>(attrsStart, attrsStart + attrs.attrs->size());
+    std::vector<Symbol> res;
+    for (auto & attr : *attrs.attrs)
+        res.push_back(attr.name);
+    return res;
 }
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)

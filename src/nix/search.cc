@@ -93,10 +93,20 @@ struct CmdSearch : InstallableCommand, MixJSON
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
             auto recurse = [&]()
             {
-                for (auto & attr : state->getFields(current, noPos)) {
+                for (auto & attrName : state->getFields(current, noPos)) {
+                  try {
                     auto attrPath2(attrPath);
-                    attrPath2.push_back(attr.name);
-                    visit2(*attr.value, attrPath2, false);
+                    attrPath2.push_back(attrName);
+                    auto attrValue = state->allocValue();
+                    auto value_ = allocRootValue(attrValue);
+                    state->lazyGetAttrField(current, {attrName}, noPos,
+                                            *attrValue);
+                    visit2(*attrValue, attrPath2, false);
+                  } catch (EvalError &e) {
+                    if (!(attrPath.size() > 0 &&
+                          attrPath[0] == "legacyPackages"))
+                      throw;
+                  }
                 }
             };
 

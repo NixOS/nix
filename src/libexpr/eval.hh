@@ -371,7 +371,7 @@ public:
     // found
     void getAttrFieldThrow(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
 
-    std::vector<Attr> getFields(Value & attrs, const Pos & pos);
+    std::vector<Symbol> getFields(Value & attrs, const Pos & pos);
 };
 
 
