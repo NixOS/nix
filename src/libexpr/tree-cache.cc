@@ -63,7 +63,7 @@ struct AttrDb
             "select id, type, value, context from Attributes where parent = ? and name = ?");
 
         state->queryAttributes.create(state->db,
-            "select name from Attributes where parent = ?");
+            "select name, type from Attributes where parent = ?");
 
         state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
@@ -198,8 +198,10 @@ struct AttrDb
 
         auto queryAttributes(state->queryAttributes.use()(parentId));
 
-        while (queryAttributes.next())
+        while (queryAttributes.next()) {
+            if (queryAttributes.getInt(1) != AttrType::Missing)
             res.push_back(queryAttributes.getStr(0));
+        }
 
         return res;
     }
