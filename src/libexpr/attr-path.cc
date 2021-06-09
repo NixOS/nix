@@ -68,7 +68,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
             auto v2 = state.allocValue();
-            auto gotField = state.lazyGetAttrField(*v, {state.symbols.create(attr)}, pos, *v2);
+            auto gotField = state.lazyGetAttrField(*v, {state.symbols.create(attr)}, pos, *v2) != EvalState::LazyValueType::Missing;
             if (!gotField)
                 throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             v = v2;

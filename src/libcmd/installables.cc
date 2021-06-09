@@ -438,7 +438,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
 
     auto vRes = state.allocValue();
     auto gotField = state.lazyGetAttrField(*vFlake, {state.symbols.create("outputs")}, noPos, *vRes);
-    assert(gotField);
+    assert(gotField != EvalState::LazyValueType::Missing);
     return vRes;
 }
 

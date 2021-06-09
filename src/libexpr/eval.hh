@@ -356,9 +356,16 @@ private:
 public:
 
     bool getAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
+
+    enum struct LazyValueType {
+        PlainValue,
+        DelayedAttrSet,
+        Missing,
+    };
+
     // Similar to `getAttrField`, but if the cache says that the result is an
     // attribute set, just return a thunk to it rather than forcing it.
-    bool lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
+    LazyValueType lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest);
 
     // Similar to `getAttrField`, but throws an `Error` if the field can’t be
     // found

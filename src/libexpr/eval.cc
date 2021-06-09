@@ -1189,7 +1189,7 @@ void EvalState::updateCacheStats(ValueCache::CacheResult cacheResult)
     };
 }
 
-bool EvalState::lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
+EvalState::LazyValueType EvalState::lazyGetAttrField(Value & attrs, const std::vector<Symbol> & selector, const Pos & pos, Value & dest)
 {
     auto eval_cache = attrs.getEvalCache();
     if (eval_cache.isEmpty()) {
@@ -1201,8 +1201,8 @@ bool EvalState::lazyGetAttrField(Value & attrs, const std::vector<Symbol> & sele
     switch (cacheResult.returnCode) {
         case ValueCache::CacheHit:
             if (cacheResult.lastQueriedSymbolIfMissing)
-                return false;
-            return true;
+                return LazyValueType::Missing;
+            return LazyValueType::PlainValue;
         case ValueCache::Forward: {
             auto recordAsVar = new ExprCastedVar(&attrs);
             auto accessExpr = new ExprSelect(pos, recordAsVar, selector);
@@ -1214,11 +1214,13 @@ bool EvalState::lazyGetAttrField(Value & attrs, const std::vector<Symbol> & sele
                 thunk,
                 new ValueCache(resultingCursor)
             );
-            return true;
+            return LazyValueType::DelayedAttrSet;
                                   }
         default:
-            return getAttrField(attrs, selector, pos, dest);
-            ;
+            if(getAttrField(attrs, selector, pos, dest))
+                return LazyValueType::PlainValue;
+            else
+                return LazyValueType::Missing;
     }
 
 }
@@ -1308,7 +1310,7 @@ std::vector<Attr> EvalState::getFields(Value & attrs, const Pos & pos)
         for (auto & attrName : *attrNames) {
             auto newValue = allocValue();
             try {
-            if (lazyGetAttrField(attrs, {attrName}, pos, *newValue)) {
+            if (lazyGetAttrField(attrs, {attrName}, pos, *newValue) != LazyValueType::Missing) {
                 res.push_back(Attr(attrName, newValue));
             } else {
                 everythingCached = false;

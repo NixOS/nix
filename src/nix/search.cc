@@ -154,7 +154,8 @@ struct CmdSearch : InstallableCommand, MixJSON
                     recurse();
 
                 else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
-                    auto hasRecurse = state->getAttrField(current, {state->sRecurseForDerivations}, noPos, *vTmp);
+                    auto recurseFieldInfo = state->lazyGetAttrField(current, {state->sRecurseForDerivations}, noPos, *vTmp);
+                    auto hasRecurse = recurseFieldInfo == EvalState::LazyValueType::PlainValue;
                     if (hasRecurse && state->forceBool(*vTmp, noPos))
                         recurse();
                 }
