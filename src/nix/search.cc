@@ -9,6 +9,7 @@
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
+#include "value.hh"
 
 #include <regex>
 #include <fstream>
@@ -100,7 +101,10 @@ struct CmdSearch : InstallableCommand, MixJSON
             };
 
             try {
-                if (state->isDerivation(current)) {
+                auto maybeTypeField = state->lazyGetAttrField(current, {state->sType}, noPos, *vTmp);
+                if (maybeTypeField == EvalState::LazyValueType::PlainValue
+                    && vTmp->type() == nix::nString
+                    && strcmp(vTmp->string.s, "derivation") == 0) {
                     size_t found = 0;
 
                     state->getAttrFieldThrow(current, {state->sName}, noPos, *vTmp);
