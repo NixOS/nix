@@ -1261,7 +1261,12 @@ bool EvalState::getAttrField(Value & attrs, const std::vector<Symbol> & selector
             }
             vAttrs = j->value;
             pos2 = j->pos;
-            forceValue(*vAttrs, pos2 != NULL ? *pos2 : pos );
+            try {
+                forceValue(*vAttrs, pos2 != NULL ? *pos2 : pos );
+            } catch (EvalError & e) {
+                resultingCursor.addFailedChild(name, e);
+                throw;
+            }
             if (cacheResult.returnCode == ValueCache::CacheMiss) {
                 resultingCursor = resultingCursor.addChild(name, *vAttrs);
                 vAttrs->setEvalCache(resultingCursor);
@@ -1982,6 +1987,13 @@ ValueCache ValueCache::addChild(const Symbol& name, Value& value)
     if (value.type() == nAttrs)
         ret.addAttrSetChilds(*value.attrs);
     return ret;
+}
+
+
+ValueCache ValueCache::addFailedChild(const Symbol& name, const Error & error)
+{
+    if (!rawCache) return ValueCache::empty;
+    return ValueCache(rawCache->addChild(name, tree_cache::failed_t{ .error = error.msg() }));
 }
 
 void ValueCache::addAttrSetChilds(Bindings & children)
