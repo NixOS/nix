@@ -616,7 +616,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     return {};
 }
 
-// typedef std::optional<const std::map<std::string, Value *>> valmap;
 typedef std::map<std::string, Value *> valmap;
 
 LocalNoInline(valmap * map0())
@@ -626,7 +625,6 @@ LocalNoInline(valmap * map0())
 
 LocalNoInline(valmap * map1(const char *name, Value *v))
 {
-    // return new valmap({{name, v}});
     return new valmap({{name, v}});
 }
 
@@ -640,13 +638,10 @@ LocalNoInline(valmap * mapBindings(Bindings *b))
 {
     auto map = new valmap();
 
-    // auto v = new Value;
-
     for (auto i = b->begin(); i != b->end(); ++i)
     {
         std::string s = i->name;
         (*map)[s] = i->value;
-        // map->insert({std::string("wat"), v});
     }
 
     return map;
@@ -866,7 +861,8 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, map0()); // TODO: env.attrs?
+            // TODO: env.attrs?
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, map0());
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
