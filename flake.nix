@@ -87,7 +87,6 @@
             openssl sqlite
             libarchive
             boost
-            nlohmann_json
             lowdown
             gmock
           ]
@@ -103,6 +102,7 @@
 
         propagatedDeps =
           [ (boehmgc.override { enableLargeConfig = true; })
+            nlohmann_json
           ];
 
         perlDeps =
@@ -254,7 +254,6 @@
                 xz
                 pkgs.perl
                 boost
-                nlohmann_json
               ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
