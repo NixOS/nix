@@ -82,12 +82,11 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
-        std::function<void(Value & current, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit2;
+        std::function<void(Value & current, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
         Value * vTmp = state->allocValue();
 
-        visit2 = [&](Value & current, const std::vector<Symbol> & attrPath, bool initialRecurse)
+        visit = [&](Value & current, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
@@ -101,7 +100,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                     auto value_ = allocRootValue(attrValue);
                     state->lazyGetAttrField(current, {attrName}, noPos,
                                             *attrValue);
-                    visit2(*attrValue, attrPath2, false);
+                    visit(*attrValue, attrPath2, false);
                   } catch (EvalError &e) {
                     if (!(attrPath.size() > 0 &&
                           attrPath[0] == "legacyPackages"))
@@ -179,90 +178,8 @@ struct CmdSearch : InstallableCommand, MixJSON
             }
         };
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
-        {
-            Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
-            try {
-                auto recurse = [&]()
-                {
-                    for (const auto & attr : cursor.getAttrs()) {
-                        auto cursor2 = cursor.getAttr(attr);
-                        auto attrPath2(attrPath);
-                        attrPath2.push_back(attr);
-                        visit(*cursor2, attrPath2, false);
-                    }
-                };
-
-                if (cursor.isDerivation()) {
-                    size_t found = 0;
-
-                    DrvName name(cursor.getAttr("name")->getString());
-
-                    auto aMeta = cursor.maybeGetAttr("meta");
-                    auto aDescription = aMeta ? aMeta->maybeGetAttr("description") : nullptr;
-                    auto description = aDescription ? aDescription->getString() : "";
-                    std::replace(description.begin(), description.end(), '\n', ' ');
-                    auto attrPath2 = concatStringsSep(".", attrPath);
-
-                    std::smatch attrPathMatch;
-                    std::smatch descriptionMatch;
-                    std::smatch nameMatch;
-
-                    for (auto & regex : regexes) {
-                        std::regex_search(attrPath2, attrPathMatch, regex);
-                        std::regex_search(name.name, nameMatch, regex);
-                        std::regex_search(description, descriptionMatch, regex);
-                        if (!attrPathMatch.empty()
-                            || !nameMatch.empty()
-                            || !descriptionMatch.empty())
-                            found++;
-                    }
-
-                    if (found == res.size()) {
-                        results++;
-                        if (json) {
-                            auto jsonElem = jsonOut->object(attrPath2);
-                            jsonElem.attr("pname", name.name);
-                            jsonElem.attr("version", name.version);
-                            jsonElem.attr("description", description);
-                        } else {
-                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
-                            if (results > 1) logger->cout("");
-                            logger->cout(
-                                "* %s%s",
-                                wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
-                                name.version != "" ? " (" + name.version + ")" : "");
-                            if (description != "")
-                                logger->cout(
-                                    "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
-                        }
-                    }
-                }
-
-                else if (
-                    attrPath.size() == 0
-                    || (attrPath[0] == "legacyPackages" && attrPath.size() <= 2)
-                    || (attrPath[0] == "packages" && attrPath.size() <= 2))
-                    recurse();
-
-                else if (initialRecurse)
-                    recurse();
-
-                else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
-                    auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
-                    if (attr && attr->getBool())
-                        recurse();
-                }
-
-            } catch (EvalError & e) {
-                if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
-                    throw;
-            }
-        };
-
         for (auto & [value, pos, prefix] : installable->toValues(*state))
-            visit2(*value, parseAttrPath(*state, prefix), true);
+            visit(*value, parseAttrPath(*state, prefix), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");
