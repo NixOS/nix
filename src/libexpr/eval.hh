@@ -359,7 +359,8 @@ public:
 
     enum struct LazyValueType {
         PlainValue,
-        DelayedAttrSet,
+        DelayedUncacheable,
+        DelayedAttr,
         Missing,
     };
 

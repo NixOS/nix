@@ -1198,12 +1198,8 @@ EvalState::LazyValueType EvalState::lazyGetAttrField(Value & attrs, const std::v
     }
     auto [ cacheResult, resultingCursor ] = eval_cache.getValue(*this, selector, dest);
     updateCacheStats(cacheResult);
-    switch (cacheResult.returnCode) {
-        case ValueCache::CacheHit:
-            if (cacheResult.lastQueriedSymbolIfMissing)
-                return LazyValueType::Missing;
-            return LazyValueType::PlainValue;
-        case ValueCache::Forward: {
+
+    auto delayValue = [&](ValueCache & cursor) {
             auto recordAsVar = new ExprCastedVar(&attrs);
             auto accessExpr = new ExprSelect(pos, recordAsVar, selector);
             auto thunk = (Thunk*)allocBytes(sizeof(Thunk));
@@ -1212,10 +1208,21 @@ EvalState::LazyValueType EvalState::lazyGetAttrField(Value & attrs, const std::v
 
             dest.mkCachedThunk(
                 thunk,
-                new ValueCache(resultingCursor)
+                new ValueCache(cursor)
             );
-            return LazyValueType::DelayedAttrSet;
-                                  }
+    };
+
+    switch (cacheResult.returnCode) {
+        case ValueCache::CacheHit:
+            if (cacheResult.lastQueriedSymbolIfMissing)
+                return LazyValueType::Missing;
+            return LazyValueType::PlainValue;
+        case ValueCache::UnCacheable:
+            delayValue(resultingCursor);
+            return LazyValueType::DelayedUncacheable;
+        case ValueCache::Forward:
+            delayValue(resultingCursor);
+            return LazyValueType::DelayedAttr;
         default:
             if(getAttrField(attrs, selector, pos, dest))
                 return LazyValueType::PlainValue;

@@ -98,9 +98,10 @@ struct CmdSearch : InstallableCommand, MixJSON
                     attrPath2.push_back(attrName);
                     auto attrValue = state->allocValue();
                     auto value_ = allocRootValue(attrValue);
-                    state->lazyGetAttrField(current, {attrName}, noPos,
+                    auto childField = state->lazyGetAttrField(current, {attrName}, noPos,
                                             *attrValue);
-                    visit(*attrValue, attrPath2, false);
+                    if (childField != EvalState::LazyValueType::DelayedUncacheable)
+                        visit(*attrValue, attrPath2, false);
                   } catch (EvalError &e) {
                     if (!(attrPath.size() > 0 &&
                           attrPath[0] == "legacyPackages"))
