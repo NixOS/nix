@@ -229,7 +229,7 @@
             echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
           '';
 
-          doInstallCheck = true;
+          doInstallCheck = false;
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           separateDebugInfo = true;
