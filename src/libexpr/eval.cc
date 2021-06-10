@@ -1308,7 +1308,7 @@ std::vector<Symbol> EvalState::getFields(Value & attrs, const Pos & pos)
         return *attrNames;
     }
 
-    forceValue(attrs);
+    forceAttrs(attrs);
     std::vector<Symbol> res;
     for (auto & attr : *attrs.attrs)
         res.push_back(attr.name);
