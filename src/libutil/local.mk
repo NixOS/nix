@@ -11,3 +11,5 @@ libutil_LDFLAGS = -pthread $(OPENSSL_LIBS) $(LIBBROTLI_LIBS) $(LIBARCHIVE_LIBS) 
 ifeq ($(HAVE_LIBCPUID), 1)
 	libutil_LDFLAGS += -lcpuid
 endif
+
+libutil_LIBS = nlohmann

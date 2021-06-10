@@ -1,7 +1,7 @@
 #pragma once
 
 #include "path.hh"
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 #include "comparator.hh"
 #include "crypto.hh"
 

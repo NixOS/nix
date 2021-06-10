@@ -4,7 +4,7 @@
 #include <map>
 #include <memory>
 
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 
 #include "util.hh"
 
