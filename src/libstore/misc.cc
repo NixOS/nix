@@ -29,9 +29,9 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                     res.insert(i);
 
             if (includeDerivers && path.isDerivation())
-                for (auto& i : queryDerivationOutputs(path))
-                    if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                        res.insert(i);
+                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                    if (maybeOutPath && isValidPath(*maybeOutPath) && queryPathInfo(*maybeOutPath)->deriver == path)
+                        res.insert(*maybeOutPath);
             return res;
         };
     else
@@ -44,9 +44,9 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                     res.insert(ref);
 
             if (includeOutputs && path.isDerivation())
-                for (auto& i : queryDerivationOutputs(path))
-                    if (isValidPath(i))
-                        res.insert(i);
+                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                    if (maybeOutPath && isValidPath(*maybeOutPath))
+                        res.insert(*maybeOutPath);
 
             if (includeDerivers && info->deriver && isValidPath(*info->deriver))
                 res.insert(*info->deriver);
