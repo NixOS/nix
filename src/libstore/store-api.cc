@@ -337,6 +337,13 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     return info;
 }
 
+StringSet StoreConfig::getDefaultSystemFeatures()
+{
+    auto res = settings.systemFeatures.get();
+    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+        res.insert("ca-derivations");
+    return res;
+}
 
 Store::Store(const Params & params)
     : StoreConfig(params)
