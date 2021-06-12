@@ -30,7 +30,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
 
             if (includeDerivers && path.isDerivation())
                 for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
-                    if (maybeOutPath && isValidPath(*maybeOutPath) && queryPathInfo(*maybeOutPath)->deriver == path)
+                    if (maybeOutPath && isValidPath(*maybeOutPath))
                         res.insert(*maybeOutPath);
             return res;
         };
