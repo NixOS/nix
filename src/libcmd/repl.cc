@@ -781,11 +781,13 @@ void runRepl(
     std::set<std::string> names;
 
     for (auto & [name, value] : extraEnv) {
-        names.insert(ANSI_BOLD + name + ANSI_NORMAL);
+        // names.insert(ANSI_BOLD + name + ANSI_NORMAL);
+        names.insert(name);
         repl->addVarToScope(repl->state->symbols.create(name), value);
     }
 
     printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
+    // printError("The following extra variables are in scope: %s\n", concatStringsSep(", ", names));
 
     repl->mainLoop({});
 }
