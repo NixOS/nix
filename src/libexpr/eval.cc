@@ -618,6 +618,15 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
 typedef std::map<std::string, Value *> valmap;
 
+/*void addEnv(Value * v, valmap &vmap)
+{
+    if (v.isThunk()) {
+        Env * env = v.thunk.env;
+
+        Expr * expr = v.thunk.expr;
+
+}
+*/
 LocalNoInline(valmap * map0())
 {
     return new valmap();
@@ -628,23 +637,31 @@ LocalNoInline(valmap * map1(const char *name, Value *v))
     return new valmap({{name, v}});
 }
 
-
 LocalNoInline(valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2))
 {
     return new valmap({{name1, v1}, {name2, v2}});
 }
 
-LocalNoInline(valmap * mapBindings(Bindings *b))
+LocalNoInline(valmap * mapBindings(Bindings &b))
 {
     auto map = new valmap();
 
-    for (auto i = b->begin(); i != b->end(); ++i)
+    for (auto i = b.begin(); i != b.end(); ++i)
     {
         std::string s = i->name;
         (*map)[s] = i->value;
     }
 
     return map;
+}
+
+LocalNoInline(valmap * mapEnvBindings(Env &env))
+{
+    if (env.values[0]->type() == nAttrs) {
+        return mapBindings(*env.values[0]->attrs);
+    } else {
+        return map0();
+    }
 }
 
 /* Every "format" object (even temporary) takes up a few hundred bytes
@@ -813,12 +830,10 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
     e.addTrace(pos, s, s2);
 }
 
-
 void mkString(Value & v, const char * s)
 {
     v.mkString(dupString(s));
 }
-
 
 Value & mkString(Value & v, std::string_view s, const PathSet & context)
 {
@@ -862,7 +877,8 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         if (!env->prevWith)
             // TODO: env.attrs?
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, map0());
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name,
+                mapEnvBindings(*env));
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -1171,7 +1187,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
             throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos,
-              map1("value", &v)); // TODO dynamicAttrs to env?
+                mapEnvBindings(env));
+              // map1("value", &v)); // TODO dynamicAttrs to env?
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1261,7 +1278,9 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name, mapBindings(vAttrs->attrs));
+                    throwEvalError(pos, "attribute '%1%' missing", name, 
+                        mapEnvBindings(env));
+                        // mapBindings(*vAttrs->attrs));
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1519,7 +1538,8 @@ this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/#ss-functions.)",
                 i.name,
-                map1("fun", &fun));  // todo add bindings + fun
+                mapBindings(args));
+                // map1("fun", &fun));  // todo add bindings + fun
             }
         }
     }
@@ -1704,15 +1724,20 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 firstType = nFloat;
                 nf = n;
                 nf += vTmp.fpoint;
-            } else
-                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), map0());
+            } else {
+                std::cerr << "envtype: " << showType(env.values[0]->type()) << std::endl;
+              
+                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), 
+                    mapEnvBindings(env));
+            }
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp), map0());
+                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp),
+                    mapEnvBindings(env));
         } else
             s << state.coerceToString(pos, vTmp, context, false, firstType == nString);
     }
@@ -1871,10 +1896,10 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s,  v.string.context[0], map1("value", &v));
+                v.string.s, v.string.context[0], map1("value", &v));
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s,  v.string.context[0], map1("value", &v));
+                v.string.s, v.string.context[0], map1("value", &v));
     }
     return s;
 }
