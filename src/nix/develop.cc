@@ -185,6 +185,7 @@ struct Common : InstallableCommand, MixProfile
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
         "NIX_LOG_FD",
+        "NIX_REMOTE",
         "PPID",
         "PWD",
         "SHELLOPTS",
