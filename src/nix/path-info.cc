@@ -67,16 +67,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             return;
         }
 
-        static const std::array<char, 9> idents{{
-            ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
-        }};
-        size_t power = 0;
-        double res = value;
-        while (res > 1024 && power < idents.size()) {
-            ++power;
-            res /= 1024;
-        }
-        std::cout << fmt("\t%6.1f%c", res, idents.at(power));
+        std::cout << fmt("\t%s", formatSize(value));
     }
 
     void run(ref<Store> store, StorePaths storePaths) override
