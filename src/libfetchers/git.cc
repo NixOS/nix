@@ -172,7 +172,7 @@ struct GitInputScheme : InputScheme
         Input input(_input);
 
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+        bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(true);
         bool allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
 
         std::string cacheType = "git";
