@@ -83,9 +83,6 @@ private:
 
 public:
 
-    PathSetting realStoreDir_;
-
-    const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
     const Path reservedPath;
@@ -278,8 +275,6 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
-
-    Path getRealStoreDir() override { return realStoreDir; }
 
     void createUser(const std::string & userName, uid_t userId) override;
 

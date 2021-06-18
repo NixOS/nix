@@ -106,9 +106,6 @@ LocalStore::LocalStore(const Params & params)
     , LocalStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
-    , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
-        "physical path to the Nix store"}
-    , realStoreDir(realStoreDir_)
     , dbDir(stateDir + "/db")
     , linksDir(realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
@@ -153,13 +150,13 @@ LocalStore::LocalStore(const Params & params)
             printError("warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
         else {
             struct stat st;
-            if (stat(realStoreDir.c_str(), &st))
+            if (stat(realStoreDir.get().c_str(), &st))
                 throw SysError("getting attributes of path '%1%'", realStoreDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                if (chown(realStoreDir.c_str(), 0, gr->gr_gid) == -1)
+                if (chown(realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
                     throw SysError("changing ownership of path '%1%'", realStoreDir);
-                if (chmod(realStoreDir.c_str(), perm) == -1)
+                if (chmod(realStoreDir.get().c_str(), perm) == -1)
                     throw SysError("changing permissions on path '%1%'", realStoreDir);
             }
         }
@@ -437,14 +434,14 @@ void LocalStore::makeStoreWritable()
     if (getuid() != 0) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
-    if (statvfs(realStoreDir.c_str(), &stat) != 0)
+    if (statvfs(realStoreDir.get().c_str(), &stat) != 0)
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
         if (unshare(CLONE_NEWNS) == -1)
             throw SysError("setting up a private mount namespace");
 
-        if (mount(0, realStoreDir.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
+        if (mount(0, realStoreDir.get().c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
             throw SysError("remounting %1% writable", realStoreDir);
     }
 #endif

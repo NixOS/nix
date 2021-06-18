@@ -43,8 +43,8 @@ struct RunCommon : virtual Command
            helper program (chrootHelper() below) to do the work. */
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
 
-        if (store2 && store->storeDir != store2->realStoreDir) {
-            Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, program };
+        if (store2 && store->storeDir != store2->getRealStoreDir()) {
+            Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), program };
             for (auto & arg : args) helperArgs.push_back(arg);
 
             execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
