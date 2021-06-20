@@ -4,7 +4,7 @@
 
 namespace nix {
 
-Logger * makeProgressBar(bool printBuildLogs = false);
+Logger * makeProgressBar(bool printBuildLogs = false, bool printMultiline = false);
 
 void startProgressBar(bool printBuildLogs = false);
 
