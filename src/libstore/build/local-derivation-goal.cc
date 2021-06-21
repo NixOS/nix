@@ -2487,6 +2487,7 @@ void LocalDerivationGoal::registerOutputs()
                 assert(newInfo.ca);
             } else {
                 auto destPath = worker.store.toRealPath(finalDestPath);
+                deletePath(destPath);
                 movePath(actualPath, destPath);
                 actualPath = destPath;
             }
