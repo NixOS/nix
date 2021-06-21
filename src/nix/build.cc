@@ -69,8 +69,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                             store2->addPermRoot(bo.path, absPath(symlink));
                         },
                         [&](BuiltPath::Built bfd) {
-                            auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
-                            for (auto & output : builtOutputs) {
+                            for (auto & output : bfd.outputs) {
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);
                                 if (output.first != "out") symlink += fmt("-%s", output.first);
