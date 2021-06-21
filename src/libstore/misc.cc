@@ -255,8 +255,8 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
 }
 
 std::map<DrvOutput, StorePath> drvOutputReferences(
-    const std::set<Realisation> inputRealisations,
-    const StorePathSet pathReferences)
+    const std::set<Realisation> & inputRealisations,
+    const StorePathSet & pathReferences)
 {
     std::map<DrvOutput, StorePath> res;
 

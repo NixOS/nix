@@ -22,14 +22,14 @@ std::string DrvOutput::to_string() const {
     return strHash() + "!" + outputName;
 }
 
-std::set<Realisation> Realisation::closure(Store & store, std::set<Realisation> startOutputs)
+std::set<Realisation> Realisation::closure(Store & store, const std::set<Realisation> & startOutputs)
 {
     std::set<Realisation> res;
     Realisation::closure(store, startOutputs, res);
     return res;
 }
 
-void Realisation::closure(Store & store, std::set<Realisation> startOutputs, std::set<Realisation> & res)
+void Realisation::closure(Store & store, const std::set<Realisation> & startOutputs, std::set<Realisation> & res)
 {
     auto getDeps = [&](const Realisation& current) -> std::set<Realisation> {
         std::set<Realisation> res;

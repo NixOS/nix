@@ -44,8 +44,8 @@ struct Realisation {
     bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
     size_t checkSignatures(const PublicKeys & publicKeys) const;
 
-    static std::set<Realisation> closure(Store &, std::set<Realisation>);
-    static void closure(Store &, std::set<Realisation>, std::set<Realisation>& res);
+    static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
+    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation>& res);
 
     StorePath getPath() const { return outPath; }
 
