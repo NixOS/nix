@@ -150,7 +150,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
             output.second = {
                 .output = DerivationOutputDeferred{},
             };
-            drv.env[output.first] = "";
+            drv.env[output.first] = hashPlaceholder(output.first);
         }
     } else {
         for (auto & output : drv.outputs) {
