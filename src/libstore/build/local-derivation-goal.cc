@@ -292,7 +292,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
         auto & localStore = getLocalStore();
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(localStore.realStoreDir.c_str(), &st) == 0 &&
+        if (statvfs(localStore.realStoreDir.get().c_str(), &st) == 0 &&
             (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 &&
@@ -417,7 +417,7 @@ void LocalDerivationGoal::startBuilder()
     }
 
     auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.realStoreDir) {
+    if (localStore.storeDir != localStore.realStoreDir.get()) {
         #if __linux__
             useChroot = true;
         #else
