@@ -59,8 +59,8 @@ struct LocalStore::State::Stmts {
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
-    SQLiteStmt QueryRealisationRealisationReferences;
-    SQLiteStmt AddRealisationRealisationReference;
+    SQLiteStmt QueryRealisationReferences;
+    SQLiteStmt AddRealisationReference;
 };
 
 int getSchema(Path schemaPath)
@@ -362,13 +362,13 @@ LocalStore::LocalStore(const Params & params)
                     where drvPath = ?
                     ;
             )");
-        state->stmts->QueryRealisationRealisationReferences.create(state->db,
+        state->stmts->QueryRealisationReferences.create(state->db,
             R"(
                 select drvPath, outputName from Realisations
                     join RealisationsRefs on realisationReference = Realisations.id
                     where referrer = ?;
             )");
-        state->stmts->AddRealisationRealisationReference.create(state->db,
+        state->stmts->AddRealisationReference.create(state->db,
             R"(
                 insert or replace into RealisationsRefs (referrer, realisationReference)
                 values (
@@ -719,7 +719,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             .exec();
         uint64_t myId = state->db.getLastInsertedRowId();
         for (auto & [outputId, _] : info.dependentRealisations) {
-            state->stmts->AddRealisationRealisationReference
+            state->stmts->AddRealisationReference
                 .use()(myId)(outputId.strHash())(outputId.outputName)
                 .exec();
         }
@@ -1732,7 +1732,7 @@ std::optional<const Realisation> LocalStore::queryRealisation(
 
         std::map<DrvOutput, StorePath> dependentRealisations;
         auto useRealisationRefs(
-            state->stmts->QueryRealisationRealisationReferences.use()(
+            state->stmts->QueryRealisationReferences.use()(
                 realisationDbId));
         while (useRealisationRefs.next()) {
             auto depHash = useRealisationRefs.getStr(0);
