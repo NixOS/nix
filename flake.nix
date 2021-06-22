@@ -256,7 +256,8 @@
                 boost
                 nlohmann_json
               ]
-              ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+              ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+              ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
             configureFlags = ''
               --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
