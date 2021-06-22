@@ -108,7 +108,8 @@ let
 
         buildInputs =
           [ jobs.build.${system} curl bzip2 xz pkgconfig pkgs.perl boost ]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
