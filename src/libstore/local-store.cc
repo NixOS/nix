@@ -713,14 +713,18 @@ void LocalStore::registerDrvOutput(const Realisation & info)
     settings.requireExperimentalFeature("ca-derivations");
     retrySQLite<void>([&]() {
         auto state(_state.lock());
-        state->stmts->RegisterRealisedOutput
-            .use()(info.id.strHash())(info.id.outputName)(printStorePath(
-                info.outPath))(concatStringsSep(" ", info.signatures))
+        state->stmts->RegisterRealisedOutput.use()
+                (info.id.strHash())
+                (info.id.outputName)
+                (printStorePath(info.outPath))
+                (concatStringsSep(" ", info.signatures))
             .exec();
         uint64_t myId = state->db.getLastInsertedRowId();
         for (auto & [outputId, _] : info.dependentRealisations) {
-            state->stmts->AddRealisationReference
-                .use()(myId)(outputId.strHash())(outputId.outputName)
+            state->stmts->AddRealisationReference.use()
+                (myId)
+                (outputId.strHash())
+                (outputId.outputName)
                 .exec();
         }
     });
@@ -1721,8 +1725,9 @@ std::optional<const Realisation> LocalStore::queryRealisation(
     typedef std::optional<const Realisation> Ret;
     return retrySQLite<Ret>([&]() -> Ret {
         auto state(_state.lock());
-        auto useQueryRealisedOutput(state->stmts->QueryRealisedOutput.use()(
-            id.strHash())(id.outputName));
+        auto useQueryRealisedOutput(state->stmts->QueryRealisedOutput.use()
+                (id.strHash())
+                (id.outputName));
         if (!useQueryRealisedOutput.next())
             return std::nullopt;
         auto realisationDbId = useQueryRealisedOutput.getInt(0);
@@ -1732,13 +1737,14 @@ std::optional<const Realisation> LocalStore::queryRealisation(
 
         std::map<DrvOutput, StorePath> dependentRealisations;
         auto useRealisationRefs(
-            state->stmts->QueryRealisationReferences.use()(
-                realisationDbId));
+            state->stmts->QueryRealisationReferences.use()
+                (realisationDbId));
         while (useRealisationRefs.next()) {
             auto depHash = useRealisationRefs.getStr(0);
             auto depOutputName = useRealisationRefs.getStr(1);
-            auto useQueryRealisedOutput(
-                state->stmts->QueryRealisedOutput.use()(depHash)(depOutputName));
+            auto useQueryRealisedOutput(state->stmts->QueryRealisedOutput.use()
+                    (depHash)
+                    (depOutputName));
             assert(useQueryRealisedOutput.next());
             auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
             auto depId = DrvOutput { Hash::parseAnyPrefixed(depHash), depOutputName };
