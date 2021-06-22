@@ -803,8 +803,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                     if (!currentChild)
                         throw Error(
                             "Incomplete realisation closure: '%s' is a "
-                            "dependency "
-                            "of '%s' but isn’t registered",
+                            "dependency of '%s' but isn’t registered",
                             drvOutput.to_string(), current.id.to_string());
                     children.insert(*currentChild);
                 }
