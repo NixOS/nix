@@ -389,8 +389,7 @@ static void main_nix_build(int argc, char * * argv)
 
         if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
             auto resolvedDrv = drv.tryResolve(*store);
-            if (!resolvedDrv)
-                throw Error("unable to resolve the derivation '%s'. nix-shell can’t continue", drvInfo.queryDrvPath());
+            assert(resolvedDrv && "Successfully resolved the derivation");
             drv = *resolvedDrv;
         }
 
