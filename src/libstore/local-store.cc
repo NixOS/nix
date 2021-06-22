@@ -1826,11 +1826,12 @@ std::optional<const Realisation> LocalStore::queryRealisation_(
 }
 
 std::optional<const Realisation>
-LocalStore::queryRealisation(const DrvOutput &id) {
-  return retrySQLite<std::optional<const Realisation>>([&]() {
-    auto state(_state.lock());
-    return queryRealisation_(*state, id);
-  });
+LocalStore::queryRealisation(const DrvOutput & id)
+{
+    return retrySQLite<std::optional<const Realisation>>([&]() {
+        auto state(_state.lock());
+        return queryRealisation_(*state, id);
+    });
 }
 
 FixedOutputHash LocalStore::hashCAPath(
