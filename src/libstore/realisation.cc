@@ -143,7 +143,11 @@ StorePath RealisedPath::path() const {
 bool Realisation::isCompatibleWith(const Realisation & other) const
 {
     assert (id == other.id);
-    return outPath == other.outPath;
+    if (outPath == other.outPath) {
+        assert(dependentRealisations == other.dependentRealisations);
+        return true;
+    }
+    return false;
 }
 
 void RealisedPath::closure(
