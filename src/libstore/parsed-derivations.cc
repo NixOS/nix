@@ -165,13 +165,13 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(std::opti
     return json;
 }
 
-std::string ParsedDerivation::writeStructuredAttrsShell(nlohmann::json & json)
+/* As a convenience to bash scripts, write a shell file that
+   maps all attributes that are representable in bash -
+   namely, strings, integers, nulls, Booleans, and arrays and
+   objects consisting entirely of those values. (So nested
+   arrays or objects are not supported.) */
+std::string writeStructuredAttrsShell(nlohmann::json & json)
 {
-    /* As a convenience to bash scripts, write a shell file that
-       maps all attributes that are representable in bash -
-       namely, strings, integers, nulls, Booleans, and arrays and
-       objects consisting entirely of those values. (So nested
-       arrays or objects are not supported.) */
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
         if (value.is_string())

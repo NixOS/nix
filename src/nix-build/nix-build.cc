@@ -446,7 +446,7 @@ static void main_nix_build(int argc, char * * argv)
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(std::nullopt, *store, inputs)) {
                 auto json = structAttrs.value();
-                structuredAttrsRC = parsedDrv.writeStructuredAttrsShell(json);
+                structuredAttrsRC = writeStructuredAttrsShell(json);
 
                 auto attrsJSON = (Path) tmpDir + "/.attrs.json";
                 writeFile(attrsJSON, json.dump());
