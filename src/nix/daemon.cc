@@ -265,10 +265,16 @@ static void daemonLoop()
     }
 }
 
-static void runDaemon(bool stdio)
+static void runDaemon(bool stdio, std::optional<TrustedFlag> isTrustedOpt = {})
 {
+    auto ensureNoTrustedFlag = [&]() {
+        if (isTrustedOpt)
+            throw Error("--trust and --no-trust flags are only for use with --stdio when this nix-daemon process is not proxying another");
+    };
+
     if (stdio) {
         if (auto store = openUncachedStore().dynamic_pointer_cast<RemoteStore>()) {
+            ensureNoTrustedFlag();
             auto conn = store->openConnectionWrapper();
             int from = conn->from.fd;
             int to = conn->to.fd;
@@ -302,16 +308,20 @@ static void runDaemon(bool stdio)
             /* Auth hook is empty because in this mode we blindly trust the
                standard streams. Limiting access to those is explicitly
                not `nix-daemon`'s responsibility. */
-            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
+            auto isTrusted = isTrustedOpt.value_or(Trusted);
+            processConnection(openUncachedStore(), from, to, isTrusted, NotRecursive, [&](Store & _){});
         }
-    } else
+    } else {
+        ensureNoTrustedFlag();
         daemonLoop();
+    }
 }
 
 static int main_nix_daemon(int argc, char * * argv)
 {
     {
         auto stdio = false;
+        std::optional<TrustedFlag> isTrustedOpt;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--daemon")
@@ -322,11 +332,17 @@ static int main_nix_daemon(int argc, char * * argv)
                 printVersion("nix-daemon");
             else if (*arg == "--stdio")
                 stdio = true;
-            else return false;
+            else if (*arg == "--trust") {
+                settings.requireExperimentalFeature("nix-testing");
+                isTrustedOpt = Trusted;
+            } else if (*arg == "--no-trust") {
+                settings.requireExperimentalFeature("nix-testing");
+                isTrustedOpt = NotTrusted;
+            } else return false;
             return true;
         });
 
-        runDaemon(stdio);
+        runDaemon(stdio, isTrustedOpt);
 
         return 0;
     }

@@ -776,8 +776,40 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
+void copyStorePathAdapter(ref<Store> srcStore, ref<Store> dstStore,
+    const ValidPathInfo & info, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    copyStorePath(srcStore, dstStore, info.path, repair, checkSigs);
+}
+
+void copyOrBuildStorePath(ref<Store> srcStore, ref<Store> dstStore,
+    const ValidPathInfo & info, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    auto storePath = info.path;
+    if (dstStore->isTrusting || info.ca) {
+        copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+    } else if (info.deriver && dstStore->storeDir == srcStore->storeDir) {
+        auto drvPath = *info.deriver;
+        auto outputMap = srcStore->queryDerivationOutputMap(drvPath);
+        auto p = std::find_if(outputMap.begin(), outputMap.end(), [&](auto & i) {
+            return i.second == storePath;
+        });
+        // drv file is always CA
+        srcStore->ensurePath(drvPath);
+        copyStorePath(srcStore, dstStore, drvPath, repair, checkSigs);
+        dstStore->buildPaths({{
+            drvPath,
+            p != outputMap.end() ? StringSet { p->first } : StringSet {},
+        }});
+    } else {
+        dstStore->ensurePath(storePath);
+    }
+}
+
+
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set & paths,
-    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl)
 {
     StorePathSet storePaths;
     std::set<Realisation> realisations;
@@ -788,7 +820,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             realisations.insert(*realisation);
         }
     }
-    auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+    auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute, copyStorePathImpl);
     try {
         for (auto & realisation : realisations) {
             dstStore->registerDrvOutput(realisation, checkSigs);
@@ -807,7 +839,8 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
 }
 
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
-    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl)
 {
     auto valid = dstStore->queryValidPaths(storePaths, substitute);
 
@@ -879,7 +912,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
-                    copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                    copyStorePathImpl(srcStore, dstStore, *info, repair, checkSigs);
                 } catch (Error &e) {
                     nrFailed++;
                     if (!settings.keepGoing)

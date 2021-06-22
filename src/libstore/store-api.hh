@@ -190,7 +190,9 @@ struct StoreConfig : public Config
 
     const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size", "size of the in-memory store path information cache"};
 
-    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
+    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures. Compare \"trusting\""};
+
+    Setting<bool> isTrusting{this, true, "trusting", "whether (we think) paths can be added to this store even when they lack trusted signatures. Compare \"trusted\""};
 
     Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
 
@@ -748,22 +750,39 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
 
+/* copyStorePath wrapped to be used with `copyPaths`. */
+void copyStorePathAdapter(ref<Store> srcStore, ref<Store> dstStore,
+    const ValidPathInfo & info, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+
+/* The more liberal alternative to `copyStorePathAdapter`, useful for remote
+   stores that do not trust us. */
+void copyOrBuildStorePath(ref<Store> srcStore, ref<Store> dstStore,
+    const ValidPathInfo & info, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+
 /* Copy store paths from one store to another. The paths may be copied
    in parallel. They are copied in a topologically sorted order (i.e.
    if A is a reference of B, then A is copied before B), but the set
    of store paths is not automatically closed; use copyClosure() for
    that. Returns a map of what each path was copied to the dstStore
-   as. */
+   as.
+
+   The `copyStorePathImpl` parameter allows doing something other than just
+   copying. For example, this is used with the build hook to allow the other
+   side to build dependencies we don't have permission to copy. This behavior
+   isn't just the default that way `nix copy` etc. still can be relied upon to
+   not build anything. */
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
     const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
+    SubstituteFlag substitute = NoSubstitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl = copyStorePathAdapter);
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
     const StorePathSet& paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
+    SubstituteFlag substitute = NoSubstitute,
+    std::function<void(ref<Store>, ref<Store>, const ValidPathInfo &, RepairFlag, CheckSigsFlag)> copyStorePathImpl = copyStorePathAdapter);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

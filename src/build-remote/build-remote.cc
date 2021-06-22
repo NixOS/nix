@@ -248,6 +248,9 @@ static int main_build_remote(int argc, char * * argv)
 connected:
         close(5);
 
+        assert(sshStore);
+        auto sshStore2 = ref<Store>(sshStore);
+
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
@@ -268,22 +271,31 @@ connected:
 
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
+        auto copyStorePathImpl = sshStore2->isTrusting ? copyStorePathAdapter : copyOrBuildStorePath;
+
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(store, sshStore2, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
         }
 
         uploadLock = -1;
 
-        auto drv = store->readDerivation(*drvPath);
+        BasicDerivation drv = store->readDerivation(*drvPath);
+
+        std::optional<BuildResult> optResult;
+        if (sshStore2->isTrusting || derivationIsCA(drv.type())) {
+            drv.inputSrcs = store->parseStorePathSet(inputs);
+            optResult = sshStore2->buildDerivation(*drvPath, drv);
+            auto & result = *optResult;
+            if (!result.success())
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+        } else {
+            copyPaths(store, sshStore2, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
+            sshStore2->buildPaths({{*drvPath}});
+        }
+
+
         auto outputHashes = staticOutputHashes(*store, drv);
-        drv.inputSrcs = store->parseStorePathSet(inputs);
-
-        auto result = sshStore->buildDerivation(*drvPath, drv);
-
-        if (!result.success())
-            throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
-
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
         if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
@@ -292,6 +304,8 @@ connected:
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
                 if (!store->queryRealisation(thisOutputId)) {
                     debug("missing output %s", outputName);
+                    assert(optResult);
+                    auto & result = *optResult;
                     assert(result.builtOutputs.count(thisOutputId));
                     auto newRealisation = result.builtOutputs.at(thisOutputId);
                     missingRealisations.insert(newRealisation);
@@ -312,6 +326,7 @@ connected:
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
+            /* No `copyStorePathImpl` because we always trust ourselves. */
             copyPaths(ref<Store>(sshStore), store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
         }
         // XXX: Should be done as part of `copyPaths`
