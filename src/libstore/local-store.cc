@@ -732,8 +732,13 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                     .exec();
             } else {
                 throw Error("Trying to register a realisation of '%s', but we already "
-                            "have another one locally",
-                    info.id.to_string());
+                            "have another one locally.\n"
+                            "Local:  %s\n"
+                            "Remote: %s",
+                    info.id.to_string(),
+                    printStorePath(oldR->outPath),
+                    printStorePath(info.outPath)
+                );
             }
         } else {
             state->stmts->RegisterRealisedOutput.use()
