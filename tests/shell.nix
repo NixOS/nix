@@ -10,7 +10,7 @@ let pkgs = rec {
     done
 
     # mimic behavior of stdenv for `$out` etc. for structured attrs.
-    if [ -n "''${ATTRS_SH_FILE}" ]; then
+    if [ -n "''${NIX_ATTRS_SH_FILE}" ]; then
       for o in "''${!outputs[@]}"; do
         eval "''${o}=''${outputs[$o]}"
         export "''${o}"

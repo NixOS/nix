@@ -454,8 +454,8 @@ static void main_nix_build(int argc, char * * argv)
                 auto attrsSH = (Path) tmpDir + "/.attrs.sh";
                 writeFile(attrsSH, structuredAttrsRC);
 
-                env["ATTRS_SH_FILE"] = attrsSH;
-                env["ATTRS_JSON_FILE"] = attrsJSON;
+                env["NIX_ATTRS_SH_FILE"] = attrsSH;
+                env["NIX_ATTRS_JSON_FILE"] = attrsJSON;
                 keepTmp = true;
             }
         }

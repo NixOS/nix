@@ -11,7 +11,7 @@ nix-build structured-attrs.nix -A all -o $TEST_ROOT/result
 
 export NIX_BUILD_SHELL=$SHELL
 env NIX_PATH=nixpkgs=shell.nix nix-shell structured-attrs-shell.nix \
-    --run 'test -e .attrs.json; test "3" = "$(jq ".my.list|length" < $ATTRS_JSON_FILE)"'
+    --run 'test -e .attrs.json; test "3" = "$(jq ".my.list|length" < $NIX_ATTRS_JSON_FILE)"'
 
 # `nix develop` is a slightly special way of dealing with environment vars, it parses
 # these from a shell-file exported from a derivation. This is to test especially `outputs`
