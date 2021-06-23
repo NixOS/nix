@@ -11,13 +11,16 @@ PathSet scanForReferences(Sink & toTee, const Path & path, const PathSet & refs)
 
 struct RewritingSink : Sink
 {
-    std::string from, to, prev;
+    const StringMap rewrites;
+    long unsigned int maxRewriteSize;
+    std::string prev;
     Sink & nextSink;
     uint64_t pos = 0;
 
     std::vector<uint64_t> matches;
 
     RewritingSink(const std::string & from, const std::string & to, Sink & nextSink);
+    RewritingSink(const StringMap & rewrites, Sink & nextSink);
 
     void operator () (std::string_view data) override;
 
