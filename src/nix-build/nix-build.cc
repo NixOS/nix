@@ -387,6 +387,12 @@ static void main_nix_build(int argc, char * * argv)
 
         if (dryRun) return;
 
+        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+            auto resolvedDrv = drv.tryResolve(*store);
+            assert(resolvedDrv && "Successfully resolved the derivation");
+            drv = *resolvedDrv;
+        }
+
         // Set the environment.
         auto env = getEnv();
 
