@@ -140,6 +140,16 @@ StorePath RealisedPath::path() const {
     return std::visit([](auto && arg) { return arg.getPath(); }, raw);
 }
 
+bool Realisation::isCompatibleWith(const Realisation & other) const
+{
+    assert (id == other.id);
+    if (outPath == other.outPath) {
+        assert(dependentRealisations == other.dependentRealisations);
+        return true;
+    }
+    return false;
+}
+
 void RealisedPath::closure(
     Store& store,
     const RealisedPath::Set& startPaths,

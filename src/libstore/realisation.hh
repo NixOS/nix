@@ -47,6 +47,8 @@ struct Realisation {
     static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
     static void closure(Store &, const std::set<Realisation> &, std::set<Realisation>& res);
 
+    bool isCompatibleWith(const Realisation & other) const;
+
     StorePath getPath() const { return outPath; }
 
     GENERATE_CMP(Realisation, me->id, me->outPath);

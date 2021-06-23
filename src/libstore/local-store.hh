@@ -203,6 +203,8 @@ public:
     void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
 
+    std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
+    std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
 
 private:
