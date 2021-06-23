@@ -144,17 +144,26 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
-    for (auto & output : drv.outputs) {
-        output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
-        drv.env[output.first] = "";
-    }
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        for (auto & output : drv.outputs) {
+            output.second = {
+                .output = DerivationOutputDeferred{},
+            };
+            drv.env[output.first] = hashPlaceholder(output.first);
+        }
+    } else {
+        for (auto & output : drv.outputs) {
+            output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+            drv.env[output.first] = "";
+        }
+        Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
 
-    for (auto & output : drv.outputs) {
-        auto outPath = store->makeOutputPath(output.first, h, drv.name);
-        output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
-        drv.env[output.first] = store->printStorePath(outPath);
+        for (auto & output : drv.outputs) {
+            auto outPath = store->makeOutputPath(output.first, h, drv.name);
+            output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+            drv.env[output.first] = store->printStorePath(outPath);
+        }
     }
 
     auto shellDrvPath = writeDerivation(*store, drv);
@@ -162,8 +171,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     /* Build the derivation. */
     store->buildPaths({DerivedPath::Built{shellDrvPath}});
 
-    for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
-        auto & [_1, optPath] = outputAndOptPath;
+    for (auto & [_0, optPath] : store->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
         auto & outPath = *optPath;
         assert(store->isValidPath(outPath));
