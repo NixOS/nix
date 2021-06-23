@@ -2294,13 +2294,16 @@ void LocalDerivationGoal::registerOutputs()
             if (!outputRewrites.empty()) {
                 warn("rewriting hashes in '%1%'; cross fingers", actualPath);
 
-                /* FIXME: this is in-memory. */
-                StringSink sink;
-                dumpPath(actualPath, sink);
+                /* FIXME: Is this actually streaming? */
+                auto source = sinkToSource([&](Sink & nextSink) {
+                    RewritingSink rsink(outputRewrites, nextSink);
+                    dumpPath(actualPath, rsink);
+                    rsink.flush();
+                });
+                Path tmpPath = actualPath + ".tmp";
+                restorePath(tmpPath, *source);
                 deletePath(actualPath);
-                sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
-                StringSource source(*sink.s);
-                restorePath(actualPath, source);
+                movePath(tmpPath, actualPath);
             }
         };
 
