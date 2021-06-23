@@ -714,10 +714,10 @@ void LocalStore::registerDrvOutput(const Realisation & info)
     retrySQLite<void>([&]() {
         auto state(_state.lock());
         state->stmts->RegisterRealisedOutput.use()
-                (info.id.strHash())
-                (info.id.outputName)
-                (printStorePath(info.outPath))
-                (concatStringsSep(" ", info.signatures))
+            (info.id.strHash())
+            (info.id.outputName)
+            (printStorePath(info.outPath))
+            (concatStringsSep(" ", info.signatures))
             .exec();
         uint64_t myId = state->db.getLastInsertedRowId();
         for (auto & [outputId, _] : info.dependentRealisations) {
