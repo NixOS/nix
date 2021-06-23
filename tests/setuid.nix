@@ -2,7 +2,7 @@
 
 { nixpkgs, system, nix }:
 
-with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing-python.nix") { inherit system; };
 
 makeTest {
 
