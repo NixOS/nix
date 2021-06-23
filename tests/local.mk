@@ -52,6 +52,7 @@ nix_tests = \
   ca/signatures.sh \
   ca/nix-shell.sh \
   ca/nix-run.sh \
+  ca/recursive.sh \
   ca/nix-copy.sh
   # parallel.sh
 
