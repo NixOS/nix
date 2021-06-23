@@ -59,6 +59,8 @@ struct LocalStore::State::Stmts {
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
+    SQLiteStmt QueryRealisationReferences;
+    SQLiteStmt AddRealisationReference;
 };
 
 int getSchema(Path schemaPath)
@@ -76,7 +78,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 1;
+    const int nixCASchemaVersion = 2;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -94,7 +96,39 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
               #include "ca-specific-schema.sql.gen.hh"
                 ;
             db.exec(schema);
+            curCASchema = nixCASchemaVersion;
         }
+
+        if (curCASchema < 2) {
+            SQLiteTxn txn(db);
+            // Ugly little sql dance to add a new `id` column and make it the primary key
+            db.exec(R"(
+                create table Realisations2 (
+                    id integer primary key autoincrement not null,
+                    drvPath text not null,
+                    outputName text not null, -- symbolic output id, usually "out"
+                    outputPath integer not null,
+                    signatures text, -- space-separated list
+                    foreign key (outputPath) references ValidPaths(id) on delete cascade
+                );
+                insert into Realisations2 (drvPath, outputName, outputPath, signatures)
+                    select drvPath, outputName, outputPath, signatures from Realisations;
+                drop table Realisations;
+                alter table Realisations2 rename to Realisations;
+            )");
+            db.exec(R"(
+                create index if not exists IndexRealisations on Realisations(drvPath, outputName);
+
+                create table if not exists RealisationsRefs (
+                    referrer integer not null,
+                    realisationReference integer,
+                    foreign key (referrer) references Realisations(id) on delete cascade,
+                    foreign key (realisationReference) references Realisations(id) on delete restrict
+                );
+            )");
+            txn.commit();
+        }
+
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
         lockFile(lockFd.get(), ltRead, true);
     }
@@ -313,7 +347,7 @@ LocalStore::LocalStore(const Params & params)
             )");
         state->stmts->QueryRealisedOutput.create(state->db,
             R"(
-                select Output.path, Realisations.signatures from Realisations
+                select Realisations.id, Output.path, Realisations.signatures from Realisations
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ? and outputName = ?
                     ;
@@ -324,6 +358,19 @@ LocalStore::LocalStore(const Params & params)
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ?
                     ;
+            )");
+        state->stmts->QueryRealisationReferences.create(state->db,
+            R"(
+                select drvPath, outputName from Realisations
+                    join RealisationsRefs on realisationReference = Realisations.id
+                    where referrer = ?;
+            )");
+        state->stmts->AddRealisationReference.create(state->db,
+            R"(
+                insert or replace into RealisationsRefs (referrer, realisationReference)
+                values (
+                    ?,
+                    (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
 }
@@ -661,14 +708,22 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
 void LocalStore::registerDrvOutput(const Realisation & info)
 {
     settings.requireExperimentalFeature("ca-derivations");
-    auto state(_state.lock());
     retrySQLite<void>([&]() {
+        auto state(_state.lock());
         state->stmts->RegisterRealisedOutput.use()
             (info.id.strHash())
             (info.id.outputName)
             (printStorePath(info.outPath))
             (concatStringsSep(" ", info.signatures))
             .exec();
+        uint64_t myId = state->db.getLastInsertedRowId();
+        for (auto & [outputId, _] : info.dependentRealisations) {
+            state->stmts->AddRealisationReference.use()
+                (myId)
+                (outputId.strHash())
+                (outputId.outputName)
+                .exec();
+        }
     });
 }
 
@@ -1684,14 +1739,38 @@ std::optional<const Realisation> LocalStore::queryRealisation(
     typedef std::optional<const Realisation> Ret;
     return retrySQLite<Ret>([&]() -> Ret {
         auto state(_state.lock());
-        auto use(state->stmts->QueryRealisedOutput.use()(id.strHash())(
-            id.outputName));
-        if (!use.next())
+        auto useQueryRealisedOutput(state->stmts->QueryRealisedOutput.use()
+                (id.strHash())
+                (id.outputName));
+        if (!useQueryRealisedOutput.next())
             return std::nullopt;
-        auto outputPath = parseStorePath(use.getStr(0));
-        auto signatures = tokenizeString<StringSet>(use.getStr(1));
+        auto realisationDbId = useQueryRealisedOutput.getInt(0);
+        auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
+        auto signatures =
+            tokenizeString<StringSet>(useQueryRealisedOutput.getStr(2));
+
+        std::map<DrvOutput, StorePath> dependentRealisations;
+        auto useRealisationRefs(
+            state->stmts->QueryRealisationReferences.use()
+                (realisationDbId));
+        while (useRealisationRefs.next()) {
+            auto depHash = useRealisationRefs.getStr(0);
+            auto depOutputName = useRealisationRefs.getStr(1);
+            auto useQueryRealisedOutput(state->stmts->QueryRealisedOutput.use()
+                    (depHash)
+                    (depOutputName));
+            assert(useQueryRealisedOutput.next());
+            auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
+            auto depId = DrvOutput { Hash::parseAnyPrefixed(depHash), depOutputName };
+            dependentRealisations.insert({depId, outputPath});
+        }
+
         return Ret{Realisation{
-            .id = id, .outPath = outputPath, .signatures = signatures}};
+            .id = id,
+            .outPath = outputPath,
+            .signatures = signatures,
+            .dependentRealisations = dependentRealisations,
+        }};
     });
 }
 
