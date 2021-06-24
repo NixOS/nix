@@ -102,7 +102,13 @@
           });
 
         propagatedDeps =
-          [ (boehmgc.override { enableLargeConfig = true; })
+          [ ((boehmgc.override {
+              enableLargeConfig = true;
+            }).overrideAttrs(o: {
+              patches = (o.patches or []) ++ [
+                ./boehmgc-coroutine-sp-fallback.diff
+              ];
+            }))
           ];
 
         perlDeps =
