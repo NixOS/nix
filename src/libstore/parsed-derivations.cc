@@ -124,7 +124,7 @@ bool ParsedDerivation::substitutesAllowed() const
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
-std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(std::optional<StringMap> inputRewrites, Store & store, const StorePathSet & inputPaths)
+std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
     auto structuredAttrs = getStructuredAttrs();
     if (!structuredAttrs) return std::nullopt;
@@ -134,14 +134,7 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(std::opti
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputs;
     for (auto & i : drv.outputs) {
-        if (inputRewrites) {
-            /* The placeholder must have a rewrite, so we use it to cover both the
-               cases where we know or don't know the output path ahead of time. */
-            outputs[i.first] = rewriteStrings(hashPlaceholder(i.first), inputRewrites.value());
-        } else {
-            /* This case is only relevant for the nix-shell */
-            outputs[i.first] = hashPlaceholder(i.first);
-        }
+        outputs[i.first] = hashPlaceholder(i.first);
     }
     json["outputs"] = outputs;
 

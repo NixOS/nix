@@ -444,7 +444,7 @@ static void main_nix_build(int argc, char * * argv)
                 drv
             );
 
-            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(std::nullopt, *store, inputs)) {
+            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();
                 structuredAttrsRC = writeStructuredAttrsShell(json);
 

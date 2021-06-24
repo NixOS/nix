@@ -1086,8 +1086,17 @@ void LocalDerivationGoal::initEnv()
 
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(inputRewrites, worker.store, inputPaths)) {
+    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths)) {
         auto json = structAttrsJson.value();
+        nlohmann::json rewritten;
+        for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
+            /* The placeholder must have a rewrite, so we use it to cover both the
+               cases where we know or don't know the output path ahead of time. */
+            rewritten[i] = rewriteStrings(v, inputRewrites);
+        }
+
+        json["outputs"] = rewritten;
+
         auto jsonSh = writeStructuredAttrsShell(json);
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));

@@ -37,7 +37,7 @@ public:
 
     bool substitutesAllowed() const;
 
-    std::optional<nlohmann::json> prepareStructuredAttrs(std::optional<StringMap> inputRewrites, Store & store, const StorePathSet & inputPaths);
+    std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
 };
 
 std::string writeStructuredAttrsShell(nlohmann::json & json);
