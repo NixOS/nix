@@ -739,6 +739,63 @@ void DerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 {
 }
 
+void runPostBuildHook(
+    Store & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    StorePathSet outputPaths
+)
+{
+    auto hook = settings.postBuildHook;
+    if (hook == "")
+        return;
+
+    Activity act(logger, lvlInfo, actPostBuildHook,
+            fmt("running post-build-hook '%s'", settings.postBuildHook),
+            Logger::Fields{store.printStorePath(drvPath)});
+    PushActivity pact(act.id);
+    std::map<std::string, std::string> hookEnvironment = getEnv();
+
+    hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
+    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+
+    RunOptions opts(settings.postBuildHook, {});
+    opts.environment = hookEnvironment;
+
+    struct LogSink : Sink {
+        Activity & act;
+        std::string currentLine;
+
+        LogSink(Activity & act) : act(act) { }
+
+        void operator() (std::string_view data) override {
+            for (auto c : data) {
+                if (c == '\n') {
+                    flushLine();
+                } else {
+                    currentLine += c;
+                }
+            }
+        }
+
+        void flushLine() {
+            act.result(resPostBuildLogLine, currentLine);
+            currentLine.clear();
+        }
+
+        ~LogSink() {
+            if (currentLine != "") {
+                currentLine += '\n';
+                flushLine();
+            }
+        }
+    };
+    LogSink sink(act);
+
+    opts.standardOut = &sink;
+    opts.mergeStderrToStdout = true;
+    runProgram2(opts);
+}
 
 void DerivationGoal::buildDone()
 {
@@ -804,57 +861,15 @@ void DerivationGoal::buildDone()
            being valid. */
         registerOutputs();
 
-        if (settings.postBuildHook != "") {
-            Activity act(*logger, lvlInfo, actPostBuildHook,
-                fmt("running post-build-hook '%s'", settings.postBuildHook),
-                Logger::Fields{worker.store.printStorePath(drvPath)});
-            PushActivity pact(act.id);
-            StorePathSet outputPaths;
-            for (auto i : drv->outputs) {
-                outputPaths.insert(finalOutputs.at(i.first));
-            }
-            std::map<std::string, std::string> hookEnvironment = getEnv();
-
-            hookEnvironment.emplace("DRV_PATH", worker.store.printStorePath(drvPath));
-            hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", worker.store.printStorePathSet(outputPaths))));
-
-            RunOptions opts(settings.postBuildHook, {});
-            opts.environment = hookEnvironment;
-
-            struct LogSink : Sink {
-                Activity & act;
-                std::string currentLine;
-
-                LogSink(Activity & act) : act(act) { }
-
-                void operator() (std::string_view data) override {
-                    for (auto c : data) {
-                        if (c == '\n') {
-                            flushLine();
-                        } else {
-                            currentLine += c;
-                        }
-                    }
-                }
-
-                void flushLine() {
-                    act.result(resPostBuildLogLine, currentLine);
-                    currentLine.clear();
-                }
-
-                ~LogSink() {
-                    if (currentLine != "") {
-                        currentLine += '\n';
-                        flushLine();
-                    }
-                }
-            };
-            LogSink sink(act);
-
-            opts.standardOut = &sink;
-            opts.mergeStderrToStdout = true;
-            runProgram2(opts);
-        }
+        StorePathSet outputPaths;
+        for (auto & [_, path] : finalOutputs)
+            outputPaths.insert(path);
+        runPostBuildHook(
+            worker.store,
+            *logger,
+            drvPath,
+            outputPaths
+        );
 
         if (buildMode == bmCheck) {
             cleanupPostOutputsRegisteredModeCheck();
@@ -910,6 +925,8 @@ void DerivationGoal::resolvedFinished() {
 
     auto resolvedHashes = staticOutputHashes(worker.store, *resolvedDrv);
 
+    StorePathSet outputPaths;
+
     // `wantedOutputs` might be empty, which means “all the outputs”
     auto realWantedOutputs = wantedOutputs;
     if (realWantedOutputs.empty())
@@ -930,12 +947,20 @@ void DerivationGoal::resolvedFinished() {
             newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation->outPath);
             signRealisation(newRealisation);
             worker.store.registerDrvOutput(newRealisation);
+            outputPaths.insert(realisation->outPath);
         } else {
             // If we don't have a realisation, then it must mean that something
             // failed when building the resolved drv
             assert(!result.success());
         }
     }
+
+    runPostBuildHook(
+        worker.store,
+        *logger,
+        drvPath,
+        outputPaths
+    );
 
     // This is potentially a bit fishy in terms of error reporting. Not sure
     // how to do it in a cleaner way
