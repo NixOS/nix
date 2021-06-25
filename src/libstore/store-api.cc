@@ -803,14 +803,14 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
         // Copy the realisation closure
         processGraph<Realisation>(
             pool, Realisation::closure(*srcStore, toplevelRealisations),
-            [&](const Realisation& current) -> std::set<Realisation> {
+            [&](const Realisation & current) -> std::set<Realisation> {
                 std::set<Realisation> children;
-                for (const auto& [drvOutput, _] : current.dependentRealisations) {
+                for (const auto & [drvOutput, _] : current.dependentRealisations) {
                     auto currentChild = srcStore->queryRealisation(drvOutput);
                     if (!currentChild)
                         throw Error(
-                            "Incomplete realisation closure: '%s' is a "
-                            "dependency of '%s' but isn’t registered",
+                            "incomplete realisation closure: '%s' is a "
+                            "dependency of '%s' but isn't registered",
                             drvOutput.to_string(), current.id.to_string());
                     children.insert(*currentChild);
                 }

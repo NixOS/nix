@@ -762,7 +762,7 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet& paths,
+    const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
