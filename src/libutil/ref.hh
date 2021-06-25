@@ -73,6 +73,16 @@ public:
         return ref<T2>((std::shared_ptr<T2>) p);
     }
 
+    bool operator == (const ref<T> & other) const
+    {
+        return p == other.p;
+    }
+
+    bool operator != (const ref<T> & other) const
+    {
+        return p != other.p;
+    }
+
 private:
 
     template<typename T2, typename... Args>
