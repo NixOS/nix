@@ -53,13 +53,6 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 }
 
 
-StorePathWithOutputs Store::followLinksToStorePathWithOutputs(std::string_view path) const
-{
-    auto [path2, outputs] = nix::parsePathWithOutputs(path);
-    return StorePathWithOutputs { followLinksToStorePath(path2), std::move(outputs) };
-}
-
-
 /* Store paths have the following form:
 
    <realized-path> = <store>/<h>-<name>
@@ -344,6 +337,13 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     return info;
 }
 
+StringSet StoreConfig::getDefaultSystemFeatures()
+{
+    auto res = settings.systemFeatures.get();
+    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+        res.insert("ca-derivations");
+    return res;
+}
 
 Store::Store(const Params & params)
     : StoreConfig(params)
@@ -536,10 +536,10 @@ void Store::queryPathInfo(const StorePath & storePath,
 
 void Store::substitutePaths(const StorePathSet & paths)
 {
-    std::vector<StorePathWithOutputs> paths2;
+    std::vector<DerivedPath> paths2;
     for (auto & path : paths)
         if (!path.isDerivation())
-            paths2.push_back({path});
+            paths2.push_back(DerivedPath::Opaque{path});
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     queryMissing(paths2,
@@ -547,8 +547,8 @@ void Store::substitutePaths(const StorePathSet & paths)
 
     if (!willSubstitute.empty())
         try {
-            std::vector<StorePathWithOutputs> subs;
-            for (auto & p : willSubstitute) subs.push_back({p});
+            std::vector<DerivedPath> subs;
+            for (auto & p : willSubstitute) subs.push_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());
@@ -787,20 +787,39 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
     StorePathSet storePaths;
-    std::set<Realisation> realisations;
+    std::set<Realisation> toplevelRealisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
         if (auto realisation = std::get_if<Realisation>(&path.raw)) {
             settings.requireExperimentalFeature("ca-derivations");
-            realisations.insert(*realisation);
+            toplevelRealisations.insert(*realisation);
         }
     }
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+
+    ThreadPool pool;
+
     try {
-        for (auto & realisation : realisations) {
-            dstStore->registerDrvOutput(realisation);
-        }
-    } catch (MissingExperimentalFeature & e) {
+        // Copy the realisation closure
+        processGraph<Realisation>(
+            pool, Realisation::closure(*srcStore, toplevelRealisations),
+            [&](const Realisation& current) -> std::set<Realisation> {
+                std::set<Realisation> children;
+                for (const auto& [drvOutput, _] : current.dependentRealisations) {
+                    auto currentChild = srcStore->queryRealisation(drvOutput);
+                    if (!currentChild)
+                        throw Error(
+                            "Incomplete realisation closure: '%s' is a "
+                            "dependency of '%s' but isn’t registered",
+                            drvOutput.to_string(), current.id.to_string());
+                    children.insert(*currentChild);
+                }
+                return children;
+            },
+            [&](const Realisation& current) -> void {
+                dstStore->registerDrvOutput(current, checkSigs);
+            });
+    } catch (MissingExperimentalFeature& e) {
         // Don't fail if the remote doesn't support CA derivations is it might
         // not be within our control to change that, and we might still want
         // to at least copy the output paths.

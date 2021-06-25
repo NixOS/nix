@@ -54,7 +54,7 @@ void StoreCommand::run()
     run(getStore());
 }
 
-RealisedPathsCommand::RealisedPathsCommand(bool recursive)
+BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     : recursive(recursive)
 {
     if (recursive)
@@ -81,39 +81,45 @@ RealisedPathsCommand::RealisedPathsCommand(bool recursive)
     });
 }
 
-void RealisedPathsCommand::run(ref<Store> store)
+void BuiltPathsCommand::run(ref<Store> store)
 {
-    std::vector<RealisedPath> paths;
+    BuiltPaths paths;
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.push_back(p);
+            paths.push_back(BuiltPath::Opaque{p});
     } else {
-        auto pathSet = toRealisedPaths(store, realiseMode, operateOn, installables);
+        paths = toBuiltPaths(store, realiseMode, operateOn, installables);
         if (recursive) {
-            auto roots = std::move(pathSet);
-            pathSet = {};
-            RealisedPath::closure(*store, roots, pathSet);
+            // XXX: This only computes the store path closure, ignoring
+            // intermediate realisations
+            StorePathSet pathsRoots, pathsClosure;
+            for (auto & root: paths) {
+                auto rootFromThis = root.outPaths();
+                pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
+            }
+            store->computeFSClosure(pathsRoots, pathsClosure);
+            for (auto & path : pathsClosure)
+                paths.push_back(BuiltPath::Opaque{path});
         }
-        for (auto & path : pathSet)
-            paths.push_back(path);
     }
 
     run(store, std::move(paths));
 }
 
 StorePathsCommand::StorePathsCommand(bool recursive)
-    : RealisedPathsCommand(recursive)
+    : BuiltPathsCommand(recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, std::vector<RealisedPath> paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths paths)
 {
     StorePaths storePaths;
-    for (auto & p : paths)
-        storePaths.push_back(p.path());
+    for (auto& builtPath : paths)
+        for (auto& p : builtPath.outPaths())
+            storePaths.push_back(p);
 
     run(store, std::move(storePaths));
 }
@@ -162,7 +168,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
             profile2, storePath));
 }
 
-void MixProfile::updateProfile(const Buildables & buildables)
+void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
@@ -170,18 +176,15 @@ void MixProfile::updateProfile(const Buildables & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuildableOpaque bo) {
+            [&](BuiltPath::Opaque bo) {
                 result.push_back(bo.path);
             },
-            [&](BuildableFromDrv bfd) {
+            [&](BuiltPath::Built bfd) {
                 for (auto & output : bfd.outputs) {
-                    /* Output path should be known because we just tried to
-                       build it. */
-                    assert(output.second);
-                    result.push_back(*output.second);
+                    result.push_back(output.second);
                 }
             },
-        }, buildable);
+        }, buildable.raw());
     }
 
     if (result.size() != 1)

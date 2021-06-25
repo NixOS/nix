@@ -133,20 +133,8 @@ for my $fn (glob "$tmpDir/*") {
 
 exit if $version =~ /pre/;
 
-# Update Nixpkgs in a very hacky way.
+# Update nix-fallback-paths.nix.
 system("cd $nixpkgsDir && git pull") == 0 or die;
-my $oldName = `nix-instantiate --eval $nixpkgsDir -A nix.name`; chomp $oldName;
-my $oldHash = `nix-instantiate --eval $nixpkgsDir -A nix.src.outputHash`; chomp $oldHash;
-print STDERR "old stable version in Nixpkgs = $oldName / $oldHash\n";
-
-my $fn = "$nixpkgsDir/pkgs/tools/package-management/nix/default.nix";
-my $oldFile = read_file($fn);
-$oldFile =~ s/$oldName/"$releaseName"/g;
-$oldFile =~ s/$oldHash/"$tarballHash"/g;
-write_file($fn, $oldFile);
-
-$oldName =~ s/nix-//g;
-$oldName =~ s/"//g;
 
 sub getStorePath {
     my ($jobName) = @_;
@@ -167,7 +155,7 @@ write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
            "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
            "}\n");
 
-system("cd $nixpkgsDir && git commit -a -m 'nix: $oldName -> $version'") == 0 or die;
+system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 
 # Update the "latest" symlink.
 $channelsBucket->add_key(

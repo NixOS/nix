@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <netdb.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -73,7 +74,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     state = &DerivationGoal::getDerivation;
     name = fmt(
         "building of '%s' from .drv file",
-        StorePathWithOutputs { drvPath, wantedOutputs }.to_string(worker.store));
+        DerivedPath::Built { drvPath, wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -94,7 +95,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
-        StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
+        DerivedPath::Built { drvPath, drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -170,7 +171,7 @@ void DerivationGoal::getDerivation()
         return;
     }
 
-    addWaitee(upcast_goal(worker.makeSubstitutionGoal(drvPath)));
+    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
 
     state = &DerivationGoal::loadDerivation;
 }
@@ -246,17 +247,22 @@ void DerivationGoal::haveDerivation()
        through substitutes.  If that doesn't work, we'll build
        them. */
     if (settings.useSubstitutes && parsedDrv->substitutesAllowed())
-        for (auto & [_, status] : initialOutputs) {
+        for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted) continue;
-            if (!status.known) {
-                warn("do not know how to query for unknown floating content-addressed derivation output yet");
-                /* Nothing to wait for; tail call */
-                return DerivationGoal::gaveUpOnSubstitution();
-            }
-            addWaitee(upcast_goal(worker.makeSubstitutionGoal(
-                status.known->path,
-                buildMode == bmRepair ? Repair : NoRepair,
-                getDerivationCA(*drv))));
+            if (!status.known)
+                addWaitee(
+                    upcast_goal(
+                        worker.makeDrvOutputSubstitutionGoal(
+                            DrvOutput{status.outputHash, outputName},
+                            buildMode == bmRepair ? Repair : NoRepair
+                        )
+                    )
+                );
+            else
+                addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
+                    status.known->path,
+                    buildMode == bmRepair ? Repair : NoRepair,
+                    getDerivationCA(*drv))));
         }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -337,7 +343,7 @@ void DerivationGoal::gaveUpOnSubstitution()
         if (!settings.useSubstitutes)
             throw Error("dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
-        addWaitee(upcast_goal(worker.makeSubstitutionGoal(i)));
+        addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i)));
     }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -388,7 +394,7 @@ void DerivationGoal::repairClosure()
             worker.store.printStorePath(i), worker.store.printStorePath(drvPath));
         auto drvPath2 = outputsToDrv.find(i);
         if (drvPath2 == outputsToDrv.end())
-            addWaitee(upcast_goal(worker.makeSubstitutionGoal(i, Repair)));
+            addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
             addWaitee(worker.makeDerivationGoal(drvPath2->second, StringSet(), bmRepair));
     }
@@ -920,6 +926,9 @@ void DerivationGoal::resolvedFinished() {
         if (realisation) {
             auto newRealisation = *realisation;
             newRealisation.id = DrvOutput{initialOutputs.at(wantedOutput).outputHash, wantedOutput};
+            newRealisation.signatures.clear();
+            newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation->outPath);
+            signRealisation(newRealisation);
             worker.store.registerDrvOutput(newRealisation);
         } else {
             // If we don't have a realisation, then it must mean that something
@@ -1243,9 +1252,12 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
 void DerivationGoal::checkPathValidity()
 {
     bool checkHash = buildMode == bmRepair;
+    auto wantedOutputsLeft = wantedOutputs;
     for (auto & i : queryPartialDerivationOutputMap()) {
         InitialOutput & info = initialOutputs.at(i.first);
         info.wanted = wantOutput(i.first, wantedOutputs);
+        if (info.wanted)
+            wantedOutputsLeft.erase(i.first);
         if (i.second) {
             auto outputPath = *i.second;
             info.known = {
@@ -1258,15 +1270,33 @@ void DerivationGoal::checkPathValidity()
             };
         }
         if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-            if (auto real = worker.store.queryRealisation(
-                    DrvOutput{initialOutputs.at(i.first).outputHash, i.first})) {
+            auto drvOutput = DrvOutput{initialOutputs.at(i.first).outputHash, i.first};
+            if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
                     .path = real->outPath,
                     .status = PathStatus::Valid,
                 };
+            } else if (info.known && info.known->status == PathStatus::Valid) {
+                // We know the output because it' a static output of the
+                // derivation, and the output path is valid, but we don't have
+                // its realisation stored (probably because it has been built
+                // without the `ca-derivations` experimental flag)
+                worker.store.registerDrvOutput(
+                    Realisation{
+                        drvOutput,
+                        info.known->path,
+                    }
+                );
             }
         }
     }
+    // If we requested all the outputs via the empty set, we are always fine.
+    // If we requested specific elements, the loop above removes all the valid
+    // ones, so any that are left must be invalid.
+    if (!wantedOutputsLeft.empty())
+        throw Error("derivation '%s' does not have wanted outputs %s",
+            worker.store.printStorePath(drvPath),
+            concatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
 }
 
 

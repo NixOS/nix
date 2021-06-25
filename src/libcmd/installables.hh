@@ -2,12 +2,12 @@
 
 #include "util.hh"
 #include "path.hh"
+#include "path-with-outputs.hh"
+#include "derived-path.hh"
 #include "eval.hh"
 #include "flake/flake.hh"
 
 #include <optional>
-
-#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -16,30 +16,17 @@ struct SourceExprCommand;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }
 
-struct BuildableOpaque {
-    StorePath path;
-    nlohmann::json toJSON(ref<Store> store) const;
-};
-
-struct BuildableFromDrv {
-    StorePath drvPath;
-    std::map<std::string, std::optional<StorePath>> outputs;
-    nlohmann::json toJSON(ref<Store> store) const;
-};
-
-typedef std::variant<
-    BuildableOpaque,
-    BuildableFromDrv
-> Buildable;
-
-typedef std::vector<Buildable> Buildables;
-nlohmann::json buildablesToJSON(const Buildables & buildables, ref<Store> store);
-
 struct App
 {
     std::vector<StorePathWithOutputs> context;
     Path program;
     // FIXME: add args, sandbox settings, metadata, ...
+};
+
+struct UnresolvedApp
+{
+    App unresolved;
+    App resolve(ref<Store>);
 };
 
 struct Installable
@@ -48,11 +35,11 @@ struct Installable
 
     virtual std::string what() = 0;
 
-    virtual Buildables toBuildables() = 0;
+    virtual DerivedPaths toDerivedPaths() = 0;
 
-    Buildable toBuildable();
+    DerivedPath toDerivedPath();
 
-    App toApp(EvalState & state);
+    UnresolvedApp toApp(EvalState & state);
 
     virtual std::pair<Value *, Pos> toValue(EvalState & state)
     {
@@ -93,7 +80,7 @@ struct InstallableValue : Installable
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
 
-    Buildables toBuildables() override;
+    DerivedPaths toDerivedPaths() override;
 };
 
 struct InstallableFlake : InstallableValue

@@ -1,17 +1,22 @@
-if ! canUseSandbox; then exit; fi
-if ! [[ $busybox =~ busybox ]]; then exit; fi
+if ! canUseSandbox; then exit 99; fi
+if ! [[ $busybox =~ busybox ]]; then exit 99; fi
 
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
 
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
+EXTRA_SYSTEM_FEATURES=()
+if [[ -n "$CONTENT_ADDRESSED" ]]; then
+    EXTRA_SYSTEM_FEATURES=("ca-derivations")
+fi
+
 builders=(
   # system-features will automatically be added to the outer URL, but not inner
   # remote-store URL.
-  "ssh://localhost?remote-store=$TEST_ROOT/machine1?system-features=foo - - 1 1 foo"
-  "$TEST_ROOT/machine2 - - 1 1 bar"
-  "ssh-ng://localhost?remote-store=$TEST_ROOT/machine3?system-features=baz - - 1 1 baz"
+  "ssh://localhost?remote-store=$TEST_ROOT/machine1?system-features=$(join_by "%20" foo ${EXTRA_SYSTEM_FEATURES[@]}) - - 1 1 $(join_by "," foo ${EXTRA_SYSTEM_FEATURES[@]})"
+  "$TEST_ROOT/machine2 - - 1 1 $(join_by "," bar ${EXTRA_SYSTEM_FEATURES[@]})"
+  "ssh-ng://localhost?remote-store=$TEST_ROOT/machine3?system-features=$(join_by "%20" baz ${EXTRA_SYSTEM_FEATURES[@]}) - - 1 1 $(join_by "," baz ${EXTRA_SYSTEM_FEATURES[@]})"
 )
 
 chmod -R +w $TEST_ROOT/machine* || true

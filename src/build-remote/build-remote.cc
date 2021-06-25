@@ -277,7 +277,16 @@ connected:
 
         auto drv = store->readDerivation(*drvPath);
         auto outputHashes = staticOutputHashes(*store, drv);
-        drv.inputSrcs = store->parseStorePathSet(inputs);
+
+        // Hijack the inputs paths of the derivation to include all the paths
+        // that come from the `inputDrvs` set.
+        // We don’t do that for the derivations whose `inputDrvs` is empty
+        // because
+        // 1. It’s not needed
+        // 2. Changing the `inputSrcs` set changes the associated output ids,
+        //  which break CA derivations
+        if (!drv.inputDrvs.empty())
+            drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);
 

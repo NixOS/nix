@@ -25,19 +25,19 @@ nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=1 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/%.8: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=8 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
@@ -80,7 +80,7 @@ install: $(d)/src/command-ref/new-cli
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
 	  cat $$i >> $$i.tmp; \
-	  lowdown -sT man $$i.tmp -o $(mandir)/man1/$$name.1; \
+	  lowdown -sT man -M section=1 $$i.tmp -o $(mandir)/man1/$$name.1; \
 	done
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md

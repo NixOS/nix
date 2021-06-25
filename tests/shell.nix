@@ -1,6 +1,18 @@
-{ inNixShell ? false }:
+{ inNixShell ? false, contentAddressed ? false }:
 
-with import ./config.nix;
+let cfg = import ./config.nix; in
+with cfg;
+
+let
+  mkDerivation =
+    if contentAddressed then
+      args: cfg.mkDerivation ({
+        __contentAddressed = true;
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+      } // args)
+    else cfg.mkDerivation;
+in
 
 let pkgs = rec {
   setupSh = builtins.toFile "setup" ''

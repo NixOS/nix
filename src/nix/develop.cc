@@ -3,6 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "derivations.hh"
 #include "affinity.hh"
 #include "progress-bar.hh"
@@ -143,26 +144,34 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
-    for (auto & output : drv.outputs) {
-        output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
-        drv.env[output.first] = "";
-    }
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
+    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        for (auto & output : drv.outputs) {
+            output.second = {
+                .output = DerivationOutputDeferred{},
+            };
+            drv.env[output.first] = hashPlaceholder(output.first);
+        }
+    } else {
+        for (auto & output : drv.outputs) {
+            output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+            drv.env[output.first] = "";
+        }
+        Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
 
-    for (auto & output : drv.outputs) {
-        auto outPath = store->makeOutputPath(output.first, h, drv.name);
-        output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
-        drv.env[output.first] = store->printStorePath(outPath);
+        for (auto & output : drv.outputs) {
+            auto outPath = store->makeOutputPath(output.first, h, drv.name);
+            output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+            drv.env[output.first] = store->printStorePath(outPath);
+        }
     }
 
     auto shellDrvPath = writeDerivation(*store, drv);
 
     /* Build the derivation. */
-    store->buildPaths({{shellDrvPath}});
+    store->buildPaths({DerivedPath::Built{shellDrvPath}});
 
-    for (auto & [_0, outputAndOptPath] : drv.outputsAndOptPaths(*store)) {
-        auto & [_1, optPath] = outputAndOptPath;
+    for (auto & [_0, optPath] : store->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
         auto & outPath = *optPath;
         assert(store->isValidPath(outPath));
@@ -184,6 +193,7 @@ struct Common : InstallableCommand, MixProfile
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
         "NIX_LOG_FD",
+        "NIX_REMOTE",
         "PPID",
         "PWD",
         "SHELLOPTS",
@@ -264,9 +274,9 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto buildable = installable->toBuildable();
-            auto doRedirect = [&](const StorePath & path)
-            {
+            auto builtPaths = toStorePaths(
+                store, Realise::Nothing, OperateOn::Output, {installable});
+            for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
                 if (script.find(from) == std::string::npos)
                     warn("'%s' (path '%s') is not used by this build environment", installable->what(), from);
@@ -274,16 +284,7 @@ struct Common : InstallableCommand, MixProfile
                     printInfo("redirecting '%s' to '%s'", from, dir);
                     rewrites.insert({from, dir});
                 }
-            };
-            std::visit(overloaded {
-                [&](const BuildableOpaque & bo) {
-                    doRedirect(bo.path);
-                },
-                [&](const BuildableFromDrv & bfd) {
-                    for (auto & [outputName, path] : bfd.outputs)
-                        if (path) doRedirect(*path);
-                },
-            }, buildable);
+            }
         }
 
         return rewriteStrings(script, rewrites);
@@ -403,7 +404,7 @@ struct CmdDevelop : Common, MixEnvironment
         if (verbosity >= lvlDebug)
             script += "set -x\n";
 
-        script += fmt("rm -f '%s'\n", rcFilePath);
+        script += fmt("command rm -f '%s'\n", rcFilePath);
 
         if (phase) {
             if (!command.empty())
@@ -422,7 +423,7 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         else {
-            script += "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n";
+            script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n" + script;
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", shellEscape(developSettings.bashPrompt));
             if (developSettings.bashPromptSuffix != "")
@@ -461,8 +462,7 @@ struct CmdDevelop : Common, MixEnvironment
         auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
             : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
-        restoreAffinity();
-        restoreSignals();
+        restoreProcessContext();
 
         execvp(shell.c_str(), stringsToCharPtrs(args).data());
 

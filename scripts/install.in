@@ -46,15 +46,9 @@ case "$(uname -s).$(uname -m)" in
         system=x86_64-darwin
         ;;
     Darwin.arm64|Darwin.aarch64)
-        # check for Rosetta 2 support
-        if ! [ -f /Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist ]; then
-          oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
-        fi
-
-        hash=@binaryTarball_x86_64-darwin@
-        path=@tarballPath_x86_64-darwin@
-        # eventually maybe: aarch64-darwin
-        system=x86_64-darwin
+        hash=@binaryTarball_aarch64-darwin@
+        path=@tarballPath_aarch64-darwin@
+        system=aarch64-darwin
         ;;
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac

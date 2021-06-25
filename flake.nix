@@ -1,10 +1,10 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-20.09-small";
-  #inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.nixpkgs.url = "nixpkgs/nixos-21.05-small";
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, lowdown-src }:
 
     let
 
@@ -18,7 +18,7 @@
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" ];
+      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
@@ -80,11 +80,12 @@
             buildPackages.git
             buildPackages.mercurial
             buildPackages.jq
-          ] ++ lib.optional stdenv.hostPlatform.isLinux buildPackages.utillinuxMinimal;
+          ]
+          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
           [ curl
-            bzip2 xz brotli zlib editline
+            bzip2 xz brotli editline
             openssl sqlite
             libarchive
             boost
@@ -92,7 +93,7 @@
             lowdown
             gmock
           ]
-          ++ lib.optional stdenv.isLinux libseccomp
+          ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
@@ -146,11 +147,45 @@
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
           '';
 
+      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; pkgs.stdenv.mkDerivation {
+        NIX_DAEMON_PACKAGE = daemon;
+        NIX_CLIENT_PACKAGE = client;
+        # Must keep this name short as OSX has a rather strict limit on the
+        # socket path length, and this name appears in the path of the
+        # nix-daemon socket used in the tests
+        name = "nix-tests";
+        inherit version;
+
+        src = self;
+
+        VERSION_SUFFIX = versionSuffix;
+
+        nativeBuildInputs = nativeBuildDeps;
+        buildInputs = buildDeps ++ awsDeps;
+        propagatedBuildInputs = propagatedDeps;
+
+        enableParallelBuilding = true;
+
+        dontBuild = true;
+        doInstallCheck = true;
+
+        installPhase = ''
+          mkdir -p $out
+        '';
+        installCheckPhase = "make installcheck";
+
+      };
+
     in {
 
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
       overlay = final: prev: {
+
+        # An older version of Nix to test against when using the daemon.
+        # Currently using `nixUnstable` as the stable one doesn't respect
+        # `NIX_DAEMON_SOCKET_PATH` which is needed for the tests.
+        nixStable = prev.nix;
 
         nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
           name = "nix-${version}";
@@ -201,6 +236,8 @@
 
           separateDebugInfo = true;
 
+          strictDeps = true;
+
           passthru.perl-bindings = with final; stdenv.mkDerivation {
             name = "nix-perl-${version}";
 
@@ -221,7 +258,8 @@
                 boost
                 nlohmann_json
               ]
-              ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+              ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+              ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
             configureFlags = ''
               --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
@@ -236,21 +274,23 @@
         };
 
         lowdown = with final; stdenv.mkDerivation rec {
-          name = "lowdown-0.8.0";
+          name = "lowdown-0.8.4";
 
+          /*
           src = fetchurl {
             url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
             hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
+          */
 
-          #src = lowdown-src;
+          src = lowdown-src;
 
           outputs = [ "out" "bin" "dev" ];
 
           nativeBuildInputs = [ buildPackages.which ];
 
-          configurePhase =
-            ''
+          configurePhase = ''
+              ${if (stdenv.isDarwin && stdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
               ./configure \
                 PREFIX=${placeholder "dev"} \
                 BINDIR=${placeholder "bin"}/bin
@@ -353,7 +393,7 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
         installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
 
         # Line coverage analysis.
@@ -439,6 +479,15 @@
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
+        installTests =
+          let pkgs = nixpkgsFor.${system}; in
+          pkgs.runCommand "install-tests" {
+            againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
+            againstCurrentUnstable = testNixVersions pkgs pkgs.nix pkgs.nixUnstable;
+            # Disabled because the latest stable version doesn't handle
+            # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
+            # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
+          } "touch $out";
       });
 
       packages = forAllSystems (system: {
@@ -479,6 +528,8 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           stripAllList = ["bin"];
+
+          strictDeps = true;
         };
       } // builtins.listToAttrs (map (crossSystem: {
         name = "nix-${crossSystem}";

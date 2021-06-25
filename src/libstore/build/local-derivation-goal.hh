@@ -108,6 +108,9 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Paths that were added via recursive Nix calls. */
     StorePathSet addedPaths;
 
+    /* Realisations that were added via recursive Nix calls. */
+    std::set<DrvOutput> addedDrvOutputs;
+
     /* Recursive Nix calls are only allowed to build or realize paths
        in the original input closure or added via a recursive Nix call
        (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
@@ -116,6 +119,12 @@ struct LocalDerivationGoal : public DerivationGoal
     {
         return inputPaths.count(path) || addedPaths.count(path);
     }
+    bool isAllowed(const DrvOutput & id)
+    {
+        return addedDrvOutputs.count(id);
+    }
+
+    bool isAllowed(const DerivedPath & req);
 
     friend struct RestrictedStore;
 
@@ -160,6 +169,8 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Check that the derivation outputs all exist and register them
        as valid. */
     void registerOutputs() override;
+
+    void signRealisation(Realisation &) override;
 
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy

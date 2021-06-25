@@ -17,10 +17,6 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
-#if __linux__
-#include <sys/resource.h>
-#endif
-
 #include <nlohmann/json.hpp>
 
 extern std::string chrootHelperName;
@@ -309,13 +305,13 @@ void mainWrapped(int argc, char * * argv)
 
     if (!args.useNet) {
         // FIXME: should check for command line overrides only.
-        if (!settings.useSubstitutes.overriden)
+        if (!settings.useSubstitutes.overridden)
             settings.useSubstitutes = false;
-        if (!settings.tarballTtl.overriden)
+        if (!settings.tarballTtl.overridden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!fileTransferSettings.tries.overriden)
+        if (!fileTransferSettings.tries.overridden)
             fileTransferSettings.tries = 0;
-        if (!fileTransferSettings.connectTimeout.overriden)
+        if (!fileTransferSettings.connectTimeout.overridden)
             fileTransferSettings.connectTimeout = 1;
     }
 
@@ -335,14 +331,7 @@ int main(int argc, char * * argv)
 {
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    #if __linux__
-    rlim_t stackSize = 64 * 1024 * 1024;
-    struct rlimit limit;
-    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
-        limit.rlim_cur = stackSize;
-        setrlimit(RLIMIT_STACK, &limit);
-    }
-    #endif
+    nix::setStackSize(64 * 1024 * 1024);
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

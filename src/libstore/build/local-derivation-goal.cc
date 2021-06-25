@@ -153,6 +153,7 @@ void LocalDerivationGoal::killChild()
 void LocalDerivationGoal::tryLocalBuild() {
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
+        state = &DerivationGoal::tryToBuild;
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
@@ -287,17 +288,17 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
        So instead, check if the disk is (nearly) full now.  If
        so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
-	{
+    {
         auto & localStore = getLocalStore();
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(localStore.realStoreDir.c_str(), &st) == 0 &&
+        if (statvfs(localStore.realStoreDir.get().c_str(), &st) == 0 &&
             (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 &&
             (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
-	}
+    }
 #endif
 
     deleteTmpDir(false);
@@ -416,7 +417,7 @@ void LocalDerivationGoal::startBuilder()
     }
 
     auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.realStoreDir) {
+    if (localStore.storeDir != localStore.realStoreDir.get()) {
         #if __linux__
             useChroot = true;
         #else
@@ -581,7 +582,9 @@ void LocalDerivationGoal::startBuilder()
                 throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
                     worker.store.printStorePath(drvPath), i);
 
-            dirsInChroot[i] = i;
+            /* Allow files in __impureHostDeps to be missing; e.g.
+               macOS 11+ has no /usr/lib/libSystem*.dylib */
+            dirsInChroot[i] = {i, true};
         }
 
 #if __linux__
@@ -1190,6 +1193,26 @@ void LocalDerivationGoal::writeStructuredAttrs()
     chownToBuilder(tmpDir + "/.attrs.sh");
 }
 
+
+static StorePath pathPartOfReq(const DerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](DerivedPath::Opaque bo) {
+            return bo.path;
+        },
+        [&](DerivedPath::Built bfd)  {
+            return bfd.drvPath;
+        },
+    }, req.raw());
+}
+
+
+bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
+{
+    return this->isAllowed(pathPartOfReq(req));
+}
+
+
 struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
@@ -1310,33 +1333,52 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
     // XXX: This should probably be allowed if the realisation corresponds to
     // an allowed derivation
-    { throw Error("queryRealisation"); }
+    {
+        if (!goal.isAllowed(id))
+            throw InvalidPath("cannot query an unknown output id '%s' in recursive Nix", id.to_string());
+        return next->queryRealisation(id);
+    }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
 
         StorePathSet newPaths;
+        std::set<Realisation> newRealisations;
 
-        for (auto & path : paths) {
-            if (!goal.isAllowed(path.path))
-                throw InvalidPath("cannot build unknown path '%s' in recursive Nix", printStorePath(path.path));
+        for (auto & req : paths) {
+            if (!goal.isAllowed(req))
+                throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", req.to_string(*next));
         }
 
         next->buildPaths(paths, buildMode);
 
         for (auto & path : paths) {
-            if (!path.path.isDerivation()) continue;
-            auto outputs = next->queryDerivationOutputMap(path.path);
-            for (auto & output : outputs)
-                if (wantOutput(output.first, path.outputs))
-                    newPaths.insert(output.second);
+            auto p =  std::get_if<DerivedPath::Built>(&path);
+            if (!p) continue;
+            auto & bfd = *p;
+            auto drv = readDerivation(bfd.drvPath);
+            auto drvHashes = staticOutputHashes(*this, drv);
+            auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
+            for (auto & [outputName, outputPath] : outputs)
+                if (wantOutput(outputName, bfd.outputs)) {
+                    newPaths.insert(outputPath);
+                    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+                        auto thisRealisation = next->queryRealisation(
+                            DrvOutput{drvHashes.at(outputName), outputName}
+                        );
+                        assert(thisRealisation);
+                        newRealisations.insert(*thisRealisation);
+                    }
+                }
         }
 
         StorePathSet closure;
         next->computeFSClosure(newPaths, closure);
         for (auto & path : closure)
             goal.addDependency(path);
+        for (auto & real : Realisation::closure(*next, newRealisations))
+            goal.addedDrvOutputs.insert(real.id);
     }
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
@@ -1358,7 +1400,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override
     { unsupported("addSignatures"); }
 
-    void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override
     {
@@ -1366,12 +1408,12 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
            client about what paths will be built/substituted or are
            already present. Probably not a big deal. */
 
-        std::vector<StorePathWithOutputs> allowed;
-        for (auto & path : targets) {
-            if (goal.isAllowed(path.path))
-                allowed.emplace_back(path);
+        std::vector<DerivedPath> allowed;
+        for (auto & req : targets) {
+            if (goal.isAllowed(req))
+                allowed.emplace_back(req);
             else
-                unknown.insert(path.path);
+                unknown.insert(pathPartOfReq(req));
         }
 
         next->queryMissing(allowed, willBuild, willSubstitute,
@@ -1703,18 +1745,18 @@ void LocalDerivationGoal::runChild()
                network, so give them access to /etc/resolv.conf and so
                on. */
             if (derivationIsImpure(derivationType)) {
-                ss.push_back("/etc/resolv.conf");
-
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
                 // potential impurities introduced in fixed-outputs.
                 writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
-                ss.push_back("/etc/services");
-                ss.push_back("/etc/hosts");
-                if (pathExists("/var/run/nscd/socket"))
-                    ss.push_back("/var/run/nscd/socket");
+                /* N.B. it is realistic that these paths might not exist. It
+                   happens when testing Nix building fixed-output derivations
+                   within a pure derivation. */
+                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts", "/var/run/nscd/socket" })
+                    if (pathExists(path))
+                        ss.push_back(path);
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);
@@ -2276,10 +2318,6 @@ void LocalDerivationGoal::registerOutputs()
                 sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
                 StringSource source(*sink.s);
                 restorePath(actualPath, source);
-
-                /* FIXME: set proper permissions in restorePath() so
-                   we don't have to do another traversal. */
-                canonicalisePathMetaData(actualPath, -1, inodesSeen);
             }
         };
 
@@ -2333,32 +2371,19 @@ void LocalDerivationGoal::registerOutputs()
             }
             auto got = caSink.finish().first;
             auto refs = rewriteRefs();
-            HashModuloSink narSink { htSHA256, oldHashPart };
-            dumpPath(actualPath, narSink);
-            auto narHashAndSize = narSink.finish();
-            ValidPathInfo newInfo0 {
-                worker.store.makeFixedOutputPath(
+
+            auto finalPath = worker.store.makeFixedOutputPath(
                     outputHash.method,
                     got,
                     outputPathName(drv->name, outputName),
                     refs.second,
-                    refs.first),
-                narHashAndSize.first,
-            };
-            newInfo0.narSize = narHashAndSize.second;
-            newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
-                .hash = got,
-            };
-            newInfo0.references = refs.second;
-            if (refs.first)
-                newInfo0.references.insert(newInfo0.path);
-            if (scratchPath != newInfo0.path) {
+                    refs.first);
+            if (scratchPath != finalPath) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
                     StringSink sink;
                     dumpPath(actualPath, sink);
-                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
+                    RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
                     rsink2(*sink.s);
                     rsink2.flush();
                 });
@@ -2367,6 +2392,21 @@ void LocalDerivationGoal::registerOutputs()
                 deletePath(actualPath);
                 movePath(tmpPath, actualPath);
             }
+
+            HashResult narHashAndSize = hashPath(htSHA256, actualPath);
+            ValidPathInfo newInfo0 {
+                finalPath,
+                narHashAndSize.first,
+            };
+
+            newInfo0.narSize = narHashAndSize.second;
+            newInfo0.ca = FixedOutputHash {
+                .method = outputHash.method,
+                .hash = got,
+            };
+            newInfo0.references = refs.second;
+            if (refs.first)
+                newInfo0.references.insert(newInfo0.path);
 
             assert(newInfo0.ca);
             return newInfo0;
@@ -2428,6 +2468,10 @@ void LocalDerivationGoal::registerOutputs()
             },
         }, output.output);
 
+        /* FIXME: set proper permissions in restorePath() so
+            we don't have to do another traversal. */
+        canonicalisePathMetaData(actualPath, -1, inodesSeen);
+
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
            their usual "final destination" */
@@ -2460,6 +2504,7 @@ void LocalDerivationGoal::registerOutputs()
                 assert(newInfo.ca);
             } else {
                 auto destPath = worker.store.toRealPath(finalDestPath);
+                deletePath(destPath);
                 movePath(actualPath, destPath);
                 actualPath = destPath;
             }
@@ -2615,11 +2660,20 @@ void LocalDerivationGoal::registerOutputs()
        but it's fine to do in all cases. */
 
     if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        for (auto& [outputName, newInfo] : infos)
-            worker.store.registerDrvOutput(Realisation{
-                .id = DrvOutput{initialOutputs.at(outputName).outputHash, outputName},
-                .outPath = newInfo.path});
+        for (auto& [outputName, newInfo] : infos) {
+            auto thisRealisation = Realisation{
+                .id = DrvOutput{initialOutputs.at(outputName).outputHash,
+                                outputName},
+                .outPath = newInfo.path};
+            signRealisation(thisRealisation);
+            worker.store.registerDrvOutput(thisRealisation);
+        }
     }
+}
+
+void LocalDerivationGoal::signRealisation(Realisation & realisation)
+{
+    getLocalStore().signRealisation(realisation);
 }
 
 

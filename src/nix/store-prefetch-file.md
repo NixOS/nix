@@ -27,6 +27,6 @@ the resulting store path and the cryptographic hash of the contents of
 the file.
 
 The name component of the store path defaults to the last component of
-*url*, but this can be overriden using `--name`.
+*url*, but this can be overridden using `--name`.
 
 )""

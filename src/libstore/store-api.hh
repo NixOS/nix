@@ -2,6 +2,7 @@
 
 #include "realisation.hh"
 #include "path.hh"
+#include "derived-path.hh"
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"
@@ -179,6 +180,8 @@ struct StoreConfig : public Config
 
     StoreConfig() = delete;
 
+    StringSet getDefaultSystemFeatures();
+
     virtual ~StoreConfig() { }
 
     virtual const std::string name() = 0;
@@ -195,7 +198,7 @@ struct StoreConfig : public Config
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
-    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
 
@@ -261,11 +264,6 @@ public:
 
     PathSet printStorePathSet(const StorePathSet & path) const;
 
-    /* Split a string specifying a derivation and a set of outputs
-       (/nix/store/hash-foo!out1,out2,...) into the derivation path
-       and the outputs. */
-    StorePathWithOutputs parsePathWithOutputs(const string & s);
-
     /* Display a set of paths in human-readable form (i.e., between quotes
        and separated by commas). */
     std::string showPaths(const StorePathSet & paths);
@@ -288,8 +286,6 @@ public:
     /* Same as followLinksToStore(), but apply toStorePath() to the
        result. */
     StorePath followLinksToStorePath(std::string_view path) const;
-
-    StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
     StorePath makeStorePath(std::string_view type,
@@ -384,7 +380,12 @@ public:
        we don't really want to add the dependencies listed in a nar info we
        don't trust anyyways.
        */
-    virtual bool pathInfoIsTrusted(const ValidPathInfo &)
+    virtual bool pathInfoIsUntrusted(const ValidPathInfo &)
+    {
+        return true;
+    }
+
+    virtual bool realisationIsUntrusted(const Realisation & )
     {
         return true;
     }
@@ -480,6 +481,8 @@ public:
      */
     virtual void registerDrvOutput(const Realisation & output)
     { unsupported("registerDrvOutput"); }
+    virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
+    { return registerDrvOutput(output); }
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const StorePath & path, Sink & sink) = 0;
@@ -493,7 +496,7 @@ public:
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
     virtual void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
+        const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
@@ -655,7 +658,7 @@ public:
     /* Given a set of paths that are to be built, return the set of
        derivations that will be built, and the set of output paths
        that will be substituted. */
-    virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    virtual void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize);
 
@@ -862,5 +865,10 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath);
 
 }

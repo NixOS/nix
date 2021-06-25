@@ -78,6 +78,8 @@ void Goal::amDone(ExitCode result, std::optional<Error> ex)
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());
+
+    cleanup();
 }
 
 

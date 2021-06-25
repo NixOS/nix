@@ -1,5 +1,6 @@
 #include "serialise.hh"
 #include "util.hh"
+#include "path-with-outputs.hh"
 #include "remote-fs-accessor.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
@@ -50,6 +51,19 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
     out << renderContentAddress(ca);
 }
 
+
+DerivedPath read(const Store & store, Source & from, Phantom<DerivedPath> _)
+{
+    auto s = readString(from);
+    return DerivedPath::parse(store, s);
+}
+
+void write(const Store & store, Sink & out, const DerivedPath & req)
+{
+    out << req.to_string(store);
+}
+
+
 Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
 {
     std::string rawInput = readString(from);
@@ -58,13 +72,23 @@ Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
         "remote-protocol"
     );
 }
+
 void write(const Store & store, Sink & out, const Realisation & realisation)
-{ out << realisation.toJSON().dump(); }
+{
+    out << realisation.toJSON().dump();
+}
+
 
 DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
-{ return DrvOutput::parse(readString(from)); }
+{
+    return DrvOutput::parse(readString(from));
+}
+
 void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
-{ out << drvOutput.to_string(); }
+{
+    out << drvOutput.to_string();
+}
+
 
 std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
 {
@@ -629,8 +653,12 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << wopRegisterDrvOutput;
-    conn->to << info.id.to_string();
-    conn->to << std::string(info.outPath.to_string());
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+        conn->to << info.id.to_string();
+        conn->to << std::string(info.outPath.to_string());
+    } else {
+        worker_proto::write(*this, conn->to, info);
+    }
     conn.processStderr();
 }
 
@@ -640,22 +668,49 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
     conn->to << wopQueryRealisation;
     conn->to << id.to_string();
     conn.processStderr();
-    auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
-    if (outPaths.empty())
-        return std::nullopt;
-    return {Realisation{.id = id, .outPath = *outPaths.begin()}};
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+        auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
+        if (outPaths.empty())
+            return std::nullopt;
+        return {Realisation{.id = id, .outPath = *outPaths.begin()}};
+    } else {
+        auto realisations = worker_proto::read(*this, conn->from, Phantom<std::set<Realisation>>{});
+        if (realisations.empty())
+            return std::nullopt;
+        return *realisations.begin();
+    }
 }
 
+static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
+{
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 30) {
+        worker_proto::write(store, conn->to, reqs);
+    } else {
+        Strings ss;
+        for (auto & p : reqs) {
+            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
+            std::visit(overloaded {
+                [&](StorePathWithOutputs s) {
+                    ss.push_back(s.to_string(store));
+                },
+                [&](StorePath drvPath) {
+                    throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
+                        store.printStorePath(drvPath),
+                        GET_PROTOCOL_MAJOR(conn->daemonVersion),
+                        GET_PROTOCOL_MINOR(conn->daemonVersion));
+                },
+            }, sOrDrvPath);
+        }
+        conn->to << ss;
+    }
+}
 
-void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode)
 {
     auto conn(getConnection());
     conn->to << wopBuildPaths;
     assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
-    Strings ss;
-    for (auto & p : drvPaths)
-        ss.push_back(p.to_string(*this));
-    conn->to << ss;
+    writeDerivedPaths(*this, conn, drvPaths);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
@@ -677,10 +732,12 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     conn->to << buildMode;
     conn.processStderr();
     BuildResult res;
-    unsigned int status;
-    conn->from >> status >> res.errorMsg;
-    res.status = (BuildResult::Status) status;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0xc) {
+    res.status = (BuildResult::Status) readInt(conn->from);
+    conn->from >> res.errorMsg;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
+        conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
+    }
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
         auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
         res.builtOutputs = builtOutputs;
     }
@@ -792,7 +849,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 }
 
 
-void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets,
+void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
     StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
     uint64_t & downloadSize, uint64_t & narSize)
 {
@@ -803,10 +860,7 @@ void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets
             // to prevent a deadlock.
             goto fallback;
         conn->to << wopQueryMissing;
-        Strings ss;
-        for (auto & p : targets)
-            ss.push_back(p.to_string(*this));
-        conn->to << ss;
+        writeDerivedPaths(*this, conn, targets);
         conn.processStderr();
         willBuild = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
         willSubstitute = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});

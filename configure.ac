@@ -1,4 +1,4 @@
-AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX"]))
+AC_INIT([nix],[m4_esyscmd(bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX")])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
@@ -9,8 +9,7 @@ AC_PROG_SED
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
 
-AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
-  [Platform identifier (e.g., `i686-linux').]),
+AC_ARG_WITH(system, AS_HELP_STRING([--with-system=SYSTEM],[Platform identifier (e.g., `i686-linux').]),
   [system=$withval],
   [case "$host_cpu" in
      i*86)
@@ -66,7 +65,7 @@ AC_SYS_LARGEFILE
 AC_STRUCT_DIRENT_D_TYPE
 if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
-    LIBS="-lsocket -lnsl $LIBS"
+    LDFLAGS="-lsocket -lnsl $LDFLAGS"
 fi
 
 
@@ -127,8 +126,7 @@ NEED_PROG(jq, jq)
 AC_SUBST(coreutils, [$(dirname $(type -p cat))])
 
 
-AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
-  [path of the Nix store (defaults to /nix/store)]),
+AC_ARG_WITH(store-dir, AS_HELP_STRING([--with-store-dir=PATH],[path of the Nix store (defaults to /nix/store)]),
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
@@ -152,13 +150,12 @@ int main() {
 }]])], GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=no, GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=yes)
 AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC)
 if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
-    LDFLAGS="$LDFLAGS -latomic"
+    LDFLAGS="-latomic $LDFLAGS"
 fi
 
 PKG_PROG_PKG_CONFIG
 
-AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
-  [Build shared libraries for Nix [default=yes]]),
+AC_ARG_ENABLE(shared, AS_HELP_STRING([--enable-shared],[Build shared libraries for Nix [default=yes]]),
   shared=$enableval, shared=yes)
 if test "$shared" = yes; then
   AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
@@ -172,11 +169,6 @@ fi
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Look for libbz2, a required dependency.
-AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
-AC_CHECK_HEADERS([bzlib.h], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
@@ -205,16 +197,6 @@ PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLA
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
-# Look for liblzma, a required dependency.
-PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
-AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
-  [AC_DEFINE([HAVE_LZMA_MT], [1], [xz multithreaded compression support])])
-
-# Look for zlib, a required dependency.
-PKG_CHECK_MODULES([ZLIB], [zlib], [CXXFLAGS="$ZLIB_CFLAGS $CXXFLAGS"])
-AC_CHECK_HEADER([zlib.h],[:],[AC_MSG_ERROR([could not find the zlib.h header])])
-LDFLAGS="-lz $LDFLAGS"
-
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
@@ -230,9 +212,8 @@ AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then
   AC_ARG_ENABLE([seccomp-sandboxing],
-                AC_HELP_STRING([--disable-seccomp-sandboxing],
-                               [Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)]
-                              ))
+                AS_HELP_STRING([--disable-seccomp-sandboxing],[Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)
+                              ]))
   if test "x$enable_seccomp_sandboxing" != "xno"; then
     PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
                       [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
@@ -250,8 +231,8 @@ AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([aws/s3/S3Client.h],
-  [AC_DEFINE([ENABLE_S3], [1], [Whether to enable S3 support via aws-sdk-cpp.])
-  enable_s3=1], [enable_s3=])
+  [AC_DEFINE([ENABLE_S3], [1], [Whether to enable S3 support via aws-sdk-cpp.]) enable_s3=1],
+  [AC_DEFINE([ENABLE_S3], [0], [Whether to enable S3 support via aws-sdk-cpp.]) enable_s3=])
 AC_SUBST(ENABLE_S3, [$enable_s3])
 AC_LANG_POP(C++)
 
@@ -264,8 +245,7 @@ fi
 
 
 # Whether to use the Boehm garbage collector.
-AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
-  [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=yes]]),
+AC_ARG_ENABLE(gc, AS_HELP_STRING([--enable-gc],[enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=yes]]),
   gc=$enableval, gc=yes)
 if test "$gc" = yes; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
@@ -279,8 +259,7 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 
 # documentation generation switch
-AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
-  [disable documentation generation]),
+AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
@@ -300,19 +279,7 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
-# Do we have GNU tar?
-AC_MSG_CHECKING([if you have a recent GNU tar])
-if $tar --version 2> /dev/null | grep -q GNU && tar cvf /dev/null --warning=no-timestamp ./config.log > /dev/null; then
-    AC_MSG_RESULT(yes)
-    tarFlags="--warning=no-timestamp"
-else
-    AC_MSG_RESULT(no)
-fi
-AC_SUBST(tarFlags)
-
-
-AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
-  [path of a statically-linked shell to use as /bin/sh in sandboxes]),
+AC_ARG_WITH(sandbox-shell, AS_HELP_STRING([--with-sandbox-shell=PATH],[path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
 
@@ -327,6 +294,6 @@ done
 
 rm -f Makefile.config
 
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([])
 AC_OUTPUT

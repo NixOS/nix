@@ -9,7 +9,7 @@ scope. Instead, you can access them through the `builtins` built-in
 value, which is a set that contains all built-in functions and values.
 For instance, `derivation` is also available as `builtins.derivation`.
 
-  - `derivation` *attrs*; `builtins.derivation` *attrs*  
+  - `derivation` *attrs*; `builtins.derivation` *attrs*\
 
     `derivation` is described in [its own section](derivations.md).
 
