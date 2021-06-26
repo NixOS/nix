@@ -404,7 +404,7 @@
         # tarball for the user's system and calls the second half of the
         # installation script.
         installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
-        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
+        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
 
         # Line coverage analysis.
         coverage =
