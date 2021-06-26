@@ -378,7 +378,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
           of new entries without a reboot:
         </para>
 
-        <screen>alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B</screen>
+        <screen>alice$ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t</screen>
       </listitem>
 
       <listitem>
