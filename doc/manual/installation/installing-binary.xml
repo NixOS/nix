@@ -242,7 +242,7 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
       <!-- TODO: Yes, but how?! -->
 
-      It would also possible (and often requested) to just apply this
+      It would also be possible (and often requested) to just apply this
       change ecosystem-wide, but it's an intrusive process that has
       side effects we want to avoid for now.
       <!-- magnificent hand-wavy gesture -->
