@@ -31,6 +31,10 @@
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
 #include <boost/context/stack_context.hpp>
 
+#else
+
+template<class T> using traceable_allocator = std::allocator<T>;
+
 #endif
 
 namespace nix {
@@ -821,6 +825,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
 Value * EvalState::allocValue()
 {
+#if HAVE_BOEHMGC
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
@@ -835,7 +840,9 @@ Value * EvalState::allocValue()
     void * p = valueAllocCache;
     GC_PTR_STORE_AND_DIRTY(&valueAllocCache, GC_NEXT(p));
     GC_NEXT(p) = nullptr;
-
+#else
+    void *p = allocBytes(sizeof(Value));
+#endif
     nrValues++;
     auto v = (Value *) p;
     return v;
