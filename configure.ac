@@ -205,9 +205,11 @@ PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTL
 
 # Look for libcpuid.
 if test "$machine_name" = "x86_64"; then
-  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"])
-  have_libcpuid=1
-  AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [
+    CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"
+    have_libcpuid=1
+    AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+  ], [have_libcpuid=0])
 fi
 AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 
