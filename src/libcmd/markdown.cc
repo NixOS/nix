@@ -1,3 +1,5 @@
+#if HAVE_LOWDOWN
+
 #include "markdown.hh"
 #include "util.hh"
 #include "finally.hh"
@@ -48,3 +50,5 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
 }
 
 }
+
+#endif

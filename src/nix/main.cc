@@ -203,7 +203,11 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
     auto markdown = state.forceString(*attr->value);
 
     RunPager pager;
+#if HAVE_LOWDOWN
     std::cout << renderMarkdownToTerminal(markdown) << "\n";
+#else
+    std::cout << markdown << "\n";
+#endif
 }
 
 struct CmdHelp : Command
