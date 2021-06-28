@@ -387,7 +387,7 @@
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
         # the installation script.
-        binaryTarball = nixpkgs.lib.genAttrs systems (system: binaryTarball nixpkgsFor.${system});
+        binaryTarball = nixpkgs.lib.genAttrs systems (system: binaryTarball nixpkgsFor.${system} nixpkgsFor.${system}.nix nixpkgsFor.${system});
 
         binaryTarballCross = nixpkgs.lib.genAttrs systems (system: builtins.listToAttrs (map (crossSystem: {
           name = crossSystem;
@@ -498,7 +498,10 @@
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out";
-      });
+      } // (if system == "x86_64-linux" then (builtins.listToAttrs (map (crossSystem: {
+        name = "binaryTarball-${crossSystem}";
+        value = self.hydraJobs.binaryTarballCross.${system}.${crossSystem};
+      }) crossSystems)) else {}));
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
