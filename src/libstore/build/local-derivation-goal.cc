@@ -726,7 +726,7 @@ void LocalDerivationGoal::startBuilder()
     Path logFile = openLogFile();
 
     /* Create a pipe to get the output of the builder. */
-    //builderOut.create();
+    builderOut.create();
 
     builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
     if (!builderOut.readSide)
