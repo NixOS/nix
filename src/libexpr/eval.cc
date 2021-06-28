@@ -31,6 +31,10 @@
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
 #include <boost/context/stack_context.hpp>
 
+#else
+
+template<class T> using traceable_allocator = std::allocator<T>;
+
 #endif
 
 namespace nix {
