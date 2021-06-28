@@ -8,7 +8,7 @@ libcmd_SOURCES := $(wildcard $(d)/*.cc)
 
 libcmd_CXXFLAGS += -I src/libutil -I src/libstore -I src/libexpr -I src/libmain -I src/libfetchers
 
-libcmd_LDFLAGS = -llowdown
+libcmd_LDFLAGS = $(LOWDOWN_LIBS)
 
 libcmd_LIBS = libstore libutil libexpr libmain libfetchers
 
