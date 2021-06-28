@@ -39,6 +39,7 @@ nix_tests = \
   search.sh \
   nix-copy-ssh.sh \
   post-hook.sh \
+  ca/post-hook.sh \
   function-trace.sh \
   recursive.sh \
   describe-stores.sh \
