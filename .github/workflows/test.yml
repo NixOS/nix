@@ -20,8 +20,7 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    #- run: nix flake check
-    - run: nix-build -A checks.$(if [[ `uname` = Linux ]]; then echo x86_64-linux; else echo x86_64-darwin; fi)
+    - run: nix-build -A checks.$(nix-instantiate --eval -E '(builtins.currentSystem)')
   check_cachix:
     name: Cachix secret present for installer tests
     runs-on: ubuntu-latest
