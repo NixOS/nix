@@ -2481,6 +2481,7 @@ void LocalDerivationGoal::registerOutputs()
            floating CA derivations and hash-mismatching fixed-output
            derivations. */
         PathLocks dynamicOutputLock;
+        dynamicOutputLock.setDeletion(true);
         auto optFixedPath = output.path(worker.store, drv->name, outputName);
         if (!optFixedPath ||
             worker.store.printStorePath(*optFixedPath) != finalDestPath)
