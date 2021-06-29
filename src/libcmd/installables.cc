@@ -12,6 +12,7 @@
 #include "eval-cache.hh"
 #include "url.hh"
 #include "registry.hh"
+#include "remote-store.hh"
 
 #include <regex>
 #include <queue>
@@ -378,6 +379,7 @@ DerivedPaths InstallableValue::toDerivedPaths()
     DerivedPaths res;
 
     std::map<StorePath, std::set<std::string>> drvsToOutputs;
+    RealisedPath::Set drvsToCopy;
 
     // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
@@ -385,10 +387,37 @@ DerivedPaths InstallableValue::toDerivedPaths()
         if (outputName == "")
             throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(drv.drvPath));
         drvsToOutputs[drv.drvPath].insert(outputName);
+        drvsToCopy.insert(drv.drvPath);
     }
 
     for (auto & i : drvsToOutputs)
         res.push_back(DerivedPath::Built { i.first, i.second });
+
+    // FIXME: Temporary hack
+    if (state->store != state->buildStore) {
+        RealisedPath::Set closure;
+        RealisedPath::closure(*state->store, drvsToCopy, closure);
+
+        if (dynamic_cast<RemoteStore *>(&*state->buildStore)) {
+            StorePathSet closure2;
+            for (auto & p : closure)
+                closure2.insert(p.path());
+
+            auto valid = state->buildStore->queryValidPaths(closure2);
+            StorePathSet missing;
+            for (auto & p : closure2)
+                if (!valid.count(p)) missing.insert(p);
+
+            if (!missing.empty()) {
+                auto source = sinkToSource([&](Sink & sink) {
+                    state->store->exportPaths(missing, sink);
+                });
+                state->buildStore->importPaths(*source, NoCheckSigs);
+            }
+
+        } else
+            copyPaths(state->store, state->buildStore, closure);
+    }
 
     return res;
 }

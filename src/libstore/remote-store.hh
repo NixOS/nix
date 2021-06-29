@@ -112,6 +112,8 @@ public:
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
 
+    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs) override;
+
     void connect() override;
 
     unsigned int getProtocol() override;

@@ -55,6 +55,7 @@ typedef enum {
     wopQueryDerivationOutputMap = 41,
     wopRegisterDrvOutput = 42,
     wopQueryRealisation = 43,
+    wopImportPaths2 = 44, // hack
 } WorkerOp;
 
 

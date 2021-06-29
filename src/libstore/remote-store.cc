@@ -875,6 +875,16 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 }
 
 
+StorePaths RemoteStore::importPaths(Source & source, CheckSigsFlag checkSigs)
+{
+    auto conn(getConnection());
+    conn->to << wopImportPaths2;
+    source.drainInto(conn->to);
+    conn.processStderr();
+    return worker_proto::read(*this, conn->from, Phantom<StorePaths> {});
+}
+
+
 void RemoteStore::connect()
 {
     auto conn(getConnection());

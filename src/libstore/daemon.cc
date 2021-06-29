@@ -505,6 +505,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopImportPaths2: {
+        logger->startWork();
+        auto paths = store->importPaths(from,
+            trusted ? NoCheckSigs : CheckSigs);
+        logger->stopWork();
+        Strings paths2;
+        for (auto & i : paths) paths2.push_back(store->printStorePath(i));
+        to << paths2;
+        break;
+    }
+
     case wopBuildPaths: {
         auto drvs = readDerivedPaths(*store, clientVersion, from);
         BuildMode mode = bmNormal;
