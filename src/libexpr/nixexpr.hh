@@ -79,6 +79,7 @@ struct Expr
 {
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
+    virtual void showAsJson(std::ostream & str) const;
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
@@ -89,6 +90,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
+    void showAsJson(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
     void bindVars(const StaticEnv & env);
 
@@ -290,6 +292,27 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
+
+
+// define NodeTypeId::ExprLambda etc.
+// similar: value.hh: typedef enum { ... } InternalType;
+enum class NodeTypeId {
+    NotUsed = 0, // make IDs one-based -> sync with line numbers in *.def file
+    // https://stackoverflow.com/a/320888/10440128
+#   define ADD_TYPE(t) t,
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
+    NodeTypeCount
+};
+
+// define NodeTypeName::ExprLambda etc.
+struct NodeTypeName {
+#   define ADD_TYPE(t) static std::string t;
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
+    // values are defined in nixexpr.cc
+};
+
 #define MakeBinOp(name, s) \
     struct name : Expr \
     { \
@@ -300,6 +323,17 @@ struct ExprOpNot : Expr
         void show(std::ostream & str) const \
         { \
             str << "(" << *e1 << " " s " " << *e2 << ")";   \
+        } \
+        void showAsJson(std::ostream & str) const \
+        { \
+            str << "{\"type\":\"" << NodeTypeName::name << "\"";   \
+            if (pos.line > 0) {   \
+                str << ",\"line\":" << pos.line;   \
+                str << ",\"column\":" << pos.column;   \
+            }   \
+            str << ",\"op1\":"; e1->showAsJson(str);   \
+            str << ",\"op2\":"; e2->showAsJson(str);   \
+            str << "}";   \
         } \
         void bindVars(const StaticEnv & env) \
         { \
@@ -347,5 +381,6 @@ struct StaticEnv
     StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
 };
 
+void AttrPath_showAsJson(std::ostream & out, const AttrPath & attrPath);
 
 }

@@ -7,6 +7,10 @@
 
 namespace nix {
 
+// define NodeTypeName::ExprLambda etc.
+#   define ADD_TYPE(t) std::string NodeTypeName::t = #t;
+#   include "nixexpr-node-types.def"
+#   undef ADD_TYPE
 
 /* Displaying abstract syntax trees. */
 
@@ -58,6 +62,9 @@ std::ostream & operator << (std::ostream & str, const Symbol & sym)
     return str;
 }
 
+
+// default output format ("aterm")
+
 void Expr::show(std::ostream & str) const
 {
     abort();
@@ -104,7 +111,7 @@ void ExprAttrs::show(std::ostream & str) const
     if (recursive) str << "rec ";
     str << "{ ";
     for (auto & i : attrs)
-        if (i.second.inherited)
+        if (i.second.inherited) // NOTE inherited is always false. { inherit (scope) attr; } -> { attr = scope.attr; }
             str << "inherit " << i.first << " " << "; ";
         else
             str << i.first << " = " << *i.second.e << "; ";

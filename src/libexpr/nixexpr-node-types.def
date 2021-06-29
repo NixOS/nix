@@ -1,0 +1,38 @@
+ADD_TYPE(ExprLambda) // aka Function
+ADD_TYPE(ExprSet) // complex values ...
+ADD_TYPE(ExprList)
+ADD_TYPE(ExprAttrs) // NOTE inherited is always false. { inherit (scope) attr; } -> { attr = scope.attr; }
+ADD_TYPE(ExprString) // scalar values ...
+ADD_TYPE(ExprInt)
+ADD_TYPE(ExprFloat)
+ADD_TYPE(ExprPath)
+ADD_TYPE(ExprBoolean)
+ADD_TYPE(ExprNull)
+ADD_TYPE(ExprLet)
+ADD_TYPE(ExprWith)
+ADD_TYPE(ExprIf)
+ADD_TYPE(ExprAssert)
+ADD_TYPE(ExprVar)
+ADD_TYPE(ExprSelect) // operators ...
+ADD_TYPE(ExprApp)
+ADD_TYPE(ExprOpNeg) // not used -> __sub 0 e
+ADD_TYPE(ExprOpHasAttr)
+ADD_TYPE(ExprOpConcatLists)
+ADD_TYPE(ExprOpMul) // not used -> __mul e1 e2
+ADD_TYPE(ExprOpDiv) // not used -> __div e1 e2
+ADD_TYPE(ExprConcatStrings) // or ExprOpAdd [ambiguous]
+ADD_TYPE(ExprOpAdd) // not used -> ExprConcatStrings e1 e2 [ambiguous]
+ADD_TYPE(ExprOpSub) // not used -> __sub e1 e2
+ADD_TYPE(ExprOpNot)
+ADD_TYPE(ExprOpUpdate)
+ADD_TYPE(ExprOpLt) // not used
+ADD_TYPE(ExprOpLte) // not used
+ADD_TYPE(ExprOpGt) // not used
+ADD_TYPE(ExprOpGte) // not used
+ADD_TYPE(ExprOpEq)
+ADD_TYPE(ExprOpNEq)
+ADD_TYPE(ExprOpAnd)
+ADD_TYPE(ExprOpOr)
+ADD_TYPE(ExprOpImpl)
+ADD_TYPE(ExprPos) // TODO what is Pos?
+ADD_TYPE(Comment) // not used
