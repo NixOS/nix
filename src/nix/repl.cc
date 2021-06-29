@@ -168,6 +168,33 @@ static int listPossibleCallback(char *s, char ***avp) {
   return ac;
 }
 
+#ifdef READLINE
+static char * completionEntry(const char * text, int state) {
+  rl_completion_suppress_append = 1;
+
+  static char** completions = nullptr;
+  static int index, count;
+
+  if (!state) {
+    if (completions) {
+      free(completions);
+      completions = nullptr;
+    }
+    count = listPossibleCallback((char*)text, &completions);
+    index = 0;
+    return completionEntry(text, 1);
+  } else {
+    return index < count ? completions[index++] : NULL;
+  }
+}
+
+static char ** completionAttempted(const char * text, int start, int end) {
+  rl_attempted_completion_over = 1;
+
+  return rl_completion_matches(text, completionEntry);
+}
+#endif
+
 namespace {
     // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
     volatile sig_atomic_t g_signal_received = 0;
@@ -175,6 +202,21 @@ namespace {
     void sigintHandler(int signo) {
         g_signal_received = signo;
     }
+
+#ifdef READLINE
+    int signalEventHook() {
+        if (g_signal_received) {
+            rl_replace_line("", 1);
+            rl_crlf();
+            rl_crlf();
+            rl_reset_line_state();
+            rl_redisplay();
+            history_set_pos(history_length);
+            g_signal_received = 0;
+        }
+        return 0;
+    }
+#endif
 }
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
@@ -193,12 +235,19 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     createDirs(dirOf(historyFile));
 #ifndef READLINE
     el_hist_size = 1000;
+#else
+    stifle_history(1000);
 #endif
     read_history(historyFile.c_str());
     curRepl = this;
 #ifndef READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
+#else
+    rl_signal_event_hook = signalEventHook;
+    rl_completion_entry_function = completionEntry;
+    rl_attempted_completion_function = completionAttempted;
+    rl_completion_query_items = -1;
 #endif
 
     std::string input;
@@ -227,6 +276,11 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 
         // We handled the current input fully, so we should clear it
         // and read brand new input.
+#ifdef READLINE
+        if (input != "") {
+            add_history(input.c_str());
+        }
+#endif
         input.clear();
         std::cout << std::endl;
     }
@@ -263,16 +317,21 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     Finally doFree([&]() { free(s); });
     restoreSignals();
 
+#ifndef READLINE
+    // readline doesn't return when encountering SIGINT, but editline does
     if (g_signal_received) {
         g_signal_received = 0;
         input.clear();
         return true;
     }
+#endif
 
     if (!s)
       return false;
+    if (!input.empty()) {
+        input += '\n';
+    }
     input += s;
-    input += '\n';
     return true;
 }
 
