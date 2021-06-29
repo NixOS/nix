@@ -443,13 +443,17 @@ struct CmdDevelop : Common, MixEnvironment
         try {
             auto state = getEvalState();
 
+            auto nixpkgsLockFlags = lockFlags;
+            nixpkgsLockFlags.inputOverrides = {};
+            nixpkgsLockFlags.inputUpdates = {};
+
             auto bashInstallable = std::make_shared<InstallableFlake>(
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
-                lockFlags);
+                nixpkgsLockFlags);
 
             shell = state->store->printStorePath(
                 toStorePath(state->store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
