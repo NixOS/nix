@@ -54,6 +54,38 @@ void StoreCommand::run()
     run(getStore());
 }
 
+EvalCommand::EvalCommand()
+{
+    // FIXME: move to MixEvalArgs?
+    addFlag({
+        .longName = "eval-store",
+        .description = "The Nix store to use for evaluations.",
+        .labels = {"store-url"},
+        //.category = ...,
+        .handler = {&evalStoreUrl},
+    });
+}
+
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
+}
+
+ref<Store> EvalCommand::getEvalStore()
+{
+    if (!evalStore)
+        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
+    return ref<Store>(evalStore);
+}
+
+ref<EvalState> EvalCommand::getEvalState()
+{
+    if (!evalState)
+        evalState = std::make_shared<EvalState>(searchPath, getEvalStore(), getStore());
+    return ref<EvalState>(evalState);
+}
+
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     : recursive(recursive)
 {

@@ -289,19 +289,6 @@ void completeFlakeRefWithFragment(
     completeFlakeRef(evalState->store, prefix);
 }
 
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getStore());
-    return ref<EvalState>(evalState);
-}
-
-EvalCommand::~EvalCommand()
-{
-    if (evalState)
-        evalState->printStats();
-}
-
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
     if (prefix == "")
