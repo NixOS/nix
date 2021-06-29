@@ -188,7 +188,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
     }
 
     if (result.size() != 1)
-        throw Error("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
+        throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
     updateProfile(result[0]);
 }

@@ -908,7 +908,7 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
         // computation.
         if (mustBeTrivial &&
             !(dynamic_cast<ExprAttrs *>(e)))
-            throw Error("file '%s' must be an attribute set", path);
+            throw EvalError("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
         addErrorTrace(e, "while evaluating the file '%1%':", path2);
