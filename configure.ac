@@ -231,7 +231,7 @@ AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([aws/s3/S3Client.h],
-  [AC_DEFINE([ENABLE_S3], [1], [Whether to enable S3 support via aws-sdk-cpp.]) enable_s3=1], 
+  [AC_DEFINE([ENABLE_S3], [1], [Whether to enable S3 support via aws-sdk-cpp.]) enable_s3=1],
   [AC_DEFINE([ENABLE_S3], [0], [Whether to enable S3 support via aws-sdk-cpp.]) enable_s3=])
 AC_SUBST(ENABLE_S3, [$enable_s3])
 AC_LANG_POP(C++)
