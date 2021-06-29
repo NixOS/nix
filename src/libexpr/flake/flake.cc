@@ -359,7 +359,12 @@ LockedFlake lockFlake(
                        ancestors? */
                     auto i = overrides.find(inputPath);
                     bool hasOverride = i != overrides.end();
-                    if (hasOverride) overridesUsed.insert(inputPath);
+                    if (hasOverride) {
+                        overridesUsed.insert(inputPath);
+                        // Respect the “flakeness” of the input even if we
+                        // override it
+                        i->second.isFlake = input2.isFlake;
+                    }
                     auto & input = hasOverride ? i->second : input2;
 
                     /* Resolve 'follows' later (since it may refer to an input
