@@ -202,9 +202,11 @@ PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTL
 
 # Look for libcpuid.
 if test "$machine_name" = "x86_64"; then
-  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"])
-  have_libcpuid=1
-  AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [
+    CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"
+    have_libcpuid=1
+    AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+  ], [have_libcpuid=0])
 fi
 AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 
@@ -262,6 +264,16 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
+
+# Look for lowdown
+PKG_CHECK_MODULES([LOWDOWN], [lowdown], [
+  CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"
+  AC_DEFINE([HAVE_LOWDOWN], [1], [Use lowdown]
+  have_lowdown=1)
+], [
+  have_lowdown=0
+  doc_generate=no
+])
 
 
 # Setuid installations.

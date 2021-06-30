@@ -521,6 +521,7 @@ bool NixRepl::processLine(string line)
         return false;
 
     else if (command == ":doc") {
+#if HAVE_LOWDOWN
         Value v;
         evalString(arg, v);
         if (auto doc = state->getDoc(v)) {
@@ -541,6 +542,9 @@ bool NixRepl::processLine(string line)
             std::cout << renderMarkdownToTerminal(markdown);
         } else
             throw Error("value does not have documentation");
+#else
+        throw Error("nix was compiled without markdown support");
+#endif
     }
 
     else if (command != "")
