@@ -10,6 +10,45 @@
 using namespace nix;
 using namespace nix::flake;
 
+
+class RegistryCommand: virtual Args
+{
+    std::string registry_path;
+
+    std::shared_ptr<fetchers::Registry> registry;
+
+
+public:
+
+    RegistryCommand()
+    {
+        addFlag({
+            .longName = "registry",
+            .description = "The registry to operate on.",
+            .labels = {"registry"},
+            .handler = {&registry_path},
+        });
+    }
+
+    std::shared_ptr<fetchers::Registry> getRegistry() {
+        if (registry) return registry;
+        if (registry_path.empty()) {
+            registry = fetchers::getUserRegistry();
+        } else {
+            registry = fetchers::getCustomRegistry(registry_path);
+        }
+        return registry;
+    }
+
+    Path getRegistryPath() {
+        if (registry_path.empty()) {
+            return fetchers::getUserRegistryPath();
+        } else {
+            return registry_path;
+        }
+    }
+};
+
 struct CmdRegistryList : StoreCommand
 {
     std::string description() override
@@ -45,7 +84,7 @@ struct CmdRegistryList : StoreCommand
     }
 };
 
-struct CmdRegistryAdd : MixEvalArgs, Command
+struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
 {
     std::string fromUrl, toUrl;
 
@@ -71,16 +110,16 @@ struct CmdRegistryAdd : MixEvalArgs, Command
     {
         auto fromRef = parseFlakeRef(fromUrl);
         auto toRef = parseFlakeRef(toUrl);
+        auto registry = getRegistry();
         fetchers::Attrs extraAttrs;
         if (toRef.subdir != "") extraAttrs["dir"] = toRef.subdir;
-        auto userRegistry = fetchers::getUserRegistry();
-        userRegistry->remove(fromRef.input);
-        userRegistry->add(fromRef.input, toRef.input, extraAttrs);
-        userRegistry->write(fetchers::getUserRegistryPath());
+        registry->remove(fromRef.input);
+        registry->add(fromRef.input, toRef.input, extraAttrs);
+        registry->write(getRegistryPath());
     }
 };
 
-struct CmdRegistryRemove : virtual Args, MixEvalArgs, Command
+struct CmdRegistryRemove : RegistryCommand, Command
 {
     std::string url;
 
@@ -103,13 +142,13 @@ struct CmdRegistryRemove : virtual Args, MixEvalArgs, Command
 
     void run() override
     {
-        auto userRegistry = fetchers::getUserRegistry();
-        userRegistry->remove(parseFlakeRef(url).input);
-        userRegistry->write(fetchers::getUserRegistryPath());
+        auto registry = getRegistry();
+        registry->remove(parseFlakeRef(url).input);
+        registry->write(getRegistryPath());
     }
 };
 
-struct CmdRegistryPin : virtual Args, EvalCommand
+struct CmdRegistryPin : RegistryCommand, EvalCommand
 {
     std::string url;
 
@@ -132,14 +171,14 @@ struct CmdRegistryPin : virtual Args, EvalCommand
 
     void run(nix::ref<nix::Store> store) override
     {
+        auto registry = getRegistry();
         auto ref = parseFlakeRef(url);
-        auto userRegistry = fetchers::getUserRegistry();
-        userRegistry->remove(ref.input);
+        registry->remove(ref.input);
         auto [tree, resolved] = ref.resolve(store).input.fetch(store);
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
-        userRegistry->add(ref.input, resolved, extraAttrs);
-        userRegistry->write(fetchers::getUserRegistryPath());
+        registry->add(ref.input, resolved, extraAttrs);
+        registry->write(getRegistryPath());
     }
 };
 
