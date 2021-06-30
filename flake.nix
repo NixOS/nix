@@ -385,7 +385,7 @@
         buildStatic = nixpkgs.lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
         buildCross = nixpkgs.lib.genAttrs crossSystems (crossSystem:
-          nixpkgs.lib.genAttrs linux64BitSystems (system: self.packages.${system}."nix-${crossSystem}"));
+          nixpkgs.lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
@@ -395,7 +395,7 @@
         # the installation script.
         binaryTarball = nixpkgs.lib.genAttrs systems (system: binaryTarball nixpkgsFor.${system} nixpkgsFor.${system}.nix nixpkgsFor.${system});
 
-        binaryTarballCross = nixpkgs.lib.genAttrs systems (system: builtins.listToAttrs (map (crossSystem: {
+        binaryTarballCross = nixpkgs.lib.genAttrs ["x86_64-linux"] (system: builtins.listToAttrs (map (crossSystem: {
           name = crossSystem;
           value = let
             nixpkgsCross = import nixpkgs {
