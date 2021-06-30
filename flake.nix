@@ -549,6 +549,8 @@
           stripAllList = ["bin"];
 
           strictDeps = true;
+
+          hardeningDisable = [ "pie" ];
         };
       } // builtins.listToAttrs (map (crossSystem: {
         name = "nix-${crossSystem}";
