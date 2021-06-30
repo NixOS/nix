@@ -124,6 +124,13 @@ std::shared_ptr<Registry> getUserRegistry()
     return userRegistry;
 }
 
+std::shared_ptr<Registry> getCustomRegistry(Path p)
+{
+    static auto customRegistry =
+        Registry::read(p, Registry::Custom);
+    return customRegistry;
+}
+
 static std::shared_ptr<Registry> flagRegistry =
     std::make_shared<Registry>(Registry::Flag);
 

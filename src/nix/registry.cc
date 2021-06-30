@@ -152,9 +152,11 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
 {
     std::string url;
 
+    std::string locked;
+
     std::string description() override
     {
-        return "pin a flake to its current version in user flake registry";
+        return "pin a flake to its current version in user flake registry or to the current version of a flake URI";
     }
 
     std::string doc() override
@@ -167,14 +169,27 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     CmdRegistryPin()
     {
         expectArg("url", &url);
+
+        expectArgs({
+            .label = "locked",
+            .optional = true,
+            .handler = {&locked},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeFlakeRef(getStore(), prefix);
+            }}
+        });
     }
 
     void run(nix::ref<nix::Store> store) override
     {
+        if (locked.empty()) {
+            locked = url;
+        }
         auto registry = getRegistry();
         auto ref = parseFlakeRef(url);
+        auto locked_ref = parseFlakeRef(locked);
         registry->remove(ref.input);
-        auto [tree, resolved] = ref.resolve(store).input.fetch(store);
+        auto [tree, resolved] = locked_ref.resolve(store).input.fetch(store);
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         registry->add(ref.input, resolved, extraAttrs);
