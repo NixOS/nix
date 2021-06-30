@@ -39,14 +39,13 @@ class SimpleLogger : public Logger
 {
 public:
 
-    bool systemd, tty;
+    bool systemd;
     bool printBuildLogs;
 
     SimpleLogger(bool printBuildLogs)
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = isatty(STDERR_FILENO);
     }
 
     bool isVerbose() override {
@@ -71,7 +70,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(fs.s, loggerSettings.filterStderrAnsi.get()) + "\n");
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -101,6 +100,15 @@ public:
             printError("post-build-hook: " + lastLine);
         }
     }
+
+    void writeToStdout(std::string_view s) override
+    {
+        if (loggerSettings.filterStdoutAnsi.get())
+            Logger::writeToStdout(filterANSIEscapes(std::string(s), true));
+        else
+            Logger::writeToStdout(s);
+    }
+
 };
 
 Verbosity verbosity = lvlInfo;

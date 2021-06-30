@@ -43,6 +43,18 @@ struct LoggerSettings : Config
           Where Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
+
+    Setting<bool> filterStdoutAnsi{
+        this, getEnv("CLICOLOR_FORCE").value_or("0") != "1" && (getEnv("CLICOLOR").value_or("1") == "0" || !isatty(STDOUT_FILENO)), "filter-stdout-ansi",
+        R"(
+          Whether color should be filtered in logger stdout output.
+        )"};
+
+    Setting<bool> filterStderrAnsi{
+        this, getEnv("CLICOLOR_FORCE").value_or("0") != "1" && (getEnv("CLICOLOR").value_or("1") == "0" || !isatty(STDERR_FILENO)), "filter-stderr-ansi",
+        R"(
+          Whether color should be filtered in logger stderr output.
+        )"};
 };
 
 extern LoggerSettings loggerSettings;

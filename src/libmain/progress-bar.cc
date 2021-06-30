@@ -140,11 +140,11 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         if (state.active) {
-            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
+            writeToStderr("\r\e[K" + filterANSIEscapes(s, loggerSettings.filterStderrAnsi.get()) + ANSI_NORMAL "\n");
             draw(state);
         } else {
             auto s2 = s + ANSI_NORMAL "\n";
-            if (!isTTY) s2 = filterANSIEscapes(s2, true);
+            if (loggerSettings.filterStderrAnsi.get()) s2 = filterANSIEscapes(s2, true);
             writeToStderr(s2);
         }
     }
@@ -464,7 +464,10 @@ public:
             Logger::writeToStdout(s);
             draw(*state);
         } else {
-            Logger::writeToStdout(s);
+            if (loggerSettings.filterStdoutAnsi.get())
+                Logger::writeToStdout(filterANSIEscapes(std::string(s), true));
+            else
+                Logger::writeToStdout(s);
         }
     }
 
