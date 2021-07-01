@@ -573,8 +573,10 @@ InstallableFlake::getCursors(EvalState & state)
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
+    flake::LockFlags lockFlagsApplyConfig = lockFlags;
+    lockFlagsApplyConfig.applyNixConfig = true;
     if (!_lockedFlake) {
-        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlags));
+        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlagsApplyConfig));
     }
     return _lockedFlake;
 }

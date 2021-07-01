@@ -104,6 +104,10 @@ struct LockFlags
        references like 'nixpkgs'. */
     bool useRegistries = true;
 
+    /* Whether to apply flake's nixConfig attribute to the configuration */
+
+    bool applyNixConfig = false;
+
     /* Whether mutable flake references (i.e. those without a Git
        revision or similar) without a corresponding lock are
        allowed. Mutable flake references with a lock are always

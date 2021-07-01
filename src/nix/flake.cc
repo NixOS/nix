@@ -84,6 +84,7 @@ struct CmdFlakeUpdate : FlakeCommand
 
         lockFlags.recreateLockFile = true;
         lockFlags.writeLockFile = true;
+        lockFlags.applyNixConfig = true;
 
         lockFlake();
     }
@@ -114,6 +115,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.applyNixConfig = true;
 
         lockFlake();
     }
@@ -270,6 +272,8 @@ struct CmdFlakeCheck : FlakeCommand
         settings.readOnlyMode = !build;
 
         auto state = getEvalState();
+
+        lockFlags.applyNixConfig = true;
         auto flake = lockFlake();
 
         bool hasErrors = false;
