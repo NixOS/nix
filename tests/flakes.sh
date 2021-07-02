@@ -26,6 +26,7 @@ nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
+flakeGitBroken=$TEST_ROOT/flakeGitBroken
 
 for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
@@ -737,3 +738,16 @@ git -C $flakeB commit -a -m 'Foo'
 
 # Test list-inputs with circular dependencies
 nix flake metadata $flakeA
+
+# Test ignore-git config setting
+
+rm -rf $flakeGitBroken
+mkdir -p $flakeGitBroken
+git -C $flakeGitBroken init
+cp $flake1Dir/flake.nix $flakeGitBroken
+
+## Check that it fails without ignore-git
+! nix flake metadata $flakeGitBroken
+
+## Check that it works with ignore-git
+nix flake metadata --ignore-git $flakeGitBroken
