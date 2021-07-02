@@ -110,6 +110,7 @@ downloadFile("binaryTarball.i686-linux", "1");
 downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("binaryTarball.aarch64-darwin", "1");
 downloadFile("binaryTarballCross.x86_64-linux.armv6l-linux", "1");
 downloadFile("binaryTarballCross.x86_64-linux.armv7l-linux", "1");
 downloadFile("installerScript", "1");
@@ -155,6 +156,7 @@ write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
            "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
            "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
            "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+           "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
            "}\n");
 
 system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
