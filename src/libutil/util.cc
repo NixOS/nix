@@ -1374,7 +1374,9 @@ void ignoreException()
 
 bool shouldANSI()
 {
-	return isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb";
+    return isatty(STDERR_FILENO)
+        && getEnv("TERM").value_or("dumb") != "dumb"
+        && !getEnv("NO_COLOR").has_value();
 }
 
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
