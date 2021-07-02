@@ -102,7 +102,7 @@ struct LockFlags
 
     /* Whether to use the registries to lookup indirect flake
        references like 'nixpkgs'. */
-    bool useRegistries = true;
+    std::optional<bool> useRegistries = std::nullopt;
 
     /* Whether to apply flake's nixConfig attribute to the configuration */
 
