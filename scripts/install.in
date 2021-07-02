@@ -29,8 +29,7 @@ case "$(uname -s).$(uname -m)" in
     Linux.i?86) system=i686-linux; hash=@binaryTarball_i686-linux@;;
     Linux.aarch64) system=aarch64-linux; hash=@binaryTarball_aarch64-linux@;;
     Darwin.x86_64) system=x86_64-darwin; hash=@binaryTarball_x86_64-darwin@;;
-    # eventually maybe: system=arm64-darwin; hash=@binaryTarball_arm64-darwin@;;
-    Darwin.arm64) system=x86_64-darwin; hash=@binaryTarball_x86_64-darwin@;;
+    Darwin.arm64) system=aarch64-darwin; hash=@binaryTarball_aarch64-darwin@;;
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
 
