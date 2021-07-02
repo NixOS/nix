@@ -46,7 +46,7 @@ public:
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = isatty(STDERR_FILENO);
+        tty = shouldANSI();
     }
 
     bool isVerbose() override {

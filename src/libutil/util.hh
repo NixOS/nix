@@ -482,6 +482,9 @@ constexpr char treeLast[] = "└───";
 constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
+/* Determine whether ANSI escape sequences are appropriate for the
+   present output. */
+bool shouldANSI();
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,

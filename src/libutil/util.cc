@@ -1372,6 +1372,10 @@ void ignoreException()
     }
 }
 
+bool shouldANSI()
+{
+	return isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb";
+}
 
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
 {
