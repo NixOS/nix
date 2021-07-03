@@ -180,6 +180,16 @@ struct GitInputScheme : InputScheme
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
 
+        bool isDirtyTree = false;
+
+        // TODO: Recursively use the `write-tree` logic for the submodules.
+        //       For now, we use a diff to get the uncommitted submodule
+        //       changes. This only works correctly in cases where the diff
+        //       does not depend on smudge/clean behavior, which we can't
+        //       assume. The submodule worktree does come from a fresh repo,
+        //       so at least it seems that git-crypt security is not at risk.
+        std::string dirtySubmoduleDiff;
+
         auto getImmutableAttrs = [&]()
         {
             return Attrs({
@@ -197,6 +207,13 @@ struct GitInputScheme : InputScheme
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
+
+            // If the tree is dirty, we use a tree hash internally, but we don't
+            // want to expose it.
+            if (isDirtyTree) {
+                input.attrs.insert_or_assign("rev", "0000000000000000000000000000000000000000");
+            }
+
             return {
                 Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
@@ -210,6 +227,8 @@ struct GitInputScheme : InputScheme
 
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
+
+        bool haveHEAD = true;
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
@@ -227,10 +246,10 @@ struct GitInputScheme : InputScheme
             if (commonGitDir != ".git")
                     gitDir = commonGitDir;
 
-            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
+            haveHEAD = !readDirectory(gitDir + "/refs/heads").empty();
 
             try {
-                if (haveCommits) {
+                if (haveHEAD) {
                     runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
                     clean = true;
                 }
@@ -240,7 +259,8 @@ struct GitInputScheme : InputScheme
 
             if (!clean) {
 
-                /* This is an unclean working tree. So copy all tracked files. */
+                /* This is an unclean working tree. We can't use the worktree
+                   files, because those may be smudged. */
 
                 if (!settings.allowDirty)
                     throw Error("Git tree '%s' is dirty", actualUrl);
@@ -248,44 +268,66 @@ struct GitInputScheme : InputScheme
                 if (settings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
-                auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
-                if (submodules)
-                    gitOpts.emplace_back("--recurse-submodules");
+                isDirtyTree = true;
 
-                auto files = tokenizeString<std::set<std::string>>(
-                    runProgram("git", true, gitOpts), "\0"s);
+                // We can't use an existing file for the temporary git index,
+                // so we need to use a tmpdir instead of a tmpfile.
+                // Non-submodule changes are captured by the tree we build using
+                // this temporary index.
+                Path tmpIndexDir = createTempDir();
+                AutoDelete delTmpIndexDir(tmpIndexDir, true);
+                Path tmpIndex = tmpIndexDir + "/tmp-git-index";
 
-                PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                std::set<Path> files = tokenizeString<std::set<std::string>>(
+                    runProgram("git", true, { "-C", actualUrl, "ls-files", "-z" }),
+                    "\0"s);
 
-                    auto st = lstat(p);
+                {
+                    RunOptions gitOptions("git", { "-C", actualUrl, "add", "--no-warn-embedded-repo", "--" });
+                    auto env = getEnv();
+                    env["GIT_INDEX_FILE"] = tmpIndex;
+                    gitOptions.environment = env;
+                    for (auto file : files)
+                        gitOptions.args.push_back(file);
 
-                    if (S_ISDIR(st.st_mode)) {
-                        auto prefix = file + "/";
-                        auto i = files.lower_bound(prefix);
-                        return i != files.end() && hasPrefix(*i, prefix);
-                    }
+                    auto result = runProgram(gitOptions);
+                    if (result.first)
+                        throw ExecError(result.first, fmt("program git add -u %1%", statusToString(result.first)));
+                }
+                std::string tree;
+                {
+                    RunOptions gitOptions("git", { "-C", actualUrl, "write-tree" });
+                    auto env = getEnv();
+                    env["GIT_INDEX_FILE"] = tmpIndex;
+                    gitOptions.environment = env;
 
-                    return files.count(file);
-                };
+                    auto result = runProgram(gitOptions);
+                    if (result.first)
+                        throw ExecError(result.first, fmt("program git write-tree %1%", statusToString(result.first)));
+                    tree = trim(result.second);
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                    // Note [tree as rev]
+                    // We set `rev` to a tree object, even if it's normally a
+                    // commit object. This way, we get some use out of the
+                    // cache, to avoid copying files unnecessarily.
+                    input.attrs.insert_or_assign("rev", trim(result.second));
+                }
 
-                // FIXME: maybe we should use the timestamp of the last
-                // modified dirty file?
-                input.attrs.insert_or_assign(
-                    "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                // Use a diff to gather submodule changes as well. See `dirtySubmoduleDiff`
+                if (submodules) {
+                    RunOptions gitOptions("git", { "-C", actualUrl, "diff", tree, "--submodule=diff" });
 
-                return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
-                    input
-                };
+                    auto result = runProgram(gitOptions);
+                    if (result.first)
+                        throw ExecError(result.first, fmt("program git diff %1%", statusToString(result.first)));
+
+                    dirtySubmoduleDiff = result.second;
+                }
             }
         }
 
-        if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
+        if (!input.getRef() && haveHEAD)
+            input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
 
         Attrs mutableAttrs({
             {"type", cacheType},
@@ -406,49 +448,96 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        RunOptions checkCommitOpts(
-            "git",
-            { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() }
-        );
-        checkCommitOpts.searchPath = true;
-        checkCommitOpts.mergeStderrToStdout = true;
-
-        auto result = runProgram(checkCommitOpts);
-        if (WEXITSTATUS(result.first) == 128
-            && result.second.find("bad file") != std::string::npos
-        ) {
-            throw Error(
-                "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
-                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
-                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
-                input.getRev()->gitRev(),
-                *input.getRef(),
-                actualUrl
+        // Skip check if rev is set to a tree object. See Note [tree as rev]
+        if (!isDirtyTree) {
+            RunOptions checkCommitOpts(
+                "git",
+                { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() }
             );
+            checkCommitOpts.searchPath = true;
+            checkCommitOpts.mergeStderrToStdout = true;
+
+            auto result = runProgram(checkCommitOpts);
+            if (WEXITSTATUS(result.first) == 128
+                && result.second.find("bad file") != std::string::npos
+            ) {
+                throw Error(
+                    "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
+                        "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                        ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                        "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                    input.getRev()->gitRev(),
+                    *input.getRef(),
+                    actualUrl
+                );
+            }
         }
 
         if (submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
+            // For this checkout approach, we need a commit, not just a treeish.
+            if (isDirtyTree) {
+                RunOptions gitOptions("git", { "-C", actualUrl, "commit-tree", "-m", "temporary commit for dirty tree", input.getRev()->gitRev() });
+                auto result = runProgram(gitOptions);
+                if (result.first)
+                    throw ExecError(result.first, fmt("program git commit-tree %1%", statusToString(result.first)));
+                input.attrs.insert_or_assign("rev", trim(result.second));
+            }
+
             runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
             // TODO: repoDir might lack the ref (it only checks if rev
             // exists, see FIXME above) so use a big hammer and fetch
             // everything to ensure we get the rev.
             runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*",
+                                      input.getRev()->gitRev() });
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
             runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
             runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
+            if (dirtySubmoduleDiff.size()) {
+                RunOptions gitOptions("git", { "-C", tmpDir, "apply" });
+                StringSource s(dirtySubmoduleDiff);
+                gitOptions.standardIn = &s;
+                auto result = runProgram(gitOptions);
+                if (result.first)
+                    throw ExecError(result.first, fmt("program git apply %1%", statusToString(result.first)));
+            }
+
             filter = isNotDotGitDirectory;
         } else {
+            Strings noSmudgeOptions;
+            {
+                RunOptions gitOptions("git", { "-C", repoDir, "config", "-l" });
+                auto result = runProgram(gitOptions);
+                auto ss = std::stringstream{result.second};
+                StringSet filters;
+
+                for (std::string line; std::getline(ss, line, '\n');) {
+                    std::string prefix = "filter.";
+                    std::string infix = ".smudge=";
+                    auto infixPos = line.find(infix);
+                    if (hasPrefix(line, prefix) && infixPos != std::string::npos) {
+                        filters.emplace(line.substr(prefix.size(), infixPos - prefix.size()));
+                    }
+                }
+                for (auto filter : filters) {
+                    noSmudgeOptions.emplace_back("-c");
+                    noSmudgeOptions.emplace_back("filter." + filter + ".smudge=cat --");
+                }
+            }
+
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getRev()->gitRev() });
+                RunOptions gitOptions("git", noSmudgeOptions);
+                gitOptions.args.push_back("-C");
+                gitOptions.args.push_back(repoDir);
+                gitOptions.args.push_back("archive");
+                gitOptions.args.push_back(input.getRev()->gitRev());
                 gitOptions.standardOut = &sink;
                 runProgram2(gitOptions);
             });
@@ -458,7 +547,13 @@ struct GitInputScheme : InputScheme
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
-        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+        const auto now = std::chrono::system_clock::now();
+
+        // FIXME: when isDirtyTree, maybe we should use the timestamp
+        //        of the last modified dirty file?
+        auto lastModified = isDirtyTree ?
+            (std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+            : std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},

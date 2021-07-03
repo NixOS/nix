@@ -306,6 +306,23 @@ static RegisterPrimOp primop_fetchGit({
         - url\
           The URL of the repo.
 
+          The URL can be a path value, in order to fetch from a local
+          repository. When `ref` and `rev` unset, the default behavior is to
+          produce an output that includes the uncommitted changes to files known
+          to git. This is similar to `HEAD` after running `git add -u` and
+          `git commit`. Files that have not been added to the index or `HEAD`
+          will be ignored.
+
+          This will not run the git smudge filters, but changed files will be
+          processed with the git clean filter, in order to be consistent with
+          remote repositories. This way, decrypted git-crypt secrets are not
+          added to the store. Warning: the current implementation does not
+          apply this logic to submodules.
+
+          Tip: if you prefer to keep your index clean, you can use `git add -N`
+          to add files to the index without adding their contents. You can add
+          the contents later with `git add -p` or `git add`.
+
         - name\
           The name of the directory the repo should be exported to in the
           store. Defaults to the basename of the URL.
@@ -315,11 +332,13 @@ static RegisterPrimOp primop_fetchGit({
 
         - ref\
           The git ref to look for the requested revision under. This is
-          often a branch or tag name. Defaults to `HEAD`.
+          often a branch or tag name. For remote repositories, this defaults
+          to `HEAD`. If the `url` is a path value, some local changes are
+          included; see `url`.
 
           By default, the `ref` value is prefixed with `refs/heads/`. As
           of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
-          with `refs/`.
+          with `refs/`. `HEAD` is also not prefixed.
 
         - submodules\
           A Boolean parameter that specifies whether submodules should be
