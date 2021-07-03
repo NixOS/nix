@@ -171,14 +171,44 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    if (file) return; // FIXME
+    if (file) {
+        evalSettings.pureEval = false;
+        auto state = getEvalState();
+        Expr *e = state->parseExprFromFile(
+            resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
+        );
 
-    completeFlakeRefWithFragment(
-        getEvalState(),
-        lockFlags,
-        getDefaultFlakeAttrPathPrefixes(),
-        getDefaultFlakeAttrPaths(),
-        prefix);
+        Value root;
+        state->eval(e, root);
+
+        auto autoArgs = getAutoArgs(*state);
+
+        std::string prefix_ = std::string(prefix);
+        auto sep = prefix_.rfind('.');
+        if (sep != std::string::npos) {
+            prefix_.erase(sep);
+        } else {
+            prefix_ = "";
+        }
+
+        Value &v1(*findAlongAttrPath(*state, prefix_, *autoArgs, root).first);
+        state->forceValue(v1);
+        Value v2;
+        state->autoCallFunction(*autoArgs, v1, v2);
+
+        if (v2.type() == nAttrs) {
+            for (auto & i : *v2.attrs) {
+                completions->add(i.name);
+            }
+        }
+    } else {
+        completeFlakeRefWithFragment(
+            getEvalState(),
+            lockFlags,
+            getDefaultFlakeAttrPathPrefixes(),
+            getDefaultFlakeAttrPaths(),
+            prefix);
+    }
 }
 
 void completeFlakeRefWithFragment(
