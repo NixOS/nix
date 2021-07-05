@@ -64,7 +64,11 @@ static char * dupStringWithLen(const char * s, size_t size)
 
 RootValue allocRootValue(Value * v)
 {
+#if HAVE_BOEHMGC
     return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
+#else
+    return std::make_shared<Value *>(v);
+#endif
 }
 
 
