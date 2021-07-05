@@ -185,9 +185,12 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
 
         std::string prefix_ = std::string(prefix);
         auto sep = prefix_.rfind('.');
+        std::string searchWord;
         if (sep != std::string::npos) {
-            prefix_.erase(sep);
+            searchWord = prefix_.substr(sep, std::string::npos);
+            prefix_ = prefix_.substr(0, sep);
         } else {
+            searchWord = prefix_;
             prefix_ = "";
         }
 
@@ -198,7 +201,10 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
 
         if (v2.type() == nAttrs) {
             for (auto & i : *v2.attrs) {
-                completions->add(i.name);
+                std::string name = i.name;
+                if (name.find(searchWord) == 0) {
+                    completions->add(i.name);
+                }
             }
         }
     } else {
