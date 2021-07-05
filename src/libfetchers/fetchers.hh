@@ -81,6 +81,8 @@ public:
         std::string_view file,
         std::optional<std::string> commitMsg) const;
 
+    std::string getName() const;
+
     StorePath computeStorePath(Store & store) const;
 
     // Convenience functions for common attributes.
