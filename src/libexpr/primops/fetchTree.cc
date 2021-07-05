@@ -7,6 +7,7 @@
 
 #include <ctime>
 #include <iomanip>
+#include <regex>
 
 namespace nix {
 
@@ -60,10 +61,19 @@ void emitTreeAttrs(
     v.attrs->sort();
 }
 
-std::string fixURI(std::string uri, EvalState &state)
+std::string fixURI(std::string uri, EvalState &state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : "file://" + uri;
+    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+}
+
+std::string fixURIForGit(std::string uri, EvalState & state)
+{
+    static std::regex scp_uri("([^/].*)@(.*):(.*)");
+    if (uri[0] != '/' && std::regex_match(uri, scp_uri))
+        return fixURI(std::regex_replace(uri, scp_uri, "$1@$2/$3"), state, "ssh");
+    else
+        return fixURI(uri, state);
 }
 
 void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v)
@@ -121,15 +131,15 @@ static void fetchTree(
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = fixURI(state.coerceToString(pos, *args[0], context, false, false), state);
+        auto url = state.coerceToString(pos, *args[0], context, false, false);
 
         if (type == "git") {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", url);
+            attrs.emplace("url", fixURIForGit(url, state));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(fixURI(url, state));
         }
     }
 
