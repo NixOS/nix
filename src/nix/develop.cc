@@ -54,7 +54,7 @@ BuildEnvironment readEnvironment(const Path & path)
         R"re((?:[a-zA-Z_][a-zA-Z0-9_]*))re";
 
     static std::string simpleStringRegex =
-        R"re((?:[a-zA-Z0-9_/:\.\-\+=]*))re";
+        R"re((?:[a-zA-Z0-9_/:\.\-\+=@%]*))re";
 
     static std::string dquotedStringRegex =
         R"re((?:\$?"(?:[^"\\]|\\[$`"\\\n])*"))re";
