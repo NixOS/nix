@@ -64,6 +64,7 @@ $(d)/conf-file.json: $(bindir)/nix
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
 	@cat doc/manual/src/expressions/builtins-prefix.md > $@.tmp
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@cat doc/manual/src/expressions/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/builtins.json: $(bindir)/nix
