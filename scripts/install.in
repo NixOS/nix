@@ -56,7 +56,7 @@ case "$(uname -s).$(uname -m)" in
         system=x86_64-darwin
         ;;
     Darwin.arm64|Darwin.aarch64)
-        hash=@binaryTarball_aarch64-darwin@
+        hash=@tarballHash_aarch64-darwin@
         path=@tarballPath_aarch64-darwin@
         system=aarch64-darwin
         ;;
