@@ -34,6 +34,8 @@ let pkgs = rec {
     name = "shellDrv";
     builder = "/does/not/exist";
     VAR_FROM_NIX = "bar";
+    ASCII_PERCENT = "%";
+    ASCII_AT = "@";
     TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
     outputs = ["dev" "out"];
