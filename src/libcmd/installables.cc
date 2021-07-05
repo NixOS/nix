@@ -171,14 +171,50 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    if (file) return; // FIXME
+    if (file) {
+        evalSettings.pureEval = false;
+        auto state = getEvalState();
+        Expr *e = state->parseExprFromFile(
+            resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
+        );
 
-    completeFlakeRefWithFragment(
-        getEvalState(),
-        lockFlags,
-        getDefaultFlakeAttrPathPrefixes(),
-        getDefaultFlakeAttrPaths(),
-        prefix);
+        Value root;
+        state->eval(e, root);
+
+        auto autoArgs = getAutoArgs(*state);
+
+        std::string prefix_ = std::string(prefix);
+        auto sep = prefix_.rfind('.');
+        std::string searchWord;
+        if (sep != std::string::npos) {
+            searchWord = prefix_.substr(sep, std::string::npos);
+            prefix_ = prefix_.substr(0, sep);
+        } else {
+            searchWord = prefix_;
+            prefix_ = "";
+        }
+
+        Value &v1(*findAlongAttrPath(*state, prefix_, *autoArgs, root).first);
+        state->forceValue(v1);
+        Value v2;
+        state->autoCallFunction(*autoArgs, v1, v2);
+
+        if (v2.type() == nAttrs) {
+            for (auto & i : *v2.attrs) {
+                std::string name = i.name;
+                if (name.find(searchWord) == 0) {
+                    completions->add(i.name);
+                }
+            }
+        }
+    } else {
+        completeFlakeRefWithFragment(
+            getEvalState(),
+            lockFlags,
+            getDefaultFlakeAttrPathPrefixes(),
+            getDefaultFlakeAttrPaths(),
+            prefix);
+    }
 }
 
 void completeFlakeRefWithFragment(
