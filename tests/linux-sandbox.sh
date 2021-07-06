@@ -29,6 +29,11 @@ nix store cat $outPath/foobar | grep FOOBAR
 # Test --check without hash rewriting.
 nix-build dependencies.nix --no-out-link --check --sandbox-paths /nix/store
 
+# Make sure we rename build with .check suffix in correct store
+(! nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link --repeat 2 -K 2> $TEST_ROOT/log)
+if grep 'error: renaming' $TEST_ROOT/log; then false; fi
+grep -q 'differs from previous round' $TEST_ROOT/log
+
 # Test that sandboxed builds with --check and -K can move .check directory to store
 nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link
 
