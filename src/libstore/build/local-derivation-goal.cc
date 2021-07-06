@@ -966,7 +966,7 @@ void LocalDerivationGoal::startBuilder()
         }();
         if (string(msg, 0, 1) == "\2") break;
         if (string(msg, 0, 1) == "\1") {
-            FdSource source(builderOut.readSide.get());
+            FdSource source(builderOut.readSide.get(), "");
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
             throw ex;
@@ -1467,7 +1467,7 @@ void LocalDerivationGoal::startDaemon()
             debug("received daemon connection");
 
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                FdSource from(remote.get());
+                FdSource from(remote.get(), "");
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
@@ -2380,7 +2380,7 @@ void LocalDerivationGoal::registerOutputs()
                     refs.first);
             if (scratchPath != finalPath) {
                 // Also rewrite the output path
-                auto source = sinkToSource([&](Sink & nextSink) {
+                auto source = sinkToSource("path:" + actualPath, [&](Sink & nextSink) {
                     StringSink sink;
                     dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);

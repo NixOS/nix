@@ -32,7 +32,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     auto fetch = [&](const std::string & url) {
 
-        auto source = sinkToSource([&](Sink & sink) {
+        auto source = sinkToSource("url:" + url, [&](Sink & sink) {
 
             /* No need to do TLS verification, because we check the hash of
                the result anyway. */

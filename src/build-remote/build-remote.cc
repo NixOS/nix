@@ -61,7 +61,7 @@ static int main_build_remote(int argc, char * * argv)
 
         verbosity = (Verbosity) std::stoll(argv[1]);
 
-        FdSource source(STDIN_FILENO);
+        FdSource source(STDIN_FILENO, "<stdin>");
 
         /* Read the parent's settings. */
         while (readInt(source)) {

@@ -239,7 +239,7 @@ StorePath Store::addToStore(const string & name, const Path & _srcPath,
     FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
-    auto source = sinkToSource([&](Sink & sink) {
+    auto source = sinkToSource("path:" + srcPath, [&](Sink & sink) {
         if (method == FileIngestionMethod::Recursive)
             dumpPath(srcPath, sink, filter);
         else
@@ -292,7 +292,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     /* Functionally, this means that fileSource will yield the content of
        srcPath. The fact that we use scratchpadSink as a temporary buffer here
        is an implementation detail. */
-    auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
+    auto fileSource = sinkToSource("path:" + srcPath, [&](Sink & scratchpadSink) {
         dumpPath(srcPath, scratchpadSink);
     });
 
@@ -328,7 +328,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     info.ca = FixedOutputHash { .method = method, .hash = hash };
 
     if (!isValidPath(info.path)) {
-        auto source = sinkToSource([&](Sink & scratchpadSink) {
+        auto source = sinkToSource("path:" + srcPath, [&](Sink & scratchpadSink) {
             dumpPath(srcPath, scratchpadSink);
         });
         addToStore(info, *source);
@@ -768,7 +768,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         info = info2;
     }
 
-    auto source = sinkToSource([&](Sink & sink) {
+    auto source = sinkToSource("store-path:" + std::string(storePath.to_string()), [&](Sink & sink) {
         LambdaSink progressSink([&](std::string_view data) {
             total += data.size();
             act.progress(total, info->narSize);
