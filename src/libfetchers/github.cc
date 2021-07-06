@@ -207,7 +207,7 @@ struct GitArchiveInputScheme : InputScheme
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, url.headers);
+        auto [tree, lastModified] = downloadTarball(store, url.url, input.getName(), true, url.headers);
 
         input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
