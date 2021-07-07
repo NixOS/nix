@@ -47,6 +47,7 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   flake-local-settings.sh \
+  flake-missing-file.sh \
   build.sh \
   compute-levels.sh \
   repl.sh ca/repl.sh \
