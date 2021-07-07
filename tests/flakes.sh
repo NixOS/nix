@@ -90,76 +90,14 @@ EOF
 git -C $nonFlakeDir add README.md
 git -C $nonFlakeDir commit -m 'Initial'
 
-cat > $registry <<EOF
-{
-  "version": 2,
-  "flakes": [
-    { "from": {
-        "type": "indirect",
-        "id": "flake1"
-      },
-      "to": {
-        "type": "git",
-        "url": "file://$flake1Dir"
-      }
-    },
-    { "from": {
-        "type": "indirect",
-        "id": "flake2"
-      },
-      "to": {
-        "type": "git",
-        "url": "file://$flake2Dir"
-      }
-    },
-    { "from": {
-        "type": "indirect",
-        "id": "flake3"
-      },
-      "to": {
-        "type": "git",
-        "url": "file://$flake3Dir"
-      }
-    },
-    { "from": {
-        "type": "indirect",
-        "id": "flake4"
-      },
-      "to": {
-        "type": "indirect",
-        "id": "flake3"
-      }
-    },
-    { "from": {
-        "type": "indirect",
-        "id": "flake5"
-      },
-      "to": {
-        "type": "hg",
-        "url": "file://$flake5Dir"
-      }
-    },
-    { "from": {
-        "type": "indirect",
-        "id": "nixpkgs"
-      },
-      "to": {
-        "type": "indirect",
-        "id": "flake1"
-      }
-    },
-    { "from": {
-        "type": "indirect",
-        "id": "templates"
-      },
-      "to": {
-        "type": "git",
-        "url": "file://$templatesDir"
-      }
-    }
-  ]
-}
-EOF
+# Construct a custom registry, additionally test the --registry flag
+nix registry add --registry $registry flake1 git+file://$flake1Dir
+nix registry add --registry $registry flake2 git+file://$flake2Dir
+nix registry add --registry $registry flake3 git+file://$flake3Dir
+nix registry add --registry $registry flake4 flake3
+nix registry add --registry $registry flake5 hg+file://$flake5Dir
+nix registry add --registry $registry nixpkgs flake1
+nix registry add --registry $registry templates git+file://$templatesDir
 
 # Test 'nix flake list'.
 [[ $(nix registry list | wc -l) == 7 ]]
@@ -404,6 +342,8 @@ nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 nix registry add flake1 flake3
 [[ $(nix registry list | wc -l) == 8 ]]
 nix registry pin flake1
+[[ $(nix registry list | wc -l) == 8 ]]
+nix registry pin flake1 flake3
 [[ $(nix registry list | wc -l) == 8 ]]
 nix registry remove flake1
 [[ $(nix registry list | wc -l) == 7 ]]
