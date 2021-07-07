@@ -76,7 +76,6 @@ perl/Makefile.config
 # /tests/
 /tests/test-tmp
 /tests/common.sh
-/tests/dummy
 /tests/result*
 /tests/restricted-innocent
 /tests/shell
