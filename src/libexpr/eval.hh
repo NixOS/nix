@@ -342,6 +342,10 @@ private:
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+    bool trackRealisedPaths;
+    std::vector<StorePath> realisedPaths;
+    friend void prim_traceContext(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
 
