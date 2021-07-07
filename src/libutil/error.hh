@@ -205,4 +205,17 @@ public:
     virtual const char* sname() const override { return "SysError"; }
 };
 
+class FileError : public SysError
+{
+public:
+    const Path path;
+
+    template<typename... Args>
+    FileError(const std::string & fs, const Path & path, const Args & ... args)
+        :SysError(fs, path, args...)
+        , path(path)
+        {
+        }
+};
+
 }
