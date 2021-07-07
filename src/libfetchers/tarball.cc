@@ -193,11 +193,12 @@ struct TarballInputScheme : InputScheme
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
+        auto type = maybeGetStrAttr(attrs, "type");
+        if (type != "tarball" && type != "file") return {};
 
         for (auto & [name, value] : attrs)
             if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash")
-                throw Error("unsupported tarball input attribute '%s'", name);
+                throw Error("unsupported %s input attribute '%s'", *type, name);
 
         Input input;
         input.attrs = attrs;
@@ -226,8 +227,14 @@ struct TarballInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
-        return {std::move(tree), input};
+        std::optional<Tree> tree;
+        if (getStrAttr(input.attrs, "type") == "tarball")
+            tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
+        else {
+            auto file = downloadFile(store, getStrAttr(input.attrs, "url"), "source", false);
+            tree = Tree(store->toRealPath(file.storePath), std::move(file.storePath));
+        }
+        return {std::move(*tree), input};
     }
 };
 
