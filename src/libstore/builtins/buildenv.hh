@@ -14,7 +14,7 @@ struct Package {
 
 typedef std::vector<Package> Packages;
 
-void buildProfile(const Path & out, Packages && pkgs);
+void buildProfile(const Path & out, Packages && pkgs, uint64_t cutoff);
 
 void builtinBuildenv(const BasicDerivation & drv);
 

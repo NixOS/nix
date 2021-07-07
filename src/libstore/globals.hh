@@ -956,6 +956,17 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
+
+    Setting<uint64_t> minProfileSymlinkCutoff{
+        this, 0, "min-profile-symlink-cutoff",
+        R"(
+          When creating profiles, this is the minimum directory depth at which
+          early symlink cutoff can be done. A value of 0 (the default) means
+          that e.g. if only a single derivation provides a `/bin` directory,
+          `/bin` in the profile can be symlinked to that derivation's `/bin`
+          directly. A value of 1 means that such symlinks can't be created at
+          the toplevel, but only one level further down.
+        )"};
 };
 
 

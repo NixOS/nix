@@ -14,7 +14,7 @@ struct State
 };
 
 /* For each activated package, create symlinks */
-static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
+static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority, uint64_t cutoff)
 {
     DirEntries srcFiles;
 
@@ -65,7 +65,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
                 if (S_ISDIR(dstSt.st_mode)) {
-                    createLinks(state, srcFile, dstFile, priority);
+                    createLinks(state, srcFile, dstFile, priority, cutoff - 1);
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = canonPath(dstFile, true);
@@ -75,12 +75,18 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw SysError("unlinking '%1%'", dstFile);
                     if (mkdir(dstFile.c_str(), 0755) == -1)
                         throw SysError("creating directory '%1%'", dstFile);
-                    createLinks(state, target, dstFile, state.priorities[dstFile]);
-                    createLinks(state, srcFile, dstFile, priority);
+                    createLinks(state, target, dstFile, state.priorities[dstFile], cutoff - 1);
+                    createLinks(state, srcFile, dstFile, priority, cutoff - 1);
                     continue;
                 }
-            } else if (errno != ENOENT)
+            } else if (errno != ENOENT) {
                 throw SysError("getting status of '%1%'", dstFile);
+            } else if (cutoff > 0) {
+                if (mkdir(dstFile.c_str(), 0755) == -1)
+                    throw SysError("creating directory '%1%'", dstFile);
+                createLinks(state, srcFile, dstFile, priority, cutoff - 1);
+                continue;
+            }
         }
 
         else {
@@ -112,7 +118,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 }
 
-void buildProfile(const Path & out, Packages && pkgs)
+void buildProfile(const Path & out, Packages && pkgs, uint64_t cutoff)
 {
     State state;
 
@@ -120,7 +126,7 @@ void buildProfile(const Path & out, Packages && pkgs)
 
     auto addPkg = [&](const Path & pkgDir, int priority) {
         if (!done.insert(pkgDir).second) return;
-        createLinks(state, pkgDir, out, priority);
+        createLinks(state, pkgDir, out, priority, cutoff);
 
         try {
             for (const auto & p : tokenizeString<std::vector<string>>(
@@ -185,7 +191,9 @@ void builtinBuildenv(const BasicDerivation & drv)
         }
     }
 
-    buildProfile(out, std::move(pkgs));
+    uint64_t cutoff = std::strtoull(getAttr("minProfileSymlinkCutoff").c_str(), nullptr, 10);
+
+    buildProfile(out, std::move(pkgs), cutoff);
 
     createSymlink(getAttr("manifest"), out + "/manifest.nix");
 }
