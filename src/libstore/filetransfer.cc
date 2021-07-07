@@ -288,6 +288,7 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_USERAGENT,
                 ("curl/" LIBCURL_VERSION " Nix/" + nixVersion +
                     (fileTransferSettings.userAgentSuffix != "" ? " " + fileTransferSettings.userAgentSuffix.get() : "")).c_str());
+            curl_easy_setopt(req, CURLOPT_ACCEPT_ENCODING, "");
             #if LIBCURL_VERSION_NUM >= 0x072b00
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
