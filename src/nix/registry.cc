@@ -11,12 +11,11 @@ using namespace nix;
 using namespace nix::flake;
 
 
-class RegistryCommand: virtual Args
+class RegistryCommand : virtual Args
 {
     std::string registry_path;
 
     std::shared_ptr<fetchers::Registry> registry;
-
 
 public:
 
@@ -30,7 +29,8 @@ public:
         });
     }
 
-    std::shared_ptr<fetchers::Registry> getRegistry() {
+    std::shared_ptr<fetchers::Registry> getRegistry()
+    {
         if (registry) return registry;
         if (registry_path.empty()) {
             registry = fetchers::getUserRegistry();
@@ -40,7 +40,8 @@ public:
         return registry;
     }
 
-    Path getRegistryPath() {
+    Path getRegistryPath()
+    {
         if (registry_path.empty()) {
             return fetchers::getUserRegistryPath();
         } else {
@@ -156,7 +157,7 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
 
     std::string description() override
     {
-        return "pin a flake to its current version in user flake registry or to the current version of a flake URI";
+        return "pin a flake to its current version or to the current version of a flake URL";
     }
 
     std::string doc() override

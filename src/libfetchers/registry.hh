@@ -49,7 +49,7 @@ typedef std::vector<std::shared_ptr<Registry>> Registries;
 
 std::shared_ptr<Registry> getUserRegistry();
 
-std::shared_ptr<Registry> getCustomRegistry(Path p);
+std::shared_ptr<Registry> getCustomRegistry(const Path & p);
 
 Path getUserRegistryPath();
 

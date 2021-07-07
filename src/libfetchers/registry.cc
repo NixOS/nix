@@ -124,7 +124,7 @@ std::shared_ptr<Registry> getUserRegistry()
     return userRegistry;
 }
 
-std::shared_ptr<Registry> getCustomRegistry(Path p)
+std::shared_ptr<Registry> getCustomRegistry(const Path & p)
 {
     static auto customRegistry =
         Registry::read(p, Registry::Custom);
