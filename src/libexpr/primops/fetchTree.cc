@@ -129,6 +129,13 @@ static void fetchTree(
                 .errPos = pos
             });
 
+        if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
+            throw Error({
+                .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
+                .errPos = pos
+            });
+
+
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
         auto url = state.coerceToString(pos, *args[0], context, false, false);

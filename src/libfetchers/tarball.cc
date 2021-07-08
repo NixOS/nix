@@ -196,7 +196,7 @@ struct TarballInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash")
+            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash" && name != "name")
                 throw Error("unsupported tarball input attribute '%s'", name);
 
         Input input;
@@ -226,7 +226,7 @@ struct TarballInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
+        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first;
         return {std::move(tree), input};
     }
 };
