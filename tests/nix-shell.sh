@@ -101,3 +101,4 @@ source <(nix print-dev-env -f shell.nix shellDrv)
 [[ ${arr1[2]} = "3 4" ]]
 [[ ${arr2[1]} = $'\n' ]]
 [[ ${arr2[2]} = $'x\ny' ]]
+[[ $(fun) = blabla ]]

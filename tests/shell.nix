@@ -22,6 +22,9 @@ let pkgs = rec {
     done
     declare -a arr1=(1 2 "3 4" 5)
     declare -a arr2=(x $'\n' $'x\ny')
+    fun() {
+      echo blabla
+    }
   '';
 
   stdenv = mkDerivation {
