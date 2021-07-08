@@ -208,9 +208,10 @@ if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
 fi
 
 added=
-p=$HOME/.nix-profile/etc/profile.d/nix.sh
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+    # For bash-compatible shells like bash or zsh
     # Make the shell source nix.sh during login.
+    p=$HOME/.nix-profile/etc/profile.d/nix.sh
     for i in .bash_profile .bash_login .profile; do
         fn="$HOME/$i"
         if [ -w "$fn" ]; then
@@ -233,6 +234,17 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
             break
         fi
     done
+
+    # Make fish source nix.fish during login.
+    p=$HOME/.nix-profile/etc/profile.d/nix.fish
+    fn="$HOME/$i"
+    if [ -w "$fn" ]; then
+        if ! grep -q "$p" "$fn"; then
+            echo "modifying $fn..." >&2
+            echo -e "\nif test -e '$p';  source '$p'; end # added by Nix installer" >> "$fn"
+        fi
+        added=1
+    fi
 fi
 
 if [ -z "$added" ]; then
