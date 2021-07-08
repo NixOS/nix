@@ -8,7 +8,7 @@
 #include "affinity.hh"
 #include "progress-bar.hh"
 
-#include <regex>
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -25,94 +25,98 @@ static DevelopSettings developSettings;
 
 static GlobalConfig::Register rDevelopSettings(&developSettings);
 
-struct Var
-{
-    bool exported = true;
-    bool associative = false;
-    std::string quoted; // quoted string or array
-};
-
 struct BuildEnvironment
 {
-    std::map<std::string, Var> env;
-    std::string bashFunctions;
-};
+    struct String
+    {
+        bool exported;
+        std::string value;
+    };
 
-BuildEnvironment readEnvironment(const Path & path)
-{
-    BuildEnvironment res;
+    using Array = std::vector<std::string>;
 
-    std::set<std::string> exported;
+    using Associative = std::map<std::string, std::string>;
 
-    debug("reading environment file '%s'", path);
+    using Value = std::variant<String, Array, Associative>;
 
-    auto file = readFile(path);
+    std::map<std::string, Value> vars;
+    std::map<std::string, std::string> bashFunctions;
 
-    auto pos = file.cbegin();
+    static BuildEnvironment fromJSON(const Path & path)
+    {
+        BuildEnvironment res;
 
-    static std::string varNameRegex =
-        R"re((?:[a-zA-Z_][a-zA-Z0-9_]*))re";
+        std::set<std::string> exported;
 
-    static std::string simpleStringRegex =
-        R"re((?:[a-zA-Z0-9_/:\.\-\+=@%]*))re";
+        debug("reading environment file '%s'", path);
 
-    static std::string dquotedStringRegex =
-        R"re((?:\$?"(?:[^"\\]|\\[$`"\\\n])*"))re";
+        auto json = nlohmann::json::parse(readFile(path));
 
-    static std::string squotedStringRegex =
-        R"re((?:\$?(?:'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'|\\')+))re";
-
-    static std::string indexedArrayRegex =
-        R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
-
-    static std::regex declareRegex(
-        "^declare -a?x (" + varNameRegex + ")(=(" +
-        dquotedStringRegex + "|" + indexedArrayRegex + "))?\n");
-
-    static std::regex varRegex(
-        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + squotedStringRegex + "|" + indexedArrayRegex + ")\n");
-
-    /* Note: we distinguish between an indexed and associative array
-       using the space before the closing parenthesis. Will
-       undoubtedly regret this some day. */
-    static std::regex assocArrayRegex(
-        "^(" + varNameRegex + ")=" + R"re((?:\(( *\[[^\]]+\]="(?:[^"\\]|\\.)*")* *\)))re" + "\n");
-
-    static std::regex functionRegex(
-        "^" + varNameRegex + " \\(\\) *\n");
-
-    while (pos != file.end()) {
-
-        std::smatch match;
-
-        if (std::regex_search(pos, file.cend(), match, declareRegex, std::regex_constants::match_continuous)) {
-            pos = match[0].second;
-            exported.insert(match[1]);
+        for (auto & [name, info] : json["variables"].items()) {
+            std::string type = info["type"];
+            if (type == "var" || type == "exported")
+                res.vars.insert({name, BuildEnvironment::String { .exported = type == "exported", .value = info["value"] }});
+            else if (type == "array")
+                res.vars.insert({name, (Array) info["value"]});
+            else if (type == "associative")
+                res.vars.insert({name, (Associative) info["value"]});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, varRegex, std::regex_constants::match_continuous)) {
-            pos = match[0].second;
-            res.env.insert({match[1], Var { .exported = exported.count(match[1]) > 0, .quoted = match[2] }});
+        for (auto & [name, def] : json["bashFunctions"].items()) {
+            res.bashFunctions.insert({name, def});
         }
 
-        else if (std::regex_search(pos, file.cend(), match, assocArrayRegex, std::regex_constants::match_continuous)) {
-            pos = match[0].second;
-            res.env.insert({match[1], Var { .associative = true, .quoted = match[2] }});
-        }
-
-        else if (std::regex_search(pos, file.cend(), match, functionRegex, std::regex_constants::match_continuous)) {
-            res.bashFunctions = std::string(pos, file.cend());
-            break;
-        }
-
-        else throw Error("shell environment '%s' has unexpected line '%s'",
-            path, file.substr(pos - file.cbegin(), 60));
+        return res;
     }
 
-    res.env.erase("__output");
+    void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
+    {
+        for (auto & [name, value] : vars) {
+            if (!ignoreVars.count(name) && !hasPrefix(name, "BASH_")) {
+                if (auto str = std::get_if<String>(&value)) {
+                    out << fmt("%s=%s\n", name, shellEscape(str->value));
+                    if (str->exported)
+                        out << fmt("export %s\n", name);
+                }
+                else if (auto arr = std::get_if<Array>(&value)) {
+                    out << "declare -a " << name << "=(";
+                    for (auto & s : *arr)
+                        out << shellEscape(s) << " ";
+                    out << ")\n";
+                }
+                else if (auto arr = std::get_if<Associative>(&value)) {
+                    out << "declare -A " << name << "=(";
+                    for (auto & [n, v] : *arr)
+                        out << "[" << shellEscape(n) << "]=" << shellEscape(v) << " ";
+                    out << ")\n";
+                }
+            }
+        }
 
-    return res;
-}
+        for (auto & [name, def] : bashFunctions) {
+            out << name << " ()\n{\n" << def << "}\n";
+        }
+    }
+
+    static std::string getString(const Value & value)
+    {
+        if (auto str = std::get_if<String>(&value))
+            return str->value;
+        else
+            throw Error("bash variable is not a string");
+    }
+
+    static Array getStrings(const Value & value)
+    {
+        if (auto str = std::get_if<String>(&value))
+            return tokenizeString<Array>(str->value);
+        else if (auto arr = std::get_if<Array>(&value)) {
+            return *arr;
+        }
+        else
+            throw Error("bash variable is not a string or array");
+    }
+};
 
 const static std::string getEnvSh =
     #include "get-env.sh.gen.hh"
@@ -185,7 +189,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 
 struct Common : InstallableCommand, MixProfile
 {
-    std::set<string> ignoreVars{
+    std::set<std::string> ignoreVars{
         "BASHOPTS",
         "EUID",
         "HOME", // FIXME: don't ignore in pure mode?
@@ -233,21 +237,9 @@ struct Common : InstallableCommand, MixProfile
 
         out << "nix_saved_PATH=\"$PATH\"\n";
 
-        for (auto & i : buildEnvironment.env) {
-            if (!ignoreVars.count(i.first) && !hasPrefix(i.first, "BASH_")) {
-                if (i.second.associative)
-                    out << fmt("declare -A %s=(%s)\n", i.first, i.second.quoted);
-                else {
-                    out << fmt("%s=%s\n", i.first, i.second.quoted);
-                    if (i.second.exported)
-                        out << fmt("export %s\n", i.first);
-                }
-            }
-        }
+        buildEnvironment.toBash(out, ignoreVars);
 
         out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
-
-        out << buildEnvironment.bashFunctions << "\n";
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
@@ -258,16 +250,16 @@ struct Common : InstallableCommand, MixProfile
         auto script = out.str();
 
         /* Substitute occurrences of output paths. */
-        auto outputs = buildEnvironment.env.find("outputs");
-        assert(outputs != buildEnvironment.env.end());
+        auto outputs = buildEnvironment.vars.find("outputs");
+        assert(outputs != buildEnvironment.vars.end());
 
         // FIXME: properly unquote 'outputs'.
         StringMap rewrites;
-        for (auto & outputName : tokenizeString<std::vector<std::string>>(replaceStrings(outputs->second.quoted, "'", ""))) {
-            auto from = buildEnvironment.env.find(outputName);
-            assert(from != buildEnvironment.env.end());
+        for (auto & outputName : BuildEnvironment::getStrings(outputs->second)) {
+            auto from = buildEnvironment.vars.find(outputName);
+            assert(from != buildEnvironment.vars.end());
             // FIXME: unquote
-            rewrites.insert({from->second.quoted, outputsDir + "/" + outputName});
+            rewrites.insert({BuildEnvironment::getString(from->second), outputsDir + "/" + outputName});
         }
 
         /* Substitute redirects. */
@@ -321,7 +313,7 @@ struct Common : InstallableCommand, MixProfile
 
         updateProfile(shellOutPath);
 
-        return {readEnvironment(strPath), strPath};
+        return {BuildEnvironment::fromJSON(strPath), strPath};
     }
 };
 
