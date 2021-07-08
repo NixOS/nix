@@ -298,6 +298,11 @@ LockedFlake lockFlake(
 
     auto flake = getFlake(state, topRef, lockFlags.useRegistries, flakeCache);
 
+    if (lockFlags.applyNixConfig) {
+        flake.config.apply();
+        // FIXME: send new config to the daemon.
+    }
+
     try {
 
         // FIXME: symlink attack
