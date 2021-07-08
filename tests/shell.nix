@@ -21,6 +21,7 @@ let pkgs = rec {
       export PATH=$PATH:$pkg/bin
     done
     declare -a arr1=(1 2 "3 4" 5)
+    declare -a arr2=(x $'\n' $'x\ny')
   '';
 
   stdenv = mkDerivation {
