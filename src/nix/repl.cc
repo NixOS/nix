@@ -96,12 +96,14 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
     , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
+    GC_add_roots(this, ((void*)this) + sizeof(NixRepl));
 }
 
 
 NixRepl::~NixRepl()
 {
     write_history(historyFile.c_str());
+    GC_remove_roots(this, ((void*)this) + sizeof(NixRepl));
 }
 
 string runNix(Path program, const Strings & args,
