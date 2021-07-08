@@ -72,7 +72,7 @@ struct BuildEnvironment
     void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
     {
         for (auto & [name, value] : vars) {
-            if (!ignoreVars.count(name) && !hasPrefix(name, "BASH_")) {
+            if (!ignoreVars.count(name)) {
                 if (auto str = std::get_if<String>(&value)) {
                     out << fmt("%s=%s\n", name, shellEscape(str->value));
                     if (str->exported)
@@ -191,17 +191,13 @@ struct Common : InstallableCommand, MixProfile
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",
-        "EUID",
         "HOME", // FIXME: don't ignore in pure mode?
-        "HOSTNAME",
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
         "NIX_LOG_FD",
         "NIX_REMOTE",
         "PPID",
-        "PWD",
         "SHELLOPTS",
-        "SHLVL",
         "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
         "TEMPDIR",
