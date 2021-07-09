@@ -49,6 +49,7 @@ __dumpEnv() {
               $__var_name = FUNCNAME || \
               $__var_name = HISTCMD || \
               $__var_name = HOSTNAME || \
+              $__var_name = GROUPS || \
               $__var_name = PIPESTATUS || \
               $__var_name = PWD || \
               $__var_name = RANDOM || \
