@@ -3109,7 +3109,7 @@ static RegisterPrimOp primop_toString({
 
         - A path (e.g., `toString /foo/bar` yields `"/foo/bar"`.
 
-        - A set containing `{ __toString = self: ...; }`.
+        - A set containing `{ __toString = self: ...; }` or `{ outPath = ...; }`.
 
         - An integer.
 
