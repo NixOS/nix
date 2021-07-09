@@ -98,3 +98,7 @@ nix_develop -f shell.nix shellDrv -c echo foo |& grep -q foo
 # Test 'nix print-dev-env'.
 source <(nix print-dev-env -f shell.nix shellDrv)
 [[ -n $stdenv ]]
+[[ ${arr1[2]} = "3 4" ]]
+[[ ${arr2[1]} = $'\n' ]]
+[[ ${arr2[2]} = $'x\ny' ]]
+[[ $(fun) = blabla ]]
