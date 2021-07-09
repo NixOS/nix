@@ -96,6 +96,8 @@ echo foo | nix develop -f shell.nix shellDrv -c cat | grep -q foo
 nix_develop -f shell.nix shellDrv -c echo foo |& grep -q foo
 
 # Test 'nix print-dev-env'.
+[[ $(nix print-dev-env -f shell.nix shellDrv --json | jq -r .variables.arr1.value[2]) = '3 4' ]]
+
 source <(nix print-dev-env -f shell.nix shellDrv)
 [[ -n $stdenv ]]
 [[ ${arr1[2]} = "3 4" ]]

@@ -31,6 +31,11 @@ struct BuildEnvironment
     {
         bool exported;
         std::string value;
+
+        bool operator == (const String & other) const
+        {
+            return exported == other.exported && value == other.value;
+        }
     };
 
     using Array = std::vector<std::string>;
@@ -42,15 +47,13 @@ struct BuildEnvironment
     std::map<std::string, Value> vars;
     std::map<std::string, std::string> bashFunctions;
 
-    static BuildEnvironment fromJSON(const Path & path)
+    static BuildEnvironment fromJSON(std::string_view in)
     {
         BuildEnvironment res;
 
         std::set<std::string> exported;
 
-        debug("reading environment file '%s'", path);
-
-        auto json = nlohmann::json::parse(readFile(path));
+        auto json = nlohmann::json::parse(in);
 
         for (auto & [name, info] : json["variables"].items()) {
             std::string type = info["type"];
@@ -67,6 +70,38 @@ struct BuildEnvironment
         }
 
         return res;
+    }
+
+    std::string toJSON() const
+    {
+        auto res = nlohmann::json::object();
+
+        auto vars2 = nlohmann::json::object();
+        for (auto & [name, value] : vars) {
+            auto info = nlohmann::json::object();
+            if (auto str = std::get_if<String>(&value)) {
+                info["type"] = str->exported ? "exported" : "var";
+                info["value"] = str->value;
+            }
+            else if (auto arr = std::get_if<Array>(&value)) {
+                info["type"] = "array";
+                info["value"] = *arr;
+            }
+            else if (auto arr = std::get_if<Associative>(&value)) {
+                info["type"] = "associative";
+                info["value"] = *arr;
+            }
+            vars2[name] = std::move(info);
+        }
+        res["variables"] = std::move(vars2);
+
+        res["bashFunctions"] = bashFunctions;
+
+        auto json = res.dump();
+
+        assert(BuildEnvironment::fromJSON(json) == *this);
+
+        return json;
     }
 
     void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
@@ -115,6 +150,11 @@ struct BuildEnvironment
         }
         else
             throw Error("bash variable is not a string or array");
+    }
+
+    bool operator == (const BuildEnvironment & other) const
+    {
+        return vars == other.vars && bashFunctions == other.bashFunctions;
     }
 };
 
@@ -309,7 +349,9 @@ struct Common : InstallableCommand, MixProfile
 
         updateProfile(shellOutPath);
 
-        return {BuildEnvironment::fromJSON(strPath), strPath};
+        debug("reading environment file '%s'", strPath);
+
+        return {BuildEnvironment::fromJSON(readFile(strPath)), strPath};
     }
 };
 
@@ -462,7 +504,7 @@ struct CmdDevelop : Common, MixEnvironment
     }
 };
 
-struct CmdPrintDevEnv : Common
+struct CmdPrintDevEnv : Common, MixJSON
 {
     std::string description() override
     {
@@ -484,7 +526,10 @@ struct CmdPrintDevEnv : Common
 
         stopProgressBar();
 
-        std::cout << makeRcScript(store, buildEnvironment);
+        logger->writeToStdout(
+            json
+            ? buildEnvironment.toJSON()
+            : makeRcScript(store, buildEnvironment));
     }
 };
 
