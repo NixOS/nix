@@ -126,6 +126,30 @@ string runNix(Path program, const Strings & args,
 
 static NixRepl * curRepl; // ugly
 
+#ifdef READLINE
+static char * completionFuncReadline(const char * text, int state)
+{
+    static StringSet matches = curRepl->completePrefix(text);
+
+    if (state == 0) {
+        matches = curRepl->completePrefix(text);
+    }
+
+    auto it = matches.begin();
+    while (state > 0 && it != matches.end()) {
+        it++;
+        state--;
+    }
+
+    if (it == matches.end()) {
+        return nullptr;
+    }
+    else {
+        return strdup(it->c_str());
+    }
+}
+
+#else
 static char * completionCallback(char * s, int *match) {
   auto possible = curRepl->completePrefix(s);
   if (possible.size() == 1) {
@@ -187,6 +211,7 @@ static int listPossibleCallback(char *s, char ***avp) {
 
   return ac;
 }
+#endif
 
 namespace {
     // Used to communicate to NixRepl::getLine whether a signal occurred in ::readline.
@@ -216,7 +241,9 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 #endif
     read_history(historyFile.c_str());
     curRepl = this;
-#ifndef READLINE
+#ifdef READLINE
+    rl_completion_entry_function = completionFuncReadline;
+#else
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif
@@ -291,6 +318,11 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
 
     if (!s)
       return false;
+#ifdef READLINE
+    if (*s) {
+        add_history(s);
+    }
+#endif
     input += s;
     input += '\n';
     return true;
