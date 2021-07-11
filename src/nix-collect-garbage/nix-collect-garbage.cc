@@ -19,7 +19,10 @@ bool dryRun = false;
 
 void removeOldGenerations(std::string dir)
 {
-    if (access(dir.c_str(), R_OK) != 0) return;
+    if (access(dir.c_str(), R_OK) != 0) {
+        printError(format("warning: could not remove generations in: %1%") % dir);
+        return;
+    }
 
     bool canWrite = access(dir.c_str(), W_OK) == 0;
 
