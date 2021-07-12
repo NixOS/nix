@@ -211,6 +211,9 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
 
 void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun)
 {
+    if (timeSpec.empty() || timeSpec[timeSpec.size() - 1] != 'd')
+        throw Error("invalid number of days specifier '%1%', expected something like '14d'", timeSpec);
+
     time_t curTime = time(0);
     string strDays = string(timeSpec, 0, timeSpec.size() - 1);
     auto days = string2Int<int>(strDays);
