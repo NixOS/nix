@@ -82,18 +82,34 @@ struct PathInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
     {
+        std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
-        // FIXME: check whether access to 'path' is allowed.
+        if (path[0] != '/' && input.parent)
+        {
+            auto parent = canonPath(*input.parent);
 
-        auto storePath = store->maybeParseStorePath(path);
+            // the path isn't relative, prefix it
+            absPath = canonPath(parent + "/" + path);
+
+            // for security, ensure that if the parent is a store path, it's inside it
+            if (!parent.rfind(store->storeDir, 0) && absPath.rfind(store->storeDir, 0))
+                throw BadStorePath("relative path '%s' points outside of its parent's store path %s, this is a security violation", path, parent);
+        }
+        else
+        {
+            absPath = path;
+        }
+
+        // FIXME: check whether access to 'path' is allowed.
+        auto storePath = store->maybeParseStorePath(absPath);
 
         if (storePath)
             store->addTempRoot(*storePath);
 
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
             // FIXME: try to substitute storePath.
-            storePath = store->addToStore("source", path);
+            storePath = store->addToStore("source", absPath);
 
         return {
             Tree(store->toRealPath(*storePath), std::move(*storePath)),

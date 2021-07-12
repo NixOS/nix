@@ -38,6 +38,9 @@ struct Input
     bool immutable = false;
     bool direct = true;
 
+    /* path of the parent of this input, used for relative path resolution */
+    std::optional<Path> parent;
+
 public:
     static Input fromURL(const std::string & url);
 
