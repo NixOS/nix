@@ -20,6 +20,15 @@ let pkgs = rec {
     for pkg in $buildInputs; do
       export PATH=$PATH:$pkg/bin
     done
+
+    # mimic behavior of stdenv for `$out` etc. for structured attrs.
+    if [ -n "''${NIX_ATTRS_SH_FILE}" ]; then
+      for o in "''${!outputs[@]}"; do
+        eval "''${o}=''${outputs[$o]}"
+        export "''${o}"
+      done
+    fi
+
     declare -a arr1=(1 2 "3 4" 5)
     declare -a arr2=(x $'\n' $'x\ny')
     fun() {

@@ -697,6 +697,11 @@ public:
 
     const Stats & getStats();
 
+    /* Computes the full closure of of a set of store-paths for e.g.
+       derivations that need this information for `exportReferencesGraph`.
+     */
+    StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
+
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
     virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)

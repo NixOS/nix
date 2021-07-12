@@ -143,7 +143,6 @@ void DerivationGoal::work()
     (this->*state)();
 }
 
-
 void DerivationGoal::addWantedOutputs(const StringSet & outputs)
 {
     /* If we already want all outputs, there is nothing to do. */
@@ -1071,42 +1070,6 @@ HookReply DerivationGoal::tryBuildHook()
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
-}
-
-
-StorePathSet DerivationGoal::exportReferences(const StorePathSet & storePaths)
-{
-    StorePathSet paths;
-
-    for (auto & storePath : storePaths) {
-        if (!inputPaths.count(storePath))
-            throw BuildError("cannot export references of path '%s' because it is not in the input closure of the derivation", worker.store.printStorePath(storePath));
-
-        worker.store.computeFSClosure({storePath}, paths);
-    }
-
-    /* If there are derivations in the graph, then include their
-       outputs as well.  This is useful if you want to do things
-       like passing all build-time dependencies of some path to a
-       derivation that builds a NixOS DVD image. */
-    auto paths2 = paths;
-
-    for (auto & j : paths2) {
-        if (j.isDerivation()) {
-            Derivation drv = worker.store.derivationFromPath(j);
-            for (auto & k : drv.outputsAndOptPaths(worker.store)) {
-                if (!k.second.second)
-                    /* FIXME: I am confused why we are calling
-                       `computeFSClosure` on the output path, rather than
-                       derivation itself. That doesn't seem right to me, so I
-                       won't try to implemented this for CA derivations. */
-                    throw UnimplementedError("exportReferences on CA derivations is not yet implemented");
-                worker.store.computeFSClosure(*k.second.second, paths);
-            }
-        }
-    }
-
-    return paths;
 }
 
 

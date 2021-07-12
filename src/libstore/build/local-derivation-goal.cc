@@ -518,7 +518,7 @@ void LocalDerivationGoal::startBuilder()
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    exportReferences({storePath}), false, false));
+                    worker.store.exportReferences({storePath}, inputPaths), false, false));
         }
     }
 
@@ -1084,113 +1084,28 @@ void LocalDerivationGoal::initEnv()
 }
 
 
-static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
-
-
 void LocalDerivationGoal::writeStructuredAttrs()
 {
-    auto structuredAttrs = parsedDrv->getStructuredAttrs();
-    if (!structuredAttrs) return;
+    if (auto structAttrsJson = parsedDrv->prepareStructuredAttrs(worker.store, inputPaths)) {
+        auto json = structAttrsJson.value();
+        nlohmann::json rewritten;
+        for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
+            /* The placeholder must have a rewrite, so we use it to cover both the
+               cases where we know or don't know the output path ahead of time. */
+            rewritten[i] = rewriteStrings(v, inputRewrites);
+        }
 
-    auto json = *structuredAttrs;
+        json["outputs"] = rewritten;
 
-    /* Add an "outputs" object containing the output paths. */
-    nlohmann::json outputs;
-    for (auto & i : drv->outputs) {
-        /* The placeholder must have a rewrite, so we use it to cover both the
-           cases where we know or don't know the output path ahead of time. */
-        outputs[i.first] = rewriteStrings(hashPlaceholder(i.first), inputRewrites);
+        auto jsonSh = writeStructuredAttrsShell(json);
+
+        writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
+        chownToBuilder(tmpDir + "/.attrs.sh");
+        env["NIX_ATTRS_SH_FILE"] = tmpDir + "/.attrs.sh";
+        writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
+        chownToBuilder(tmpDir + "/.attrs.json");
+        env["NIX_ATTRS_JSON_FILE"] = tmpDir + "/.attrs.json";
     }
-    json["outputs"] = outputs;
-
-    /* Handle exportReferencesGraph. */
-    auto e = json.find("exportReferencesGraph");
-    if (e != json.end() && e->is_object()) {
-        for (auto i = e->begin(); i != e->end(); ++i) {
-            std::ostringstream str;
-            {
-                JSONPlaceholder jsonRoot(str, true);
-                StorePathSet storePaths;
-                for (auto & p : *i)
-                    storePaths.insert(worker.store.parseStorePath(p.get<std::string>()));
-                worker.store.pathInfoToJSON(jsonRoot,
-                    exportReferences(storePaths), false, true);
-            }
-            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
-        }
-    }
-
-    writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
-    chownToBuilder(tmpDir + "/.attrs.json");
-
-    /* As a convenience to bash scripts, write a shell file that
-       maps all attributes that are representable in bash -
-       namely, strings, integers, nulls, Booleans, and arrays and
-       objects consisting entirely of those values. (So nested
-       arrays or objects are not supported.) */
-
-    auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
-        if (value.is_string())
-            return shellEscape(value);
-
-        if (value.is_number()) {
-            auto f = value.get<float>();
-            if (std::ceil(f) == f)
-                return std::to_string(value.get<int>());
-        }
-
-        if (value.is_null())
-            return std::string("''");
-
-        if (value.is_boolean())
-            return value.get<bool>() ? std::string("1") : std::string("");
-
-        return {};
-    };
-
-    std::string jsonSh;
-
-    for (auto i = json.begin(); i != json.end(); ++i) {
-
-        if (!std::regex_match(i.key(), shVarName)) continue;
-
-        auto & value = i.value();
-
-        auto s = handleSimpleType(value);
-        if (s)
-            jsonSh += fmt("declare %s=%s\n", i.key(), *s);
-
-        else if (value.is_array()) {
-            std::string s2;
-            bool good = true;
-
-            for (auto i = value.begin(); i != value.end(); ++i) {
-                auto s3 = handleSimpleType(i.value());
-                if (!s3) { good = false; break; }
-                s2 += *s3; s2 += ' ';
-            }
-
-            if (good)
-                jsonSh += fmt("declare -a %s=(%s)\n", i.key(), s2);
-        }
-
-        else if (value.is_object()) {
-            std::string s2;
-            bool good = true;
-
-            for (auto i = value.begin(); i != value.end(); ++i) {
-                auto s3 = handleSimpleType(i.value());
-                if (!s3) { good = false; break; }
-                s2 += fmt("[%s]=%s ", shellEscape(i.key()), *s3);
-            }
-
-            if (good)
-                jsonSh += fmt("declare -A %s=(%s)\n", i.key(), s2);
-        }
-    }
-
-    writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-    chownToBuilder(tmpDir + "/.attrs.sh");
 }
 
 
