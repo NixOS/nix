@@ -41,10 +41,15 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 throw SysError("getting status of '%1%'", srcFile);
         } catch (SysError & e) {
             if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
-                warn("skipping dangling symlink '%s'", dstFile);
-                continue;
+                /* Use lstat() to populate srcSt for use with S_ISDIR() below. */
+                if (lstat(srcFile.c_str(), &srcSt) == -1) {
+                    warn("skipping dangling symlink '%s'", dstFile);
+                    continue;
+                }
+                warn("creating dangling symlink '%s'", dstFile);
+            } else {
+                throw;
             }
-            throw;
         }
 
         /* The files below are special-cased to that they don't show up

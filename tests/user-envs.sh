@@ -13,7 +13,7 @@ mkdir -p $TEST_HOME
 nix-env --switch-profile $profiles/test
 
 # Query available: should contain several.
-test "$(nix-env -f ./user-envs.nix -qa '*' | wc -l)" -eq 6
+test "$(nix-env -f ./user-envs.nix -qa '*' | wc -l)" -eq 7
 outPath10=$(nix-env -f ./user-envs.nix -qa --out-path --no-name '*' | grep foo-1.0)
 drvPath10=$(nix-env -f ./user-envs.nix -qa --drv-path --no-name '*' | grep foo-1.0)
 [ -n "$outPath10" -a -n "$drvPath10" ]
@@ -158,12 +158,13 @@ nix-env -q '*' | grep -q foo-2.0
 nix-env -e '*'
 (! nix-env -i foo-1.0 foo-2.0)
 
-# Installing "*" should install one foo and one bar.
+# Installing "*" should install one foo and one bar and the dangling-link
 nix-env -e '*'
 nix-env -i '*'
-test "$(nix-env -q '*' | wc -l)" -eq 2
+test "$(nix-env -q '*' | wc -l)" -eq 3
 nix-env -q '*' | grep -q foo-2.0
 nix-env -q '*' | grep -q bar-0.1.1
+nix-env -q '*' | grep -q dangling-link
 
 # Test priorities: foo-0.1 has a lower priority than foo-1.0, so it
 # should be possible to install both without a collision.  Also test
@@ -179,3 +180,16 @@ nix-env --set $outPath10
 [ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
 nix-env --set $drvPath10
 [ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
+
+# This tests behavior of the daemon that has not been backported to
+# previous versions, so for now we don't run it when we test with
+# other versions
+if [[ -n "${NIX_CLIENT_PACKAGE:-}" && -n "${NIX_DAEMON_PACKAGE:-}"
+    && "$NIX_CLIENT_PACKAGE" == "$NIX_DAEMON_PACKAGE" ]]; then
+    # Test that a derivation containing a symlink to a file that isn't
+    # accessible in the sandbox will still install the symlink
+    nix-env -e '*'
+    nix-env -i dangling-link
+    echo somevalue > $TEST_ROOT/somefile
+    [ "$(cat "$profiles"/test/link)" = "somevalue" ]
+fi
