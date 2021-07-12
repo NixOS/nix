@@ -130,6 +130,38 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
+                    if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "*") != m.systemTypes.end() ||
+                        std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "*") != m.supportedFeatures.end()) {
+                        // wildcard is used, so we need to ask the machine what it supports
+                        try {
+                            Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", m.storeUri));
+
+                            auto store = m.openStore();
+
+                            if (hasPrefix(m.storeUri, "ssh://"))
+                                throw Error("Cannot use wildcards with legacy ssh store. Instead use the ssh-ng:// protocol.");
+
+                            store->connect();
+
+                            if (std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "*") != m.supportedFeatures.end()) {
+                                m.supportedFeatures.erase("*");
+                                m.supportedFeatures.insert(store->systemFeatures.get().begin(), store->systemFeatures.get().end());
+                            }
+
+                            if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "*") != m.systemTypes.end()) {
+                                m.systemTypes.erase(std::find(m.systemTypes.begin(), m.systemTypes.end(), "*"));
+                                m.systemTypes.insert(m.systemTypes.end(), store->systemTypes.get().begin(), store->systemTypes.get().end());
+                            }
+                        } catch (std::exception & e) {
+                            auto msg = chomp(drainFD(5, false));
+                            printError("cannot connect to '%s': %s%s",
+                                bestMachine->storeUri, e.what(),
+                                msg.empty() ? "" : ": " + msg);
+                            m.enabled = false;
+                            continue;
+                        }
+                    }
+
                     if (m.enabled && std::find(m.systemTypes.begin(),
                             m.systemTypes.end(),
                             neededSystem) != m.systemTypes.end() &&

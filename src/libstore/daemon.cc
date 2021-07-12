@@ -915,6 +915,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopGetOptions: {
+        logger->startWork();
+        auto systemTypes = StringSet(settings.extraPlatforms.get());
+        systemTypes.insert(settings.thisSystem.get());
+        logger->stopWork();
+        worker_proto::write(*store, to, systemTypes);
+        worker_proto::write(*store, to, settings.systemFeatures.get());
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }

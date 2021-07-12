@@ -9,11 +9,11 @@ class Store;
 struct Machine {
 
     const string storeUri;
-    const std::vector<string> systemTypes;
+    std::vector<string> systemTypes;
     const string sshKey;
     const unsigned int maxJobs;
     const unsigned int speedFactor;
-    const std::set<string> supportedFeatures;
+    std::set<string> supportedFeatures;
     const std::set<string> mandatoryFeatures;
     const std::string sshPublicHostKey;
     bool enabled = true;

@@ -202,6 +202,10 @@ struct StoreConfig : public Config
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
 
+    Setting<StringSet> systemTypes{this, {},
+        "system-types",
+        "Optional system types this store can build on."};
+
 };
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
