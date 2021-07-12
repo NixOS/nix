@@ -126,6 +126,7 @@ bool ParsedDerivation::substitutesAllowed() const
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
     auto structuredAttrs = getStructuredAttrs();
@@ -135,9 +136,8 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
 
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputs;
-    for (auto & i : drv.outputs) {
+    for (auto & i : drv.outputs)
         outputs[i.first] = hashPlaceholder(i.first);
-    }
     json["outputs"] = outputs;
 
     /* Handle exportReferencesGraph. */
@@ -165,7 +165,7 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
    namely, strings, integers, nulls, Booleans, and arrays and
    objects consisting entirely of those values. (So nested
    arrays or objects are not supported.) */
-std::string writeStructuredAttrsShell(nlohmann::json & json)
+std::string writeStructuredAttrsShell(const nlohmann::json & json)
 {
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
@@ -189,42 +189,40 @@ std::string writeStructuredAttrsShell(nlohmann::json & json)
 
     std::string jsonSh;
 
-    for (auto i = json.begin(); i != json.end(); ++i) {
+    for (auto & [key, value] : json.items()) {
 
-        if (!std::regex_match(i.key(), shVarName)) continue;
-
-        auto & value = i.value();
+        if (!std::regex_match(key, shVarName)) continue;
 
         auto s = handleSimpleType(value);
         if (s)
-            jsonSh += fmt("declare %s=%s\n", i.key(), *s);
+            jsonSh += fmt("declare %s=%s\n", key, *s);
 
         else if (value.is_array()) {
             std::string s2;
             bool good = true;
 
-            for (auto i = value.begin(); i != value.end(); ++i) {
-                auto s3 = handleSimpleType(i.value());
+            for (auto & value2 : value) {
+                auto s3 = handleSimpleType(value2);
                 if (!s3) { good = false; break; }
                 s2 += *s3; s2 += ' ';
             }
 
             if (good)
-                jsonSh += fmt("declare -a %s=(%s)\n", i.key(), s2);
+                jsonSh += fmt("declare -a %s=(%s)\n", key, s2);
         }
 
         else if (value.is_object()) {
             std::string s2;
             bool good = true;
 
-            for (auto i = value.begin(); i != value.end(); ++i) {
-                auto s3 = handleSimpleType(i.value());
+            for (auto & [key2, value2] : value.items()) {
+                auto s3 = handleSimpleType(value2);
                 if (!s3) { good = false; break; }
-                s2 += fmt("[%s]=%s ", shellEscape(i.key()), *s3);
+                s2 += fmt("[%s]=%s ", shellEscape(key2), *s3);
             }
 
             if (good)
-                jsonSh += fmt("declare -A %s=(%s)\n", i.key(), s2);
+                jsonSh += fmt("declare -A %s=(%s)\n", key, s2);
         }
     }
 

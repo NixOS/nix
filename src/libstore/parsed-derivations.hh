@@ -40,6 +40,6 @@ public:
     std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
 };
 
-std::string writeStructuredAttrsShell(nlohmann::json & json);
+std::string writeStructuredAttrsShell(const nlohmann::json & json);
 
 }
