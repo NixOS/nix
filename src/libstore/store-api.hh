@@ -180,6 +180,8 @@ struct StoreConfig : public Config
 
     StoreConfig() = delete;
 
+    StringSet getDefaultSystemFeatures();
+
     virtual ~StoreConfig() { }
 
     virtual const std::string name() = 0;
@@ -196,7 +198,7 @@ struct StoreConfig : public Config
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
-    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
 
@@ -868,5 +870,10 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath);
 
 }

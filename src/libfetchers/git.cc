@@ -60,7 +60,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -167,9 +167,9 @@ struct GitInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        auto name = "source";
-
         Input input(_input);
+
+        std::string name = input.getName();
 
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
         bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
@@ -270,7 +270,7 @@ struct GitInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?

@@ -74,7 +74,7 @@ struct MercurialInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "hg") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash" && name != "name")
                 throw Error("unsupported Mercurial input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -147,9 +147,9 @@ struct MercurialInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        auto name = "source";
-
         Input input(_input);
+
+        auto name = input.getName();
 
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
@@ -193,7 +193,7 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 return {
                     Tree(store->toRealPath(storePath), std::move(storePath)),

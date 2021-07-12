@@ -1248,13 +1248,18 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
     // XXX: This should probably be allowed if the realisation corresponds to
     // an allowed derivation
-    { throw Error("queryRealisation"); }
+    {
+        if (!goal.isAllowed(id))
+            throw InvalidPath("cannot query an unknown output id '%s' in recursive Nix", id.to_string());
+        return next->queryRealisation(id);
+    }
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
 
         StorePathSet newPaths;
+        std::set<Realisation> newRealisations;
 
         for (auto & req : paths) {
             if (!goal.isAllowed(req))
@@ -1267,16 +1272,28 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             auto p =  std::get_if<DerivedPath::Built>(&path);
             if (!p) continue;
             auto & bfd = *p;
+            auto drv = readDerivation(bfd.drvPath);
+            auto drvHashes = staticOutputHashes(*this, drv);
             auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
             for (auto & [outputName, outputPath] : outputs)
-                if (wantOutput(outputName, bfd.outputs))
+                if (wantOutput(outputName, bfd.outputs)) {
                     newPaths.insert(outputPath);
+                    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+                        auto thisRealisation = next->queryRealisation(
+                            DrvOutput{drvHashes.at(outputName), outputName}
+                        );
+                        assert(thisRealisation);
+                        newRealisations.insert(*thisRealisation);
+                    }
+                }
         }
 
         StorePathSet closure;
         next->computeFSClosure(newPaths, closure);
         for (auto & path : closure)
             goal.addDependency(path);
+        for (auto & real : Realisation::closure(*next, newRealisations))
+            goal.addedDrvOutputs.insert(real.id);
     }
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
@@ -2379,6 +2396,7 @@ void LocalDerivationGoal::registerOutputs()
            floating CA derivations and hash-mismatching fixed-output
            derivations. */
         PathLocks dynamicOutputLock;
+        dynamicOutputLock.setDeletion(true);
         auto optFixedPath = output.path(worker.store, drv->name, outputName);
         if (!optFixedPath ||
             worker.store.printStorePath(*optFixedPath) != finalDestPath)

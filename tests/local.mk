@@ -2,6 +2,7 @@ nix_tests = \
   hash.sh lang.sh add.sh simple.sh dependencies.sh \
   config.sh \
   gc.sh \
+  ca/gc.sh \
   gc-concurrent.sh \
   gc-auto.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
@@ -38,6 +39,7 @@ nix_tests = \
   search.sh \
   nix-copy-ssh.sh \
   post-hook.sh \
+  ca/post-hook.sh \
   function-trace.sh \
   recursive.sh \
   describe-stores.sh \
@@ -46,9 +48,12 @@ nix_tests = \
   compute-levels.sh \
   ca/build.sh \
   ca/build-with-garbage-path.sh \
+  ca/duplicate-realisation-in-closure.sh \
   ca/substitute.sh \
   ca/signatures.sh \
+  ca/nix-shell.sh \
   ca/nix-run.sh \
+  ca/recursive.sh \
   ca/nix-copy.sh
   # parallel.sh
 

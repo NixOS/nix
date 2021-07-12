@@ -53,12 +53,15 @@ struct LocalStore::State::Stmts {
     SQLiteStmt InvalidatePath;
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
+    SQLiteStmt UpdateRealisedOutput;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
+    SQLiteStmt QueryRealisationReferences;
+    SQLiteStmt AddRealisationReference;
 };
 
 int getSchema(Path schemaPath)
@@ -76,7 +79,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 1;
+    const int nixCASchemaVersion = 2;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -94,7 +97,39 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
               #include "ca-specific-schema.sql.gen.hh"
                 ;
             db.exec(schema);
+            curCASchema = nixCASchemaVersion;
         }
+
+        if (curCASchema < 2) {
+            SQLiteTxn txn(db);
+            // Ugly little sql dance to add a new `id` column and make it the primary key
+            db.exec(R"(
+                create table Realisations2 (
+                    id integer primary key autoincrement not null,
+                    drvPath text not null,
+                    outputName text not null, -- symbolic output id, usually "out"
+                    outputPath integer not null,
+                    signatures text, -- space-separated list
+                    foreign key (outputPath) references ValidPaths(id) on delete cascade
+                );
+                insert into Realisations2 (drvPath, outputName, outputPath, signatures)
+                    select drvPath, outputName, outputPath, signatures from Realisations;
+                drop table Realisations;
+                alter table Realisations2 rename to Realisations;
+            )");
+            db.exec(R"(
+                create index if not exists IndexRealisations on Realisations(drvPath, outputName);
+
+                create table if not exists RealisationsRefs (
+                    referrer integer not null,
+                    realisationReference integer,
+                    foreign key (referrer) references Realisations(id) on delete cascade,
+                    foreign key (realisationReference) references Realisations(id) on delete restrict
+                );
+            )");
+            txn.commit();
+        }
+
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
         lockFile(lockFd.get(), ltRead, true);
     }
@@ -311,9 +346,18 @@ LocalStore::LocalStore(const Params & params)
                 values (?, ?, (select id from ValidPaths where path = ?), ?)
                 ;
             )");
+        state->stmts->UpdateRealisedOutput.create(state->db,
+            R"(
+                update Realisations
+                    set signatures = ?
+                where
+                    drvPath = ? and
+                    outputName = ?
+                ;
+            )");
         state->stmts->QueryRealisedOutput.create(state->db,
             R"(
-                select Output.path, Realisations.signatures from Realisations
+                select Realisations.id, Output.path, Realisations.signatures from Realisations
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ? and outputName = ?
                     ;
@@ -324,6 +368,19 @@ LocalStore::LocalStore(const Params & params)
                     inner join ValidPaths as Output on Output.id = Realisations.outputPath
                     where drvPath = ?
                     ;
+            )");
+        state->stmts->QueryRealisationReferences.create(state->db,
+            R"(
+                select drvPath, outputName from Realisations
+                    join RealisationsRefs on realisationReference = Realisations.id
+                    where referrer = ?;
+            )");
+        state->stmts->AddRealisationReference.create(state->db,
+            R"(
+                insert or replace into RealisationsRefs (referrer, realisationReference)
+                values (
+                    ?,
+                    (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
 }
@@ -661,14 +718,54 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
 void LocalStore::registerDrvOutput(const Realisation & info)
 {
     settings.requireExperimentalFeature("ca-derivations");
-    auto state(_state.lock());
     retrySQLite<void>([&]() {
-        state->stmts->RegisterRealisedOutput.use()
-            (info.id.strHash())
-            (info.id.outputName)
-            (printStorePath(info.outPath))
-            (concatStringsSep(" ", info.signatures))
-            .exec();
+        auto state(_state.lock());
+        if (auto oldR = queryRealisation_(*state, info.id)) {
+            if (info.isCompatibleWith(*oldR)) {
+                auto combinedSignatures = oldR->signatures;
+                combinedSignatures.insert(info.signatures.begin(),
+                    info.signatures.end());
+                state->stmts->UpdateRealisedOutput.use()
+                    (concatStringsSep(" ", combinedSignatures))
+                    (info.id.strHash())
+                    (info.id.outputName)
+                    .exec();
+            } else {
+                throw Error("Trying to register a realisation of '%s', but we already "
+                            "have another one locally.\n"
+                            "Local:  %s\n"
+                            "Remote: %s",
+                    info.id.to_string(),
+                    printStorePath(oldR->outPath),
+                    printStorePath(info.outPath)
+                );
+            }
+        } else {
+            state->stmts->RegisterRealisedOutput.use()
+                (info.id.strHash())
+                (info.id.outputName)
+                (printStorePath(info.outPath))
+                (concatStringsSep(" ", info.signatures))
+                .exec();
+        }
+        uint64_t myId = state->db.getLastInsertedRowId();
+        for (auto & [outputId, depPath] : info.dependentRealisations) {
+            auto localRealisation = queryRealisationCore_(*state, outputId);
+            if (!localRealisation)
+                throw Error("unable to register the derivation '%s' as it "
+                            "depends on the non existent '%s'",
+                    info.id.to_string(), outputId.to_string());
+            if (localRealisation->second.outPath != depPath)
+                throw Error("unable to register the derivation '%s' as it "
+                            "depends on a realisation of '%s' that doesn’t"
+                            "match what we have locally",
+                    info.id.to_string(), outputId.to_string());
+            state->stmts->AddRealisationReference.use()
+                (myId)
+                (outputId.strHash())
+                (outputId.outputName)
+                .exec();
+        }
     });
 }
 
@@ -1679,22 +1776,68 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
-std::optional<const Realisation> LocalStore::queryRealisation(
-    const DrvOutput& id) {
-    typedef std::optional<const Realisation> Ret;
-    return retrySQLite<Ret>([&]() -> Ret {
-        auto state(_state.lock());
-        auto use(state->stmts->QueryRealisedOutput.use()(id.strHash())(
-            id.outputName));
-        if (!use.next())
-            return std::nullopt;
-        auto outputPath = parseStorePath(use.getStr(0));
-        auto signatures = tokenizeString<StringSet>(use.getStr(1));
-        return Ret{Realisation{
-            .id = id, .outPath = outputPath, .signatures = signatures}};
-    });
+std::optional<std::pair<int64_t, Realisation>> LocalStore::queryRealisationCore_(
+        LocalStore::State & state,
+        const DrvOutput & id)
+{
+    auto useQueryRealisedOutput(
+            state.stmts->QueryRealisedOutput.use()
+                (id.strHash())
+                (id.outputName));
+    if (!useQueryRealisedOutput.next())
+        return std::nullopt;
+    auto realisationDbId = useQueryRealisedOutput.getInt(0);
+    auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
+    auto signatures =
+        tokenizeString<StringSet>(useQueryRealisedOutput.getStr(2));
+
+    return {{
+        realisationDbId,
+        Realisation{
+            .id = id,
+            .outPath = outputPath,
+            .signatures = signatures,
+        }
+    }};
 }
 
+std::optional<const Realisation> LocalStore::queryRealisation_(
+            LocalStore::State & state,
+            const DrvOutput & id)
+{
+    auto maybeCore = queryRealisationCore_(state, id);
+    if (!maybeCore)
+        return std::nullopt;
+    auto [realisationDbId, res] = *maybeCore;
+
+    std::map<DrvOutput, StorePath> dependentRealisations;
+    auto useRealisationRefs(
+        state.stmts->QueryRealisationReferences.use()
+            (realisationDbId));
+    while (useRealisationRefs.next()) {
+        auto depId = DrvOutput {
+            Hash::parseAnyPrefixed(useRealisationRefs.getStr(0)),
+            useRealisationRefs.getStr(1),
+        };
+        auto dependentRealisation = queryRealisationCore_(state, depId);
+        assert(dependentRealisation); // Enforced by the db schema
+        auto outputPath = dependentRealisation->second.outPath;
+        dependentRealisations.insert({depId, outputPath});
+    }
+
+    res.dependentRealisations = dependentRealisations;
+
+    return { res };
+}
+
+std::optional<const Realisation>
+LocalStore::queryRealisation(const DrvOutput & id)
+{
+    return retrySQLite<std::optional<const Realisation>>([&]() {
+        auto state(_state.lock());
+        return queryRealisation_(*state, id);
+    });
+}
 
 FixedOutputHash LocalStore::hashCAPath(
     const FileIngestionMethod & method, const HashType & hashType,

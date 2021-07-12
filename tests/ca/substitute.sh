@@ -17,11 +17,15 @@ buildDrvs () {
 
 # Populate the remote cache
 clearStore
-buildDrvs --post-build-hook ../push-to-store.sh
+nix copy --to $REMOTE_STORE --file ./content-addressed.nix
 
 # Restart the build on an empty store, ensuring that we don't build
 clearStore
-buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0
+buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0 transitivelyDependentCA
+# Check that the thing we’ve just substituted has its realisation stored
+nix realisation info --file ./content-addressed.nix transitivelyDependentCA
+# Check that its dependencies have it too
+nix realisation info --file ./content-addressed.nix dependentCA rootCA
 
 # Same thing, but
 # 1. With non-ca derivations

@@ -1,6 +1,18 @@
-{ inNixShell ? false }:
+{ inNixShell ? false, contentAddressed ? false }:
 
-with import ./config.nix;
+let cfg = import ./config.nix; in
+with cfg;
+
+let
+  mkDerivation =
+    if contentAddressed then
+      args: cfg.mkDerivation ({
+        __contentAddressed = true;
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+      } // args)
+    else cfg.mkDerivation;
+in
 
 let pkgs = rec {
   setupSh = builtins.toFile "setup" ''
@@ -16,6 +28,12 @@ let pkgs = rec {
         export "''${o}"
       done
     fi
+
+    declare -a arr1=(1 2 "3 4" 5)
+    declare -a arr2=(x $'\n' $'x\ny')
+    fun() {
+      echo blabla
+    }
   '';
 
   stdenv = mkDerivation {
@@ -30,6 +48,8 @@ let pkgs = rec {
     name = "shellDrv";
     builder = "/does/not/exist";
     VAR_FROM_NIX = "bar";
+    ASCII_PERCENT = "%";
+    ASCII_AT = "@";
     TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
     outputs = ["dev" "out"];

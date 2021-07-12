@@ -35,5 +35,3 @@ nix-store --init
 
 # Did anything happen?
 test -e "$NIX_STATE_DIR"/db/db.sqlite
-
-echo 'Hello World' > ./dummy

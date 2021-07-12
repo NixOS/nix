@@ -4,7 +4,7 @@ clearStore
 
 rm -f $TEST_ROOT/result
 
-export REMOTE_STORE=$TEST_ROOT/remote_store
+export REMOTE_STORE=file:$TEST_ROOT/remote_store
 
 # Build the dependencies and push them to the remote store
 nix-build -o $TEST_ROOT/result dependencies.nix --post-build-hook $PWD/push-to-store.sh

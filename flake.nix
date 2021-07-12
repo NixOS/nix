@@ -20,6 +20,8 @@
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
       systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
 
+      crossSystems = [ "armv6l-linux" "armv7l-linux" ];
+
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
 
       # Memoize nixpkgs for different platforms for efficiency.
@@ -79,7 +81,7 @@
             buildPackages.mercurial
             buildPackages.jq
           ]
-          ++ lib.optionals stdenv.isLinux [(pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)];
+          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
           [ curl
@@ -93,7 +95,7 @@
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-          ++ lib.optional stdenv.isx86_64 libcpuid;
+          ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
           (aws-sdk-cpp.override {
@@ -102,7 +104,13 @@
           });
 
         propagatedDeps =
-          [ (boehmgc.override { enableLargeConfig = true; })
+          [ ((boehmgc.override {
+              enableLargeConfig = true;
+            }).overrideAttrs(o: {
+              patches = (o.patches or []) ++ [
+                ./boehmgc-coroutine-sp-fallback.diff
+              ];
+            }))
           ];
 
         perlDeps =
@@ -133,10 +141,11 @@
 
             substitute ${./scripts/install.in} $out/install \
               ${pkgs.lib.concatMapStrings
-                (system:
-                  '' \
-                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
-                  --replace '@tarballPath_${system}@' $(tarballPath ${self.hydraJobs.binaryTarball.${system}}/*.tar.xz) \
+                (system: let
+                    tarball = if builtins.elem system crossSystems then self.hydraJobs.binaryTarballCross.x86_64-linux.${system} else self.hydraJobs.binaryTarball.${system};
+                  in '' \
+                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
+                  --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
                   ''
                 )
                 systems
@@ -173,6 +182,77 @@
         installCheckPhase = "make installcheck";
 
       };
+
+      binaryTarball = buildPackages: nix: pkgs: let
+        inherit (pkgs) cacert;
+        installerClosureInfo = buildPackages.closureInfo { rootPaths = [ nix cacert ]; };
+      in
+
+      buildPackages.runCommand "nix-binary-tarball-${version}"
+        { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
+          meta.description = "Distribution-independent Nix bootstrap binaries for ${pkgs.system}";
+        }
+        ''
+          cp ${installerClosureInfo}/registration $TMPDIR/reginfo
+          cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
+          substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
+            --subst-var-by nix ${nix} \
+            --subst-var-by cacert ${cacert}
+
+          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
+            --subst-var-by nix ${nix} \
+            --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
+            --subst-var-by nix ${nix} \
+            --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
+            --subst-var-by nix ${nix} \
+            --subst-var-by cacert ${cacert}
+
+          if type -p shellcheck; then
+            # SC1090: Don't worry about not being able to find
+            #         $nix/etc/profile.d/nix.sh
+            shellcheck --exclude SC1090 $TMPDIR/install
+            shellcheck $TMPDIR/create-darwin-volume.sh
+            shellcheck $TMPDIR/install-darwin-multi-user.sh
+            shellcheck $TMPDIR/install-systemd-multi-user.sh
+
+            # SC1091: Don't panic about not being able to source
+            #         /etc/profile
+            # SC2002: Ignore "useless cat" "error", when loading
+            #         .reginfo, as the cat is a much cleaner
+            #         implementation, even though it is "useless"
+            # SC2116: Allow ROOT_HOME=$(echo ~root) for resolving
+            #         root's home directory
+            shellcheck --external-sources \
+              --exclude SC1091,SC2002,SC2116 $TMPDIR/install-multi-user
+          fi
+
+          chmod +x $TMPDIR/install
+          chmod +x $TMPDIR/create-darwin-volume.sh
+          chmod +x $TMPDIR/install-darwin-multi-user.sh
+          chmod +x $TMPDIR/install-systemd-multi-user.sh
+          chmod +x $TMPDIR/install-multi-user
+          dir=nix-${version}-${pkgs.system}
+          fn=$out/$dir.tar.xz
+          mkdir -p $out/nix-support
+          echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
+          tar cvfJ $fn \
+            --owner=0 --group=0 --mode=u+rw,uga+r \
+            --absolute-names \
+            --hard-dereference \
+            --transform "s,$TMPDIR/install,$dir/install," \
+            --transform "s,$TMPDIR/create-darwin-volume.sh,$dir/create-darwin-volume.sh," \
+            --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
+            --transform "s,$NIX_STORE,$dir/store,S" \
+            $TMPDIR/install \
+            $TMPDIR/create-darwin-volume.sh \
+            $TMPDIR/install-darwin-multi-user.sh \
+            $TMPDIR/install-systemd-multi-user.sh \
+            $TMPDIR/install-multi-user \
+            $TMPDIR/reginfo \
+            $(cat ${installerClosureInfo}/store-paths)
+        '';
 
     in {
 
@@ -285,7 +365,7 @@
 
           outputs = [ "out" "bin" "dev" ];
 
-          nativeBuildInputs = [ which ];
+          nativeBuildInputs = [ buildPackages.which ];
 
           configurePhase = ''
               ${if (stdenv.isDarwin && stdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
@@ -304,92 +384,33 @@
 
         buildStatic = nixpkgs.lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
+        buildCross = nixpkgs.lib.genAttrs crossSystems (crossSystem:
+          nixpkgs.lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
+
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
         # the installation script.
-        binaryTarball = nixpkgs.lib.genAttrs systems (system:
+        binaryTarball = nixpkgs.lib.genAttrs systems (system: binaryTarball nixpkgsFor.${system} nixpkgsFor.${system}.nix nixpkgsFor.${system});
 
-          with nixpkgsFor.${system};
-
-          let
-            installerClosureInfo = closureInfo { rootPaths = [ nix cacert ]; };
-          in
-
-          runCommand "nix-binary-tarball-${version}"
-            { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
-              meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
-            }
-            ''
-              cp ${installerClosureInfo}/registration $TMPDIR/reginfo
-              cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-              substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-                --subst-var-by nix ${nix} \
-                --subst-var-by cacert ${cacert}
-
-              substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
-                --subst-var-by nix ${nix} \
-                --subst-var-by cacert ${cacert}
-              substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
-                --subst-var-by nix ${nix} \
-                --subst-var-by cacert ${cacert}
-              substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
-                --subst-var-by nix ${nix} \
-                --subst-var-by cacert ${cacert}
-
-              if type -p shellcheck; then
-                # SC1090: Don't worry about not being able to find
-                #         $nix/etc/profile.d/nix.sh
-                shellcheck --exclude SC1090 $TMPDIR/install
-                shellcheck $TMPDIR/create-darwin-volume.sh
-                shellcheck $TMPDIR/install-darwin-multi-user.sh
-                shellcheck $TMPDIR/install-systemd-multi-user.sh
-
-                # SC1091: Don't panic about not being able to source
-                #         /etc/profile
-                # SC2002: Ignore "useless cat" "error", when loading
-                #         .reginfo, as the cat is a much cleaner
-                #         implementation, even though it is "useless"
-                # SC2116: Allow ROOT_HOME=$(echo ~root) for resolving
-                #         root's home directory
-                shellcheck --external-sources \
-                  --exclude SC1091,SC2002,SC2116 $TMPDIR/install-multi-user
-              fi
-
-              chmod +x $TMPDIR/install
-              chmod +x $TMPDIR/create-darwin-volume.sh
-              chmod +x $TMPDIR/install-darwin-multi-user.sh
-              chmod +x $TMPDIR/install-systemd-multi-user.sh
-              chmod +x $TMPDIR/install-multi-user
-              dir=nix-${version}-${system}
-              fn=$out/$dir.tar.xz
-              mkdir -p $out/nix-support
-              echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
-              tar cvfJ $fn \
-                --owner=0 --group=0 --mode=u+rw,uga+r \
-                --absolute-names \
-                --hard-dereference \
-                --transform "s,$TMPDIR/install,$dir/install," \
-                --transform "s,$TMPDIR/create-darwin-volume.sh,$dir/create-darwin-volume.sh," \
-                --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
-                --transform "s,$NIX_STORE,$dir/store,S" \
-                $TMPDIR/install \
-                $TMPDIR/create-darwin-volume.sh \
-                $TMPDIR/install-darwin-multi-user.sh \
-                $TMPDIR/install-systemd-multi-user.sh \
-                $TMPDIR/install-multi-user \
-                $TMPDIR/reginfo \
-                $(cat ${installerClosureInfo}/store-paths)
-            '');
+        binaryTarballCross = nixpkgs.lib.genAttrs ["x86_64-linux"] (system: builtins.listToAttrs (map (crossSystem: {
+          name = crossSystem;
+          value = let
+            nixpkgsCross = import nixpkgs {
+              inherit system crossSystem;
+              overlays = [ self.overlay ];
+            };
+          in binaryTarball nixpkgsFor.${system} self.packages.${system}."nix-${crossSystem}" nixpkgsCross;
+        }) crossSystems));
 
         # The first half of the installation script. This is uploaded
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
-        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" ];
+        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
+        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
 
         # Line coverage analysis.
         coverage =
@@ -483,11 +504,14 @@
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out";
-      });
+      } // (if system == "x86_64-linux" then (builtins.listToAttrs (map (crossSystem: {
+        name = "binaryTarball-${crossSystem}";
+        value = self.hydraJobs.binaryTarballCross.${system}.${crossSystem};
+      }) crossSystems)) else {}));
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
-      } // nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
+      } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = let
           nixpkgs = nixpkgsFor.${system}.pkgsStatic;
         in with commonDeps nixpkgs; nixpkgs.stdenv.mkDerivation {
@@ -525,8 +549,49 @@
           stripAllList = ["bin"];
 
           strictDeps = true;
+
+          hardeningDisable = [ "pie" ];
         };
-      });
+      } // builtins.listToAttrs (map (crossSystem: {
+        name = "nix-${crossSystem}";
+        value = let
+          nixpkgsCross = import nixpkgs {
+            inherit system crossSystem;
+            overlays = [ self.overlay ];
+          };
+        in with commonDeps nixpkgsCross; nixpkgsCross.stdenv.mkDerivation {
+          name = "nix-${version}";
+
+          src = self;
+
+          VERSION_SUFFIX = versionSuffix;
+
+          outputs = [ "out" "dev" "doc" ];
+
+          nativeBuildInputs = nativeBuildDeps;
+          buildInputs = buildDeps ++ propagatedDeps;
+
+          configureFlags = [ "--sysconfdir=/etc" "--disable-doc-gen" ];
+
+          enableParallelBuilding = true;
+
+          makeFlags = "profiledir=$(out)/etc/profile.d";
+
+          doCheck = true;
+
+          installFlags = "sysconfdir=$(out)/etc";
+
+          postInstall = ''
+            mkdir -p $doc/nix-support
+            echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+            mkdir -p $out/nix-support
+            echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
+          '';
+
+          doInstallCheck = true;
+          installCheckFlags = "sysconfdir=$(out)/etc";
+        };
+      }) crossSystems)));
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
 

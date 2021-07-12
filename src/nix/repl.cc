@@ -104,6 +104,26 @@ NixRepl::~NixRepl()
     write_history(historyFile.c_str());
 }
 
+string runNix(Path program, const Strings & args,
+    const std::optional<std::string> & input = {})
+{
+    auto experimentalFeatures = concatStringsSep(" ", settings.experimentalFeatures.get());
+    auto nixConf = getEnv("NIX_CONFIG").value_or("");
+    nixConf.append("\nexperimental-features = " + experimentalFeatures);
+    auto subprocessEnv = getEnv();
+    subprocessEnv["NIX_CONFIG"] = nixConf;
+    RunOptions opts(settings.nixBinDir+ "/" + program, args);
+    opts.input = input;
+    opts.environment = subprocessEnv;
+
+    auto res = runProgram(opts);
+
+    if (!statusOk(res.first))
+        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+
+    return res.second;
+}
+
 static NixRepl * curRepl; // ugly
 
 static char * completionCallback(char * s, int *match) {
@@ -463,7 +483,7 @@ bool NixRepl::processLine(string line)
         state->callFunction(f, v, result, Pos());
 
         StorePath drvPath = getDerivationPath(result);
-        runProgram(settings.nixBinDir + "/nix-shell", true, {state->store->printStorePath(drvPath)});
+        runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
@@ -477,7 +497,7 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             try {
-                runProgram(settings.nixBinDir + "/nix", true, {"build", "--no-link", drvPathRaw});
+                runNix("nix", {"build", "--no-link", drvPathRaw});
                 auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputsAndOptPaths(*state->store))
@@ -485,9 +505,9 @@ bool NixRepl::processLine(string line)
             } catch (ExecError &) {
             }
         } else if (command == ":i") {
-            runProgram(settings.nixBinDir + "/nix-env", true, {"-i", drvPathRaw});
+            runNix("nix-env", {"-i", drvPathRaw});
         } else {
-            runProgram(settings.nixBinDir + "/nix-shell", true, {drvPathRaw});
+            runNix("nix-shell", {drvPathRaw});
         }
     }
 
