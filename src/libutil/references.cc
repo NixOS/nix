@@ -5,6 +5,7 @@
 
 #include <map>
 #include <cstdlib>
+#include <algorithm>
 
 
 namespace nix {
@@ -117,9 +118,19 @@ PathSet scanForReferences(Sink & toTee,
 
 
 RewritingSink::RewritingSink(const std::string & from, const std::string & to, Sink & nextSink)
-    : from(from), to(to), nextSink(nextSink)
+    : RewritingSink({{from, to}}, nextSink)
 {
-    assert(from.size() == to.size());
+}
+
+RewritingSink::RewritingSink(const StringMap & rewrites, Sink & nextSink)
+    : rewrites(rewrites), nextSink(nextSink)
+{
+    long unsigned int maxRewriteSize = 0;
+    for (auto & [from, to] : rewrites) {
+        assert(from.size() == to.size());
+        maxRewriteSize = std::max(maxRewriteSize, from.size());
+    }
+    this->maxRewriteSize = maxRewriteSize;
 }
 
 void RewritingSink::operator () (std::string_view data)
@@ -127,13 +138,13 @@ void RewritingSink::operator () (std::string_view data)
     std::string s(prev);
     s.append(data);
 
-    size_t j = 0;
-    while ((j = s.find(from, j)) != string::npos) {
-        matches.push_back(pos + j);
-        s.replace(j, from.size(), to);
-    }
+    s = rewriteStrings(s, rewrites);
 
-    prev = s.size() < from.size() ? s : std::string(s, s.size() - from.size() + 1, from.size() - 1);
+    prev = s.size() < maxRewriteSize
+        ? s
+        : maxRewriteSize == 0
+            ? ""
+            : std::string(s, s.size() - maxRewriteSize + 1, maxRewriteSize - 1);
 
     auto consumed = s.size() - prev.size();
 
