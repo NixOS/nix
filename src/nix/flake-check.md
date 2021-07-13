@@ -33,6 +33,7 @@ The following flake output attributes must be derivations:
 * `checks.`*system*`.`*name*
 * `defaultPackage.`*system*`
 * `devShell.`*system*`
+* `devShells.`*system*`.`*name*`
 * `nixosConfigurations.`*name*`.config.system.build.toplevel
 * `packages.`*system*`.`*name*
 

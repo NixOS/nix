@@ -486,7 +486,7 @@ struct CmdFlakeCheck : FlakeCommand
                             }
                         }
 
-                        else if (name == "packages") {
+                        else if (name == "packages" || name == "devShells") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(attr.name, *attr.pos);
