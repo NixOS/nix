@@ -38,11 +38,13 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
     loc->first_line = loc->last_line;
     loc->first_column = loc->last_column;
 
-    while (len--) {
+    for (size_t i = 0; i < len; i++) {
        switch (*s++) {
        case '\r':
-           if (*s == '\n') /* cr/lf */
+           if (*s == '\n') { /* cr/lf */
+               i++;
                s++;
+           }
            /* fall through */
        case '\n':
            ++loc->last_line;
