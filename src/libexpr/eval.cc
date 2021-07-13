@@ -1863,7 +1863,17 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     else {
         auto p = settings.readOnlyMode
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
-            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+            : [&] {
+              // show paths we're copying, unless they're already in the store.
+              std::unique_ptr<PushActivity> pact;
+              auto path_to_add = checkSourcePath(path);
+              if (!store->isInStore(path) || repair) {
+                Activity act(*logger, lvlInfo, actCopyPath, fmt("copying path '%s'", path_to_add));
+                pact = std::unique_ptr<PushActivity>(new PushActivity(act.id));
+              }
+              return store->addToStore(std::string(baseNameOf(path)), path_to_add, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+            } ();
+
         dstPath = store->printStorePath(p);
         srcToStore.insert_or_assign(path, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
