@@ -24,7 +24,7 @@ Machine::Machine(decltype(storeUri) storeUri,
         || hasPrefix(storeUri, "auto")
         || hasPrefix(storeUri, "/")
         ? storeUri
-        : "ssh://" + storeUri),
+        : "ssh-ng://" + storeUri),
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
