@@ -46,6 +46,7 @@ nix_tests = \
   flakes.sh \
   build.sh \
   compute-levels.sh \
+  check-imports.sh \
   ca/build.sh \
   ca/build-with-garbage-path.sh \
   ca/duplicate-realisation-in-closure.sh \
