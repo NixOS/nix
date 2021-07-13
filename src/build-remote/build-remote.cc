@@ -133,13 +133,14 @@ static int main_build_remote(int argc, char * * argv)
                     if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "*") != m.systemTypes.end() ||
                         std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "*") != m.supportedFeatures.end()) {
                         // wildcard is used, so we need to ask the machine what it supports
+
+                        if (hasPrefix(m.storeUri, "ssh://"))
+                            throw Error("Cannot use wildcards with legacy ssh store. Instead use the ssh-ng:// protocol.");
+
                         try {
                             Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", m.storeUri));
 
                             auto store = m.openStore();
-
-                            if (hasPrefix(m.storeUri, "ssh://"))
-                                throw Error("Cannot use wildcards with legacy ssh store. Instead use the ssh-ng:// protocol.");
 
                             store->connect();
 
