@@ -486,7 +486,7 @@ struct CmdFlakeCheck : FlakeCommand
                             }
                         }
 
-                        else if (name == "packages") {
+                        else if (name == "packages" || name == "devShells") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(attr.name, *attr.pos);
@@ -914,6 +914,7 @@ struct CmdFlakeShow : FlakeCommand
                     logger->cout("%s: %s '%s'",
                         headerPrefix,
                         attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
+                        attrPath.size() >= 2 && attrPath[0] == "devShells" ? "development environment" :
                         attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
                         attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
                         "package",
@@ -932,6 +933,7 @@ struct CmdFlakeShow : FlakeCommand
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPath[0] == "checks"
                             || attrPath[0] == "packages"
+                            || attrPath[0] == "devShells"
                             || attrPath[0] == "apps"))
                     )
                 {
@@ -940,7 +942,7 @@ struct CmdFlakeShow : FlakeCommand
 
                 else if (
                     (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell"))
-                    || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages"))
+                    || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages" || attrPath[0] == "devShells"))
                     )
                 {
                     if (visitor.isDerivation())
