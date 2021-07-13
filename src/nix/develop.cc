@@ -326,6 +326,12 @@ struct Common : InstallableCommand, MixProfile
     {
         return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
     }
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();
+        res.emplace_front("devShells." + settings.thisSystem.get());
+        return res;
+    }
 
     StorePath getShellOutPath(ref<Store> store)
     {
