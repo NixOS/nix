@@ -1754,7 +1754,7 @@ void LocalDerivationGoal::runChild()
                 /* N.B. it is realistic that these paths might not exist. It
                    happens when testing Nix building fixed-output derivations
                    within a pure derivation. */
-                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts", "/var/run/nscd/socket" })
+                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts" })
                     if (pathExists(path))
                         ss.push_back(path);
             }
