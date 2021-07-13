@@ -3648,7 +3648,10 @@ void EvalState::createBaseEnv()
     }
 
     if (!evalSettings.pureEval) {
-        mkString(v, settings.thisSystem.get());
+        if (settings.evalSystem.get() != "")
+            mkString(v, settings.evalSystem.get());
+        else
+            mkString(v, settings.thisSystem.get());
         addConstant("__currentSystem", v);
     }
 

@@ -172,6 +172,19 @@ public:
           at build time.
         )"};
 
+    Setting<std::string> evalSystem{
+        this, "", "eval-system",
+        R"(
+          This option specifies the canonical Nix system name to
+          report when evaluating Nix expressions. This can be accessed
+          via builtins.currentSystem. Unlike `system`, this setting
+          does not change what kind of derivations can be built
+          locally. This is useful for evaluating Nix on your system
+          but building the derivation on remote builders.
+
+          It defaults to `system` when unset.
+        )"};
+
     Setting<time_t> maxSilentTime{
         this, 0, "max-silent-time",
         R"(
