@@ -9,7 +9,7 @@ class Store;
 struct Machine {
 
     const string storeUri;
-    std::vector<string> systemTypes;
+    std::set<string> systemTypes;
     const string sshKey;
     const unsigned int maxJobs;
     const unsigned int speedFactor;

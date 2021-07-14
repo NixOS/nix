@@ -130,8 +130,8 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
-                    if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "*") != m.systemTypes.end() ||
-                        std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "*") != m.supportedFeatures.end()) {
+                    if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "auto") != m.systemTypes.end() ||
+                        std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "auto") != m.supportedFeatures.end()) {
                         // wildcard is used, so we need to ask the machine what it supports
 
                         if (hasPrefix(m.storeUri, "ssh://"))
@@ -144,19 +144,25 @@ static int main_build_remote(int argc, char * * argv)
 
                             store->connect();
 
-                            if (std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "*") != m.supportedFeatures.end()) {
-                                m.supportedFeatures.erase("*");
-                                m.supportedFeatures.insert(store->systemFeatures.get().begin(), store->systemFeatures.get().end());
+                            {
+                                auto autoIter = std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "auto");
+                                if (autoIter != m.supportedFeatures.end()) {
+                                    m.supportedFeatures.insert(store->systemFeatures.get().begin(), store->systemFeatures.get().end());
+                                    m.supportedFeatures.erase(autoIter);
+                                }
                             }
 
-                            if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "*") != m.systemTypes.end()) {
-                                m.systemTypes.erase(std::find(m.systemTypes.begin(), m.systemTypes.end(), "*"));
-                                m.systemTypes.insert(m.systemTypes.end(), store->systemTypes.get().begin(), store->systemTypes.get().end());
+                            {
+                                auto autoIter = std::find(m.systemTypes.begin(), m.systemTypes.end(), "auto");
+                                if (autoIter != m.systemTypes.end()) {
+                                    m.systemTypes.insert(store->systemTypes.get().begin(), store->systemTypes.get().end());
+                                    m.systemTypes.erase(autoIter);
+                                }
                             }
                         } catch (std::exception & e) {
                             auto msg = chomp(drainFD(5, false));
                             printError("cannot connect to '%s': %s%s",
-                                bestMachine->storeUri, e.what(),
+                                m.storeUri, e.what(),
                                 msg.empty() ? "" : ": " + msg);
                             m.enabled = false;
                             continue;
@@ -237,7 +243,7 @@ static int main_build_remote(int argc, char * * argv)
 
                         for (auto & m : machines)
                             error
-                                % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                                % concatStringsSep<StringSet>(", ", m.systemTypes)
                                 % m.maxJobs
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);

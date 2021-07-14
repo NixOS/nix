@@ -81,7 +81,9 @@ default, set it to `-`.
 2.  A comma-separated list of Nix platform type identifiers, such as
     `x86_64-darwin`. It is possible for a machine to support multiple
     platform types, e.g., `i686-linux,x86_64-linux`. If omitted, this
-    defaults to the local platform type.
+    defaults to the local platform type. To allow the builder to specify
+    its supported platform types, you can set `auto` here (only
+    supported with the `ssh-ng://` protocol).
 
 3.  The SSH identity file to be used to log in to the remote machine. If
     omitted, SSH will use its regular identities.
@@ -105,7 +107,8 @@ default, set it to `-`.
     ```
 
     will cause the build to be performed on a machine that has the `kvm`
-    feature.
+    feature. To allow the builder to specify its supported features, you
+    can set `auto` here (only supported with the `ssh-ng://` protocol).
 
 7.  A comma-separated list of *mandatory features*. A machine will only
     be used to build a derivation if all of the machine’s mandatory
