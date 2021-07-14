@@ -24,6 +24,10 @@ struct SSHStoreConfig : virtual RemoteStoreConfig
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
+    // Hack for getting remote build log output.
+    // Intentionally not in `SSHStoreConfig` so that it doesn't appear in
+    // the documentation
+    const Setting<int> logFD{(StoreConfig*) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
@@ -38,7 +42,8 @@ public:
             sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
-            compress)
+            compress,
+            logFD)
     {
     }
 
