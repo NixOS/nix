@@ -11,6 +11,9 @@ namespace nix {
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
 {
+    StringSet systemTypes_ = {settings.thisSystem.get()};
+    systemTypes_.insert(settings.extraPlatforms.get().begin(), settings.extraPlatforms.get().end());
+    systemTypes = systemTypes_;
 }
 
 struct LocalStoreAccessor : public FSAccessor

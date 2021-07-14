@@ -916,9 +916,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopGetOptions: {
+        StringSet systemTypes = {settings.thisSystem.get()};
+        systemTypes.insert(settings.extraPlatforms.get().begin(), settings.extraPlatforms.get().end());
         logger->startWork();
-        auto systemTypes = StringSet(settings.extraPlatforms.get());
-        systemTypes.insert(settings.thisSystem.get());
         logger->stopWork();
         worker_proto::write(*store, to, systemTypes);
         worker_proto::write(*store, to, settings.systemFeatures.get());
