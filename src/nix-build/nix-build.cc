@@ -250,8 +250,9 @@ static void main_nix_build(int argc, char * * argv)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
     auto store = openStore();
+    auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-    auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+    auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
     state->repair = repair;
 
     auto autoArgs = myArgs.getAutoArgs(*state);

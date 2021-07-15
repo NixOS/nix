@@ -56,14 +56,6 @@ void StoreCommand::run()
 
 EvalCommand::EvalCommand()
 {
-    // FIXME: move to MixEvalArgs?
-    addFlag({
-        .longName = "eval-store",
-        .description = "The Nix store to use for evaluations.",
-        .labels = {"store-url"},
-        //.category = ...,
-        .handler = {&evalStoreUrl},
-    });
 }
 
 EvalCommand::~EvalCommand()
