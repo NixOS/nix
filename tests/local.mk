@@ -44,6 +44,7 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
+  flake-missing-file.sh \
   build.sh \
   compute-levels.sh \
   ca/build.sh \
