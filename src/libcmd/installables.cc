@@ -771,7 +771,7 @@ BuiltPaths build(ref<Store> store, Realise mode,
         pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
     }
 
-    if (mode == Realise::Nothing)
+    if (mode == Realise::Nothing || mode == Realise::Derivation)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
         store->buildPaths(pathsToBuild, bMode);
