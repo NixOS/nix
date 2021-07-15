@@ -89,7 +89,6 @@
             openssl sqlite
             libarchive
             boost
-            nlohmann_json
             lowdown
             gmock
           ]
@@ -334,7 +333,6 @@
                 xz
                 pkgs.perl
                 boost
-                nlohmann_json
               ]
               ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
               ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;

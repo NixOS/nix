@@ -33,4 +33,4 @@ endif
 
 include mk/lib.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17
+GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17 -I src
