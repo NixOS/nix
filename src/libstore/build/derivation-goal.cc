@@ -757,6 +757,7 @@ void runPostBuildHook(
 
     hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
     hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
 
     RunOptions opts(settings.postBuildHook, {});
     opts.environment = hookEnvironment;
