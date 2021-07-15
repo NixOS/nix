@@ -90,6 +90,32 @@ void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
 }
 
 
+// BuildResult marshalling is valid for daemon protocol >= 29 && legacy ssh >= 6
+
+BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+{
+    BuildResult res;
+    // all versions
+    res.status = (BuildResult::Status) readInt(from);
+    from >> res.errorMsg;
+    // legacy ssh >= 3 only before
+    from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
+    // daemon protocol >= 28 && legacy ssh >= 6 before
+    res.builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
+    return res;
+}
+
+void write(const Store & store, Sink & out, const BuildResult & res)
+{
+    // all versions
+    out << res.status << res.errorMsg;
+    // legacy ssh >= 3 only before
+    out << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
+    // daemon protocol >= 28 && legacy ssh >= 6 before
+    worker_proto::write(store, out, res.builtOutputs);
+}
+
+
 std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
 {
     auto s = readString(from);
@@ -731,17 +757,17 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res;
-    res.status = (BuildResult::Status) readInt(conn->from);
-    conn->from >> res.errorMsg;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
-        conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
-    }
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
-        auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
-        res.builtOutputs = builtOutputs;
-    }
-    return res;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 29) {
+        BuildResult res;
+        res.status = (BuildResult::Status) readInt(conn->from);
+        conn->from >> res.errorMsg;
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
+            auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            res.builtOutputs = builtOutputs;
+        }
+        return res;
+    } else
+        return worker_proto::read(*this, conn->from, Phantom<BuildResult>{});
 }
 
 

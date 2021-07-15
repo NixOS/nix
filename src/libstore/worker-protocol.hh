@@ -89,6 +89,7 @@ MAKE_WORKER_PROTO(, ContentAddress);
 MAKE_WORKER_PROTO(, DerivedPath);
 MAKE_WORKER_PROTO(, Realisation);
 MAKE_WORKER_PROTO(, DrvOutput);
+MAKE_WORKER_PROTO(, BuildResult);
 
 MAKE_WORKER_PROTO(template<typename T>, std::vector<T>);
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
