@@ -152,6 +152,16 @@ nlohmann::json Config::toJSON()
     return res;
 }
 
+std::string Config::toKeyValue()
+{
+    auto res = std::string();
+    for (auto & s : _settings)
+        if (!s.second.isAlias) {
+            res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
+        }
+    return res;
+}
+
 void Config::convertToArgs(Args & args, const std::string & category)
 {
     for (auto & s : _settings)
@@ -382,6 +392,16 @@ nlohmann::json GlobalConfig::toJSON()
     auto res = nlohmann::json::object();
     for (auto & config : *configRegistrations)
         res.update(config->toJSON());
+    return res;
+}
+
+std::string GlobalConfig::toKeyValue()
+{
+    std::string res;
+    std::map<std::string, Config::SettingInfo> settings;
+    globalConfig.getSettings(settings);
+    for (auto & s : settings)
+        res += fmt("%s = %s\n", s.first, s.second.value);
     return res;
 }
 
