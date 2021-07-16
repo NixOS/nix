@@ -26,7 +26,7 @@ struct App
 struct UnresolvedApp
 {
     App unresolved;
-    App resolve(ref<Store>);
+    App resolve(ref<Store> evalStore, ref<Store> store);
 };
 
 struct Installable

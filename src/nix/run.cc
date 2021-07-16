@@ -93,7 +93,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(store, Realise::Outputs, OperateOn::Output, installables);
+        auto outPaths = toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
 
         auto accessor = store->getFSAccessor();
 
@@ -178,7 +178,7 @@ struct CmdRun : InstallableCommand, RunCommon
     {
         auto state = getEvalState();
 
-        auto app = installable->toApp(*state).resolve(store);
+        auto app = installable->toApp(*state).resolve(getEvalStore(), store);
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);

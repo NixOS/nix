@@ -69,7 +69,7 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto app = installable->toApp(*evalState).resolve(store);
+        auto app = installable->toApp(*evalState).resolve(getEvalStore(), store);
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };

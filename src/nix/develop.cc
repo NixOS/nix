@@ -307,7 +307,7 @@ struct Common : InstallableCommand, MixProfile
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
             auto builtPaths = toStorePaths(
-                store, Realise::Nothing, OperateOn::Output, {installable});
+                getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
                 if (script.find(from) == std::string::npos)
@@ -495,8 +495,8 @@ struct CmdDevelop : Common, MixEnvironment
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
-            shell = state->store->printStorePath(
-                toStorePath(state->store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+            shell = store->printStorePath(
+                toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
         } catch (Error &) {
             ignoreException();
         }

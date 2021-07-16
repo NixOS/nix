@@ -52,7 +52,10 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables, buildMode);
+        auto buildables = build(
+            getEvalStore(), store,
+            dryRun ? Realise::Nothing : Realise::Outputs,
+            installables, buildMode);
 
         if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
 
