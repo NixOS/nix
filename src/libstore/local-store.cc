@@ -342,7 +342,7 @@ LocalStore::LocalStore(const Params & params)
     if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
         state->stmts->RegisterRealisedOutput.create(state->db,
             R"(
-                insert or replace into Realisations (drvPath, outputName, outputPath, signatures)
+                insert into Realisations (drvPath, outputName, outputPath, signatures)
                 values (?, ?, (select id from ValidPaths where path = ?), ?)
                 ;
             )");
@@ -379,7 +379,7 @@ LocalStore::LocalStore(const Params & params)
             R"(
                 insert or replace into RealisationsRefs (referrer, realisationReference)
                 values (
-                    ?,
+                    (select id from Realisations where drvPath = ? and outputName = ?),
                     (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
@@ -748,7 +748,6 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 (concatStringsSep(" ", info.signatures))
                 .exec();
         }
-        uint64_t myId = state->db.getLastInsertedRowId();
         for (auto & [outputId, depPath] : info.dependentRealisations) {
             auto localRealisation = queryRealisationCore_(*state, outputId);
             if (!localRealisation)
@@ -761,7 +760,8 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                             "match what we have locally",
                     info.id.to_string(), outputId.to_string());
             state->stmts->AddRealisationReference.use()
-                (myId)
+                (info.id.strHash())
+                (info.id.outputName)
                 (outputId.strHash())
                 (outputId.outputName)
                 .exec();
