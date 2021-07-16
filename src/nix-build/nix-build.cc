@@ -532,6 +532,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::vector<StorePathWithOutputs> pathsToBuild;
         std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
+        RealisedPath::Set drvsToCopy;
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
@@ -544,14 +545,16 @@ static void main_nix_build(int argc, char * * argv)
 
             pathsToBuild.push_back({drvPath, {outputName}});
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
+            drvsToCopy.insert(drvPath);
 
             auto i = drvMap.find(drvPath);
             if (i != drvMap.end())
                 i->second.second.insert(outputName);
-            else {
+            else
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
-            }
         }
+
+        copyClosure(state->store, state->buildStore, drvsToCopy);
 
         buildPaths(pathsToBuild);
 

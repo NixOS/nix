@@ -9,6 +9,7 @@
 #include "url.hh"
 #include "archive.hh"
 #include "callback.hh"
+#include "remote-store.hh"
 
 #include <regex>
 
@@ -881,6 +882,16 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     for (auto & path : storePaths)
         pathsMap.insert_or_assign(path, path);
 
+    // FIXME: Temporary hack to copy closures in a single round-trip.
+    if (dynamic_cast<RemoteStore *>(&*dstStore)) {
+        if (!missing.empty()) {
+            auto source = sinkToSource([&](Sink & sink) {
+                srcStore->exportPaths(missing, sink);
+            });
+            dstStore->importPaths(*source, NoCheckSigs);
+        }
+        return pathsMap;
+    }
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
@@ -956,6 +967,22 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
             showProgress();
         });
     return pathsMap;
+}
+
+void copyClosure(
+    ref<Store> srcStore,
+    ref<Store> dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
+{
+    if (srcStore == dstStore) return;
+
+    RealisedPath::Set closure;
+    RealisedPath::closure(*srcStore, paths, closure);
+
+    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)

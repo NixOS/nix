@@ -773,6 +773,12 @@ std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStor
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
+/* Copy the closure of `paths` from `srcStore` to `dstStore`. */
+void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
 
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered

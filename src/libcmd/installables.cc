@@ -12,7 +12,6 @@
 #include "eval-cache.hh"
 #include "url.hh"
 #include "registry.hh"
-#include "remote-store.hh"
 
 #include <regex>
 #include <queue>
@@ -393,31 +392,7 @@ DerivedPaths InstallableValue::toDerivedPaths()
     for (auto & i : drvsToOutputs)
         res.push_back(DerivedPath::Built { i.first, i.second });
 
-    // FIXME: Temporary hack
-    if (state->store != state->buildStore) {
-        RealisedPath::Set closure;
-        RealisedPath::closure(*state->store, drvsToCopy, closure);
-
-        if (dynamic_cast<RemoteStore *>(&*state->buildStore)) {
-            StorePathSet closure2;
-            for (auto & p : closure)
-                closure2.insert(p.path());
-
-            auto valid = state->buildStore->queryValidPaths(closure2);
-            StorePathSet missing;
-            for (auto & p : closure2)
-                if (!valid.count(p)) missing.insert(p);
-
-            if (!missing.empty()) {
-                auto source = sinkToSource([&](Sink & sink) {
-                    state->store->exportPaths(missing, sink);
-                });
-                state->buildStore->importPaths(*source, NoCheckSigs);
-            }
-
-        } else
-            copyPaths(state->store, state->buildStore, closure);
-    }
+    copyClosure(state->store, state->buildStore, drvsToCopy);
 
     return res;
 }
