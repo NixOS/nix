@@ -302,8 +302,8 @@ static void main_nix_build(int argc, char * * argv)
                     absolute = canonPath(absPath(i), true);
                 } catch (Error & e) {};
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
-                if (store->isStorePath(path) && hasSuffix(path, ".drv"))
-                    drvs.push_back(DrvInfo(*state, store, absolute));
+                if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
+                    drvs.push_back(DrvInfo(*state, evalStore, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
@@ -349,9 +349,10 @@ static void main_nix_build(int argc, char * * argv)
             throw UsageError("nix-shell requires a single derivation");
 
         auto & drvInfo = drvs.front();
-        auto drv = store->derivationFromPath(store->parseStorePath(drvInfo.queryDrvPath()));
+        auto drv = evalStore->derivationFromPath(evalStore->parseStorePath(drvInfo.queryDrvPath()));
 
         std::vector<StorePathWithOutputs> pathsToBuild;
+        RealisedPath::Set pathsToCopy;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
            is not set, then build bashInteractive from
@@ -370,7 +371,9 @@ static void main_nix_build(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.push_back({store->parseStorePath(drv->queryDrvPath())});
+                auto bashDrv = store->parseStorePath(drv->queryDrvPath());
+                pathsToBuild.push_back({bashDrv});
+                pathsToCopy.insert(bashDrv);
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
@@ -385,9 +388,16 @@ static void main_nix_build(int argc, char * * argv)
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
                     [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+            {
                 pathsToBuild.push_back({input.first, input.second});
-        for (const auto & src : drv.inputSrcs)
+                pathsToCopy.insert(input.first);
+            }
+        for (const auto & src : drv.inputSrcs) {
             pathsToBuild.push_back({src});
+            pathsToCopy.insert(src);
+        }
+
+        copyClosure(evalStore, store, pathsToCopy);
 
         buildPaths(pathsToBuild);
 
@@ -554,7 +564,7 @@ static void main_nix_build(int argc, char * * argv)
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
 
-        copyClosure(state->store, state->buildStore, drvsToCopy);
+        copyClosure(evalStore, store, drvsToCopy);
 
         buildPaths(pathsToBuild);
 
