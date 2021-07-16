@@ -12,7 +12,7 @@ perl/Makefile.config
 /libtool
 
 # /doc/manual/
-/doc/manual/*.1
+/doc/manual/**/*.1
 /doc/manual/*.5
 /doc/manual/*.8
 /doc/manual/nix.json
