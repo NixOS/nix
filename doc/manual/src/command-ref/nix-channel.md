@@ -4,7 +4,7 @@
 
 # Synopsis
 
-`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--rollback` [*generation*] }
+`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--list-generations` | `--rollback` [*generation*] }
 
 # Description
 
@@ -35,6 +35,15 @@ This command has the following operations:
     those included in *names* if specified) and makes them the default
     for `nix-env` operations (by symlinking them from the directory
     `~/.nix-defexpr`).
+
+  - `--list-generations`\
+    Prints a list of all the current existing generations for the
+    channel profile.
+
+    Works the same way as
+    ```
+    nix-env --profile /nix/var/nix/profiles/per-user/$USER/channels --list-generations
+    ```
 
   - `--rollback` \[*generation*\]\
     Reverts the previous call to `nix-channel
@@ -76,6 +85,7 @@ $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
     --update`, a new channel generation (that is, a symlink to the
     channel Nix expressions in the Nix store) is created. This enables
     `nix-channel --rollback` to revert to previous versions.
+    `nix-channel --list-generations` lists the existing channel generations.
 
   - `~/.nix-defexpr/channels`\
     This is a symlink to
