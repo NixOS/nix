@@ -853,7 +853,7 @@ static RegisterPrimOp primop_deepSeq({
     .fun = prim_deepSeq,
 });
 
-/* Evaluate the first expression and print it on standard error.  Then
+/* Evaluate the first expression and print it on standard error. Then
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -875,6 +875,33 @@ static RegisterPrimOp primop_trace({
       debugging.
     )",
     .fun = prim_trace,
+});
+
+
+/* Evaluate the first expression and print it on standard error if talkative verbosity
+ * is enabled. Then return the second expression.  Useful for debugging. */
+static void prim_debug(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (verbosity >= lvlTalkative) {
+        if (args[0]->type() == nString)
+            printError("debug: %1%", args[0]->string.s);
+        else
+            printError("debug: %1%", *args[0]);
+    }
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
+
+static RegisterPrimOp primop_debug({
+    .name = "__debug",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Evaluate *e1* and print its abstract syntax representation on standard
+      error if talkative verbosity enabled. Then return *e2*. This function
+      is useful for debugging.
+    )",
+    .fun = prim_debug,
 });
 
 
