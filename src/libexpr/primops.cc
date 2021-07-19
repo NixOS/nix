@@ -35,7 +35,7 @@ namespace nix {
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
-void EvalState::realiseContext(const PathSet & context)
+void EvalState::realiseContext(const PathSet & context, const Pos &pos, const string & reason)
 {
     std::vector<DerivedPath::Built> drvs;
 
@@ -46,6 +46,9 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back({ctx, {outputName}});
+            if (evalSettings.logAllIFD) {
+              printInfo("%1% importing from derivation %2% via %3%", pos, ctxS, reason);
+            }
         }
     }
 
@@ -116,7 +119,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
     Path path = state.coerceToPath(pos, vPath, context);
 
     try {
-        state.realiseContext(context);
+        state.realiseContext(context, pos, "scopedImport");
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
@@ -286,7 +289,7 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
     Path path = state.coerceToPath(pos, *args[0], context);
 
     try {
-        state.realiseContext(context);
+        state.realiseContext(context, pos, "importNative");
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt(
@@ -340,7 +343,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
         commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
     }
     try {
-        state.realiseContext(context);
+        state.realiseContext(context, pos, "exec");
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
@@ -1337,7 +1340,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
     try {
-        state.realiseContext(context);
+        state.realiseContext(context, pos, "pathExists");
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt(
@@ -1414,7 +1417,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
     try {
-        state.realiseContext(context);
+        state.realiseContext(context, pos, "readFile");
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
@@ -1465,7 +1468,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         string path = state.coerceToString(pos, *i->value, context, false, false);
 
         try {
-            state.realiseContext(context);
+            state.realiseContext(context, pos, "findFile");
         } catch (InvalidPathError & e) {
             throw EvalError({
                 .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
@@ -1521,7 +1524,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     PathSet ctx;
     Path path = state.coerceToPath(pos, *args[0], ctx);
     try {
-        state.realiseContext(ctx);
+        state.realiseContext(ctx, pos, "readDir");
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),

@@ -308,7 +308,7 @@ public:
     /* Print statistics. */
     void printStats();
 
-    void realiseContext(const PathSet & context);
+    void realiseContext(const PathSet & context, const Pos &pos, const string & reason);
 
 private:
 
@@ -428,6 +428,9 @@ struct EvalSettings : Config
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};
+
+    Setting<bool> logAllIFD{this, false, "log-all-ifd",
+        "Emit log messages for all imports from derivation at the 'info' log level"};
 };
 
 extern EvalSettings evalSettings;
