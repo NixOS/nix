@@ -454,7 +454,7 @@ bool NixRepl::processLine(string line)
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
-            pos = findDerivationFilename(*state, v, arg);
+            pos = findPackageFilename(*state, v, arg);
         }
 
         // Open in EDITOR

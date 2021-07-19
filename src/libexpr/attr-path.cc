@@ -100,7 +100,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 }
 
 
-Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
+Pos findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {

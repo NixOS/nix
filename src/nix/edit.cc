@@ -31,7 +31,7 @@ struct CmdEdit : InstallableCommand
         auto [v, pos] = installable->toValue(*state);
 
         try {
-            pos = findDerivationFilename(*state, *v, installable->what());
+            pos = findPackageFilename(*state, *v, installable->what());
         } catch (NoPositionInfo &) {
         }
 
