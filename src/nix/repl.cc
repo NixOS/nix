@@ -412,7 +412,7 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
-             << "  :e <expr>     Open the derivation in $EDITOR\n"
+             << "  :e <expr>     Open package or function in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
@@ -454,7 +454,7 @@ bool NixRepl::processLine(string line)
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
-            pos = findDerivationFilename(*state, v, arg);
+            pos = findPackageFilename(*state, v, arg);
         }
 
         // Open in EDITOR
