@@ -1,6 +1,8 @@
 ifeq ($(doc_generate),yes)
 
-MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
+ALL_MD_FILES := $(call rwildcard, $(d)/src, *.md)
+GENERATED_MD_FILES := $(call rwildcard, $(d)/src/command-ref/new-cli, *.md)
+MANUAL_SRCS := $(filter-out $(GENERATED_MD_FILES), $(ALL_MD_FILES))
 
 # Generate man pages.
 man-pages := $(foreach n, \
@@ -75,13 +77,20 @@ $(d)/builtins.json: $(bindir)/nix
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
-install: $(d)/src/command-ref/new-cli
+install: $(mandir)/man1/nix3-build.1
+
+# Technically this rule generates all the `nix3-*` manpages, but since we don’t
+# know their list statically and they are all generated at once anyways, we can
+# just be dirty and only track one
+$(mandir)/man1/nix3-build.1: $(d)/src/command-ref/new-cli
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
 	  name=$$(basename $$i .md); \
+	  tmpFile=$$(mktemp); \
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
-	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
-	  cat $$i >> $$i.tmp; \
-	  lowdown -sT man -M section=1 $$i.tmp -o $(mandir)/man1/$$name.1; \
+	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
+	  cat $$i >> $$tmpFile; \
+	  lowdown -sT man -M section=1 $$tmpFile -o $(mandir)/man1/$$name.1; \
+	  rm $$tmpFile; \
 	done
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
