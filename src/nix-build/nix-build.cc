@@ -397,7 +397,7 @@ static void main_nix_build(int argc, char * * argv)
             pathsToCopy.insert(src);
         }
 
-        copyClosure(evalStore, store, pathsToCopy);
+        copyClosure(*evalStore, *store, pathsToCopy);
 
         buildPaths(pathsToBuild);
 
@@ -564,7 +564,7 @@ static void main_nix_build(int argc, char * * argv)
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
 
-        copyClosure(evalStore, store, drvsToCopy);
+        copyClosure(*evalStore, *store, drvsToCopy);
 
         buildPaths(pathsToBuild);
 

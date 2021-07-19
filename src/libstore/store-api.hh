@@ -751,8 +751,12 @@ protected:
 
 
 /* Copy a path from one store to another. */
-void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+void copyStorePath(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePath & storePath,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs);
 
 
 /* Copy store paths from one store to another. The paths may be copied
@@ -761,20 +765,23 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
    of store paths is not automatically closed; use copyClosure() for
    that. Returns a map of what each path was copied to the dstStore
    as. */
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+std::map<StorePath, StorePath> copyPaths(
+    Store & srcStore, Store & dstStore,
     const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+std::map<StorePath, StorePath> copyPaths(
+    Store & srcStore, Store & dstStore,
     const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
 /* Copy the closure of `paths` from `srcStore` to `dstStore`. */
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
+void copyClosure(
+    Store & srcStore, Store & dstStore,
     const RealisedPath::Set & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
