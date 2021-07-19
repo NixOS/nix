@@ -107,11 +107,8 @@ NixRepl::~NixRepl()
 string runNix(Path program, const Strings & args,
     const std::optional<std::string> & input = {})
 {
-    auto experimentalFeatures = concatStringsSep(" ", settings.experimentalFeatures.get());
-    auto nixConf = getEnv("NIX_CONFIG").value_or("");
-    nixConf.append("\nexperimental-features = " + experimentalFeatures);
     auto subprocessEnv = getEnv();
-    subprocessEnv["NIX_CONFIG"] = nixConf;
+    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
     RunOptions opts(settings.nixBinDir+ "/" + program, args);
     opts.input = input;
     opts.environment = subprocessEnv;
