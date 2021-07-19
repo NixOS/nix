@@ -144,8 +144,16 @@ bool Realisation::isCompatibleWith(const Realisation & other) const
 {
     assert (id == other.id);
     if (outPath == other.outPath) {
-        assert(dependentRealisations == other.dependentRealisations);
-        return true;
+        if (dependentRealisations.empty() != other.dependentRealisations.empty()) {
+            warn(
+                "Encountered a realisation for '%s' with an empty set of "
+                "dependencies. This is likely an artifact from an older Nix. "
+                "I’ll try to fix the realisation if I can",
+                id.to_string());
+            return true;
+        } else if (dependentRealisations == other.dependentRealisations) {
+            return true;
+        }
     }
     return false;
 }
