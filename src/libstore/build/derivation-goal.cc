@@ -165,7 +165,7 @@ void DerivationGoal::getDerivation()
     /* The first thing to do is to make sure that the derivation
        exists.  If it doesn't, it may be created through a
        substitute. */
-    if (buildMode == bmNormal && worker.store.isValidPath(drvPath)) {
+    if (buildMode == bmNormal && worker.evalStore.isValidPath(drvPath)) {
         loadDerivation();
         return;
     }
@@ -188,12 +188,12 @@ void DerivationGoal::loadDerivation()
     /* `drvPath' should already be a root, but let's be on the safe
        side: if the user forgot to make it a root, we wouldn't want
        things being garbage collected while we're busy. */
-    worker.store.addTempRoot(drvPath);
+    worker.evalStore.addTempRoot(drvPath);
 
-    assert(worker.store.isValidPath(drvPath));
+    assert(worker.evalStore.isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = std::make_unique<Derivation>(worker.store.derivationFromPath(drvPath));
+    drv = std::make_unique<Derivation>(worker.evalStore.derivationFromPath(drvPath));
 
     haveDerivation();
 }
@@ -212,8 +212,8 @@ void DerivationGoal::haveDerivation()
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
 
-    auto outputHashes = staticOutputHashes(worker.store, *drv);
-    for (auto &[outputName, outputHash] : outputHashes)
+    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+    for (auto & [outputName, outputHash] : outputHashes)
       initialOutputs.insert({
             outputName,
             InitialOutput{
@@ -336,6 +336,16 @@ void DerivationGoal::gaveUpOnSubstitution()
     if (useDerivation)
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs)
             addWaitee(worker.makeDerivationGoal(i.first, i.second, buildMode == bmRepair ? bmRepair : bmNormal));
+
+    /* Copy the input sources from the eval store to the build
+       store. */
+    if (&worker.evalStore != &worker.store) {
+        RealisedPath::Set inputSrcs, inputClosure;
+        for (auto & i : drv->inputSrcs)
+            inputSrcs.insert(i);
+        RealisedPath::closure(worker.evalStore, inputSrcs, inputClosure);
+        copyClosure(worker.evalStore, worker.store, inputClosure);
+    }
 
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i)) continue;
@@ -478,8 +488,8 @@ void DerivationGoal::inputsRealised()
             /* Add the relevant output closures of the input derivation
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
-            assert(worker.store.isValidPath(drvPath));
-            auto outputs = worker.store.queryPartialDerivationOutputMap(depDrvPath);
+            assert(worker.evalStore.isValidPath(drvPath));
+            auto outputs = worker.evalStore.queryPartialDerivationOutputMap(depDrvPath);
             for (auto & j : wantedDepOutputs) {
                 if (outputs.count(j) > 0) {
                     auto optRealizedInput = outputs.at(j);

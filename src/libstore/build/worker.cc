@@ -9,11 +9,12 @@
 
 namespace nix {
 
-Worker::Worker(Store & store)
+Worker::Worker(Store & store, Store & evalStore)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
+    , evalStore(evalStore)
 {
     /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;

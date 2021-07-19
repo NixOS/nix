@@ -497,7 +497,8 @@ public:
        not derivations, substitute them. */
     virtual void buildPaths(
         const std::vector<DerivedPath> & paths,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
 
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).

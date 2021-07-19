@@ -1254,8 +1254,10 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         return next->queryRealisation(id);
     }
 
-    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
+        assert(!evalStore);
+
         if (buildMode != bmNormal) throw Error("unsupported build mode");
 
         StorePathSet newPaths;

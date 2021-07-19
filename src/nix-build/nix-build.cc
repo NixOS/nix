@@ -341,7 +341,7 @@ static void main_nix_build(int argc, char * * argv)
             printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
 
         if (!dryRun)
-            store->buildPaths(paths, buildMode);
+            store->buildPaths(paths, buildMode, evalStore);
     };
 
     if (runEnv) {
@@ -397,8 +397,6 @@ static void main_nix_build(int argc, char * * argv)
             pathsToCopy.insert(src);
         }
 
-        copyClosure(*evalStore, *store, pathsToCopy);
-
         buildPaths(pathsToBuild);
 
         if (dryRun) return;
@@ -449,7 +447,7 @@ static void main_nix_build(int argc, char * * argv)
         if (env.count("__json")) {
             StorePathSet inputs;
             for (auto & [depDrvPath, wantedDepOutputs] : drv.inputDrvs) {
-                auto outputs = store->queryPartialDerivationOutputMap(depDrvPath);
+                auto outputs = evalStore->queryPartialDerivationOutputMap(depDrvPath);
                 for (auto & i : wantedDepOutputs) {
                     auto o = outputs.at(i);
                     store->computeFSClosure(*o, inputs);
@@ -564,8 +562,6 @@ static void main_nix_build(int argc, char * * argv)
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
 
-        copyClosure(*evalStore, *store, drvsToCopy);
-
         buildPaths(pathsToBuild);
 
         if (dryRun) return;
@@ -578,7 +574,7 @@ static void main_nix_build(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath);
+            auto builtOutputs = evalStore->queryPartialDerivationOutputMap(drvPath);
 
             auto maybeOutputPath = builtOutputs.at(outputName);
             assert(maybeOutputPath);

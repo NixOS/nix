@@ -766,7 +766,7 @@ BuiltPaths build(ref<Store> evalStore, ref<Store> store, Realise mode,
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild, bMode);
+        store->buildPaths(pathsToBuild, bMode, evalStore);
 
     return getBuiltPaths(evalStore, store, pathsToBuild);
 }

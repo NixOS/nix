@@ -171,15 +171,15 @@ const static std::string getEnvSh =
    modified derivation with the same dependencies and nearly the same
    initial environment variables, that just writes the resulting
    environment to a file and exits. */
-StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
+static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore, const StorePath & drvPath)
 {
-    auto drv = store->derivationFromPath(drvPath);
+    auto drv = evalStore->derivationFromPath(drvPath);
 
     auto builder = baseNameOf(drv.builder);
     if (builder != "bash")
         throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
-    auto getEnvShPath = store->addTextToStore("get-env.sh", getEnvSh, {});
+    auto getEnvShPath = evalStore->addTextToStore("get-env.sh", getEnvSh, {});
 
     drv.args = {store->printStorePath(getEnvShPath)};
 
@@ -205,7 +205,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
             output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
             drv.env[output.first] = "";
         }
-        Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
+        Hash h = std::get<0>(hashDerivationModulo(*evalStore, drv, true));
 
         for (auto & output : drv.outputs) {
             auto outPath = store->makeOutputPath(output.first, h, drv.name);
@@ -214,12 +214,12 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
         }
     }
 
-    auto shellDrvPath = writeDerivation(*store, drv);
+    auto shellDrvPath = writeDerivation(*evalStore, drv);
 
     /* Build the derivation. */
-    store->buildPaths({DerivedPath::Built{shellDrvPath}});
+    store->buildPaths({DerivedPath::Built{shellDrvPath}}, bmNormal, evalStore);
 
-    for (auto & [_0, optPath] : store->queryPartialDerivationOutputMap(shellDrvPath)) {
+    for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
         auto & outPath = *optPath;
         assert(store->isValidPath(outPath));
@@ -347,7 +347,7 @@ struct Common : InstallableCommand, MixProfile
 
             auto & drvPath = *drvs.begin();
 
-            return getDerivationEnvironment(store, drvPath);
+            return getDerivationEnvironment(store, getEvalStore(), drvPath);
         }
     }
 
@@ -361,7 +361,7 @@ struct Common : InstallableCommand, MixProfile
 
         debug("reading environment file '%s'", strPath);
 
-        return {BuildEnvironment::fromJSON(readFile(strPath)), strPath};
+        return {BuildEnvironment::fromJSON(readFile(store->toRealPath(shellOutPath))), strPath};
     }
 };
 
