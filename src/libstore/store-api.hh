@@ -543,7 +543,7 @@ public:
     /* Add a store path as a temporary root of the garbage collector.
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
-    { warn("not creating temp root, store doesn't support GC"); }
+    { debug("not creating temporary root, store doesn't support GC"); }
 
     /* Add an indirect root, which is merely a symlink to `path' from
        /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
