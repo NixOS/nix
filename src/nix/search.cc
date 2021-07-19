@@ -109,6 +109,12 @@ struct CmdSearch : InstallableCommand, MixJSON
                     std::replace(description.begin(), description.end(), '\n', ' ');
                     auto attrPath2 = concatStringsSep(".", attrPath);
 
+                    auto available = true;
+                    if (attrPath[0] == "legacyPackages") {
+                        auto aAvailable = aMeta ? aMeta->maybeGetAttr("available") : nullptr;
+                        available = aAvailable ? aAvailable->getBool() : true;
+                    }
+
                     std::smatch attrPathMatch;
                     std::smatch descriptionMatch;
                     std::smatch nameMatch;
@@ -123,7 +129,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                             found++;
                     }
 
-                    if (found == res.size()) {
+                    if (found == res.size() && available) {
                         results++;
                         if (json) {
                             auto jsonElem = jsonOut->object(attrPath2);
