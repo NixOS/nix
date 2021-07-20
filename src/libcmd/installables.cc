@@ -60,7 +60,10 @@ MixFlakeOptions::MixFlakeOptions()
         .longName = "no-registries",
         .description = "Don't allow lookups in the flake registries.",
         .category = category,
-        .handler = {&lockFlags.useRegistries, false}
+        .handler = {[&]() {
+            lockFlags.useRegistries = false;
+            warn("--no-registries is deprecated; use --no-use-registries (a.k.a --option use-registries false)");
+        }}
     });
 
     addFlag({

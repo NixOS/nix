@@ -147,6 +147,7 @@ nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Di
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o $TEST_ROOT/result flake2#bar --no-registries)
+(! nix build -o $TEST_ROOT/result flake2#bar --no-use-registries)
 (! nix eval --expr "builtins.getFlake \"$flake2Dir\"")
 
 # But should succeed in impure mode.
@@ -170,6 +171,7 @@ nix build -o $TEST_ROOT/result $flake2Dir#bar
 # Building with a lockfile should not require a fetch of the registry.
 nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --refresh
 nix build -o $TEST_ROOT/result --no-registries $flake2Dir#bar --refresh
+nix build -o $TEST_ROOT/result --no-use-registries $flake2Dir#bar --refresh
 
 # Updating the flake should not change the lockfile.
 nix flake lock $flake2Dir
@@ -180,6 +182,7 @@ nix build -o $TEST_ROOT/result flake2#bar
 
 # Or without a registry.
 nix build -o $TEST_ROOT/result --no-registries git+file://$flake2Dir#bar --refresh
+nix build -o $TEST_ROOT/result --no-use-registries git+file://$flake2Dir#bar --refresh
 
 # Test whether indirect dependencies work.
 nix build -o $TEST_ROOT/result $flake3Dir#xyzzy
@@ -603,6 +606,7 @@ nix flake metadata --json hg+file://$flake5Dir
 [[ $(nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
 
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
+nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-use-registries --no-allow-dirty
 
 # Test tarball flakes
 tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT --exclude .hg flake5
