@@ -1,0 +1,91 @@
+# Nix project build options
+#============================================================================
+
+# dirs
+#============================================================================
+
+option(
+    'nixstoredir',
+    type : 'string',
+    value : '/nix/store',
+    description : 'path of the Nix store (defaults to /nix/store)')
+
+
+# compiler args
+#============================================================================
+
+option(
+    'ldflags',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-L/usr/lib',
+        '-L/lib'],
+    description : 'Link flags')
+
+
+option(
+    'cxxflags',
+    type : 'array',
+    value : [
+        '-Wno-pedantic',
+        '-Wno-non-virtual-dtor',
+        '-Wno-unused-parameter',
+        '-Wno-variadic-macros',
+        '-Wdeprecated-declarations',
+        '-Wno-missing-field-initializers'],
+    description : 'C build flags')
+
+
+# optional dependencies
+#============================================================================
+
+option(
+    'enable_gc',
+    type : 'boolean',
+    value : 'true',
+    description : 'Build nix with Boehm garbage collector')
+
+option(
+    'with_libsodium',
+    type : 'feature',
+    value : 'auto',
+    description : 'Build nix with libsodium')
+
+option(
+    'with_s3',
+    type : 'boolean',
+    value : 'false',
+    description : 'Build nix with s3')
+
+option(
+    'with_coreutils_bin',
+    type : 'string',
+    description : 'path of cat, mkdir, etc.')
+
+
+# misc
+#============================================================================
+option(
+    'disable_doc_gen',
+    type : 'boolean',
+    value : 'false',
+    description : 'disable documentation generation')
+
+option(
+    'build_shared_libs',
+    type : 'boolean',
+    value : 'false',
+    description : 'Build nix with shared libs')
+
+option(
+    'sandbox_shell',
+    type : 'string',
+    value : '/usr/bin/busybox',
+    description : 'path of a statically-linked shell to use as /bin/sh in sandboxes')
+
+option(
+    'normal_var',
+    type : 'boolean',
+    value : 'true',
+    description : 'Whether to use `/nix/var` or the user-overridable `localstatedir`.')
