@@ -26,10 +26,15 @@ nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
+flakeFollowsA=$TEST_ROOT/follows/flakeA
+flakeFollowsB=$TEST_ROOT/follows/flakeA/flakeB
+flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
+flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
+flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA; do
     rm -rf $repo $repo.tmp
-    mkdir $repo
+    mkdir -p $repo
     git -C $repo init
     git -C $repo config user.email "foobar@example.com"
     git -C $repo config user.name "Foobar"
@@ -677,3 +682,89 @@ git -C $flakeB commit -a -m 'Foo'
 
 # Test list-inputs with circular dependencies
 nix flake metadata $flakeA
+
+# Test flake follow paths
+mkdir -p $flakeFollowsB
+mkdir -p $flakeFollowsC
+mkdir -p $flakeFollowsD
+mkdir -p $flakeFollowsE
+
+cat > $flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        B = {
+            url = "path:./flakeB";
+            inputs.foobar.follows = "D";
+        };
+
+        D.url = "path:./flakeD";
+        foobar.url = "path:./flakeE";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+cat > $flakeFollowsB/flake.nix <<EOF
+{
+    description = "Flake B";
+    inputs = {
+        foobar.url = "path:./../flakeE";
+        C = {
+            url = "path:./flakeC";
+            inputs.foobar.follows = "foobar";
+        };
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+cat > $flakeFollowsC/flake.nix <<EOF
+{
+    description = "Flake C";
+    inputs = {
+        foobar.url = "path:./../../flakeE";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+cat > $flakeFollowsD/flake.nix <<EOF
+{
+    description = "Flake D";
+    inputs = {};
+    outputs = { ... }: {};
+}
+EOF
+
+cat > $flakeFollowsE/flake.nix <<EOF
+{
+    description = "Flake D";
+    inputs = {};
+    outputs = { ... }: {};
+}
+EOF
+
+git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
+  flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
+
+nix flake lock $flakeFollowsA
+
+[[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
+[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["D"]' ]]
+[[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
+
+# Ensure a relative path is not allowed to go outside the store path
+cat > $flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        B.url = "path:./../../flakeB";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+git -C $flakeFollowsA add flake.nix
+
+nix flake lock $flakeFollowsA 2>&1 | grep 'this is a security violation'

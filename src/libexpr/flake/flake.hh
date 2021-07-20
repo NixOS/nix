@@ -43,7 +43,6 @@ struct FlakeInput
     std::optional<FlakeRef> ref;
     bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
-    bool absolute = false; // whether 'follows' is relative to the flake root
     FlakeInputs overrides;
 };
 
@@ -123,6 +122,15 @@ struct LockFlags
     /* Flake inputs to be updated. This means that any existing lock
        for those inputs will be ignored. */
     std::set<InputPath> inputUpdates;
+};
+
+struct LockParent {
+    /* The path to this parent */
+    InputPath path;
+
+    /* Whether we are currently inside a top-level lockfile (inputs absolute)
+       or subordinate lockfile (inputs relative) */
+    bool absolute;
 };
 
 LockedFlake lockFlake(
