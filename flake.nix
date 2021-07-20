@@ -22,15 +22,36 @@
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
+      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" ];
+
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
+      forAllSystemsAndStdenvs = f: forAllSystems (system:
+        nixpkgs.lib.listToAttrs
+          (map
+            (n:
+            nixpkgs.lib.nameValuePair "${n}Packages" (
+              f system n
+            )) stdenvs
+          )
+      );
+
+      forAllStdenvs = stdenvs: f: nixpkgs.lib.genAttrs stdenvs (stdenv: f stdenv);
 
       # Memoize nixpkgs for different platforms for efficiency.
-      nixpkgsFor = forAllSystems (system:
-        import nixpkgs {
-          inherit system;
-          overlays = [ self.overlay ];
-        }
-      );
+      nixpkgsFor =
+        let stdenvsPackages = forAllSystemsAndStdenvs
+          (system: stdenv:
+            import nixpkgs {
+              inherit system;
+              overlays = [
+                (overlayFor (p: p.${stdenv}))
+              ];
+            }
+          );
+        in
+        # Add the `stdenvPackages` at toplevel, both because these are the ones
+        # we want most of the time and for backwards compatibility
+        forAllSystems (system: stdenvsPackages.${system} // stdenvsPackages.${system}.stdenvPackages);
 
       commonDeps = pkgs: with pkgs; rec {
         # Use "busybox-sandbox-shell" if present,
@@ -253,18 +274,15 @@
             $(cat ${installerClosureInfo}/store-paths)
         '';
 
-    in {
-
-      # A Nixpkgs overlay that overrides the 'nix' and
-      # 'nix.perl-bindings' packages.
-      overlay = final: prev: {
-
+      overlayFor = getStdenv: final: prev:
+      let currentStdenv = getStdenv final; in
+      {
         # An older version of Nix to test against when using the daemon.
         # Currently using `nixUnstable` as the stable one doesn't respect
         # `NIX_DAEMON_SOCKET_PATH` which is needed for the tests.
         nixStable = prev.nix;
 
-        nix = with final; with commonDeps pkgs; stdenv.mkDerivation {
+        nix = with final; with commonDeps pkgs; currentStdenv.mkDerivation {
           name = "nix-${version}";
           inherit version;
 
@@ -286,9 +304,9 @@
               mkdir -p $out/lib
               cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
               rm -f $out/lib/*.a
-              ${lib.optionalString stdenv.isLinux ''
+              ${lib.optionalString currentStdenv.isLinux ''
                 chmod u+w $out/lib/*.so.*
-                patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
+                patchelf --set-rpath $out/lib:${currentStdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
               ''}
             '';
 
@@ -315,7 +333,7 @@
 
           strictDeps = true;
 
-          passthru.perl-bindings = with final; stdenv.mkDerivation {
+          passthru.perl-bindings = with final; currentStdenv.mkDerivation {
             name = "nix-perl-${version}";
 
             src = self;
@@ -334,8 +352,8 @@
                 pkgs.perl
                 boost
               ]
-              ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-              ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
+              ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
+              ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
             configureFlags = ''
               --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
@@ -349,13 +367,14 @@
 
         };
 
-        lowdown = with final; stdenv.mkDerivation rec {
+
+        lowdown = with final; currentStdenv.mkDerivation rec {
           name = "lowdown-0.8.4";
 
           /*
           src = fetchurl {
-            url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
-            hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
+          url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
+          hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
           };
           */
 
@@ -366,14 +385,19 @@
           nativeBuildInputs = [ buildPackages.which ];
 
           configurePhase = ''
-              ${if (stdenv.isDarwin && stdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
+              ${if (currentStdenv.isDarwin && currentStdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
               ./configure \
                 PREFIX=${placeholder "dev"} \
                 BINDIR=${placeholder "bin"}/bin
-            '';
+          '';
         };
-
       };
+
+    in {
+
+      # A Nixpkgs overlay that overrides the 'nix' and
+      # 'nix.perl-bindings' packages.
+      overlay = overlayFor (p: p.stdenv);
 
       hydraJobs = {
 
@@ -589,15 +613,22 @@
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
         };
-      }) crossSystems)));
+      }) crossSystems)) // (builtins.listToAttrs (map (stdenvName:
+      nixpkgsFor.${system}.lib.nameValuePair
+        "nix-${stdenvName}"
+        nixpkgsFor.${system}."${stdenvName}Packages".nix
+      ) stdenvs))
+      );
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
 
-      devShell = forAllSystems (system:
+      devShell = forAllSystems (system: self.devShells.${system}.stdenvPackages);
+
+      devShells = forAllSystemsAndStdenvs (system: stdenv:
         with nixpkgsFor.${system};
         with commonDeps pkgs;
 
-        stdenv.mkDerivation {
+        nixpkgsFor.${system}.${stdenv}.mkDerivation {
           name = "nix";
 
           outputs = [ "out" "dev" "doc" ];

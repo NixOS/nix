@@ -35,6 +35,25 @@ variables are set up so that those dependencies can be found:
 $ nix-shell
 ```
 
+or if you have a flake-enabled nix:
+
+```console
+$ nix develop
+```
+
+To get a shell with a different compilation environment (e.g. stdenv,
+gccStdenv, clangStdenv, clang11Stdenv):
+
+```console
+$ nix-shell -A devShell.x86_64-linux.clang11StdenvPackages
+```
+
+or if you have a flake-enabled nix:
+
+```console
+$ nix develop .#devShell.x86_64-linux.clang11StdenvPackages
+```
+
 To build Nix itself in this shell:
 
 ```console
