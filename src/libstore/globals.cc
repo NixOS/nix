@@ -136,6 +136,10 @@ StringSet Settings::getDefaultExtraPlatforms()
 {
     StringSet extraPlatforms;
 
+    // if custom --system is used, provide native system as extra platform always
+    if (std::string{SYSTEM} != settings.thisSystem.get())
+        extraPlatforms.insert(std::string{SYSTEM});
+
     if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
         extraPlatforms.insert("i686-linux");
 
