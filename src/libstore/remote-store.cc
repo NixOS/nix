@@ -191,8 +191,21 @@ void RemoteStore::initConnection(Connection & conn)
     }
 
     setOptions(conn);
+
+    getOptions(conn);
 }
 
+
+void RemoteStore::getOptions(Connection & conn)
+{
+    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 32) {
+        conn.to << wopGetOptions;
+        auto ex = conn.processStderr();
+        if (ex) std::rethrow_exception(ex);
+        systemTypes = worker_proto::read(*this, conn.from, Phantom<StringSet> {});
+        systemFeatures = worker_proto::read(*this, conn.from, Phantom<StringSet> {});
+    }
+}
 
 void RemoteStore::setOptions(Connection & conn)
 {
