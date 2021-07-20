@@ -68,6 +68,7 @@ struct NixRepl
     StorePath getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
+    void loadFlake(const std::string & flakeRef);
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
@@ -415,6 +416,7 @@ bool NixRepl::processLine(string line)
              << "  :e <expr>     Open package or function in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :lf <ref>     Load Nix flake and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
@@ -433,6 +435,10 @@ bool NixRepl::processLine(string line)
     else if (command == ":l" || command == ":load") {
         state->resetFileCache();
         loadFile(arg);
+    }
+
+    else if (command == ":lf" || command == ":load-flake") {
+        loadFlake(arg);
     }
 
     else if (command == ":r" || command == ":reload") {
@@ -574,6 +580,25 @@ void NixRepl::loadFile(const Path & path)
     state->evalFile(lookupFileArg(*state, path), v);
     state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
+}
+
+void NixRepl::loadFlake(const std::string & flakeRefS)
+{
+    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
+    if (evalSettings.pureEval && !flakeRef.input.isImmutable())
+        throw Error("cannot use ':load-flake' on mutable flake reference '%s' (use --impure to override)", flakeRefS);
+
+    Value v;
+
+    flake::callFlake(*state,
+        flake::lockFlake(*state, flakeRef,
+            flake::LockFlags {
+                .updateLockFile = false,
+                .useRegistries = !evalSettings.pureEval,
+                .allowMutable  = !evalSettings.pureEval,
+            }),
+        v);
+    addAttrsToScope(v);
 }
 
 
