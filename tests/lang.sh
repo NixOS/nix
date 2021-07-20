@@ -32,7 +32,7 @@ done
 for i in lang/eval-fail-*.nix; do
     echo "evaluating $i (should fail)";
     i=$(basename $i .nix)
-    if nix-instantiate --eval lang/$i.nix; then
+    if ! expect 1 nix-instantiate --eval lang/$i.nix; then
         echo "FAIL: $i shouldn't evaluate"
         fail=1
     fi
