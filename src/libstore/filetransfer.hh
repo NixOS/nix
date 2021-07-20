@@ -7,6 +7,8 @@
 #include <string>
 #include <future>
 
+#include <curl/curl.h>
+
 namespace nix {
 
 struct FileTransferSettings : Config
@@ -131,5 +133,17 @@ bool isUri(const string & s);
 
 /* Resolve deprecated 'channel:<foo>' URLs. */
 std::string resolveUri(const std::string & uri);
+
+typedef void (* CurlMiddleWareFun) (const std::string url, void *req);
+
+struct RegisterCurlMiddleware
+{
+    typedef std::vector<std::tuple<std::string, CurlMiddleWareFun>> CurlMiddleWares;
+    static CurlMiddleWares * curlMiddleWares;
+
+    /* you can register functions to alter the curl request.
+    This can be usefull to add a client certificate for speciffic URLs. */
+    RegisterCurlMiddleware(std::string name, CurlMiddleWareFun fun);
+};
 
 }
