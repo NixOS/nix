@@ -4,6 +4,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
+#include "util.hh"
 
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -12,9 +13,86 @@ using namespace std::string_literals;
 
 namespace nix::fetchers {
 
-static std::string readHead(const Path & path)
+// Returns the name of the HEAD branch.
+//
+// Returns the head branch name as reported by git ls-remote, e.g.,
+// if ls-remote returns the output below, "main" is returned.
+//
+//   351037...    HEAD
+//   271366...    refs/heads/my-feature
+//   351037...    refs/heads/main
+static std::optional<std::string> readHead(const Path & path)
 {
-    return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+    RunOptions opts("git", {"ls-remote", path});
+    std::pair<int, std::string> s = runProgram(opts);
+    auto& [exit_code, output] = s;
+    if (exit_code != 0) {
+        return std::nullopt;
+    }
+
+    const auto& tokens = tokenizeString<std::vector<std::string>>(output);
+    auto it = tokens.cbegin();
+    std::string headRev;
+    while (true) {
+        if (it == tokens.cend()) { break; }
+        const std::string_view rev = *it++;
+        if (it == tokens.cend()) { break; }
+        std::string_view ref = *it++;
+
+        if (ref == "HEAD") {
+            headRev = rev;
+        } else if (rev == headRev) {
+            constexpr std::string_view headsPath = "refs/heads/";
+            if (hasPrefix(ref, headsPath)) {
+                ref.remove_prefix(headsPath.size());
+            }
+            debug("resolved HEAD ref '%s' for repo '%s'", ref, path);
+            return std::string(ref);
+        }
+    }
+
+    return std::nullopt;
+}
+
+static std::optional<std::string> readHeadCached(std::string actualUrl)
+{
+    // Append something in front of the url to prevent collision with the
+    // cached repo.
+    Path cachePath = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, "<ref>|" + actualUrl).to_string(Base32, false);
+    time_t now = time(0);
+    struct stat st;
+    std::optional<std::string> cachedRef;
+    if (stat(cachePath.c_str(), &st) == 0 &&
+        // The file may be empty, because writeFile() is not atomic.
+        st.st_size > 0) {
+
+        // The cached ref is persisted unconditionally (see below).
+        cachedRef = readFile(cachePath);
+        if (st.st_mtime + settings.tarballTtl > now) {
+            debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
+            return cachedRef;
+        }
+    }
+
+    auto ref = readHead(actualUrl);
+
+    if (ref) {
+        debug("storing cached HEAD ref '%s' for repo '%s' at '%s'", *ref, actualUrl, cachePath);
+        createDirs(dirOf(cachePath));
+        writeFile(cachePath, *ref);
+        return ref;
+    }
+
+    if (cachedRef) {
+        // If the cached git ref is expired in fetch() below, and the 'git fetch'
+        // fails, it falls back to continuing with the most recent version.
+        // This function must behave the same way, so we return the expired
+        // cached ref here.
+        warn("could not get HEAD ref for repository '%s'; using expired cached ref '%s'", actualUrl, *cachedRef);
+        return *cachedRef;
+    }
+
+    return std::nullopt;
 }
 
 static bool isNotDotGitDirectory(const Path & path)
@@ -285,7 +363,14 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
+        if (!input.getRef()) {
+            auto head = isLocal ? readHead(actualUrl) : readHeadCached(actualUrl);
+            if (!head) {
+                warn("could not read HEAD ref from repo at '%s', using 'master'", actualUrl);
+                head = "master";
+            }
+            input.attrs.insert_or_assign("ref", *head);
+        }
 
         Attrs mutableAttrs({
             {"type", cacheType},
@@ -351,7 +436,7 @@ struct GitInputScheme : InputScheme
                        git fetch to update the local ref to the remote ref. */
                     struct stat st;
                     doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-                        (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
+                        st.st_mtime + settings.tarballTtl <= now;
                 }
             }
 

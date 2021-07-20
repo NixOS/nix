@@ -30,7 +30,14 @@ flakeGitBare=$TEST_ROOT/flakeGitBare
 for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
     mkdir $repo
-    git -C $repo init
+
+    # Give one repo a non-master initial branch.
+    extraArgs=
+    if [[ $repo == $flake2Dir ]]; then
+      extraArgs="--initial-branch=main"
+    fi
+
+    git -C $repo init $extraArgs
     git -C $repo config user.email "foobar@example.com"
     git -C $repo config user.name "Foobar"
 done
