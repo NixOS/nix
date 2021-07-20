@@ -55,6 +55,7 @@ nix_tests = \
   ca/nix-shell.sh \
   ca/nix-run.sh \
   ca/recursive.sh \
+  ca/concurrent-builds.sh \
   ca/nix-copy.sh
   # parallel.sh
 
