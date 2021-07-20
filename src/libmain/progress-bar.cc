@@ -102,11 +102,11 @@ public:
 
     ~ProgressBar()
     {
-        stop();
+        setNonInteractive();
         updateThread.join();
     }
 
-    void stop() override
+    void setNonInteractive() override
     {
         auto state(state_.lock());
         if (!state->active) return;
@@ -480,9 +480,9 @@ public:
     }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+ref<Logger> makeProgressBar(bool printBuildLogs)
 {
-    return new ProgressBar(
+    return make_ref<ProgressBar>(
         printBuildLogs,
         shouldANSI()
     );
@@ -495,8 +495,8 @@ void startProgressBar(bool printBuildLogs)
 
 void stopProgressBar()
 {
-    auto progressBar = dynamic_cast<ProgressBar *>(logger);
-    if (progressBar) progressBar->stop();
+    auto progressBar = dynamic_cast<ProgressBar *>(logger.get_ptr().get());
+    if (progressBar) progressBar->setNonInteractive();
 
 }
 

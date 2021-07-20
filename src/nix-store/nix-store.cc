@@ -11,6 +11,7 @@
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"
+#include "loggers.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -311,7 +312,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
     if (query == qDefault) query = qOutputs;
 
-    RunPager pager;
+    runPager();
 
     switch (query) {
 
@@ -471,7 +472,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    RunPager pager;
+    runPager();
 
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);

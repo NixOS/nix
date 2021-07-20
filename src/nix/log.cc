@@ -3,6 +3,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
+#include "loggers.hh"
 
 using namespace nix;
 
@@ -32,7 +33,7 @@ struct CmdLog : InstallableCommand
 
         auto b = installable->toDerivedPath();
 
-        RunPager pager;
+        runPager();
         for (auto & sub : subs) {
             auto log = std::visit(overloaded {
                 [&](DerivedPath::Opaque bo) {

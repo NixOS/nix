@@ -3,6 +3,7 @@
 #include "progress-bar.hh"
 #include "fs-accessor.hh"
 #include "shared.hh"
+#include "loggers.cc"
 
 #include <queue>
 
@@ -226,7 +227,7 @@ struct CmdWhyDepends : SourceExprCommand
 
             visitPath(pathS);
 
-            RunPager pager;
+            runPager();
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
 

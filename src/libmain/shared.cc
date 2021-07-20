@@ -358,51 +358,6 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 }
 
 
-RunPager::RunPager()
-{
-    if (!isatty(STDOUT_FILENO)) return;
-    char * pager = getenv("NIX_PAGER");
-    if (!pager) pager = getenv("PAGER");
-    if (pager && ((string) pager == "" || (string) pager == "cat")) return;
-
-    Pipe toPager;
-    toPager.create();
-
-    pid = startProcess([&]() {
-        if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
-        if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
-        restoreProcessContext();
-        if (pager)
-            execl("/bin/sh", "sh", "-c", pager, nullptr);
-        execlp("pager", "pager", nullptr);
-        execlp("less", "less", nullptr);
-        execlp("more", "more", nullptr);
-        throw SysError("executing '%1%'", pager);
-    });
-
-    pid.setKillSignal(SIGINT);
-
-    if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
-        throw SysError("dupping stdout");
-}
-
-
-RunPager::~RunPager()
-{
-    try {
-        if (pid != -1) {
-            std::cout.flush();
-            close(STDOUT_FILENO);
-            pid.wait();
-        }
-    } catch (...) {
-        ignoreException();
-    }
-}
-
-
 PrintFreed::~PrintFreed()
 {
     if (show)

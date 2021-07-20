@@ -1,5 +1,6 @@
 #include "loggers.hh"
 #include "progress-bar.hh"
+#include "paged-logger.hh"
 #include "util.hh"
 
 namespace nix {
@@ -20,7 +21,7 @@ LogFormat parseLogFormat(const std::string & logFormatStr) {
     throw Error("option 'log-format' has an invalid value '%s'", logFormatStr);
 }
 
-Logger * makeDefaultLogger() {
+ref<Logger> makeDefaultLogger() {
     switch (defaultLogFormat) {
     case LogFormat::raw:
         return makeSimpleLogger(false);
@@ -48,6 +49,10 @@ void setLogFormat(const LogFormat & logFormat) {
 
 void createDefaultLogger() {
     logger = makeDefaultLogger();
+}
+
+void runPager() {
+    logger = make_ref<PagedLogger>(logger);
 }
 
 }

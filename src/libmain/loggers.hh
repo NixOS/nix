@@ -17,4 +17,6 @@ void setLogFormat(const LogFormat & logFormat);
 
 void createDefaultLogger();
 
+void runPager();
+
 }

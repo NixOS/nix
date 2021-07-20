@@ -272,7 +272,7 @@ static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int cli
     return reqs;
 }
 
-static void performOp(TunnelLogger * logger, ref<Store> store,
+static void performOp(ref<TunnelLogger> logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
 {
@@ -940,7 +940,7 @@ void processConnection(
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
-    auto tunnelLogger = new TunnelLogger(to, clientVersion);
+    auto tunnelLogger = make_ref<TunnelLogger>(to, clientVersion);
     auto prevLogger = nix::logger;
     // FIXME
     if (!recursive)

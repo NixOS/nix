@@ -47,7 +47,7 @@ struct LoggerSettings : Config
 
 extern LoggerSettings loggerSettings;
 
-class Logger
+class Logger : public std::enable_shared_from_this<Logger>
 {
     friend struct Activity;
 
@@ -98,6 +98,8 @@ public:
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 
     virtual void writeToStdout(std::string_view s);
+
+    virtual void setNonInteractive() {}
 
     template<typename... Args>
     inline void cout(const std::string & fs, const Args & ... args)
@@ -160,11 +162,11 @@ struct PushActivity
     ~PushActivity() { setCurActivity(prevAct); }
 };
 
-extern Logger * logger;
+extern ref<Logger> logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+ref<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+ref<Logger> makeJSONLogger(Logger & prevLogger);
 
 bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,

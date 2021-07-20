@@ -16,6 +16,7 @@
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
+#include "loggers.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -990,7 +991,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     bool tty = isatty(STDOUT_FILENO);
-    RunPager pager;
+    runPager();
 
     Table table;
     std::ostringstream dummy;
@@ -1272,7 +1273,7 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 
     auto [gens, curGen] = findGenerations(globals.profile);
 
-    RunPager pager;
+    runPager();
 
     for (auto & i : gens) {
         tm t;
