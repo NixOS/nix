@@ -544,7 +544,7 @@ void DerivationGoal::tryToBuild()
     PathSet lockFiles;
     /* FIXME: Should lock something like the drv itself so we don't build same
        CA drv concurrently */
-    if (dynamic_cast<LocalStore *>(&worker.store))
+    if (dynamic_cast<LocalStore *>(&worker.store)) {
         /* If we aren't a local store, we might need to use the local store as
            a build remote, but that would cause a deadlock. */
         /* FIXME: Make it so we can use ourselves as a build remote even if we
@@ -552,9 +552,15 @@ void DerivationGoal::tryToBuild()
         /* FIXME: find some way to lock for scheduling for the other stores so
            a forking daemon with --store still won't farm out redundant builds.
            */
-        for (auto & i : drv->outputsAndOptPaths(worker.store))
+        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
             if (i.second.second)
                 lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+            else
+                lockFiles.insert(
+                    worker.store.Store::toRealPath(drvPath) + "!" + i.first
+                );
+        }
+    }
 
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
