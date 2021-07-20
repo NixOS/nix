@@ -13,15 +13,15 @@ pub fn decoded_len(input_len: usize) -> usize {
     input_len * 5 / 8
 }
 
-static BASE32_CHARS: &[u8; 32] = &b"0123456789abcdfghijklmnpqrsvwxyz";
+static BASE32_CHARS: [u8; 32] = *b"0123456789abcdfghijklmnpqrsvwxyz";
 
 lazy_static! {
-    static ref BASE32_CHARS_REVERSE: Box<[u8; 256]> = {
+    static ref BASE32_CHARS_REVERSE: [u8; 256] = {
         let mut xs = [0xffu8; 256];
         for (n, c) in BASE32_CHARS.iter().enumerate() {
             xs[*c as usize] = n as u8;
         }
-        Box::new(xs)
+        xs
     };
 }
 
@@ -35,7 +35,7 @@ pub fn encode_into(input: &[u8], output: &mut [u8]) {
     let len = encoded_len(input.len());
     assert_eq!(len, output.len());
 
-    let mut nr_bits_left: usize = 0;
+    let mut nr_bits_left: u32 = 0;
     let mut bits_left: u16 = 0;
     let mut pos = len;
 
@@ -61,7 +61,7 @@ pub fn encode_into(input: &[u8], output: &mut [u8]) {
 pub fn decode(input: &str) -> Result<Vec<u8>, crate::Error> {
     let mut res = Vec::with_capacity(decoded_len(input.len()));
 
-    let mut nr_bits_left: usize = 0;
+    let mut nr_bits_left: u32 = 0;
     let mut bits_left: u16 = 0;
 
     for c in input.chars().rev() {

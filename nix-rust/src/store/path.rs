@@ -72,7 +72,7 @@ impl StorePathHash {
 
 impl fmt::Display for StorePathHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buf = vec![0; STORE_PATH_HASH_CHARS];
+        let mut buf = [0; STORE_PATH_HASH_CHARS];
         base32::encode_into(&self.0, &mut buf);
         f.write_str(std::str::from_utf8(&buf).unwrap())
     }
@@ -99,28 +99,16 @@ pub struct StorePathName(String);
 impl StorePathName {
     pub fn new(s: &str) -> Result<Self, Error> {
         if s.is_empty() {
-            return Err(Error::StorePathNameEmpty);
+            Err(Error::StorePathNameEmpty)
+        } else if s.len() > 211 {
+            Err(Error::StorePathNameTooLong)
+        } else if s.starts_with('.') || !s.chars().all(
+            |c| matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' | '+' | '-' | '.' | '_' | '?' | '='),
+        ) {
+            Err(Error::BadStorePathName)
+        } else {
+            Ok(Self(s.to_string()))
         }
-
-        if s.len() > 211 {
-            return Err(Error::StorePathNameTooLong);
-        }
-
-        let is_good_path_name = s.chars().all(|c| {
-            c.is_ascii_alphabetic()
-                || c.is_ascii_digit()
-                || c == '+'
-                || c == '-'
-                || c == '.'
-                || c == '_'
-                || c == '?'
-                || c == '='
-        });
-        if s.starts_with('.') || !is_good_path_name {
-            return Err(Error::BadStorePathName);
-        }
-
-        Ok(Self(s.to_string()))
     }
 
     pub fn name(&self) -> &str {

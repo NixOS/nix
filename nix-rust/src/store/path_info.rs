@@ -1,6 +1,7 @@
 use crate::store::StorePath;
 use crate::Error;
 use std::collections::BTreeSet;
+use std::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct PathInfo {
@@ -16,7 +17,7 @@ pub struct PathInfo {
 }
 
 impl PathInfo {
-    pub fn parse_nar_info(nar_info: &str, store_dir: &str) -> Result<Self, Error> {
+    pub fn parse_nar_info(nar_info: &str, store_dir: &Path) -> Result<Self, Error> {
         let mut path = None;
         let mut references = BTreeSet::new();
         let mut nar_size = None;
@@ -36,24 +37,32 @@ impl PathInfo {
 
             let value = &value[2..];
 
-            if name == "StorePath" {
-                path = Some(StorePath::new(std::path::Path::new(value), store_dir)?);
-            } else if name == "NarSize" {
-                nar_size = Some(u64::from_str_radix(value, 10).map_err(|_| Error::BadNarInfo)?);
-            } else if name == "References" {
-                if !value.is_empty() {
+            match name {
+                "StorePath" => {
+                    path = Some(StorePath::new(Path::new(value), store_dir)?);
+                }
+                "NarSize" => {
+                    nar_size = Some(u64::from_str_radix(value, 10).map_err(|_| Error::BadNarInfo)?);
+                }
+                "References" if !value.is_empty() => {
                     for r in value.split(' ') {
                         references.insert(StorePath::new_from_base_name(r)?);
                     }
                 }
-            } else if name == "Deriver" {
-                deriver = Some(StorePath::new_from_base_name(value)?);
-            } else if name == "URL" {
-                url = Some(value.into());
-            } else if name == "Compression" {
-                compression = Some(value.into());
-            } else if name == "FileSize" {
-                file_size = Some(u64::from_str_radix(value, 10).map_err(|_| Error::BadNarInfo)?);
+                "Deriver" => {
+                    deriver = Some(StorePath::new_from_base_name(value)?);
+                }
+                "URL" => {
+                    url = Some(value.into());
+                }
+                "Compression" => {
+                    compression = Some(value.into());
+                }
+                "FileSize" => {
+                    file_size =
+                        Some(u64::from_str_radix(value, 10).map_err(|_| Error::BadNarInfo)?);
+                }
+                _ => {}
             }
         }
 
