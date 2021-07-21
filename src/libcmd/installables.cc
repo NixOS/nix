@@ -58,11 +58,12 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "no-registries",
-        .description = "Don't allow lookups in the flake registries.",
+        .description =
+          "Don't allow lookups in the flake registries. This option is deprecated; use `--no-use-registries`.",
         .category = category,
         .handler = {[&]() {
             lockFlags.useRegistries = false;
-            warn("--no-registries is deprecated; use --no-use-registries (a.k.a --option use-registries false)");
+            warn("'--no-registries' is deprecated; use '--no-use-registries'");
         }}
     });
 

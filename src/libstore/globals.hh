@@ -958,7 +958,7 @@ public:
         )"};
 
     Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries for reference resolution"};
+        "Whether to use flake registries to resolve flake references."};
 };
 
 
