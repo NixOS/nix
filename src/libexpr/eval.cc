@@ -854,39 +854,37 @@ Value * Expr::maybeThunk(EvalState & state, Env & env)
 }
 
 
-unsigned long nrAvoided = 0;
-
 Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.lookupVar(&env, *this, true);
     /* The value might not be initialised in the environment yet.
        In that case, ignore it. */
-    if (v) { nrAvoided++; return v; }
+    if (v) { state.nrAvoided++; return v; }
     return Expr::maybeThunk(state, env);
 }
 
 
 Value * ExprString::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprInt::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
@@ -1141,8 +1139,6 @@ static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPa
 }
 
 
-unsigned long nrLookups = 0;
-
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
@@ -1154,7 +1150,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     try {
 
         for (auto & i : attrPath) {
-            nrLookups++;
+            state.nrLookups++;
             Bindings::iterator j;
             Symbol name = getName(i, state, env);
             if (def) {

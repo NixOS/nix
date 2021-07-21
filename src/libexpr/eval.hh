@@ -316,8 +316,10 @@ private:
     unsigned long nrValuesInEnvs = 0;
     unsigned long nrValues = 0;
     unsigned long nrListElems = 0;
+    unsigned long nrLookups = 0;
     unsigned long nrAttrsets = 0;
     unsigned long nrAttrsInAttrsets = 0;
+    unsigned long nrAvoided = 0;
     unsigned long nrOpUpdates = 0;
     unsigned long nrOpUpdateValuesCopied = 0;
     unsigned long nrListConcats = 0;
@@ -339,6 +341,11 @@ private:
 
     friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
+    friend struct ExprVar;
+    friend struct ExprString;
+    friend struct ExprInt;
+    friend struct ExprFloat;
+    friend struct ExprPath;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
