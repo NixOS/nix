@@ -520,11 +520,11 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
 
 
 /* Add a wrapper around the derivation primop that computes the
-   `drvPath' and `outPath' attributes lazily. */
+   `drvPath', `outPath', `inputSrcs' and `inputDrvs' attributes lazily. */
 static void prim_derivation(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     Value fun;
-    state.evalFile(/*settings.nixDataDir + "/nix/corepkgs/derivation.nix"*/state.sDerivationNix, fun);
+    state.evalFile(state.sDerivationNix, fun);
     state.forceFunction(fun, pos);
     mkApp(v, fun, *args[0]);
     state.forceAttrs(v, pos);
@@ -537,7 +537,8 @@ static void prim_derivation(EvalState & state, const Pos & pos, Value * * args, 
    attributes: `outPath' containing the primary output path of the
    derivation; `drvPath' containing the path of the Nix expression;
    and `type' set to `derivation' to indicate that this is a
-   derivation. */
+   derivation; `inputSrcs' and `inputDrvs' containing the build-time
+   dependencies. */
 static void prim_derivationStrict2(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
@@ -1435,6 +1436,9 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 }
 
 
+/* Given a set of attribute names, return the set of the corresponding
+   attributes from the given set. Former `lib.genAttrs'
+ */
 static void prim_genAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
@@ -2373,8 +2377,6 @@ void EvalState::createBaseEnv()
     addPrimOp("__fetchurl", 1, prim_fetchurl);
     addPrimOp("fetchTarball", 1, prim_fetchTarball);
 
-    /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
     string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
     sDerivationNix = symbols.create(path);
 
