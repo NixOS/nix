@@ -115,6 +115,7 @@ private:
     std::unordered_map<Path, Path> resolvedPaths;
 
 public:
+    FileEvalCache derivationCache;
 
     EvalState(const Strings & _searchPath, ref<Store> store);
     ~EvalState();
