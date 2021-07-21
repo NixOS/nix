@@ -956,6 +956,9 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
+
+    Setting<bool> useRegistries{this, true, "use-registries",
+        "Whether to use flake registries for reference resolution"};
 };
 
 

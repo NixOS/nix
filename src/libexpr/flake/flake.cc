@@ -1,4 +1,5 @@
 #include "flake.hh"
+#include "eval.hh"
 #include "lockfile.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
@@ -296,7 +297,9 @@ LockedFlake lockFlake(
 
     FlakeCache flakeCache;
 
-    auto flake = getFlake(state, topRef, lockFlags.useRegistries, flakeCache);
+    auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
+
+    auto flake = getFlake(state, topRef, useRegistries, flakeCache);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply();
@@ -464,7 +467,7 @@ LockedFlake lockFlake(
                             throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                         if (input.isFlake) {
-                            auto inputFlake = getFlake(state, *input.ref, lockFlags.useRegistries, flakeCache);
+                            auto inputFlake = getFlake(state, *input.ref, useRegistries, flakeCache);
 
                             /* Note: in case of an --override-input, we use
                                the *original* ref (input2.ref) for the
@@ -499,7 +502,7 @@ LockedFlake lockFlake(
 
                         else {
                             auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                state, *input.ref, lockFlags.useRegistries, flakeCache);
+                                state, *input.ref, useRegistries, flakeCache);
                             node->inputs.insert_or_assign(id,
                                 std::make_shared<LockedNode>(lockedRef, *input.ref, false));
                         }
@@ -573,7 +576,7 @@ LockedFlake lockFlake(
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake.lockedRef;
                         FlakeCache dummyCache;
-                        flake = getFlake(state, topRef, lockFlags.useRegistries, dummyCache);
+                        flake = getFlake(state, topRef, useRegistries, dummyCache);
 
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
@@ -643,7 +646,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
         lockFlake(state, flakeRef,
             LockFlags {
                 .updateLockFile = false,
-                .useRegistries = !evalSettings.pureEval,
+                .useRegistries = !evalSettings.pureEval && !settings.useRegistries,
                 .allowMutable  = !evalSettings.pureEval,
             }),
         v);
