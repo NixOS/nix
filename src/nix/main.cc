@@ -105,26 +105,28 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         });
     }
 
-    std::map<std::string, std::vector<std::string>> aliases = {
-        {"add-to-store", {"store", "add-path"}},
-        {"cat-nar", {"nar", "cat"}},
-        {"cat-store", {"store", "cat"}},
-        {"copy-sigs", {"store", "copy-sigs"}},
-        {"dev-shell", {"develop"}},
-        {"diff-closures", {"store", "diff-closures"}},
-        {"dump-path", {"store", "dump-path"}},
-        {"hash-file", {"hash", "file"}},
-        {"hash-path", {"hash", "path"}},
-        {"ls-nar", {"nar", "ls"}},
-        {"ls-store", {"store", "ls"}},
-        {"make-content-addressable", {"store", "make-content-addressable"}},
-        {"optimise-store", {"store", "optimise"}},
-        {"ping-store", {"store", "ping"}},
-        {"sign-paths", {"store", "sign"}},
-        {"to-base16", {"hash", "to-base16"}},
-        {"to-base32", {"hash", "to-base32"}},
-        {"to-base64", {"hash", "to-base64"}},
-        {"verify", {"store", "verify"}},
+    std::map<std::vector<std::string>, std::vector<std::string>> aliases = {
+        {{"add-to-store"}, {"store", "add-path"}},
+        {{"cat-nar"}, {"nar", "cat"}},
+        {{"cat-store"}, {"store", "cat"}},
+        {{"copy-sigs"}, {"store", "copy-sigs"}},
+        {{"dev-shell"}, {"develop"}},
+        {{"diff-closures"}, {"store", "diff-closures"}},
+        {{"dump-path"}, {"store", "dump-path"}},
+        {{"hash-file"}, {"hash", "file"}},
+        {{"hash-path"}, {"hash", "path"}},
+        {{"ls-nar"}, {"nar", "ls"}},
+        {{"ls-store"}, {"store", "ls"}},
+        {{"make-content-addressable"}, {"store", "make-content-addressable"}},
+        {{"optimise-store"}, {"store", "optimise"}},
+        {{"ping-store"}, {"store", "ping"}},
+        {{"sign-paths"}, {"store", "sign"}},
+        {{"to-base16"}, {"hash", "to-base16"}},
+        {{"to-base32"}, {"hash", "to-base32"}},
+        {{"to-base64"}, {"hash", "to-base64"}},
+        {{"verify"}, {"store", "verify"}},
+        {{"flake", "init"}, {"init"}},
+        {{"flake", "new"}, {"new"}},
     };
 
     bool aliasUsed = false;
@@ -133,14 +135,33 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     {
         if (aliasUsed || command || pos == args.end()) return pos;
         auto arg = *pos;
-        auto i = aliases.find(arg);
-        if (i == aliases.end()) return pos;
-        warn("'%s' is a deprecated alias for '%s'",
-            arg, concatStringsSep(" ", i->second));
-        pos = args.erase(pos);
-        for (auto j = i->second.rbegin(); j != i->second.rend(); ++j)
-            pos = args.insert(pos, *j);
-        aliasUsed = true;
+
+        // Loop through the aliases to see whether the current cli corresponds
+        // to one of them.
+        for (auto & [from, to] : aliases) {
+            auto i = pos;
+            bool isCurrentAlias = true;
+            // Is the current alias a prefix of the args?
+            for (auto & fromItem : from) {
+                if (i == args.end() || *i != fromItem) {
+                    // The current alias doesn’t match the args
+                    isCurrentAlias = false;
+                    break;
+                }
+                i++;
+            }
+            // If we went through to the end of the previous loop, then we match
+            // the currently considered alias.
+            // So rewrite the alias in the current args.
+            if (isCurrentAlias) {
+                warn("'%s' is a deprecated alias for '%s'",
+                    concatStringsSep(" ", from), concatStringsSep(" ", to));
+                pos = args.erase(pos, i);
+                pos = args.insert(pos, to.begin(), to.end());
+                aliasUsed = true;
+                return pos;
+            }
+        }
         return pos;
     }
 
