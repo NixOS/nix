@@ -4,24 +4,24 @@
 drvAttrs @ { outputs ? [ "out" ], ... }:
 
 let
+  strict = derivationStrict2 drvAttrs outputsMap;
 
-  strict = derivationStrict drvAttrs;
-
-  commonAttrs = drvAttrs // (builtins.listToAttrs outputsList) //
-    { all = map (x: x.value) outputsList;
+  commonAttrs = drvAttrs // outputsMap //
+    { all = builtins.attrValues outputsMap;
       inherit drvAttrs;
     };
 
-  outputToAttrListElement = outputName:
-    { name = outputName;
-      value = commonAttrs // {
-        outPath = builtins.getAttr outputName strict;
-        drvPath = strict.drvPath;
-        type = "derivation";
-        inherit outputName;
-      };
-    };
+  outputsMap = builtins.genAttrs outputs (outputName:
+    commonAttrs // {
+      outPath = strict.${outputName};
+      drvPath = strict.drvPath;
+      inputSrcs = strict.inputSrcs;
+      inputDrvs = strict.inputDrvs;
+      type = "derivation";
+      inherit outputName;
+    }
+  );
 
-  outputsList = map outputToAttrListElement outputs;
+in
+  outputsMap.${builtins.head outputs}
 
-in (builtins.head outputsList).value
