@@ -707,8 +707,15 @@ static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, cons
 
 void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
-    if (evalStore && evalStore.get() != this)
-        throw Error("building on a remote store is incompatible with '--eval-store'");
+    if (evalStore && evalStore.get() != this) {
+        /* The remote doesn't have a way to access evalStore, so copy
+           the .drvs. */
+        RealisedPath::Set drvPaths2;
+        for (auto & i : drvPaths)
+            if (auto p = std::get_if<DerivedPath::Built>(&i))
+                drvPaths2.insert(p->drvPath);
+        copyClosure(*evalStore, *this, drvPaths2);
+    }
 
     auto conn(getConnection());
     conn->to << wopBuildPaths;
