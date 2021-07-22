@@ -340,11 +340,10 @@ void DerivationGoal::gaveUpOnSubstitution()
     /* Copy the input sources from the eval store to the build
        store. */
     if (&worker.evalStore != &worker.store) {
-        RealisedPath::Set inputSrcs, inputClosure;
+        RealisedPath::Set inputSrcs;
         for (auto & i : drv->inputSrcs)
             inputSrcs.insert(i);
-        RealisedPath::closure(worker.evalStore, inputSrcs, inputClosure);
-        copyClosure(worker.evalStore, worker.store, inputClosure);
+        copyClosure(worker.evalStore, worker.store, inputSrcs);
     }
 
     for (auto & i : drv->inputSrcs) {
