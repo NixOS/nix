@@ -283,8 +283,6 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
         expectArg("url", &url);
     }
 
-    Category category() override { return catUtility; }
-
     std::string description() override
     {
         return "download a file into the Nix store";
