@@ -111,7 +111,7 @@ while [ $# -gt 0 ]; do
                 echo ""
                 echo " --daemon-user-count: Number of build users to create. Defaults to 32."
                 echo ""
-                echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix.conf"
+                echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix/nix.conf"
                 echo ""
                 if [ -n "${INVOKED_FROM_INSTALL_IN:-}" ]; then
                     echo " --tarball-url-prefix URL: Base URL to download the Nix tarball from."
