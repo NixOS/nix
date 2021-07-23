@@ -130,6 +130,45 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
+                    if (std::find(m.systemTypes.begin(), m.systemTypes.end(), "auto") != m.systemTypes.end() ||
+                        std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "auto") != m.supportedFeatures.end()) {
+                        // wildcard is used, so we need to ask the machine what it supports
+
+                        if (hasPrefix(m.storeUri, "ssh://"))
+                            throw Error("Cannot use wildcards with legacy ssh store. Instead use the ssh-ng:// protocol.");
+
+                        try {
+                            Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", m.storeUri));
+
+                            auto store = m.openStore();
+
+                            store->connect();
+
+                            {
+                                auto autoIter = std::find(m.supportedFeatures.begin(), m.supportedFeatures.end(), "auto");
+                                if (autoIter != m.supportedFeatures.end()) {
+                                    m.supportedFeatures.insert(store->systemFeatures.get().begin(), store->systemFeatures.get().end());
+                                    m.supportedFeatures.erase(autoIter);
+                                }
+                            }
+
+                            {
+                                auto autoIter = std::find(m.systemTypes.begin(), m.systemTypes.end(), "auto");
+                                if (autoIter != m.systemTypes.end()) {
+                                    m.systemTypes.insert(store->systemTypes.get().begin(), store->systemTypes.get().end());
+                                    m.systemTypes.erase(autoIter);
+                                }
+                            }
+                        } catch (std::exception & e) {
+                            auto msg = chomp(drainFD(5, false));
+                            printError("cannot connect to '%s': %s%s",
+                                m.storeUri, e.what(),
+                                msg.empty() ? "" : ": " + msg);
+                            m.enabled = false;
+                            continue;
+                        }
+                    }
+
                     if (m.enabled && std::find(m.systemTypes.begin(),
                             m.systemTypes.end(),
                             neededSystem) != m.systemTypes.end() &&
@@ -204,7 +243,7 @@ static int main_build_remote(int argc, char * * argv)
 
                         for (auto & m : machines)
                             error
-                                % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                                % concatStringsSep<StringSet>(", ", m.systemTypes)
                                 % m.maxJobs
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);

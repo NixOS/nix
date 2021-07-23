@@ -143,6 +143,8 @@ protected:
 
     virtual void setOptions(Connection & conn);
 
+    virtual void getOptions(Connection & conn);
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
