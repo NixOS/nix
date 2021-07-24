@@ -435,7 +435,7 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
     if (dir == "")
         dir = "/";
 
-    AutoCloseFD dirfd(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd{open(dir.c_str(), O_RDONLY)};
     if (!dirfd) {
         if (errno == ENOENT) return;
         throw SysError("opening directory '%1%'", path);
