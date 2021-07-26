@@ -78,6 +78,11 @@ public:
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
+    void addMultipleToStore(
+        Source & source,
+        RepairFlag repair,
+        CheckSigsFlag checkSigs) override;
+
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
@@ -111,8 +116,6 @@ public:
     void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
-
-    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs) override;
 
     void connect() override;
 
@@ -152,8 +155,6 @@ protected:
     virtual ref<FSAccessor> getFSAccessor() override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
-
-    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
 
 private:
 

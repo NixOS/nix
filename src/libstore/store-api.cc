@@ -250,6 +250,20 @@ StorePath Store::addToStore(const string & name, const Path & _srcPath,
 }
 
 
+void Store::addMultipleToStore(
+    Source & source,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
+    auto expected = readNum<uint64_t>(source);
+    for (uint64_t i = 0; i < expected; ++i) {
+        auto info = ValidPathInfo::read(source, *this, 16);
+        info.ultimate = false;
+        addToStore(info, source, repair, checkSigs);
+    }
+}
+
+
 /*
 The aim of this function is to compute in one pass the correct ValidPathInfo for
 the files that we are trying to add to the store. To accomplish that in one
@@ -771,6 +785,19 @@ const Store::Stats & Store::getStats()
 }
 
 
+static std::string makeCopyPathMessage(
+    std::string_view srcUri,
+    std::string_view dstUri,
+    std::string_view storePath)
+{
+    return srcUri == "local" || srcUri == "daemon"
+        ? fmt("copying path '%s' to '%s'", storePath, dstUri)
+        : dstUri == "local" || dstUri == "daemon"
+        ? fmt("copying path '%s' from '%s'", storePath, srcUri)
+        : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri);
+}
+
+
 void copyStorePath(
     Store & srcStore,
     Store & dstStore,
@@ -780,14 +807,10 @@ void copyStorePath(
 {
     auto srcUri = srcStore.getUri();
     auto dstUri = dstStore.getUri();
-
+    auto storePathS = srcStore.printStorePath(storePath);
     Activity act(*logger, lvlInfo, actCopyPath,
-        srcUri == "local" || srcUri == "daemon"
-        ? fmt("copying path '%s' to '%s'", srcStore.printStorePath(storePath), dstUri)
-          : dstUri == "local" || dstUri == "daemon"
-        ? fmt("copying path '%s' from '%s'", srcStore.printStorePath(storePath), srcUri)
-          : fmt("copying path '%s' from '%s' to '%s'", srcStore.printStorePath(storePath), srcUri, dstUri),
-        {srcStore.printStorePath(storePath), srcUri, dstUri});
+        makeCopyPathMessage(srcUri, dstUri, storePathS),
+        {storePathS, srcUri, dstUri});
     PushActivity pact(act.id);
 
     auto info = srcStore.queryPathInfo(storePath);
@@ -896,19 +919,31 @@ std::map<StorePath, StorePath> copyPaths(
     for (auto & path : storePaths)
         pathsMap.insert_or_assign(path, path);
 
-    // FIXME: Temporary hack to copy closures in a single round-trip.
-    if (dynamic_cast<RemoteStore *>(&dstStore)) {
-        if (!missing.empty()) {
-            auto source = sinkToSource([&](Sink & sink) {
-                srcStore.exportPaths(missing, sink);
-            });
-            dstStore.importPaths(*source, NoCheckSigs);
-        }
-        return pathsMap;
-    }
-
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
+    auto sorted = srcStore.topoSortPaths(missing);
+    std::reverse(sorted.begin(), sorted.end());
+
+    auto source = sinkToSource([&](Sink & sink) {
+        sink << sorted.size();
+        for (auto & storePath : sorted) {
+            auto srcUri = srcStore.getUri();
+            auto dstUri = dstStore.getUri();
+            auto storePathS = srcStore.printStorePath(storePath);
+            Activity act(*logger, lvlInfo, actCopyPath,
+                makeCopyPathMessage(srcUri, dstUri, storePathS),
+                {storePathS, srcUri, dstUri});
+            PushActivity pact(act.id);
+
+            auto info = srcStore.queryPathInfo(storePath);
+            info->write(sink, srcStore, 16);
+            srcStore.narFromPath(storePath, sink);
+        }
+    });
+
+    dstStore.addMultipleToStore(*source, repair, checkSigs);
+
+    #if 0
     std::atomic<size_t> nrDone{0};
     std::atomic<size_t> nrFailed{0};
     std::atomic<uint64_t> bytesExpected{0};
@@ -986,6 +1021,8 @@ std::map<StorePath, StorePath> copyPaths(
             nrDone++;
             showProgress();
         });
+    #endif
+
     return pathsMap;
 }
 

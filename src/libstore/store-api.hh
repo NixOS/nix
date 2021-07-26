@@ -440,6 +440,12 @@ public:
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
+    /* Import multiple paths into the store. */
+    virtual void addMultipleToStore(
+        Source & source,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see

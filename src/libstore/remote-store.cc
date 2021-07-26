@@ -386,23 +386,6 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 }
 
 
-ref<const ValidPathInfo> RemoteStore::readValidPathInfo(ConnectionHandle & conn, const StorePath & path)
-{
-    auto deriver = readString(conn->from);
-    auto narHash = Hash::parseAny(readString(conn->from), htSHA256);
-    auto info = make_ref<ValidPathInfo>(path, narHash);
-    if (deriver != "") info->deriver = parseStorePath(deriver);
-    info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-    conn->from >> info->registrationTime >> info->narSize;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-        conn->from >> info->ultimate;
-        info->sigs = readStrings<StringSet>(conn->from);
-        info->ca = parseContentAddressOpt(readString(conn->from));
-    }
-    return info;
-}
-
-
 void RemoteStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
@@ -423,7 +406,8 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
-            info = readValidPathInfo(conn, path);
+            info = std::make_shared<ValidPathInfo>(
+                ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion), StorePath{path}));
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -525,8 +509,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
             });
         }
 
-        auto path = parseStorePath(readString(conn->from));
-        return readValidPathInfo(conn, path);
+        return make_ref<ValidPathInfo>(
+            ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion)));
     }
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -639,6 +623,25 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             conn.processStderr(0, nullptr);
         }
     }
+}
+
+
+void RemoteStore::addMultipleToStore(
+    Source & source,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
+    if (GET_PROTOCOL_MINOR(getConnection()->daemonVersion) >= 32) {
+        auto conn(getConnection());
+        conn->to
+            << wopAddMultipleToStore
+            << repair
+            << !checkSigs;
+        conn.withFramedSink([&](Sink & sink) {
+            source.drainInto(sink);
+        });
+    } else
+        Store::addMultipleToStore(source, repair, checkSigs);
 }
 
 
@@ -885,16 +888,6 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 }
 
 
-StorePaths RemoteStore::importPaths(Source & source, CheckSigsFlag checkSigs)
-{
-    auto conn(getConnection());
-    conn->to << wopImportPaths2;
-    source.drainInto(conn->to);
-    conn.processStderr();
-    return worker_proto::read(*this, conn->from, Phantom<StorePaths> {});
-}
-
-
 void RemoteStore::connect()
 {
     auto conn(getConnection());
@@ -1021,14 +1014,14 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-void ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun)
+void ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
 {
     (*this)->to.flush();
 
     std::exception_ptr ex;
 
-    /* Handle log messages / exceptions from the remote on a
-        separate thread. */
+    /* Handle log messages / exceptions from the remote on a separate
+       thread. */
     std::thread stderrThread([&]()
     {
         try {
@@ -1061,7 +1054,6 @@ void ConnectionHandle::withFramedSink(std::function<void(Sink &sink)> fun)
     stderrThread.join();
     if (ex)
         std::rethrow_exception(ex);
-
 }
 
 }
