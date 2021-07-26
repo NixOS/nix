@@ -776,18 +776,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-std::atomic<uint64_t> nrValuesFreed{0};
-
-void finalizeValue(void * obj, void * data)
-{
-    nrValuesFreed++;
-}
-
 Value * EvalState::allocValue()
 {
     nrValues++;
     auto v = (Value *) allocBytes(sizeof(Value));
-    //GC_register_finalizer_no_order(v, finalizeValue, nullptr, nullptr, nullptr);
     return v;
 }
 
