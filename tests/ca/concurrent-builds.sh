@@ -5,7 +5,7 @@
 
 source common.sh
 
-sed -i 's/experimental-features .*/& ca-derivations ca-references/' "$NIX_CONF_DIR"/nix.conf
+buggyNeedLocalStore "For some reason, this deadlocks with the daemon"
 
 export NIX_TESTS_CA_BY_DEFAULT=1
 

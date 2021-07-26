@@ -4,7 +4,7 @@
 
 source common.sh
 
-sed -i 's/experimental-features .*/& ca-derivations ca-references/' "$NIX_CONF_DIR"/nix.conf
+needLocalStore "“--no-require-sigs” can’t be used with the daemon"
 
 rm -rf $TEST_ROOT/binary_cache
 

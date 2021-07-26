@@ -2,6 +2,8 @@
 
 source common.sh
 
+requireDaemonNewerThan "2.4pre20210623"
+
 sed -i 's/experimental-features .*/& ca-derivations ca-references nix-command flakes/' "$NIX_CONF_DIR"/nix.conf
 
 export NIX_TESTS_CA_BY_DEFAULT=1

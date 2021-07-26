@@ -3,7 +3,8 @@
 # Regression test for https://github.com/NixOS/nix/issues/4858
 
 source common.sh
-sed -i 's/experimental-features .*/& ca-derivations ca-references/' "$NIX_CONF_DIR"/nix.conf
+
+requireDaemonNewerThan "2.4pre20210621"
 
 # Get the output path of `rootCA`, and put some garbage instead
 outPath="$(nix-build ./content-addressed.nix -A rootCA --no-out-link)"

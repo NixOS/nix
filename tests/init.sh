@@ -23,6 +23,7 @@ substituters =
 flake-registry = $TEST_ROOT/registry.json
 show-trace = true
 include nix.conf.extra
+trusted-users = $(whoami)
 EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
