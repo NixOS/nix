@@ -1038,7 +1038,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                         auto actualFoHash = hashCAPath(
                                 recursive,
                                 expectedHash.type,
-                                info.path
+                                realPath
                                 );
                         if (ca != actualFoHash) {
                             throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
