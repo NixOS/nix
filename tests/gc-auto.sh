@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "“min-free” and “max-free” are daemon options"
+
 clearStore
 
 garbage1=$(nix add-to-store --name garbage1 ./nar-access.sh)

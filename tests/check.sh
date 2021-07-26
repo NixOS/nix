@@ -1,5 +1,8 @@
 source common.sh
 
+# XXX: This shouldn’t be, but #4813 cause this test to fail
+buggyNeedLocalStore "see #4813"
+
 clearStore
 
 nix-build dependencies.nix --no-out-link
