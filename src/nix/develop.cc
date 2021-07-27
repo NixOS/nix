@@ -7,6 +7,7 @@
 #include "derivations.hh"
 #include "affinity.hh"
 #include "progress-bar.hh"
+#include "run.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -472,8 +473,6 @@ struct CmdDevelop : Common, MixEnvironment
 
         writeFull(rcFileFd.get(), script);
 
-        stopProgressBar();
-
         setEnviron();
         // prevent garbage collection until shell exits
         setenv("NIX_GCROOT", gcroot.data(), 1);
@@ -506,11 +505,7 @@ struct CmdDevelop : Common, MixEnvironment
         auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
             : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
-        restoreProcessContext();
-
-        execvp(shell.c_str(), stringsToCharPtrs(args).data());
-
-        throw SysError("executing shell '%s'", shell);
+        runProgramInStore(store, shell, args);
     }
 };
 
