@@ -1,9 +1,5 @@
 ifeq ($(doc_generate),yes)
 
-ALL_MD_FILES := $(call rwildcard, $(d)/src, *.md)
-GENERATED_MD_FILES := $(call rwildcard, $(d)/src/command-ref/new-cli, *.md)
-MANUAL_SRCS := $(filter-out $(GENERATED_MD_FILES), $(ALL_MD_FILES))
-
 # Generate man pages.
 man-pages := $(foreach n, \
   nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
@@ -81,13 +77,10 @@ install: $(mandir)/man1/nix3-manpages
 man: doc/manual/generated/man1/nix3-manpages
 all: doc/manual/generated/man1/nix3-manpages
 
-$(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-build.1
+$(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-manpages
 	@mkdir -p $$(dirname $@)
 	$(trace-install) install -m 0644 $$(dirname $<)/* $$(dirname $@)
 
-# Technically this rule generates all the `nix3-*` manpages, but since we don’t
-# know their list statically and they are all generated at once anyways, we can
-# just be dirty and only track one
 doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	@mkdir -p $$(dirname $@)
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
