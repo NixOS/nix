@@ -155,7 +155,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         auto store = openStore();
         auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
         state->repair = repair;
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
