@@ -56,9 +56,6 @@ perl/Makefile.config
 
 /src/nix-prefetch-url/nix-prefetch-url
 
-# /src/nix-daemon/
-/src/nix-daemon/nix-daemon
-
 /src/nix-collect-garbage/nix-collect-garbage
 
 # /src/nix-channel/
