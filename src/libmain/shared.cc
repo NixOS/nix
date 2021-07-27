@@ -238,7 +238,7 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     addFlag({
         .longName = "no-gc-warning",
         .description = "Disable warnings about not using `--add-root`.",
-        .handler = {&gcWarning, true},
+        .handler = {&gcWarning, false},
     });
 
     addFlag({
