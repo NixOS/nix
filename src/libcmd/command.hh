@@ -45,11 +45,18 @@ private:
 
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
-    ref<EvalState> getEvalState();
-
-    std::shared_ptr<EvalState> evalState;
+    EvalCommand();
 
     ~EvalCommand();
+
+    ref<Store> getEvalStore();
+
+    ref<EvalState> getEvalState();
+
+private:
+    std::shared_ptr<Store> evalStore;
+
+    std::shared_ptr<EvalState> evalState;
 };
 
 struct MixFlakeOptions : virtual Args, EvalCommand
@@ -216,15 +223,21 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-BuiltPaths build(ref<Store> store, Realise mode,
+BuiltPaths build(ref<Store> evalStore, ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
 
-std::set<StorePath> toStorePaths(ref<Store> store,
-    Realise mode, OperateOn operateOn,
+std::set<StorePath> toStorePaths(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode,
+    OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables);
 
-StorePath toStorePath(ref<Store> store,
-    Realise mode, OperateOn operateOn,
+StorePath toStorePath(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode,
+    OperateOn operateOn,
     std::shared_ptr<Installable> installable);
 
 std::set<StorePath> toDerivations(ref<Store> store,
@@ -232,6 +245,7 @@ std::set<StorePath> toDerivations(ref<Store> store,
     bool useDeriver = false);
 
 BuiltPaths toBuiltPaths(
+    ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,

@@ -250,8 +250,9 @@ static void main_nix_build(int argc, char * * argv)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
     auto store = openStore();
+    auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-    auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+    auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
     state->repair = repair;
 
     auto autoArgs = myArgs.getAutoArgs(*state);
@@ -301,8 +302,8 @@ static void main_nix_build(int argc, char * * argv)
                     absolute = canonPath(absPath(i), true);
                 } catch (Error & e) {};
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
-                if (store->isStorePath(path) && hasSuffix(path, ".drv"))
-                    drvs.push_back(DrvInfo(*state, store, absolute));
+                if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
+                    drvs.push_back(DrvInfo(*state, evalStore, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
@@ -340,7 +341,7 @@ static void main_nix_build(int argc, char * * argv)
             printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
 
         if (!dryRun)
-            store->buildPaths(paths, buildMode);
+            store->buildPaths(paths, buildMode, evalStore);
     };
 
     if (runEnv) {
@@ -348,9 +349,10 @@ static void main_nix_build(int argc, char * * argv)
             throw UsageError("nix-shell requires a single derivation");
 
         auto & drvInfo = drvs.front();
-        auto drv = store->derivationFromPath(store->parseStorePath(drvInfo.queryDrvPath()));
+        auto drv = evalStore->derivationFromPath(evalStore->parseStorePath(drvInfo.queryDrvPath()));
 
         std::vector<StorePathWithOutputs> pathsToBuild;
+        RealisedPath::Set pathsToCopy;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
            is not set, then build bashInteractive from
@@ -369,7 +371,9 @@ static void main_nix_build(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                pathsToBuild.push_back({store->parseStorePath(drv->queryDrvPath())});
+                auto bashDrv = store->parseStorePath(drv->queryDrvPath());
+                pathsToBuild.push_back({bashDrv});
+                pathsToCopy.insert(bashDrv);
 
                 shell = drv->queryOutPath() + "/bin/bash";
 
@@ -384,9 +388,14 @@ static void main_nix_build(int argc, char * * argv)
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
                     [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+            {
                 pathsToBuild.push_back({input.first, input.second});
-        for (const auto & src : drv.inputSrcs)
+                pathsToCopy.insert(input.first);
+            }
+        for (const auto & src : drv.inputSrcs) {
             pathsToBuild.push_back({src});
+            pathsToCopy.insert(src);
+        }
 
         buildPaths(pathsToBuild);
 
@@ -438,7 +447,7 @@ static void main_nix_build(int argc, char * * argv)
         if (env.count("__json")) {
             StorePathSet inputs;
             for (auto & [depDrvPath, wantedDepOutputs] : drv.inputDrvs) {
-                auto outputs = store->queryPartialDerivationOutputMap(depDrvPath);
+                auto outputs = evalStore->queryPartialDerivationOutputMap(depDrvPath);
                 for (auto & i : wantedDepOutputs) {
                     auto o = outputs.at(i);
                     store->computeFSClosure(*o, inputs);
@@ -531,6 +540,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::vector<StorePathWithOutputs> pathsToBuild;
         std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
+        RealisedPath::Set drvsToCopy;
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
@@ -543,13 +553,13 @@ static void main_nix_build(int argc, char * * argv)
 
             pathsToBuild.push_back({drvPath, {outputName}});
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
+            drvsToCopy.insert(drvPath);
 
             auto i = drvMap.find(drvPath);
             if (i != drvMap.end())
                 i->second.second.insert(outputName);
-            else {
+            else
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
-            }
         }
 
         buildPaths(pathsToBuild);
@@ -564,7 +574,7 @@ static void main_nix_build(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath);
+            auto builtOutputs = evalStore->queryPartialDerivationOutputMap(drvPath);
 
             auto maybeOutputPath = builtOutputs.at(outputName);
             assert(maybeOutputPath);

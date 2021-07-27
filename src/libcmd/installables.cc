@@ -289,19 +289,6 @@ void completeFlakeRefWithFragment(
     completeFlakeRef(evalState->store, prefix);
 }
 
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getStore());
-    return ref<EvalState>(evalState);
-}
-
-EvalCommand::~EvalCommand()
-{
-    if (evalState)
-        evalState->printStats();
-}
-
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
     if (prefix == "")
@@ -391,6 +378,7 @@ DerivedPaths InstallableValue::toDerivedPaths()
     DerivedPaths res;
 
     std::map<StorePath, std::set<std::string>> drvsToOutputs;
+    RealisedPath::Set drvsToCopy;
 
     // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
@@ -398,6 +386,7 @@ DerivedPaths InstallableValue::toDerivedPaths()
         if (outputName == "")
             throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(drv.drvPath));
         drvsToOutputs[drv.drvPath].insert(outputName);
+        drvsToCopy.insert(drv.drvPath);
     }
 
     for (auto & i : drvsToOutputs)
@@ -712,10 +701,10 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-BuiltPaths getBuiltPaths(ref<Store> store, DerivedPaths hopefullyBuiltPaths)
+BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPaths & hopefullyBuiltPaths)
 {
     BuiltPaths res;
-    for (auto& b : hopefullyBuiltPaths)
+    for (auto & b : hopefullyBuiltPaths)
         std::visit(
             overloaded{
                 [&](DerivedPath::Opaque bo) {
@@ -723,14 +712,13 @@ BuiltPaths getBuiltPaths(ref<Store> store, DerivedPaths hopefullyBuiltPaths)
                 },
                 [&](DerivedPath::Built bfd) {
                     OutputPathMap outputs;
-                    auto drv = store->readDerivation(bfd.drvPath);
-                    auto outputHashes = staticOutputHashes(*store, drv);
+                    auto drv = evalStore->readDerivation(bfd.drvPath);
+                    auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                     auto drvOutputs = drv.outputsAndOptPaths(*store);
-                    for (auto& output : bfd.outputs) {
+                    for (auto & output : bfd.outputs) {
                         if (!outputHashes.count(output))
                             throw Error(
-                                "the derivation '%s' doesn't have an output "
-                                "named '%s'",
+                                "the derivation '%s' doesn't have an output named '%s'",
                                 store->printStorePath(bfd.drvPath), output);
                         if (settings.isExperimentalFeatureEnabled(
                                 "ca-derivations")) {
@@ -762,7 +750,7 @@ BuiltPaths getBuiltPaths(ref<Store> store, DerivedPaths hopefullyBuiltPaths)
     return res;
 }
 
-BuiltPaths build(ref<Store> store, Realise mode,
+BuiltPaths build(ref<Store> evalStore, ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
 {
     if (mode == Realise::Nothing)
@@ -778,20 +766,21 @@ BuiltPaths build(ref<Store> store, Realise mode,
     if (mode == Realise::Nothing)
         printMissing(store, pathsToBuild, lvlError);
     else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild, bMode);
+        store->buildPaths(pathsToBuild, bMode, evalStore);
 
-    return getBuiltPaths(store, pathsToBuild);
+    return getBuiltPaths(evalStore, store, pathsToBuild);
 }
 
 BuiltPaths toBuiltPaths(
+    ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables)
 {
-    if (operateOn == OperateOn::Output) {
-        return build(store, mode, installables);
-    } else {
+    if (operateOn == OperateOn::Output)
+        return build(evalStore, store, mode, installables);
+    else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
@@ -802,23 +791,27 @@ BuiltPaths toBuiltPaths(
     }
 }
 
-StorePathSet toStorePaths(ref<Store> store,
+StorePathSet toStorePaths(
+    ref<Store> evalStore,
+    ref<Store> store,
     Realise mode, OperateOn operateOn,
     std::vector<std::shared_ptr<Installable>> installables)
 {
     StorePathSet outPaths;
-    for (auto & path : toBuiltPaths(store, mode, operateOn, installables)) {
+    for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
         auto thisOutPaths = path.outPaths();
         outPaths.insert(thisOutPaths.begin(), thisOutPaths.end());
     }
     return outPaths;
 }
 
-StorePath toStorePath(ref<Store> store,
+StorePath toStorePath(
+    ref<Store> evalStore,
+    ref<Store> store,
     Realise mode, OperateOn operateOn,
     std::shared_ptr<Installable> installable)
 {
-    auto paths = toStorePaths(store, mode, operateOn, {installable});
+    auto paths = toStorePaths(evalStore, store, mode, operateOn, {installable});
 
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());

@@ -204,7 +204,7 @@ void PathSubstitutionGoal::tryToRun()
             Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
-            copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
+            copyStorePath(*sub, worker.store,
                 subPath ? *subPath : storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();

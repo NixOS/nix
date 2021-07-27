@@ -45,7 +45,7 @@ struct Realisation {
     size_t checkSignatures(const PublicKeys & publicKeys) const;
 
     static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
-    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation>& res);
+    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation> & res);
 
     bool isCompatibleWith(const Realisation & other) const;
 

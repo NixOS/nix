@@ -54,6 +54,30 @@ void StoreCommand::run()
     run(getStore());
 }
 
+EvalCommand::EvalCommand()
+{
+}
+
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
+}
+
+ref<Store> EvalCommand::getEvalStore()
+{
+    if (!evalStore)
+        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
+    return ref<Store>(evalStore);
+}
+
+ref<EvalState> EvalCommand::getEvalState()
+{
+    if (!evalState)
+        evalState = std::make_shared<EvalState>(searchPath, getEvalStore(), getStore());
+    return ref<EvalState>(evalState);
+}
+
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     : recursive(recursive)
 {
@@ -91,7 +115,7 @@ void BuiltPathsCommand::run(ref<Store> store)
         for (auto & p : store->queryAllValidPaths())
             paths.push_back(BuiltPath::Opaque{p});
     } else {
-        paths = toBuiltPaths(store, realiseMode, operateOn, installables);
+        paths = toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations

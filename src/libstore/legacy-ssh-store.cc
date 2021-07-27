@@ -267,8 +267,11 @@ public:
         return status;
     }
 
-    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
+        if (evalStore && evalStore.get() != this)
+            throw Error("building on an SSH store is incompatible with '--eval-store'");
+
         auto conn(connections->get());
 
         conn->to << cmdBuildPaths;

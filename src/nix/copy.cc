@@ -90,7 +90,7 @@ struct CmdCopy : BuiltPathsCommand
         }
 
         copyPaths(
-            srcStore, dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
+            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
     }
 };
 

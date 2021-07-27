@@ -56,7 +56,8 @@ nix_tests = \
   ca/nix-run.sh \
   ca/recursive.sh \
   ca/concurrent-builds.sh \
-  ca/nix-copy.sh
+  ca/nix-copy.sh \
+  eval-store.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

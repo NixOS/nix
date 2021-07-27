@@ -94,7 +94,11 @@ public:
 
     Value vEmptySet;
 
+    /* Store used to materialise .drv files. */
     const ref<Store> store;
+
+    /* Store used to build stuff. */
+    const ref<Store> buildStore;
 
 
 private:
@@ -128,7 +132,10 @@ private:
 
 public:
 
-    EvalState(const Strings & _searchPath, ref<Store> store);
+    EvalState(
+        const Strings & _searchPath,
+        ref<Store> store,
+        std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
     void addToSearchPath(const string & s);

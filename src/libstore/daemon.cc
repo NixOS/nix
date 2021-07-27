@@ -243,23 +243,6 @@ struct ClientSettings
     }
 };
 
-static void writeValidPathInfo(
-    ref<Store> store,
-    unsigned int clientVersion,
-    Sink & to,
-    std::shared_ptr<const ValidPathInfo> info)
-{
-    to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-       << info->narHash.to_string(Base16, false);
-    worker_proto::write(*store, to, info->references);
-    to << info->registrationTime << info->narSize;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-        to << info->ultimate
-           << info->sigs
-           << renderContentAddress(info->ca);
-    }
-}
-
 static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
 {
     std::vector<DerivedPath> reqs;
@@ -422,9 +405,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             }();
             logger->stopWork();
 
-            to << store->printStorePath(pathInfo->path);
-            writeValidPathInfo(store, clientVersion, to, pathInfo);
-
+            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -468,6 +449,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
             to << store->printStorePath(path);
         }
+        break;
+    }
+
+    case wopAddMultipleToStore: {
+        bool repair, dontCheckSigs;
+        from >> repair >> dontCheckSigs;
+        if (!trusted && dontCheckSigs)
+            dontCheckSigs = false;
+
+        logger->startWork();
+        FramedSource source(from);
+        store->addMultipleToStore(source,
+            RepairFlag{repair},
+            dontCheckSigs ? NoCheckSigs : CheckSigs);
+        logger->stopWork();
         break;
     }
 
@@ -770,7 +766,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            writeValidPathInfo(store, clientVersion, to, info);
+            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
