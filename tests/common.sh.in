@@ -86,10 +86,10 @@ startDaemon() {
     fi
     # Start the daemon, wait for the socket to appear.  !!!
     # ‘nix-daemon’ should have an option to fork into the background.
-    rm -f $NIX_STATE_DIR/daemon-socket/socket
+    rm -f $NIX_DAEMON_SOCKET_PATH
     ${NIX_DAEMON_COMMAND:-nix-daemon} &
     for ((i = 0; i < 30; i++)); do
-        if [ -e $NIX_DAEMON_SOCKET_PATH ]; then break; fi
+        if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then break; fi
         sleep 1
     done
     pidDaemon=$!
