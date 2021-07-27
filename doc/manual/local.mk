@@ -77,21 +77,29 @@ $(d)/builtins.json: $(bindir)/nix
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
-install: $(mandir)/man1/nix3-build.1
+install: $(mandir)/man1/nix3-manpages
+man: doc/manual/generated/man1/nix3-manpages
+all: doc/manual/generated/man1/nix3-manpages
+
+$(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-build.1
+	@mkdir -p $$(dirname $@)
+	$(trace-install) install -m 0644 $$(dirname $<)/* $$(dirname $@)
 
 # Technically this rule generates all the `nix3-*` manpages, but since we don’t
 # know their list statically and they are all generated at once anyways, we can
 # just be dirty and only track one
-$(mandir)/man1/nix3-build.1: $(d)/src/command-ref/new-cli
+doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
+	@mkdir -p $$(dirname $@)
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
 	  name=$$(basename $$i .md); \
 	  tmpFile=$$(mktemp); \
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
 	  cat $$i >> $$tmpFile; \
-	  lowdown -sT man -M section=1 $$tmpFile -o $(mandir)/man1/$$name.1; \
+	  lowdown -sT man -M section=1 $$tmpFile -o $$(dirname $@)/$$name.1; \
 	  rm $$tmpFile; \
 	done
+	touch $@
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
 	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
