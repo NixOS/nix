@@ -83,12 +83,12 @@ sub downloadFile {
 
     if (!-e $tmpFile) {
         print STDERR "downloading $srcFile to $tmpFile...\n";
-        system("NIX_REMOTE=https://cache.nixos.org/ nix cat-store '$srcFile' > '$tmpFile'") == 0
+        system("NIX_REMOTE=https://cache.nixos.org/ nix store cat '$srcFile' > '$tmpFile'") == 0
             or die "unable to fetch $srcFile\n";
     }
 
     my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
-    my $sha256_actual = `nix hash-file --base16 --type sha256 '$tmpFile'`;
+    my $sha256_actual = `nix hash file --base16 --type sha256 '$tmpFile'`;
     chomp $sha256_actual;
     if ($sha256_expected ne $sha256_actual) {
         print STDERR "file $tmpFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
