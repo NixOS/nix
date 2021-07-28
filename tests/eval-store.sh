@@ -1,5 +1,7 @@
 source common.sh
 
+requireDaemonNewerThan "2.4pre20210727"
+
 eval_store=$TEST_ROOT/eval-store
 
 clearStore

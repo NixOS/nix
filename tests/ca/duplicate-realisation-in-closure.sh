@@ -1,5 +1,7 @@
 source ./common.sh
 
+requireDaemonNewerThan "2.4pre20210625"
+
 sed -i 's/experimental-features .*/& ca-derivations ca-references/' "$NIX_CONF_DIR"/nix.conf
 
 export REMOTE_STORE_DIR="$TEST_ROOT/remote_store"
