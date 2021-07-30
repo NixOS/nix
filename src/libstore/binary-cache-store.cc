@@ -130,17 +130,6 @@ AutoCloseFD openFile(const Path & path)
     return fd;
 }
 
-struct FileSource : FdSource
-{
-    AutoCloseFD fd2;
-
-    FileSource(const Path & path)
-        : fd2(openFile(path))
-    {
-        fd = fd2.get();
-    }
-};
-
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
     std::function<ValidPathInfo(HashResult)> mkInfo)
