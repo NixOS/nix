@@ -269,7 +269,7 @@ static void main_nix_build(int argc, char * * argv)
 
     if (packages) {
         std::ostringstream joined;
-        joined << "with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
+        joined << "{...}@args: with import <nixpkgs> args; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
         for (const auto & i : left)
             joined << '(' << i << ") ";
         joined << "]; } \"\"";
