@@ -1,4 +1,4 @@
-{ inNixShell ? false, contentAddressed ? false }:
+{ inNixShell ? false, contentAddressed ? false, fooContents ? "foo" }:
 
 let cfg = import ./config.nix; in
 with cfg;
@@ -62,7 +62,7 @@ let pkgs = rec {
 
   foo = runCommand "foo" {} ''
     mkdir -p $out/bin
-    echo 'echo foo' > $out/bin/foo
+    echo 'echo ${fooContents}' > $out/bin/foo
     chmod a+rx $out/bin/foo
     ln -s ${shell} $out/bin/bash
   '';

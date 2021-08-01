@@ -54,6 +54,10 @@ nix-instantiate shell.nix -A shellDrv --add-root $TEST_ROOT/shell
 output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure -p foo bar --run 'echo "$(foo) $(bar)"')
 [ "$output" = "foo bar" ]
 
+# Test nix-shell -p --arg x y
+output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure -p foo --argstr fooContents baz --run 'echo "$(foo)"')
+[ "$output" = "baz" ]
+
 # Test nix-shell shebang mode
 sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.sh > $TEST_ROOT/shell.shebang.sh
 chmod a+rx $TEST_ROOT/shell.shebang.sh
