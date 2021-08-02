@@ -4,6 +4,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
+#include "pathlocks.hh"
 
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -317,10 +318,16 @@ struct GitInputScheme : InputScheme
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
 
+            Path cacheDirLock = cacheDir + ".lock";
+            createDirs(dirOf(cacheDir));
+            AutoCloseFD lock = openLockFile(cacheDirLock, true);
+            lockFile(lock.get(), ltWrite, true);
+
             if (!pathExists(cacheDir)) {
-                createDirs(dirOf(cacheDir));
                 runProgram("git", true, { "init", "--bare", repoDir });
             }
+
+            deleteLockFile(cacheDirLock, lock.get());
 
             Path localRefFile =
                 input.getRef()->compare(0, 5, "refs/") == 0
