@@ -86,6 +86,5 @@ install: $(d)/src/command-ref/new-cli
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
 	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
-	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
 
 endif
