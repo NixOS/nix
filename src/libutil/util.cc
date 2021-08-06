@@ -6,14 +6,15 @@
 
 #include <cctype>
 #include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
+#include <future>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
-#include <future>
 
 #include <fcntl.h>
 #include <grp.h>
@@ -1447,7 +1448,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
 
 static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
+static std::array<char, 256> base64DecodeChars;
 
 string base64Encode(std::string_view s)
 {
@@ -1472,15 +1473,12 @@ string base64Encode(std::string_view s)
 
 string base64Decode(std::string_view s)
 {
-    bool init = false;
-    char decode[256];
-    if (!init) {
-        // FIXME: not thread-safe.
-        memset(decode, -1, sizeof(decode));
+    static std::once_flag flag;
+    std::call_once(flag, [](){
+        base64DecodeChars = { (char)-1 };
         for (int i = 0; i < 64; i++)
-            decode[(int) base64Chars[i]] = i;
-        init = true;
-    }
+            base64DecodeChars[(int) base64Chars[i]] = i;
+    });
 
     string res;
     unsigned int d = 0, bits = 0;
@@ -1489,7 +1487,7 @@ string base64Decode(std::string_view s)
         if (c == '=') break;
         if (c == '\n') continue;
 
-        char digit = decode[(unsigned char) c];
+        char digit = base64DecodeChars[(unsigned char) c];
         if (digit == -1)
             throw Error("invalid character in Base64 string: '%c'", c);
 
