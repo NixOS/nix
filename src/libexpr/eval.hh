@@ -33,12 +33,14 @@ struct PrimOp
     const char * doc = nullptr;
 };
 
+typedef std::map<std::string, Value *> valmap;
 
 struct Env
 {
     Env * up;
     unsigned short prevWith:14; // nr of levels up to next `with' environment
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
+    std::unique_ptr<valmap> valuemap;  // TODO: rename 
     Value * values[0];
 };
 
@@ -204,6 +206,7 @@ public:
     string forceString(Value & v, const Pos & pos = noPos);
     string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
     string forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    // string forceStringNoCtx(std::optional<Bindings*> b, Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */

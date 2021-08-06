@@ -408,6 +408,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 if (auto attr = v.attrs->get(state->symbols.create("description")))
                     state->forceStringNoCtx(*attr->value, *attr->pos);
+                    // state->forceStringNoCtx(std::optional(v.attrs), *attr->value, *attr->pos);
                 else
                     throw Error("template '%s' lacks attribute 'description'", attrPath);
 

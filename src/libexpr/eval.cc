@@ -78,6 +78,8 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         return;
     }
 
+    str << "internal type: " << v.internalType << std::endl;
+
     switch (v.internalType) {
     case tInt:
         str << v.integer;
@@ -404,7 +406,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     assert(gcInitialised);
 
-    static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+    static_assert(sizeof(Env) <= 16 + sizeof(std::unique_ptr<void*>), "environment must be <= 16 bytes");
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -616,7 +618,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     return {};
 }
 
-typedef std::map<std::string, Value *> valmap;
+// typedef std::map<std::string, Value *> valmap;
 
 /*void addEnv(Value * v, valmap &vmap)
 {
@@ -655,13 +657,44 @@ LocalNoInline(valmap * mapBindings(Bindings &b))
     return map;
 }
 
+LocalNoInline(void addBindings(string prefix, Bindings &b, valmap &valmap))
+{
+    for (auto i = b.begin(); i != b.end(); ++i)
+    {
+        std::string s = prefix;
+        s += i->name;
+        valmap[s] = i->value;
+    }
+}
+
 LocalNoInline(valmap * mapEnvBindings(Env &env))
 {
-    if (env.values[0]->type() == nAttrs) {
-        return mapBindings(*env.values[0]->attrs);
-    } else {
-        return map0();
+    // NOT going to use this
+    if (env.staticEnv) {
+      std::cout << "got static env" << std::endl;
     }
+
+// std::cout << "envsize: " << env.values.size() << std::endl;
+
+    // std::cout << "size_t size: " << sizeof(size_t) << std::endl;
+    // std::cout << "envsize: " << env.size << std::endl;
+    // std::cout << "envup: " << env.up << std::endl;
+
+    valmap *vm = env.up ? mapEnvBindings(*env.up) : new valmap();
+
+    /*
+    size_t i=0;
+    do {
+      std::cout << "env: " << i << " value: " << showType(*env.values[i]) << std::endl;
+      // std::cout << *env.values[i] << std::endl;
+      ++i;
+    } while(i < (std::min(env.size, (size_t)100)));
+
+    
+    if (env.values[0]->type() == nAttrs) 
+        addBindings(std::to_string((int)env.size), *env.values[0]->attrs, *vm);
+    */
+    return vm;
 }
 
 /* Every "format" object (even temporary) takes up a few hundred bytes
@@ -876,7 +909,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            // TODO: env.attrs?
             throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name,
                 mapEnvBindings(*env));
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
@@ -902,14 +934,28 @@ Value * EvalState::allocValue()
 
 Env & EvalState::allocEnv(size_t size)
 {
+
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->type = Env::Plain;
+    // if (debuggerHook) 
+    //   {
+    //     Env * env = (Env *) allocBytes(sizeof(DebugEnv) + size * sizeof(Value *));
+    //     // Env * env = new DebugEnv;
+    //     env->type = Env::Plain;
+    //     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
-    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
+    //     return *env;
+    // } else {
+        Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+        env->type = Env::Plain;
+        // env->size = size;
 
-    return *env;
+        /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
+
+        return *env;
+    // }
+    
+    
 }
 
 
@@ -1126,6 +1172,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         env2.up = &env;
         dynamicEnv = &env2;
 
+        // TODO; deal with the below overrides or whatever
+        if (debuggerHook) {
+          env2.valuemap = mapBindings(attrs);
+        }
+
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
 
@@ -1207,6 +1258,9 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
+    if (debuggerHook) {
+      env2.valuemap = mapBindings(attrs);
+    }
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
@@ -1420,9 +1474,11 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     size_t displ = 0;
 
-    if (!lambda.matchAttrs)
+    if (!lambda.matchAttrs){
+        // TODO: what is this arg?  empty argument?
+        // add empty valmap here? 
         env2.values[displ++] = &arg;
-
+    }
     else {
         forceAttrs(arg, pos);
 
@@ -1432,22 +1488,50 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
            argument has a default, use the default. */
-        size_t attrsUsed = 0;
-        for (auto & i : lambda.formals->formals) {
-            Bindings::iterator j = arg.attrs->find(i.name);
-            if (j == arg.attrs->end()) {
-                if (!i.def)
-                    throwTypeError(
-                        pos,
-                        "%1% called without required argument '%2%'",
-                        lambda,
-                        i.name,
-                        map2("fun", &fun, "arg", &arg));
-                env2.values[displ++] = i.def->maybeThunk(*this, env2);
-            } else {
-                attrsUsed++;
-                env2.values[displ++] = j->value;
+        if (debuggerHook) {
+            size_t attrsUsed = 0;
+            for (auto & i : lambda.formals->formals) {
+                Bindings::iterator j = arg.attrs->find(i.name);
+                if (j == arg.attrs->end()) {
+                    if (!i.def)
+                        throwTypeError(
+                            pos,
+                            "%1% called without required argument '%2%'",
+                            lambda,
+                            i.name,
+                            map2("fun", &fun, "arg", &arg));
+                    env2.values[displ++] = i.def->maybeThunk(*this, env2);
+                } else {
+                    attrsUsed++;
+                    env2.values[displ++] = j->value;
+                }
             }
+        }
+        else {
+            auto map = new valmap();
+            
+            size_t attrsUsed = 0;
+            for (auto & i : lambda.formals->formals) {
+                Bindings::iterator j = arg.attrs->find(i.name);
+                if (j == arg.attrs->end()) {
+                    if (!i.def)
+                        throwTypeError(
+                            pos,
+                            "%1% called without required argument '%2%'",
+                            lambda,
+                            i.name,
+                            map2("fun", &fun, "arg", &arg));
+                    env2.values[displ++] = i.def->maybeThunk(*this, env2);
+                } else {
+                    attrsUsed++;
+                    env2.values[displ++] = j->value;
+
+                    // add to debugger name-value map
+                    std::string s = i->name;
+                    (*map)[s] = i->value;
+                }
+            }
+            env2.valuemap = map;
         }
 
         /* Check that each actual argument is listed as a formal
@@ -1558,6 +1642,8 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
 
+    env2.valuemap = mapBindings(attrs)
+    
     body->eval(state, env2, v);
 }
 
@@ -1896,13 +1982,35 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], map1("value", &v));
+                v.string.s, v.string.context[0], 
+                  // b.has_value() ? mapBindings(*b.get()) : map0());
+                map1("value", &v));
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], map1("value", &v));
+                v.string.s, v.string.context[0], 
+                  // b.has_value() ? mapBindings(*b.get()) : map0());
+                map1("value", &v));
     }
     return s;
 }
+
+/*string EvalState::forceStringNoCtx(std::optional<Bindings*> b, Value & v, const Pos & pos)
+{
+    string s = forceString(v, pos);
+    if (v.string.context) {
+        if (pos)
+            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
+                v.string.s, v.string.context[0], 
+                  b.has_value() ? mapBindings(*b.get()) : map0());
+                // map1("value", &v));
+        else
+            throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
+                v.string.s, v.string.context[0], 
+                  b.has_value() ? mapBindings(*b.get()) : map0());
+                // map1("value", &v));
+    }
+    return s;
+}*/
 
 
 bool EvalState::isDerivation(Value & v)
