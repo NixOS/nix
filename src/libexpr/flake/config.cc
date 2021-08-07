@@ -29,7 +29,7 @@ static void writeTrustedList(const TrustedList & trustedList)
 
 void ConfigFile::apply()
 {
-    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-suffix"};
+    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-suffix", "flake-registry"};
 
     for (auto & [name, value] : settings) {
 
