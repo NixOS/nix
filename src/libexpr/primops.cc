@@ -3645,9 +3645,7 @@ void EvalState::createBaseEnv()
     if (!evalSettings.pureEval) {
         mkInt(v, time(0));
         addConstant("__currentTime", v);
-    }
 
-    if (!evalSettings.pureEval) {
         mkString(v, settings.thisSystem.get());
         addConstant("__currentSystem", v);
     }
