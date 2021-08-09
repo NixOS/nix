@@ -430,9 +430,10 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a map of paths to their optional ca values. If a path
-       does not have substitute info, it's omitted from the resulting
-       ‘infos’ map. */
+       sizes) of a map of paths to their optional ca values. The info
+       of the first succeeding substituter for each path will be
+       returned. If a path does not have substitute info, it's omitted
+       from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) { return; };
 
