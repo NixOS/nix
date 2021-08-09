@@ -489,6 +489,9 @@ static void main_nix_build(int argc, char * * argv)
                     "_nix_shell_clean_tmpdir; ") +
                 (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
                 "%2%"
+                // always clear PATH.
+                // when nix-shell is run impure, we rehydrate it with the `p=$PATH` above
+                "unset PATH;"
                 "dontAddDisableDepTrack=1;\n"
                 + structuredAttrsRC +
                 "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
