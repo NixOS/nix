@@ -6,9 +6,14 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     NIX_LINK=$HOME/.nix-profile
 
 
-    # Append ~/.nix-defexpr/channels to $NIX_PATH so that <nixpkgs>
-    # paths work when the user has fetched the Nixpkgs channel.
-    export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
+    # Default NIX_PATH if undefined so that <nixpkgs> paths work when the user
+    # has fetched the Nixpkgs channel.
+    if [ -z "${NIX_PATH+x}" ]; then
+        NIX_PATH="$HOME/.nix-defexpr/channels"
+        NIX_PATH+=":nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs"
+        NIX_PATH+=":@localstatedir@/nix/profiles/per-user/root/channels"
+        export NIX_PATH
+    fi
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix

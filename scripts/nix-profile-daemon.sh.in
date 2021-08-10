@@ -34,5 +34,15 @@ else
   unset -f check_nix_profiles
 fi
 
-export NIX_PATH="nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs:@localstatedir@/nix/profiles/per-user/root/channels"
+# Default NIX_PATH if undefined so that <nixpkgs> paths work when the user
+# has fetched the Nixpkgs channel.
+if [ -z "${NIX_PATH+x}" ]; then
+  if [ -n "$HOME" ]; then
+    NIX_PATH="$HOME/.nix-defexpr/channels"
+  fi
+  NIX_PATH+=":nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs"
+  NIX_PATH+=":@localstatedir@/nix/profiles/per-user/root/channels"
+  export NIX_PATH
+fi
+
 export PATH="$HOME/.nix-profile/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
