@@ -12,8 +12,6 @@
 #include <brotli/decode.h>
 #include <brotli/encode.h>
 
-#include <zlib.h>
-
 #include <iostream>
 
 namespace nix {
