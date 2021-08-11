@@ -567,8 +567,8 @@ LockedFlake lockFlake(
                         topRef.input.markChangedFile(
                             (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
                             lockFlags.commitLockFile
-                            ? std::optional<std::string>(fmt("%s: %s\n\nFlake input changes:\n\n%s",
-                                    relPath, lockFileExists ? "Update" : "Add", diff))
+                            ? std::optional<std::string>(fmt("%s: %s\n\nFlake lock file changes:\n\n%s",
+                                    relPath, lockFileExists ? "Update" : "Add", filterANSIEscapes(diff, true)))
                             : std::nullopt);
 
                         /* Rewriting the lockfile changed the top-level
