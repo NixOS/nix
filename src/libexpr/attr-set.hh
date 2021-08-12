@@ -41,7 +41,7 @@ private:
     size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
+    Bindings(size_t capacity) : pos(&noPos), size_(0), capacity_(capacity) { }
     Bindings(const Bindings & bindings) = delete;
 
 public:
