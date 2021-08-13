@@ -729,7 +729,7 @@ BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPa
                             if (!realisation)
                                 throw Error(
                                     "cannot operate on an output of unbuilt "
-                                    "content-addresed derivation '%s'",
+                                    "content-addressed derivation '%s'",
                                     outputId.to_string());
                             outputs.insert_or_assign(
                                 output, realisation->outPath);
