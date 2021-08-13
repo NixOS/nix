@@ -32,14 +32,6 @@ AC_ARG_WITH(system, AS_HELP_STRING([--with-system=SYSTEM],[Platform identifier (
         system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
    esac])
 
-sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
-
-case $sys_name in
-    cygwin*)
-        sys_name=cygwin
-        ;;
-esac
-
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
@@ -63,10 +55,12 @@ AC_SYS_LARGEFILE
 
 # Solaris-specific stuff.
 AC_STRUCT_DIRENT_D_TYPE
-if test "$sys_name" = sunos; then
+case "$host_os" in
+  solaris*)
     # Solaris requires -lsocket -lnsl for network functions
     LDFLAGS="-lsocket -lnsl $LDFLAGS"
-fi
+    ;;
+esac
 
 
 # Check for pubsetbuf.
@@ -210,21 +204,24 @@ AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 
 
 # Look for libseccomp, required for Linux sandboxing.
-if test "$sys_name" = linux; then
-  AC_ARG_ENABLE([seccomp-sandboxing],
-                AS_HELP_STRING([--disable-seccomp-sandboxing],[Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)
-                              ]))
-  if test "x$enable_seccomp_sandboxing" != "xno"; then
-    PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
-                      [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
-    have_seccomp=1
-    AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
-  else
+case "$host_os" in
+  linux*)
+    AC_ARG_ENABLE([seccomp-sandboxing],
+                  AS_HELP_STRING([--disable-seccomp-sandboxing],[Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)
+                                ]))
+    if test "x$enable_seccomp_sandboxing" != "xno"; then
+      PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
+                        [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+      have_seccomp=1
+      AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
+    else
+      have_seccomp=
+    fi
+    ;;
+  *)
     have_seccomp=
-  fi
-else
-  have_seccomp=
-fi
+    ;;
+esac
 AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
 
