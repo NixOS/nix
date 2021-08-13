@@ -294,9 +294,11 @@ AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
 
 # This is needed if bzip2 is a static library, and the Nix libraries
 # are dynamic.
-if test "$(uname)" = "Darwin"; then
+case "${host_os}" in
+  darwin*)
     LDFLAGS="-all_load $LDFLAGS"
-fi
+    ;;
+esac
 
 
 # Do we have GNU tar?
