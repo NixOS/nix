@@ -14,4 +14,4 @@ libmain_LIBS = libstore libutil
 
 libmain_ALLOW_UNDEFINED = 1
 
-$(eval $(call install-file-in, $(d)/nix-main.pc, $(prefix)/lib/pkgconfig, 0644))
+$(eval $(call install-file-in, $(d)/nix-main.pc, $(libdir)/pkgconfig, 0644))

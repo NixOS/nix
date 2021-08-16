@@ -12,4 +12,4 @@ libcmd_LDFLAGS = -llowdown -pthread
 
 libcmd_LIBS = libstore libutil libexpr libmain libfetchers
 
-$(eval $(call install-file-in, $(d)/nix-cmd.pc, $(prefix)/lib/pkgconfig, 0644))
+$(eval $(call install-file-in, $(d)/nix-cmd.pc, $(libdir)/pkgconfig, 0644))
