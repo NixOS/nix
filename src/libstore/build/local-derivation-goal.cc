@@ -1353,7 +1353,7 @@ void LocalDerivationGoal::startDaemon()
             AutoCloseFD remote = accept(daemonSocket.get(),
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
-                if (errno == EINTR) continue;
+                if (errno == EINTR || errno == EAGAIN) continue;
                 if (errno == EINVAL) break;
                 throw SysError("accepting connection");
             }

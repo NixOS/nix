@@ -571,6 +571,9 @@ extern PathFilter defaultPathFilter;
 /* Common initialisation performed in child processes. */
 void commonChildInit(Pipe & logPipe);
 
+/* Create a Unix domain socket. */
+AutoCloseFD createUnixDomainSocket();
+
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
 

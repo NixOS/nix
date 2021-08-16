@@ -58,8 +58,14 @@ private:
         struct Stmts;
         std::unique_ptr<Stmts> stmts;
 
+        /* The global GC lock  */
+        AutoCloseFD fdGCLock;
+
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
+
+        /* Connection to the garbage collector. */
+        AutoCloseFD fdRootsSocket;
 
         /* The last time we checked whether to do an auto-GC, or an
            auto-GC finished. */
@@ -150,10 +156,7 @@ public:
 
 private:
 
-    typedef std::shared_ptr<AutoCloseFD> FDPtr;
-    typedef list<FDPtr> FDs;
-
-    void findTempRoots(FDs & fds, Roots & roots, bool censor);
+    void findTempRoots(Roots & roots, bool censor);
 
 public:
 
@@ -235,18 +238,11 @@ private:
 
     struct GCState;
 
-    void deleteGarbage(GCState & state, const Path & path);
-
-    void tryToDelete(GCState & state, const Path & path);
-
-    bool canReachRoot(GCState & state, StorePathSet & visited, const StorePath & path);
-
-    void deletePathRecursive(GCState & state, const Path & path);
-
-    bool isActiveTempFile(const GCState & state,
-        const Path & path, const string & suffix);
-
-    AutoCloseFD openGCLock(LockType lockType);
+    bool tryToDelete(
+        GCState & state,
+        StorePathSet & visited,
+        const Path & path,
+        bool recursive);
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
