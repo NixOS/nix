@@ -465,11 +465,9 @@ struct LocalStore::GCState
     StorePathSet alive;
     bool gcKeepOutputs;
     bool gcKeepDerivations;
-    uint64_t bytesInvalidated;
-    bool moveToTrash = true;
     bool shouldDelete;
     GCState(const GCOptions & options, GCResults & results)
-        : options(options), results(results), bytesInvalidated(0) { }
+        : options(options), results(results) { }
 };
 
 
@@ -493,15 +491,12 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 {
     checkInterrupt();
 
-    uint64_t size = 0;
-
     auto storePath = maybeParseStorePath(path);
     if (storePath && isValidPath(*storePath)) {
         StorePathSet referrers;
         queryReferrers(*storePath, referrers);
         for (auto & i : referrers)
             if (printStorePath(i) != path) deletePathRecursive(state, printStorePath(i));
-        size = queryPathInfo(*storePath)->narSize;
         invalidatePathChecked(*storePath);
     }
 
@@ -517,33 +512,10 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 
     state.results.paths.insert(path);
 
-    /* If the path is not a regular file or symlink, move it to the
-       trash directory.  The move is to ensure that later (when we're
-       not holding the global GC lock) we can delete the path without
-       being afraid that the path has become alive again.  Otherwise
-       delete it right away. */
-    if (state.moveToTrash && S_ISDIR(st.st_mode)) {
-        // Estimate the amount freed using the narSize field.  FIXME:
-        // if the path was not valid, need to determine the actual
-        // size.
-        try {
-            if (chmod(realPath.c_str(), st.st_mode | S_IWUSR) == -1)
-                throw SysError("making '%1%' writable", realPath);
-            Path tmp = trashDir + "/" + std::string(baseNameOf(path));
-            if (rename(realPath.c_str(), tmp.c_str()))
-                throw SysError("unable to rename '%1%' to '%2%'", realPath, tmp);
-            state.bytesInvalidated += size;
-        } catch (SysError & e) {
-            if (e.errNo == ENOSPC) {
-                printInfo(format("note: can't create move '%1%': %2%") % realPath % e.msg());
-                deleteGarbage(state, realPath);
-            }
-        }
-    } else
-        deleteGarbage(state, realPath);
+    deleteGarbage(state, realPath);
 
-    if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
-        printInfo(format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
+    if (state.results.bytesFreed > state.options.maxFreed) {
+        printInfo("deleted more than %d bytes; stopping", state.options.maxFreed);
         throw GCLimitReached();
     }
 }
@@ -607,7 +579,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
     checkInterrupt();
 
     auto realPath = realStoreDir + "/" + std::string(baseNameOf(path));
-    if (realPath == linksDir || realPath == trashDir) return;
+    if (realPath == linksDir) return;
 
     //Activity act(*logger, lvlDebug, format("considering whether to delete '%1%'") % path);
 
@@ -710,9 +682,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (state.shouldDelete)
         deletePath(reservedPath);
 
-    /* Acquire the global GC root.  This prevents
-       a) New roots from being added.
-       b) Processes from creating new temporary root files. */
+    /* Acquire the global GC root. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
@@ -738,18 +708,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* After this point the set of roots or temporary roots cannot
        increase, since we hold locks on everything.  So everything
        that is not reachable from `roots' is garbage. */
-
-    if (state.shouldDelete) {
-        if (pathExists(trashDir)) deleteGarbage(state, trashDir);
-        try {
-            createDirs(trashDir);
-        } catch (SysError & e) {
-            if (e.errNo == ENOSPC) {
-                printInfo("note: can't create trash directory: %s", e.msg());
-                state.moveToTrash = false;
-            }
-        }
-    }
 
     /* Now either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */
@@ -827,14 +785,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             state.results.paths.insert(printStorePath(i));
         return;
     }
-
-    /* Allow other processes to add to the store from here on. */
-    fdGCLock = -1;
-    fds.clear();
-
-    /* Delete the trash directory. */
-    printInfo(format("deleting '%1%'") % trashDir);
-    deleteGarbage(state, trashDir);
 
     /* Clean up the links directory. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {

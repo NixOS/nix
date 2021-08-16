@@ -87,7 +87,6 @@ public:
     const Path linksDir;
     const Path reservedPath;
     const Path schemaPath;
-    const Path trashDir;
     const Path tempRootsDir;
     const Path fnTempRoots;
 
