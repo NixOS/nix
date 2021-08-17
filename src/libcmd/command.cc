@@ -105,7 +105,7 @@ ref<EvalState> EvalCommand::getEvalState()
     if (!evalState) {
         evalState = std::make_shared<EvalState>(searchPath, getStore());
         if (startReplOnEvalErrors)
-            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const std::map<std::string, Value *> & env) {
+            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env) {
                 printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
                 runRepl(evalState, env);
             };

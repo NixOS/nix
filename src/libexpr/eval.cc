@@ -1172,11 +1172,6 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         env2.up = &env;
         dynamicEnv = &env2;
 
-        // TODO; deal with the below overrides or whatever
-        if (debuggerHook) {
-          env2.valuemap = mapBindings(attrs);
-        }
-
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
 
@@ -1193,6 +1188,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
             v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+        }
+
+        // TODO; deal with the below overrides or whatever
+        if (debuggerHook) {
+          env2.valuemap.reset(mapBindings(*v.attrs));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -1258,15 +1258,24 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
-    if (debuggerHook) {
-      env2.valuemap = mapBindings(attrs);
-    }
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
     size_t displ = 0;
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
+
+    if (debuggerHook) {
+      auto map = new valmap();
+
+      displ = 0;
+      for (auto & i : attrs->attrs)
+      {
+          // std::string s = i->name;
+          (*map)[i.first] = env2.values[displ++];
+      }
+      env2.valuemap.reset(map);
+    }
 
     body->eval(state, env2, v);
 }
@@ -1460,6 +1469,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
           pos,
           "attempt to call something which is not a function but %1%",
           showType(fun).c_str(),
+          // fun.env);
           map2("fun", &fun, "arg", &arg));
     }
 
@@ -1498,7 +1508,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                             "%1% called without required argument '%2%'",
                             lambda,
                             i.name,
-                            map2("fun", &fun, "arg", &arg));
+                            fun.lambda.env);
+                            // map2("fun", &fun, "arg", &arg));
                     env2.values[displ++] = i.def->maybeThunk(*this, env2);
                 } else {
                     attrsUsed++;
@@ -1519,18 +1530,19 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                             "%1% called without required argument '%2%'",
                             lambda,
                             i.name,
-                            map2("fun", &fun, "arg", &arg));
+                            fun.env);
+                            // map2("fun", &fun, "arg", &arg));
                     env2.values[displ++] = i.def->maybeThunk(*this, env2);
                 } else {
                     attrsUsed++;
                     env2.values[displ++] = j->value;
 
                     // add to debugger name-value map
-                    std::string s = i->name;
-                    (*map)[s] = i->value;
+                    std::string s = i.name;
+                    (*map)[s] = i.value;
                 }
             }
-            env2.valuemap = map;
+            env2.valuemap.reset(map);
         }
 
         /* Check that each actual argument is listed as a formal
@@ -1544,7 +1556,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                         "%1% called with unexpected argument '%2%'",
                         lambda,
                         i.name,
-                        map2("fun", &fun, "arg", &arg));
+                        fun.env);
+                        // map2("fun", &fun, "arg", &arg));
             abort(); // can't happen
         }
     }
@@ -1621,7 +1634,7 @@ this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/#ss-functions.)",
                 i.name,
-                fun.lambda.env);
+                *fun.lambda.env);
                 // mapBindings(args));
                 // map1("fun", &fun));  // todo add bindings + fun
             }
