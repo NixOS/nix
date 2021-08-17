@@ -101,8 +101,6 @@ public:
 
     void addIndirectRoot(const Path & path) override;
 
-    void syncWithGC() override;
-
     Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;

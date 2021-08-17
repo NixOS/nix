@@ -148,8 +148,6 @@ public:
 
     void addIndirectRoot(const Path & path) override;
 
-    void syncWithGC() override;
-
 private:
 
     typedef std::shared_ptr<AutoCloseFD> FDPtr;

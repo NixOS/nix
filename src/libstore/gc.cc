@@ -71,12 +71,6 @@ static void makeSymlink(const Path & link, const Path & target)
 }
 
 
-void LocalStore::syncWithGC()
-{
-    AutoCloseFD fdGCLock = openGCLock(ltRead);
-}
-
-
 void LocalStore::addIndirectRoot(const Path & path)
 {
     string hash = hashString(htSHA1, path).to_string(Base32, false);
@@ -95,17 +89,18 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot
                 "creating a garbage collector root (%1%) in the Nix store is forbidden "
                 "(are you running nix-build inside the store?)", gcRoot);
 
+    /* Register this root with the garbage collector, if it's
+       running. This should be superfluous since the caller should
+       have registered this root yet, but let's be on the safe
+       side. */
+    addTempRoot(storePath);
+
     /* Don't clobber the link if it already exists and doesn't
        point to the Nix store. */
     if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
         throw Error("cannot create symlink '%1%'; already exists", gcRoot);
     makeSymlink(gcRoot, printStorePath(storePath));
     addIndirectRoot(gcRoot);
-
-    /* Grab the global GC root, causing us to block while a GC is in
-       progress.  This prevents the set of permanent roots from
-       increasing while a GC is in progress. */
-    syncWithGC();
 
     return gcRoot;
 }
