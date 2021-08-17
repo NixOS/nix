@@ -10,9 +10,13 @@ let
         let
 
           sourceInfo =
-            if key == lockFile.root
-            then rootSrc
-            else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+            let addDir = if subdir == ""
+                         then x: x
+                         else x: x // { dir = subdir; };
+                s = if key == lockFile.root
+                    then rootSrc
+                    else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+            in addDir s;
 
           subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
 

@@ -21,13 +21,14 @@ flake3Dir=$TEST_ROOT/flake3
 flake5Dir=$TEST_ROOT/flake5
 flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
+flakeDirAttr=$TEST_ROOT/flakeDirAttr
 templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $flakeDirAttr $templatesDir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
     mkdir $repo
     git -C $repo init
@@ -607,6 +608,42 @@ nix flake metadata --json hg+file://$flake5Dir
 
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-use-registries --no-allow-dirty
+
+# Test that the dir attribute is maintained on the input argument
+mkdir -p $flakeDirAttr/sub/path
+cat > $flakeDirAttr/sub/path/README <<EOF
+This is the sub path readme
+EOF
+cat > $flakeDirAttr/builder.sh <<EOF
+mkdir \$out
+cp \$src/README \$out/sub.out
+EOF
+cat > $flakeDirAttr/flake.nix <<EOF
+{
+  description = "flake sub path";
+  inputs.foo = {
+    url = git+file://$flakeDirAttr?dir=sub/path;
+    flake = false;
+  };
+  outputs = { self, foo }: rec {
+    defaultPackage.$system = packages.$system.main;
+    packages.$system.main = with import ./config.nix;
+      mkDerivation {
+        name = "subpath";
+        builder = "\${self}/builder.sh";
+        src = if builtins.hasAttr "dir" foo then foo + "/" + foo.dir else foo;
+      };
+  };
+}
+EOF
+cp ./config.nix $flakeDirAttr/
+git -C $flakeDirAttr add sub/path/README
+git -C $flakeDirAttr add builder.sh
+git -C $flakeDirAttr add config.nix
+git -C $flakeDirAttr add flake.nix
+git -C $flakeDirAttr commit -m 'Setup sub path'
+nix build -o $flakeDirAttr/result $flakeDirAttr -vvvvv
+diff $flakeDirAttr/sub/path/README $flakeDirAttr/result/sub.out
 
 # Test tarball flakes
 tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT --exclude .hg flake5
