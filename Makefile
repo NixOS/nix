@@ -19,9 +19,7 @@ makefiles = \
   misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
-  misc/upstart/local.mk \
-  doc/manual/local.mk \
-  doc/internal-api/local.mk
+  misc/upstart/local.mk
 endif
 
 ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
@@ -54,5 +52,12 @@ else
 endif
 
 include mk/lib.mk
+
+# Must be included after `mk/lib.mk` so rules refer to variables defined
+# by the library. Rules are not "lazy" like variables, unfortunately.
+ifeq ($(ENABLE_BUILD), yes)
+$(eval $(call include-sub-makefile, doc/manual/local.mk))
+$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
+endif
 
 GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src
