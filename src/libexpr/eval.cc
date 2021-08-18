@@ -958,6 +958,16 @@ Env & EvalState::allocEnv(size_t size)
     
 }
 
+Env & fakeEnv(size_t size)
+{
+    // making a fake Env so we'll have one to pass to exception ftns.
+    // a placeholder until we can pass real envs everywhere they're needed.
+    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+    env->type = Env::Plain;
+
+    return *env;
+}
+
 
 void EvalState::mkList(Value & v, size_t size)
 {
@@ -1469,8 +1479,9 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
           pos,
           "attempt to call something which is not a function but %1%",
           showType(fun).c_str(),
+          fakeEnv(1));
           // fun.env);
-          map2("fun", &fun, "arg", &arg));
+          // map2("fun", &fun, "arg", &arg));
     }
 
     ExprLambda & lambda(*fun.lambda.fun);
@@ -1508,7 +1519,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                             "%1% called without required argument '%2%'",
                             lambda,
                             i.name,
-                            fun.lambda.env);
+                            *fun.lambda.env);
                             // map2("fun", &fun, "arg", &arg));
                     env2.values[displ++] = i.def->maybeThunk(*this, env2);
                 } else {
@@ -1530,7 +1541,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                             "%1% called without required argument '%2%'",
                             lambda,
                             i.name,
-                            fun.env);
+                            *fun.lambda.env);
                             // map2("fun", &fun, "arg", &arg));
                     env2.values[displ++] = i.def->maybeThunk(*this, env2);
                 } else {
@@ -1539,7 +1550,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
                     // add to debugger name-value map
                     std::string s = i.name;
-                    (*map)[s] = i.value;
+                    (*map)[s] = j->value;
                 }
             }
             env2.valuemap.reset(map);
@@ -1556,7 +1567,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                         "%1% called with unexpected argument '%2%'",
                         lambda,
                         i.name,
-                        fun.env);
+                        *fun.lambda.env);
                         // map2("fun", &fun, "arg", &arg));
             abort(); // can't happen
         }
@@ -1655,7 +1666,11 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
 
-    env2.valuemap = mapBindings(*attrs)
+    if (debuggerHook) {
+        forceAttrs(attrs);
+        env2.valuemap = mapBindings(attrs->attrs);
+    }
+    
     
     body->eval(state, env2, v);
 }
@@ -1672,7 +1687,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError(pos, "assertion '%1%' failed", out.str(), map0());
+        throwAssertionError(pos, "assertion '%1%' failed", out.str(), env);
     }
     body->eval(state, env, v);
 }
@@ -1895,7 +1910,8 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nInt)
         throwTypeError(pos, "value is %1% while an integer was expected", v,
-            map1("value", &v));
+            fakeEnv(1));
+            // map1("value", &v));
     return v.integer;
 }
 
@@ -1907,7 +1923,8 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
         return v.integer;
     else if (v.type() != nFloat)
         throwTypeError(pos, "value is %1% while a float was expected", v,
-            map1("value", &v));
+            fakeEnv(1));
+            // map1("value", &v));
     return v.fpoint;
 }
 
@@ -1916,8 +1933,9 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v,
-            map1("value", &v));
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v,	
+            fakeEnv(1));
+            // map1("value", &v));
     return v.boolean;
 }
 
@@ -1933,7 +1951,8 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nFunction && !isFunctor(v))
         throwTypeError(pos, "value is %1% while a function was expected", v,
-            map1("value", &v));
+            fakeEnv(1));
+            // map1("value", &v));
 }
 
 
@@ -1942,7 +1961,8 @@ string EvalState::forceString(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nString) {
         throwTypeError(pos, "value is %1% while a string was expected", v,
-            map1("value", &v));
+            fakeEnv(1));
+            // map1("value", &v));
     }
     return string(v.string.s);
 }
@@ -1995,12 +2015,14 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0], 
                   // b.has_value() ? mapBindings(*b.get()) : map0());
-                map1("value", &v));
+                fakeEnv(1));
+                // map1("value", &v));
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0], 
                   // b.has_value() ? mapBindings(*b.get()) : map0());
-                map1("value", &v));
+                fakeEnv(1));
+               // map1("value", &v));
     }
     return s;
 }
@@ -2072,7 +2094,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
-            throwTypeError(pos, "cannot coerce a set to a string", map1("value", &v));
+            throwTypeError(pos, "cannot coerce a set to a string", 
+                fakeEnv(1));
+                // map1("value", &v));
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -2080,7 +2104,6 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         return v.external->coerceToString(pos, context, coerceMore, copyToStore);
 
     if (coerceMore) {
-
         /* Note that `false' is represented as an empty string for
            shell scripting convenience, just like `null'. */
         if (v.type() == nBool && v.boolean) return "1";
@@ -2103,7 +2126,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
     }
 
-    throwTypeError(pos, "cannot coerce %1% to a string", v, map1("value", &v));
+    throwTypeError(pos, "cannot coerce %1% to a string", v, 
+        fakeEnv(1));
+        // map1("value", &v));
 }
 
 
@@ -2136,7 +2161,9 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path, map1("value", &v));
+        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path, 
+            fakeEnv(1));
+            // map1("value", &v));
     return path;
 }
 
@@ -2218,7 +2245,8 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             throwEvalError("cannot compare %1% with %2%",
                 showType(v1),
                 showType(v2),
-                map2("value1", &v1, "value2", &v2));
+                fakeEnv(1));
+                // map2("value1", &v1, "value2", &v2));
     }
 }
 
