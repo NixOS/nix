@@ -386,12 +386,14 @@ git -C $templatesDir commit -m 'Initial'
 
 nix flake check templates
 nix flake show templates
+nix flake show templates --json | jq
 
 (cd $flake7Dir && nix flake init)
 (cd $flake7Dir && nix flake init) # check idempotence
 git -C $flake7Dir add flake.nix
 nix flake check $flake7Dir
 nix flake show $flake7Dir
+nix flake show $flake7Dir --json | jq
 git -C $flake7Dir commit -a -m 'Initial'
 
 # Test 'nix flake new'.
