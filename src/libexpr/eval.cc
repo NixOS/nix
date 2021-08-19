@@ -1667,8 +1667,8 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.values[0] = (Value *) attrs;
 
     if (debuggerHook) {
-        forceAttrs(attrs);
-        env2.valuemap = mapBindings(attrs->attrs);
+        state.forceAttrs(*env2.values[0]);
+        env2.valuemap.reset(mapBindings(*env2.values[0]->attrs));
     }
     
     
@@ -2132,12 +2132,13 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
-string EvalState::copyPathToStore(Env &env, PathSet & context, const Path & path)
+string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in '%1%'",
             drvExtension,
-            map0());
+            fakeEnv(1));
+            // map0());
 
     Path dstPath;
     auto i = srcToStore.find(path);
