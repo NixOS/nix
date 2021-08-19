@@ -158,6 +158,8 @@ private:
 
     void findTempRoots(Roots & roots, bool censor);
 
+    AutoCloseFD openGCLock();
+
 public:
 
     Roots findRoots(bool censor) override;

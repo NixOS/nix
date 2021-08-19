@@ -112,6 +112,9 @@ void LocalStore::addTempRoot(const StorePath & path)
 
     }
 
+    if (!state->fdGCLock)
+        state->fdGCLock = openGCLock();
+
  restart:
     FdLock gcLock(state->fdGCLock.get(), ltRead, false, "");
 
@@ -653,8 +656,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (state.shouldDelete)
         deletePath(reservedPath);
 
-    /* Acquire the global GC root. */
-    FdLock gcLock(_state.lock()->fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
+    /* Acquire the global GC root. Note: we don't use state->fdGCLock
+       here because then in auto-gc mode, another thread could
+       downgrade our exclusive lock. */
+    auto fdGCLock = openGCLock();
+    FdLock gcLock(fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
 
     /* Start the server for receiving new roots. */
     auto socketPath = stateDir.get() + gcSocketPath;

@@ -382,11 +382,16 @@ LocalStore::LocalStore(const Params & params)
                     (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
+}
 
+
+AutoCloseFD LocalStore::openGCLock()
+{
     Path fnGCLock = stateDir + "/gc.lock";
-    state->fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-    if (!state->fdGCLock)
+    auto fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    if (!fdGCLock)
         throw SysError("opening global GC lock '%1%'", fnGCLock);
+    return fdGCLock;
 }
 
 
@@ -1509,7 +1514,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     /* Acquire the global GC lock to get a consistent snapshot of
        existing and valid paths. */
-    FdLock gcLock(_state.lock()->fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
+    auto fdGCLock = openGCLock();
+    FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
     StringSet store;
     for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
