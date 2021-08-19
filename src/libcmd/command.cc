@@ -99,6 +99,8 @@ EvalCommand::EvalCommand()
 // extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
 extern std::function<void(const Error & error, const Env & env)> debuggerHook;
 
+
+
 ref<EvalState> EvalCommand::getEvalState()
 {
     std::cout << " EvalCommand::getEvalState()" << startReplOnEvalErrors << std::endl;
@@ -107,7 +109,8 @@ ref<EvalState> EvalCommand::getEvalState()
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env) {
                 printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
-                runRepl(evalState, env);
+                auto vm = mapEnvBindings(env);
+                runRepl(evalState, *vm);
             };
     }
     return ref<EvalState>(evalState);

@@ -668,6 +668,28 @@ LocalNoInline(void addBindings(string prefix, Bindings &b, valmap &valmap))
     }
 }
 
+
+
+void mapEnvBindings(const Env &env, valmap & vm)
+{
+  // add bindings for the next level up first.
+  if (env.up) {
+    mapEnvBindings(*env.up, vm);
+  }
+
+  // merge - and write over - higher level bindings.
+  vm.merge(*env.valuemap);
+}
+
+valmap * mapEnvBindings(const Env &env)
+{
+    auto vm = new valmap();
+
+    mapEnvBindings(env, *vm);
+
+    return vm;
+}
+
 // LocalNoInline(valmap * mapEnvBindings(Env &env))
 // {
 //     // NOT going to use this
@@ -1508,8 +1530,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
            argument has a default, use the default. */
+        size_t attrsUsed = 0;
         if (debuggerHook) {
-            size_t attrsUsed = 0;
             for (auto & i : lambda.formals->formals) {
                 Bindings::iterator j = arg.attrs->find(i.name);
                 if (j == arg.attrs->end()) {
@@ -1531,7 +1553,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         else {
             auto map = new valmap();
             
-            size_t attrsUsed = 0;
             for (auto & i : lambda.formals->formals) {
                 Bindings::iterator j = arg.attrs->find(i.name);
                 if (j == arg.attrs->end()) {

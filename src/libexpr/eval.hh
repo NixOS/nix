@@ -44,6 +44,7 @@ struct Env
     Value * values[0];
 };
 
+valmap * mapEnvBindings(const Env &env);
 
 Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
 
