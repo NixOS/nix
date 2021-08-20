@@ -511,6 +511,18 @@ std::optional<typename T::mapped_type> get(const T & map, const typename T::key_
 }
 
 
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> remove_begin(T & c)
+{
+    auto i = c.begin();
+    if (i == c.end()) return {};
+    auto v = std::move(*i);
+    c.erase(i);
+    return v;
+}
+
+
 template<typename T>
 class Callback;
 
