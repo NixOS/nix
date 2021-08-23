@@ -330,7 +330,7 @@ struct Common : InstallableCommand, MixProfile
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
         auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();
-        res.emplace_front("devShells." + settings.thisSystem.get());
+        res.emplace_front("devShells." + settings.thisSystem.get() + ".");
         return res;
     }
 
