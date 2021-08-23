@@ -325,12 +325,23 @@ LockedFlake lockFlake(
 
         std::vector<FlakeRef> parents;
 
+        struct LockParent {
+            /* The path to this parent. */
+            InputPath path;
+
+            /* Whether we are currently inside a top-level lockfile
+               (inputs absolute) or subordinate lockfile (inputs
+               relative). */
+            bool absolute;
+        };
+
         std::function<void(
             const FlakeInputs & flakeInputs,
             std::shared_ptr<Node> node,
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
-            const LockParent parent, const Path parentPath)>
+            const LockParent & parent,
+            const Path & parentPath)>
             computeLocks;
 
         computeLocks = [&](
@@ -338,7 +349,8 @@ LockedFlake lockFlake(
             std::shared_ptr<Node> node,
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
-            const LockParent parent, const Path parentPath)
+            const LockParent & parent,
+            const Path & parentPath)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
 
@@ -384,15 +396,11 @@ LockedFlake lockFlake(
                         if (parent.absolute && !hasOverride) {
                             target = *input.follows;
                         } else {
-                            if (hasOverride)
-                            {
+                            if (hasOverride) {
                                 target = inputPathPrefix;
                                 target.pop_back();
-                            }
-                            else
-                            {
+                            } else
                                 target = parent.path;
-                            }
 
                             for (auto & i : *input.follows) target.push_back(i);
                         }
@@ -480,8 +488,7 @@ LockedFlake lockFlake(
 
                             // If this input is a path, recurse it down.
                             // This allows us to resolve path inputs relative to the current flake.
-                            if (localRef.input.getType() == "path")
-                            {
+                            if (localRef.input.getType() == "path") {
                                 localRef.input.parent = parentPath;
                                 localPath = canonPath(parentPath + "/" + *input.ref->input.getSourcePath());
                             }

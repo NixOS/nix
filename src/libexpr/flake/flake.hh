@@ -124,15 +124,6 @@ struct LockFlags
     std::set<InputPath> inputUpdates;
 };
 
-struct LockParent {
-    /* The path to this parent */
-    InputPath path;
-
-    /* Whether we are currently inside a top-level lockfile (inputs absolute)
-       or subordinate lockfile (inputs relative) */
-    bool absolute;
-};
-
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & flakeRef,

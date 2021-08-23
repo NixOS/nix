@@ -85,8 +85,7 @@ struct PathInputScheme : InputScheme
         std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
-        if (path[0] != '/' && input.parent)
-        {
+        if (path[0] != '/' && input.parent) {
             auto parent = canonPath(*input.parent);
 
             // the path isn't relative, prefix it
@@ -95,11 +94,8 @@ struct PathInputScheme : InputScheme
             // for security, ensure that if the parent is a store path, it's inside it
             if (!parent.rfind(store->storeDir, 0) && absPath.rfind(store->storeDir, 0))
                 throw BadStorePath("relative path '%s' points outside of its parent's store path %s, this is a security violation", path, parent);
-        }
-        else
-        {
+        } else
             absPath = path;
-        }
 
         // FIXME: check whether access to 'path' is allowed.
         auto storePath = store->maybeParseStorePath(absPath);
