@@ -669,6 +669,26 @@ LocalNoInline(void addBindings(string prefix, Bindings &b, valmap &valmap))
 }
 
 
+void printEnvBindings(const Env &env, int lv )
+{
+  if (env.values[0]->type() == nAttrs) {
+    Bindings::iterator j = env.values[0]->attrs->begin();
+
+    while (j != env.values[0]->attrs->end()) {
+        std::cout << lv << " env binding: " << j->name << std::endl;
+        // if (countCalls && j->pos) attrSelects[*j->pos]++;
+        // return j->value;
+        j++;
+    }
+
+  }
+
+  std::cout << "next env : " << env.up << std::endl;
+  
+  if (env.up) {
+    printEnvBindings(*env.up, ++lv);
+  }
+}
 
 void mapEnvBindings(const Env &env, valmap & vm)
 {
@@ -678,14 +698,38 @@ void mapEnvBindings(const Env &env, valmap & vm)
   }
 
   // merge - and write over - higher level bindings.
-  vm.merge(*env.valuemap);
+  if (env.valuemap)
+    vm.merge(*env.valuemap);
 }
+
+// void mapEnvBindings(const Env &env, valmap & vm)
+// {
+//   // add bindings for the next level up first.
+//   if (env.up) {
+//     mapEnvBindings(*env.up, vm);
+//   }
+
+//   // merge - and write over - higher level bindings.
+//   if (env.valuemap)
+//     vm.merge(*env.valuemap);
+// }
 
 valmap * mapEnvBindings(const Env &env)
 {
     auto vm = new valmap();
 
+    // segfault!
+    std::cout << "before mapenv" << std::endl;
+    if (env.valuemap) { 
+      std::cout << "valuemap" << std::endl;
+      std::cout << "mapenv count" << env.valuemap->size() << std::endl;
+    } else
+    { 
+      std::cout << "novaluemap" << std::endl;
+    }
+
     mapEnvBindings(env, *vm);
+    std::cout << "after mapenv" << std::endl;
 
     return vm;
 }
@@ -852,6 +896,8 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env))
 {
+    std::cout << "throwUndefinedVarError" << std::endl;
+  
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
@@ -914,6 +960,8 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
+    // std::cout << " EvalState::lookupVar" << std::endl;
+
     for (size_t l = var.level; l; --l, env = env->up) ;
 
     if (!var.fromWith) return env->values[var.displ];
@@ -931,8 +979,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             if (countCalls && j->pos) attrSelects[*j->pos]++;
             return j->value;
         }
-        if (!env->prevWith)
+        if (!env->prevWith) {
+            std::cout << "pre throwUndefinedVarError" << std::endl;
             throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env);
+        }
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -1681,16 +1731,24 @@ https://nixos.org/manual/nix/stable/#ss-functions.)",
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
+    // std::cout << "ExprWith::eval" << std::endl;
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
     env2.type = Env::HasWithExpr;
-    env2.values[0] = (Value *) attrs;
+    env2.values[0] = (Value *) attrs;  // ok DAG nasty.  just smoosh this in.
+        // presumably evaluate later, lazily.
+    // std::cout << "ExprWith::eval2" << std::endl;
 
-    if (debuggerHook) {
-        state.forceAttrs(*env2.values[0]);
-        env2.valuemap.reset(mapBindings(*env2.values[0]->attrs));
-    }
+    // can't load the valuemap until they've been evaled, which is not yet.
+    // if (debuggerHook) {
+    //     std::cout << "ExprWith::eval3.0" << std::endl;
+    //     std::cout << "ExprWith attrs" << *attrs << std::endl;
+    //     state.forceAttrs(*(Value*) attrs);
+    //     std::cout << "ExprWith::eval3.5" << std::endl;
+    //     env2.valuemap.reset(mapBindings(*env2.values[0]->attrs));
+    //     std::cout << "ExprWith::eval4" << std::endl;
+    // }
     
     
     body->eval(state, env2, v);
