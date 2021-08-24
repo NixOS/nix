@@ -65,16 +65,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
         throw SysError("cannot create Unix domain socket");
     closeOnExec(conn->fd.get());
 
-    string socketPath = path ? *path : settings.nixDaemonSocketFile;
-
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", socketPath);
-    strcpy(addr.sun_path, socketPath.c_str());
-
-    if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot connect to daemon at '%1%'", socketPath);
+    nix::connect(conn->fd.get(), path ? *path : settings.nixDaemonSocketFile);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
