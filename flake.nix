@@ -156,10 +156,7 @@
       testNixVersions = pkgs: client: daemon: with commonDeps pkgs; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
-        # Must keep this name short as OSX has a rather strict limit on the
-        # socket path length, and this name appears in the path of the
-        # nix-daemon socket used in the tests
-        name = "nix-tests";
+        name = "nix-tests-${client.version}-against-${daemon.version}";
         inherit version;
 
         src = self;
