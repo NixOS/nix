@@ -698,21 +698,19 @@ void mapEnvBindings(const Env &env, valmap & vm)
   }
 
   // merge - and write over - higher level bindings.
-  if (env.valuemap)
-    vm.merge(*env.valuemap);
+  if (env.values[0]->type() == nAttrs) {
+    auto map = valmap();
+
+    Bindings::iterator j = env.values[0]->attrs->begin();
+
+    while (j != env.values[0]->attrs->end()) {
+        map[j->name] = j->value;
+        j++;
+    }
+    vm.merge(map);
+  }  
 }
 
-// void mapEnvBindings(const Env &env, valmap & vm)
-// {
-//   // add bindings for the next level up first.
-//   if (env.up) {
-//     mapEnvBindings(*env.up, vm);
-//   }
-
-//   // merge - and write over - higher level bindings.
-//   if (env.valuemap)
-//     vm.merge(*env.valuemap);
-// }
 
 valmap * mapEnvBindings(const Env &env)
 {
