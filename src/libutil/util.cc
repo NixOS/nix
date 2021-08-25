@@ -1749,7 +1749,7 @@ void connect(int fd, const std::string & path)
         });
         int status = pid.wait();
         if (status != 0)
-            throw Error("cannot connect to socket ar '%s'", path);
+            throw Error("cannot connect to socket at '%s'", path);
     } else {
         strcpy(addr.sun_path, path.c_str());
         if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
