@@ -40,7 +40,6 @@ struct Env
     Env * up;
     unsigned short prevWith:14; // nr of levels up to next `with' environment
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
-    std::unique_ptr<valmap> valuemap;  // TODO: rename 
     Value * values[0];
 };
 

@@ -630,43 +630,43 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
 }
 */
-LocalNoInline(valmap * map0())
-{
-    return new valmap();
-}
+// LocalNoInline(valmap * map0())
+// {
+//     return new valmap();
+// }
 
-LocalNoInline(valmap * map1(const char *name, Value *v))
-{
-    return new valmap({{name, v}});
-}
+// LocalNoInline(valmap * map1(const char *name, Value *v))
+// {
+//     return new valmap({{name, v}});
+// }
 
-LocalNoInline(valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2))
-{
-    return new valmap({{name1, v1}, {name2, v2}});
-}
+// LocalNoInline(valmap * map2(const char *name1, Value *v1, const char *name2, Value *v2))
+// {
+//     return new valmap({{name1, v1}, {name2, v2}});
+// }
 
-LocalNoInline(valmap * mapBindings(Bindings &b))
-{
-    auto map = new valmap();
+// LocalNoInline(valmap * mapBindings(Bindings &b))
+// {
+//     auto map = new valmap();
 
-    for (auto i = b.begin(); i != b.end(); ++i)
-    {
-        std::string s = i->name;
-        (*map)[s] = i->value;
-    }
+//     for (auto i = b.begin(); i != b.end(); ++i)
+//     {
+//         std::string s = i->name;
+//         (*map)[s] = i->value;
+//     }
 
-    return map;
-}
+//     return map;
+// }
 
-LocalNoInline(void addBindings(string prefix, Bindings &b, valmap &valmap))
-{
-    for (auto i = b.begin(); i != b.end(); ++i)
-    {
-        std::string s = prefix;
-        s += i->name;
-        valmap[s] = i->value;
-    }
-}
+// LocalNoInline(void addBindings(string prefix, Bindings &b, valmap &valmap))
+// {
+//     for (auto i = b.begin(); i != b.end(); ++i)
+//     {
+//         std::string s = prefix;
+//         s += i->name;
+//         valmap[s] = i->value;
+//     }
+// }
 
 
 void printEnvBindings(const Env &env, int lv )
@@ -698,6 +698,7 @@ void mapEnvBindings(const Env &env, valmap & vm)
   }
 
   // merge - and write over - higher level bindings.
+  // note; skipping HasWithExpr that haven't been evaled yet.
   if (env.values[0]->type() == nAttrs) {
     auto map = valmap();
 
@@ -716,18 +717,7 @@ valmap * mapEnvBindings(const Env &env)
 {
     auto vm = new valmap();
 
-    // segfault!
-    std::cout << "before mapenv" << std::endl;
-    if (env.valuemap) { 
-      std::cout << "valuemap" << std::endl;
-      std::cout << "mapenv count" << env.valuemap->size() << std::endl;
-    } else
-    { 
-      std::cout << "novaluemap" << std::endl;
-    }
-
     mapEnvBindings(env, *vm);
-    std::cout << "after mapenv" << std::endl;
 
     return vm;
 }
@@ -1270,11 +1260,6 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
         }
 
-        // TODO; deal with the below overrides or whatever
-        if (debuggerHook) {
-          env2.valuemap.reset(mapBindings(*v.attrs));
-        }
-
         /* If the rec contains an attribute called `__overrides', then
            evaluate it, and add the attributes in that set to the rec.
            This allows overriding of recursive attributes, which is
@@ -1344,18 +1329,6 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     size_t displ = 0;
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
-
-    if (debuggerHook) {
-      auto map = new valmap();
-
-      displ = 0;
-      for (auto & i : attrs->attrs)
-      {
-          // std::string s = i->name;
-          (*map)[i.first] = env2.values[displ++];
-      }
-      env2.valuemap.reset(map);
-    }
 
     body->eval(state, env2, v);
 }
@@ -1579,51 +1552,24 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
            there is no matching actual argument but the formal
            argument has a default, use the default. */
         size_t attrsUsed = 0;
-        if (debuggerHook) {
-            for (auto & i : lambda.formals->formals) {
-                Bindings::iterator j = arg.attrs->find(i.name);
-                if (j == arg.attrs->end()) {
-                    if (!i.def)
-                        throwTypeError(
-                            pos,
-                            "%1% called without required argument '%2%'",
-                            lambda,
-                            i.name,
-                            *fun.lambda.env);
-                            // map2("fun", &fun, "arg", &arg));
-                    env2.values[displ++] = i.def->maybeThunk(*this, env2);
-                } else {
-                    attrsUsed++;
-                    env2.values[displ++] = j->value;
-                }
+        for (auto & i : lambda.formals->formals) {
+            Bindings::iterator j = arg.attrs->find(i.name);
+            if (j == arg.attrs->end()) {
+                if (!i.def)
+                    throwTypeError(
+                        pos,
+                        "%1% called without required argument '%2%'",
+                        lambda,
+                        i.name,
+                        *fun.lambda.env);
+                        // map2("fun", &fun, "arg", &arg));
+                env2.values[displ++] = i.def->maybeThunk(*this, env2);
+            } else {
+                attrsUsed++;
+                env2.values[displ++] = j->value;
             }
         }
-        else {
-            auto map = new valmap();
-            
-            for (auto & i : lambda.formals->formals) {
-                Bindings::iterator j = arg.attrs->find(i.name);
-                if (j == arg.attrs->end()) {
-                    if (!i.def)
-                        throwTypeError(
-                            pos,
-                            "%1% called without required argument '%2%'",
-                            lambda,
-                            i.name,
-                            *fun.lambda.env);
-                            // map2("fun", &fun, "arg", &arg));
-                    env2.values[displ++] = i.def->maybeThunk(*this, env2);
-                } else {
-                    attrsUsed++;
-                    env2.values[displ++] = j->value;
 
-                    // add to debugger name-value map
-                    std::string s = i.name;
-                    (*map)[s] = j->value;
-                }
-            }
-            env2.valuemap.reset(map);
-        }
 
         /* Check that each actual argument is listed as a formal
            argument (unless the attribute match specifies a `...'). */
