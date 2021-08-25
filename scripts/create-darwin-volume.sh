@@ -759,6 +759,10 @@ setup_volume() {
 
     await_volume
 
+    if [ "$(/usr/sbin/diskutil info -plist "$NIX_ROOT" | xmllint --xpath "(/plist/dict/key[text()='GlobalPermissionsEnabled'])/following-sibling::*[1]" -)" = "<false/>" ]; then
+        sudo /usr/sbin/diskutil enableOwnership "$NIX_ROOT"
+    fi
+
     # TODO: below is a vague kludge for now; I just don't know
     # what if any safe action there is to take here. Also, the
     # reminder isn't very helpful.
