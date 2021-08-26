@@ -295,7 +295,8 @@ void mainWrapped(int argc, char * * argv)
 
     if (args.command->first != "repl"
         && args.command->first != "doctor"
-        && args.command->first != "upgrade-nix")
+        && args.command->first != "upgrade-nix"
+        && args.command->first != "show-config")
         settings.requireExperimentalFeature("nix-command");
 
     if (args.useNet && !haveInternet()) {
