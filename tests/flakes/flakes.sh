@@ -64,7 +64,17 @@ cat > $nonFlakeDir/README.md <<EOF
 FNORD
 EOF
 
-git -C $nonFlakeDir add README.md
+cat > $nonFlakeDir/shebang.sh <<EOF
+#! $(type -P env) nix
+#! nix --offline shell
+#! nix flake1#fooScript
+#! nix --no-write-lock-file --command bash
+set -e
+foo
+EOF
+chmod +x $nonFlakeDir/shebang.sh
+
+git -C $nonFlakeDir add README.md shebang.sh
 git -C $nonFlakeDir commit -m 'Initial'
 
 # Construct a custom registry, additionally test the --registry flag
@@ -504,3 +514,6 @@ nix flake metadata $flake2Dir --reference-lock-file $TEST_ROOT/flake2-overridden
 
 # reference-lock-file can only be used if allow-dirty is set.
 expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-file $TEST_ROOT/flake2-overridden.lock
+
+# Test shebang
+[[ $($nonFlakeDir/shebang.sh) = "foo" ]]

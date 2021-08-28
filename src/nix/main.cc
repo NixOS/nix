@@ -397,7 +397,7 @@ void mainWrapped(int argc, char * * argv)
     });
 
     try {
-        args.parseCmdline(argvToStrings(argc, argv));
+        args.parseCmdline(programName, argvToStrings(argc, argv));
     } catch (UsageError &) {
         if (!args.helpRequested && !completions) throw;
     }

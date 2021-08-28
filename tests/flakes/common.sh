@@ -11,6 +11,7 @@ writeSimpleFlake() {
   outputs = inputs: rec {
     packages.$system = rec {
       foo = import ./simple.nix;
+      fooScript = (import ./shell.nix {}).foo;
       default = foo;
     };
     packages.someOtherSystem = rec {
@@ -24,13 +25,13 @@ writeSimpleFlake() {
 }
 EOF
 
-    cp ../simple.nix ../simple.builder.sh ../config.nix $flakeDir/
+    cp ../simple.nix ../shell.nix ../simple.builder.sh ../config.nix $flakeDir/
 }
 
 createSimpleGitFlake() {
     local flakeDir="$1"
     writeSimpleFlake $flakeDir
-    git -C $flakeDir add flake.nix simple.nix simple.builder.sh config.nix
+    git -C $flakeDir add flake.nix simple.nix shell.nix simple.builder.sh config.nix
     git -C $flakeDir commit -m 'Initial'
 }
 

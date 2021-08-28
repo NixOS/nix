@@ -1,6 +1,7 @@
 #include "args.hh"
 #include "hash.hh"
 
+#include <regex>
 #include <glob.h>
 
 #include <nlohmann/json.hpp>
@@ -63,6 +64,12 @@ static std::optional<std::string> needsCompletion(std::string_view s)
 
 void Args::parseCmdline(const Strings & _cmdline)
 {
+    // Default via 5.1.2.2.1 in C standard
+    Args::parseCmdline("", _cmdline);
+}
+
+void Args::parseCmdline(const std::string & programName, const Strings & _cmdline)
+{
     Strings pendingArgs;
     bool dashDash = false;
 
@@ -77,6 +84,36 @@ void Args::parseCmdline(const Strings & _cmdline)
     }
 
     bool argsSeen = false;
+
+    // Heuristic to see if we're invoked as a shebang script, namely,
+    // if we have at least one argument, it's the name of an
+    // executable file, and it starts with "#!".
+    Strings savedArgs;
+    auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
+    if (isNixCommand && cmdline.size() > 0) {
+        auto script = *cmdline.begin();
+        try {
+            auto lines = tokenizeString<Strings>(readFile(script), "\n");
+            if (std::regex_search(lines.front(), std::regex("^#!"))) {
+                lines.pop_front();
+                for (auto pos = std::next(cmdline.begin()); pos != cmdline.end();pos++)
+                    savedArgs.push_back(*pos);
+                cmdline.clear();
+
+                for (auto line : lines) {
+                    line = chomp(line);
+
+                    std::smatch match;
+                    if (std::regex_match(line, match, std::regex("^#!\\s*nix\\s(.*)$")))
+                        for (const auto & word : shellwords(match[1].str()))
+                            cmdline.push_back(word);
+                }
+                cmdline.push_back(script);
+                for (auto pos = savedArgs.begin(); pos != savedArgs.end();pos++)
+                    cmdline.push_back(*pos);
+            }
+        } catch (SysError &) { }
+    }
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
         auto arg = *pos;

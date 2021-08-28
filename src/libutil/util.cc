@@ -14,6 +14,7 @@
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <regex>
 #include <sstream>
 #include <thread>
 
@@ -1459,6 +1460,49 @@ std::string shellEscape(const std::string_view s)
     return r;
 }
 
+/* Recreate the effect of the perl shellwords function, breaking up a
+ * string into arguments like a shell word, including escapes
+ */
+std::vector<std::string> shellwords(const std::string & s)
+{
+    std::regex whitespace("^(\\s+).*");
+    auto begin = s.cbegin();
+    std::vector<std::string> res;
+    std::string cur;
+    enum state {
+        sBegin,
+        sQuote
+    };
+    state st = sBegin;
+    auto it = begin;
+    for (; it != s.cend(); ++it) {
+        if (st == sBegin) {
+            std::smatch match;
+            if (regex_search(it, s.cend(), match, whitespace)) {
+                cur.append(begin, it);
+                res.push_back(cur);
+                cur.clear();
+                it = match[1].second;
+                begin = it;
+            }
+        }
+        switch (*it) {
+            case '"':
+                cur.append(begin, it);
+                begin = it + 1;
+                st = st == sBegin ? sQuote : sBegin;
+                break;
+            case '\\':
+                /* perl shellwords mostly just treats the next char as part of the string with no special processing */
+                cur.append(begin, it);
+                begin = ++it;
+                break;
+        }
+    }
+    cur.append(begin, it);
+    if (!cur.empty()) res.push_back(cur);
+    return res;
+}
 
 void ignoreException(Verbosity lvl)
 {
