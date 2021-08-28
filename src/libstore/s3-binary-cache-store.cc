@@ -28,6 +28,10 @@ using namespace Aws::Transfer;
 
 namespace nix {
 
+/* Convert string types. They differ only by allocator type. */
+static std::string a2s (const Aws::String & s) { return std::string(std::cbegin(s), std::cend(s)); }
+static Aws::String s2a (const std::string & s) { return Aws::String(std::cbegin(s), std::cend(s)); }
+
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;
@@ -45,7 +49,7 @@ R && checkAws(const FormatOrString & fs, Aws::Utils::Outcome<R, E> && outcome)
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
-            fs.s + ": " + outcome.GetError().GetMessage());
+            fs.s + ": " + a2s(outcome.GetError().GetMessage()));
     return outcome.GetResultWithOwnership();
 }
 
@@ -146,8 +150,8 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
     auto request =
         Aws::S3::Model::GetObjectRequest()
-        .WithBucket(bucketName)
-        .WithKey(key);
+        .WithBucket(s2a(bucketName))
+        .WithKey(s2a(key));
 
     request.SetResponseStreamFactory([&]() {
         return Aws::New<std::stringstream>("STRINGSTREAM");
@@ -162,7 +166,7 @@ S3Helper::FileTransferResult S3Helper::getObject(
         auto result = checkAws(fmt("AWS error fetching '%s'", key),
             client->GetObject(request));
 
-        res.data = decompress(result.GetContentEncoding(),
+        res.data = decompress(a2s(result.GetContentEncoding()),
             dynamic_cast<std::stringstream &>(result.GetBody()).str());
 
     } catch (S3Error & e) {
@@ -265,8 +269,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
         auto res = s3Helper.client->HeadObject(
             Aws::S3::Model::HeadObjectRequest()
-            .WithBucket(bucketName)
-            .WithKey(path));
+            .WithBucket(s2a(bucketName))
+            .WithKey(s2a(path)));
 
         if (!res.IsSuccess()) {
             auto & error = res.GetError();
@@ -332,7 +336,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             std::shared_ptr<TransferHandle> transferHandle =
                 transferManager->UploadFile(
-                    istream, bucketName, path, mimeType,
+                    istream, s2a(bucketName), s2a(path), s2a(mimeType),
                     Aws::Map<Aws::String, Aws::String>(),
                     nullptr /*, contentEncoding */);
 
@@ -350,13 +354,13 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             auto request =
                 Aws::S3::Model::PutObjectRequest()
-                .WithBucket(bucketName)
-                .WithKey(path);
+                .WithBucket(s2a(bucketName))
+                .WithKey(s2a(path));
 
-            request.SetContentType(mimeType);
+            request.SetContentType(s2a(mimeType));
 
             if (contentEncoding != "")
-                request.SetContentEncoding(contentEncoding);
+                request.SetContentEncoding(s2a(contentEncoding));
 
             request.SetBody(istream);
 
@@ -428,9 +432,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             auto res = checkAws(format("AWS error listing bucket '%s'") % bucketName,
                 s3Helper.client->ListObjects(
                     Aws::S3::Model::ListObjectsRequest()
-                    .WithBucket(bucketName)
+                    .WithBucket(s2a(bucketName))
                     .WithDelimiter("/")
-                    .WithMarker(marker)));
+                    .WithMarker(s2a(marker))));
 
             auto & contents = res.GetContents();
 
@@ -438,7 +442,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
                 % contents.size() % res.GetNextMarker());
 
             for (auto object : contents) {
-                auto & key = object.GetKey();
+                auto key = a2s(object.GetKey());
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
                 paths.insert(parseStorePath(storeDir + "/" + key.substr(0, key.size() - 8) + "-" + MissingName));
             }
