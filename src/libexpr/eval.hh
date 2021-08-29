@@ -308,7 +308,7 @@ public:
     void mkList(Value & v, size_t length);
     void mkAttrs(Value & v, size_t capacity);
     void mkThunk_(Value & v, Expr * expr);
-    void mkPos(Value & v, Pos * pos);
+    void mkPos(Value & v, ptr<Pos> pos);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 
