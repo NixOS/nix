@@ -160,16 +160,15 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         }
         w.attrs->sort();
 
-        static RootValue fun;
-        if (!fun) {
-            fun = allocRootValue(state.allocValue());
+        if (!state.vImportedDrvToDerivation) {
+            state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , "/"), **fun);
+                , "/"), **state.vImportedDrvToDerivation);
         }
 
-        state.forceFunction(**fun, pos);
-        mkApp(v, **fun, w);
+        state.forceFunction(**state.vImportedDrvToDerivation, pos);
+        mkApp(v, **state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos);
     }
 
