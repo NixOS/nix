@@ -663,16 +663,14 @@ void callFlake(EvalState & state,
 
     mkString(*vRootSubdir, lockedFlake.flake.lockedRef.subdir);
 
-    static RootValue vCallFlake = nullptr;
-
-    if (!vCallFlake) {
-        vCallFlake = allocRootValue(state.allocValue());
+    if (!state.vCallFlake) {
+        state.vCallFlake = allocRootValue(state.allocValue());
         state.eval(state.parseExprFromString(
             #include "call-flake.nix.gen.hh"
-            , "/"), **vCallFlake);
+            , "/"), **state.vCallFlake);
     }
 
-    state.callFunction(**vCallFlake, *vLocks, *vTmp1, noPos);
+    state.callFunction(**state.vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
 }

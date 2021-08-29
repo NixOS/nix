@@ -100,6 +100,7 @@ public:
     /* Store used to build stuff. */
     const ref<Store> buildStore;
 
+    RootValue vCallFlake = nullptr;
 
 private:
     SrcToStore srcToStore;
