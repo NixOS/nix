@@ -17,10 +17,13 @@ struct TarArchive {
     // disable copy constructor
     TarArchive(const TarArchive &) = delete;
 
+    void init();
+
     void close();
 
     ~TarArchive();
 };
+
 void unpackTarfile(Source & source, const Path & destDir);
 
 void unpackTarfile(const Path & tarFile, const Path & destDir);
