@@ -78,23 +78,23 @@ man: doc/manual/generated/man1/nix3-manpages
 all: doc/manual/generated/man1/nix3-manpages
 
 $(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-manpages
-	@mkdir -p $$(dirname $@)
-	$(trace-install) install -m 0644 $$(dirname $<)/* $$(dirname $@)
+	@mkdir -p $(DESTDIR)$$(dirname $@)
+	$(trace-install) install -m 0644 $$(dirname $<)/* $(DESTDIR)$$(dirname $@)
 
 doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
-	@mkdir -p $$(dirname $@)
+	@mkdir -p $(DESTDIR)$$(dirname $@)
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
 	  name=$$(basename $$i .md); \
 	  tmpFile=$$(mktemp); \
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
 	  cat $$i >> $$tmpFile; \
-	  lowdown -sT man -M section=1 $$tmpFile -o $$(dirname $@)/$$name.1; \
+	  lowdown -sT man -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
 	  rm $$tmpFile; \
 	done
 	touch $@
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
-	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
+	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual
 
 endif
