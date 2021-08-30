@@ -25,7 +25,10 @@ jobs:
     - run: nix-build -A checks.$(nix-instantiate --eval -E '(builtins.currentSystem)')
     - run: |
         NIX_BUILD=$(nix-build -A defaultPackage.$(nix-instantiate --eval -E '(builtins.currentSystem)'))/bin/nix-build
-        $NIX_BUILD --option experimental-features 'flakes' --impure --expr '(builtins.getFlake (builtins.toPath ./.)).lib.testAgainst.${builtins.currentSystem} (builtins.getFlake "github:nixos/nix/master").defaultPackage.${builtins.currentSystem}'
+        $NIX_BUILD \
+          --option experimental-features 'flakes' \
+          --option access-tokens github.com=${{ secrets.GITHUB_TOKEN }} \
+          --impure --expr '(builtins.getFlake (builtins.toPath ./.)).lib.testAgainst.${builtins.currentSystem} (builtins.getFlake "github:nixos/nix/master").defaultPackage.${builtins.currentSystem}'
   check_cachix:
     name: Cachix secret present for installer tests
     runs-on: ubuntu-latest
