@@ -2109,7 +2109,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
         pos
     );
     // !!! add to stack trace?
-    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
+    if (state.countCalls && *i->pos != noPos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
     v = *i->value;
 }
@@ -2369,7 +2369,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     for (auto & i : args[0]->lambda.fun->formals->formals) {
         // !!! should optimise booleans (allocate only once)
         Value * value = state.allocValue();
-        v.attrs->push_back(Attr(i.name, value, &i.pos));
+        v.attrs->push_back(Attr(i.name, value, ptr(&i.pos)));
         mkBool(*value, i.def);
     }
     v.attrs->sort();

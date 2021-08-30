@@ -770,7 +770,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
-            if (countCalls && j->pos) attrSelects[*j->pos]++;
+            if (countCalls) attrSelects[*j->pos]++;
             return j->value;
         }
         if (!env->prevWith)
@@ -825,9 +825,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
-void EvalState::mkPos(Value & v, Pos * pos)
+void EvalState::mkPos(Value & v, ptr<Pos> pos)
 {
-    if (pos && pos->file.set()) {
+    if (pos->file.set()) {
         mkAttrs(v, 3);
         mkString(*allocAttr(v, sFile), pos->file);
         mkInt(*allocAttr(v, sLine), pos->line);
@@ -1027,7 +1027,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             } else
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+            v.attrs->push_back(Attr(i.first, vAttr, ptr(&i.second.pos)));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -1059,7 +1059,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
+            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), ptr(&i.second.pos)));
 
     /* Dynamic attrs apply *after* rec and __overrides. */
     for (auto & i : dynamicAttrs) {
@@ -1076,11 +1076,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
+        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), ptr(&i.pos)));
         v.attrs->sort(); // FIXME: inefficient
     }
 
-    v.attrs->pos = &pos;
+    v.attrs->pos = ptr(&pos);
 }
 
 
@@ -1138,7 +1138,7 @@ static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPa
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos2 = 0;
+    ptr<Pos> pos2(&noPos);
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -1164,13 +1164,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             }
             vAttrs = j->value;
             pos2 = j->pos;
-            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+            if (state.countCalls) state.attrSelects[*pos2]++;
         }
 
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
+        state.forceValue(*vAttrs, (*pos2 != noPos ? *pos2 : this->pos ) );
 
     } catch (Error & e) {
-        if (pos2 && pos2->file != state.sDerivationNix)
+        if (*pos2 != noPos && pos2->file != state.sDerivationNix)
             addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath));
         throw;
@@ -1616,7 +1616,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkPos(v, &pos);
+    state.mkPos(v, ptr(&pos));
 }
 
 
