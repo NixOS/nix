@@ -100,6 +100,8 @@ public:
     /* Store used to build stuff. */
     const ref<Store> buildStore;
 
+    RootValue vCallFlake = nullptr;
+    RootValue vImportedDrvToDerivation = nullptr;
 
 private:
     SrcToStore srcToStore;
