@@ -87,13 +87,16 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
         struct archive_entry * entry;
         int r = archive_read_next_header(archive.archive, &entry);
         if (r == ARCHIVE_EOF) break;
-        else if (r == ARCHIVE_WARN)
+        auto name = archive_entry_pathname(entry);
+        if (!name)
+            throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
+        if (r == ARCHIVE_WARN)
             warn(archive_error_string(archive.archive));
         else
             archive.check(r);
 
         archive_entry_set_pathname(entry,
-            (destDir + "/" + archive_entry_pathname(entry)).c_str());
+            (destDir + "/" + name).c_str());
 
         archive.check(archive_read_extract(archive.archive, entry, flags));
     }
