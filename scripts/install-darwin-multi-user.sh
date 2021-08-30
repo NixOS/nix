@@ -206,4 +206,8 @@ poly_prepare_to_install() {
 EOF
         setup_darwin_volume
     fi
+
+    if [ "$(diskutil info -plist /nix | xmllint --xpath "(/plist/dict/key[text()='GlobalPermissionsEnabled'])/following-sibling::*[1]" -)" = "<false/>" ]; then
+        failure "This script needs a /nix volume with global permissions! This may require running sudo diskutil enableOwnership /nix."
+    fi
 }
