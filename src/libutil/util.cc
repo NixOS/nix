@@ -1448,7 +1448,18 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
 
 static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-static std::array<char, 256> base64DecodeChars;
+/*
+  Lookup table for base64Chars. base64DecodeChars['C'] == 2, etc.
+  Precomputed on Haskell repl:
+
+    > import qualified Data.Vector as V
+    > import Data.Char(ord)
+    > let base64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    > V.update (V.replicate 256 (-1)) (V.fromList [ (ord c, i) | (c, i) <- zip base64chars [0..] ])
+ */
+static char base64DecodeChars[256] {
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,-1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+};
 
 string base64Encode(std::string_view s)
 {
@@ -1474,11 +1485,6 @@ string base64Encode(std::string_view s)
 string base64Decode(std::string_view s)
 {
     static std::once_flag flag;
-    std::call_once(flag, [](){
-        base64DecodeChars = { (char)-1 };
-        for (int i = 0; i < 64; i++)
-            base64DecodeChars[(int) base64Chars[i]] = i;
-    });
 
     string res;
     unsigned int d = 0, bits = 0;
