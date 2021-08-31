@@ -459,7 +459,7 @@ path_start
   : PATH {
     Path path(absPath($1, data->basePath));
     /* add back in the trailing '/' to the first segment */
-    if ($1[strlen($1)-1] == '/')
+    if ($1[strlen($1)-1] == '/' && strlen($1) > 1)
       path += "/";
     $$ = new ExprPath(path);
   }
