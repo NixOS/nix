@@ -218,7 +218,7 @@ public:
        referenced paths are copied to the Nix store as a side effect. */
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true,
-        bool canonizePath = true);
+        bool canonicalizePath = true);
 
     string copyPathToStore(PathSet & context, const Path & path);
 
