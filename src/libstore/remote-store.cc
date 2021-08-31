@@ -222,6 +222,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.buildCores.name);
         overrides.erase(settings.useSubstitutes.name);
         overrides.erase(loggerSettings.showTrace.name);
+        overrides.erase(settings.experimentalFeatures.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
