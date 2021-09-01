@@ -16,6 +16,7 @@
 #endif
 
 #include <queue>
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -93,6 +94,35 @@ struct CmdShell : InstallablesCommand, MixEnvironment
     void run(ref<Store> store) override
     {
         auto outPaths = toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
+
+        StorePathSet envPaths;
+        try {
+            std::vector<std::shared_ptr<Installable>> envs;
+            // Ugly and forces extra evaluation. Better way to add environment attribute to above?
+            auto flake = std::dynamic_pointer_cast<InstallableFlake>(installables.front());
+            warn(flake->flakeRef.to_string());
+            auto flakeString = flake->flakeRef.to_string();
+            auto env = parseInstallable(getEvalStore(),flakeString + "#environment."+ settings.thisSystem.get());
+            envs.push_back(env);
+
+            // TODO: this creates another eval+warning
+            envPaths = toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, envs);
+        } catch (Error & e) {
+        }
+        if (!envPaths.empty()){
+            try {
+                for (auto & path : envPaths) {
+                    auto storePath = store->printStorePath(path);
+                    std::map<std::string, std::string> json = nlohmann::json::parse(readFile(storePath));
+                    for (const auto& [key,value] :json) {
+                        // TODO: blacklist/whitelist/TrustedSettings
+                        setenv(key.c_str(),value.c_str(),1);
+                    }
+                }
+            } catch (Error & e) {
+                throw;
+            }
+        }
 
         auto accessor = store->getFSAccessor();
 
