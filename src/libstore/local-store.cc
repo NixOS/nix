@@ -1071,18 +1071,19 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
+// FIXME: move this, it's not specific to LocalStore.
 void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
         for (auto & path : paths) {
-            if (infos.find(path.first) != infos.end())
-                // choose first succeeding substituter
+            if (infos.count(path.first))
+                // Choose first succeeding substituter.
                 continue;
 
             auto subPath(path.first);
 
-            // recompute store path so that we can use a different store root
+            // Recompute store path so that we can use a different store root.
             if (path.second) {
                 subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
                 if (sub->storeDir == storeDir)
