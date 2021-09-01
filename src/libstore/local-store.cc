@@ -1076,6 +1076,10 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
     if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
         for (auto & path : paths) {
+            if (infos.find(path.first) != infos.end())
+                // choose first succeeding substituter
+                continue;
+
             auto subPath(path.first);
 
             // recompute store path so that we can use a different store root
