@@ -290,13 +290,13 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts_interpolated ind_string_parts
-%type <e> string_parts string_attr
+%type <e> path_start string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
-%token <path> PATH HPATH SPATH
+%token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
@@ -405,8 +405,11 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
-  | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
-  | HPATH { $$ = new ExprPath(getHome() + string{$1 + 1}); }
+  | path_start PATH_END { $$ = $1; }
+  | path_start string_parts_interpolated PATH_END {
+      $2->insert($2->begin(), $1);
+      $$ = new ExprConcatStrings(CUR_POS, false, $2);
+  }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
       $$ = new ExprApp(CUR_POS,
@@ -450,6 +453,20 @@ string_parts_interpolated
       $$->push_back($1);
       $$->push_back($3);
     }
+  ;
+
+path_start
+  : PATH {
+    Path path(absPath($1, data->basePath));
+    /* add back in the trailing '/' to the first segment */
+    if ($1[strlen($1)-1] == '/' && strlen($1) > 1)
+      path += "/";
+    $$ = new ExprPath(path);
+  }
+  | HPATH {
+    Path path(getHome() + string($1 + 1));
+    $$ = new ExprPath(path);
+  }
   ;
 
 ind_string_parts

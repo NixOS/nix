@@ -226,7 +226,8 @@ public:
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
-        bool coerceMore = false, bool copyToStore = true);
+        bool coerceMore = false, bool copyToStore = true,
+        bool canonicalizePath = true);
 
     string copyPathToStore(PathSet & context, const Path & path);
 

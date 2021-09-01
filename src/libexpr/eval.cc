@@ -1576,7 +1576,6 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            and none of the strings are allowed to have contexts. */
         if (first) {
             firstType = vTmp.type();
-            first = false;
         }
 
         if (firstType == nInt) {
@@ -1597,7 +1596,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else
                 throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
         } else
-            s << state.coerceToString(pos, vTmp, context, false, firstType == nString);
+            /* skip canonization of first path, which would only be not
+            canonized in the first place if it's coming from a ./${foo} type
+            path */
+            s << state.coerceToString(pos, vTmp, context, false, firstType == nString, !first);
+
+        first = false;
     }
 
     if (firstType == nInt)
@@ -1786,7 +1790,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
 }
 
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
-    bool coerceMore, bool copyToStore)
+    bool coerceMore, bool copyToStore, bool canonicalizePath)
 {
     forceValue(v, pos);
 
@@ -1798,7 +1802,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type() == nPath) {
-        Path path(canonPath(v.path));
+        Path path(canonicalizePath ? canonPath(v.path) : v.path);
         return copyToStore ? copyPathToStore(context, path) : path;
     }
 
