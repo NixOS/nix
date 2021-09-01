@@ -1,6 +1,8 @@
 #include "args.hh"
 #include "hash.hh"
 
+#include <fstream>
+#include <string>
 #include <regex>
 #include <glob.h>
 
@@ -93,14 +95,17 @@ void Args::parseCmdline(const std::string & programName, const Strings & _cmdlin
     if (isNixCommand && cmdline.size() > 0) {
         auto script = *cmdline.begin();
         try {
-            auto lines = tokenizeString<Strings>(readFile(script), "\n");
-            if (std::regex_search(lines.front(), std::regex("^#!"))) {
-                lines.pop_front();
+            std::ifstream stream(script);
+            char shebang[3]={0,0,0};
+            stream.get(shebang,3);
+            if (strncmp(shebang,"#!",2) == 0){
                 for (auto pos = std::next(cmdline.begin()); pos != cmdline.end();pos++)
                     savedArgs.push_back(*pos);
                 cmdline.clear();
 
-                for (auto line : lines) {
+                std::string line;
+                std::getline(stream,line);
+                while (std::getline(stream,line) && !line.empty()){
                     line = chomp(line);
 
                     std::smatch match;
