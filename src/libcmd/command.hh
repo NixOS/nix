@@ -108,6 +108,8 @@ enum class Realise {
        exists. */
     Derivation,
     /* Evaluate in dry-run mode. Postcondition: nothing. */
+    // FIXME: currently unused, but could be revived if we can
+    // evaluate derivations in-memory.
     Nothing
 };
 
