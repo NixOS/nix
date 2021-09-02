@@ -566,7 +566,7 @@ void DerivationGoal::tryToBuild()
                 lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
             else
                 lockFiles.insert(
-                    worker.store.Store::toRealPath(drvPath) + "!" + i.first
+                    worker.store.Store::toRealPath(drvPath) + "." + i.first
                 );
         }
     }
