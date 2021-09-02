@@ -775,6 +775,10 @@ git -C $flakeFollowsA add flake.nix
 nix flake lock $flakeFollowsA 2>&1 | grep 'this is a security violation'
 
 # Test flake in store does not evaluate
+rm -rf $badFlakeDir
 mkdir $badFlakeDir
 echo INVALID > $badFlakeDir/flake.nix
 nix store delete $(nix store add-path $badFlakeDir)
+
+[[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
+[[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
