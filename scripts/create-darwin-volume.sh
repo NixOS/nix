@@ -715,7 +715,8 @@ create_volume() {
     # 6) getting special w/ awk may be fragile, but doing it to:
     #    - save time over running slow diskutil commands
     #    - skirt risk we grab wrong volume if multiple match
-    /usr/sbin/diskutil apfs addVolume "$NIX_VOLUME_USE_DISK" "$NIX_VOLUME_FS" "$NIX_VOLUME_LABEL" -nomount | /usr/bin/awk '/Created new APFS Volume/ {print $5}'
+    _sudo "to create a new APFS volume '$NIX_VOLUME_LABEL' on $NIX_VOLUME_USE_DISK" \
+        /usr/sbin/diskutil apfs addVolume "$NIX_VOLUME_USE_DISK" "$NIX_VOLUME_FS" "$NIX_VOLUME_LABEL" -nomount | /usr/bin/awk '/Created new APFS Volume/ {print $5}'
 }
 
 volume_uuid_from_special() {
@@ -738,7 +739,6 @@ await_volume() {
 setup_volume() {
     local use_special use_uuid profile_packages
     task "Creating a Nix volume" >&2
-    # DOING: I'm tempted to wrap this call in a grep to get the new disk special without doing anything too complex, but this sudo wrapper *is* a little complex, so it'll be a PITA unless maybe we can skip sudo on this. Let's just try it without.
 
     use_special="${NIX_VOLUME_USE_SPECIAL:-$(create_volume)}"
 
@@ -760,7 +760,8 @@ setup_volume() {
     await_volume
 
     if [ "$(/usr/sbin/diskutil info -plist "$NIX_ROOT" | xmllint --xpath "(/plist/dict/key[text()='GlobalPermissionsEnabled'])/following-sibling::*[1]" -)" = "<false/>" ]; then
-        sudo /usr/sbin/diskutil enableOwnership "$NIX_ROOT"
+        _sudo "to set enableOwnership (enabling users to own files)" \
+            /usr/sbin/diskutil enableOwnership "$NIX_ROOT"
     fi
 
     # TODO: below is a vague kludge for now; I just don't know
