@@ -686,7 +686,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
         lockFlake(state, flakeRef,
             LockFlags {
                 .updateLockFile = false,
-                .useRegistries = !evalSettings.pureEval && !settings.useRegistries,
+                .useRegistries = !evalSettings.pureEval && settings.useRegistries,
                 .allowMutable  = !evalSettings.pureEval,
             }),
         v);
