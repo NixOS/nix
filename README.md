@@ -33,4 +33,4 @@ build nix from source with nix-build or how to get a development environment.
 
 ## License
 
-Nix is released under the [LGPL v2.1](./COPYING).
+Nix is licensed under the [GNU Lesser General Public License v2.1 or later](./COPYING).
