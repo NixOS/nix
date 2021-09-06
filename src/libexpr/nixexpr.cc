@@ -105,7 +105,7 @@ void ExprAttrs::show(std::ostream & str) const
     str << "{ ";
     for (auto & i : attrs)
         if (i.second.inherited)
-            str << "inherit " << i.first << " " << "; ";
+            str << "inherit " << i.first << "; ";
         else
             str << i.first << " = " << *i.second.e << "; ";
     for (auto & i : dynamicAttrs)
@@ -211,7 +211,7 @@ string showAttrPath(const AttrPath & attrPath)
         if (i.symbol.set())
             out << i.symbol;
         else
-            out << "\"${" << *i.expr << "}\"";
+            out << "${" << *i.expr << "}";
     }
     return out.str();
 }
