@@ -1896,8 +1896,18 @@ static void preloadNSS() {
     std::call_once(dns_resolve_flag, []() {
         struct addrinfo *res = NULL;
 
-        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) != 0) {
+        /* nss will only force the "local" (not through nscd) dns resolution if its on the LOCALDOMAIN.
+           We need the resolution to be done locally, as nscd socket will not be accessible in the
+           sandbox. */
+        char * previous_env = getenv("LOCALDOMAIN");
+        setenv("LOCALDOMAIN", "invalid", 1);
+        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) == 0) {
             if (res) freeaddrinfo(res);
+        }
+        if (previous_env) {
+             setenv("LOCALDOMAIN", previous_env, 1);
+        } else {
+             unsetenv("LOCALDOMAIN");
         }
     });
 }
