@@ -1,9 +1,11 @@
+#include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"
 #include "legacy.hh"
 #include "fetchers.hh"
+#include "util.hh"
 
 #include <fcntl.h>
 #include <regex>
@@ -166,7 +168,7 @@ static int main_nix_channel(int argc, char ** argv)
         nixDefExpr = home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
-        profile = fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName());
+        profile = profilesDir() + "/channels";
 
         enum {
             cNone,

@@ -630,9 +630,6 @@ public:
         return toRealPath(printStorePath(storePath));
     }
 
-    virtual void createUser(const std::string & userName, uid_t userId)
-    { }
-
     /*
      * Synchronises the options of the client with those of the daemon
      * (a no-op when there’s no daemon)

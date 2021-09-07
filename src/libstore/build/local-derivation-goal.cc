@@ -1394,7 +1394,7 @@ void LocalDerivationGoal::startDaemon()
                 try {
                     daemon::processConnection(store, from, to,
                         daemon::NotTrusted, daemon::Recursive,
-                        [&](Store & store) { store.createUser("nobody", 65535); });
+                        [&](Store & store) {});
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
