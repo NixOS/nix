@@ -34,7 +34,6 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <fcntl.h>
-#include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
@@ -45,7 +44,6 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-#include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
@@ -1886,32 +1884,6 @@ PathSet DerivationGoal::exportReferences(PathSet storePaths)
     return paths;
 }
 
-static std::once_flag dns_resolve_flag;
-
-static void preloadNSS() {
-    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
-       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
-       load its lookup libraries in the parent before any child gets a chance to. */
-    std::call_once(dns_resolve_flag, []() {
-        struct addrinfo *res = NULL;
-
-        /* nss will only force the "local" (not through nscd) dns resolution if its on the LOCALDOMAIN.
-           We need the resolution to be done locally, as nscd socket will not be accessible in the
-           sandbox. */
-        char * previous_env = getenv("LOCALDOMAIN");
-        setenv("LOCALDOMAIN", "invalid", 1);
-        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) == 0) {
-            if (res) freeaddrinfo(res);
-        }
-        if (previous_env) {
-             setenv("LOCALDOMAIN", previous_env, 1);
-        } else {
-             unsetenv("LOCALDOMAIN");
-        }
-    });
-}
-
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
@@ -1922,9 +1894,6 @@ void DerivationGoal::startBuilder()
             drvPath,
             settings.thisSystem,
             concatStringsSep(", ", settings.systemFeatures));
-
-    if (drv->isBuiltin())
-        preloadNSS();
 
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
