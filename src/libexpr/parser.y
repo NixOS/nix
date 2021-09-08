@@ -146,7 +146,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
-static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Expr *> & es)
+static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Expr *> & es, bool openNewLine)
 {
     if (es.empty()) return new ExprString(symbols.create(""));
 
@@ -156,8 +156,8 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     size_t minIndent = 1000000;
     size_t curIndent = 0;
-    for (auto & i : es) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
+    for (size_t n = 0; n < es.size(); ++n) {
+        ExprIndStr * e = dynamic_cast<ExprIndStr *>(es[n]);
         if (!e) {
             /* Anti-quotations end the current start-of-line whitespace. */
             if (atStartOfLine) {
@@ -166,6 +166,11 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
             }
             continue;
         }
+
+        if (!openNewLine && n == 0 && e->s[0] == ' ')
+            printError("space just after '' at %1%", pos);
+
+        char prevchar = 0;
         for (size_t j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
                 if (e->s[j] == ' ')
@@ -179,9 +184,13 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
                     if (curIndent < minIndent) minIndent = curIndent;
                 }
             } else if (e->s[j] == '\n') {
+                if (prevchar == ' ')
+                   printError("space at the end of line at %1%", pos);
+
                 atStartOfLine = true;
                 curIndent = 0;
             }
+            prevchar = e->s[j];
         }
     }
 
@@ -290,7 +299,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
-%token IND_STRING_OPEN IND_STRING_CLOSE
+%token IND_STRING_OPEN IND_STRING_OPEN_NEWLINE IND_STRING_CLOSE
 %token ELLIPSIS
 
 %right IMPL
@@ -391,7 +400,10 @@ expr_simple
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(CUR_POS, data->symbols, *$2);
+      $$ = stripIndentation(CUR_POS, data->symbols, *$2, false);
+  }
+  | IND_STRING_OPEN_NEWLINE ind_string_parts IND_STRING_CLOSE {
+      $$ = stripIndentation(CUR_POS, data->symbols, *$2, true);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | HPATH { $$ = new ExprPath(getHome() + string{$1 + 1}); }
