@@ -121,7 +121,8 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length, 
             else if (c == 'r') t += '\r';
             else if (c == 't') t += '\t';
             else if (c == '\\') t += '\\';
-            else if (c == '"') t += '\"';
+            else if (c == '"') t += '"';
+            else if (c == '$') t += '$';
             else {
                 if (!utf.update(c, data, yylloc))
                      throw ParseError("unicode char after \\ in single quoted string \"%s\" at %s", c, s0, CUR_POS);
