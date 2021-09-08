@@ -4,6 +4,7 @@
 #include "finally.hh"
 #include "serialise.hh"
 
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <climits>
