@@ -17,10 +17,7 @@
 #include <regex>
 #include <queue>
 
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/un.h>
-#include <netdb.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -34,7 +31,6 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-#include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
@@ -344,23 +340,6 @@ int childEntry(void * arg)
 }
 
 
-static std::once_flag dns_resolve_flag;
-
-static void preloadNSS() {
-    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
-       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
-       load its lookup libraries in the parent before any child gets a chance to. */
-    std::call_once(dns_resolve_flag, []() {
-        struct addrinfo *res = NULL;
-
-        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) != 0) {
-            if (res) freeaddrinfo(res);
-        }
-    });
-}
-
-
 static void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
@@ -388,9 +367,6 @@ void LocalDerivationGoal::startBuilder()
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
             concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
-
-    if (drv->isBuiltin())
-        preloadNSS();
 
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
