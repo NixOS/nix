@@ -225,15 +225,18 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-BuiltPaths build(ref<Store> evalStore, ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
+BuiltPaths build(
+    ref<Store> evalStore,
+    ref<Store> store, Realise mode,
+    const std::vector<std::shared_ptr<Installable>> & installables,
+    BuildMode bMode = bmNormal);
 
 std::set<StorePath> toStorePaths(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables);
+    const std::vector<std::shared_ptr<Installable>> & installables);
 
 StorePath toStorePath(
     ref<Store> evalStore,
@@ -242,8 +245,9 @@ StorePath toStorePath(
     OperateOn operateOn,
     std::shared_ptr<Installable> installable);
 
-std::set<StorePath> toDerivations(ref<Store> store,
-    std::vector<std::shared_ptr<Installable>> installables,
+std::set<StorePath> toDerivations(
+    ref<Store> store,
+    const std::vector<std::shared_ptr<Installable>> & installables,
     bool useDeriver = false);
 
 BuiltPaths toBuiltPaths(
@@ -251,7 +255,7 @@ BuiltPaths toBuiltPaths(
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables);
+    const std::vector<std::shared_ptr<Installable>> & installables);
 
 /* Helper function to generate args that invoke $EDITOR on
    filename:lineno. */
