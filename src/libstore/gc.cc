@@ -17,27 +17,38 @@
 #include <unistd.h>
 #include <climits>
 
-#if __linux__
-#include <sys/syscall.h>
-
-enum {
-    IOPRIO_WHO_PROCESS = 1,
-    IOPRIO_WHO_PGRP,
-    IOPRIO_WHO_USER
-};
-
-enum {
-    IOPRIO_CLASS_NONE,
-    IOPRIO_CLASS_RT,
-    IOPRIO_CLASS_BE,
-    IOPRIO_CLASS_IDLE
-};
-
-#define IOPRIO_CLASS_SHIFT 13
-#endif
-
 
 namespace nix {
+
+struct IoNice {
+    enum {
+        IOPRIO_WHO_PROCESS = 1,
+        IOPRIO_WHO_PGRP,
+        IOPRIO_WHO_USER
+    };
+    enum {
+        IOPRIO_CLASS_NONE,
+        IOPRIO_CLASS_RT,
+        IOPRIO_CLASS_BE,
+        IOPRIO_CLASS_IDLE
+    };
+
+    enum {
+        IOPRIO_CLASS_SHIFT = 13
+    };
+    IoNice(int cl) {
+#if __linux__
+        if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, cl << IOPRIO_CLASS_SHIFT))
+            throw SysError("collectGarbage: ionice to idle");
+#endif
+    }
+    ~IoNice() {
+#if __linux__
+        if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, IOPRIO_CLASS_NONE << IOPRIO_CLASS_SHIFT))
+            throw SysError("collectGarbage: ionice back to normal");
+#endif
+    }
+};
 
 
 static string gcLockName = "gc.lock";
@@ -751,15 +762,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     state.shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
 
+    IoNice _(IoNice::IOPRIO_CLASS_IDLE);
+    
     if (state.shouldDelete)
         deletePath(reservedPath);
 
-#if __linux__
-    if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, IOPRIO_CLASS_IDLE << IOPRIO_CLASS_SHIFT))
-        throw SysError("collectGarbage: ionice to idle");
-
-    try {
-#endif
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
@@ -887,12 +894,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* While we're at it, vacuum the database. */
     //if (options.action == GCOptions::gcDeleteDead) vacuumDB();
-#if __linux__
-    } catch (...) {
-        if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, 0))
-            throw SysError("collectGarbage: ionice back to normal");
-    }
-#endif
 }
 
 
