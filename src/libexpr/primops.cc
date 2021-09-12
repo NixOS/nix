@@ -414,7 +414,7 @@ static RegisterPrimOp primop_isNull({
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
       > **Warning**
-      > 
+      >
       > This function is *deprecated*; just write `e == null` instead.
     )",
     .fun = prim_isNull,
@@ -532,7 +532,7 @@ struct CompareValues
             case nFloat:
                 return v1->fpoint < v2->fpoint;
             case nString:
-                return strcmp(v1->string.s, v2->string.s) < 0;
+                return (*v1->string.s).compare(*v2->string.s);
             case nPath:
                 return strcmp(v1->path, v2->path) < 0;
             default:
@@ -1422,8 +1422,8 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
         });
     }
     string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
-    if (s.find((char) 0) != string::npos)
-        throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
+    //if (s.find((char) 0) != string::npos)
+    //    throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     mkString(v, s.c_str());
 }
 
@@ -2052,7 +2052,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
         mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+              [](Value * v1, Value * v2) { return (*v1->string.s).compare(*v2->string.s) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2188,7 +2188,7 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     std::set<Symbol> names;
     for (unsigned int i = 0; i < args[1]->listSize(); ++i) {
         state.forceStringNoCtx(*args[1]->listElems()[i], pos);
-        names.insert(state.symbols.create(args[1]->listElems()[i]->string.s));
+        names.insert(state.symbols.create(*args[1]->listElems()[i]->string.s));
     }
 
     /* Copy all attributes not in that set.  Note that we don't need
@@ -2515,7 +2515,7 @@ static RegisterPrimOp primop_tail({
       the argument isn’t a list or is an empty list.
 
       > **Warning**
-      > 
+      >
       > This function should generally be avoided since it's inefficient:
       > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
       > list by repeatedly calling `tail` takes O(n^2) time.

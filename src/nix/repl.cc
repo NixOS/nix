@@ -631,14 +631,14 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 
-std::ostream & printStringValue(std::ostream & str, const char * string) {
+std::ostream & printStringValue(std::ostream & str, const std::string & string) {
     str << "\"";
-    for (const char * i = string; *i; i++)
-        if (*i == '\"' || *i == '\\') str << "\\" << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else str << *i;
+    for (const auto & i : string)
+        if (i == '\"' || i == '\\') str << "\\" << i;
+        else if (i == '\n') str << "\\n";
+        else if (i == '\r') str << "\\r";
+        else if (i == '\t') str << "\\t";
+        else str << i;
     str << "\"";
     return str;
 }
@@ -664,7 +664,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     case nString:
         str << ANSI_YELLOW;
-        printStringValue(str, v.string.s);
+        printStringValue(str, *v.string.s);
         str << ANSI_NORMAL;
         break;
 

@@ -109,7 +109,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
         try {
             if (attr.name == sUrl) {
                 expectType(state, nString, *attr.value, *attr.pos);
-                url = attr.value->string.s;
+                url = *attr.value->string.s;
                 attrs.emplace("url", *url);
             } else if (attr.name == sFlake) {
                 expectType(state, nBool, *attr.value, *attr.pos);
@@ -118,11 +118,11 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, *attr.pos);
-                input.follows = parseInputPath(attr.value->string.s);
+                input.follows = parseInputPath(*attr.value->string.s);
             } else {
                 switch (attr.value->type()) {
                     case nString:
-                        attrs.emplace(attr.name, attr.value->string.s);
+                        attrs.emplace(attr.name, *attr.value->string.s);
                         break;
                     case nBool:
                         attrs.emplace(attr.name, Explicit<bool> { attr.value->boolean });
@@ -212,7 +212,7 @@ static Flake getFlake(
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, *description->pos);
-        flake.description = description->value->string.s;
+        flake.description = *description->value->string.s;
     }
 
     auto sInputs = state.symbols.create("inputs");

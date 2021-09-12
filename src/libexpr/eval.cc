@@ -86,13 +86,13 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         break;
     case tString:
         str << "\"";
-        for (const char * i = v.string.s; *i; i++)
-            if (*i == '\"' || *i == '\\') str << "\\" << *i;
-            else if (*i == '\n') str << "\\n";
-            else if (*i == '\r') str << "\\r";
-            else if (*i == '\t') str << "\\t";
-            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
-            else str << *i;
+        for (const char & i : *v.string.s)
+            if (i == '\"' || i == '\\') str << "\\" << i;
+            else if (i == '\n') str << "\\n";
+            else if (i == '\r') str << "\\r";
+            else if (i == '\t') str << "\\t";
+            else if (i == '$' && *(&i+1) == '{') str << "\\" << i;
+            else str << i;
         str << "\"";
         break;
     case tPath:
@@ -267,7 +267,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
         Value nameValue;
         name.expr->eval(state, env, nameValue);
         state.forceStringNoCtx(nameValue);
-        return state.symbols.create(nameValue.string.s);
+        return state.symbols.create(*nameValue.string.s);
     }
 }
 
@@ -1059,7 +1059,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (nameVal.type() == nNull)
             continue;
         state.forceStringNoCtx(nameVal);
-        Symbol nameSym = state.symbols.create(nameVal.string.s);
+        Symbol nameSym = state.symbols.create(*nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
             throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos);
@@ -1695,7 +1695,7 @@ string EvalState::forceString(Value & v, const Pos & pos)
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
-    return string(v.string.s);
+    return *v.string.s;
 }
 
 
@@ -1744,10 +1744,10 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0]);
+                *v.string.s, v.string.context[0]);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0]);
+                *v.string.s, v.string.context[0]);
     }
     return s;
 }
@@ -1760,7 +1760,7 @@ bool EvalState::isDerivation(Value & v)
     if (i == v.attrs->end()) return false;
     forceValue(*i->value);
     if (i->value->type() != nString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    return *i->value->string.s == "derivation";
 }
 
 
@@ -1786,7 +1786,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
     if (v.type() == nString) {
         copyContext(v, context);
-        return v.string.s;
+        return *v.string.s;
     }
 
     if (v.type() == nPath) {
@@ -1895,7 +1895,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return v1.boolean == v2.boolean;
 
         case nString:
-            return strcmp(v1.string.s, v2.string.s) == 0;
+            return *v1.string.s == *v2.string.s;
 
         case nPath:
             return strcmp(v1.path, v2.path) == 0;

@@ -154,7 +154,7 @@ public:
 
            For canonicity, the store paths should be in sorted order. */
         struct {
-            const char * s;
+            const std::string * s;
             const char * * context; // must be in sorted order
         } string;
 
@@ -225,10 +225,10 @@ public:
         boolean = b;
     }
 
-    inline void mkString(const char * s, const char * * context = 0)
+    inline void mkString(const std::string & s, const char * * context = 0)
     {
         internalType = tString;
-        string.s = s;
+        string.s = &s;
         string.context = context;
     }
 
@@ -381,7 +381,7 @@ static inline void mkApp(Value & v, Value & left, Value & right)
 
 static inline void mkString(Value & v, const Symbol & s)
 {
-    v.mkString(((const string &) s).c_str());
+    v.mkString((const string &) s);
 }
 
 

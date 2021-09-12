@@ -84,7 +84,7 @@ struct CmdEval : MixJSON, InstallableCommand
                 state->forceValue(v);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
-                    writeFile(path, v.string.s);
+                    writeFile(path, *v.string.s);
                 else if (v.type() == nAttrs) {
                     if (mkdir(path.c_str(), 0777) == -1)
                         throw SysError("creating directory '%s'", path);

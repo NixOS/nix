@@ -5,25 +5,6 @@
 
 namespace nix {
 
-void toJSON(std::ostream & str, const char * start, const char * end)
-{
-    str << '"';
-    for (auto i = start; i != end; i++)
-        if (*i == '\"' || *i == '\\') str << '\\' << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else if (*i >= 0 && *i < 32)
-            str << "\\u" << std::setfill('0') << std::setw(4) << std::hex << (uint16_t) *i << std::dec;
-        else str << *i;
-    str << '"';
-}
-
-void toJSON(std::ostream & str, const char * s)
-{
-    if (!s) str << "null"; else toJSON(str, s, s + strlen(s));
-}
-
 template<> void toJSON<int>(std::ostream & str, const int & n) { str << n; }
 template<> void toJSON<unsigned int>(std::ostream & str, const unsigned int & n) { str << n; }
 template<> void toJSON<long>(std::ostream & str, const long & n) { str << n; }
@@ -35,7 +16,26 @@ template<> void toJSON<double>(std::ostream & str, const double & n) { str << n;
 
 template<> void toJSON<std::string>(std::ostream & str, const std::string & s)
 {
-    toJSON(str, s.c_str(), s.c_str() + s.size());
+    str << '"';
+    for (const char & i : s)
+        if (i == '\"' || i == '\\') str << '\\' << i;
+        else if (i == '\n') str << "\\n";
+        else if (i == '\r') str << "\\r";
+        else if (i == '\t') str << "\\t";
+        else if (i >= 0 && i < 32)
+            str << "\\u" << std::setfill('0') << std::setw(4) << std::hex << (uint16_t) i << std::dec;
+        else str << i;
+    str << '"';
+}
+
+void toJSON(std::ostream & str, const char * s)
+{
+    if (!s) str << "null"; else toJSON(str, std::string(s));
+}
+
+void toJSON(std::ostream & str, const std::string * s)
+{
+    if (!s) str << "null"; else toJSON<std::string>(str, *s);
 }
 
 template<> void toJSON<bool>(std::ostream & str, const bool & b)

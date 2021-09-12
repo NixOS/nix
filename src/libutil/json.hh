@@ -6,7 +6,7 @@
 
 namespace nix {
 
-void toJSON(std::ostream & str, const char * start, const char * end);
+void toJSON(std::ostream & str, const std::string * s);
 void toJSON(std::ostream & str, const char * s);
 
 template<typename T>

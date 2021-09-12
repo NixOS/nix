@@ -71,7 +71,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
         case nString:
             /* !!! show the context? */
             copyContext(v, context);
-            doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
+            doc.writeEmptyElement("string", singletonAttrs("value", *v.string.s));
             break;
 
         case nPath:
@@ -93,14 +93,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
                     if (a->value->type() == nString)
-                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
+                        xmlAttrs["drvPath"] = drvPath = *a->value->string.s;
                 }
 
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
                     if (a->value->type() == nString)
-                        xmlAttrs["outPath"] = a->value->string.s;
+                        xmlAttrs["outPath"] = *a->value->string.s;
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);

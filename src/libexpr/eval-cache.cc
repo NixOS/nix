@@ -391,8 +391,8 @@ Value & AttrCursor::forceValue()
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
-                           string_t{v.string.s, {}}};
+            cachedValue = {root->db->setString(getKey(), *v.string.s, v.string.context),
+                           string_t{*v.string.s, {}}};
         else if (v.type() == nPath)
             cachedValue = {root->db->setString(getKey(), v.path), string_t{v.path, {}}};
         else if (v.type() == nBool)
@@ -515,7 +515,7 @@ std::string AttrCursor::getString()
     if (v.type() != nString && v.type() != nPath)
         throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
 
-    return v.type() == nString ? v.string.s : v.path;
+    return v.type() == nString ? *v.string.s : v.path;
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -544,7 +544,7 @@ string_t AttrCursor::getStringWithContext()
     auto & v = forceValue();
 
     if (v.type() == nString)
-        return {v.string.s, v.getContext()};
+        return {*v.string.s, v.getContext()};
     else if (v.type() == nPath)
         return {v.path, {}};
     else
