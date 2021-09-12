@@ -1034,6 +1034,19 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
+// return true if the programmed returned ok, false otherwise
+bool getProgramStatus(Path program, bool searchPath, const Strings & args,
+    const std::optional<std::string> & input)
+{
+    RunOptions opts(program, args);
+    opts.searchPath = searchPath;
+    opts.input = input;
+
+    auto res = runProgram(opts);
+
+    return statusOk(res.first);
+}
+
 // Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)

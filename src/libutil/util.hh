@@ -267,6 +267,11 @@ struct ProcessOptions
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
 
+/* Run a program and return true if the exit code doesn't expresse an error,
+    false otherwise */
+bool getProgramStatus(Path program, bool searchPath = false,
+    const Strings & args = Strings(),
+    const std::optional<std::string> & input = {});
 
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */

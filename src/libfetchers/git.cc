@@ -47,6 +47,8 @@ struct GitInputScheme : InputScheme
                 attrs.emplace(name, value);
             else if (name == "shallow")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
+            else if (name == "largeFileSystem")
+                attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
         }
@@ -61,13 +63,14 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "largeFileSystem")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");
+        maybeGetBoolAttr(attrs, "largeFileSystem");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
             if (std::regex_search(*ref, badGitRefRegex))
@@ -175,11 +178,13 @@ struct GitInputScheme : InputScheme
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
         bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(true);
         bool allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
+        bool largeFileSystem = maybeGetBoolAttr(input.attrs, "largeFileSystem").value_or(false);
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
+        if (largeFileSystem) cacheType += "-lfs";
 
         auto getImmutableAttrs = [&]()
         {
@@ -362,20 +367,21 @@ struct GitInputScheme : InputScheme
                 }
             }
 
+            auto ref = input.getRef();
+            auto fetchRef = allRefs
+                ? "refs/*"
+                : ref->compare(0, 5, "refs/") == 0
+                    ? *ref
+                    : ref == "HEAD"
+                        ? *ref
+                        : "refs/heads/" + *ref;
+
             if (doFetch) {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", actualUrl));
 
                 // FIXME: git stderr messes up our progress indicator, so
                 // we're using --quiet for now. Should process its stderr.
                 try {
-                    auto ref = input.getRef();
-                    auto fetchRef = allRefs
-                        ? "refs/*"
-                        : ref->compare(0, 5, "refs/") == 0
-                            ? *ref
-                            : ref == "HEAD"
-                                ? *ref
-                                : "refs/heads/" + *ref;
                     runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
@@ -391,9 +397,19 @@ struct GitInputScheme : InputScheme
                 utimes(localRefFile.c_str(), times);
             }
 
+            // don't know how to check if the lfs was cloned up to the end, so fetch it all the time (if enabled, which should be uncommon)
+            if (largeFileSystem) {
+                if (getProgramStatus("git", true, { "-C", repoDir, "remote", "get-url", "nix_fetcher_remote_for_lfs"})) {
+                    runProgram("git", true, { "-C", repoDir, "remote", "remove", "nix_fetcher_remote_for_lfs"});
+                }
+                runProgram("git", true, { "-C", repoDir, "remote", "add", "nix_fetcher_remote_for_lfs", actualUrl});
+                runProgram("git", true, { "-C", repoDir, "lfs", "fetch", "nix_fetcher_remote_for_lfs", fetchRef});
+            }
+            
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
         }
+
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
@@ -445,8 +461,14 @@ struct GitInputScheme : InputScheme
             // everything to ensure we get the rev.
             runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                                       "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
-
+            if (largeFileSystem) {
+                runProgram("git", true, { "-C", tmpDir, "remote", "add", "local", repoDir});
+                runProgram("git", true, { "-C", tmpDir, "lfs", "fetch", "local", input.getRev()->gitRev()});
+            }
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
+            if (largeFileSystem) {
+                runProgram("git", true, { "-C", tmpDir, "lfs", "checkout"});
+            }
             runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
             runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
