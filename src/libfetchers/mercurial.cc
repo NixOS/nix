@@ -13,30 +13,31 @@ namespace nix::fetchers {
 
 namespace {
 
-RunOptions hgOptions(const Strings & args) {
-	RunOptions opts("hg", args);
-	opts.searchPath = true;
+RunOptions hgOptions(const Strings & args)
+{
+    RunOptions opts("hg", args);
+    opts.searchPath = true;
 
-	auto env = getEnv();
-	// Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
-	env["HGPLAIN"] = "";
-	opts.environment = env;
+    auto env = getEnv();
+    // Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
+    env["HGPLAIN"] = "";
+    opts.environment = env;
 
-	return opts;
+    return opts;
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.
 string runHg(const Strings & args, const std::optional<std::string> & input = {})
 {
-	RunOptions opts = hgOptions(args);
-	opts.input = input;
+    RunOptions opts = hgOptions(args);
+    opts.input = input;
 
-	auto res = runProgram(opts);
+    auto res = runProgram(opts);
 
-	if (!statusOk(res.first))
-		throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
+    if (!statusOk(res.first))
+        throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
 
-	return res.second;
+    return res.second;
 }
 
 }
