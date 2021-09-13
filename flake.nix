@@ -2,7 +2,7 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-21.05-small";
-  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_6"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
 
@@ -350,7 +350,7 @@
         };
 
         lowdown = with final; stdenv.mkDerivation rec {
-          name = "lowdown-0.8.4";
+          name = "lowdown-0.8.6";
 
           /*
           src = fetchurl {
