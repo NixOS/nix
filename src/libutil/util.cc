@@ -1034,17 +1034,10 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
-    RunOptions opts(program, args);
-    opts.searchPath = searchPath;
-    // This allows you to refer to a program with a pathname relative to the
-    // PATH variable.
-    opts.input = input;
-
-    auto res = runProgram(opts);
+    auto res = runProgram({.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
@@ -1053,9 +1046,8 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 }
 
 // Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(const RunOptions & options_)
+std::pair<int, std::string> runProgram(RunOptions && options)
 {
-    RunOptions options(options_);
     StringSink sink;
     options.standardOut = &sink;
 

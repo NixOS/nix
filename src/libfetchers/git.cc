@@ -413,17 +413,14 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        RunOptions checkCommitOpts(
-            "git",
-            { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() }
-        );
-        checkCommitOpts.searchPath = true;
-        checkCommitOpts.mergeStderrToStdout = true;
-
-        auto result = runProgram(checkCommitOpts);
+        auto result = runProgram({
+            .program = "git",
+            .args = { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() },
+            .mergeStderrToStdout = true
+        });
         if (WEXITSTATUS(result.first) == 128
-            && result.second.find("bad file") != std::string::npos
-        ) {
+            && result.second.find("bad file") != std::string::npos)
+        {
             throw Error(
                 "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
                     "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
@@ -455,9 +452,11 @@ struct GitInputScheme : InputScheme
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getRev()->gitRev() });
-                gitOptions.standardOut = &sink;
-                runProgram2(gitOptions);
+                runProgram2({
+                    .program = "git",
+                    .args = { "-C", repoDir, "archive", input.getRev()->gitRev() },
+                    .standardOut = &sink
+                });
             });
 
             unpackTarfile(*source, tmpDir);

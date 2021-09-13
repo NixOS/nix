@@ -110,11 +110,13 @@ string runNix(Path program, const Strings & args,
 {
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-    RunOptions opts(settings.nixBinDir+ "/" + program, args);
-    opts.input = input;
-    opts.environment = subprocessEnv;
 
-    auto res = runProgram(opts);
+    auto res = runProgram({
+        .program = settings.nixBinDir+ "/" + program,
+        .args = args,
+        .environment = subprocessEnv,
+        .input = input,
+    });
 
     if (!statusOk(res.first))
         throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
