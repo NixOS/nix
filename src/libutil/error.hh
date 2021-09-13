@@ -100,6 +100,12 @@ struct ErrPos {
     }
 };
 
+std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
+void printCodeLines(std::ostream & out,
+    const string & prefix,
+    const ErrPos & errPos,
+    const LinesOfCode & loc);
+
 struct Trace {
     std::optional<ErrPos> pos;
     hintformat hint;

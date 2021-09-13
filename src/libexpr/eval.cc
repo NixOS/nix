@@ -648,13 +648,11 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 // LocalNoInline(valmap * mapBindings(Bindings &b))
 // {
 //     auto map = new valmap();
-
 //     for (auto i = b.begin(); i != b.end(); ++i)
 //     {
 //         std::string s = i->name;
 //         (*map)[s] = i->value;
 //     }
-
 //     return map;
 // }
 
@@ -668,11 +666,12 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 //     }
 // }
 
-
 void printEnvBindings(const Env &env, int lv )
 {
+  std::cout << "env " << lv << " type: " << env.type << std::endl;
   if (env.values[0]->type() == nAttrs) {
     Bindings::iterator j = env.values[0]->attrs->begin();
+
 
     while (j != env.values[0]->attrs->end()) {
         std::cout << lv << " env binding: " << j->name << std::endl;
@@ -690,6 +689,33 @@ void printEnvBindings(const Env &env, int lv )
   }
 }
 
+void printEnvPosChain(const Env &env, int lv )
+{
+  std::cout << "printEnvPosChain " << lv << std::endl;
+
+  std::cout << "env" << env.values[0] << std::endl;
+
+  if (env.values[0] && env.values[0]->type() == nAttrs) {
+    std::cout << "im in the loop" << std::endl;
+    std::cout << "pos " << env.values[0]->attrs->pos << std::endl;
+    if (env.values[0]->attrs->pos) {
+      ErrPos ep(*env.values[0]->attrs->pos);
+      auto loc = getCodeLines(ep);
+      if (loc)
+        printCodeLines(std::cout,
+              std::__cxx11::to_string(lv),
+              ep,
+              *loc);
+    }
+  }
+
+  std::cout << "next env : " << env.up << std::endl;
+  
+  if (env.up) {
+    printEnvPosChain(*env.up, ++lv);
+  }
+}
+
 void mapEnvBindings(const Env &env, valmap & vm)
 {
   // add bindings for the next level up first.
@@ -699,7 +725,7 @@ void mapEnvBindings(const Env &env, valmap & vm)
 
   // merge - and write over - higher level bindings.
   // note; skipping HasWithExpr that haven't been evaled yet.
-  if (env.values[0]->type() == nAttrs) {
+  if (env.values[0] && env.values[0]->type() == nAttrs) {
     auto map = valmap();
 
     Bindings::iterator j = env.values[0]->attrs->begin();
