@@ -707,7 +707,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nString:
-        str << ANSI_YELLOW;
+        str << ANSI_WARNING;
         printStringValue(str, v.string.s);
         str << ANSI_NORMAL;
         break;
