@@ -846,7 +846,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
-struct CmdFlakeShow : FlakeCommand
+struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
 
@@ -878,6 +878,18 @@ struct CmdFlakeShow : FlakeCommand
 
         std::function<void(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
 
+        nlohmann::json j;
+        // Populate json attributes along `attrPath` with a leaf value of `name`
+        auto populateJson = [&](const std::vector<Symbol> & attrPath, const std::string name)
+        {
+            nlohmann::json* r = & j;
+            for (const auto & element : attrPath){
+                (*r)[element] = (*r)[element].is_null() ? nlohmann::json({}) : (*r)[element];
+                r = & (*r)[element];
+            }
+            (*r) = name;
+        };
+
         visit = [&](eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)
         {
             Activity act(*logger, lvlInfo, actUnknown,
@@ -885,7 +897,9 @@ struct CmdFlakeShow : FlakeCommand
             try {
                 auto recurse = [&]()
                 {
-                    logger->cout("%s", headerPrefix);
+                    if (!json){
+                        logger->cout("%s", headerPrefix);
+                    }
                     auto attrs = visitor.getAttrs();
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         bool last = i + 1 == attrs.size();
@@ -910,15 +924,18 @@ struct CmdFlakeShow : FlakeCommand
                             description = aDescription->getString();
                     }
                     */
-
-                    logger->cout("%s: %s '%s'",
-                        headerPrefix,
-                        attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
-                        attrPath.size() >= 2 && attrPath[0] == "devShells" ? "development environment" :
-                        attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
-                        attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
-                        "package",
-                        name);
+                    if (json){
+                        populateJson(attrPath,name);
+                    } else {
+                        logger->cout("%s: %s '%s'",
+                            headerPrefix,
+                            attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
+                            attrPath.size() >= 2 && attrPath[0] == "devShells" ? "development environment" :
+                            attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
+                            attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
+                            "package",
+                            name);
+                    }
                 };
 
                 if (attrPath.size() == 0
@@ -962,7 +979,7 @@ struct CmdFlakeShow : FlakeCommand
                     if (attrPath.size() == 1)
                         recurse();
                     else if (!showLegacy)
-                        logger->cout("%s: " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
+                        logger->warn(fmt("%s: " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
                     else {
                         if (visitor.isDerivation())
                             showDerivation();
@@ -979,7 +996,11 @@ struct CmdFlakeShow : FlakeCommand
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
                         throw EvalError("not an app definition");
-                    logger->cout("%s: app", headerPrefix);
+                    if(json){
+                        populateJson(attrPath,"app");
+                    } else {
+                        logger->cout("%s: app", headerPrefix);
+                    }
                 }
 
                 else if (
@@ -987,17 +1008,24 @@ struct CmdFlakeShow : FlakeCommand
                     (attrPath.size() == 2 && attrPath[0] == "templates"))
                 {
                     auto description = visitor.getAttr("description")->getString();
-                    logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
+                    if(json){
+                        populateJson(attrPath,description);
+                    } else {
+                        logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
+                    }
                 }
 
                 else {
-                    logger->cout("%s: %s",
-                        headerPrefix,
-                        (attrPath.size() == 1 && attrPath[0] == "overlay")
+                    auto description = (attrPath.size() == 1 && attrPath[0] == "overlay")
                         || (attrPath.size() == 2 && attrPath[0] == "overlays") ? "Nixpkgs overlay" :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
                         attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
-                        ANSI_WARNING "unknown" ANSI_NORMAL);
+                        "unknown";
+                    if(json){
+                        populateJson(attrPath,description);
+                    } else {
+                        logger->cout("%s: " ANSI_WARNING "%s" ANSI_NORMAL, headerPrefix, description);
+                    }
                 }
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
@@ -1008,6 +1036,9 @@ struct CmdFlakeShow : FlakeCommand
         auto cache = openEvalCache(*state, flake);
 
         visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        if(json){
+            logger->cout("%s", j.dump());
+        }
     }
 };
 
