@@ -248,7 +248,7 @@ let
         installPhase = ''
           mkdir -p $out
         '';
-        installCheckPhase = "make installcheck";
+        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORE";
       };
 
     testAgainstSelf = pkgs.lib.genAttrs systems (system:
