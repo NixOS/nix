@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <iomanip>
 
 using namespace nix;
 
@@ -528,10 +529,11 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
             if (!first) std::cout << "\n";
             first = false;
 
-            if (prevGen)
-                std::cout << fmt("Version %d -> %d:\n", prevGen->first.number, gen.number);
-            else
-                std::cout << fmt("Version %d:\n", gen.number);
+            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+                gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
+                gen.number,
+                std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
+                prevGen ? fmt(" <- %d", prevGen->first.number) : "");
 
             ProfileManifest::printDiff(
                 prevGen ? prevGen->second : ProfileManifest(),
