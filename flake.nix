@@ -178,8 +178,8 @@
         installPhase = ''
           mkdir -p $out
         '';
-        installCheckPhase = "make installcheck";
 
+        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES";
       };
 
       binaryTarball = buildPackages: nix: pkgs: let
