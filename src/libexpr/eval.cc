@@ -895,23 +895,41 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
         return;
     }
 
-    Path path2 = resolveExprPath(path);
-    if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
+    Path resolvedPath = resolveExprPath(path);
+    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
-    printTalkative("evaluating file '%1%'", path2);
+    printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    auto j = fileParseCache.find(path2);
+    auto j = fileParseCache.find(resolvedPath);
     if (j != fileParseCache.end())
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(checkSourcePath(path2));
+        e = parseExprFromFile(checkSourcePath(resolvedPath));
 
-    fileParseCache[path2] = e;
+    cacheFile(path, resolvedPath, e, v, mustBeTrivial);
+}
+
+
+void EvalState::resetFileCache()
+{
+    fileEvalCache.clear();
+    fileParseCache.clear();
+}
+
+
+void EvalState::cacheFile(
+    const Path & path,
+    const Path & resolvedPath,
+    Expr * e,
+    Value & v,
+    bool mustBeTrivial)
+{
+    fileParseCache[resolvedPath] = e;
 
     try {
         // Enforce that 'flake.nix' is a direct attrset, not a
@@ -921,19 +939,12 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
             throw EvalError("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", path2);
+        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
         throw;
     }
 
-    fileEvalCache[path2] = v;
-    if (path != path2) fileEvalCache[path] = v;
-}
-
-
-void EvalState::resetFileCache()
-{
-    fileEvalCache.clear();
-    fileParseCache.clear();
+    fileEvalCache[resolvedPath] = v;
+    if (path != resolvedPath) fileEvalCache[path] = v;
 }
 
 

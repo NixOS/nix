@@ -172,6 +172,14 @@ public:
        trivial (i.e. doesn't require arbitrary computation). */
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
+    /* Like `cacheFile`, but with an already parsed expression. */
+    void cacheFile(
+        const Path & path,
+        const Path & resolvedPath,
+        Expr * e,
+        Value & v,
+        bool mustBeTrivial = false);
+
     void resetFileCache();
 
     /* Look up a file in the search path. */
