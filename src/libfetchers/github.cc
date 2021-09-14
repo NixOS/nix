@@ -341,7 +341,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
-        Input::fromURL(fmt("git+https://git@%s/%s/%s.git",
+        Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
