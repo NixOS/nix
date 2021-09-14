@@ -91,6 +91,14 @@ protected:
               })
             , arity(1)
         { }
+
+        template<class I>
+        Handler(std::optional<I> * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+            })
+            , arity(1)
+        { }
     };
 
     /* Options. */
