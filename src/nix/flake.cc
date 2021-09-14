@@ -876,56 +876,54 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
 
-        std::function<void(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
+        std::function<nlohmann::json(
+            eval_cache::AttrCursor & visitor,
+            const std::vector<Symbol> & attrPath,
+            const std::string & headerPrefix,
+            const std::string & nextPrefix)> visit;
 
-        nlohmann::json j;
-        // Populate json attributes along `attrPath` with a leaf value of `name`
-        auto populateJson = [&](const std::vector<Symbol> & attrPath, const std::string name)
+        visit = [&](
+            eval_cache::AttrCursor & visitor,
+            const std::vector<Symbol> & attrPath,
+            const std::string & headerPrefix,
+            const std::string & nextPrefix)
+            -> nlohmann::json
         {
-            nlohmann::json* r = & j;
-            for (const auto & element : attrPath){
-                (*r)[element] = (*r)[element].is_null() ? nlohmann::json({}) : (*r)[element];
-                r = & (*r)[element];
-            }
-            (*r) = name;
-        };
+            auto j = nlohmann::json::object();
 
-        visit = [&](eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)
-        {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
             try {
                 auto recurse = [&]()
                 {
-                    if (!json){
+                    if (!json)
                         logger->cout("%s", headerPrefix);
-                    }
                     auto attrs = visitor.getAttrs();
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         bool last = i + 1 == attrs.size();
                         auto visitor2 = visitor.getAttr(attr);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*visitor2, attrPath2,
+                        auto j2 = visit(*visitor2, attrPath2,
                             fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
                             nextPrefix + (last ? treeNull : treeLine));
+                        if (json) j.emplace(attr, std::move(j2));
                     }
                 };
 
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
-
-                    /*
-                    std::string description;
-
-                    if (auto aMeta = visitor.maybeGetAttr("meta")) {
-                        if (auto aDescription = aMeta->maybeGetAttr("description"))
-                            description = aDescription->getString();
-                    }
-                    */
-                    if (json){
-                        populateJson(attrPath,name);
+                    if (json) {
+                        std::optional<std::string> description;
+                        if (auto aMeta = visitor.maybeGetAttr("meta")) {
+                            if (auto aDescription = aMeta->maybeGetAttr("description"))
+                                description = aDescription->getString();
+                        }
+                        j.emplace("type", "derivation");
+                        j.emplace("name", name);
+                        if (description)
+                            j.emplace("description", *description);
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,
@@ -996,8 +994,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
                         throw EvalError("not an app definition");
-                    if(json){
-                        populateJson(attrPath,"app");
+                    if (json) {
+                        j.emplace("type", "app");
                     } else {
                         logger->cout("%s: app", headerPrefix);
                     }
@@ -1008,21 +1006,23 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 2 && attrPath[0] == "templates"))
                 {
                     auto description = visitor.getAttr("description")->getString();
-                    if(json){
-                        populateJson(attrPath,description);
+                    if (json) {
+                        j.emplace("type", "template");
+                        j.emplace("description", description);
                     } else {
                         logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
                     }
                 }
 
                 else {
-                    auto description = (attrPath.size() == 1 && attrPath[0] == "overlay")
-                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? "Nixpkgs overlay" :
-                        attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
-                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
-                        "unknown";
-                    if(json){
-                        populateJson(attrPath,description);
+                    auto [type, description] =
+                        (attrPath.size() == 1 && attrPath[0] == "overlay")
+                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
+                        attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
+                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? std::make_pair("nixos-module", "NixOS module") :
+                        std::make_pair("unknown", "unknown");
+                    if (json) {
+                        j.emplace("type", type);
                     } else {
                         logger->cout("%s: " ANSI_WARNING "%s" ANSI_NORMAL, headerPrefix, description);
                     }
@@ -1031,14 +1031,15 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
                     throw;
             }
+
+            return j;
         };
 
         auto cache = openEvalCache(*state, flake);
 
-        visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
-        if(json){
+        auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        if (json)
             logger->cout("%s", j.dump());
-        }
     }
 };
 
