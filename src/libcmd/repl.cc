@@ -53,7 +53,8 @@ struct NixRepl
     Strings loadedFiles;
 
     const static int envSize = 32768;
-    StaticEnv staticEnv;
+    std::shared_ptr<StaticEnv> staticEnv;
+    // StaticEnv staticEnv;
     Env * env;
     int displ;
     StringSet varNames;
@@ -92,7 +93,7 @@ string removeWhitespace(string s)
 
 NixRepl::NixRepl(ref<EvalState> state)
     : state(state)
-    , staticEnv(false, &state->staticBaseEnv)
+    , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
@@ -567,10 +568,10 @@ void NixRepl::initEnv()
     env = &state->allocEnv(envSize);
     env->up = &state->baseEnv;
     displ = 0;
-    staticEnv.vars.clear();
+    staticEnv->vars.clear();
 
     varNames.clear();
-    for (auto & i : state->staticBaseEnv.vars)
+    for (auto & i : state->staticBaseEnv->vars)
         varNames.insert(i.first);
 }
 
@@ -605,7 +606,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value * v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
-    staticEnv.vars[name] = displ;
+    staticEnv->vars[name] = displ;
     env->values[displ++] = v;
     varNames.insert((string) name);
 }

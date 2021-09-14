@@ -79,10 +79,12 @@ struct Expr
 {
     virtual ~Expr() { };
     virtual void show(std::ostream & str) const;
-    virtual void bindVars(const StaticEnv & env);
+    virtual void bindVars(const std::shared_ptr<const StaticEnv> & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
+
+    std::shared_ptr<StaticEnv> staticenv;
 };
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
@@ -90,7 +92,7 @@ std::ostream & operator << (std::ostream & str, const Expr & e);
 #define COMMON_METHODS \
     void show(std::ostream & str) const; \
     void eval(EvalState & state, Env & env, Value & v); \
-    void bindVars(const StaticEnv & env);
+    void bindVars(const std::shared_ptr<const StaticEnv> & env);
 
 struct ExprInt : Expr
 {
@@ -301,7 +303,7 @@ struct ExprOpNot : Expr
         { \
             str << "(" << *e1 << " " s " " << *e2 << ")";   \
         } \
-        void bindVars(const StaticEnv & env) \
+        void bindVars(const std::shared_ptr<const StaticEnv> & env) \
         { \
             e1->bindVars(env); e2->bindVars(env); \
         } \

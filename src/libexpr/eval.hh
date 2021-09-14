@@ -23,6 +23,7 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
+extern std::function<void(const Error & error, const Env & env)> debuggerHook;
 
 struct PrimOp
 {
@@ -154,10 +155,10 @@ public:
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
-    Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
+    Expr * parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv);
+    Expr * parseExprFromString(std::string_view s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string_view s, const Path & basePath);
 
     Expr * parseStdin();
@@ -238,7 +239,7 @@ public:
     Env & baseEnv;
 
     /* The same, but used during parsing to resolve variables. */
-    StaticEnv staticBaseEnv; // !!! should be private
+    std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
 private:
 
@@ -277,7 +278,7 @@ private:
     friend struct ExprLet;
 
     Expr * parse(const char * text, FileOrigin origin, const Path & path,
-        const Path & basePath, StaticEnv & staticEnv);
+        const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
 

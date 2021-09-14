@@ -186,11 +186,11 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
-            StaticEnv staticEnv(false, &state.staticBaseEnv);
+            auto staticEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, state.staticBaseEnv.get()));
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
-                staticEnv.vars[attr.name] = displ;
+                staticEnv->vars[attr.name] = displ;
                 env->values[displ++] = attr.value;
             }
 

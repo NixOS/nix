@@ -570,7 +570,7 @@ namespace nix {
 
 
 Expr * EvalState::parse(const char * text, FileOrigin origin,
-    const Path & path, const Path & basePath, StaticEnv & staticEnv)
+    const Path & path, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);
@@ -633,13 +633,13 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 }
 
 
-Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
     return parse(readFile(path).c_str(), foFile, path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     return parse(s.data(), foString, "", basePath, staticEnv);
 }

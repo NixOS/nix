@@ -237,35 +237,35 @@ Pos noPos;
 
 /* Computing levels/displacements for variables. */
 
-void Expr::bindVars(const StaticEnv & env)
+void Expr::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     abort();
 }
 
-void ExprInt::bindVars(const StaticEnv & env)
+void ExprInt::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
 }
 
-void ExprFloat::bindVars(const StaticEnv & env)
+void ExprFloat::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
 }
 
-void ExprString::bindVars(const StaticEnv & env)
+void ExprString::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
 }
 
-void ExprPath::bindVars(const StaticEnv & env)
+void ExprPath::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
 }
 
-void ExprVar::bindVars(const StaticEnv & env)
+void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
     unsigned int level;
     int withLevel = -1;
-    for (curEnv = &env, level = 0; curEnv; curEnv = curEnv->up, level++) {
+    for (curEnv = env.get(), level = 0; curEnv; curEnv = curEnv->up, level++) {
         if (curEnv->isWith) {
             if (withLevel == -1) withLevel = level;
         } else {
@@ -291,7 +291,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     this->level = withLevel;
 }
 
-void ExprSelect::bindVars(const StaticEnv & env)
+void ExprSelect::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     e->bindVars(env);
     if (def) def->bindVars(env);
@@ -300,7 +300,7 @@ void ExprSelect::bindVars(const StaticEnv & env)
             i.expr->bindVars(env);
 }
 
-void ExprOpHasAttr::bindVars(const StaticEnv & env)
+void ExprOpHasAttr::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     e->bindVars(env);
     for (auto & i : attrPath)
@@ -308,17 +308,17 @@ void ExprOpHasAttr::bindVars(const StaticEnv & env)
             i.expr->bindVars(env);
 }
 
-void ExprAttrs::bindVars(const StaticEnv & env)
+void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
-    const StaticEnv * dynamicEnv = &env;
-    StaticEnv newEnv(false, &env);
+    const StaticEnv * dynamicEnv = env.get();
+    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
 
     if (recursive) {
-        dynamicEnv = &newEnv;
+        dynamicEnv = newEnv.get();
 
         unsigned int displ = 0;
         for (auto & i : attrs)
-            newEnv.vars[i.first] = i.second.displ = displ++;
+            newEnv->vars[i.first] = i.second.displ = displ++;
 
         for (auto & i : attrs)
             i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -329,28 +329,28 @@ void ExprAttrs::bindVars(const StaticEnv & env)
             i.second.e->bindVars(env);
 
     for (auto & i : dynamicAttrs) {
-        i.nameExpr->bindVars(*dynamicEnv);
-        i.valueExpr->bindVars(*dynamicEnv);
+        i.nameExpr->bindVars(newEnv);
+        i.valueExpr->bindVars(newEnv);
     }
 }
 
-void ExprList::bindVars(const StaticEnv & env)
+void ExprList::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     for (auto & i : elems)
         i->bindVars(env);
 }
 
-void ExprLambda::bindVars(const StaticEnv & env)
+void ExprLambda::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
-    StaticEnv newEnv(false, &env);
+    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
 
     unsigned int displ = 0;
 
-    if (!arg.empty()) newEnv.vars[arg] = displ++;
+    if (!arg.empty()) newEnv->vars[arg] = displ++;
 
     if (matchAttrs) {
         for (auto & i : formals->formals)
-            newEnv.vars[i.name] = displ++;
+            newEnv->vars[i.name] = displ++;
 
         for (auto & i : formals->formals)
             if (i.def) i.def->bindVars(newEnv);
@@ -359,13 +359,13 @@ void ExprLambda::bindVars(const StaticEnv & env)
     body->bindVars(newEnv);
 }
 
-void ExprLet::bindVars(const StaticEnv & env)
+void ExprLet::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
-    StaticEnv newEnv(false, &env);
+    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
 
     unsigned int displ = 0;
     for (auto & i : attrs->attrs)
-        newEnv.vars[i.first] = i.second.displ = displ++;
+        newEnv->vars[i.first] = i.second.displ = displ++;
 
     for (auto & i : attrs->attrs)
         i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -373,7 +373,7 @@ void ExprLet::bindVars(const StaticEnv & env)
     body->bindVars(newEnv);
 }
 
-void ExprWith::bindVars(const StaticEnv & env)
+void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
@@ -381,42 +381,42 @@ void ExprWith::bindVars(const StaticEnv & env)
     const StaticEnv * curEnv;
     unsigned int level;
     prevWith = 0;
-    for (curEnv = &env, level = 1; curEnv; curEnv = curEnv->up, level++)
+    for (curEnv = env.get(), level = 1; curEnv; curEnv = curEnv->up, level++)
         if (curEnv->isWith) {
             prevWith = level;
             break;
         }
 
     attrs->bindVars(env);
-    StaticEnv newEnv(true, &env);
+    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
     body->bindVars(newEnv);
 }
 
-void ExprIf::bindVars(const StaticEnv & env)
+void ExprIf::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     cond->bindVars(env);
     then->bindVars(env);
     else_->bindVars(env);
 }
 
-void ExprAssert::bindVars(const StaticEnv & env)
+void ExprAssert::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     cond->bindVars(env);
     body->bindVars(env);
 }
 
-void ExprOpNot::bindVars(const StaticEnv & env)
+void ExprOpNot::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     e->bindVars(env);
 }
 
-void ExprConcatStrings::bindVars(const StaticEnv & env)
+void ExprConcatStrings::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     for (auto & i : *es)
         i->bindVars(env);
 }
 
-void ExprPos::bindVars(const StaticEnv & env)
+void ExprPos::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
 }
 

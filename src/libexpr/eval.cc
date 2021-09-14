@@ -401,7 +401,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , store(store)
     , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
-    , staticBaseEnv(false, 0)
+    , staticBaseEnv(new StaticEnv(false, 0))
 {
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
@@ -538,7 +538,7 @@ Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    staticBaseEnv->vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
@@ -564,7 +564,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    staticBaseEnv->vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
     return v;
@@ -590,7 +590,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(std::move(primOp)));
-    staticBaseEnv.vars[envName] = baseEnvDispl;
+    staticBaseEnv->vars[envName] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
     return v;
