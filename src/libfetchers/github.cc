@@ -275,7 +275,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
+            .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
 };
@@ -343,7 +343,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // FIXME: get username somewhere
         Input::fromURL(fmt("git+https://git@%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
+            .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
 };
