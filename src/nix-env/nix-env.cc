@@ -1204,37 +1204,6 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static constexpr GenerationNumber prevGen = std::numeric_limits<GenerationNumber>::max();
-
-
-static void switchGeneration(Globals & globals, GenerationNumber dstGen)
-{
-    PathLocks lock;
-    lockProfile(lock, globals.profile);
-
-    auto [gens, curGen] = findGenerations(globals.profile);
-
-    std::optional<Generation> dst;
-    for (auto & i : gens)
-        if ((dstGen == prevGen && i.number < curGen) ||
-            (dstGen >= 0 && i.number == dstGen))
-            dst = i;
-
-    if (!dst) {
-        if (dstGen == prevGen)
-            throw Error("no generation older than the current (%1%) exists", curGen.value_or(0));
-        else
-            throw Error("generation %1% does not exist", dstGen);
-    }
-
-    printInfo("switching from generation %1% to %2%", curGen.value_or(0), dst->number);
-
-    if (globals.dryRun) return;
-
-    switchLink(globals.profile, dst->path);
-}
-
-
 static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
@@ -1243,7 +1212,7 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
         throw UsageError("exactly one argument expected");
 
     if (auto dstGen = string2Int<GenerationNumber>(opArgs.front()))
-        switchGeneration(globals, *dstGen);
+        switchGeneration(globals.profile, *dstGen, globals.dryRun);
     else
         throw UsageError("expected a generation number");
 }
@@ -1256,7 +1225,7 @@ static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
     if (opArgs.size() != 0)
         throw UsageError("no arguments expected");
 
-    switchGeneration(globals, prevGen);
+    switchGeneration(globals.profile, {}, globals.dryRun);
 }
 
 

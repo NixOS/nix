@@ -236,6 +236,37 @@ void switchLink(Path link, Path target)
 }
 
 
+void switchGeneration(
+    const Path & profile,
+    std::optional<GenerationNumber> dstGen,
+    bool dryRun)
+{
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    auto [gens, curGen] = findGenerations(profile);
+
+    std::optional<Generation> dst;
+    for (auto & i : gens)
+        if ((!dstGen && i.number < curGen) ||
+            (dstGen && i.number == *dstGen))
+            dst = i;
+
+    if (!dst) {
+        if (dstGen)
+            throw Error("generation %1% does not exist", *dstGen);
+        else
+            throw Error("no generation older than the current (%1%) exists", curGen.value_or(0));
+    }
+
+    notice("switching from generation %d to %d", curGen.value_or(0), dst->number);
+
+    if (dryRun) return;
+
+    switchLink(profile, dst->path);
+}
+
+
 void lockProfile(PathLocks & lock, const Path & profile)
 {
     lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());

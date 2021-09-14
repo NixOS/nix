@@ -543,6 +543,38 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
     }
 };
 
+struct CmdProfileRollback : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<GenerationNumber> version;
+
+    CmdProfileRollback()
+    {
+        addFlag({
+            .longName = "to",
+            .description = "The profile version to roll back to.",
+            .labels = {"version"},
+            .handler = {&version},
+        });
+    }
+
+    std::string description() override
+    {
+        return "roll back to the previous version or a specified version of this profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-rollback.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        switchGeneration(*profile, version, dryRun);
+    }
+};
+
 struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
@@ -553,6 +585,7 @@ struct CmdProfile : NixMultiCommand
               {"list", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
               {"history", []() { return make_ref<CmdProfileHistory>(); }},
+              {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
           })
     { }
 
