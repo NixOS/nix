@@ -6,14 +6,14 @@ R""(
 
   ```console
   # nix profile rollback
-  switching from generation 519 to 518
+  switching profile from version 519 to 518
   ```
 
 * Switch your default profile to version 510:
 
   ```console
   # nix profile rollback --to 510
-  switching from generation 518 to 510
+  switching profile from version 518 to 510
   ```
 
 # Description

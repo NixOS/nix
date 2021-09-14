@@ -559,7 +559,7 @@ struct CmdProfileRollback : virtual StoreCommand, MixDefaultProfile, MixDryRun
 
     std::string description() override
     {
-        return "roll back to the previous version or a specified version of this profile";
+        return "roll back to the previous version or a specified version of a profile";
     }
 
     std::string doc() override

@@ -126,9 +126,9 @@ void deleteGeneration(const Path & profile, GenerationNumber gen)
 static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
-        printInfo(format("would remove generation %1%") % gen);
+        printInfo(format("would remove profile version %1%") % gen);
     else {
-        printInfo(format("removing generation %1%") % gen);
+        printInfo(format("removing profile version %1%") % gen);
         deleteGeneration(profile, gen);
     }
 }
@@ -142,7 +142,7 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
     auto [gens, curGen] = findGenerations(profile);
 
     if (gensToDelete.count(*curGen))
-        throw Error("cannot delete current generation of profile %1%'", profile);
+        throw Error("cannot delete current version of profile %1%'", profile);
 
     for (auto & i : gens) {
         if (!gensToDelete.count(i.number)) continue;
@@ -254,12 +254,12 @@ void switchGeneration(
 
     if (!dst) {
         if (dstGen)
-            throw Error("generation %1% does not exist", *dstGen);
+            throw Error("profile version %1% does not exist", *dstGen);
         else
-            throw Error("no generation older than the current (%1%) exists", curGen.value_or(0));
+            throw Error("no profile version older than the current (%1%) exists", curGen.value_or(0));
     }
 
-    notice("switching from generation %d to %d", curGen.value_or(0), dst->number);
+    notice("switching profile from version %d to %d", curGen.value_or(0), dst->number);
 
     if (dryRun) return;
 
