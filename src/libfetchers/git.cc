@@ -413,7 +413,7 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        auto result = runProgram({
+        auto result = runProgram(RunOptions {
             .program = "git",
             .args = { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() },
             .mergeStderrToStdout = true

@@ -111,7 +111,7 @@ string runNix(Path program, const Strings & args,
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
 
-    auto res = runProgram({
+    auto res = runProgram(RunOptions {
         .program = settings.nixBinDir+ "/" + program,
         .args = args,
         .environment = subprocessEnv,
