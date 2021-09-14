@@ -126,9 +126,9 @@ void deleteGeneration(const Path & profile, GenerationNumber gen)
 static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
-        printInfo(format("would remove profile version %1%") % gen);
+        notice("would remove profile version %1%", gen);
     else {
-        printInfo(format("removing profile version %1%") % gen);
+        notice("removing profile version %1%", gen);
         deleteGeneration(profile, gen);
     }
 }

@@ -575,6 +575,44 @@ struct CmdProfileRollback : virtual StoreCommand, MixDefaultProfile, MixDryRun
     }
 };
 
+struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<std::string> minAge;
+
+    CmdProfileWipeHistory()
+    {
+        addFlag({
+            .longName = "older-than",
+            .description =
+                "Delete versions older than the specified age. *age* "
+                "must be in the format *N*`d`, where *N* denotes a number "
+                "of days.",
+            .labels = {"age"},
+            .handler = {&minAge},
+        });
+    }
+
+    std::string description() override
+    {
+        return "delete non-current versions of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-wipe-history.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        if (minAge)
+            deleteGenerationsOlderThan(*profile, *minAge, dryRun);
+        else
+            deleteOldGenerations(*profile, dryRun);
+    }
+};
+
 struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
@@ -586,6 +624,7 @@ struct CmdProfile : NixMultiCommand
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
               {"history", []() { return make_ref<CmdProfileHistory>(); }},
               {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
+              {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
           })
     { }
 
