@@ -66,7 +66,7 @@ void handleDiffHook(
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
         try {
-            auto diffRes = runProgram({
+            auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
                 .searchPath = true,
                 .args = {tryA, tryB, drvPath, tmpDir},
