@@ -502,10 +502,7 @@
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out";
-      } // (if system == "x86_64-linux" then (builtins.listToAttrs (map (crossSystem: {
-        name = "binaryTarball-${crossSystem}";
-        value = self.hydraJobs.binaryTarballCross.${system}.${crossSystem};
-      }) crossSystems)) else {}));
+      });
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
