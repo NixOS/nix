@@ -97,3 +97,7 @@
 ; This is used by /bin/sh on macOS 10.15 and later.
 (allow file*
        (literal "/private/var/select/sh"))
+
+; Allow Rosetta 2 to run x86_64 binaries on aarch64-darwin.
+(allow file-read*
+       (subpath "/Library/Apple/usr/libexec/oah"))
