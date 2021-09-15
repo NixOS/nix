@@ -33,9 +33,15 @@ std::string hilite(const std::string & s, const std::smatch & m, std::string pos
 struct CmdSearch : InstallableCommand, MixJSON
 {
     std::vector<std::string> res;
+    bool skipDescription = false;
 
     CmdSearch()
     {
+        addFlag({
+            .longName = "skip-description",
+            .description = "Do not search in package descriptions.",
+            .handler = {[&]() { skipDescription = true; }},
+        });
         expectArgs("regex", &res);
     }
 
@@ -114,9 +120,11 @@ struct CmdSearch : InstallableCommand, MixJSON
                     std::smatch nameMatch;
 
                     for (auto & regex : regexes) {
-                        std::regex_search(attrPath2, attrPathMatch, regex);
                         std::regex_search(name.name, nameMatch, regex);
-                        std::regex_search(description, descriptionMatch, regex);
+                        std::regex_search(attrPath2, attrPathMatch, regex);
+                        if (!skipDescription) {
+                            std::regex_search(description, descriptionMatch, regex);
+                        }
                         if (!attrPathMatch.empty()
                             || !nameMatch.empty()
                             || !descriptionMatch.empty())

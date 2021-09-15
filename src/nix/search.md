@@ -31,6 +31,14 @@ R""(
     Compiler for GObject type system
   ```
 
+* Exclude package descriptions from search with `--skip-description`:
+
+  ```console
+  # nix search nixpkgs gnome3 --skip-description
+  * legacyPackages.x86_64-linux.gnome3.vala (0.48.9)
+    Compiler for GObject type system
+  ```
+
 * Show all packages in the flake in the current directory:
 
   ```console
