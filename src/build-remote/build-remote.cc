@@ -270,14 +270,23 @@ connected:
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
         auto outputHashes = staticOutputHashes(*store, drv);
-        drv.inputSrcs = store->parseStorePathSet(inputs);
+
+        // Hijack the inputs paths of the derivation to include all the paths
+        // that come from the `inputDrvs` set.
+        // We don’t do that for the derivations whose `inputDrvs` is empty
+        // because
+        // 1. It’s not needed
+        // 2. Changing the `inputSrcs` set changes the associated output ids,
+        //  which break CA derivations
+        if (!drv.inputDrvs.empty())
+            drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);
 
@@ -312,7 +321,7 @@ connected:
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
+            copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
         }
         // XXX: Should be done as part of `copyPaths`
         for (auto & realisation : missingRealisations) {

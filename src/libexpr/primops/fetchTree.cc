@@ -7,6 +7,7 @@
 
 #include <ctime>
 #include <iomanip>
+#include <regex>
 
 namespace nix {
 
@@ -44,7 +45,7 @@ void emitTreeAttrs(
 
     if (input.getType() == "git")
         mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
-            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(true));
 
     if (auto revCount = input.getRevCount())
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
@@ -60,10 +61,19 @@ void emitTreeAttrs(
     v.attrs->sort();
 }
 
-std::string fixURI(std::string uri, EvalState &state)
+std::string fixURI(std::string uri, EvalState &state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : "file://" + uri;
+    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+}
+
+std::string fixURIForGit(std::string uri, EvalState & state)
+{
+    static std::regex scp_uri("([^/].*)@(.*):(.*)");
+    if (uri[0] != '/' && std::regex_match(uri, scp_uri))
+        return fixURI(std::regex_replace(uri, scp_uri, "$1@$2/$3"), state, "ssh");
+    else
+        return fixURI(uri, state);
 }
 
 void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v)
@@ -72,13 +82,18 @@ void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v
     attrs.emplace(name, n == "url" ? fixURI(v, state) : v);
 }
 
+struct FetchTreeParams {
+    bool emptyRevFallback = false;
+    bool allowNameArgument = false;
+};
+
 static void fetchTree(
     EvalState &state,
     const Pos &pos,
     Value **args,
     Value &v,
     const std::optional<std::string> type,
-    bool emptyRevFallback = false
+    const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
     PathSet context;
@@ -119,17 +134,25 @@ static void fetchTree(
                 .errPos = pos
             });
 
+        if (!params.allowNameArgument)
+            if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
+                throw Error({
+                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
+                    .errPos = pos
+                });
+
+
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = fixURI(state.coerceToString(pos, *args[0], context, false, false), state);
+        auto url = state.coerceToString(pos, *args[0], context, false, false);
 
         if (type == "git") {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", url);
+            attrs.emplace("url", fixURIForGit(url, state));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(fixURI(url, state));
         }
     }
 
@@ -144,13 +167,13 @@ static void fetchTree(
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
 
-    emitTreeAttrs(state, tree, input2, v, emptyRevFallback);
+    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback);
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     settings.requireExperimentalFeature("flakes");
-    fetchTree(state, pos, args, v, std::nullopt);
+    fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
 // FIXME: document
@@ -292,7 +315,7 @@ static RegisterPrimOp primop_fetchTarball({
 
 static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
 {
-    fetchTree(state, pos, args, v, "git", true);
+    fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }
 
 static RegisterPrimOp primop_fetchGit({
@@ -303,17 +326,17 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url  
+        - url\
           The URL of the repo.
 
-        - name  
+        - name\
           The name of the directory the repo should be exported to in the
           store. Defaults to the basename of the URL.
 
-        - rev  
+        - rev\
           The git revision to fetch. Defaults to the tip of `ref`.
 
-        - ref  
+        - ref\
           The git ref to look for the requested revision under. This is
           often a branch or tag name. Defaults to `HEAD`.
 
@@ -321,11 +344,11 @@ static RegisterPrimOp primop_fetchGit({
           of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
           with `refs/`.
 
-        - submodules  
+        - submodules\
           A Boolean parameter that specifies whether submodules should be
           checked out. Defaults to `false`.
 
-        - allRefs  
+        - allRefs\
           Whether to fetch all refs of the repository. With this argument being
           true, it's possible to load a `rev` from *any* `ref` (by default only
           `rev`s from the specified `ref` are supported).

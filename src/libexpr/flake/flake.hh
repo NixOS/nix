@@ -43,7 +43,6 @@ struct FlakeInput
     std::optional<FlakeRef> ref;
     bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
-    bool absolute = false; // whether 'follows' is relative to the flake root
     FlakeInputs overrides;
 };
 
@@ -102,7 +101,11 @@ struct LockFlags
 
     /* Whether to use the registries to lookup indirect flake
        references like 'nixpkgs'. */
-    bool useRegistries = true;
+    std::optional<bool> useRegistries = std::nullopt;
+
+    /* Whether to apply flake's nixConfig attribute to the configuration */
+
+    bool applyNixConfig = false;
 
     /* Whether mutable flake references (i.e. those without a Git
        revision or similar) without a corresponding lock are

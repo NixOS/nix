@@ -68,6 +68,7 @@ struct NixRepl
     StorePath getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
+    void loadFlake(const std::string & flakeRef);
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
@@ -102,6 +103,25 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 NixRepl::~NixRepl()
 {
     write_history(historyFile.c_str());
+}
+
+string runNix(Path program, const Strings & args,
+    const std::optional<std::string> & input = {})
+{
+    auto subprocessEnv = getEnv();
+    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
+
+    auto res = runProgram(RunOptions {
+        .program = settings.nixBinDir+ "/" + program,
+        .args = args,
+        .environment = subprocessEnv,
+        .input = input,
+    });
+
+    if (!statusOk(res.first))
+        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+
+    return res.second;
 }
 
 static NixRepl * curRepl; // ugly
@@ -395,9 +415,10 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
-             << "  :e <expr>     Open the derivation in $EDITOR\n"
+             << "  :e <expr>     Open package or function in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :lf <ref>     Load Nix flake and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
@@ -416,6 +437,10 @@ bool NixRepl::processLine(string line)
     else if (command == ":l" || command == ":load") {
         state->resetFileCache();
         loadFile(arg);
+    }
+
+    else if (command == ":lf" || command == ":load-flake") {
+        loadFlake(arg);
     }
 
     else if (command == ":r" || command == ":reload") {
@@ -437,7 +462,7 @@ bool NixRepl::processLine(string line)
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
-            pos = findDerivationFilename(*state, v, arg);
+            pos = findPackageFilename(*state, v, arg);
         }
 
         // Open in EDITOR
@@ -463,7 +488,7 @@ bool NixRepl::processLine(string line)
         state->callFunction(f, v, result, Pos());
 
         StorePath drvPath = getDerivationPath(result);
-        runProgram(settings.nixBinDir + "/nix-shell", true, {state->store->printStorePath(drvPath)});
+        runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
@@ -477,7 +502,7 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             try {
-                runProgram(settings.nixBinDir + "/nix", true, {"build", "--no-link", drvPathRaw});
+                runNix("nix", {"build", "--no-link", drvPathRaw});
                 auto drv = state->store->readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputsAndOptPaths(*state->store))
@@ -485,9 +510,9 @@ bool NixRepl::processLine(string line)
             } catch (ExecError &) {
             }
         } else if (command == ":i") {
-            runProgram(settings.nixBinDir + "/nix-env", true, {"-i", drvPathRaw});
+            runNix("nix-env", {"-i", drvPathRaw});
         } else {
-            runProgram(settings.nixBinDir + "/nix-shell", true, {drvPathRaw});
+            runNix("nix-shell", {drvPathRaw});
         }
     }
 
@@ -557,6 +582,25 @@ void NixRepl::loadFile(const Path & path)
     state->evalFile(lookupFileArg(*state, path), v);
     state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
+}
+
+void NixRepl::loadFlake(const std::string & flakeRefS)
+{
+    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
+    if (evalSettings.pureEval && !flakeRef.input.isImmutable())
+        throw Error("cannot use ':load-flake' on mutable flake reference '%s' (use --impure to override)", flakeRefS);
+
+    Value v;
+
+    flake::callFlake(*state,
+        flake::lockFlake(*state, flakeRef,
+            flake::LockFlags {
+                .updateLockFile = false,
+                .useRegistries = !evalSettings.pureEval,
+                .allowMutable  = !evalSettings.pureEval,
+            }),
+        v);
+    addAttrsToScope(v);
 }
 
 
@@ -663,7 +707,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nString:
-        str << ANSI_YELLOW;
+        str << ANSI_WARNING;
         printStringValue(str, v.string.s);
         str << ANSI_NORMAL;
         break;

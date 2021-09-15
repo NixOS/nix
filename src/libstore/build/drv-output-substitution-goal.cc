@@ -17,6 +17,13 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput& id, Worker
 void DrvOutputSubstitutionGoal::init()
 {
     trace("init");
+
+    /* If the derivation already exists, we’re done */
+    if (worker.store.queryRealisation(id)) {
+        amDone(ecSuccess);
+        return;
+    }
+
     subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
     tryNext();
 }
@@ -51,6 +58,26 @@ void DrvOutputSubstitutionGoal::tryNext()
     if (!outputInfo) {
         tryNext();
         return;
+    }
+
+    for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
+        if (depId != id) {
+            if (auto localOutputInfo = worker.store.queryRealisation(depId);
+                localOutputInfo && localOutputInfo->outPath != depPath) {
+                warn(
+                    "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
+                    "Local:  %s\n"
+                    "Remote: %s",
+                    sub->getUri(),
+                    depId.to_string(),
+                    worker.store.printStorePath(localOutputInfo->outPath),
+                    worker.store.printStorePath(depPath)
+                );
+                tryNext();
+                return;
+            }
+            addWaitee(worker.makeDrvOutputSubstitutionGoal(depId));
+        }
     }
 
     addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));

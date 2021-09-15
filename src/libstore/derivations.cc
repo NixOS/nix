@@ -568,7 +568,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
 }
 
 
-std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& drv)
+std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv)
 {
     std::map<std::string, Hash> res;
     std::visit(overloaded {

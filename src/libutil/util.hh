@@ -276,26 +276,20 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    Path program;
+    bool searchPath = true;
+    Strings args;
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
     std::optional<std::map<std::string, std::string>> environment;
-    Path program;
-    bool searchPath = true;
-    Strings args;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
-    bool _killStderr = false;
-
-    RunOptions(const Path & program, const Strings & args)
-        : program(program), args(args) { };
-
-    RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
 };
 
-std::pair<int, std::string> runProgram(const RunOptions & options);
+std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
 
@@ -482,6 +476,9 @@ constexpr char treeLast[] = "└───";
 constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
+/* Determine whether ANSI escape sequences are appropriate for the
+   present output. */
+bool shouldANSI();
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,

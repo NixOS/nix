@@ -6,7 +6,7 @@ clearCache
 nix shell -f shell-hello.nix hello -c hello | grep 'Hello World'
 nix shell -f shell-hello.nix hello -c hello NixOS | grep 'Hello NixOS'
 
-if ! canUseSandbox; then exit; fi
+if ! canUseSandbox; then exit 99; fi
 
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0

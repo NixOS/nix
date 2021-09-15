@@ -26,15 +26,6 @@
     available for download from the official repository
     <https://github.com/google/brotli>.
 
-  - The bzip2 compressor program and the `libbz2` library. Thus you must
-    have bzip2 installed, including development headers and libraries.
-    If your distribution does not provide these, you can obtain bzip2
-    from
-    <https://sourceware.org/bzip2/>.
-
-  - `liblzma`, which is provided by XZ Utils. If your distribution does
-    not provide this, you can get it from <https://tukaani.org/xz/>.
-
   - cURL and its library. If your distribution does not provide it, you
     can get it from <https://curl.haxx.se/>.
 
@@ -69,6 +60,3 @@
     `--disable-seccomp-sandboxing` option to the `configure` script (Not
     recommended unless your system doesn't support `libseccomp`). To get
     the library, visit <https://github.com/seccomp/libseccomp>.
- 
-  - Niels Lohmann's [JSON library](https://github.com/nlohmann/json).
-  

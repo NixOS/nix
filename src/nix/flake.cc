@@ -84,6 +84,7 @@ struct CmdFlakeUpdate : FlakeCommand
 
         lockFlags.recreateLockFile = true;
         lockFlags.writeLockFile = true;
+        lockFlags.applyNixConfig = true;
 
         lockFlake();
     }
@@ -114,6 +115,7 @@ struct CmdFlakeLock : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.writeLockFile = true;
+        lockFlags.applyNixConfig = true;
 
         lockFlake();
     }
@@ -270,27 +272,44 @@ struct CmdFlakeCheck : FlakeCommand
         settings.readOnlyMode = !build;
 
         auto state = getEvalState();
+
+        lockFlags.applyNixConfig = true;
         auto flake = lockFlake();
+
+        bool hasErrors = false;
+        auto reportError = [&](const Error & e) {
+            try {
+                throw e;
+            } catch (Error & e) {
+                if (settings.keepGoing) {
+                    ignoreException();
+                    hasErrors = true;
+                }
+                else
+                    throw;
+            }
+        };
 
         // FIXME: rewrite to use EvalCache.
 
         auto checkSystemName = [&](const std::string & system, const Pos & pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
-                throw Error("'%s' is not a valid system type, at %s", system, pos);
+                reportError(Error("'%s' is not a valid system type, at %s", system, pos));
         };
 
-        auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+        auto checkDerivation = [&](const std::string & attrPath, Value & v, const Pos & pos) -> std::optional<StorePath> {
             try {
                 auto drvInfo = getDerivation(*state, v, false);
                 if (!drvInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return store->parseStorePath(drvInfo->queryDrvPath());
+                return std::make_optional(store->parseStorePath(drvInfo->queryDrvPath()));
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the derivation '%s'", attrPath));
-                throw;
+                reportError(e);
             }
+            return std::nullopt;
         };
 
         std::vector<DerivedPath> drvPaths;
@@ -307,7 +326,7 @@ struct CmdFlakeCheck : FlakeCommand
                 #endif
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the app definition '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -323,7 +342,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // evaluate the overlay.
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the overlay '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -347,7 +366,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // check the module.
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the NixOS module '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -369,7 +388,7 @@ struct CmdFlakeCheck : FlakeCommand
 
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the Hydra jobset '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -384,7 +403,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the NixOS configuration '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -418,7 +437,7 @@ struct CmdFlakeCheck : FlakeCommand
                 }
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -433,7 +452,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("bundler must take formal arguments 'program' and 'system'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
-                throw;
+                reportError(e);
             }
         };
 
@@ -461,13 +480,13 @@ struct CmdFlakeCheck : FlakeCommand
                                     auto drvPath = checkDerivation(
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
-                                    if ((std::string) attr.name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{drvPath});
+                                    if (drvPath && (std::string) attr.name == settings.thisSystem.get())
+                                        drvPaths.push_back(DerivedPath::Built{*drvPath});
                                 }
                             }
                         }
 
-                        else if (name == "packages") {
+                        else if (name == "packages" || name == "devShells") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(attr.name, *attr.pos);
@@ -574,7 +593,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                     } catch (Error & e) {
                         e.addTrace(pos, hintfmt("while checking flake output '%s'", name));
-                        throw;
+                        reportError(e);
                     }
                 });
         }
@@ -583,6 +602,8 @@ struct CmdFlakeCheck : FlakeCommand
             Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
             store->buildPaths(drvPaths);
         }
+        if (hasErrors)
+            throw Error("Some errors were encountered during the evaluation");
     }
 };
 
@@ -820,12 +841,12 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         if (!dryRun && !dstUri.empty()) {
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-            copyPaths(store, dstStore, sources);
+            copyPaths(*store, *dstStore, sources);
         }
     }
 };
 
-struct CmdFlakeShow : FlakeCommand
+struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
 
@@ -855,48 +876,64 @@ struct CmdFlakeShow : FlakeCommand
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
 
-        std::function<void(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)> visit;
+        std::function<nlohmann::json(
+            eval_cache::AttrCursor & visitor,
+            const std::vector<Symbol> & attrPath,
+            const std::string & headerPrefix,
+            const std::string & nextPrefix)> visit;
 
-        visit = [&](eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const std::string & headerPrefix, const std::string & nextPrefix)
+        visit = [&](
+            eval_cache::AttrCursor & visitor,
+            const std::vector<Symbol> & attrPath,
+            const std::string & headerPrefix,
+            const std::string & nextPrefix)
+            -> nlohmann::json
         {
+            auto j = nlohmann::json::object();
+
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
             try {
                 auto recurse = [&]()
                 {
-                    logger->cout("%s", headerPrefix);
+                    if (!json)
+                        logger->cout("%s", headerPrefix);
                     auto attrs = visitor.getAttrs();
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         bool last = i + 1 == attrs.size();
                         auto visitor2 = visitor.getAttr(attr);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*visitor2, attrPath2,
+                        auto j2 = visit(*visitor2, attrPath2,
                             fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
                             nextPrefix + (last ? treeNull : treeLine));
+                        if (json) j.emplace(attr, std::move(j2));
                     }
                 };
 
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
-
-                    /*
-                    std::string description;
-
-                    if (auto aMeta = visitor.maybeGetAttr("meta")) {
-                        if (auto aDescription = aMeta->maybeGetAttr("description"))
-                            description = aDescription->getString();
+                    if (json) {
+                        std::optional<std::string> description;
+                        if (auto aMeta = visitor.maybeGetAttr("meta")) {
+                            if (auto aDescription = aMeta->maybeGetAttr("description"))
+                                description = aDescription->getString();
+                        }
+                        j.emplace("type", "derivation");
+                        j.emplace("name", name);
+                        if (description)
+                            j.emplace("description", *description);
+                    } else {
+                        logger->cout("%s: %s '%s'",
+                            headerPrefix,
+                            attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
+                            attrPath.size() >= 2 && attrPath[0] == "devShells" ? "development environment" :
+                            attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
+                            attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
+                            "package",
+                            name);
                     }
-                    */
-
-                    logger->cout("%s: %s '%s'",
-                        headerPrefix,
-                        attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
-                        attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
-                        attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
-                        "package",
-                        name);
                 };
 
                 if (attrPath.size() == 0
@@ -911,6 +948,7 @@ struct CmdFlakeShow : FlakeCommand
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPath[0] == "checks"
                             || attrPath[0] == "packages"
+                            || attrPath[0] == "devShells"
                             || attrPath[0] == "apps"))
                     )
                 {
@@ -919,7 +957,7 @@ struct CmdFlakeShow : FlakeCommand
 
                 else if (
                     (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell"))
-                    || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages"))
+                    || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages" || attrPath[0] == "devShells"))
                     )
                 {
                     if (visitor.isDerivation())
@@ -939,7 +977,7 @@ struct CmdFlakeShow : FlakeCommand
                     if (attrPath.size() == 1)
                         recurse();
                     else if (!showLegacy)
-                        logger->cout("%s: " ANSI_YELLOW "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix);
+                        logger->warn(fmt("%s: " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
                     else {
                         if (visitor.isDerivation())
                             showDerivation();
@@ -956,7 +994,11 @@ struct CmdFlakeShow : FlakeCommand
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
                         throw EvalError("not an app definition");
-                    logger->cout("%s: app", headerPrefix);
+                    if (json) {
+                        j.emplace("type", "app");
+                    } else {
+                        logger->cout("%s: app", headerPrefix);
+                    }
                 }
 
                 else if (
@@ -964,27 +1006,40 @@ struct CmdFlakeShow : FlakeCommand
                     (attrPath.size() == 2 && attrPath[0] == "templates"))
                 {
                     auto description = visitor.getAttr("description")->getString();
-                    logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
+                    if (json) {
+                        j.emplace("type", "template");
+                        j.emplace("description", description);
+                    } else {
+                        logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
+                    }
                 }
 
                 else {
-                    logger->cout("%s: %s",
-                        headerPrefix,
+                    auto [type, description] =
                         (attrPath.size() == 1 && attrPath[0] == "overlay")
-                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? "Nixpkgs overlay" :
-                        attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? "NixOS configuration" :
-                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? "NixOS module" :
-                        ANSI_YELLOW "unknown" ANSI_NORMAL);
+                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
+                        attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
+                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? std::make_pair("nixos-module", "NixOS module") :
+                        std::make_pair("unknown", "unknown");
+                    if (json) {
+                        j.emplace("type", type);
+                    } else {
+                        logger->cout("%s: " ANSI_WARNING "%s" ANSI_NORMAL, headerPrefix, description);
+                    }
                 }
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
                     throw;
             }
+
+            return j;
         };
 
         auto cache = openEvalCache(*state, flake);
 
-        visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        if (json)
+            logger->cout("%s", j.dump());
     }
 };
 

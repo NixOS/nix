@@ -22,6 +22,7 @@ our @EXPORT = qw(
     derivationFromPath
     addTempRoot
     getBinDir getStoreDir
+    queryRawRealisation
 );
 
 our $VERSION = '0.15';

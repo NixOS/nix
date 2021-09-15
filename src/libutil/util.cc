@@ -4,16 +4,18 @@
 #include "finally.hh"
 #include "serialise.hh"
 
+#include <array>
 #include <cctype>
 #include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
+#include <future>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
-#include <future>
 
 #include <fcntl.h>
 #include <grp.h>
@@ -144,16 +146,21 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             s += '/';
             while (i != end && *i != '/') s += *i++;
 
-            /* If s points to a symlink, resolve it and restart (since
-               the symlink target might contain new symlinks). */
+            /* If s points to a symlink, resolve it and continue from there */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = absPath(readLink(s), dirOf(s))
-                    + string(i, end);
-                i = temp.begin(); /* restart */
+                temp = readLink(s) + string(i, end);
+                i = temp.begin();
                 end = temp.end();
-                s = "";
+                if (!temp.empty() && temp[0] == '/') {
+                    s.clear();  /* restart for symlinks pointing to absolute path */
+                } else {
+                    s = dirOf(s);
+                    if (s == "/") {  // we don’t want trailing slashes here, which dirOf only produces if s = /
+                        s.clear();
+                    }
+                }
             }
         }
     }
@@ -408,7 +415,7 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         }
 
         int fd = openat(parentfd, path.c_str(), O_RDONLY);
-        if (!fd)
+        if (fd == -1)
             throw SysError("opening directory '%1%'", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
@@ -430,12 +437,9 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
     if (dir == "")
         dir = "/";
 
-    AutoCloseFD dirfd(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd{open(dir.c_str(), O_RDONLY)};
     if (!dirfd) {
-        // This really shouldn't fail silently, but it's left this way
-        // for backwards compatibility.
         if (errno == ENOENT) return;
-
         throw SysError("opening directory '%1%'", path);
     }
 
@@ -1030,17 +1034,10 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
-    RunOptions opts(program, args);
-    opts.searchPath = searchPath;
-    // This allows you to refer to a program with a pathname relative to the
-    // PATH variable.
-    opts.input = input;
-
-    auto res = runProgram(opts);
+    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
@@ -1049,9 +1046,8 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 }
 
 // Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(const RunOptions & options_)
+std::pair<int, std::string> runProgram(RunOptions && options)
 {
-    RunOptions options(options_);
     StringSink sink;
     options.standardOut = &sink;
 
@@ -1367,6 +1363,12 @@ void ignoreException()
     }
 }
 
+bool shouldANSI()
+{
+    return isatty(STDERR_FILENO)
+        && getEnv("TERM").value_or("dumb") != "dumb"
+        && !getEnv("NO_COLOR").has_value();
+}
 
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
 {
@@ -1439,7 +1441,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
 
 static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
+static std::array<char, 256> base64DecodeChars;
 
 string base64Encode(std::string_view s)
 {
@@ -1464,15 +1466,12 @@ string base64Encode(std::string_view s)
 
 string base64Decode(std::string_view s)
 {
-    bool init = false;
-    char decode[256];
-    if (!init) {
-        // FIXME: not thread-safe.
-        memset(decode, -1, sizeof(decode));
+    static std::once_flag flag;
+    std::call_once(flag, [](){
+        base64DecodeChars = { (char)-1 };
         for (int i = 0; i < 64; i++)
-            decode[(int) base64Chars[i]] = i;
-        init = true;
-    }
+            base64DecodeChars[(int) base64Chars[i]] = i;
+    });
 
     string res;
     unsigned int d = 0, bits = 0;
@@ -1481,7 +1480,7 @@ string base64Decode(std::string_view s)
         if (c == '=') break;
         if (c == '\n') continue;
 
-        char digit = decode[(unsigned char) c];
+        char digit = base64DecodeChars[(unsigned char) c];
         if (digit == -1)
             throw Error("invalid character in Base64 string: '%c'", c);
 

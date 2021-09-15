@@ -78,6 +78,11 @@ public:
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
+    void addMultipleToStore(
+        Source & source,
+        RepairFlag repair,
+        CheckSigsFlag checkSigs) override;
+
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
@@ -85,7 +90,7 @@ public:
 
     std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
 
-    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override;
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -150,8 +155,6 @@ protected:
     virtual ref<FSAccessor> getFSAccessor() override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
-
-    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
 
 private:
 

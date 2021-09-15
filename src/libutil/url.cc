@@ -32,7 +32,7 @@ ParsedURL parseURL(const std::string & url)
         auto isFile = scheme.find("file") != std::string::npos;
 
         if (authority && *authority != "" && isFile)
-            throw Error("file:// URL '%s' has unexpected authority '%s'",
+            throw BadURL("file:// URL '%s' has unexpected authority '%s'",
                 url, *authority);
 
         if (isFile && path.empty())

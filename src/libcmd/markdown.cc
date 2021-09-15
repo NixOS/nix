@@ -12,7 +12,7 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
     struct lowdown_opts opts {
         .type = LOWDOWN_TERM,
         .maxdepth = 20,
-        .cols = std::min(getWindowSize().second, (unsigned short) 80),
+        .cols = std::max(getWindowSize().second, (unsigned short) 80),
         .hmargin = 0,
         .vmargin = 0,
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
@@ -44,7 +44,7 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
     if (!rndr_res)
         throw Error("allocation error while rendering Markdown");
 
-    return std::string(buf->data, buf->size);
+    return filterANSIEscapes(std::string(buf->data, buf->size), !shouldANSI());
 }
 
 }
