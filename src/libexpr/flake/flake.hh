@@ -58,9 +58,10 @@ struct ConfigFile
 /* The contents of a flake.nix file. */
 struct Flake
 {
-    FlakeRef originalRef;   // the original flake specification (by the user)
-    FlakeRef resolvedRef;   // registry references and caching resolved to the specific underlying flake
-    FlakeRef lockedRef;     // the specific local store result of invoking the fetcher
+    FlakeRef originalRef; // the original flake specification (by the user)
+    FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
+    FlakeRef lockedRef; // the specific local store result of invoking the fetcher
+    bool forceDirty = false; // pretend that 'lockedRef' is dirty
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
@@ -140,6 +141,8 @@ void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
     const fetchers::Input & input,
-    Value & v, bool emptyRevFallback = false);
+    Value & v,
+    bool emptyRevFallback = false,
+    bool forceDirty = false);
 
 }
