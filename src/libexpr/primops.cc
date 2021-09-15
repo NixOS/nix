@@ -110,6 +110,8 @@ static void mkOutputString(EvalState & state, Value & v,
    argument. */
 static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
+    std::cout << " import " << std::endl;
+  
     PathSet context;
     Path path = state.coerceToPath(pos, vPath, context);
 
@@ -193,6 +195,8 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
                 staticEnv->vars[attr.name] = displ;
                 env->values[displ++] = attr.value;
             }
+
+            std::cout << "import staticenv: {} " << staticEnv << std::endl;
 
             printTalkative("evaluating file '%1%'", realPath);
             Expr * e = state.parseExprFromFile(resolveExprPath(realPath), staticEnv);

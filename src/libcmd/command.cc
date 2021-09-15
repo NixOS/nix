@@ -99,8 +99,6 @@ EvalCommand::EvalCommand()
 // extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
 extern std::function<void(const Error & error, const Env & env)> debuggerHook;
 
-
-
 ref<EvalState> EvalCommand::getEvalState()
 {
     std::cout << "EvalCommand::getEvalState()" << startReplOnEvalErrors << std::endl;

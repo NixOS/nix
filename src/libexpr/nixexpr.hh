@@ -20,6 +20,7 @@ MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 MakeError(RestrictedPathError, Error);
 
+extern std::function<void(const Error & error, const Env & env)> debuggerHook;
 
 /* Position objects. */
 

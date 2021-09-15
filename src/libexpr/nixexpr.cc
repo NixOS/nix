@@ -3,7 +3,7 @@
 #include "util.hh"
 
 #include <cstdlib>
-
+#include <iostream>
 
 namespace nix {
 
@@ -283,6 +283,7 @@ void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
     if (withLevel == -1)
+        std::cout << " throw UndefinedVarError({" << std::endl;
         throw UndefinedVarError({
             .msg = hintfmt("undefined variable '%1%'", name),
             .errPos = pos
@@ -310,11 +311,12 @@ void ExprOpHasAttr::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
-    const StaticEnv * dynamicEnv = env.get();
-    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
+    std::cout << "ExprAttrs::bindVars" << std::endl;
+    // auto dynamicEnv(env);
 
     if (recursive) {
-        dynamicEnv = newEnv.get();
+        // dynamicEnv = newEnv.get();
+        auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
 
         unsigned int displ = 0;
         for (auto & i : attrs)
@@ -322,16 +324,25 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
         for (auto & i : attrs)
             i.second.e->bindVars(i.second.inherited ? env : newEnv);
+
+        for (auto & i : dynamicAttrs) {
+            i.nameExpr->bindVars(newEnv);
+            i.valueExpr->bindVars(newEnv);
+        }
     }
 
-    else
+    else {
         for (auto & i : attrs)
             i.second.e->bindVars(env);
 
-    for (auto & i : dynamicAttrs) {
-        i.nameExpr->bindVars(newEnv);
-        i.valueExpr->bindVars(newEnv);
+        for (auto & i : dynamicAttrs) {
+            i.nameExpr->bindVars(env);
+            i.valueExpr->bindVars(env);
+        }
     }
+
+    std::cout << "ExprAttrs::bindVars end" << std::endl;
+
 }
 
 void ExprList::bindVars(const std::shared_ptr<const StaticEnv> &env)
@@ -375,6 +386,7 @@ void ExprLet::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    std::cout << " ExprWith::bindVars " << std::endl;
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
@@ -387,9 +399,23 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
             break;
         }
 
+    std::cout << " ExprWith::bindVars  1" << std::endl;
+    attrs->show(std::cout);
+    std::cout << std::endl;
     attrs->bindVars(env);
     auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
+    std::cout << " ExprWith::bindVars  2" << std::endl;
+    std::cout << " body: " << std::endl;
+    body->show(std::cout);
+    std::cout << std::endl;
+
+    std::cout << "ExprWith::newenv: " << newEnv->vars.size() << std::endl;
+    for (auto i = newEnv->vars.begin(); i != newEnv->vars.end(); ++i) 
+        std::cout << "EvalState::parse newEnv " << i->first << std::endl;
+
+
     body->bindVars(newEnv);
+    std::cout << " ExprWith::bindVars  3" << std::endl;
 }
 
 void ExprIf::bindVars(const std::shared_ptr<const StaticEnv> &env)

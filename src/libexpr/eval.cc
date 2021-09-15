@@ -918,6 +918,8 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
         .errPos = pos
     });
 
+    std::cout << "pre debuggerHook" << std::endl;
+
     if (debuggerHook)
         debuggerHook(error, env);
     throw error;

@@ -15,7 +15,7 @@ makefiles = \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
-  doc/manual/local.mk \
+  # doc/manual/local.mk \
   tests/local.mk \
   tests/plugins/local.mk
 
