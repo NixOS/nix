@@ -1412,11 +1412,6 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    if (baseNameOf(path) == "flake.lock")
-        throw Error({
-            .msg = hintfmt("cannot read '%s' because flake lock files can be out of sync", path),
-            .errPos = pos
-        });
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
