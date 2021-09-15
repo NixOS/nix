@@ -7,10 +7,13 @@ makefiles = \
   src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
+  src/libcmd/local.mk \
   src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
-  corepkgs/local.mk \
+  misc/bash/local.mk \
+  misc/fish/local.mk \
+  misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
@@ -25,9 +28,9 @@ OPTIMIZE = 1
 ifeq ($(OPTIMIZE), 1)
   GLOBAL_CXXFLAGS += -O3
 else
-  GLOBAL_CXXFLAGS += -O0
+  GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
 endif
 
 include mk/lib.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17
+GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17 -I src

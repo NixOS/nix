@@ -14,9 +14,8 @@
 #include "util.hh"
 #include "crypto.hh"
 
-#if HAVE_SODIUM
 #include <sodium.h>
-#endif
+#include <nlohmann/json.hpp>
 
 
 using namespace nix;
@@ -110,13 +109,29 @@ SV * queryPathInfo(char * path, int base32)
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
-            AV * arr = newAV();
+            AV * refs = newAV();
             for (auto & i : info->references)
-                av_push(arr, newSVpv(store()->printStorePath(i).c_str(), 0));
-            XPUSHs(sv_2mortal(newRV((SV *) arr)));
+                av_push(refs, newSVpv(store()->printStorePath(i).c_str(), 0));
+            XPUSHs(sv_2mortal(newRV((SV *) refs)));
+            AV * sigs = newAV();
+            for (auto & i : info->sigs)
+                av_push(sigs, newSVpv(i.c_str(), 0));
+            XPUSHs(sv_2mortal(newRV((SV *) sigs)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+SV * queryRawRealisation(char * outputId)
+    PPCODE:
+      try {
+        auto realisation = store()->queryRealisation(DrvOutput::parse(outputId));
+        if (realisation)
+            XPUSHs(sv_2mortal(newSVpv(realisation->toJSON().dump().c_str(), 0)));
+        else
+            XPUSHs(sv_2mortal(newSVpv("", 0)));
+      } catch (Error & e) {
+        croak("%s", e.what());
+      }
 
 
 SV * queryPathFromHashPart(char * hashPart)
@@ -182,7 +197,7 @@ void importPaths(int fd, int dontCheckSigs)
     PPCODE:
         try {
             FdSource source(fd);
-            store()->importPaths(source, nullptr, dontCheckSigs ? NoCheckSigs : CheckSigs);
+            store()->importPaths(source, dontCheckSigs ? NoCheckSigs : CheckSigs);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -224,7 +239,7 @@ SV * hashString(char * algo, int base32, char * s)
 SV * convertHash(char * algo, char * s, int toBase32)
     PPCODE:
         try {
-            Hash h(s, parseHashType(algo));
+            auto h = Hash::parseAny(s, parseHashType(algo));
             string s = h.to_string(toBase32 ? Base32 : Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -235,12 +250,8 @@ SV * convertHash(char * algo, char * s, int toBase32)
 SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
-#if HAVE_SODIUM
             auto sig = SecretKey(secretKey_).signDetached(msg);
             XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -249,7 +260,6 @@ SV * signString(char * secretKey_, char * msg)
 int checkSignature(SV * publicKey_, SV * sig_, char * msg)
     CODE:
         try {
-#if HAVE_SODIUM
             STRLEN publicKeyLen;
             unsigned char * publicKey = (unsigned char *) SvPV(publicKey_, publicKeyLen);
             if (publicKeyLen != crypto_sign_PUBLICKEYBYTES)
@@ -261,9 +271,6 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
                 throw Error("signature is not valid");
 
             RETVAL = crypto_sign_verify_detached(sig, (unsigned char *) msg, strlen(msg), publicKey) == 0;
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -285,7 +292,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
 SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
-            Hash h(hash, parseHashType(algo));
+            auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             auto path = store()->makeFixedOutputPath(method, h, name);
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
@@ -303,8 +310,14 @@ SV * derivationFromPath(char * drvPath)
             hash = newHV();
 
             HV * outputs = newHV();
-            for (auto & i : drv.outputs)
-                hv_store(outputs, i.first.c_str(), i.first.size(), newSVpv(store()->printStorePath(i.second.path).c_str(), 0), 0);
+            for (auto & i : drv.outputsAndOptPaths(*store())) {
+                hv_store(
+                    outputs, i.first.c_str(), i.first.size(),
+                    !i.second.second
+                        ? newSV(0) /* null value */
+                        : newSVpv(store()->printStorePath(*i.second.second).c_str(), 0),
+                    0);
+            }
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
@@ -345,3 +358,13 @@ void addTempRoot(char * storePath)
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+
+SV * getBinDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixBinDir.c_str(), 0)));
+
+
+SV * getStoreDir()
+    PPCODE:
+        XPUSHs(sv_2mortal(newSVpv(settings.nixStore.c_str(), 0)));

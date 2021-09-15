@@ -4,6 +4,7 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "sync.hh"
 #include "util.hh"
 
@@ -23,18 +24,26 @@ namespace nix {
 const int nixSchemaVersion = 10;
 
 
-struct Derivation;
-
-
 struct OptimiseStats
 {
     unsigned long filesLinked = 0;
-    unsigned long long bytesFreed = 0;
-    unsigned long long blocksFreed = 0;
+    uint64_t bytesFreed = 0;
+    uint64_t blocksFreed = 0;
+};
+
+struct LocalStoreConfig : virtual LocalFSStoreConfig
+{
+    using LocalFSStoreConfig::LocalFSStoreConfig;
+
+    Setting<bool> requireSigs{(StoreConfig*) this,
+        settings.requireSigs,
+        "require-sigs", "whether store paths should have a trusted signature on import"};
+
+    const std::string name() override { return "Local Store"; }
 };
 
 
-class LocalStore : public LocalFSStore
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore
 {
 private:
 
@@ -46,19 +55,8 @@ private:
         /* The SQLite database object. */
         SQLite db;
 
-        /* Some precompiled SQLite statements. */
-        SQLiteStmt stmtRegisterValidPath;
-        SQLiteStmt stmtUpdatePathInfo;
-        SQLiteStmt stmtAddReference;
-        SQLiteStmt stmtQueryPathInfo;
-        SQLiteStmt stmtQueryReferences;
-        SQLiteStmt stmtQueryReferrers;
-        SQLiteStmt stmtInvalidatePath;
-        SQLiteStmt stmtAddDerivationOutput;
-        SQLiteStmt stmtQueryValidDerivers;
-        SQLiteStmt stmtQueryDerivationOutputs;
-        SQLiteStmt stmtQueryPathFromHashPart;
-        SQLiteStmt stmtQueryValidPaths;
+        struct Stmts;
+        std::unique_ptr<Stmts> stmts;
 
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
@@ -81,13 +79,10 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    Sync<State, std::recursive_mutex> _state;
+    Sync<State> _state;
 
 public:
 
-    PathSetting realStoreDir_;
-
-    const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
     const Path reservedPath;
@@ -97,10 +92,6 @@ public:
     const Path fnTempRoots;
 
 private:
-
-    Setting<bool> requireSigs{(Store*) this,
-        settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
 
     const PublicKeys & getPublicKeys();
 
@@ -133,41 +124,26 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    OutputPathMap queryDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathSet & paths,
+    void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
+    bool pathInfoIsUntrusted(const ValidPathInfo &) override;
+    bool realisationIsUntrusted(const Realisation & ) override;
+
     void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override;
-
-    /* Like addToStore(), but the contents of the path are contained
-       in `dump', which is either a NAR serialisation (if recursive ==
-       true) or simply the contents of a regular file (if recursive ==
-       false). */
-    StorePath addToStoreFromDump(const string & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+    StorePath addToStoreFromDump(Source & dump, const string & name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
-
-    void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
-        BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
-
-    void ensurePath(const StorePath & path) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -213,15 +189,23 @@ public:
 
     void vacuumDB();
 
-    /* Repair the contents of the given path by redownloading it using
-       a substituter (if available). */
-    void repairPath(const StorePath & path);
+    void repairPath(const StorePath & path) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     /* If free disk space in /nix/store if below minFree, delete
        garbage until it exceeds maxFree. */
     void autoGC(bool sync = true);
+
+    /* Register the store path 'output' as the output named 'outputName' of
+       derivation 'deriver'. */
+    void registerDrvOutput(const Realisation & info) override;
+    void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
+    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
+
+    std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
+    std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
+    std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
 
 private:
 
@@ -242,6 +226,8 @@ private:
 
     void verifyPath(const Path & path, const StringSet & store,
         PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
+    std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
@@ -287,16 +273,30 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /* Add signatures to a ValidPathInfo using the secret keys
+    /* Add signatures to a ValidPathInfo or Realisation using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
-
-    Path getRealStoreDir() override { return realStoreDir; }
+    void signRealisation(Realisation &);
 
     void createUser(const std::string & userName, uid_t userId) override;
 
-    friend class DerivationGoal;
-    friend class SubstitutionGoal;
+    // XXX: Make a generic `Store` method
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const StorePath & path);
+
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const Path & path,
+        const std::string_view pathHash
+    );
+
+    friend struct LocalDerivationGoal;
+    friend struct PathSubstitutionGoal;
+    friend struct SubstitutionGoal;
+    friend struct DerivationGoal;
 };
 
 

@@ -41,10 +41,8 @@ handle_network_proxy() {
     fi
 }
 
-poly_validate_assumptions() {
-    if [ "$(uname -s)" != "Linux" ]; then
-        failure "This script is for use with Linux!"
-    fi
+poly_cure_artifacts() {
+    :
 }
 
 poly_service_installed_check() {
@@ -72,24 +70,38 @@ poly_service_setup_note() {
 EOF
 }
 
+poly_extra_try_me_commands() {
+    if [ -e /run/systemd/system ]; then
+        :
+    else
+        cat <<EOF
+  $ sudo nix-daemon
+EOF
+    fi
+}
+
 poly_configure_nix_daemon_service() {
-    _sudo "to set up the nix-daemon service" \
-          systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
+    if [ -e /run/systemd/system ]; then
+        task "Setting up the nix-daemon systemd service"
+        _sudo "to set up the nix-daemon service" \
+              systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
 
-    _sudo "to set up the nix-daemon socket service" \
-          systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
+        _sudo "to set up the nix-daemon socket service" \
+              systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
 
-    handle_network_proxy
+        handle_network_proxy
 
-    _sudo "to load the systemd unit for nix-daemon" \
-          systemctl daemon-reload
+        _sudo "to load the systemd unit for nix-daemon" \
+              systemctl daemon-reload
 
-    _sudo "to start the nix-daemon.socket" \
-          systemctl start nix-daemon.socket
+        _sudo "to start the nix-daemon.socket" \
+              systemctl start nix-daemon.socket
 
-    _sudo "to start the nix-daemon.service" \
-          systemctl restart nix-daemon.service
-
+        _sudo "to start the nix-daemon.service" \
+              systemctl restart nix-daemon.service
+    else
+        reminder "I don't support your init system yet; you may want to add nix-daemon manually."
+    fi
 }
 
 poly_group_exists() {
@@ -185,4 +197,8 @@ poly_create_build_user() {
           --uid "$uid" \
           --password "!" \
           "$username"
+}
+
+poly_prepare_to_install() {
+    :
 }

@@ -57,17 +57,35 @@ struct ParseSink
 
     virtual void createRegularFile(const Path & path) { };
     virtual void isExecutable() { };
-    virtual void preallocateContents(unsigned long long size) { };
-    virtual void receiveContents(unsigned char * data, unsigned int len) { };
+    virtual void preallocateContents(uint64_t size) { };
+    virtual void receiveContents(std::string_view data) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
 };
 
-struct TeeSink : ParseSink
+/* If the NAR archive contains a single file at top-level, then save
+   the contents of the file to `s'.  Otherwise barf. */
+struct RetrieveRegularNARSink : ParseSink
 {
-    TeeSource source;
+    bool regular = true;
+    Sink & sink;
 
-    TeeSink(Source & source) : source(source) { }
+    RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
+
+    void createDirectory(const Path & path) override
+    {
+        regular = false;
+    }
+
+    void receiveContents(std::string_view data) override
+    {
+        sink(data);
+    }
+
+    void createSymlink(const Path & path, const string & target) override
+    {
+        regular = false;
+    }
 };
 
 void parseDump(ParseSink & sink, Source & source);

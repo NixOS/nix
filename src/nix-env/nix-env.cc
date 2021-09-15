@@ -6,14 +6,16 @@
 #include "globals.hh"
 #include "names.hh"
 #include "profiles.hh"
+#include "path-with-outputs.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "user-env.hh"
 #include "util.hh"
 #include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -123,10 +125,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (!attrs.insert(attrName).second) {
-                logError({
-                    .name = "Name collision",
-                    .hint = hintfmt("warning: name collision in input Nix expressions, skipping '%1%'", path2)
-                });
+                printError("warning: name collision in input Nix expressions, skipping '%1%'", path2);
                 continue;
             }
             /* Load the expression on demand. */
@@ -230,7 +229,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
-        selectors.push_back(DrvName("*"));
+        selectors.emplace_back("*");
 
     DrvInfos elems;
     set<unsigned int> done;
@@ -381,7 +380,8 @@ static void queryInstSources(EvalState & state,
 
                 if (path.isDerivation()) {
                     elem.setDrvPath(state.store->printStorePath(path));
-                    elem.setOutPath(state.store->printStorePath(state.store->derivationFromPath(path).findOutput("out")));
+                    auto outputs = state.store->queryDerivationOutputMap(path);
+                    elem.setOutPath(state.store->printStorePath(outputs.at("out")));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
@@ -419,13 +419,13 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
-    std::vector<StorePathWithOutputs> targets;
+    std::vector<DerivedPath> targets;
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.push_back({state.store->parseStorePath(drvPath)});
+            targets.push_back(DerivedPath::Built{state.store->parseStorePath(drvPath)});
         else
-            targets.push_back({state.store->parseStorePath(i.queryOutPath())});
+            targets.push_back(DerivedPath::Opaque{state.store->parseStorePath(i.queryOutPath())});
     }
 
     printMissing(state.store, targets);
@@ -694,20 +694,23 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     if (globals.forceName != "")
         drv.setName(globals.forceName);
 
-    if (drv.queryDrvPath() != "") {
-        std::vector<StorePathWithOutputs> paths{{globals.state->store->parseStorePath(drv.queryDrvPath())}};
-        printMissing(globals.state->store, paths);
-        if (globals.dryRun) return;
-        globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
-    } else {
-        printMissing(globals.state->store,
-            {{globals.state->store->parseStorePath(drv.queryOutPath())}});
-        if (globals.dryRun) return;
-        globals.state->store->ensurePath(globals.state->store->parseStorePath(drv.queryOutPath()));
-    }
+    std::vector<DerivedPath> paths {
+        (drv.queryDrvPath() != "")
+        ? (DerivedPath) (DerivedPath::Built {
+                globals.state->store->parseStorePath(drv.queryDrvPath())
+            })
+        : (DerivedPath) (DerivedPath::Opaque {
+                globals.state->store->parseStorePath(drv.queryOutPath())
+            }),
+    };
+    printMissing(globals.state->store, paths);
+    if (globals.dryRun) return;
+    globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(ref<LocalFSStore>(store2), globals.profile, drv.queryOutPath());
+    Path generation = createGeneration(
+        ref<LocalFSStore>(store2), globals.profile,
+        store2->parseStorePath(drv.queryOutPath()));
     switchLink(globals.profile, generation);
 }
 
@@ -872,11 +875,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
-                logError({
-                    .name = "Invalid meta attribute",
-                    .hint = hintfmt("derivation '%s' has invalid meta attribute '%s'",
-                        i.queryName(), j)
-                });
+                printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
                 placeholder.write(nullptr);
             } else {
                 PathSet context;
@@ -1127,45 +1126,42 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             attrs2["name"] = j;
                             Value * v = i.queryMeta(j);
                             if (!v)
-                                logError({
-                                    .name = "Invalid meta attribute",
-                                    .hint = hintfmt(
-                                        "derivation '%s' has invalid meta attribute '%s'",
-                                        i.queryName(), j)
-                                });
+                                printError(
+                                    "derivation '%s' has invalid meta attribute '%s'",
+                                    i.queryName(), j);
                             else {
-                                if (v->type == tString) {
+                                if (v->type() == nString) {
                                     attrs2["type"] = "string";
                                     attrs2["value"] = v->string.s;
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tInt) {
+                                } else if (v->type() == nInt) {
                                     attrs2["type"] = "int";
                                     attrs2["value"] = (format("%1%") % v->integer).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tFloat) {
+                                } else if (v->type() == nFloat) {
                                     attrs2["type"] = "float";
                                     attrs2["value"] = (format("%1%") % v->fpoint).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tBool) {
+                                } else if (v->type() == nBool) {
                                     attrs2["type"] = "bool";
                                     attrs2["value"] = v->boolean ? "true" : "false";
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->isList()) {
+                                } else if (v->type() == nList) {
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
                                     for (unsigned int j = 0; j < v->listSize(); ++j) {
-                                        if (v->listElems()[j]->type != tString) continue;
+                                        if (v->listElems()[j]->type() != nString) continue;
                                         XMLAttrs attrs3;
                                         attrs3["value"] = v->listElems()[j]->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
-                              } else if (v->type == tAttrs) {
+                              } else if (v->type() == nAttrs) {
                                   attrs2["type"] = "strings";
                                   XMLOpenElement m(xml, "meta", attrs2);
                                   Bindings & attrs = *v->attrs;
                                   for (auto &i : attrs) {
                                       Attr & a(*attrs.find(i.name));
-                                      if(a.value->type != tString) continue;
+                                      if(a.value->type() != nString) continue;
                                       XMLAttrs attrs3;
                                       attrs3["type"] = i.name;
                                       attrs3["value"] = a.value->string.s;
@@ -1208,40 +1204,6 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static const int prevGen = -2;
-
-
-static void switchGeneration(Globals & globals, int dstGen)
-{
-    PathLocks lock;
-    lockProfile(lock, globals.profile);
-
-    int curGen;
-    Generations gens = findGenerations(globals.profile, curGen);
-
-    Generation dst;
-    for (auto & i : gens)
-        if ((dstGen == prevGen && i.number < curGen) ||
-            (dstGen >= 0 && i.number == dstGen))
-            dst = i;
-
-    if (!dst) {
-        if (dstGen == prevGen)
-            throw Error("no generation older than the current (%1%) exists",
-                curGen);
-        else
-            throw Error("generation %1% does not exist", dstGen);
-    }
-
-    printInfo(format("switching from generation %1% to %2%")
-        % curGen % dst.number);
-
-    if (globals.dryRun) return;
-
-    switchLink(globals.profile, dst.path);
-}
-
-
 static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
@@ -1249,11 +1211,10 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
     if (opArgs.size() != 1)
         throw UsageError("exactly one argument expected");
 
-    int dstGen;
-    if (!string2Int(opArgs.front(), dstGen))
+    if (auto dstGen = string2Int<GenerationNumber>(opArgs.front()))
+        switchGeneration(globals.profile, *dstGen, globals.dryRun);
+    else
         throw UsageError("expected a generation number");
-
-    switchGeneration(globals, dstGen);
 }
 
 
@@ -1264,7 +1225,7 @@ static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
     if (opArgs.size() != 0)
         throw UsageError("no arguments expected");
 
-    switchGeneration(globals, prevGen);
+    switchGeneration(globals.profile, {}, globals.dryRun);
 }
 
 
@@ -1278,8 +1239,7 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     PathLocks lock;
     lockProfile(lock, globals.profile);
 
-    int curGen;
-    Generations gens = findGenerations(globals.profile, curGen);
+    auto [gens, curGen] = findGenerations(globals.profile);
 
     RunPager pager;
 
@@ -1305,20 +1265,20 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     } else if (opArgs.size() == 1 && opArgs.front().find('d') != string::npos) {
         deleteGenerationsOlderThan(globals.profile, opArgs.front(), globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('+') != string::npos) {
-        if(opArgs.front().size() < 2)
-            throw Error("invalid number of generations ‘%1%’", opArgs.front());
+        if (opArgs.front().size() < 2)
+            throw Error("invalid number of generations '%1%'", opArgs.front());
         string str_max = string(opArgs.front(), 1, opArgs.front().size());
-        int max;
-        if (!string2Int(str_max, max) || max == 0)
-            throw Error("invalid number of generations to keep ‘%1%’", opArgs.front());
-        deleteGenerationsGreaterThan(globals.profile, max, globals.dryRun);
+        auto max = string2Int<GenerationNumber>(str_max);
+        if (!max || *max == 0)
+            throw Error("invalid number of generations to keep '%1%'", opArgs.front());
+        deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
     } else {
-        std::set<unsigned int> gens;
+        std::set<GenerationNumber> gens;
         for (auto & i : opArgs) {
-            unsigned int n;
-            if (!string2Int(i, n))
+            if (auto n = string2Int<GenerationNumber>(i))
+                gens.insert(*n);
+            else
                 throw UsageError("invalid generation number '%1%'", i);
-            gens.insert(n);
         }
         deleteGenerations(globals.profile, gens, globals.dryRun);
     }
@@ -1331,7 +1291,7 @@ static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static int _main(int argc, char * * argv)
+static int main_nix_env(int argc, char * * argv)
 {
     {
         Strings opFlags, opArgs;
@@ -1431,8 +1391,6 @@ static int _main(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
-        initPlugins();
-
         if (!op) throw UsageError("no operation specified");
 
         auto store = openStore();
@@ -1461,4 +1419,4 @@ static int _main(int argc, char * * argv)
     }
 }
 
-static RegisterLegacyCommand s1("nix-env", _main);
+static RegisterLegacyCommand r_nix_env("nix-env", main_nix_env);

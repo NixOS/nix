@@ -5,46 +5,44 @@ clearStore
 # Test fetching a flat file.
 hash=$(nix-hash --flat --type sha256 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link --hashed-mirrors '')
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link)
 
 cmp $outPath fetchurl.sh
 
 # Now using a base-64 hash.
 clearStore
 
-hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
+hash=$(nix hash file --type sha512 --base64 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors '')
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link)
 
 cmp $outPath fetchurl.sh
 
 # Now using an SRI hash.
 clearStore
 
-hash=$(nix hash-file ./fetchurl.sh)
+hash=$(nix hash file ./fetchurl.sh)
 
 [[ $hash =~ ^sha256- ]]
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr hash $hash --no-out-link --hashed-mirrors '')
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr hash $hash --no-out-link)
 
 cmp $outPath fetchurl.sh
 
-# Test the hashed mirror feature.
+# Test that we can substitute from a different store dir.
 clearStore
 
-hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
-hash32=$(nix hash-file --type sha512 --base16 ./fetchurl.sh)
+other_store=file://$TEST_ROOT/other_store?store=/fnord/store
 
-mirror=$TEST_ROOT/hashed-mirror
-rm -rf $mirror
-mkdir -p $mirror/sha512
-ln -s $(pwd)/fetchurl.sh $mirror/sha512/$hash32
+hash=$(nix hash file --type sha256 --base16 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors "file://$mirror")
+storePath=$(nix --store $other_store store add-file ./fetchurl.sh)
+
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
 
 # Test hashed mirrors with an SRI hash.
-nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix to-sri --type sha512 $hash) \
-          --argstr name bla --no-out-link --hashed-mirrors "file://$mirror"
+nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix hash to-sri --type sha256 $hash) \
+          --no-out-link --substituters $other_store
 
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
@@ -57,7 +55,7 @@ nix-store --dump $TEST_ROOT/archive > $nar
 
 hash=$(nix-hash --flat --type sha256 $nar)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
 echo $outPath | grep -q 'xyzzy'
@@ -71,7 +69,7 @@ nix-store --delete $outPath
 narxz=$TEST_ROOT/archive.nar.xz
 rm -f $narxz
 xz --keep $nar
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
 test -x $outPath/fetchurl.sh

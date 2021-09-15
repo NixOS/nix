@@ -117,6 +117,24 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
+    TEST(parseURL, parseScopedRFC4007IPv6Address) {
+        auto s = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080";
+        auto parsed = parseURL(s);
+
+        ParsedURL expected {
+            .url = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .base = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .scheme = "http",
+            .authority = "[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .path = "",
+            .query = (StringMap) { },
+            .fragment = "",
+        };
+
+        ASSERT_EQ(parsed, expected);
+
+    }
+
     TEST(parseURL, parseIPv6Address) {
         auto s = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080";
         auto parsed = parseURL(s);

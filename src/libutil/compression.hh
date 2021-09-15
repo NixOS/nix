@@ -8,14 +8,16 @@
 
 namespace nix {
 
-struct CompressionSink : BufferedSink
+struct CompressionSink : BufferedSink, FinishSink
 {
-    virtual void finish() = 0;
+    using BufferedSink::operator ();
+    using BufferedSink::write;
+    using FinishSink::finish;
 };
 
 ref<std::string> decompress(const std::string & method, const std::string & in);
 
-ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
+std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
 
 ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel = false);
 

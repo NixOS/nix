@@ -17,7 +17,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using std::cin;
@@ -33,18 +33,18 @@ std::string escapeUri(std::string uri)
 
 static string currentLoad;
 
-static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
+static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-static bool allSupportedLocally(const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
     for (auto & feature : requiredFeatures)
-        if (!settings.systemFeatures.get().count(feature)) return false;
+        if (!store.systemFeatures.get().count(feature)) return false;
     return true;
 }
 
-static int _main(int argc, char * * argv)
+static int main_build_remote(int argc, char * * argv)
 {
     {
         logger = makeJSONLogger(*logger);
@@ -53,6 +53,9 @@ static int _main(int argc, char * * argv)
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
 
+        /* If we ever use the common args framework, make sure to
+           remove initPlugins below and initialize settings first.
+        */
         if (argc != 2)
             throw UsageError("called without required arguments");
 
@@ -71,11 +74,15 @@ static int _main(int argc, char * * argv)
 
         initPlugins();
 
-        auto store = openStore().cast<LocalStore>();
+        auto store = openStore();
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
-        currentLoad = store->stateDir + "/current-load";
+        auto currentLoadName = "/current-load";
+        if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
+            currentLoad = std::string { localStore->stateDir } + currentLoadName;
+        else
+            currentLoad = settings.nixStateDir + currentLoadName;
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
@@ -103,10 +110,10 @@ static int _main(int argc, char * * argv)
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-             auto canBuildLocally = amWilling
+            auto canBuildLocally = amWilling
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
-                 &&  allSupportedLocally(requiredFeatures);
+                 &&  allSupportedLocally(*store, requiredFeatures);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -119,7 +126,7 @@ static int _main(int argc, char * * argv)
                 bool rightType = false;
 
                 Machine * bestMachine = nullptr;
-                unsigned long long bestLoad = 0;
+                uint64_t bestLoad = 0;
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
@@ -130,8 +137,8 @@ static int _main(int argc, char * * argv)
                         m.mandatoryMet(requiredFeatures)) {
                         rightType = true;
                         AutoCloseFD free;
-                        unsigned long long load = 0;
-                        for (unsigned long long slot = 0; slot < m.maxJobs; ++slot) {
+                        uint64_t load = 0;
+                        for (uint64_t slot = 0; slot < m.maxJobs; ++slot) {
                             auto slotLock = openSlotLock(m, slot);
                             if (lockFile(slotLock.get(), ltWrite, false)) {
                                 if (!free) {
@@ -170,7 +177,42 @@ static int _main(int argc, char * * argv)
                     if (rightType && !canBuildLocally)
                         std::cerr << "# postpone\n";
                     else
+                    {
+                        // build the hint template.
+                        string errorText =
+                            "Failed to find a machine for remote build!\n"
+                            "derivation: %s\nrequired (system, features): (%s, %s)";
+                        errorText += "\n%s available machines:";
+                        errorText += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
+
+                        for (unsigned int i = 0; i < machines.size(); ++i)
+                            errorText += "\n(%s, %s, %s, %s)";
+
+                        // add the template values.
+                        string drvstr;
+                        if (drvPath.has_value())
+                            drvstr = drvPath->to_string();
+                        else
+                            drvstr = "<unknown>";
+
+                        auto error = hintformat(errorText);
+                        error
+                            % drvstr
+                            % neededSystem
+                            % concatStringsSep<StringSet>(", ", requiredFeatures)
+                            % machines.size();
+
+                        for (auto & m : machines)
+                            error
+                                % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                                % m.maxJobs
+                                % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+                                % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+
+                        printMsg(canBuildLocally ? lvlChatty : lvlWarn, error);
+
                         std::cerr << "# decline\n";
+                    }
                     break;
                 }
 
@@ -186,26 +228,15 @@ static int _main(int argc, char * * argv)
 
                     Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
 
-                    Store::Params storeParams;
-                    if (hasPrefix(bestMachine->storeUri, "ssh://")) {
-                        storeParams["max-connections"] = "1";
-                        storeParams["log-fd"] = "4";
-                        if (bestMachine->sshKey != "")
-                            storeParams["ssh-key"] = bestMachine->sshKey;
-                    }
-
-                    sshStore = openStore(bestMachine->storeUri, storeParams);
+                    sshStore = bestMachine->openStore();
                     sshStore->connect();
                     storeUri = bestMachine->storeUri;
 
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
-                    logError({
-                        .name = "Remote build",
-                        .hint = hintfmt("cannot build on '%s': %s%s",
-                            bestMachine->storeUri, e.what(),
-                            (msg.empty() ? "" : ": " + msg))
-                    });
+                    printError("cannot build on '%s': %s%s",
+                        bestMachine->storeUri, e.what(),
+                        msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
                 }
@@ -220,7 +251,7 @@ connected:
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
-        auto outputs = readStrings<PathSet>(source);
+        auto wantedOutputs = readStrings<StringSet>(source);
 
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 
@@ -239,32 +270,69 @@ connected:
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
-        drv.inputSrcs = store->parseStorePathSet(inputs);
+        auto outputHashes = staticOutputHashes(*store, drv);
+
+        // Hijack the inputs paths of the derivation to include all the paths
+        // that come from the `inputDrvs` set.
+        // We don’t do that for the derivations whose `inputDrvs` is empty
+        // because
+        // 1. It’s not needed
+        // 2. Changing the `inputSrcs` set changes the associated output ids,
+        //  which break CA derivations
+        if (!drv.inputDrvs.empty())
+            drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);
 
         if (!result.success())
             throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
 
-        StorePathSet missing;
-        for (auto & path : outputs)
-            if (!store->isValidPath(store->parseStorePath(path))) missing.insert(store->parseStorePath(path));
+        std::set<Realisation> missingRealisations;
+        StorePathSet missingPaths;
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+            for (auto & outputName : wantedOutputs) {
+                auto thisOutputHash = outputHashes.at(outputName);
+                auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
+                if (!store->queryRealisation(thisOutputId)) {
+                    debug("missing output %s", outputName);
+                    assert(result.builtOutputs.count(thisOutputId));
+                    auto newRealisation = result.builtOutputs.at(thisOutputId);
+                    missingRealisations.insert(newRealisation);
+                    missingPaths.insert(newRealisation.outPath);
+                }
+            }
+        } else {
+            auto outputPaths = drv.outputsAndOptPaths(*store);
+            for (auto & [outputName, hopefullyOutputPath] : outputPaths) {
+                assert(hopefullyOutputPath.second);
+                if (!store->isValidPath(*hopefullyOutputPath.second))
+                    missingPaths.insert(*hopefullyOutputPath.second);
+            }
+        }
 
-        if (!missing.empty()) {
+        if (!missingPaths.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
-            for (auto & i : missing)
-                store->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
+            if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
+                for (auto & path : missingPaths)
+                    localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
+            copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
+        }
+        // XXX: Should be done as part of `copyPaths`
+        for (auto & realisation : missingRealisations) {
+            // Should hold, because if the feature isn't enabled the set
+            // of missing realisations should be empty
+            settings.requireExperimentalFeature("ca-derivations");
+            store->registerDrvOutput(realisation);
         }
 
         return 0;
     }
 }
 
-static RegisterLegacyCommand s1("build-remote", _main);
+static RegisterLegacyCommand r_build_remote("build-remote", main_build_remote);

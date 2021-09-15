@@ -32,7 +32,7 @@ namespace nix {
         Path basePath;
         Symbol file;
         FileOrigin origin;
-        ErrorInfo error;
+        std::optional<ErrorInfo> error;
         Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
@@ -66,8 +66,8 @@ namespace nix {
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError({
-         .hint = hintfmt("attribute '%1%' already defined at %2%",
-            showAttrPath(attrPath), prevPos),
+         .msg = hintfmt("attribute '%1%' already defined at %2%",
+             showAttrPath(attrPath), prevPos),
          .errPos = pos
     });
 }
@@ -75,7 +75,7 @@ static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prev
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError({
-        .hint = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
+        .msg = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
         .errPos = pos
     });
 }
@@ -146,7 +146,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (!formals->argNames.insert(formal.name).second)
         throw ParseError({
-            .hint = hintfmt("duplicate formal function argument '%1%'",
+            .msg = hintfmt("duplicate formal function argument '%1%'",
                 formal.name),
             .errPos = pos
         });
@@ -258,7 +258,7 @@ static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
     data->error = {
-        .hint = hintfmt(error),
+        .msg = hintfmt(error),
         .errPos = makeCurPos(*loc, data)
     };
 }
@@ -290,13 +290,13 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts_interpolated ind_string_parts
-%type <e> string_parts string_attr
+%type <e> path_start string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
-%token <path> PATH HPATH SPATH
+%token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
@@ -338,7 +338,7 @@ expr_function
   | LET binds IN expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
-            .hint = hintfmt("dynamic attributes not allowed in let"),
+            .msg = hintfmt("dynamic attributes not allowed in let"),
             .errPos = CUR_POS
         });
       $$ = new ExprLet($2, $4);
@@ -405,8 +405,11 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
-  | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
-  | HPATH { $$ = new ExprPath(getHome() + string{$1 + 1}); }
+  | path_start PATH_END { $$ = $1; }
+  | path_start string_parts_interpolated PATH_END {
+      $2->insert($2->begin(), $1);
+      $$ = new ExprConcatStrings(CUR_POS, false, $2);
+  }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
       $$ = new ExprApp(CUR_POS,
@@ -418,7 +421,7 @@ expr_simple
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
       if (noURLLiterals)
           throw ParseError({
-              .hint = hintfmt("URL literals are disabled"),
+              .msg = hintfmt("URL literals are disabled"),
               .errPos = CUR_POS
           });
       $$ = new ExprString(data->symbols.create($1));
@@ -452,6 +455,20 @@ string_parts_interpolated
     }
   ;
 
+path_start
+  : PATH {
+    Path path(absPath($1, data->basePath));
+    /* add back in the trailing '/' to the first segment */
+    if ($1[strlen($1)-1] == '/' && strlen($1) > 1)
+      path += "/";
+    $$ = new ExprPath(path);
+  }
+  | HPATH {
+    Path path(getHome() + string($1 + 1));
+    $$ = new ExprPath(path);
+  }
+  ;
+
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
@@ -478,7 +495,7 @@ binds
           $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data));
       }
     }
-  | { $$ = new ExprAttrs; }
+  | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
   ;
 
 attrs
@@ -491,7 +508,7 @@ attrs
           delete str;
       } else
           throw ParseError({
-              .hint = hintfmt("dynamic attributes not allowed in inherit"),
+              .msg = hintfmt("dynamic attributes not allowed in inherit"),
               .errPos = makeCurPos(@2, data)
           });
     }
@@ -576,7 +593,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     ParseData data(*this);
     data.origin = origin;
     switch (origin) {
-        case foFile: 
+        case foFile:
             data.file = data.symbols.create(path);
             break;
         case foStdin:
@@ -593,7 +610,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
-    if (res) throw ParseError(data.error);
+    if (res) throw ParseError(data.error.value());
 
     data.result->bindVars(staticEnv);
 
@@ -614,8 +631,7 @@ Path resolveExprPath(Path path)
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
-        if (lstat(path.c_str(), &st))
-            throw SysError("getting status of '%s'", path);
+        st = lstat(path);
         if (!S_ISLNK(st.st_mode)) break;
         path = absPath(readLink(path), dirOf(path));
     }
@@ -699,8 +715,12 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
+
+    if (hasPrefix(path, "nix/"))
+        return corepkgsPrefix + path.substr(4);
+
     throw ThrownError({
-        .hint = hintfmt(evalSettings.pureEval
+        .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
@@ -719,11 +739,10 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
     if (isUri(elem.second)) {
         try {
             res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).storePath) };
+                        store, resolveUri(elem.second), "source", false).first.storePath) };
         } catch (FileTransferError & e) {
             logWarning({
-                .name = "Entry download",
-                .hint = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
             res = { false, "" };
         }
@@ -733,8 +752,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, path };
         else {
             logWarning({
-                .name = "Entry not found",
-                .hint = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }

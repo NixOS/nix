@@ -10,29 +10,20 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 {
     CmdMakeContentAddressable()
     {
-        realiseMode = Build;
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override
     {
-        return "rewrite a path or closure to content-addressable form";
+        return "rewrite a path or closure to content-addressed form";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To create a content-addressable representation of GNU Hello (but not its dependencies):",
-                "nix make-content-addressable nixpkgs.hello"
-            },
-            Example{
-                "To compute a content-addressable representation of the current NixOS system closure:",
-                "nix make-content-addressable -r /run/current-system"
-            },
-        };
+        return
+          #include "make-content-addressable.md"
+          ;
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store, StorePaths storePaths) override
     {
@@ -73,14 +64,16 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             *sink.s = rewriteStrings(*sink.s, rewrites);
 
             HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-            hashModuloSink((unsigned char *) sink.s->data(), sink.s->size());
+            hashModuloSink(*sink.s);
 
             auto narHash = hashModuloSink.finish().first;
 
-            ValidPathInfo info(store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference));
+            ValidPathInfo info {
+                store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference),
+                narHash,
+            };
             info.references = std::move(references);
             if (hasSelfReference) info.references.insert(info.path);
-            info.narHash = narHash;
             info.narSize = sink.s->size();
             info.ca = FixedOutputHash {
                 .method = FileIngestionMethod::Recursive,
@@ -88,11 +81,11 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
             };
 
             if (!json)
-                printInfo("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
+                notice("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
 
             auto source = sinkToSource([&](Sink & nextSink) {
                 RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-                rsink2((unsigned char *) sink.s->data(), sink.s->size());
+                rsink2(*sink.s);
                 rsink2.flush();
             });
 
@@ -106,4 +99,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto r1 = registerCommand<CmdMakeContentAddressable>("make-content-addressable");
+static auto rCmdMakeContentAddressable = registerCommand2<CmdMakeContentAddressable>({"store", "make-content-addressable"});

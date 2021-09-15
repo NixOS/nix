@@ -61,6 +61,11 @@ void SQLite::exec(const std::string & stmt)
     });
 }
 
+uint64_t SQLite::getLastInsertedRowId()
+{
+    return sqlite3_last_insert_rowid(db);
+}
+
 void SQLiteStmt::create(sqlite3 * db, const string & sql)
 {
     checkInterrupt();
@@ -95,10 +100,10 @@ SQLiteStmt::Use::~Use()
     sqlite3_reset(stmt);
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (const std::string & value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool notNull)
 {
     if (notNull) {
-        if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        if (sqlite3_bind_text(stmt, curArg++, value.data(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
             throwSQLiteError(stmt.db, "binding argument");
     } else
         bind();
@@ -142,14 +147,14 @@ void SQLiteStmt::Use::exec()
     int r = step();
     assert(r != SQLITE_ROW);
     if (r != SQLITE_DONE)
-        throwSQLiteError(stmt.db, fmt("executing SQLite statement '%s'", stmt.sql));
+        throwSQLiteError(stmt.db, fmt("executing SQLite statement '%s'", sqlite3_expanded_sql(stmt.stmt)));
 }
 
 bool SQLiteStmt::Use::next()
 {
     int r = step();
     if (r != SQLITE_DONE && r != SQLITE_ROW)
-        throwSQLiteError(stmt.db, fmt("executing SQLite query '%s'", stmt.sql));
+        throwSQLiteError(stmt.db, fmt("executing SQLite query '%s'", sqlite3_expanded_sql(stmt.stmt)));
     return r == SQLITE_ROW;
 }
 
@@ -206,7 +211,7 @@ void handleSQLiteBusy(const SQLiteBusy & e)
         lastWarned = now;
         logWarning({
             .name = "Sqlite busy",
-            .hint = hintfmt(e.what())
+            .msg = hintfmt(e.what())
         });
     }
 

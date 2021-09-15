@@ -4,6 +4,8 @@
 
 #include "types.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 #pragma once
 
 namespace nix {
@@ -42,8 +44,6 @@ namespace nix {
 
 class Args;
 class AbstractSetting;
-class JSONPlaceholder;
-class JSONObject;
 
 class AbstractConfig
 {
@@ -71,9 +71,9 @@ public:
     /**
      * Adds the currently known settings to the given result map `res`.
      * - res: map to store settings in
-     * - overridenOnly: when set to true only overridden settings will be added to `res`
+     * - overriddenOnly: when set to true only overridden settings will be added to `res`
      */
-    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) = 0;
+    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) = 0;
 
     /**
      * Parses the configuration in `contents` and applies it
@@ -91,13 +91,19 @@ public:
     /**
      * Resets the `overridden` flag of all Settings
      */
-    virtual void resetOverriden() = 0;
+    virtual void resetOverridden() = 0;
 
     /**
      * Outputs all settings to JSON
      * - out: JSONObject to write the configuration to
      */
-    virtual void toJSON(JSONObject & out) = 0;
+    virtual nlohmann::json toJSON() = 0;
+
+    /**
+     * Outputs all settings in a key-value pair format suitable to be used as
+     * `nix.conf`
+     */
+    virtual std::string toKeyValue() = 0;
 
     /**
      * Converts settings to `Args` to be used on the command line interface
@@ -127,7 +133,7 @@ public:
 
      MyClass() : Config(readConfigFile("/etc/my-app.conf"))
      {
-       std::cout << foo << "\n"; // will print 123 unless overriden
+       std::cout << foo << "\n"; // will print 123 unless overridden
      }
    };
 */
@@ -163,11 +169,13 @@ public:
 
     void addSetting(AbstractSetting * setting);
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
 
-    void resetOverriden() override;
+    void resetOverridden() override;
 
-    void toJSON(JSONObject & out) override;
+    nlohmann::json toJSON() override;
+
+    std::string toKeyValue() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 };
@@ -184,7 +192,7 @@ public:
 
     int created = 123;
 
-    bool overriden = false;
+    bool overridden = false;
 
     void setDefault(const std::string & str);
 
@@ -202,15 +210,20 @@ protected:
         assert(created == 123);
     }
 
-    virtual void set(const std::string & value) = 0;
+    virtual void set(const std::string & value, bool append = false) = 0;
+
+    virtual bool isAppendable()
+    { return false; }
 
     virtual std::string to_string() const = 0;
 
-    virtual void toJSON(JSONPlaceholder & out);
+    nlohmann::json toJSON();
+
+    virtual std::map<std::string, nlohmann::json> toJSONObject();
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverriden() const { return overriden; }
+    bool isOverridden() const { return overridden; }
 };
 
 /* A setting of type T. */
@@ -220,6 +233,7 @@ class BaseSetting : public AbstractSetting
 protected:
 
     T value;
+    const T defaultValue;
 
 public:
 
@@ -229,6 +243,7 @@ public:
         const std::set<std::string> & aliases = {})
         : AbstractSetting(name, description, aliases)
         , value(def)
+        , defaultValue(def)
     { }
 
     operator const T &() const { return value; }
@@ -239,11 +254,13 @@ public:
     void operator =(const T & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
+
+    bool isAppendable() override;
 
     virtual void override(const T & v)
     {
-        overriden = true;
+        overridden = true;
         value = v;
     }
 
@@ -251,7 +268,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    void toJSON(JSONPlaceholder & out) override;
+    std::map<std::string, nlohmann::json> toJSONObject() override;
 };
 
 template<typename T>
@@ -301,7 +318,7 @@ public:
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
 
     Path operator +(const char * p) const { return value + p; }
 
@@ -315,11 +332,13 @@ struct GlobalConfig : public AbstractConfig
 
     bool set(const std::string & name, const std::string & value) override;
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
 
-    void resetOverriden() override;
+    void resetOverridden() override;
 
-    void toJSON(JSONObject & out) override;
+    nlohmann::json toJSON() override;
+
+    std::string toKeyValue() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

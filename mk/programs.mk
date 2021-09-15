@@ -32,7 +32,7 @@ define build-program
   $$(eval $$(call create-dir, $$(_d)))
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$$(trace-ld) $(CXX) -o $$@ $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS)
 
   $(1)_INSTALL_DIR ?= $$(bindir)
 
@@ -49,7 +49,7 @@ define build-program
       _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
       $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
-	$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$$(trace-ld) $(CXX) -o $$@ $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED)) $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS)
 
     else
 
@@ -79,7 +79,6 @@ define build-program
 
   programs-list += $$($(1)_PATH)
   clean-files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
-  dist-files += $$(_srcs)
 
   # Phony target to run this program (typically as a dependency of 'check').
   .PHONY: $(1)_RUN

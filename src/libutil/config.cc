@@ -1,15 +1,26 @@
 #include "config.hh"
 #include "args.hh"
-#include "json.hh"
+#include "abstract-setting-to-json.hh"
+
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
 bool Config::set(const std::string & name, const std::string & value)
 {
+    bool append = false;
     auto i = _settings.find(name);
-    if (i == _settings.end()) return false;
-    i->second.setting->set(value);
-    i->second.setting->overriden = true;
+    if (i == _settings.end()) {
+        if (hasPrefix(name, "extra-")) {
+            i = _settings.find(std::string(name, 6));
+            if (i == _settings.end() || !i->second.setting->isAppendable())
+                return false;
+            append = true;
+        } else
+            return false;
+    }
+    i->second.setting->set(value, append);
+    i->second.setting->overridden = true;
     return true;
 }
 
@@ -24,7 +35,7 @@ void Config::addSetting(AbstractSetting * setting)
     auto i = unknownSettings.find(setting->name);
     if (i != unknownSettings.end()) {
         setting->set(i->second);
-        setting->overriden = true;
+        setting->overridden = true;
         unknownSettings.erase(i);
         set = true;
     }
@@ -37,7 +48,7 @@ void Config::addSetting(AbstractSetting * setting)
                     alias, setting->name);
             else {
                 setting->set(i->second);
-                setting->overriden = true;
+                setting->overridden = true;
                 unknownSettings.erase(i);
                 set = true;
             }
@@ -58,10 +69,10 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & opt : _settings)
-        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
+        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
@@ -125,21 +136,30 @@ void AbstractConfig::applyConfigFile(const Path & path)
     } catch (SysError &) { }
 }
 
-void Config::resetOverriden()
+void Config::resetOverridden()
 {
     for (auto & s : _settings)
-        s.second.setting->overriden = false;
+        s.second.setting->overridden = false;
 }
 
-void Config::toJSON(JSONObject & out)
+nlohmann::json Config::toJSON()
 {
+    auto res = nlohmann::json::object();
     for (auto & s : _settings)
         if (!s.second.isAlias) {
-            JSONObject out2(out.object(s.first));
-            out2.attr("description", s.second.setting->description);
-            JSONPlaceholder out3(out2.placeholder("value"));
-            s.second.setting->toJSON(out3);
+            res.emplace(s.first, s.second.setting->toJSON());
         }
+    return res;
+}
+
+std::string Config::toKeyValue()
+{
+    auto res = std::string();
+    for (auto & s : _settings)
+        if (!s.second.isAlias) {
+            res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
+        }
+    return res;
 }
 
 void Config::convertToArgs(Args & args, const std::string & category)
@@ -153,18 +173,26 @@ AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
     const std::set<std::string> & aliases)
-    : name(name), description(description), aliases(aliases)
+    : name(name), description(stripIndentation(description)), aliases(aliases)
 {
 }
 
 void AbstractSetting::setDefault(const std::string & str)
 {
-    if (!overriden) set(str);
+    if (!overridden) set(str);
 }
 
-void AbstractSetting::toJSON(JSONPlaceholder & out)
+nlohmann::json AbstractSetting::toJSON()
 {
-    out.write(to_string());
+    return nlohmann::json(toJSONObject());
+}
+
+std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
+{
+    std::map<std::string, nlohmann::json> obj;
+    obj.emplace("description", description);
+    obj.emplace("aliases", aliases);
+    return obj;
 }
 
 void AbstractSetting::convertToArg(Args & args, const std::string & category)
@@ -172,9 +200,9 @@ void AbstractSetting::convertToArg(Args & args, const std::string & category)
 }
 
 template<typename T>
-void BaseSetting<T>::toJSON(JSONPlaceholder & out)
+bool BaseSetting<T>::isAppendable()
 {
-    out.write(value);
+    return false;
 }
 
 template<typename T>
@@ -182,14 +210,23 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
-        .description = description,
+        .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
-        .handler = {[=](std::string s) { overriden = true; set(s); }},
+        .handler = {[=](std::string s) { overridden = true; set(s); }},
     });
+
+    if (isAppendable())
+        args.addFlag({
+            .longName = "extra-" + name,
+            .description = fmt("Append to the `%s` setting.", name),
+            .category = category,
+            .labels = {"value"},
+            .handler = {[=](std::string s) { overridden = true; set(s, true); }},
+        });
 }
 
-template<> void BaseSetting<std::string>::set(const std::string & str)
+template<> void BaseSetting<std::string>::set(const std::string & str, bool append)
 {
     value = str;
 }
@@ -200,10 +237,12 @@ template<> std::string BaseSetting<std::string>::to_string() const
 }
 
 template<typename T>
-void BaseSetting<T>::set(const std::string & str)
+void BaseSetting<T>::set(const std::string & str, bool append)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
-    if (!string2Int(str, value))
+    if (auto n = string2Int<T>(str))
+        value = *n;
+    else
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
 }
 
@@ -214,7 +253,7 @@ std::string BaseSetting<T>::to_string() const
     return std::to_string(value);
 }
 
-template<> void BaseSetting<bool>::set(const std::string & str)
+template<> void BaseSetting<bool>::set(const std::string & str, bool append)
 {
     if (str == "true" || str == "yes" || str == "1")
         value = true;
@@ -233,21 +272,28 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
-        .description = description,
+        .description = fmt("Enable the `%s` setting.", name),
         .category = category,
         .handler = {[=]() { override(true); }}
     });
     args.addFlag({
         .longName = "no-" + name,
-        .description = description,
+        .description = fmt("Disable the `%s` setting.", name),
         .category = category,
         .handler = {[=]() { override(false); }}
     });
 }
 
-template<> void BaseSetting<Strings>::set(const std::string & str)
+template<> void BaseSetting<Strings>::set(const std::string & str, bool append)
 {
-    value = tokenizeString<Strings>(str);
+    auto ss = tokenizeString<Strings>(str);
+    if (!append) value.clear();
+    for (auto & s : ss) value.push_back(std::move(s));
+}
+
+template<> bool BaseSetting<Strings>::isAppendable()
+{
+    return true;
 }
 
 template<> std::string BaseSetting<Strings>::to_string() const
@@ -255,16 +301,16 @@ template<> std::string BaseSetting<Strings>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<Strings>::toJSON(JSONPlaceholder & out)
+template<> void BaseSetting<StringSet>::set(const std::string & str, bool append)
 {
-    JSONList list(out.list());
-    for (auto & s : value)
-        list.elem(s);
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<StringSet>(str))
+        value.insert(s);
 }
 
-template<> void BaseSetting<StringSet>::set(const std::string & str)
+template<> bool BaseSetting<StringSet>::isAppendable()
 {
-    value = tokenizeString<StringSet>(str);
+    return true;
 }
 
 template<> std::string BaseSetting<StringSet>::to_string() const
@@ -272,11 +318,28 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringSet>::toJSON(JSONPlaceholder & out)
+template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
 {
-    JSONList list(out.list());
-    for (auto & s : value)
-        list.elem(s);
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<Strings>(str)) {
+        auto eq = s.find_first_of('=');
+        if (std::string::npos != eq)
+            value.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
+        // else ignored
+    }
+}
+
+template<> bool BaseSetting<StringMap>::isAppendable()
+{
+    return true;
+}
+
+template<> std::string BaseSetting<StringMap>::to_string() const
+{
+    Strings kvstrs;
+    std::transform(value.begin(), value.end(), back_inserter(kvstrs),
+        [&](auto kvpair){ return kvpair.first + "=" + kvpair.second; });
+    return concatStringsSep(" ", kvstrs);
 }
 
 template class BaseSetting<int>;
@@ -289,8 +352,9 @@ template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
+template class BaseSetting<StringMap>;
 
-void PathSetting::set(const std::string & str)
+void PathSetting::set(const std::string & str, bool append)
 {
     if (str == "") {
         if (allowEmpty)
@@ -311,22 +375,34 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
     return false;
 }
 
-void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & config : *configRegistrations)
-        config->getSettings(res, overridenOnly);
+        config->getSettings(res, overriddenOnly);
 }
 
-void GlobalConfig::resetOverriden()
+void GlobalConfig::resetOverridden()
 {
     for (auto & config : *configRegistrations)
-        config->resetOverriden();
+        config->resetOverridden();
 }
 
-void GlobalConfig::toJSON(JSONObject & out)
+nlohmann::json GlobalConfig::toJSON()
 {
+    auto res = nlohmann::json::object();
     for (auto & config : *configRegistrations)
-        config->toJSON(out);
+        res.update(config->toJSON());
+    return res;
+}
+
+std::string GlobalConfig::toKeyValue()
+{
+    std::string res;
+    std::map<std::string, Config::SettingInfo> settings;
+    globalConfig.getSettings(settings);
+    for (auto & s : settings)
+        res += fmt("%s = %s\n", s.first, s.second.value);
+    return res;
 }
 
 void GlobalConfig::convertToArgs(Args & args, const std::string & category)

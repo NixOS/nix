@@ -4,6 +4,12 @@ clearStore
 
 rm -f $TEST_ROOT/result*
 
+# Test whether the output names match our expectations
+outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.out.outPath)
+[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a" ]
+outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.dev.outPath)
+[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a-dev" ]
+
 # Test whether read-only evaluation works when referring to the
 # ‘drvPath’ attribute.
 echo "evaluating c..."
@@ -52,7 +58,7 @@ outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a.second) --no-ou
 
 # Delete one of the outputs and rebuild it.  This will cause a hash
 # rewrite.
-nix-store --delete $TEST_ROOT/result-second --ignore-liveness
+env -u NIX_REMOTE nix store delete $TEST_ROOT/result-second --ignore-liveness
 nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]

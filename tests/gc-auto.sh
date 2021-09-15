@@ -1,10 +1,12 @@
 source common.sh
 
+needLocalStore "“min-free” and “max-free” are daemon options"
+
 clearStore
 
-garbage1=$(nix add-to-store --name garbage1 ./nar-access.sh)
-garbage2=$(nix add-to-store --name garbage2 ./nar-access.sh)
-garbage3=$(nix add-to-store --name garbage3 ./nar-access.sh)
+garbage1=$(nix store add-path --name garbage1 ./nar-access.sh)
+garbage2=$(nix store add-path --name garbage2 ./nar-access.sh)
+garbage3=$(nix store add-path --name garbage3 ./nar-access.sh)
 
 ls -l $garbage3
 POSIXLY_CORRECT=1 du $garbage3
@@ -59,11 +61,11 @@ with import ./config.nix; mkDerivation {
 EOF
 )
 
-nix build -v -o $TEST_ROOT/result-A -L "($expr)" \
+nix build --impure -v -o $TEST_ROOT/result-A -L --expr "$expr" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
 pid1=$!
 
-nix build -v -o $TEST_ROOT/result-B -L "($expr2)" \
+nix build --impure -v -o $TEST_ROOT/result-B -L --expr "$expr2" \
     --min-free 1000 --max-free 2000 --min-free-check-interval 1 &
 pid2=$!
 

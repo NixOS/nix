@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "--repair needs a local store"
+
 clearStore
 
 path=$(nix-build dependencies.nix -o $TEST_ROOT/result)
@@ -13,13 +15,13 @@ hash=$(nix-hash $path2)
 chmod u+w $path2
 touch $path2/bad
 
-if nix-store --verify --check-contents -v; then
-    echo "nix-store --verify succeeded unexpectedly" >&2
-    exit 1
-fi
+(! nix-store --verify --check-contents -v)
 
 # The path can be repaired by rebuilding the derivation.
 nix-store --verify --check-contents --repair
+
+(! [ -e $path2/bad ])
+(! [ -w $path2 ])
 
 nix-store --verify-path $path2
 
@@ -30,10 +32,7 @@ touch $path2/bad
 
 nix-store --delete $(nix-store -qd $path2)
 
-if nix-store --verify --check-contents --repair; then
-    echo "nix-store --verify --repair succeeded unexpectedly" >&2
-    exit 1
-fi
+(! nix-store --verify --check-contents --repair)
 
 nix-build dependencies.nix -o $TEST_ROOT/result --repair
 

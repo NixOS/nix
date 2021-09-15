@@ -1,3 +1,4 @@
+#include "run.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -20,45 +21,47 @@ using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";
 
-struct RunCommon : virtual Command
+namespace nix {
+
+void runProgramInStore(ref<Store> store,
+    const std::string & program,
+    const Strings & args)
 {
-    void runProgram(ref<Store> store,
-        const std::string & program,
-        const Strings & args)
-    {
-        stopProgressBar();
+    stopProgressBar();
 
-        restoreSignals();
+    restoreProcessContext();
 
-        restoreAffinity();
+    /* If this is a diverted store (i.e. its "logical" location
+       (typically /nix/store) differs from its "physical" location
+       (e.g. /home/eelco/nix/store), then run the command in a
+       chroot. For non-root users, this requires running it in new
+       mount and user namespaces. Unfortunately,
+       unshare(CLONE_NEWUSER) doesn't work in a multithreaded program
+       (which "nix" is), so we exec() a single-threaded helper program
+       (chrootHelper() below) to do the work. */
+    auto store2 = store.dynamic_pointer_cast<LocalStore>();
 
-        /* If this is a diverted store (i.e. its "logical" location
-           (typically /nix/store) differs from its "physical" location
-           (e.g. /home/eelco/nix/store), then run the command in a
-           chroot. For non-root users, this requires running it in new
-           mount and user namespaces. Unfortunately,
-           unshare(CLONE_NEWUSER) doesn't work in a multithreaded
-           program (which "nix" is), so we exec() a single-threaded
-           helper program (chrootHelper() below) to do the work. */
-        auto store2 = store.dynamic_pointer_cast<LocalStore>();
+    if (store2 && store->storeDir != store2->getRealStoreDir()) {
+        Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), program };
+        for (auto & arg : args) helperArgs.push_back(arg);
 
-        if (store2 && store->storeDir != store2->realStoreDir) {
-            Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, program };
-            for (auto & arg : args) helperArgs.push_back(arg);
+        execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
 
-            execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
-
-            throw SysError("could not execute chroot helper");
-        }
-
-        execvp(program.c_str(), stringsToCharPtrs(args).data());
-
-        throw SysError("unable to execute '%s'", program);
+        throw SysError("could not execute chroot helper");
     }
-};
 
-struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
+    execvp(program.c_str(), stringsToCharPtrs(args).data());
+
+    throw SysError("unable to execute '%s'", program);
+}
+
+}
+
+struct CmdShell : InstallablesCommand, MixEnvironment
 {
+
+    using InstallablesCommand::run;
+
     std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
 
     CmdShell()
@@ -66,7 +69,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         addFlag({
             .longName = "command",
             .shortName = 'c',
-            .description = "command and arguments to be executed; defaults to '$SHELL'",
+            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
             .labels = {"command", "args"},
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
@@ -80,34 +83,18 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         return "run a shell in which the specified packages are available";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To start a shell providing GNU Hello from NixOS 17.03:",
-                "nix shell -f channel:nixos-17.03 hello"
-            },
-            Example{
-                "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
-                "nix shell nixpkgs.youtube-dl"
-            },
-            Example{
-                "To run GNU Hello:",
-                "nix shell nixpkgs.hello -c hello --greeting 'Hi everybody!'"
-            },
-            Example{
-                "To run GNU Hello in a chroot store:",
-                "nix shell --store ~/my-nix nixpkgs.hello -c hello"
-            },
-        };
+        return
+          #include "shell.md"
+          ;
     }
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(store, Build, installables);
+        auto outPaths = toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
 
         auto accessor = store->getFSAccessor();
-
 
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
@@ -137,11 +124,69 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
-        runProgram(store, *command.begin(), args);
+        runProgramInStore(store, *command.begin(), args);
     }
 };
 
-static auto r1 = registerCommand<CmdShell>("shell");
+static auto rCmdShell = registerCommand<CmdShell>("shell");
+
+struct CmdRun : InstallableCommand
+{
+    using InstallableCommand::run;
+
+    std::vector<std::string> args;
+
+    CmdRun()
+    {
+        expectArgs({
+            .label = "args",
+            .handler = {&args},
+            .completer = completePath
+        });
+    }
+
+    std::string description() override
+    {
+        return "run a Nix application";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "run.md"
+          ;
+    }
+
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        Strings res{"defaultApp." + settings.thisSystem.get()};
+        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
+            res.push_back(s);
+        return res;
+    }
+
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        Strings res{"apps." + settings.thisSystem.get() + "."};
+        for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
+            res.push_back(s);
+        return res;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto state = getEvalState();
+
+        auto app = installable->toApp(*state).resolve(getEvalStore(), store);
+
+        Strings allArgs{app.program};
+        for (auto & i : args) allArgs.push_back(i);
+
+        runProgramInStore(store, app.program, allArgs);
+    }
+};
+
+static auto rCmdRun = registerCommand<CmdRun>("run");
 
 void chrootHelper(int argc, char * * argv)
 {
@@ -182,14 +227,16 @@ void chrootHelper(int argc, char * * argv)
 
         for (auto entry : readDirectory("/")) {
             auto src = "/" + entry.name;
-            auto st = lstat(src);
-            if (!S_ISDIR(st.st_mode)) continue;
             Path dst = tmpDir + "/" + entry.name;
             if (pathExists(dst)) continue;
-            if (mkdir(dst.c_str(), 0700) == -1)
-                throw SysError("creating directory '%s'", dst);
-            if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                throw SysError("mounting '%s' on '%s'", src, dst);
+            auto st = lstat(src);
+            if (S_ISDIR(st.st_mode)) {
+                if (mkdir(dst.c_str(), 0700) == -1)
+                    throw SysError("creating directory '%s'", dst);
+                if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                    throw SysError("mounting '%s' on '%s'", src, dst);
+            } else if (S_ISLNK(st.st_mode))
+                createSymlink(readLink(src), dst);
         }
 
         char * cwd = getcwd(0, 0);

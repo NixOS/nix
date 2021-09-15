@@ -19,9 +19,9 @@ impl StorePath {
         }
         Self::new_from_base_name(
             path.file_name()
-                .ok_or(Error::BadStorePath(path.into()))?
+                .ok_or_else(|| Error::BadStorePath(path.into()))?
                 .to_str()
-                .ok_or(Error::BadStorePath(path.into()))?,
+                .ok_or_else(|| Error::BadStorePath(path.into()))?,
         )
     }
 
@@ -34,7 +34,7 @@ impl StorePath {
 
     pub fn new_from_base_name(base_name: &str) -> Result<Self, Error> {
         if base_name.len() < STORE_PATH_HASH_CHARS + 1
-            || base_name.as_bytes()[STORE_PATH_HASH_CHARS] != '-' as u8
+            || base_name.as_bytes()[STORE_PATH_HASH_CHARS] != b'-'
         {
             return Err(Error::BadStorePath(base_name.into()));
         }
@@ -65,7 +65,7 @@ impl StorePathHash {
         Ok(Self(bytes))
     }
 
-    pub fn hash<'a>(&'a self) -> &'a [u8; STORE_PATH_HASH_BYTES] {
+    pub fn hash(&self) -> &[u8; STORE_PATH_HASH_BYTES] {
         &self.0
     }
 }
@@ -98,7 +98,7 @@ pub struct StorePathName(String);
 
 impl StorePathName {
     pub fn new(s: &str) -> Result<Self, Error> {
-        if s.len() == 0 {
+        if s.is_empty() {
             return Err(Error::StorePathNameEmpty);
         }
 
@@ -106,25 +106,24 @@ impl StorePathName {
             return Err(Error::StorePathNameTooLong);
         }
 
-        if s.starts_with('.')
-            || !s.chars().all(|c| {
-                c.is_ascii_alphabetic()
-                    || c.is_ascii_digit()
-                    || c == '+'
-                    || c == '-'
-                    || c == '.'
-                    || c == '_'
-                    || c == '?'
-                    || c == '='
-            })
-        {
+        let is_good_path_name = s.chars().all(|c| {
+            c.is_ascii_alphabetic()
+                || c.is_ascii_digit()
+                || c == '+'
+                || c == '-'
+                || c == '.'
+                || c == '_'
+                || c == '?'
+                || c == '='
+        });
+        if s.starts_with('.') || !is_good_path_name {
             return Err(Error::BadStorePathName);
         }
 
         Ok(Self(s.to_string()))
     }
 
-    pub fn name<'a>(&'a self) -> &'a str {
+    pub fn name(&self) -> &str {
         &self.0
     }
 }

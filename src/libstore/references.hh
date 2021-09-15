@@ -5,8 +5,9 @@
 
 namespace nix {
 
-PathSet scanForReferences(const Path & path, const PathSet & refs,
-    HashResult & hash);
+std::pair<PathSet, HashResult> scanForReferences(const Path & path, const PathSet & refs);
+
+PathSet scanForReferences(Sink & toTee, const Path & path, const PathSet & refs);
 
 struct RewritingSink : Sink
 {
@@ -18,7 +19,7 @@ struct RewritingSink : Sink
 
     RewritingSink(const std::string & from, const std::string & to, Sink & nextSink);
 
-    void operator () (const unsigned char * data, size_t len) override;
+    void operator () (std::string_view data) override;
 
     void flush();
 };
@@ -30,7 +31,7 @@ struct HashModuloSink : AbstractHashSink
 
     HashModuloSink(HashType ht, const std::string & modulus);
 
-    void operator () (const unsigned char * data, size_t len) override;
+    void operator () (std::string_view data) override;
 
     HashResult finish() override;
 };
