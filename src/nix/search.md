@@ -57,6 +57,13 @@ R""(
   # nix search nixpkgs git 'frontend|gui'
   ```
 
+* Only print package paths without decoration:
+
+  ```console
+  # nix search nixpkgs gnome3 --plain
+  legacyPackages.x86_64-linux.gnome3.vala
+  ```
+
 # Description
 
 `nix search` searches *installable* (which must be evaluatable, e.g. a

@@ -34,6 +34,7 @@ struct CmdSearch : InstallableCommand, MixJSON
 {
     std::vector<std::string> res;
     bool skipDescription = false;
+    bool plainOutput = false;
 
     CmdSearch()
     {
@@ -41,6 +42,14 @@ struct CmdSearch : InstallableCommand, MixJSON
             .longName = "skip-description",
             .description = "Do not search in package descriptions.",
             .handler = {[&]() { skipDescription = true; }},
+        });
+        addFlag({
+            .longName = "plain",
+            .description =
+                "Plain output mode. "
+                "Only prints a package per line, without descriptions or decoration. "
+                "Ignored if --json is present.",
+            .handler = {[&]() { plainOutput = true; }},
         });
         expectArgs("regex", &res);
     }
@@ -138,9 +147,11 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("pname", name.name);
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
+                        } else if (plainOutput) {
+                            logger->cout("%s", attrPath2);
                         } else {
-                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
                             if (results > 1) logger->cout("");
+                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
                             logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
