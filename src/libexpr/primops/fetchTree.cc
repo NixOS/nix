@@ -229,20 +229,21 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(storePath);
+    auto realPath = state.store->toRealPath(storePath);
 
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, path);
+            : hashFile(htSHA256, realPath);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(path);
+        state.allowedPaths->insert(realPath);
 
+    auto path = state.store->printStorePath(storePath);
     mkString(v, path, PathSet({path}));
 }
 
