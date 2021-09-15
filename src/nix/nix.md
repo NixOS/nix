@@ -114,6 +114,34 @@ flake in the current directory.
 
 Most `nix` subcommands operate on a *Nix store*.
 
-TODO: list store types, options
+* **local**: The Nix store in `/nix/store` and database in `/nix/var/nix/db`,
+  accessed directly.
+
+* **daemon**: The Nix store accessed via a Unix domain socket connection to
+  nix-daemon.
+
+* **unix://<path>**: The Nix store accessed via a Unix domain socket
+  connection to nix-daemon, with the socket located at `<path>`.
+
+* **auto** or the empty string: Equivalent to **local** or **daemon**
+  depending on whether the user has write access to the local Nix
+  store/database.
+
+* **file://<path>**: A binary cache stored in the local filesystem at `<path>`.
+
+* **https://<path>** or **http://<path>**: A binary cache accessed via
+  HTTPS/HTTP.
+
+* **s3://<path>**: A writable binary cache stored on a
+  S3-compatible service. Must be enabled at compile time.
+
+* **ssh://[user@]<host>**: A remote Nix store accessed by running `nix-store
+  --serve` via SSH.
+
+* **ssh-ng://[user@]<host>**: Supports arbitrary Nix operations on a remote
+  machine via the same protocol used by `nix-daemon`.
+
+Specfic options for each type of store can be found using the command `nix
+describe-stores`.
 
 )""
