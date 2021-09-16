@@ -21,6 +21,7 @@
 namespace nix {
 
 struct IoNice {
+#if __linux__    
     enum {
         IOPRIO_WHO_PROCESS = 1,
         IOPRIO_WHO_PGRP,
@@ -32,22 +33,18 @@ struct IoNice {
         IOPRIO_CLASS_BE,
         IOPRIO_CLASS_IDLE
     };
-
     enum {
         IOPRIO_CLASS_SHIFT = 13
     };
-    IoNice(int cl) {
-#if __linux__
-        if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, cl << IOPRIO_CLASS_SHIFT))
-            throw SysError("collectGarbage: ionice to idle");
-#endif
+    IoNice() {
+        if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, IOPRIO_CLASS_IDLE << IOPRIO_CLASS_SHIFT))
+            throw SysError("IoNice: set idle");
     }
     ~IoNice() {
-#if __linux__
         if (syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0, IOPRIO_CLASS_NONE << IOPRIO_CLASS_SHIFT))
-            throw SysError("collectGarbage: ionice back to normal");
-#endif
+            throw SysError("IoNice: back to normal");
     }
+#endif    
 };
 
 
@@ -762,7 +759,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     state.shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
 
-    IoNice _(IoNice::IOPRIO_CLASS_IDLE);
+    IoNice ioniceRAII;
     
     if (state.shouldDelete)
         deletePath(reservedPath);
