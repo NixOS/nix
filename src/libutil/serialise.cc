@@ -244,7 +244,8 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
             if (!cur.empty()) (*coro)(false);
         }
 
-        void finish() {
+        void finish() override
+        {
             if (!coro) return;
             if (!*coro) abort();
             (*coro)(true);

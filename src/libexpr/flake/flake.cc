@@ -635,8 +635,10 @@ LockedFlake lockFlake(
                     }
                 } else
                     throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
-            } else
+            } else {
                 warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
+                flake.forceDirty = true;
+            }
         }
 
         return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
@@ -659,7 +661,13 @@ void callFlake(EvalState & state,
 
     mkString(*vLocks, lockedFlake.lockFile.to_string());
 
-    emitTreeAttrs(state, *lockedFlake.flake.sourceInfo, lockedFlake.flake.lockedRef.input, *vRootSrc);
+    emitTreeAttrs(
+        state,
+        *lockedFlake.flake.sourceInfo,
+        lockedFlake.flake.lockedRef.input,
+        *vRootSrc,
+        false,
+        lockedFlake.flake.forceDirty);
 
     mkString(*vRootSubdir, lockedFlake.flake.lockedRef.subdir);
 
@@ -702,8 +710,9 @@ Fingerprint LockedFlake::getFingerprint() const
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
-        fmt("%s;%d;%d;%s",
+        fmt("%s;%s;%d;%d;%s",
             flake.sourceInfo->storePath.to_string(),
+            flake.lockedRef.subdir,
             flake.lockedRef.input.getRevCount().value_or(0),
             flake.lockedRef.input.getLastModified().value_or(0),
             lockFile));

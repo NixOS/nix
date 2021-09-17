@@ -16,7 +16,8 @@ void emitTreeAttrs(
     const fetchers::Tree & tree,
     const fetchers::Input & input,
     Value & v,
-    bool emptyRevFallback)
+    bool emptyRevFallback,
+    bool forceDirty)
 {
     assert(input.isImmutable());
 
@@ -33,24 +34,28 @@ void emitTreeAttrs(
     mkString(*state.allocAttr(v, state.symbols.create("narHash")),
         narHash->to_string(SRI, true));
 
-    if (auto rev = input.getRev()) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
-    } else if (emptyRevFallback) {
-        // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
-        auto emptyHash = Hash(htSHA1);
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
-    }
-
     if (input.getType() == "git")
         mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(true));
 
-    if (auto revCount = input.getRevCount())
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
-    else if (emptyRevFallback)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+    if (!forceDirty) {
+
+        if (auto rev = input.getRev()) {
+            mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
+            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
+        } else if (emptyRevFallback) {
+            // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
+            auto emptyHash = Hash(htSHA1);
+            mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
+            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
+        }
+
+        if (auto revCount = input.getRevCount())
+            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
+        else if (emptyRevFallback)
+            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+
+    }
 
     if (auto lastModified = input.getLastModified()) {
         mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
@@ -167,7 +172,7 @@ static void fetchTree(
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
 
-    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback);
+    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -229,20 +234,21 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(storePath);
+    auto realPath = state.store->toRealPath(storePath);
 
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, path);
+            : hashFile(htSHA256, realPath);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(path);
+        state.allowedPaths->insert(realPath);
 
+    auto path = state.store->printStorePath(storePath);
     mkString(v, path, PathSet({path}));
 }
 

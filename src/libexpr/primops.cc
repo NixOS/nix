@@ -1492,15 +1492,20 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     string type = state.forceStringNoCtx(*args[0], pos);
     std::optional<HashType> ht = parseHashType(type);
     if (!ht)
-      throw Error({
-          .msg = hintfmt("unknown hash type '%1%'", type),
-          .errPos = pos
-      });
+        throw Error({
+            .msg = hintfmt("unknown hash type '%1%'", type),
+            .errPos = pos
+        });
 
-    PathSet context; // discarded
-    Path p = state.coerceToPath(pos, *args[1], context);
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[1], context);
+    try {
+        state.realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError("cannot read '%s' since path '%s' is not valid, at %s", path, e.path, pos);
+    }
 
-    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(*ht, state.checkSourcePath(state.toRealPath(path, context))).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -3193,7 +3198,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(*ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(*ht, s).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({

@@ -2,7 +2,7 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-21.05-small";
-  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_4"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/VERSION_0_8_6"; flake = false; };
 
   outputs = { self, nixpkgs, lowdown-src }:
 
@@ -178,8 +178,8 @@
         installPhase = ''
           mkdir -p $out
         '';
-        installCheckPhase = "make installcheck";
 
+        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES";
       };
 
       binaryTarball = buildPackages: nix: pkgs: let
@@ -350,7 +350,7 @@
         };
 
         lowdown = with final; stdenv.mkDerivation rec {
-          name = "lowdown-0.8.4";
+          name = "lowdown-0.8.6";
 
           /*
           src = fetchurl {
@@ -502,10 +502,7 @@
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out";
-      } // (if system == "x86_64-linux" then (builtins.listToAttrs (map (crossSystem: {
-        name = "binaryTarball-${crossSystem}";
-        value = self.hydraJobs.binaryTarballCross.${system}.${crossSystem};
-      }) crossSystems)) else {}));
+      });
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;

@@ -743,8 +743,12 @@ BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPa
     return res;
 }
 
-BuiltPaths build(ref<Store> evalStore, ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode)
+BuiltPaths build(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode,
+    const std::vector<std::shared_ptr<Installable>> & installables,
+    BuildMode bMode)
 {
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
@@ -769,7 +773,7 @@ BuiltPaths toBuiltPaths(
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables)
+    const std::vector<std::shared_ptr<Installable>> & installables)
 {
     if (operateOn == OperateOn::Output)
         return build(evalStore, store, mode, installables);
@@ -788,7 +792,7 @@ StorePathSet toStorePaths(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables)
+    const std::vector<std::shared_ptr<Installable>> & installables)
 {
     StorePathSet outPaths;
     for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
@@ -812,8 +816,10 @@ StorePath toStorePath(
     return *paths.begin();
 }
 
-StorePathSet toDerivations(ref<Store> store,
-    std::vector<std::shared_ptr<Installable>> installables, bool useDeriver)
+StorePathSet toDerivations(
+    ref<Store> store,
+    const std::vector<std::shared_ptr<Installable>> & installables,
+    bool useDeriver)
 {
     StorePathSet drvPaths;
 

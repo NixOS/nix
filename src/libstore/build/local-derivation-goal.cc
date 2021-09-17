@@ -66,12 +66,14 @@ void handleDiffHook(
     auto diffHook = settings.diffHook;
     if (diffHook != "" && settings.runDiffHook) {
         try {
-            RunOptions diffHookOptions(diffHook,{tryA, tryB, drvPath, tmpDir});
-            diffHookOptions.searchPath = true;
-            diffHookOptions.uid = uid;
-            diffHookOptions.gid = gid;
-            diffHookOptions.chdir = "/";
-            auto diffRes = runProgram(diffHookOptions);
+            auto diffRes = runProgram(RunOptions {
+                .program = diffHook,
+                .searchPath = true,
+                .args = {tryA, tryB, drvPath, tmpDir},
+                .uid = uid,
+                .gid = gid,
+                .chdir = "/"
+            });
             if (!statusOk(diffRes.first))
                 throw ExecError(diffRes.first,
                     "diff-hook program '%1%' %2%",
