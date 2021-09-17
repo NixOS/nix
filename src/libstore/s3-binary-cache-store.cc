@@ -209,7 +209,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & scheme,
+        const std::string & uriScheme,
         const std::string & bucketName,
         const Params & params)
         : StoreConfig(params)
