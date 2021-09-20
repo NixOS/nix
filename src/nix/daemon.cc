@@ -99,19 +99,16 @@ bool matchUser(const string & user, const string & group, const Strings & users)
 
 struct PeerInfo
 {
-    bool pidKnown;
-    pid_t pid;
-    bool uidKnown;
-    uid_t uid;
-    bool gidKnown;
-    gid_t gid;
+    std::optional<pid_t> pid;
+    std::optional<uid_t> uid;
+    std::optional<gid_t> gid;
 };
 
 
 //  Get the identity of the caller, if possible.
 static PeerInfo getPeerInfo(int remote)
 {
-    PeerInfo peer = { false, 0, false, 0, false, 0 };
+    PeerInfo peer;
 
 #if defined(SO_PEERCRED)
 
@@ -119,7 +116,9 @@ static PeerInfo getPeerInfo(int remote)
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { true, cred.pid, true, cred.uid, true, cred.gid };
+    peer.pid = cred.pid;
+    peer.uid = cred.uid;
+    peer.gid = cred.gid;
 
 #elif defined(LOCAL_PEERCRED)
 
@@ -131,7 +130,7 @@ static PeerInfo getPeerInfo(int remote)
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { false, 0, true, cred.cr_uid, false, 0 };
+    peer.uid = cred.uid;
 
 #endif
 
@@ -197,11 +196,17 @@ static void daemonLoop()
             TrustedFlag trusted = NotTrusted;
             PeerInfo peer = getPeerInfo(remote.get());
 
-            struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
-            string user = pw ? pw->pw_name : std::to_string(peer.uid);
+            std::string user, group;
 
-            struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
-            string group = gr ? gr->gr_name : std::to_string(peer.gid);
+            if (peer.uid) {
+                auto pw = getpwuid(*peer.uid);
+                user = pw ? pw->pw_name : std::to_string(*peer.uid);
+            }
+
+            if (peer.gid) {
+                auto gr = getgrgid(*peer.gid);
+                auto group = gr ? gr->gr_name : std::to_string(*peer.gid);
+            }
 
             Strings trustedUsers = settings.trustedUsers;
             Strings allowedUsers = settings.allowedUsers;
@@ -212,9 +217,11 @@ static void daemonLoop()
             if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
                 throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
-            printInfo(format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
-                % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
-                % (peer.uidKnown ? user : "<unknown>"));
+            printInfo(
+                "accepted connection from pid %s, user %s%s",
+                peer.pid ? std::to_string(*peer.pid) : "<unknown>",
+                peer.uid ? user : "<unknown>",
+                trusted ? " (trusted)" : "");
 
             //  Fork a child to handle the connection.
             ProcessOptions options;
@@ -233,8 +240,8 @@ static void daemonLoop()
                 setSigChldAction(false);
 
                 //  For debugging, stuff the pid into argv[1].
-                if (peer.pidKnown && savedArgv[1]) {
-                    string processName = std::to_string(peer.pid);
+                if (peer.pid && savedArgv[1]) {
+                    string processName = std::to_string(*peer.pid);
                     strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
                 }
 
@@ -242,13 +249,8 @@ static void daemonLoop()
                 FdSource from(remote.get());
                 FdSink to(remote.get());
                 processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
-#if 0
-                    /* Prevent users from doing something very dangerous. */
-                    if (geteuid() == 0 &&
-                        querySetting("build-users-group", "") == "")
-                        throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
-#endif
-                    store.createUser(user, peer.uid);
+                    if (peer.uid)
+                        store.createUser(user, *peer.uid);
                 });
 
                 exit(0);
