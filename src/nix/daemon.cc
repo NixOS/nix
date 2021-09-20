@@ -336,6 +336,17 @@ static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 
 struct CmdDaemon : StoreCommand
 {
+    bool stdio = false;
+
+    CmdDaemon()
+    {
+        addFlag({
+            .longName = "stdio",
+            .description = "Handle a single connection on stdin/stdout.",
+            .handler = {&stdio, true},
+        });
+    }
+
     std::string description() override
     {
         return "daemon to perform store operations on behalf of non-root clients";
@@ -352,7 +363,7 @@ struct CmdDaemon : StoreCommand
 
     void run(ref<Store> store) override
     {
-        runDaemon(false);
+        runDaemon(stdio);
     }
 };
 
