@@ -115,11 +115,11 @@ static PeerInfo getPeerInfo(int remote)
 
     ucred cred;
     socklen_t credLen = sizeof(cred);
-    if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
-        throw SysError("getting peer credentials");
-    peer.pid = cred.pid;
-    peer.uid = cred.uid;
-    peer.gid = cred.gid;
+    if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0) {
+        peer.pid = cred.pid;
+        peer.uid = cred.uid;
+        peer.gid = cred.gid;
+    }
 
 #elif defined(LOCAL_PEERCRED)
 
@@ -129,9 +129,8 @@ static PeerInfo getPeerInfo(int remote)
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
-    if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
-        throw SysError("getting peer credentials");
-    peer.uid = cred.uid;
+    if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == 0)
+        peer.uid = cred.uid;
 
 #endif
 
@@ -148,6 +147,52 @@ static ref<Store> openUncachedStore()
     // Disable caching since the client already does that.
     params["path-info-cache-size"] = "0";
     return openStore(settings.storeUri, params);
+}
+
+
+static void authConnection(FdSource & from, FdSink & to)
+{
+    TrustedFlag trusted = NotTrusted;
+    PeerInfo peer = getPeerInfo(from.fd);
+
+    std::string user, group;
+
+    if (peer.uid) {
+        auto pw = getpwuid(*peer.uid);
+        user = pw ? pw->pw_name : std::to_string(*peer.uid);
+    }
+
+    if (peer.gid) {
+        auto gr = getgrgid(*peer.gid);
+        group = gr ? gr->gr_name : std::to_string(*peer.gid);
+    }
+
+    Strings trustedUsers = settings.trustedUsers;
+    Strings allowedUsers = settings.allowedUsers;
+
+    if (matchUser(user, group, trustedUsers))
+        trusted = Trusted;
+
+    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
+        throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
+
+    printInfo(
+        "accepted connection from pid %s, user %s%s",
+        peer.pid ? std::to_string(*peer.pid) : "<unknown>",
+        peer.uid ? user : "<unknown>",
+        trusted ? " (trusted)" : "");
+
+    // For debugging, stuff the pid into argv[1].
+    if (peer.pid && savedArgv[1]) {
+        string processName = std::to_string(*peer.pid);
+        strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
+    }
+
+    // Handle the connection.
+    processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
+        if (peer.uid)
+            store.createUser(user, *peer.uid);
+    });
 }
 
 
@@ -201,11 +246,7 @@ static void daemonLoop()
                 if (!fd.revents) continue;
 
                 // Accept a connection.
-                struct sockaddr_un remoteAddr;
-                socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-                AutoCloseFD remote = accept(fd.fd,
-                    (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                AutoCloseFD remote = accept(fd.fd, nullptr, nullptr);
                 checkInterrupt();
                 if (!remote) {
                     if (errno == EINTR) continue;
@@ -213,36 +254,6 @@ static void daemonLoop()
                 }
 
                 closeOnExec(remote.get());
-
-                TrustedFlag trusted = NotTrusted;
-                PeerInfo peer = getPeerInfo(remote.get());
-
-                std::string user, group;
-
-                if (peer.uid) {
-                    auto pw = getpwuid(*peer.uid);
-                    user = pw ? pw->pw_name : std::to_string(*peer.uid);
-                }
-
-                if (peer.gid) {
-                    auto gr = getgrgid(*peer.gid);
-                    auto group = gr ? gr->gr_name : std::to_string(*peer.gid);
-                }
-
-                Strings trustedUsers = settings.trustedUsers;
-                Strings allowedUsers = settings.allowedUsers;
-
-                if (matchUser(user, group, trustedUsers))
-                    trusted = Trusted;
-
-                if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
-                    throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
-
-                printInfo(
-                    "accepted connection from pid %s, user %s%s",
-                    peer.pid ? std::to_string(*peer.pid) : "<unknown>",
-                    peer.uid ? user : "<unknown>",
-                    trusted ? " (trusted)" : "");
 
                 // Fork a child to handle the connection.
                 ProcessOptions options;
@@ -260,19 +271,9 @@ static void daemonLoop()
                     // Restore normal handling of SIGCHLD.
                     setSigChldAction(false);
 
-                    // For debugging, stuff the pid into argv[1].
-                    if (peer.pid && savedArgv[1]) {
-                        string processName = std::to_string(*peer.pid);
-                        strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
-                    }
-
-                    // Handle the connection.
                     FdSource from(remote.get());
                     FdSink to(remote.get());
-                    processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
-                        if (peer.uid)
-                            store.createUser(user, *peer.uid);
-                    });
+                    authConnection(from, to);
 
                     exit(0);
                 }, options);
@@ -290,7 +291,7 @@ static void daemonLoop()
     }
 }
 
-static void runDaemon(bool stdio)
+static void runDaemon(bool stdio, bool auth)
 {
     if (stdio) {
         if (auto store = openUncachedStore().dynamic_pointer_cast<RemoteStore>()) {
@@ -324,10 +325,10 @@ static void runDaemon(bool stdio)
         } else {
             FdSource from(STDIN_FILENO);
             FdSink to(STDOUT_FILENO);
-            /* Auth hook is empty because in this mode we blindly trust the
-               standard streams. Limiting access to those is explicitly
-               not `nix-daemon`'s responsibility. */
-            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
+            if (auth)
+                authConnection(from, to);
+            else
+                processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _) {});
         }
     } else
         daemonLoop();
@@ -351,7 +352,7 @@ static int main_nix_daemon(int argc, char * * argv)
             return true;
         });
 
-        runDaemon(stdio);
+        runDaemon(stdio, false);
 
         return 0;
     }
@@ -362,6 +363,7 @@ static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 struct CmdDaemon : StoreCommand
 {
     bool stdio = false;
+    bool auth = true;
 
     CmdDaemon()
     {
@@ -369,6 +371,12 @@ struct CmdDaemon : StoreCommand
             .longName = "stdio",
             .description = "Handle a single connection on stdin/stdout.",
             .handler = {&stdio, true},
+        });
+
+        addFlag({
+            .longName = "no-auth",
+            .description = "Do not check whether the client is in `allowed-users`.",
+            .handler = {&auth, false},
         });
     }
 
@@ -388,7 +396,7 @@ struct CmdDaemon : StoreCommand
 
     void run(ref<Store> store) override
     {
-        runDaemon(stdio);
+        runDaemon(stdio, auth);
     }
 };
 

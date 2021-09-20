@@ -12,7 +12,7 @@ R""(
   socket, but you can do this using `socat`:
 
   ```console
-  # socat TCP-LISTEN:3456,reuseaddr,fork EXEC:'nix daemon --stdio'
+  # socat TCP-LISTEN:3456,reuseaddr,fork EXEC:'nix daemon --stdio',nofork
   ```
 
   You can then connect to this daemon using the `tcp` store type:
