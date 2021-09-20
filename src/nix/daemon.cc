@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <netdb.h>
 #include <poll.h>
 #include <pwd.h>
 #include <signal.h>
@@ -103,11 +104,13 @@ struct PeerInfo
     std::optional<pid_t> pid;
     std::optional<uid_t> uid;
     std::optional<gid_t> gid;
+    std::optional<std::string> ip;
+    std::optional<std::string> port;
 };
 
 
 //  Get the identity of the caller, if possible.
-static PeerInfo getPeerInfo(int remote)
+static PeerInfo getPeerInfo(int fd)
 {
     PeerInfo peer;
 
@@ -115,7 +118,7 @@ static PeerInfo getPeerInfo(int remote)
 
     ucred cred;
     socklen_t credLen = sizeof(cred);
-    if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0) {
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0) {
         peer.pid = cred.pid;
         peer.uid = cred.uid;
         peer.gid = cred.gid;
@@ -129,10 +132,23 @@ static PeerInfo getPeerInfo(int remote)
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
-    if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == 0)
+    if (getsockopt(fd, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == 0)
         peer.uid = cred.uid;
 
 #endif
+
+    sockaddr_storage addr;
+    socklen_t addrlen = sizeof(addr);
+    if (getpeername(fd, (sockaddr *) &addr, &addrlen) == 0
+        && (addr.ss_family == AF_INET || addr.ss_family == AF_INET6))
+    {
+        char host[1024];
+        char serv[128];
+        if (getnameinfo((sockaddr *) &addr, addrlen, host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+            peer.ip = std::string(host);
+            peer.port = std::string(serv);
+        }
+    }
 
     return peer;
 }
@@ -177,9 +193,12 @@ static void authConnection(FdSource & from, FdSink & to)
         throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
     printInfo(
-        "accepted connection from pid %s, user %s%s",
-        peer.pid ? std::to_string(*peer.pid) : "<unknown>",
-        peer.uid ? user : "<unknown>",
+        "accepted connection from %s%s",
+        peer.ip
+        ? fmt("%s:%s", *peer.ip, *peer.port)
+        : peer.pid && peer.uid
+        ? fmt("pid %s, user %s", std::to_string(*peer.pid), user)
+        : "<unknown>",
         trusted ? " (trusted)" : "");
 
     // For debugging, stuff the pid into argv[1].
