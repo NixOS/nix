@@ -15,17 +15,18 @@
 #include <climits>
 #include <cstring>
 
-#include <unistd.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <errno.h>
-#include <pwd.h>
-#include <grp.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <poll.h>
+#include <pwd.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #if __APPLE__ || __FreeBSD__
 #include <sys/ucred.h>
@@ -155,106 +156,128 @@ static void daemonLoop()
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    //  Get rid of children automatically; don't let them become zombies.
+    // Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
-    AutoCloseFD fdSocket;
+    std::vector<AutoCloseFD> listeningSockets;
 
-    //  Handle socket-based activation by systemd.
+    // Handle socket-based activation by systemd.
     auto listenFds = getEnv("LISTEN_FDS");
     if (listenFds) {
-        if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
+        if (getEnv("LISTEN_PID") != std::to_string(getpid()))
             throw Error("unexpected systemd environment variables");
-        fdSocket = SD_LISTEN_FDS_START;
-        closeOnExec(fdSocket.get());
+        auto count = string2Int<unsigned int>(*listenFds);
+        assert(count);
+        for (auto i = 0; i < count; ++i) {
+            AutoCloseFD fdSocket(SD_LISTEN_FDS_START + i);
+            closeOnExec(fdSocket.get());
+            listeningSockets.push_back(std::move(fdSocket));
+        }
     }
 
-    //  Otherwise, create and bind to a Unix domain socket.
+    // Otherwise, create and bind to a Unix domain socket.
     else {
         createDirs(dirOf(settings.nixDaemonSocketFile));
-        fdSocket = createUnixDomainSocket(settings.nixDaemonSocketFile, 0666);
+        listeningSockets.push_back(createUnixDomainSocket(settings.nixDaemonSocketFile, 0666));
     }
 
-    //  Loop accepting connections.
+    std::vector<struct pollfd> fds;
+    for (auto & i : listeningSockets)
+        fds.push_back({.fd = i.get(), .events = POLLIN});
+
+    // Loop accepting connections.
     while (1) {
 
         try {
-            //  Accept a connection.
-            struct sockaddr_un remoteAddr;
-            socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-            AutoCloseFD remote = accept(fdSocket.get(),
-                (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
-            if (!remote) {
+
+            auto count = poll(fds.data(), fds.size(), -1);
+            if (count == -1) {
                 if (errno == EINTR) continue;
-                throw SysError("accepting connection");
+                throw SysError("poll");
             }
 
-            closeOnExec(remote.get());
+            for (auto & fd : fds) {
+                if (!fd.revents) continue;
 
-            TrustedFlag trusted = NotTrusted;
-            PeerInfo peer = getPeerInfo(remote.get());
+                // Accept a connection.
+                struct sockaddr_un remoteAddr;
+                socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-            std::string user, group;
-
-            if (peer.uid) {
-                auto pw = getpwuid(*peer.uid);
-                user = pw ? pw->pw_name : std::to_string(*peer.uid);
-            }
-
-            if (peer.gid) {
-                auto gr = getgrgid(*peer.gid);
-                auto group = gr ? gr->gr_name : std::to_string(*peer.gid);
-            }
-
-            Strings trustedUsers = settings.trustedUsers;
-            Strings allowedUsers = settings.allowedUsers;
-
-            if (matchUser(user, group, trustedUsers))
-                trusted = Trusted;
-
-            if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
-                throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
-
-            printInfo(
-                "accepted connection from pid %s, user %s%s",
-                peer.pid ? std::to_string(*peer.pid) : "<unknown>",
-                peer.uid ? user : "<unknown>",
-                trusted ? " (trusted)" : "");
-
-            //  Fork a child to handle the connection.
-            ProcessOptions options;
-            options.errorPrefix = "unexpected Nix daemon error: ";
-            options.dieWithParent = false;
-            options.runExitHandlers = true;
-            options.allowVfork = false;
-            startProcess([&]() {
-                fdSocket = -1;
-
-                //  Background the daemon.
-                if (setsid() == -1)
-                    throw SysError("creating a new session");
-
-                //  Restore normal handling of SIGCHLD.
-                setSigChldAction(false);
-
-                //  For debugging, stuff the pid into argv[1].
-                if (peer.pid && savedArgv[1]) {
-                    string processName = std::to_string(*peer.pid);
-                    strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
+                AutoCloseFD remote = accept(fd.fd,
+                    (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                checkInterrupt();
+                if (!remote) {
+                    if (errno == EINTR) continue;
+                    throw SysError("accepting connection");
                 }
 
-                //  Handle the connection.
-                FdSource from(remote.get());
-                FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
-                    if (peer.uid)
-                        store.createUser(user, *peer.uid);
-                });
+                closeOnExec(remote.get());
 
-                exit(0);
-            }, options);
+                TrustedFlag trusted = NotTrusted;
+                PeerInfo peer = getPeerInfo(remote.get());
+
+                std::string user, group;
+
+                if (peer.uid) {
+                    auto pw = getpwuid(*peer.uid);
+                    user = pw ? pw->pw_name : std::to_string(*peer.uid);
+                }
+
+                if (peer.gid) {
+                    auto gr = getgrgid(*peer.gid);
+                    auto group = gr ? gr->gr_name : std::to_string(*peer.gid);
+                }
+
+                Strings trustedUsers = settings.trustedUsers;
+                Strings allowedUsers = settings.allowedUsers;
+
+                if (matchUser(user, group, trustedUsers))
+                    trusted = Trusted;
+
+                if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
+                    throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
+
+                printInfo(
+                    "accepted connection from pid %s, user %s%s",
+                    peer.pid ? std::to_string(*peer.pid) : "<unknown>",
+                    peer.uid ? user : "<unknown>",
+                    trusted ? " (trusted)" : "");
+
+                // Fork a child to handle the connection.
+                ProcessOptions options;
+                options.errorPrefix = "unexpected Nix daemon error: ";
+                options.dieWithParent = false;
+                options.runExitHandlers = true;
+                options.allowVfork = false;
+                startProcess([&]() {
+                    listeningSockets.clear();
+
+                    // Background the daemon.
+                    if (setsid() == -1)
+                        throw SysError("creating a new session");
+
+                    // Restore normal handling of SIGCHLD.
+                    setSigChldAction(false);
+
+                    // For debugging, stuff the pid into argv[1].
+                    if (peer.pid && savedArgv[1]) {
+                        string processName = std::to_string(*peer.pid);
+                        strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
+                    }
+
+                    // Handle the connection.
+                    FdSource from(remote.get());
+                    FdSink to(remote.get());
+                    processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
+                        if (peer.uid)
+                            store.createUser(user, *peer.uid);
+                    });
+
+                    exit(0);
+                }, options);
+
+            }
 
         } catch (Interrupted & e) {
             return;
