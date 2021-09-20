@@ -8,6 +8,19 @@ R""(
   # nix daemon
   ```
 
+* The daemon does not have native support for listening on a TCP
+  socket, but you can do this using `socat`:
+
+  ```console
+  # socat TCP-LISTEN:3456,reuseaddr,fork EXEC:'nix daemon --stdio'
+  ```
+
+  You can then connect to this daemon using the `tcp` store type:
+
+  ```console
+  # nix store ping --store tcp://example.org:3456
+  ```
+
 # Description
 
 This command runs the Nix daemon, which is a required component in
