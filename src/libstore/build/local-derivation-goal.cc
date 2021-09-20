@@ -1778,6 +1778,10 @@ void LocalDerivationGoal::runChild()
             if (personality(PER_LINUX32) == -1)
                 throw SysError("cannot set i686-linux personality");
         }
+        if (drv->platform == "armv7l-linux" || drv->platform == "armv6l-linux") {
+          if (personality(PER_LINUX32) == -1)
+            throw SysError("cannot set 32bit linux personality");
+        }
 
         /* Impersonate a Linux 2.6 machine to get some determinism in
            builds that depend on the kernel version. */
