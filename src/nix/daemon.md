@@ -8,8 +8,8 @@ R""(
   # nix daemon
   ```
 
-* The daemon does not have native support for listening on a TCP
-  socket, but you can do this using `socat`:
+* The daemon does not have native support for opening a TCP socket to
+  listen to, but you can do this using `socat`:
 
   ```console
   # socat TCP-LISTEN:3456,reuseaddr,fork EXEC:'nix daemon --stdio',nofork
