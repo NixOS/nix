@@ -13,11 +13,22 @@ NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 read_only_root() {
     # this touch command ~should~ always produce an error
     # as of this change I confirmed /usr/bin/touch emits:
+    # "touch: /: Operation not permitted" Monterey
     # "touch: /: Read-only file system" Catalina+ and Big Sur
     # "touch: /: Permission denied" Mojave
     # (not matching prefix for compat w/ coreutils touch in case using
     # an explicit path causes problems; its prefix differs)
-    [[ "$(/usr/bin/touch / 2>&1)" = *"Read-only file system" ]]
+    case "$(/usr/bin/touch / 2>&1)" in
+        *"Read-only file system") # Catalina, Big Sur
+            return 0
+            ;;
+        *"Operation not permitted") # Monterey
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 
     # Avoiding the slow semantic way to get this information (~330ms vs ~8ms)
     # unless using touch causes problems. Just in case, that approach is:
