@@ -89,10 +89,12 @@ static void expectType(EvalState & state, ValueType type,
 }
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
-    EvalState & state, Value * value, const Pos & pos);
+    EvalState & state, Value * value, const Pos & pos,
+    const std::optional<Path> & baseDir);
 
 static FlakeInput parseFlakeInput(EvalState & state,
-    const std::string & inputName, Value * value, const Pos & pos)
+    const std::string & inputName, Value * value, const Pos & pos,
+    const std::optional<Path> & baseDir)
 {
     expectType(state, nAttrs, *value, pos);
 
@@ -116,7 +118,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, nBool, *attr.value, *attr.pos);
                 input.isFlake = attr.value->boolean;
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, *attr.pos);
+                input.overrides = parseFlakeInputs(state, attr.value, *attr.pos, baseDir);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, *attr.pos);
                 input.follows = parseInputPath(attr.value->string.s);
@@ -154,7 +156,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, pos);
         if (url)
-            input.ref = parseFlakeRef(*url, {}, true);
+            input.ref = parseFlakeRef(*url, baseDir, true);
     }
 
     if (!input.follows && !input.ref)
@@ -164,7 +166,8 @@ static FlakeInput parseFlakeInput(EvalState & state,
 }
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
-    EvalState & state, Value * value, const Pos & pos)
+    EvalState & state, Value * value, const Pos & pos,
+    const std::optional<Path> & baseDir)
 {
     std::map<FlakeId, FlakeInput> inputs;
 
@@ -175,7 +178,8 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
             parseFlakeInput(state,
                 inputAttr.name,
                 inputAttr.value,
-                *inputAttr.pos));
+                *inputAttr.pos,
+                baseDir));
     }
 
     return inputs;
@@ -191,7 +195,8 @@ static Flake getFlake(
         state, originalRef, allowLookup, flakeCache);
 
     // Guard against symlink attacks.
-    auto flakeFile = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir + "/flake.nix");
+    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir);
+    auto flakeFile = canonPath(flakeDir + "/flake.nix");
     if (!isInDir(flakeFile, sourceInfo.actualPath))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
             lockedRef, state.store->printStorePath(sourceInfo.storePath));
@@ -219,7 +224,7 @@ static Flake getFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, *inputs->pos);
+        flake.inputs = parseFlakeInputs(state, inputs->value, *inputs->pos, flakeDir);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -488,10 +493,8 @@ LockedFlake lockFlake(
 
                             // If this input is a path, recurse it down.
                             // This allows us to resolve path inputs relative to the current flake.
-                            if (localRef.input.getType() == "path") {
-                                localRef.input.parent = parentPath;
-                                localPath = canonPath(parentPath + "/" + *input.ref->input.getSourcePath());
-                            }
+                            if (localRef.input.getType() == "path")
+                                localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
 
                             auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache);
 
