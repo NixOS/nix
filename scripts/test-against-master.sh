@@ -7,6 +7,10 @@ CurrentNixDir=$(pwd)
 CurrentRev=${GITHUB_SHA:-$(git rev-parse HEAD)}
 WorkDir=$(mktemp -d)
 trap 'rm -r "$WorkDir"' EXIT
+GITHUB_TOKEN_OPTION=()
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    GITHUB_TOKEN_OPTION=("--option" "access-tokens" "github.com=$GITHUB_TOKEN")
+fi
 
 pushd "$WorkDir"
 
@@ -22,6 +26,8 @@ cat <<EOF > flake.nix
     };
 }
 EOF
-nix --experimental-features 'nix-command flakes' flake check
+nix flake check\
+    --experimental-features 'nix-command flakes' \
+    "${GITHUB_TOKEN_OPTION[@]}"
 
 popd

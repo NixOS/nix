@@ -26,7 +26,7 @@ jobs:
     - run: |
         cachix use nixos-nix-install-tests
         CURRENT_NIX_BUILD=$(nix-build -A defaultPackage.$(nix-instantiate --eval -E '(builtins.currentSystem)'))/bin
-        PATH=$CURRENT_NIX_BUILD:$PATH bash scripts/test-against-master.sh
+        PATH=$CURRENT_NIX_BUILD:$PATH GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} bash scripts/test-against-master.sh
   check_cachix:
     name: Cachix secret present for installer tests
     runs-on: ubuntu-latest
