@@ -766,7 +766,7 @@ cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
-        B.url = "path:./../../flakeB";
+        B.url = "path:../flakeB";
     };
     outputs = { ... }: {};
 }
@@ -774,7 +774,7 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep 'this is a security violation'
+nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
 
 # Test flake in store does not evaluate
 rm -rf $badFlakeDir
