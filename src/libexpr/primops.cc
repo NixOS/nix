@@ -413,7 +413,7 @@ static RegisterPrimOp primop_isNull({
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
       > **Warning**
-      > 
+      >
       > This function is *deprecated*; just write `e == null` instead.
     )",
     .fun = prim_isNull,
@@ -1919,6 +1919,19 @@ static RegisterPrimOp primop_filterSource({
     .name = "__filterSource",
     .args = {"e1", "e2"},
     .doc = R"(
+      > **Warning**
+      >
+      > `filterSource` should not be used to filter store paths. Since
+      > `filterSource` uses the name of the input directory while naming
+      > the output directory, doing so will produce a directory name in
+      > the form of `<hash2>-<hash>-<name>`, where `<hash>-<name>` is
+      > the name of the input directory. Since `<hash>` depends on the
+      > unfiltered directory, the name of the output directory will
+      > indirectly depend on files that are filtered out by the
+      > function. This will trigger a rebuild even when a filtered out
+      > file is changed. Use `builtins.path` instead, which allows
+      > specifying the name of the output directory.
+
       This function allows you to copy sources into the Nix store while
       filtering certain files. For instance, suppose that you want to use
       the directory `source-dir` as an input to a Nix expression, e.g.
@@ -2519,7 +2532,7 @@ static RegisterPrimOp primop_tail({
       the argument isn’t a list or is an empty list.
 
       > **Warning**
-      > 
+      >
       > This function should generally be avoided since it's inefficient:
       > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
       > list by repeatedly calling `tail` takes O(n^2) time.
