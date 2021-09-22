@@ -574,7 +574,7 @@ namespace nix {
 Expr * EvalState::parse(const char * text, FileOrigin origin,
     const Path & path, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    std::cout << "EvalState::parse " << std::endl;
+    std::cout << "EvalState::parse " << text <<  std::endl;
     for (auto i = staticEnv->vars.begin(); i != staticEnv->vars.end(); ++i) 
         std::cout << "EvalState::parse staticEnv " << i->first << std::endl;
 

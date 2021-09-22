@@ -315,12 +315,16 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
     // auto dynamicEnv(env);
 
     if (recursive) {
+        std::cout << "recursive" << std::endl;
         // dynamicEnv = newEnv.get();
-        auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
+        // also make shared_ptr?
+        auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  
 
         unsigned int displ = 0;
-        for (auto & i : attrs)
+        for (auto & i : attrs) {
+            std::cout << "newenvvar: " << i.first << std::endl;
             newEnv->vars[i.first] = i.second.displ = displ++;
+        }
 
         for (auto & i : attrs)
             i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -330,8 +334,8 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
             i.valueExpr->bindVars(newEnv);
         }
     }
-
     else {
+        std::cout << "NOT recursive" << std::endl;
         for (auto & i : attrs)
             i.second.e->bindVars(env);
 
@@ -409,7 +413,7 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
     body->show(std::cout);
     std::cout << std::endl;
 
-    std::cout << "ExprWith::newenv: " << newEnv->vars.size() << std::endl;
+    std::cout << "ExprWith::newenv: (iswith, size); (" << newEnv->isWith << ", " << newEnv->vars.size() << ") " << std::endl;
     for (auto i = newEnv->vars.begin(); i != newEnv->vars.end(); ++i) 
         std::cout << "EvalState::parse newEnv " << i->first << std::endl;
 
@@ -417,6 +421,35 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
     body->bindVars(newEnv);
     std::cout << " ExprWith::bindVars  3" << std::endl;
 }
+
+/*
+void ExprWith::bindVars(const StaticEnv & env)
+{
+    //  Does this `with' have an enclosing `with'?  If so, record its
+    //    level so that `lookupVar' can look up variables in the previous
+    //    `with' if this one doesn't contain the desired attribute. 
+    const StaticEnv * curEnv;
+    unsigned int level;
+    prevWith = 0;
+    for (curEnv = &env, level = 1; curEnv; curEnv = curEnv->up, level++)
+        if (curEnv->isWith) {
+            prevWith = level;
+            break;
+        }
+
+    attrs->bindVars(env);
+    std::cout << "ExprWith::bindVars env: " << env.vars.size();  // add std::endl;
+    for (auto i = env.vars.begin(); i != env.vars.end(); ++i)
+    {
+        std::cout << i->first << std::endl;
+    }
+
+    StaticEnv newEnv(true, &env);
+    body->bindVars(newEnv);
+}
+*/
+ 
+
 
 void ExprIf::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
