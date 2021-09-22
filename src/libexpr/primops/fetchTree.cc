@@ -36,7 +36,7 @@ void emitTreeAttrs(
 
     if (input.getType() == "git")
         mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
-            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(true));
+            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (!forceDirty) {
 
