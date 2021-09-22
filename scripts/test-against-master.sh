@@ -6,7 +6,7 @@ set -x;
 CurrentNixDir=$(pwd)
 CurrentRev=${GITHUB_SHA:-$(git rev-parse HEAD)}
 WorkDir=$(mktemp -d)
-trap 'rm -r "$WorkDir"' EXIT
+trap 'rm -rf "$WorkDir"' EXIT
 GITHUB_TOKEN_OPTION=()
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     GITHUB_TOKEN_OPTION=("--option" "access-tokens" "github.com=$GITHUB_TOKEN")
@@ -14,20 +14,16 @@ fi
 
 pushd "$WorkDir"
 
-cat <<EOF > flake.nix
-{
-    inputs.currentNix.url = "git+file://$CurrentNixDir?rev=$CurrentRev";
-    inputs.nixMaster.url = "github:nixos/nix";
+git clone "https://github.com/nixos/nix"
 
-    outputs = { self, currentNix, nixMaster }: {
-        checks = builtins.mapAttrs (systemName: _:
-        { againstMaster = currentNix.lib.testAgainst.\${systemName} nixMaster.defaultPackage.\${systemName}; }
-        ) currentNix.defaultPackage;
-    };
-}
+cat <<EOF > default.nix
+let
+  currentNix = import $CurrentNixDir;
+  masterNix = import ./nix;
+in
+currentNix.lib.testAgainst.\${builtins.currentSystem} masterNix.defaultPackage.\${builtins.currentSystem}
 EOF
-nix flake check\
-    --experimental-features 'nix-command flakes' \
-    "${GITHUB_TOKEN_OPTION[@]}"
+
+nix-build "${GITHUB_TOKEN_OPTION[@]}"
 
 popd
