@@ -52,9 +52,9 @@ void BinaryCacheStore::init()
                     throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
-                wantMassQuery.setDefault(value == "1" ? "true" : "false");
+                wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
-                priority.setDefault(fmt("%d", std::stoi(value)));
+                priority.setDefault(std::stoi(value));
             }
         }
     }

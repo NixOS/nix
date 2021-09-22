@@ -194,8 +194,6 @@ public:
 
     bool overridden = false;
 
-    void setDefault(const std::string & str);
-
 protected:
 
     AbstractSetting(
@@ -253,6 +251,7 @@ public:
     bool operator !=(const T & v2) const { return value != v2; }
     void operator =(const T & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
+    void setDefault(const T & v) { if (!overridden) value = v; }
 
     void set(const std::string & str, bool append = false) override;
 

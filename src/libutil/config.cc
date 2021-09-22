@@ -177,11 +177,6 @@ AbstractSetting::AbstractSetting(
 {
 }
 
-void AbstractSetting::setDefault(const std::string & str)
-{
-    if (!overridden) set(str);
-}
-
 nlohmann::json AbstractSetting::toJSON()
 {
     return nlohmann::json(toJSONObject());
