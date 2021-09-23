@@ -938,7 +938,10 @@ void LocalDerivationGoal::startBuilder()
             try {
                 return readLine(builderOut.readSide.get());
             } catch (Error & e) {
-                e.addTrace({}, "while waiting for the build environment to initialize (previous messages: %s)",
+                auto status = pid.wait();
+                e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
+                    worker.store.printStorePath(drvPath),
+                    statusToString(status),
                     concatStringsSep("|", msgs));
                 throw e;
             }
