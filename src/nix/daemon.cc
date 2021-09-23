@@ -133,7 +133,7 @@ static PeerInfo getPeerInfo(int fd)
     xucred cred;
     socklen_t credLen = sizeof(cred);
     if (getsockopt(fd, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == 0)
-        peer.uid = cred.uid;
+        peer.uid = cred.cr_uid;
 
 #endif
 
