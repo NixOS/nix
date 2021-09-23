@@ -125,13 +125,14 @@ public:
 
     struct Connection
     {
-        AutoCloseFD fd;
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 
         virtual ~Connection();
+
+        virtual void closeWrite() = 0;
 
         std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };

@@ -162,8 +162,19 @@ void RemoteStore::initConnection(Connection & conn)
     try {
         conn.to << WORKER_MAGIC_1;
         conn.to.flush();
-        unsigned int magic = readInt(conn.from);
-        if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
+        StringSink saved;
+        try {
+            TeeSource tee(conn.from, saved);
+            unsigned int magic = readInt(tee);
+            if (magic != WORKER_MAGIC_2)
+                throw Error("protocol mismatch");
+        } catch (SerialisationError & e) {
+            /* In case the other side is waiting for our input, close
+               it. */
+            conn.closeWrite();
+            auto msg = conn.from.drain();
+            throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
+        }
 
         conn.from >> conn.daemonVersion;
         if (GET_PROTOCOL_MAJOR(conn.daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
