@@ -1835,7 +1835,7 @@ void LocalDerivationGoal::runChild()
         /* Fill in the arguments. */
         Strings args;
 
-        const char *builder = "invalid";
+        std::string builder = "invalid";
 
         if (drv->isBuiltin()) {
             ;
@@ -1961,13 +1961,13 @@ void LocalDerivationGoal::runChild()
                 }
                 args.push_back(drv->builder);
             } else {
-                builder = drv->builder.c_str();
+                builder = drv->builder;
                 args.push_back(std::string(baseNameOf(drv->builder)));
             }
         }
 #else
         else {
-            builder = drv->builder.c_str();
+            builder = drv->builder;
             args.push_back(std::string(baseNameOf(drv->builder)));
         }
 #endif
@@ -2023,9 +2023,9 @@ void LocalDerivationGoal::runChild()
             posix_spawnattr_setbinpref_np(&attrp, 1, &cpu, NULL);
         }
 
-        posix_spawn(NULL, builder, NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        posix_spawn(NULL, builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #else
-        execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        execve(builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 #endif
 
         throw SysError("executing '%1%'", drv->builder);
