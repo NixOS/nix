@@ -407,7 +407,7 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
     attrs->show(std::cout);
     std::cout << std::endl;
     attrs->bindVars(env);
-    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
+    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(true, env.get()));  // also make shared_ptr?
     std::cout << " ExprWith::bindVars  2" << std::endl;
     std::cout << " body: " << std::endl;
     body->show(std::cout);

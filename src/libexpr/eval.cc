@@ -976,7 +976,7 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
-    // std::cout << " EvalState::lookupVar" << std::endl;
+    std::cout << " EvalState::lookupVar" << var << std::endl;
 
     for (size_t l = var.level; l; --l, env = env->up) ;
 
