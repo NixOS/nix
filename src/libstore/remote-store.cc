@@ -169,6 +169,9 @@ void RemoteStore::initConnection(Connection & conn)
             if (magic != WORKER_MAGIC_2)
                 throw Error("protocol mismatch");
         } catch (SerialisationError & e) {
+            /* In case the other side is waiting for our input, close
+               it. */
+            conn.closeWrite();
             auto msg = conn.from.drain();
             throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
         }

@@ -89,6 +89,8 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 if (magic != SERVE_MAGIC_2)
                     throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
             } catch (SerialisationError & e) {
+                /* In case the other side is waiting for our input,
+                   close it. */
                 conn->sshConn->in.close();
                 auto msg = conn->from.drain();
                 throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
