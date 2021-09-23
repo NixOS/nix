@@ -181,7 +181,7 @@ void ExprConcatStrings::show(std::ostream & str) const
     str << "(";
     for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << *i;
+        str << i.second;
     }
     str << ")";
 }
@@ -413,7 +413,7 @@ void ExprOpNot::bindVars(const StaticEnv & env)
 void ExprConcatStrings::bindVars(const StaticEnv & env)
 {
     for (auto & i : *es)
-        i->bindVars(env);
+        i.second->bindVars(env);
 }
 
 void ExprPos::bindVars(const StaticEnv & env)
