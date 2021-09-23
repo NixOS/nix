@@ -618,10 +618,10 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         if (file)
             state->evalFile(lookupFileArg(*state, *file), *vFile);
         else {
+            std::cout << "pre parseExprFromString" << std::endl;
             auto e = state->parseExprFromString(*expr, absPath("."));
 
-            int x = 5;
-            std::cout << "x =" << x << std::endl;
+            std::cout << "pre eval" << std::endl;
             
             state->eval(e, *vFile);
         }

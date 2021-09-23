@@ -262,34 +262,52 @@ void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
-    const StaticEnv * curEnv;
-    unsigned int level;
-    int withLevel = -1;
-    for (curEnv = env.get(), level = 0; curEnv; curEnv = curEnv->up, level++) {
-        if (curEnv->isWith) {
-            if (withLevel == -1) withLevel = level;
-        } else {
-            StaticEnv::Vars::const_iterator i = curEnv->vars.find(name);
-            if (i != curEnv->vars.end()) {
-                fromWith = false;
-                this->level = level;
-                displ = i->second;
-                return;
-            }
-        }
+
+    std::cout << "ExprVar::bindVars " << name << std::endl;
+
+    int a = 10;
+    if (name == "callPackage") {
+      a++;  // try to make code that I can put a breakpoint on...
+      std::cout << "meh" << a + 10 << std::endl;
+      int withLevel = -1;
+      fromWith = true;
+      // this->level = withLevel;
     }
 
-    /* Otherwise, the variable must be obtained from the nearest
-       enclosing `with'.  If there is no `with', then we can issue an
-       "undefined variable" error now. */
-    if (withLevel == -1)
-        std::cout << " throw UndefinedVarError({" << std::endl;
-        throw UndefinedVarError({
-            .msg = hintfmt("undefined variable '%1%'", name),
-            .errPos = pos
-        });
-    fromWith = true;
-    this->level = withLevel;
+    {
+
+        const StaticEnv * curEnv;
+        unsigned int level;
+        int withLevel = -1;
+        for (curEnv = env.get(), level = 0; curEnv; curEnv = curEnv->up, level++) {
+            if (curEnv->isWith) {
+                if (withLevel == -1) withLevel = level;
+            } else {
+                StaticEnv::Vars::const_iterator i = curEnv->vars.find(name);
+                if (i != curEnv->vars.end()) {
+                    fromWith = false;
+                    this->level = level;
+                    displ = i->second;
+                    return;
+                }
+            }
+        }
+        
+
+        /* Otherwise, the variable must be obtained from the nearest
+           enclosing `with'.  If there is no `with', then we can issue an
+           "undefined variable" error now. */
+        if (withLevel == -1) 
+        {
+            std::cout << " throw UndefinedVarError({" << std::endl;
+            throw UndefinedVarError({
+                .msg = hintfmt("undefined variable (ExprVar bindvars) '%1%'", name),
+                .errPos = pos
+            });
+        }
+        fromWith = true;
+        this->level = withLevel;
+    }
 }
 
 void ExprSelect::bindVars(const std::shared_ptr<const StaticEnv> &env)
@@ -418,6 +436,7 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
         std::cout << "EvalState::parse newEnv " << i->first << std::endl;
 
 
+    std::cout << " body->bindVars(newEnv), iswith: " << newEnv->isWith << std::endl;
     body->bindVars(newEnv);
     std::cout << " ExprWith::bindVars  3" << std::endl;
 }
