@@ -13,6 +13,12 @@ using namespace std::string_literals;
 
 namespace nix::fetchers {
 
+// Explicit initial branch of our bare repo to suppress warnings from new version of git.
+// The value itself does not matter, since we always fetch a specific revision or branch.
+// It is set with `-c init.defaultBranch=` instead of `--initial-branch=` to stay compatible with
+// old version of git, which will ignore unrecognized `-c` options.
+const std::string gitInitialBranch = "__nix_dummy_branch";
+
 static std::string readHead(const Path & path)
 {
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
@@ -324,7 +330,7 @@ struct GitInputScheme : InputScheme
             lockFile(lock.get(), ltWrite, true);
 
             if (!pathExists(cacheDir)) {
-                runProgram("git", true, { "init", "--bare", repoDir });
+                runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
             }
 
             deleteLockFile(cacheDirLock, lock.get());
@@ -436,7 +442,7 @@ struct GitInputScheme : InputScheme
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
-            runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
             // TODO: repoDir might lack the ref (it only checks if rev
             // exists, see FIXME above) so use a big hammer and fetch
             // everything to ensure we get the rev.
