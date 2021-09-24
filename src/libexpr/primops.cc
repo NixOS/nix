@@ -52,7 +52,8 @@ void EvalState::realiseContext(const PathSet & context)
     if (drvs.empty()) return;
 
     if (!evalSettings.enableImportFromDerivation)
-        throw EvalError("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false",
+        throw Error(
+            "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             store->printStorePath(drvs.begin()->drvPath));
 
     /* For performance, prefetch all substitute info. */

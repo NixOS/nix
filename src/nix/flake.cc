@@ -131,8 +131,18 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
 
     state.forceAttrs(*aOutputs->value);
 
-    for (auto & attr : *aOutputs->value->attrs)
-        callback(attr.name, *attr.value, *attr.pos);
+    auto sHydraJobs = state.symbols.create("hydraJobs");
+
+    /* Hack: ensure that hydraJobs is evaluated before anything
+       else. This way we can disable IFD for hydraJobs and then enable
+       it for other outputs. */
+    if (auto attr = aOutputs->value->attrs->get(sHydraJobs))
+        callback(attr->name, *attr->value, *attr->pos);
+
+    for (auto & attr : *aOutputs->value->attrs) {
+        if (attr.name != sHydraJobs)
+            callback(attr.name, *attr.value, *attr.pos);
+    }
 }
 
 struct CmdFlakeMetadata : FlakeCommand, MixJSON
@@ -269,7 +279,10 @@ struct CmdFlakeCheck : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        settings.readOnlyMode = !build;
+        if (!build) {
+            settings.readOnlyMode = true;
+            evalSettings.enableImportFromDerivation.setDefault(false);
+        }
 
         auto state = getEvalState();
 
@@ -381,9 +394,13 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     state->forceAttrs(*attr.value, *attr.pos);
-                    if (!state->isDerivation(*attr.value))
-                        checkHydraJobs(attrPath + "." + (std::string) attr.name,
-                            *attr.value, *attr.pos);
+                    auto attrPath2 = attrPath + "." + (std::string) attr.name;
+                    if (state->isDerivation(*attr.value)) {
+                        Activity act(*logger, lvlChatty, actUnknown,
+                            fmt("checking Hydra job '%s'", attrPath2));
+                        checkDerivation(attrPath2, *attr.value, *attr.pos);
+                    } else
+                        checkHydraJobs(attrPath2, *attr.value, *attr.pos);
                 }
 
             } catch (Error & e) {
@@ -447,8 +464,8 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
                 if (!v.lambda.fun->formals ||
-                    v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end() ||
-                    v.lambda.fun->formals->argNames.find(state->symbols.create("system")) == v.lambda.fun->formals->argNames.end())
+                    !v.lambda.fun->formals->argNames.count(state->symbols.create("program")) ||
+                    !v.lambda.fun->formals->argNames.count(state->symbols.create("system")))
                     throw Error("bundler must take formal arguments 'program' and 'system'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
@@ -469,6 +486,8 @@ struct CmdFlakeCheck : FlakeCommand
                         fmt("checking flake output '%s'", name));
 
                     try {
+                        evalSettings.enableImportFromDerivation.setDefault(name != "hydraJobs");
+
                         state->forceValue(vOutput, pos);
 
                         if (name == "checks") {
@@ -603,7 +622,7 @@ struct CmdFlakeCheck : FlakeCommand
             store->buildPaths(drvPaths);
         }
         if (hasErrors)
-            throw Error("Some errors were encountered during the evaluation");
+            throw Error("some errors were encountered during the evaluation");
     }
 };
 
@@ -873,6 +892,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
+        evalSettings.enableImportFromDerivation.setDefault(false);
+
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
 

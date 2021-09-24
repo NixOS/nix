@@ -92,7 +92,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	  lowdown -sT man -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
 	  rm $$tmpFile; \
 	done
-	touch $@
+	@touch $@
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md $(call rwildcard, $(d)/src, *.md)
 	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual
