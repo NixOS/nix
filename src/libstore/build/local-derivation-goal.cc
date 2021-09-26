@@ -2474,7 +2474,13 @@ void LocalDerivationGoal::registerOutputs()
         infos.emplace(outputName, std::move(newInfo));
     }
 
-    if (buildMode == bmCheck) return;
+    if (buildMode == bmCheck) {
+        // In case of FOD mismatches on `--check` an error must be thrown as this is also
+        // a source for non-determinism.
+        if (delayedException)
+            std::rethrow_exception(delayedException);
+        return;
+    }
 
     /* Apply output checks. */
     checkOutputs(infos);
