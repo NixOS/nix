@@ -125,7 +125,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         });
     } catch (Error & e) {
         e.addTrace(pos, "while importing '%s'", path);
-        throw e;
+        throw;
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
@@ -579,7 +579,7 @@ static Bindings::iterator getAttr(
             // Adding another trace for the function name to make it clear
             // which call received wrong arguments.
             e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
-            throw e;
+            throw;
         }
     }
 
@@ -1717,7 +1717,7 @@ static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Va
         parseJSON(state, s, v);
     } catch (JSONParseError &e) {
         e.addTrace(pos, "while decoding a JSON string");
-        throw e;
+        throw;
     }
 }
 
@@ -2902,7 +2902,7 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
             state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)));
         } catch (TypeError &e) {
             e.addTrace(pos, hintfmt("while invoking '%s'", "concatMap"));
-            throw e;
+            throw;
         }
         len += lists[n].listSize();
     }

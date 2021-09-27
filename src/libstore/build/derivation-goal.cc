@@ -1009,7 +1009,7 @@ HookReply DerivationGoal::tryBuildHook()
                     return readLine(worker.hook->fromHook.readSide.get());
                 } catch (Error & e) {
                     e.addTrace({}, "while reading the response from the build hook");
-                    throw e;
+                    throw;
                 }
             }();
             if (handleJSONLogMessage(s, worker.act, worker.hook->activities, true))
@@ -1055,7 +1055,7 @@ HookReply DerivationGoal::tryBuildHook()
         machineName = readLine(hook->fromHook.readSide.get());
     } catch (Error & e) {
         e.addTrace({}, "while reading the machine name from the build hook");
-        throw e;
+        throw;
     }
 
     /* Tell the hook all the inputs that have to be copied to the

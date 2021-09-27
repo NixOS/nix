@@ -943,7 +943,7 @@ void LocalDerivationGoal::startBuilder()
                     worker.store.printStorePath(drvPath),
                     statusToString(status),
                     concatStringsSep("|", msgs));
-                throw e;
+                throw;
             }
         }();
         if (string(msg, 0, 1) == "\2") break;
@@ -951,7 +951,7 @@ void LocalDerivationGoal::startBuilder()
             FdSource source(builderOut.readSide.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
-            throw ex;
+            throw;
         }
         debug("sandbox setup: " + msg);
         msgs.push_back(std::move(msg));
