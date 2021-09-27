@@ -120,7 +120,7 @@ void BuiltPathsCommand::run(ref<Store> store)
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
             StorePathSet pathsRoots, pathsClosure;
-            for (auto & root: paths) {
+            for (auto & root : paths) {
                 auto rootFromThis = root.outPaths();
                 pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
             }
@@ -140,12 +140,15 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 
 void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
 {
-    StorePaths storePaths;
-    for (auto& builtPath : paths)
-        for (auto& p : builtPath.outPaths())
-            storePaths.push_back(p);
+    StorePathSet storePaths;
+    for (auto & builtPath : paths)
+        for (auto & p : builtPath.outPaths())
+            storePaths.insert(p);
 
-    run(store, std::move(storePaths));
+    auto sorted = store->topoSortPaths(storePaths);
+    std::reverse(sorted.begin(), sorted.end());
+
+    run(store, std::move(sorted));
 }
 
 void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
