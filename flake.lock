@@ -3,16 +3,15 @@
     "lowdown-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1628247802,
-        "narHash": "sha256-4XSXGYvKqogR7bubyqYNwBHYCtrIn6XRGXj6+u+BXNs=",
+        "lastModified": 1632391204,
+        "narHash": "sha256-zjyNA4ZmaaIbbmz2JZDqMgY7+P/uGF0nLg28Nxfg5kI=",
         "owner": "kristapsdz",
         "repo": "lowdown",
-        "rev": "b4483d0ef85990f54b864158ab786b4a5b3904fa",
+        "rev": "0b85e777f3cdacf4210f0d624a0ceec8df612e05",
         "type": "github"
       },
       "original": {
         "owner": "kristapsdz",
-        "ref": "VERSION_0_8_6",
         "repo": "lowdown",
         "type": "github"
       }
