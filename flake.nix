@@ -70,7 +70,7 @@
           [
             buildPackages.bison
             buildPackages.flex
-            (lib.getBin buildPackages.lowdown)
+            (lib.getBin buildPackages.lowdown-nix)
             buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
@@ -89,7 +89,7 @@
             openssl sqlite
             libarchive
             boost
-            lowdown
+            lowdown-nix
             gmock
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
@@ -349,15 +349,8 @@
 
         };
 
-        lowdown = with final; stdenv.mkDerivation rec {
+        lowdown-nix = with final; stdenv.mkDerivation rec {
           name = "lowdown-0.9.0";
-
-          /*
-          src = fetchurl {
-            url = "https://kristaps.bsd.lv/lowdown/snapshots/${name}.tar.gz";
-            hash = "sha512-U9WeGoInT9vrawwa57t6u9dEdRge4/P+0wLxmQyOL9nhzOEUU2FRz2Be9H0dCjYE7p2v3vCXIYk40M+jjULATw==";
-          };
-          */
 
           src = lowdown-src;
 
