@@ -1716,6 +1716,8 @@ string showBytes(uint64_t bytes)
 // FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
+    logger = makeSimpleLogger();
+
     const static string pathNullDevice = "/dev/null";
     restoreProcessContext();
 
