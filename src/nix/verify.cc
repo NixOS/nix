@@ -59,7 +59,7 @@ struct CmdVerify : StorePathsCommand
           ;
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)

@@ -78,7 +78,7 @@ struct CmdCopy : BuiltPathsCommand
         BuiltPathsCommand::run(store);
     }
 
-    void run(ref<Store> srcStore, BuiltPaths paths) override
+    void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 

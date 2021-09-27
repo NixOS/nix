@@ -138,7 +138,7 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, BuiltPaths paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
 {
     StorePaths storePaths;
     for (auto& builtPath : paths)
@@ -148,7 +148,7 @@ void StorePathsCommand::run(ref<Store> store, BuiltPaths paths)
     run(store, std::move(storePaths));
 }
 
-void StorePathCommand::run(ref<Store> store, std::vector<StorePath> storePaths)
+void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
 {
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");

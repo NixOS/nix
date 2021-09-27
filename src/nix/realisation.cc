@@ -44,7 +44,7 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store, BuiltPaths paths) override
+    void run(ref<Store> store, BuiltPaths && paths) override
     {
         settings.requireExperimentalFeature("ca-derivations");
         RealisedPath::Set realisations;

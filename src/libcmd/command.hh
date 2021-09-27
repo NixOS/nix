@@ -169,7 +169,7 @@ public:
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, BuiltPaths paths) = 0;
+    virtual void run(ref<Store> store, BuiltPaths && paths) = 0;
 
     void run(ref<Store> store) override;
 
@@ -182,9 +182,9 @@ struct StorePathsCommand : public BuiltPathsCommand
 
     using BuiltPathsCommand::run;
 
-    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
+    virtual void run(ref<Store> store, std::vector<StorePath> && storePaths) = 0;
 
-    void run(ref<Store> store, BuiltPaths paths) override;
+    void run(ref<Store> store, BuiltPaths && paths) override;
 };
 
 /* A command that operates on exactly one store path. */
@@ -194,7 +194,7 @@ struct StorePathCommand : public StorePathsCommand
 
     virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
-    void run(ref<Store> store, std::vector<StorePath> storePaths) override;
+    void run(ref<Store> store, std::vector<StorePath> && storePaths) override;
 };
 
 /* A helper class for registering commands globally. */
