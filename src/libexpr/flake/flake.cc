@@ -688,6 +688,8 @@ void callFlake(EvalState & state,
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    state.requireExperimentalFeatureOnEvaluation("flakes", "builtins.getFlake", pos);
+
     auto flakeRefS = state.forceStringNoCtx(*args[0], pos);
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input.isImmutable())
@@ -703,7 +705,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
         v);
 }
 
-static RegisterPrimOp r2("__getFlake", 1, prim_getFlake, "flakes");
+static RegisterPrimOp r2("__getFlake", 1, prim_getFlake);
 
 }
 
