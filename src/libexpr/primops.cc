@@ -3606,15 +3606,13 @@ static RegisterPrimOp primop_splitVersion({
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
-    std::optional<std::string> requiredFeature)
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
 {
     if (!primOps) primOps = new PrimOps;
     primOps->push_back({
         .name = name,
         .args = {},
         .arity = arity,
-        .requiredFeature = std::move(requiredFeature),
         .fun = fun
     });
 }
@@ -3688,14 +3686,13 @@ void EvalState::createBaseEnv()
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
-                addPrimOp({
-                    .fun = primOp.fun,
-                    .arity = std::max(primOp.args.size(), primOp.arity),
-                    .name = symbols.create(primOp.name),
-                    .args = std::move(primOp.args),
-                    .doc = primOp.doc,
-                });
+            addPrimOp({
+                .fun = primOp.fun,
+                .arity = std::max(primOp.args.size(), primOp.arity),
+                .name = symbols.create(primOp.name),
+                .args = std::move(primOp.args),
+                .doc = primOp.doc,
+            });
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
