@@ -199,10 +199,10 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, ContentAddress
 {
     // New template
     return std::visit(overloaded {
-        [&](TextHash th) {
+        [&](const TextHash & th) {
             return makeTextPath(name, th.hash, references);
         },
-        [&](FixedOutputHash fsh) {
+        [&](const FixedOutputHash & fsh) {
             return makeFixedOutputPath(fsh.method, fsh.hash, name, references, hasSelfReference);
         }
     }, ca);
@@ -1114,10 +1114,10 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     if (! ca) return false;
 
     auto caPath = std::visit(overloaded {
-        [&](TextHash th) {
+        [&](const TextHash & th) {
             return store.makeTextPath(path.name(), th.hash, references);
         },
-        [&](FixedOutputHash fsh) {
+        [&](const FixedOutputHash & fsh) {
             auto refs = references;
             bool hasSelfReference = false;
             if (refs.count(path)) {

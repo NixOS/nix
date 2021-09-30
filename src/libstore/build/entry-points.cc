@@ -11,12 +11,12 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (auto & br : reqs) {
+    for (const auto & br : reqs) {
         std::visit(overloaded {
-            [&](DerivedPath::Built bfd) {
+            [&](const DerivedPath::Built & bfd) {
                 goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
             },
-            [&](DerivedPath::Opaque bo) {
+            [&](const DerivedPath::Opaque & bo) {
                 goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
             },
         }, br.raw());
