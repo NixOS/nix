@@ -25,6 +25,8 @@
     }
 #define GENERATE_EQUAL(args...) GENERATE_ONE_CMP(==, args)
 #define GENERATE_LEQ(args...) GENERATE_ONE_CMP(<, args)
+#define GENERATE_NEQ(args...) GENERATE_ONE_CMP(!=, args)
 #define GENERATE_CMP(args...) \
     GENERATE_EQUAL(args) \
-    GENERATE_LEQ(args)
+    GENERATE_LEQ(args) \
+    GENERATE_NEQ(args)

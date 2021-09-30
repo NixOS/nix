@@ -82,7 +82,7 @@ This command shows information about the store paths produced by
 
 By default, this command only prints the store paths. You can get
 additional information by passing flags such as `--closure-size`,
---size`, `--sigs` or `--json`.
+`--size`, `--sigs` or `--json`.
 
 > **Warning**
 >

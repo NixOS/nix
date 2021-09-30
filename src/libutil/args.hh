@@ -12,6 +12,8 @@ namespace nix {
 
 enum HashType : char;
 
+class MultiCommand;
+
 class Args
 {
 public:
@@ -87,6 +89,14 @@ protected:
             : fun([=](std::vector<std::string> ss) {
                 *dest = string2IntWithUnitPrefix<I>(ss[0]);
               })
+            , arity(1)
+        { }
+
+        template<class I>
+        Handler(std::optional<I> * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+            })
             , arity(1)
         { }
     };
@@ -169,11 +179,13 @@ public:
     virtual nlohmann::json toJSON();
 
     friend class MultiCommand;
+
+    MultiCommand * parent = nullptr;
 };
 
 /* A command is an argument parser that can be executed by calling its
    run() method. */
-struct Command : virtual Args
+struct Command : virtual public Args
 {
     friend class MultiCommand;
 
@@ -193,7 +205,7 @@ typedef std::map<std::string, std::function<ref<Command>()>> Commands;
 
 /* An argument parser that supports multiple subcommands,
    i.e. ‘<command> <subcommand>’. */
-class MultiCommand : virtual Args
+class MultiCommand : virtual public Args
 {
 public:
     Commands commands;

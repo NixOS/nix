@@ -21,6 +21,8 @@
 #include <regex>
 #include <dlfcn.h>
 
+#include <cmath>
+
 
 namespace nix {
 
@@ -50,7 +52,8 @@ void EvalState::realiseContext(const PathSet & context)
     if (drvs.empty()) return;
 
     if (!evalSettings.enableImportFromDerivation)
-        throw EvalError("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false",
+        throw Error(
+            "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             store->printStorePath(drvs.begin()->drvPath));
 
     /* For performance, prefetch all substitute info. */
@@ -122,7 +125,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         });
     } catch (Error & e) {
         e.addTrace(pos, "while importing '%s'", path);
-        throw e;
+        throw;
     }
 
     Path realPath = state.checkSourcePath(state.toRealPath(path, context));
@@ -158,16 +161,15 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         }
         w.attrs->sort();
 
-        static RootValue fun;
-        if (!fun) {
-            fun = allocRootValue(state.allocValue());
+        if (!state.vImportedDrvToDerivation) {
+            state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , "/"), **fun);
+                , "/"), **state.vImportedDrvToDerivation);
         }
 
-        state.forceFunction(**fun, pos);
-        mkApp(v, **fun, w);
+        state.forceFunction(**state.vImportedDrvToDerivation, pos);
+        mkApp(v, **state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos);
     }
 
@@ -547,18 +549,56 @@ typedef list<Value *> ValueList;
 #endif
 
 
+static Bindings::iterator getAttr(
+    EvalState & state,
+    string funcName,
+    string attrName,
+    Bindings * attrSet,
+    const Pos & pos)
+{
+    Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
+    if (value == attrSet->end()) {
+        hintformat errorMsg = hintfmt(
+            "attribute '%s' missing for call to '%s'",
+            attrName,
+            funcName
+        );
+
+        Pos aPos = *attrSet->pos;
+        if (aPos == noPos) {
+            throw TypeError({
+                .msg = errorMsg,
+                .errPos = pos,
+            });
+        } else {
+            auto e = TypeError({
+                .msg = errorMsg,
+                .errPos = aPos,
+            });
+
+            // Adding another trace for the function name to make it clear
+            // which call received wrong arguments.
+            e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
+            throw;
+        }
+    }
+
+    return value;
+}
+
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
-    Bindings::iterator startSet =
-        args[0]->attrs->find(state.symbols.create("startSet"));
-    if (startSet == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute 'startSet' required"),
-            .errPos = pos
-        });
+    Bindings::iterator startSet = getAttr(
+        state,
+        "genericClosure",
+        "startSet",
+        args[0]->attrs,
+        pos
+    );
+
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
@@ -566,13 +606,14 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         workSet.push_back(startSet->value->listElems()[n]);
 
     /* Get the operator. */
-    Bindings::iterator op =
-        args[0]->attrs->find(state.symbols.create("operator"));
-    if (op == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute 'operator' required"),
-            .errPos = pos
-        });
+    Bindings::iterator op = getAttr(
+        state,
+        "genericClosure",
+        "operator",
+        args[0]->attrs,
+        pos
+    );
+
     state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
@@ -673,6 +714,44 @@ static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
     .name = "__addErrorContext",
     .arity = 2,
     .fun = prim_addErrorContext,
+});
+
+static void prim_ceil(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
+    mkInt(v, ceil(value));
+}
+
+static RegisterPrimOp primop_ceil({
+    .name = "__ceil",
+    .args = {"double"},
+    .doc = R"(
+        Converts an IEEE-754 double-precision floating-point number (*double*) to
+        the next higher integer.
+
+        If the datatype is neither an integer nor a "float", an evaluation error will be
+        thrown.
+    )",
+    .fun = prim_ceil,
+});
+
+static void prim_floor(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
+    mkInt(v, floor(value));
+}
+
+static RegisterPrimOp primop_floor({
+    .name = "__floor",
+    .args = {"double"},
+    .doc = R"(
+        Converts an IEEE-754 double-precision floating-point number (*double*) to
+        the next lower integer.
+
+        If the datatype is neither an integer nor a "float", an evaluation error will be
+        thrown.
+    )",
+    .fun = prim_floor,
 });
 
 /* Try evaluating the argument. Success => {success=true; value=something;},
@@ -816,12 +895,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(state.sName);
-    if (attr == args[0]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("required attribute 'name' missing"),
-            .errPos = pos
-        });
+    Bindings::iterator attr = getAttr(
+        state,
+        "derivationStrict",
+        state.sName,
+        args[0]->attrs,
+        pos
+    );
+
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
@@ -953,7 +1034,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     }
 
                 } else {
-                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    auto s = state.coerceToString(*i->pos, *i->value, context, true);
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = s;
                     else if (i->name == state.sSystem) drv.platform = s;
@@ -1216,7 +1297,10 @@ static RegisterPrimOp primop_toPath({
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     if (evalSettings.pureEval)
-        throw EvalError("builtins.storePath' is not allowed in pure evaluation mode");
+        throw EvalError({
+            .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
+            .errPos = pos
+        });
 
     PathSet context;
     Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
@@ -1375,12 +1459,13 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         if (i != v2.attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
-        i = v2.attrs->find(state.symbols.create("path"));
-        if (i == v2.attrs->end())
-            throw EvalError({
-                .msg = hintfmt("attribute 'path' missing"),
-                .errPos = pos
-            });
+        i = getAttr(
+            state,
+            "findFile",
+            "path",
+            v2.attrs,
+            pos
+        );
 
         PathSet context;
         string path = state.coerceToString(pos, *i->value, context, false, false);
@@ -1414,15 +1499,20 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     string type = state.forceStringNoCtx(*args[0], pos);
     std::optional<HashType> ht = parseHashType(type);
     if (!ht)
-      throw Error({
-          .msg = hintfmt("unknown hash type '%1%'", type),
-          .errPos = pos
-      });
+        throw Error({
+            .msg = hintfmt("unknown hash type '%1%'", type),
+            .errPos = pos
+        });
 
-    PathSet context; // discarded
-    Path p = state.coerceToPath(pos, *args[1], context);
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[1], context);
+    try {
+        state.realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError("cannot read '%s' since path '%s' is not valid, at %s", path, e.path, pos);
+    }
 
-    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(*ht, state.checkSourcePath(state.toRealPath(path, context))).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1633,7 +1723,7 @@ static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Va
         parseJSON(state, s, v);
     } catch (JSONParseError &e) {
         e.addTrace(pos, "while decoding a JSON string");
-        throw e;
+        throw;
     }
 }
 
@@ -1932,26 +2022,26 @@ static RegisterPrimOp primop_path({
       An enrichment of the built-in path type, based on the attributes
       present in *args*. All are optional except `path`:
 
-        - path  
+        - path\
           The underlying path.
 
-        - name  
+        - name\
           The name of the path when added to the store. This can used to
           reference paths that have nix-illegal characters in their names,
           like `@`.
 
-        - filter  
+        - filter\
           A function of the type expected by `builtins.filterSource`,
           with the same semantics.
 
-        - recursive  
+        - recursive\
           When `false`, when `path` is added to the store it is with a
           flat hash, rather than a hash of the NAR serialization of the
           file. Thus, `path` must refer to a regular file, not a
           directory. This allows similar behavior to `fetchurl`. Defaults
           to `true`.
 
-        - sha256  
+        - sha256\
           When provided, this is the expected hash of the file at the
           path. Evaluation will fail if the hash is incorrect, and
           providing a hash allows `builtins.path` to be used even when the
@@ -2028,14 +2118,15 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
-        throw EvalError({
-            .msg = hintfmt("attribute '%1%' missing", attr),
-            .errPos = pos
-        });
+    Bindings::iterator i = getAttr(
+        state,
+        "getAttr",
+        attr,
+        args[1]->attrs,
+        pos
+    );
     // !!! add to stack trace?
-    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
+    if (state.countCalls && *i->pos != noPos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
     v = *i->value;
 }
@@ -2160,22 +2251,25 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Value & v2(*args[0]->listElems()[i]);
         state.forceAttrs(v2, pos);
 
-        Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end())
-            throw TypeError({
-                .msg = hintfmt("'name' attribute missing in a call to 'listToAttrs'"),
-                .errPos = pos
-            });
-        string name = state.forceStringNoCtx(*j->value, pos);
+        Bindings::iterator j = getAttr(
+            state,
+            "listToAttrs",
+            state.sName,
+            v2.attrs,
+            pos
+        );
+
+        string name = state.forceStringNoCtx(*j->value, *j->pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
-            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end())
-                throw TypeError({
-                    .msg = hintfmt("'value' attribute missing in a call to 'listToAttrs'"),
-                    .errPos = pos
-                });
+            Bindings::iterator j2 = getAttr(
+                state,
+                "listToAttrs",
+                state.sValue,
+                v2.attrs,
+                pos
+            );
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
         }
     }
@@ -2292,7 +2386,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     for (auto & i : args[0]->lambda.fun->formals->formals) {
         // !!! should optimise booleans (allocate only once)
         Value * value = state.allocValue();
-        v.attrs->push_back(Attr(i.name, value, &i.pos));
+        v.attrs->push_back(Attr(i.name, value, ptr(&i.pos)));
         mkBool(*value, i.def);
     }
     v.attrs->sort();
@@ -2816,7 +2910,12 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], pos);
+        try {
+            state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)));
+        } catch (TypeError &e) {
+            e.addTrace(pos, hintfmt("while invoking '%s'", "concatMap"));
+            throw;
+        }
         len += lists[n].listSize();
     }
 
@@ -3027,7 +3126,7 @@ static RegisterPrimOp primop_toString({
 
         - A path (e.g., `toString /foo/bar` yields `"/foo/bar"`.
 
-        - A set containing `{ __toString = self: ...; }`.
+        - A set containing `{ __toString = self: ...; }` or `{ outPath = ...; }`.
 
         - An integer.
 
@@ -3112,7 +3211,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(*ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(*ht, s).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({
@@ -3519,15 +3618,13 @@ static RegisterPrimOp primop_splitVersion({
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
-    std::optional<std::string> requiredFeature)
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
 {
     if (!primOps) primOps = new PrimOps;
     primOps->push_back({
         .name = name,
         .args = {},
         .arity = arity,
-        .requiredFeature = std::move(requiredFeature),
         .fun = fun
     });
 }
@@ -3563,9 +3660,7 @@ void EvalState::createBaseEnv()
     if (!evalSettings.pureEval) {
         mkInt(v, time(0));
         addConstant("__currentTime", v);
-    }
 
-    if (!evalSettings.pureEval) {
         mkString(v, settings.thisSystem.get());
         addConstant("__currentSystem", v);
     }
@@ -3603,14 +3698,13 @@ void EvalState::createBaseEnv()
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
-                addPrimOp({
-                    .fun = primOp.fun,
-                    .arity = std::max(primOp.args.size(), primOp.arity),
-                    .name = symbols.create(primOp.name),
-                    .args = std::move(primOp.args),
-                    .doc = primOp.doc,
-                });
+            addPrimOp({
+                .fun = primOp.fun,
+                .arity = std::max(primOp.args.size(), primOp.arity),
+                .name = symbols.create(primOp.name),
+                .args = std::move(primOp.args),
+                .doc = primOp.doc,
+            });
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

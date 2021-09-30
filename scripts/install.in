@@ -40,21 +40,25 @@ case "$(uname -s).$(uname -m)" in
         path=@tarballPath_aarch64-linux@
         system=aarch64-linux
         ;;
+    Linux.armv6l_linux)
+        hash=@tarballHash_armv6l-linux@
+        path=@tarballPath_armv6l-linux@
+        system=armv6l-linux
+        ;;
+    Linux.armv7l_linux)
+        hash=@tarballHash_armv7l-linux@
+        path=@tarballPath_armv7l-linux@
+        system=armv7l-linux
+        ;;
     Darwin.x86_64)
         hash=@tarballHash_x86_64-darwin@
         path=@tarballPath_x86_64-darwin@
         system=x86_64-darwin
         ;;
     Darwin.arm64|Darwin.aarch64)
-        # check for Rosetta 2 support
-        if ! [ -f /Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist ]; then
-          oops "Rosetta 2 is not installed on this ARM64 macOS machine. Run softwareupdate --install-rosetta then restart installation"
-        fi
-
-        hash=@binaryTarball_x86_64-darwin@
-        path=@tarballPath_x86_64-darwin@
-        # eventually maybe: aarch64-darwin
-        system=x86_64-darwin
+        hash=@tarballHash_aarch64-darwin@
+        path=@tarballPath_aarch64-darwin@
+        system=aarch64-darwin
         ;;
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
@@ -72,14 +76,21 @@ fi
 
 tarball=$tmpDir/nix-@nixVersion@-$system.tar.xz
 
-require_util curl "download the binary tarball"
 require_util tar "unpack the binary tarball"
 if [ "$(uname -s)" != "Darwin" ]; then
     require_util xz "unpack the binary tarball"
 fi
 
+if command -v wget > /dev/null 2>&1; then
+    fetch() { wget "$1" -O "$2"; }
+elif command -v curl > /dev/null 2>&1; then
+    fetch() { curl -L "$1" -o "$2"; }
+else
+    oops "you don't have wget or curl installed, which I need to download the binary tarball"
+fi
+
 echo "downloading Nix @nixVersion@ binary tarball for $system from '$url' to '$tmpDir'..."
-curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
+fetch "$url" "$tarball" || oops "failed to download '$url'"
 
 if command -v sha256sum > /dev/null 2>&1; then
     hash2="$(sha256sum -b "$tarball" | cut -c1-64)"

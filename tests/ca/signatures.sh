@@ -22,8 +22,8 @@ testOneCopy () {
     rm -rf "$REMOTE_STORE_DIR"
 
     attrPath="$1"
-    nix copy --to $REMOTE_STORE "$attrPath" --file ./content-addressed.nix \
-        --secret-key-files "$TEST_ROOT/sk1"
+    nix copy -vvvv --to $REMOTE_STORE "$attrPath" --file ./content-addressed.nix \
+        --secret-key-files "$TEST_ROOT/sk1" --show-trace
 
     ensureCorrectlyCopied "$attrPath"
 

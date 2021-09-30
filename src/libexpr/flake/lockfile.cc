@@ -2,6 +2,8 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 
+#include <iomanip>
+
 #include <nlohmann/json.hpp>
 
 namespace nix::flake {
@@ -268,10 +270,20 @@ std::map<InputPath, Node::Edge> LockFile::getAllInputs() const
     return res;
 }
 
+static std::string describe(const FlakeRef & flakeRef)
+{
+    auto s = fmt("'%s'", flakeRef.to_string());
+
+    if (auto lastModified = flakeRef.input.getLastModified())
+        s += fmt(" (%s)", std::put_time(std::gmtime(&*lastModified), "%Y-%m-%d"));
+
+    return s;
+}
+
 std::ostream & operator <<(std::ostream & stream, const Node::Edge & edge)
 {
     if (auto node = std::get_if<0>(&edge))
-        stream << "'" << (*node)->lockedRef << "'";
+        stream << describe((*node)->lockedRef);
     else if (auto follows = std::get_if<1>(&edge))
         stream << fmt("follows '%s'", printInputPath(*follows));
     return stream;
@@ -299,14 +311,15 @@ std::string LockFile::diff(const LockFile & oldLocks, const LockFile & newLocks)
 
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("* Added '%s': %s\n", printInputPath(j->first), j->second);
+            res += fmt("• " ANSI_GREEN "Added input '%s':" ANSI_NORMAL "\n    %s\n",
+                printInputPath(j->first), j->second);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
-            res += fmt("* Removed '%s'\n", printInputPath(i->first));
+            res += fmt("• " ANSI_RED "Removed input '%s'" ANSI_NORMAL "\n", printInputPath(i->first));
             ++i;
         } else {
             if (!equals(i->second, j->second)) {
-                res += fmt("* Updated '%s': %s -> %s\n",
+                res += fmt("• " ANSI_BOLD "Updated input '%s':" ANSI_NORMAL "\n    %s\n  → %s\n",
                     printInputPath(i->first),
                     i->second,
                     j->second);

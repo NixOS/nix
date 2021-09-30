@@ -100,6 +100,12 @@ public:
     virtual nlohmann::json toJSON() = 0;
 
     /**
+     * Outputs all settings in a key-value pair format suitable to be used as
+     * `nix.conf`
+     */
+    virtual std::string toKeyValue() = 0;
+
+    /**
      * Converts settings to `Args` to be used on the command line interface
      * - args: args to write to
      * - category: category of the settings
@@ -169,6 +175,8 @@ public:
 
     nlohmann::json toJSON() override;
 
+    std::string toKeyValue() override;
+
     void convertToArgs(Args & args, const std::string & category) override;
 };
 
@@ -185,8 +193,6 @@ public:
     int created = 123;
 
     bool overridden = false;
-
-    void setDefault(const std::string & str);
 
 protected:
 
@@ -245,6 +251,7 @@ public:
     bool operator !=(const T & v2) const { return value != v2; }
     void operator =(const T & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
+    void setDefault(const T & v) { if (!overridden) value = v; }
 
     void set(const std::string & str, bool append = false) override;
 
@@ -329,6 +336,8 @@ struct GlobalConfig : public AbstractConfig
     void resetOverridden() override;
 
     nlohmann::json toJSON() override;
+
+    std::string toKeyValue() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

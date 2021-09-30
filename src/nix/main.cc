@@ -10,16 +10,13 @@
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
+#include "markdown.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
-
-#if __linux__
-#include <sys/resource.h>
-#endif
 
 #include <nlohmann/json.hpp>
 
@@ -167,9 +164,43 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     }
 };
 
-static void showHelp(std::vector<std::string> subcommand)
+/* Render the help for the specified subcommand to stdout using
+   lowdown. */
+static void showHelp(std::vector<std::string> subcommand, MultiCommand & toplevel)
 {
-    showManPage(subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand)));
+    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
+
+    evalSettings.restrictEval = false;
+    evalSettings.pureEval = false;
+    EvalState state({}, openStore("dummy://"));
+
+    auto vGenerateManpage = state.allocValue();
+    state.eval(state.parseExprFromString(
+        #include "generate-manpage.nix.gen.hh"
+        , "/"), *vGenerateManpage);
+
+    auto vUtils = state.allocValue();
+    state.cacheFile(
+        "/utils.nix", "/utils.nix",
+        state.parseExprFromString(
+            #include "utils.nix.gen.hh"
+            , "/"),
+        *vUtils);
+
+    auto vJson = state.allocValue();
+    mkString(*vJson, toplevel.toJSON().dump());
+
+    auto vRes = state.allocValue();
+    state.callFunction(*vGenerateManpage, *vJson, *vRes, noPos);
+
+    auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
+    if (!attr)
+        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
+
+    auto markdown = state.forceString(*attr->value);
+
+    RunPager pager;
+    std::cout << renderMarkdownToTerminal(markdown) << "\n";
 }
 
 struct CmdHelp : Command
@@ -198,7 +229,10 @@ struct CmdHelp : Command
 
     void run() override
     {
-        showHelp(subcommand);
+        assert(parent);
+        MultiCommand * toplevel = parent;
+        while (toplevel->parent) toplevel = toplevel->parent;
+        showHelp(subcommand, *toplevel);
     }
 };
 
@@ -281,7 +315,7 @@ void mainWrapped(int argc, char * * argv)
             } else
                 break;
         }
-        showHelp(subcommand);
+        showHelp(subcommand, args);
         return;
     } catch (UsageError &) {
         if (!completions) throw;
@@ -335,14 +369,7 @@ int main(int argc, char * * argv)
 {
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    #if __linux__
-    rlim_t stackSize = 64 * 1024 * 1024;
-    struct rlimit limit;
-    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
-        limit.rlim_cur = stackSize;
-        setrlimit(RLIMIT_STACK, &limit);
-    }
-    #endif
+    nix::setStackSize(64 * 1024 * 1024);
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

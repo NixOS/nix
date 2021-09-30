@@ -64,7 +64,11 @@ static char * dupStringWithLen(const char * s, size_t size)
 
 RootValue allocRootValue(Value * v)
 {
+#if HAVE_BOEHMGC
     return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
+#else
+    return std::make_shared<Value *>(v);
+#endif
 }
 
 
@@ -201,6 +205,15 @@ string showType(const Value & v)
     }
 }
 
+Pos Value::determinePos(const Pos &pos) const
+{
+    switch (internalType) {
+        case tAttrs: return *attrs->pos;
+        case tLambda: return lambda.fun->pos;
+        case tApp: return app.left->determinePos(pos);
+        default: return pos;
+    }
+}
 
 bool Value::isTrivial() const
 {
@@ -224,22 +237,34 @@ static void * oomHandler(size_t requested)
 }
 
 class BoehmGCStackAllocator : public StackAllocator {
-  boost::coroutines2::protected_fixedsize_stack stack {
-    // We allocate 8 MB, the default max stack size on NixOS.
-    // A smaller stack might be quicker to allocate but reduces the stack
-    // depth available for source filter expressions etc.
-    std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
+    boost::coroutines2::protected_fixedsize_stack stack {
+        // We allocate 8 MB, the default max stack size on NixOS.
+        // A smaller stack might be quicker to allocate but reduces the stack
+        // depth available for source filter expressions etc.
+        std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
     };
+
+    // This is specific to boost::coroutines2::protected_fixedsize_stack.
+    // The stack protection page is included in sctx.size, so we have to
+    // subtract one page size from the stack size.
+    std::size_t pfss_usable_stack_size(boost::context::stack_context &sctx) {
+        return sctx.size - boost::context::stack_traits::page_size();
+    }
 
   public:
     boost::context::stack_context allocate() override {
         auto sctx = stack.allocate();
-        GC_add_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+
+        // Stacks generally start at a high address and grow to lower addresses.
+        // Architectures that do the opposite are rare; in fact so rare that
+        // boost_routine does not implement it.
+        // So we subtract the stack size.
+        GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         return sctx;
     }
 
     void deallocate(boost::context::stack_context sctx) override {
-        GC_remove_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+        GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         stack.deallocate(sctx);
     }
 
@@ -353,7 +378,10 @@ static Strings parseNixPath(const string & s)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
+EvalState::EvalState(
+    const Strings & _searchPath,
+    ref<Store> store,
+    std::shared_ptr<Store> buildStore)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -386,6 +414,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
+    , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -435,6 +464,23 @@ EvalState::~EvalState()
 {
 }
 
+
+void EvalState::requireExperimentalFeatureOnEvaluation(
+    const std::string & feature,
+    const std::string_view fName,
+    const Pos & pos)
+{
+    if (!settings.isExperimentalFeatureEnabled(feature)) {
+        throw EvalError({
+            .msg = hintfmt(
+                "Cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
+                feature,
+                fName
+            ),
+            .errPos = pos
+        });
+    }
+}
 
 Path EvalState::checkSourcePath(const Path & path_)
 {
@@ -741,7 +787,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
-            if (countCalls && j->pos) attrSelects[*j->pos]++;
+            if (countCalls) attrSelects[*j->pos]++;
             return j->value;
         }
         if (!env->prevWith)
@@ -751,18 +797,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-std::atomic<uint64_t> nrValuesFreed{0};
-
-void finalizeValue(void * obj, void * data)
-{
-    nrValuesFreed++;
-}
-
 Value * EvalState::allocValue()
 {
     nrValues++;
     auto v = (Value *) allocBytes(sizeof(Value));
-    //GC_register_finalizer_no_order(v, finalizeValue, nullptr, nullptr, nullptr);
     return v;
 }
 
@@ -804,9 +842,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
-void EvalState::mkPos(Value & v, Pos * pos)
+void EvalState::mkPos(Value & v, ptr<Pos> pos)
 {
-    if (pos && pos->file.set()) {
+    if (pos->file.set()) {
         mkAttrs(v, 3);
         mkString(*allocAttr(v, sFile), pos->file);
         mkInt(*allocAttr(v, sLine), pos->line);
@@ -829,39 +867,37 @@ Value * Expr::maybeThunk(EvalState & state, Env & env)
 }
 
 
-unsigned long nrAvoided = 0;
-
 Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.lookupVar(&env, *this, true);
     /* The value might not be initialised in the environment yet.
        In that case, ignore it. */
-    if (v) { nrAvoided++; return v; }
+    if (v) { state.nrAvoided++; return v; }
     return Expr::maybeThunk(state, env);
 }
 
 
 Value * ExprString::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprInt::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
@@ -876,38 +912,23 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
         return;
     }
 
-    Path path2 = resolveExprPath(path);
-    if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
+    Path resolvedPath = resolveExprPath(path);
+    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
-    printTalkative("evaluating file '%1%'", path2);
+    printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    auto j = fileParseCache.find(path2);
+    auto j = fileParseCache.find(resolvedPath);
     if (j != fileParseCache.end())
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(checkSourcePath(path2));
+        e = parseExprFromFile(checkSourcePath(resolvedPath));
 
-    fileParseCache[path2] = e;
-
-    try {
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial &&
-            !(dynamic_cast<ExprAttrs *>(e)))
-            throw Error("file '%s' must be an attribute set", path);
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", path2);
-        throw;
-    }
-
-    fileEvalCache[path2] = v;
-    if (path != path2) fileEvalCache[path] = v;
+    cacheFile(path, resolvedPath, e, v, mustBeTrivial);
 }
 
 
@@ -915,6 +936,32 @@ void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
     fileParseCache.clear();
+}
+
+
+void EvalState::cacheFile(
+    const Path & path,
+    const Path & resolvedPath,
+    Expr * e,
+    Value & v,
+    bool mustBeTrivial)
+{
+    fileParseCache[resolvedPath] = e;
+
+    try {
+        // Enforce that 'flake.nix' is a direct attrset, not a
+        // computation.
+        if (mustBeTrivial &&
+            !(dynamic_cast<ExprAttrs *>(e)))
+            throw EvalError("file '%s' must be an attribute set", path);
+        eval(e, v);
+    } catch (Error & e) {
+        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
+        throw;
+    }
+
+    fileEvalCache[resolvedPath] = v;
+    if (path != resolvedPath) fileEvalCache[path] = v;
 }
 
 
@@ -1008,7 +1055,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             } else
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+            v.attrs->push_back(Attr(i.first, vAttr, ptr(&i.second.pos)));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -1040,7 +1087,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
+            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), ptr(&i.second.pos)));
 
     /* Dynamic attrs apply *after* rec and __overrides. */
     for (auto & i : dynamicAttrs) {
@@ -1057,9 +1104,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
+        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), ptr(&i.pos)));
         v.attrs->sort(); // FIXME: inefficient
     }
+
+    v.attrs->pos = ptr(&pos);
 }
 
 
@@ -1114,12 +1163,10 @@ static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPa
 }
 
 
-unsigned long nrLookups = 0;
-
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos2 = 0;
+    ptr<Pos> pos2(&noPos);
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -1127,7 +1174,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     try {
 
         for (auto & i : attrPath) {
-            nrLookups++;
+            state.nrLookups++;
             Bindings::iterator j;
             Symbol name = getName(i, state, env);
             if (def) {
@@ -1145,13 +1192,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             }
             vAttrs = j->value;
             pos2 = j->pos;
-            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+            if (state.countCalls) state.attrSelects[*pos2]++;
         }
 
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
+        state.forceValue(*vAttrs, (*pos2 != noPos ? *pos2 : this->pos ) );
 
     } catch (Error & e) {
-        if (pos2 && pos2->file != state.sDerivationNix)
+        if (*pos2 != noPos && pos2->file != state.sDerivationNix)
             addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath));
         throw;
@@ -1557,7 +1604,6 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            and none of the strings are allowed to have contexts. */
         if (first) {
             firstType = vTmp.type();
-            first = false;
         }
 
         if (firstType == nInt) {
@@ -1578,7 +1624,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else
                 throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
         } else
-            s << state.coerceToString(pos, vTmp, context, false, firstType == nString);
+            /* skip canonization of first path, which would only be not
+            canonized in the first place if it's coming from a ./${foo} type
+            path */
+            s << state.coerceToString(pos, vTmp, context, false, firstType == nString, !first);
+
+        first = false;
     }
 
     if (firstType == nInt)
@@ -1597,7 +1648,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkPos(v, &pos);
+    state.mkPos(v, ptr(&pos));
 }
 
 
@@ -1767,7 +1818,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
 }
 
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
-    bool coerceMore, bool copyToStore)
+    bool coerceMore, bool copyToStore, bool canonicalizePath)
 {
     forceValue(v, pos);
 
@@ -1779,7 +1830,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type() == nPath) {
-        Path path(canonPath(v.path));
+        Path path(canonicalizePath ? canonPath(v.path) : v.path);
         return copyToStore ? copyPathToStore(context, path) : path;
     }
 
@@ -2091,9 +2142,12 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    add(getHome() + "/.nix-defexpr/channels");
-    add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
-    add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
+        add(getHome() + "/.nix-defexpr/channels");
+        add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
+        add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    }
+
     return res;
 }
 

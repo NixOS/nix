@@ -35,21 +35,21 @@ and second to send the dump of those paths.  If this bothers you, use
 
 # Options
 
-  - `--to`  
+  - `--to`\
     Copy the closure of _paths_ from the local Nix store to the Nix
     store on _machine_. This is the default.
 
-  - `--from`  
+  - `--from`\
     Copy the closure of _paths_ from the Nix store on _machine_ to the
     local Nix store.
 
-  - `--gzip`  
+  - `--gzip`\
     Enable compression of the SSH connection.
 
-  - `--include-outputs`  
+  - `--include-outputs`\
     Also copy the outputs of store derivations included in the closure.
 
-  - `--use-substitutes` / `-s`  
+  - `--use-substitutes` / `-s`\
     Attempt to download missing paths on the target machine using Nix’s
     substitute mechanism.  Any paths that cannot be substituted on the
     target are still copied normally from the source.  This is useful,
@@ -58,12 +58,12 @@ and second to send the dump of those paths.  If this bothers you, use
     `nixos.org` (the default binary cache server) is
     fast.
 
-  - `-v`  
+  - `-v`\
     Show verbose output.
 
 # Environment variables
 
-  - `NIX_SSHOPTS`  
+  - `NIX_SSHOPTS`\
     Additional options to be passed to `ssh` on the command
     line.
 

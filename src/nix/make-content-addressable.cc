@@ -25,7 +25,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
           ;
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         auto paths = store->topoSortPaths(StorePathSet(storePaths.begin(), storePaths.end()));
 
