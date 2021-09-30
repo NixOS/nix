@@ -9,6 +9,9 @@
 %s DEFAULT
 %x STRING
 %x IND_STRING
+%x INPATH
+%x INPATH_SLASH
+%x PATH_START
 
 
 %{
@@ -25,6 +28,8 @@ using namespace nix;
 
 namespace nix {
 
+// backup to recover from yyless(0)
+YYLTYPE prev_yylloc;
 
 static void initLoc(YYLTYPE * loc)
 {
@@ -35,14 +40,18 @@ static void initLoc(YYLTYPE * loc)
 
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
+    prev_yylloc = *loc;
+
     loc->first_line = loc->last_line;
     loc->first_column = loc->last_column;
 
-    while (len--) {
+    for (size_t i = 0; i < len; i++) {
        switch (*s++) {
        case '\r':
-           if (*s == '\n') /* cr/lf */
+           if (*s == '\n') { /* cr/lf */
+               i++;
                s++;
+           }
            /* fall through */
        case '\n':
            ++loc->last_line;
@@ -95,9 +104,12 @@ ANY         .|\n
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
 FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
-PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
-HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
-SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
+PATH_CHAR   [a-zA-Z0-9\.\_\-\+]
+PATH        {PATH_CHAR}*(\/{PATH_CHAR}+)+\/?
+PATH_SEG    {PATH_CHAR}*\/
+HPATH       \~(\/{PATH_CHAR}+)+\/?
+HPATH_START \~\/
+SPATH       \<{PATH_CHAR}+(\/{PATH_CHAR}+)*\>
 URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+
 
 
@@ -198,17 +210,75 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 
+{PATH_SEG}\$\{ |
+{HPATH_START}\$\{ {
+  PUSH_STATE(PATH_START);
+  yyless(0);
+  *yylloc = prev_yylloc;
+}
 
-{PATH}      { if (yytext[yyleng-1] == '/')
-                  throw ParseError("path '%s' has a trailing slash", yytext);
-              yylval->path = strdup(yytext);
-              return PATH;
-            }
-{HPATH}     { if (yytext[yyleng-1] == '/')
-                  throw ParseError("path '%s' has a trailing slash", yytext);
-              yylval->path = strdup(yytext);
-              return HPATH;
-            }
+<PATH_START>{PATH_SEG} {
+  POP_STATE();
+  PUSH_STATE(INPATH_SLASH);
+  yylval->path = strdup(yytext);
+  return PATH;
+}
+
+<PATH_START>{HPATH_START} {
+  POP_STATE();
+  PUSH_STATE(INPATH_SLASH);
+  yylval->path = strdup(yytext);
+  return HPATH;
+}
+
+{PATH} {
+  if (yytext[yyleng-1] == '/')
+    PUSH_STATE(INPATH_SLASH);
+  else
+    PUSH_STATE(INPATH);
+  yylval->path = strdup(yytext);
+  return PATH;
+}
+{HPATH} {
+  if (yytext[yyleng-1] == '/')
+    PUSH_STATE(INPATH_SLASH);
+  else
+    PUSH_STATE(INPATH);
+  yylval->path = strdup(yytext);
+  return HPATH;
+}
+
+<INPATH,INPATH_SLASH>\$\{ {
+  POP_STATE();
+  PUSH_STATE(INPATH);
+  PUSH_STATE(DEFAULT);
+  return DOLLAR_CURLY;
+}
+<INPATH,INPATH_SLASH>{PATH}|{PATH_SEG}|{PATH_CHAR}+ {
+  POP_STATE();
+  if (yytext[yyleng-1] == '/')
+      PUSH_STATE(INPATH_SLASH);
+  else
+      PUSH_STATE(INPATH);
+  yylval->e = new ExprString(data->symbols.create(string(yytext)));
+  return STR;
+}
+<INPATH>{ANY} |
+<INPATH><<EOF>> {
+  /* if we encounter a non-path character we inform the parser that the path has
+     ended with a PATH_END token and re-parse this character in the default
+     context (it may be ')', ';', or something of that sort) */
+  POP_STATE();
+  yyless(0);
+  *yylloc = prev_yylloc;
+  return PATH_END;
+}
+
+<INPATH_SLASH>{ANY} |
+<INPATH_SLASH><<EOF>> {
+  throw ParseError("path has a trailing slash");
+}
+
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
 {URI}       { yylval->uri = strdup(yytext); return URI; }
 

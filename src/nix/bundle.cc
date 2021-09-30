@@ -59,7 +59,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"apps." + settings.thisSystem.get() + ".", "packages"};
+        Strings res{"apps." + settings.thisSystem.get() + "."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -69,8 +69,7 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto app = installable->toApp(*evalState);
-        store->buildPaths(toDerivedPaths(app.context));
+        auto app = installable->toApp(*evalState).resolve(getEvalStore(), store);
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };

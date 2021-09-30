@@ -14,7 +14,7 @@ struct PathSubstitutionGoal : public Goal
     StorePath storePath;
 
     /* The path the substituter refers to the path as. This will be
-     * different when the stores have different names. */
+       different when the stores have different names. */
     std::optional<StorePath> subPath;
 
     /* The remaining substituters. */
@@ -79,6 +79,8 @@ public:
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
+
+    void cleanup() override;
 };
 
 }

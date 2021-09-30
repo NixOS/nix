@@ -6,6 +6,8 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <optional>
+
 namespace nix::fetchers {
 
 typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;

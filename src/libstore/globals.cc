@@ -166,7 +166,7 @@ bool Settings::isExperimentalFeatureEnabled(const std::string & name)
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(std::string feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", feature)
+    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", feature)
     , missingFeature(feature)
     {}
 

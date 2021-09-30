@@ -62,6 +62,7 @@ struct CmdSearch : InstallableCommand, MixJSON
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;
+        evalSettings.enableImportFromDerivation.setDefault(false);
 
         // Empty search string should match all packages
         // Use "^" here instead of ".*" due to differences in resulting highlighting
