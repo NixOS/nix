@@ -7,7 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 
-#ifdef ENABLE_S3
+#if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
@@ -148,7 +148,7 @@ struct curlFileTransfer : public FileTransfer
         }
 
         LambdaSink finalSink;
-        std::shared_ptr<CompressionSink> decompressionSink;
+        std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
         std::exception_ptr writeException;
@@ -665,7 +665,7 @@ struct curlFileTransfer : public FileTransfer
         writeFull(wakeupPipe.writeSide.get(), " ");
     }
 
-#ifdef ENABLE_S3
+#if ENABLE_S3
     std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
@@ -688,7 +688,7 @@ struct curlFileTransfer : public FileTransfer
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
             try {
-#ifdef ENABLE_S3
+#if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
                 std::string profile = get(params, "profile").value_or("");

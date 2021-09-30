@@ -17,8 +17,8 @@ struct Attr
 {
     Symbol name;
     Value * value;
-    Pos * pos;
-    Attr(Symbol name, Value * value, Pos * pos = &noPos)
+    ptr<Pos> pos;
+    Attr(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
         : name(name), value(value), pos(pos) { };
     Attr() : pos(&noPos) { };
     bool operator < (const Attr & a) const
@@ -35,12 +35,13 @@ class Bindings
 {
 public:
     typedef uint32_t size_t;
+    ptr<Pos> pos;
 
 private:
     size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
+    Bindings(size_t capacity) : pos(&noPos), size_(0), capacity_(capacity) { }
     Bindings(const Bindings & bindings) = delete;
 
 public:

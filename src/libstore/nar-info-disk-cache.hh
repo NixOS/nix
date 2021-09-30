@@ -2,6 +2,7 @@
 
 #include "ref.hh"
 #include "nar-info.hh"
+#include "realisation.hh"
 
 namespace nix {
 
@@ -29,6 +30,15 @@ public:
     virtual void upsertNarInfo(
         const std::string & uri, const std::string & hashPart,
         std::shared_ptr<const ValidPathInfo> info) = 0;
+
+    virtual void upsertRealisation(
+        const std::string & uri,
+        const Realisation & realisation) = 0;
+    virtual void upsertAbsentRealisation(
+        const std::string & uri,
+        const DrvOutput & id) = 0;
+    virtual std::pair<Outcome, std::shared_ptr<Realisation>> lookupRealisation(
+        const std::string & uri, const DrvOutput & id) = 0;
 };
 
 /* Return a singleton cache object that can be used concurrently by

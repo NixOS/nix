@@ -58,7 +58,7 @@ outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a.second) --no-ou
 
 # Delete one of the outputs and rebuild it.  This will cause a hash
 # rewrite.
-nix store delete $TEST_ROOT/result-second --ignore-liveness
+env -u NIX_REMOTE nix store delete $TEST_ROOT/result-second --ignore-liveness
 nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]

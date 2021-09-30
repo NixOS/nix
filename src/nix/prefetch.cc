@@ -205,26 +205,24 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             state->forceAttrs(v);
 
             /* Extract the URL. */
-            auto attr = v.attrs->find(state->symbols.create("urls"));
-            if (attr == v.attrs->end())
-                throw Error("attribute set does not contain a 'urls' attribute");
-            state->forceList(*attr->value);
-            if (attr->value->listSize() < 1)
+            auto & attr = v.attrs->need(state->symbols.create("urls"));
+            state->forceList(*attr.value);
+            if (attr.value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            url = state->forceString(*attr->value->listElems()[0]);
+            url = state->forceString(*attr.value->listElems()[0]);
 
             /* Extract the hash mode. */
-            attr = v.attrs->find(state->symbols.create("outputHashMode"));
-            if (attr == v.attrs->end())
+            auto attr2 = v.attrs->get(state->symbols.create("outputHashMode"));
+            if (!attr2)
                 printInfo("warning: this does not look like a fetchurl call");
             else
-                unpack = state->forceString(*attr->value) == "recursive";
+                unpack = state->forceString(*attr2->value) == "recursive";
 
             /* Extract the name. */
             if (!name) {
-                attr = v.attrs->find(state->symbols.create("name"));
-                if (attr != v.attrs->end())
-                    name = state->forceString(*attr->value);
+                auto attr3 = v.attrs->get(state->symbols.create("name"));
+                if (!attr3)
+                    name = state->forceString(*attr3->value);
             }
         }
 
@@ -288,8 +286,6 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
 
         expectArg("url", &url);
     }
-
-    Category category() override { return catUtility; }
 
     std::string description() override
     {

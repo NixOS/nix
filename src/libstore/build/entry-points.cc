@@ -6,9 +6,9 @@
 
 namespace nix {
 
-void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode)
+void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
-    Worker worker(*this);
+    Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
     for (auto & br : reqs) {
@@ -51,7 +51,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
 BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
-    Worker worker(*this);
+    Worker worker(*this, *this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
     BuildResult result;
@@ -93,7 +93,7 @@ void Store::ensurePath(const StorePath & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
-    Worker worker(*this);
+    Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path);
     Goals goals = {goal};
 
@@ -111,7 +111,7 @@ void Store::ensurePath(const StorePath & path)
 
 void LocalStore::repairPath(const StorePath & path)
 {
-    Worker worker(*this);
+    Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path, Repair);
     Goals goals = {goal};
 

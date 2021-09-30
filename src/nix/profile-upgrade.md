@@ -18,7 +18,7 @@ R""(
 * Upgrade a specific profile element by number:
 
   ```console
-  # nix profile info
+  # nix profile list
   0 flake:nixpkgs#legacyPackages.x86_64-linux.spotify …
 
   # nix profile upgrade 0

@@ -19,7 +19,7 @@ struct CompareGoalPtrs {
 
 /* Set of goals. */
 typedef set<GoalPtr, CompareGoalPtrs> Goals;
-typedef list<WeakGoalPtr> WeakGoals;
+typedef set<WeakGoalPtr, std::owner_less<WeakGoalPtr>> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
 typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
@@ -100,6 +100,8 @@ struct Goal : public std::enable_shared_from_this<Goal>
     virtual string key() = 0;
 
     void amDone(ExitCode result, std::optional<Error> ex = {});
+
+    virtual void cleanup() { }
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

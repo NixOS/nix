@@ -27,7 +27,7 @@ struct CmdCopySigs : StorePathsCommand
         return "copy store path signatures from substituters";
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (substituterUris.empty())
             throw UsageError("you must specify at least one substituter using '-s'");
@@ -114,7 +114,7 @@ struct CmdSign : StorePathsCommand
         return "sign store paths";
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (secretKeyFile.empty())
             throw UsageError("you must specify a secret key file using '-k'");
