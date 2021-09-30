@@ -2208,7 +2208,7 @@ void LocalDerivationGoal::registerOutputs()
         auto rewriteOutput = [&]() {
             /* Apply hash rewriting if necessary. */
             if (!outputRewrites.empty()) {
-                warn("rewriting hashes in '%1%'; cross fingers", actualPath);
+                debug("rewriting hashes in '%1%'; cross fingers", actualPath);
 
                 /* FIXME: this is in-memory. */
                 StringSink sink;
