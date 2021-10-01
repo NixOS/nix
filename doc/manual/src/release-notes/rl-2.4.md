@@ -221,7 +221,7 @@ more than 2800 commits from 195 contributors since release 2.3.
   evaluation result.
 
 * `nix eval` has a new `--write-to` flag that allows it to write a
-  nested attribute set of string leaves to a correspondingly directory
+  nested attribute set of string leaves to a corresponding directory
   tree.
 
 * Memory improvements: many operations that add paths to the store or
