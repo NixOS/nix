@@ -23,7 +23,9 @@ more than 2800 commits from 195 contributors since release 2.3.
 * The **`nix` command** has seen a lot of work and is now almost at
   feature parity with the old command-line interface (the `nix-*`
   commands). It aims to be [more modern, consistent and pleasant to
-  use](../contributing/cli-guideline.md) than the old CLI.
+  use](../contributing/cli-guideline.md) than the old CLI. It is still
+  marked as experimental but its interface should not change much
+  anymore in future releases.
 
 * **Flakes** are a new format to package Nix-based projects in a more
   discoverable, composable, consistent and reproducible way. A flake
@@ -180,8 +182,9 @@ more than 2800 commits from 195 contributors since release 2.3.
 * **New built-in functions**:
 
   - `builtins.fetchTree` allows fetching a source tree using any
-    backends supported by the fetcher infrastructure. It replaces
-    `fetchGit`, `fetchMercurial` and `fetchTarball`.
+    backends supported by the fetcher infrastructure. It subsumes the
+    functionality of existing built-ins like `fetchGit`,
+    `fetchMercurial` and `fetchTarball`.
 
   - `builtins.getFlake` fetches a flake and returns its output
     attributes. This function should not be used inside flakes! Use
@@ -247,6 +250,8 @@ more than 2800 commits from 195 contributors since release 2.3.
 
   - With `-p`, it passes any `--arg`s as Nixpkgs arguments.
 
+  - Support for structured attributes.
+
 * `nix-prefetch-url` has a new `--executable` flag.
 
 * On `x86_64` systems, [`x86_64` microarchitecture
@@ -281,7 +286,8 @@ more than 2800 commits from 195 contributors since release 2.3.
   to your `nix.conf` if you want to use it, or pass
   `--extra-experimental-features nix-command` on the command line.
 
-* `nix run` has been renamed to `nix shell`.
+* The old `nix run` has been renamed to `nix shell` (and there is a
+  new `nix run` that does something else, as described above).
 
 * It is now an error to modify the `plugin-files` setting via a
   command-line flag that appears after the first non-flag argument to
@@ -290,7 +296,7 @@ more than 2800 commits from 195 contributors since release 2.3.
   `nix-instantiate --plugin-files "" default.nix`.
 
 * We no longer release source tarballs. If you want to build from
-  source, please build from the Git repository.
+  source, please build from the tags in the Git repository.
 
 ## Contributors
 
