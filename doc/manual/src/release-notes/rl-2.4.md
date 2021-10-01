@@ -47,7 +47,7 @@ more than 2800 commits from 195 contributors since release 2.3.
   contents. Previously Nix could only build **input-addressed** store
   paths, where the hash is computed from the derivation dependency
   graph. Content-addressing allows deduplication, early cutoff in
-  build systems, and unpriviliged closure copying. This is still [an
+  build systems, and unprivileged closure copying. This is still [an
   experimental
   feature](https://discourse.nixos.org/t/content-addressed-nix-call-for-testers/12881).
 
@@ -96,7 +96,7 @@ more than 2800 commits from 195 contributors since release 2.3.
     program from the `hello` package in `nixpkgs`.
 
   - `nix flake` is the container for flake-related operations, such as
-    creating a new flake, quering the contents of a flake or updating
+    creating a new flake, querying the contents of a flake or updating
     flake lock files.
 
   - `nix registry` allows you to query and update the flake registry,
@@ -116,7 +116,7 @@ more than 2800 commits from 195 contributors since release 2.3.
       changes.
 
     **Warning**: after a profile has been updated using `nix profile`,
-    it is no longer useable with `nix-env`.
+    it is no longer usable with `nix-env`.
 
   - `nix store diff-closures` shows the differences between the
     closures of two store paths in terms of the versions and sizes of
@@ -205,7 +205,7 @@ more than 2800 commits from 195 contributors since release 2.3.
 * Nix now uses `libarchive` to decompress and unpack tarballs and zip
   files, so `tar` is no longer required.
 
-* The priority of substituters can now be overriden using the
+* The priority of substituters can now be overridden using the
   `priority` substituter setting (e.g. `--substituters
   'http://cache.nixos.org?priority=100 daemon?priority=10'`).
 
