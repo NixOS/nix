@@ -49,7 +49,8 @@ typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
  * we have made the function, written in `worker.cc` where all the goal
  * types are visible, and use it instead.
  */
-const DerivationGoal * tryGetConcreteDrvGoal(GoalPtr waitee);
+
+std::optional<std::pair<std::reference_wrapper<const DerivationGoal>, std::reference_wrapper<const SingleDerivedPath>>> tryGetConcreteDrvGoal(GoalPtr waitee);
 
 /**
  * A mapping used to remember for each child process to what goal it

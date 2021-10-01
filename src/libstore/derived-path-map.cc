@@ -21,6 +21,32 @@ typename DerivedPathMap<V>::ChildNode & DerivedPathMap<V>::ensureSlot(const Sing
     return initIter(k);
 }
 
+template<typename V>
+typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const SingleDerivedPath & k)
+{
+    std::function<ChildNode *(const SingleDerivedPath & )> initIter;
+    initIter = [&](const auto & k) {
+        return std::visit(overloaded {
+            [&](const SingleDerivedPath::Opaque & bo) {
+                auto it = map.find(bo.path);
+                return it != map.end()
+                    ? &it->second
+                    : nullptr;
+            },
+            [&](const SingleDerivedPath::Built & bfd) {
+                auto * n = initIter(*bfd.drvPath);
+                if (!n) return (ChildNode *)nullptr;
+
+                auto it = n->childMap.find(bfd.output);
+                return it != n->childMap.end()
+                    ? &it->second
+                    : nullptr;
+            },
+        }, k.raw());
+    };
+    return initIter(k);
+}
+
 }
 
 // instantiations
@@ -30,4 +56,17 @@ namespace nix {
 
 template struct DerivedPathMap<std::weak_ptr<CreateDerivationAndRealiseGoal>>;
 
-}
+GENERATE_CMP_EXT(
+    template<>,
+    DerivedPathMap<std::set<std::string>>::ChildNode,
+    me->value,
+    me->childMap);
+
+GENERATE_CMP_EXT(
+    template<>,
+    DerivedPathMap<std::set<std::string>>,
+    me->map);
+
+template struct DerivedPathMap<std::set<std::string>>;
+
+};

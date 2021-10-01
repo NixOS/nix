@@ -6,7 +6,7 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "repair-flag.hh"
-#include "derived-path.hh"
+#include "derived-path-map.hh"
 #include "sync.hh"
 #include "comparator.hh"
 #include "variant-wrapper.hh"
@@ -323,13 +323,13 @@ struct Derivation : BasicDerivation
     /**
      * inputs that are sub-derivations
      */
-    DerivationInputs inputDrvs;
+    DerivedPathMap<std::set<OutputName>> inputDrvs;
 
     /**
      * Print a derivation.
      */
     std::string unparse(const Store & store, bool maskOutputs,
-        std::map<std::string, StringSet> * actualInputs = nullptr) const;
+        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -368,7 +368,8 @@ struct Derivation : BasicDerivation
     nlohmann::json toJSON(const Store & store) const;
     static Derivation fromJSON(
         const Store & store,
-        const nlohmann::json & json);
+        const nlohmann::json & json,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     GENERATE_CMP(Derivation,
         static_cast<const BasicDerivation &>(*me),
@@ -389,7 +390,11 @@ StorePath writeDerivation(Store & store,
 /**
  * Read a derivation from a file.
  */
-Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
+Derivation parseDerivation(
+    const Store & store,
+    std::string && s,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * \todo Remove.
