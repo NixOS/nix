@@ -248,6 +248,10 @@ private:
             conn.to
                 << settings.buildRepeat
                 << settings.enforceDeterminism;
+
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
+            conn.to << ((int) settings.keepFailed);
+        }
     }
 
 public:

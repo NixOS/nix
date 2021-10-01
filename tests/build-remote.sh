@@ -53,3 +53,16 @@ nix path-info --store $TEST_ROOT/machine3 --all \
   | grep -v builder-build-remote-input-1.sh \
   | grep -v builder-build-remote-input-2.sh \
   | grep builder-build-remote-input-3.sh
+
+# Behavior of keep-failed
+out="$(nix-build 2>&1 failing.nix \
+  --builders "$(join_by '; ' "${builders[@]}")"  \
+  --keep-failed \
+  --store $TEST_ROOT/machine0 \
+  -j0 \
+  --arg busybox $busybox)" || true
+
+[[ "$out" =~ .*"note: keeping build directory".* ]]
+
+build_dir="$(grep "note: keeping build" <<< "$out" | sed -E "s/^(.*)note: keeping build directory '(.*)'(.*)$/\2/")"
+[[ "foo" = $(<"$build_dir"/bar) ]]
