@@ -23,7 +23,7 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
 
 std::string makeContentAddressingPrefix(ContentAddressMethod m) {
     return std::visit(overloaded {
-        [](TextHashMethod _) -> std::string { return "text:"; },
+        [](TextHashMethod) -> std::string { return "text:"; },
         [](FileIngestionMethod m2) {
              /* Not prefixed for back compat with things that couldn't produce text before. */
             return makeFileIngestionPrefix(m2);
@@ -52,11 +52,11 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 std::string renderContentAddress(ContentAddress ca)
 {
     return std::visit(overloaded {
-        [](TextHash th) {
+        [](TextHash & th) {
             return "text:"
                 + th.hash.to_string(Base32, true);
         },
-        [](FixedOutputHash fsh) {
+        [](FixedOutputHash & fsh) {
             return "fixed:"
                 + makeFileIngestionPrefix(fsh.method)
                 + fsh.hash.to_string(Base32, true);
@@ -128,12 +128,12 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
     auto hashType = hashType_; // work around clang bug
 
     return std::visit(overloaded {
-        [&](TextHashMethod _) {
+        [&](TextHashMethod &) {
             return ContentAddress(TextHash {
                 .hash = Hash::parseNonSRIUnprefixed(rest, hashType)
             });
         },
-        [&](FileIngestionMethod fim) {
+        [&](FileIngestionMethod & fim) {
             return ContentAddress(FixedOutputHash {
                 .method = fim,
                 .hash = Hash::parseNonSRIUnprefixed(rest, hashType),
@@ -185,10 +185,10 @@ ContentAddressWithReferences contentAddressFromMethodHashAndRefs(
 ContentAddressMethod getContentAddressMethod(const ContentAddressWithReferences & ca)
 {
     return std::visit(overloaded {
-        [](TextInfo th) -> ContentAddressMethod {
+        [](const TextInfo & th) -> ContentAddressMethod {
             return TextHashMethod {};
         },
-        [](FixedOutputInfo fsh) -> ContentAddressMethod {
+        [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
             return fsh.method;
         },
     }, ca);
@@ -197,10 +197,10 @@ ContentAddressMethod getContentAddressMethod(const ContentAddressWithReferences 
 Hash getContentAddressHash(const ContentAddress & ca)
 {
     return std::visit(overloaded {
-        [](TextHash th) {
+        [](const TextHash & th) {
             return th.hash;
         },
-        [](FixedOutputHash fsh) {
+        [](const FixedOutputHash & fsh) {
             return fsh.hash;
         },
     }, ca);
@@ -208,10 +208,10 @@ Hash getContentAddressHash(const ContentAddress & ca)
 
 ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
     return std::visit(overloaded {
-        [&](TextHash h) -> ContentAddressWithReferences {
+        [&](const TextHash & h) -> ContentAddressWithReferences {
             return TextInfo { h, {}};
         },
-        [&](FixedOutputHash h) -> ContentAddressWithReferences {
+        [&](const FixedOutputHash & h) -> ContentAddressWithReferences {
             return FixedOutputInfo { h, {}};
         },
     }, ca);
@@ -220,10 +220,10 @@ ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
 Hash getContentAddressHash(const ContentAddressWithReferences & ca)
 {
     return std::visit(overloaded {
-        [](TextInfo th) {
+        [](const TextInfo & th) {
             return th.hash;
         },
-        [](FixedOutputInfo fsh) {
+        [](const FixedOutputInfo & fsh) {
             return fsh.hash;
         },
     }, ca);

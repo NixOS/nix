@@ -530,7 +530,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
 
         std::visit(overloaded {
-            [&](TextHashMethod thm) -> void {
+            [&](const TextHashMethod & thm) -> void {
                 if (hashType != htSHA256)
                     throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
                         printHashType(hashType));
@@ -539,7 +539,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 worker_proto::write(*this, conn->to, references);
                 conn.processStderr();
             },
-            [&](FileIngestionMethod fim) -> void {
+            [&](const FileIngestionMethod & fim) -> void {
                 conn->to
                     << wopAddToStore
                     << name
@@ -710,10 +710,10 @@ static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, cons
         for (auto & p : reqs) {
             auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
             std::visit(overloaded {
-                [&](StorePathWithOutputs s) {
+                [&](const StorePathWithOutputs & s) {
                     ss.push_back(s.to_string(store));
                 },
-                [&](StorePath drvPath) {
+                [&](const StorePath & drvPath) {
                     throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
                         store.printStorePath(drvPath),
                         GET_PROTOCOL_MAJOR(conn->daemonVersion),

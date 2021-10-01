@@ -396,7 +396,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
-                    [&](TextHashMethod _) {
+                    [&](TextHashMethod &) {
                         if (hashType != htSHA256)
                             throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
                                 printHashType(hashType));
@@ -405,7 +405,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                         auto path = store->addTextToStore(name, contents, refs, repair);
                         return store->queryPathInfo(path);
                     },
-                    [&](FileIngestionMethod fim) {
+                    [&](FileIngestionMethod & fim) {
                         if (!refs.empty())
                             throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
                         auto path = store->addToStoreFromDump(source, name, fim, hashType, repair);

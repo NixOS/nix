@@ -88,12 +88,12 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
         return std::nullopt;
     if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
         return std::visit(overloaded {
-            [&](TextInfo ti) -> std::optional<ContentAddress> {
+            [&](const TextInfo & ti) -> std::optional<ContentAddress> {
                 if (!ti.references.empty())
                     return std::nullopt;
                 return static_cast<TextHash>(ti);
             },
-            [&](FixedOutputInfo fi) -> std::optional<ContentAddress> {
+            [&](const FixedOutputInfo & fi) -> std::optional<ContentAddress> {
                 if (fi.references != PathReferences<StorePath> {})
                     return std::nullopt;
                 return static_cast<FixedOutputHash>(fi);
@@ -177,7 +177,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
         }
 
         std::visit(overloaded {
-          [&](DerivedPath::Built bfd) {
+          [&](const DerivedPath::Built & bfd) {
             if (!isValidPath(bfd.drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
@@ -210,7 +210,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 mustBuildDrv(bfd.drvPath, *drv);
 
           },
-          [&](DerivedPath::Opaque bo) {
+          [&](const DerivedPath::Opaque & bo) {
 
             if (isValidPath(bo.path)) return;
 

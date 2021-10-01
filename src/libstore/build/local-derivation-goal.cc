@@ -1094,10 +1094,10 @@ void LocalDerivationGoal::writeStructuredAttrs()
 static StorePath pathPartOfReq(const DerivedPath & req)
 {
     return std::visit(overloaded {
-        [&](DerivedPath::Opaque bo) {
+        [&](const DerivedPath::Opaque & bo) {
             return bo.path;
         },
-        [&](DerivedPath::Built bfd)  {
+        [&](const DerivedPath::Built & bfd)  {
             return bfd.drvPath;
         },
     }, req.raw());
@@ -2155,8 +2155,8 @@ void LocalDerivationGoal::registerOutputs()
                 /* Since we'll use the already installed versions of these, we
                    can treat them as leaves and ignore any references they
                    have. */
-                [&](AlreadyRegistered _) { return StringSet {}; },
-                [&](PerhapsNeedToRegister refs) {
+                [&](const AlreadyRegistered &) { return StringSet {}; },
+                [&](const PerhapsNeedToRegister & refs) {
                     StringSet referencedOutputs;
                     /* FIXME build inverted map up front so no quadratic waste here */
                     for (auto & r : refs.refs)
@@ -2192,11 +2192,11 @@ void LocalDerivationGoal::registerOutputs()
         };
 
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
-            [&](AlreadyRegistered skippedFinalPath) -> std::optional<StorePathSet> {
+            [&](const AlreadyRegistered & skippedFinalPath) -> std::optional<StorePathSet> {
                 finish(skippedFinalPath.path);
                 return std::nullopt;
             },
-            [&](PerhapsNeedToRegister r) -> std::optional<StorePathSet> {
+            [&](const PerhapsNeedToRegister & r) -> std::optional<StorePathSet> {
                 return r.refs;
             },
         }, outputReferencesIfUnregistered.at(outputName));
@@ -2262,10 +2262,10 @@ void LocalDerivationGoal::registerOutputs()
             std::string oldHashPart { scratchPath.hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
             std::visit(overloaded {
-                [&](TextHashMethod _) {
+                [&](const TextHashMethod &) {
                     readFile(actualPath, caSink);
                 },
-                [&](FileIngestionMethod m2) {
+                [&](const FileIngestionMethod & m2) {
                     switch (m2) {
                     case FileIngestionMethod::Recursive:
                         dumpPath(actualPath, caSink);
@@ -2312,7 +2312,7 @@ void LocalDerivationGoal::registerOutputs()
         };
 
         ValidPathInfo newInfo = std::visit(overloaded {
-            [&](DerivationOutputInputAddressed output) {
+            [&](const DerivationOutputInputAddressed & output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
                 /* Preemptively add rewrite rule for final hash, as that is
@@ -2328,7 +2328,7 @@ void LocalDerivationGoal::registerOutputs()
                 static_cast<PathReferences<StorePath> &>(newInfo0) = rewriteRefs();
                 return newInfo0;
             },
-            [&](DerivationOutputCAFixed dof) {
+            [&](const DerivationOutputCAFixed & dof) {
                 auto wanted = getContentAddressHash(dof.ca);
 
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
