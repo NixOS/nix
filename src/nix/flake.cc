@@ -346,11 +346,15 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (!v.isLambda() || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
-                    throw Error("overlay does not take an argument named 'final'");
+                if (!v.isLambda())
+                   throw Error("Expected a lambda for the overlay attribute, but got something else");
+                if (v.lambda.fun->matchAttrs)
+                    throw Error("By convention the attribute 'overlay' is expected to be a simple lambda starting with 'final: ', not an attribute set matching lambda");
+                if (std::string(v.lambda.fun->arg) != "final")
+                    throw Error("By convention the attribute 'overlay' expects the argument 'final' not '" + std::string(v.lambda.fun->arg) + "'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
                 if (!body || body->matchAttrs || std::string(body->arg) != "prev")
-                    throw Error("overlay does not take an argument named 'prev'");
+                    throw Error("By convention the attribute 'overlay' expects the argument 'prev' not '" + std::string(body->arg) + "'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
