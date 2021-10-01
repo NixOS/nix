@@ -1180,7 +1180,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         // hash per output.
         auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
         std::visit(overloaded {
-            [&](Hash h) {
+            [&](Hash & h) {
                 for (auto & i : outputs) {
                     auto outPath = state.store->makeOutputPath(i, h, drvName);
                     drv.env[i] = state.store->printStorePath(outPath);
@@ -1192,11 +1192,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         });
                 }
             },
-            [&](CaOutputHashes) {
+            [&](CaOutputHashes &) {
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](DeferredHash _) {
+            [&](DeferredHash &) {
                 for (auto & i : outputs) {
                     drv.outputs.insert_or_assign(i,
                         DerivationOutput {

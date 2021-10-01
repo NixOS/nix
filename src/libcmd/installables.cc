@@ -697,13 +697,13 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
 BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPaths & hopefullyBuiltPaths)
 {
     BuiltPaths res;
-    for (auto & b : hopefullyBuiltPaths)
+    for (const auto & b : hopefullyBuiltPaths)
         std::visit(
             overloaded{
-                [&](DerivedPath::Opaque bo) {
+                [&](const DerivedPath::Opaque & bo) {
                     res.push_back(BuiltPath::Opaque{bo.path});
                 },
-                [&](DerivedPath::Built bfd) {
+                [&](const DerivedPath::Built & bfd) {
                     OutputPathMap outputs;
                     auto drv = evalStore->readDerivation(bfd.drvPath);
                     auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
@@ -823,10 +823,10 @@ StorePathSet toDerivations(
 {
     StorePathSet drvPaths;
 
-    for (auto & i : installables)
-        for (auto & b : i->toDerivedPaths())
+    for (const auto & i : installables)
+        for (const auto & b : i->toDerivedPaths())
             std::visit(overloaded {
-                [&](DerivedPath::Opaque bo) {
+                [&](const DerivedPath::Opaque & bo) {
                     if (!useDeriver)
                         throw Error("argument '%s' did not evaluate to a derivation", i->what());
                     auto derivers = store->queryValidDerivers(bo.path);
@@ -835,7 +835,7 @@ StorePathSet toDerivations(
                     // FIXME: use all derivers?
                     drvPaths.insert(*derivers.begin());
                 },
-                [&](DerivedPath::Built bfd) {
+                [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);
                 },
             }, b.raw());
