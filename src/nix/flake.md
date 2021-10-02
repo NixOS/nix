@@ -225,7 +225,7 @@ Currently the `type` attribute can be one of the following:
   [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
   ```
 
-  These perform a lookup of `<flake-id>` in the flake registry. or
+  These perform a lookup of `<flake-id>` in the flake registry. For
   example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
   references. The specified `rev` and/or `ref` are merged with the
   entry in the registry; see [nix registry](./nix3-registry.md) for
