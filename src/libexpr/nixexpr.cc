@@ -244,22 +244,33 @@ void Expr::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprInt::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
 }
 
 void ExprFloat::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
 }
 
 void ExprString::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
 }
 
 void ExprPath::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
 }
 
 void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
 
@@ -312,6 +323,9 @@ void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprSelect::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     e->bindVars(env);
     if (def) def->bindVars(env);
     for (auto & i : attrPath)
@@ -321,6 +335,9 @@ void ExprSelect::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprOpHasAttr::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     e->bindVars(env);
     for (auto & i : attrPath)
         if (!i.symbol.set())
@@ -329,6 +346,9 @@ void ExprOpHasAttr::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     std::cout << "ExprAttrs::bindVars" << std::endl;
     // auto dynamicEnv(env);
 
@@ -369,12 +389,18 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprList::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     for (auto & i : elems)
         i->bindVars(env);
 }
 
 void ExprLambda::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
 
     unsigned int displ = 0;
@@ -394,6 +420,9 @@ void ExprLambda::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprLet::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  // also make shared_ptr?
 
     unsigned int displ = 0;
@@ -408,6 +437,9 @@ void ExprLet::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     std::cout << " ExprWith::bindVars " << std::endl;
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
@@ -472,6 +504,9 @@ void ExprWith::bindVars(const StaticEnv & env)
 
 void ExprIf::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     cond->bindVars(env);
     then->bindVars(env);
     else_->bindVars(env);
@@ -479,23 +514,35 @@ void ExprIf::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
 void ExprAssert::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     cond->bindVars(env);
     body->bindVars(env);
 }
 
 void ExprOpNot::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     e->bindVars(env);
 }
 
 void ExprConcatStrings::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
     for (auto & i : *es)
         i->bindVars(env);
 }
 
 void ExprPos::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
+    if (debuggerHook)
+        staticenv = env;
+
 }
 
 

@@ -689,6 +689,29 @@ void printEnvBindings(const Env &env, int lv )
   }
 }
 
+void printStaticEnvBindings(const StaticEnv &se, int lvl)
+{
+    for (auto i = se.vars.begin(); i != se.vars.end(); ++i) 
+    {
+      std::cout << lvl << i->first << std::endl;
+    }
+
+    if (se.up) {
+      printStaticEnvBindings(*se.up, ++lvl);
+    }
+ 
+}
+
+void printStaticEnvBindings(const Expr &expr)
+{
+  // just print the names for now
+  if (expr.staticenv) 
+  {
+    printStaticEnvBindings(*expr.staticenv.get(), 0);
+  }
+  
+}
+
 void printEnvPosChain(const Env &env, int lv )
 {
   std::cout << "printEnvPosChain " << lv << std::endl;

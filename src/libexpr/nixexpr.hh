@@ -85,7 +85,7 @@ struct Expr
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
 
-    std::shared_ptr<StaticEnv> staticenv;
+    std::shared_ptr<const StaticEnv> staticenv;
 };
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
