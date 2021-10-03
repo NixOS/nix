@@ -100,7 +100,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
     downloadSize_ = narSize_ = 0;
 
-    ThreadPool pool;
+    ThreadPool pool(settings.maxQuerySubstitutersJobs);
 
     struct State
     {

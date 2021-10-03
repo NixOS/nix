@@ -250,6 +250,17 @@ public:
         )",
         {"build-use-substitutes"}};
 
+    Setting<unsigned int> maxQuerySubstitutersJobs{
+        this, 25, "max-query-substituters-jobs",
+        R"(
+          This option defines the maximum number of parallel queries Nix will
+          use to ask substituters for the presence of substitutes (which is a
+          separate step from actually downloading substitutes). For builds of
+          many derivations backed by substituters supporting HTTP/2,
+          significant speedups of this step have been observed by increasing
+          this option thanks to request multiplexing.
+        )"};
+
     Setting<std::string> buildUsersGroup{
         this, "", "build-users-group",
         R"(
