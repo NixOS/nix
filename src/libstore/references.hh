@@ -9,6 +9,24 @@ std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const S
 
 StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
 
+class RefScanSink : public Sink
+{
+    StringSet hashes;
+    StringSet seen;
+
+    std::string tail;
+
+public:
+
+    RefScanSink(StringSet && hashes) : hashes(hashes)
+    { }
+
+    StringSet & getResult()
+    { return seen; }
+
+    void operator () (std::string_view data) override;
+};
+
 struct RewritingSink : Sink
 {
     std::string from, to, prev;

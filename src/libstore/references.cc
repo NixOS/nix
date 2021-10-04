@@ -11,11 +11,13 @@
 namespace nix {
 
 
-static unsigned int refLength = 32; /* characters */
+static size_t refLength = 32; /* characters */
 
 
-static void search(const unsigned char * s, size_t len,
-    StringSet & hashes, StringSet & seen)
+static void search(
+    std::string_view s,
+    StringSet & hashes,
+    StringSet & seen)
 {
     static std::once_flag initialised;
     static bool isBase32[256];
@@ -25,7 +27,7 @@ static void search(const unsigned char * s, size_t len,
             isBase32[(unsigned char) base32Chars[i]] = true;
     });
 
-    for (size_t i = 0; i + refLength <= len; ) {
+    for (size_t i = 0; i + refLength <= s.size(); ) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -35,7 +37,7 @@ static void search(const unsigned char * s, size_t len,
                 break;
             }
         if (!match) continue;
-        string ref((const char *) s + i, refLength);
+        std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
             debug(format("found reference to '%1%' at offset '%2%'")
                   % ref % i);
@@ -46,30 +48,23 @@ static void search(const unsigned char * s, size_t len,
 }
 
 
-struct RefScanSink : Sink
+void RefScanSink::operator () (std::string_view data)
 {
-    StringSet hashes;
-    StringSet seen;
+    /* It's possible that a reference spans the previous and current
+       fragment, so search in the concatenation of the tail of the
+       previous fragment and the start of the current fragment. */
+    auto s = tail;
+    s.append(data.data(), refLength);
+    search(s, hashes, seen);
 
-    string tail;
+    search(data, hashes, seen);
 
-    RefScanSink() { }
-
-    void operator () (std::string_view data) override
-    {
-        /* It's possible that a reference spans the previous and current
-           fragment, so search in the concatenation of the tail of the
-           previous fragment and the start of the current fragment. */
-        string s = tail + std::string(data, 0, refLength);
-        search((const unsigned char *) s.data(), s.size(), hashes, seen);
-
-        search((const unsigned char *) data.data(), data.size(), hashes, seen);
-
-        size_t tailLen = data.size() <= refLength ? data.size() : refLength;
-        tail = std::string(tail, tail.size() < refLength - tailLen ? 0 : tail.size() - (refLength - tailLen));
-        tail.append({data.data() + data.size() - tailLen, tailLen});
-    }
-};
+    auto tailLen = std::min(data.size(), refLength);
+    auto rest = refLength - tailLen;
+    if (rest < tail.size())
+        tail = tail.substr(tail.size() - rest);
+    tail.append(data.data() + data.size() - tailLen, tailLen);
+}
 
 
 std::pair<StorePathSet, HashResult> scanForReferences(
@@ -87,23 +82,24 @@ StorePathSet scanForReferences(
     const Path & path,
     const StorePathSet & refs)
 {
-    RefScanSink refsSink;
-    TeeSink sink { refsSink, toTee };
+    StringSet hashes;
     std::map<std::string, StorePath> backMap;
 
     for (auto & i : refs) {
         std::string hashPart(i.hashPart());
         auto inserted = backMap.emplace(hashPart, i).second;
         assert(inserted);
-        refsSink.hashes.insert(hashPart);
+        hashes.insert(hashPart);
     }
 
     /* Look for the hashes in the NAR dump of the path. */
+    RefScanSink refsSink(std::move(hashes));
+    TeeSink sink { refsSink, toTee };
     dumpPath(path, sink);
 
     /* Map the hashes found back to their store paths. */
     StorePathSet found;
-    for (auto & i : refsSink.seen) {
+    for (auto & i : refsSink.getResult()) {
         auto j = backMap.find(i);
         assert(j != backMap.end());
         found.insert(j->second);
