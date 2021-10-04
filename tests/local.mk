@@ -37,6 +37,7 @@ nix_tests = \
   check.sh \
   plugins.sh \
   search.sh \
+  selfref-gc.sh ca/selfref-gc.sh \
   nix-copy-ssh.sh \
   post-hook.sh \
   ca/post-hook.sh \
