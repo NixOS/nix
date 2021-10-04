@@ -90,6 +90,7 @@ nix_tests = \
   plugins.sh \
   build.sh \
   ca/nix-run.sh \
+  selfref-gc.sh ca/selfref-gc.sh \
   db-migration.sh \
   bash-profile.sh \
   pass-as-file.sh \
