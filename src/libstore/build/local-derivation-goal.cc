@@ -2140,8 +2140,7 @@ void LocalDerivationGoal::registerOutputs()
 
         /* Pass blank Sink as we are not ready to hash data at this stage. */
         NullSink blank;
-        auto references = worker.store.parseStorePathSet(
-            scanForReferences(blank, actualPath, worker.store.printStorePathSet(referenceablePaths)));
+        auto references = scanForReferences(blank, actualPath, referenceablePaths);
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,

@@ -72,43 +72,40 @@ struct RefScanSink : Sink
 };
 
 
-std::pair<PathSet, HashResult> scanForReferences(const string & path,
-    const PathSet & refs)
+std::pair<StorePathSet, HashResult> scanForReferences(
+    const string & path,
+    const StorePathSet & refs)
 {
     HashSink hashSink { htSHA256 };
     auto found = scanForReferences(hashSink, path, refs);
     auto hash = hashSink.finish();
-    return std::pair<PathSet, HashResult>(found, hash);
+    return std::pair<StorePathSet, HashResult>(found, hash);
 }
 
-PathSet scanForReferences(Sink & toTee,
-    const string & path, const PathSet & refs)
+StorePathSet scanForReferences(
+    Sink & toTee,
+    const Path & path,
+    const StorePathSet & refs)
 {
     RefScanSink refsSink;
     TeeSink sink { refsSink, toTee };
-    std::map<string, Path> backMap;
+    std::map<std::string, StorePath> backMap;
 
     for (auto & i : refs) {
-        auto baseName = std::string(baseNameOf(i));
-        string::size_type pos = baseName.find('-');
-        if (pos == string::npos)
-            throw Error("bad reference '%1%'", i);
-        string s = string(baseName, 0, pos);
-        assert(s.size() == refLength);
-        assert(backMap.find(s) == backMap.end());
-        // parseHash(htSHA256, s);
-        refsSink.hashes.insert(s);
-        backMap[s] = i;
+        std::string hashPart(i.hashPart());
+        auto inserted = backMap.emplace(hashPart, i).second;
+        assert(inserted);
+        refsSink.hashes.insert(hashPart);
     }
 
     /* Look for the hashes in the NAR dump of the path. */
     dumpPath(path, sink);
 
     /* Map the hashes found back to their store paths. */
-    PathSet found;
+    StorePathSet found;
     for (auto & i : refsSink.seen) {
-        std::map<string, Path>::iterator j;
-        if ((j = backMap.find(i)) == backMap.end()) abort();
+        auto j = backMap.find(i);
+        assert(j != backMap.end());
         found.insert(j->second);
     }
 
