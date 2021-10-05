@@ -126,8 +126,7 @@
           ''
             mkdir -p $out/nix-support
 
-            # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
-            # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
+            # Converts /nix/store/50p3qk8k...-nix-2.4pre20201102_550e11f/bin/nix to 50p3qk8k.../bin/nix.
             tarballPath() {
               # Remove the store prefix
               local path=''${1#${builtins.storeDir}/}
@@ -153,10 +152,15 @@
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
           '';
 
-      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; pkgs.stdenv.mkDerivation {
+      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
-        name = "nix-tests-${client.version}-against-${daemon.version}";
+        name =
+          "nix-tests"
+          + optionalString
+            (versionAtLeast daemon.version "2.4pre20211005" &&
+             versionAtLeast client.version "2.4pre20211005")
+            "-${client.version}-against-${daemon.version}";
         inherit version;
 
         src = self;
