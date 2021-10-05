@@ -903,7 +903,7 @@ int Pid::wait()
             return status;
         }
         if (errno != EINTR)
-            throw SysError("cannot get child exit status");
+            throw SysError("cannot get exit status of PID %d", pid);
         checkInterrupt();
     }
 }
