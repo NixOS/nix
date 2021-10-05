@@ -711,6 +711,7 @@ void LocalDerivationGoal::startBuilder()
     if (!builderOut.readSide)
         throw SysError("opening pseudoterminal master");
 
+    // FIXME: not thread-safe, use ptsname_r
     std::string slaveName(ptsname(builderOut.readSide.get()));
 
     if (buildUser) {
