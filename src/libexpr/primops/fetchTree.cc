@@ -66,7 +66,7 @@ void emitTreeAttrs(
     v.attrs->sort();
 }
 
-std::string fixURI(std::string uri, EvalState &state, const std::string & defaultScheme = "file")
+std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
     return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
@@ -81,37 +81,17 @@ std::string fixURIForGit(std::string uri, EvalState & state)
         return fixURI(uri, state);
 }
 
-void addURI(
-    EvalState &state,
-    fetchers::Attrs &attrs,
-    Symbol name,
-    std::string v,
-    const std::optional<std::string> type
-) {
-    string n(name);
-    if (n == "url") {
-        if (type == "git") {
-            attrs.emplace("type", "git");
-            attrs.emplace(name, fixURIForGit(v, state));
-        } else {
-            attrs.emplace(name, fixURI(v, state));
-        }
-    } else {
-        attrs.emplace(name, v);
-    }
-}
-
 struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
 };
 
 static void fetchTree(
-    EvalState &state,
-    const Pos &pos,
-    Value **args,
-    Value &v,
-    const std::optional<std::string> type,
+    EvalState & state,
+    const Pos & pos,
+    Value * * args,
+    Value & v,
+    const std::optional<std::string> & type,
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
@@ -126,14 +106,15 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             state.forceValue(*attr.value);
-            if (attr.value->type() == nPath || attr.value->type() == nString)
-                addURI(
-                    state,
-                    attrs,
-                    attr.name,
-                    state.coerceToString(*attr.pos, *attr.value, context, false, false),
-                    type
-                );
+            if (attr.value->type() == nPath || attr.value->type() == nString) {
+                auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                attrs.emplace(attr.name,
+                    attr.name == "url"
+                    ? type == "git"
+                      ? fixURIForGit(s, state)
+                      : fixURI(s, state)
+                    : s);
+            }
             else if (attr.value->type() == nBool)
                 attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
@@ -158,7 +139,6 @@ static void fetchTree(
                     .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
                     .errPos = pos
                 });
-
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
