@@ -91,7 +91,7 @@ static void fetchTree(
     const Pos & pos,
     Value * * args,
     Value & v,
-    const std::optional<std::string> & type,
+    std::optional<std::string> type,
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
@@ -104,7 +104,23 @@ static void fetchTree(
 
         fetchers::Attrs attrs;
 
+        if (auto aType = args[0]->attrs->get(state.sType)) {
+            if (type)
+                throw Error({
+                    .msg = hintfmt("unexpected attribute 'type'"),
+                    .errPos = pos
+                });
+            type = state.forceStringNoCtx(*aType->value, *aType->pos);
+        } else if (!type)
+            throw Error({
+                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .errPos = pos
+            });
+
+        attrs.emplace("type", type.value());
+
         for (auto & attr : *args[0]->attrs) {
+            if (attr.name == state.sType) continue;
             state.forceValue(*attr.value);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false);
@@ -123,15 +139,6 @@ static void fetchTree(
                 throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     attr.name, showType(*attr.value));
         }
-
-        if (type)
-            attrs.emplace("type", type.value());
-
-        if (!attrs.count("type"))
-            throw Error({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = pos
-            });
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
