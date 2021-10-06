@@ -95,7 +95,7 @@ default, set it to `-`.
     there are multiple machines of the right type, Nix will prefer the
     fastest, taking load into account.
 
-6.  A comma-separated list of _supported features_. If a derivation has
+6.  A comma-separated list of *supported features*. If a derivation has
     the `requiredSystemFeatures` attribute, then Nix will only perform
     the derivation on a machine that has the specified features. For
     instance, the attribute
@@ -107,7 +107,7 @@ default, set it to `-`.
     will cause the build to be performed on a machine that has the `kvm`
     feature.
 
-7.  A comma-separated list of _mandatory features_. A machine will only
+7.  A comma-separated list of *mandatory features*. A machine will only
     be used to build a derivation if all of the machine’s mandatory
     features appear in the derivation’s `requiredSystemFeatures`
     attribute..
@@ -156,13 +156,3 @@ option `builders-use-substitutes` in your local `nix.conf`.
 
 To build only on remote builders and disable building on the local
 machine, you can use the option `--max-jobs 0`.
-
-## Troubleshooting
-
-### ssh
-
-even if the store is reachable with `nix store ping --store your_store_url`, the nix-daemon might not be able to reach it. nix-daemon operates as root so you need to make sure that the machine is reachable via ssh as root user.
-
-- add the `-vvv` flags to show more information on the potential problem.
-- make sure your store is reachable by the root user. `sudo ssh -i "your_ssh_key_path" your_user@your_hostname`
-- make sure your ssh_config is set for the root user to access that server or that your builders configuration contains the ssh_key, user and hostname
