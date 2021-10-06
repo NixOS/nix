@@ -755,7 +755,6 @@ void LocalDerivationGoal::startBuilder()
     result.startTime = time(0);
 
     /* Fork a child to build the package. */
-    ProcessOptions options;
 
 #if __linux__
     if (useChroot) {
@@ -797,8 +796,6 @@ void LocalDerivationGoal::startBuilder()
             privateNetwork = true;
 
         userNamespaceSync.create();
-
-        options.allowVfork = false;
 
         Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
         static bool userNamespacesEnabled =
@@ -857,7 +854,7 @@ void LocalDerivationGoal::startBuilder()
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
-        }, options);
+        });
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
@@ -921,10 +918,9 @@ void LocalDerivationGoal::startBuilder()
 #endif
     {
     fallback:
-        options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
-        }, options);
+        });
     }
 
     /* parent */
