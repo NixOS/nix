@@ -261,6 +261,7 @@ cat > $flake3Dir/flake.nix <<EOF
       mkDerivation {
         inherit system;
         name = "fnord";
+        dummy = builtins.readFile (builtins.path { name = "source"; path = ./.; filter = path: type: baseNameOf path == "config.nix"; } + "/config.nix");
         buildCommand = ''
           cat \${inputs.nonFlake}/README.md > \$out
         '';
