@@ -81,10 +81,24 @@ std::string fixURIForGit(std::string uri, EvalState & state)
         return fixURI(uri, state);
 }
 
-void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v)
-{
+void addURI(
+    EvalState &state,
+    fetchers::Attrs &attrs,
+    Symbol name,
+    std::string v,
+    const std::optional<std::string> type
+) {
     string n(name);
-    attrs.emplace(name, n == "url" ? fixURI(v, state) : v);
+    if (n == "url") {
+        if (type == "git") {
+            attrs.emplace("type", "git");
+            attrs.emplace(name, fixURIForGit(v, state));
+        } else {
+            attrs.emplace(name, fixURI(v, state));
+        }
+    } else {
+        attrs.emplace(name, v);
+    }
 }
 
 struct FetchTreeParams {
@@ -117,10 +131,9 @@ static void fetchTree(
                     state,
                     attrs,
                     attr.name,
-                    state.coerceToString(*attr.pos, *attr.value, context, false, false)
+                    state.coerceToString(*attr.pos, *attr.value, context, false, false),
+                    type
                 );
-            else if (attr.value->type() == nString)
-                addURI(state, attrs, attr.name, attr.value->string.s);
             else if (attr.value->type() == nBool)
                 attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
