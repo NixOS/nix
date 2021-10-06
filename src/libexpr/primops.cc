@@ -1891,20 +1891,9 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
         dstPath = state.store->printStorePath(*expectedStorePath);
 
     mkString(v, dstPath, {dstPath});
+
     if (state.allowedPaths)
         state.allowedPaths->insert(v.string.s);
-
-    try {
-        state.realiseContext({});
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
-            .errPos = pos
-        });
-    } catch (Error & e) {
-        e.addTrace(pos, "while importing '%s'", path);
-        throw e;
-    }
 }
 
 
