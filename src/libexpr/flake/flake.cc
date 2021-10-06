@@ -231,7 +231,7 @@ static Flake getFlake(
     if (auto outputs = vInfo.attrs->get(sOutputs)) {
         expectType(state, nFunction, *outputs->value, *outputs->pos);
 
-        if (outputs->value->isLambda() && outputs->value->lambda.fun->matchAttrs) {
+        if (outputs->value->isLambda() && outputs->value->lambda.fun->hasFormals()) {
             for (auto & formal : outputs->value->lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(formal.name, FlakeInput {

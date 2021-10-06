@@ -2365,7 +2365,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    if (!args[0]->lambda.fun->matchAttrs) {
+    if (!args[0]->lambda.fun->hasFormals()) {
         state.mkAttrs(v, 0);
         return;
     }
