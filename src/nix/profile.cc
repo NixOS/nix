@@ -98,10 +98,8 @@ struct ProfileManifest
 
         else if (pathExists(profile + "/manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            if (state.allowedPaths) {
-                state.allowedPaths->insert(state.store->followLinksToStore(profile));
-                state.allowedPaths->insert(state.store->followLinksToStore(profile + "/manifest.nix"));
-            }
+            state.allowPath(state.store->followLinksToStore(profile));
+            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
             auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 

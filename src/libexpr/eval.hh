@@ -150,6 +150,11 @@ public:
 
     SearchPath getSearchPath() { return searchPath; }
 
+    /* Allow access to a path. */
+    void allowPath(const Path & path);
+
+    /* Check whether access to a path is allowed and throw an error if
+       not. Otherwise return the canonicalised path. */
     Path checkSourcePath(const Path & path);
 
     void checkURI(const std::string & uri);

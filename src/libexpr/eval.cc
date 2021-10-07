@@ -445,12 +445,12 @@ EvalState::EvalState(
                     StorePathSet closure;
                     store->computeFSClosure(store->toStorePath(r.second).first, closure);
                     for (auto & path : closure)
-                        allowedPaths->insert(store->printStorePath(path));
+                        allowPath(store->printStorePath(path));
                 } catch (InvalidPath &) {
-                    allowedPaths->insert(r.second);
+                    allowPath(r.second);
                 }
             } else
-                allowedPaths->insert(r.second);
+                allowPath(r.second);
         }
     }
 
@@ -480,6 +480,12 @@ void EvalState::requireExperimentalFeatureOnEvaluation(
             .errPos = pos
         });
     }
+}
+
+void EvalState::allowPath(const Path & path)
+{
+    if (allowedPaths)
+        allowedPaths->insert(path);
 }
 
 Path EvalState::checkSourcePath(const Path & path_)
