@@ -56,13 +56,9 @@ void EvalState::realiseContext(const PathSet & context)
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             store->printStorePath(drvs.begin()->drvPath));
 
-    /* For performance, prefetch all substitute info. */
-    StorePathSet willBuild, willSubstitute, unknown;
-    uint64_t downloadSize, narSize;
+    /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
-    store->queryMissing(buildReqs, willBuild, willSubstitute, unknown, downloadSize, narSize);
-
     store->buildPaths(buildReqs);
 
     /* Add the output of this derivations to the allowed
