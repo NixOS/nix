@@ -716,15 +716,32 @@ struct curlFileTransfer : public FileTransfer
     }
 };
 
+ref<curlFileTransfer> makeCurlFileTransfer()
+{
+    return make_ref<curlFileTransfer>();
+}
+
 ref<FileTransfer> getFileTransfer()
 {
-    static ref<FileTransfer> fileTransfer = makeFileTransfer();
+    static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
+
+    // this has to be done in its own scope to make sure that the lock is released
+    // before creating a new fileTransfer instance.
+    auto needsRecreation = [&]() -> bool {
+        auto state = fileTransfer->state_.lock();
+        return state->quit;
+    };
+
+    if (needsRecreation()) {
+        fileTransfer = makeCurlFileTransfer();
+    }
+
     return fileTransfer;
 }
 
 ref<FileTransfer> makeFileTransfer()
 {
-    return make_ref<curlFileTransfer>();
+    return makeCurlFileTransfer();
 }
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
