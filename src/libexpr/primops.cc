@@ -1843,12 +1843,43 @@ static RegisterPrimOp primop_toFile({
     .fun = prim_toFile,
 });
 
-static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
+static void addPath(
+    EvalState & state,
+    const Pos & pos,
+    const string & name,
+    const Path & path_,
+    Value * filterFun,
+    FileIngestionMethod method,
+    const std::optional<Hash> expectedHash,
+    Value & v,
+    const PathSet & context)
 {
-    const auto path = evalSettings.pureEval && expectedHash ?
-        path_ :
-        state.checkSourcePath(path_);
+    try {
+        // FIXME: handle CA derivation outputs (where path_ needs to
+        // be rewritten to the actual output).
+        state.realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError({
+            .msg = hintfmt("cannot add path '%s', since path '%s' is not valid", path_, e.path),
+            .errPos = pos
+        });
+    } catch (Error & e) {
+        e.addTrace(pos, "while adding path '%s'", path_);
+        throw;
+    }
+
+    const auto path = evalSettings.pureEval && expectedHash
+        ? path_
+        : state.checkSourcePath(path_);
+
+    if (state.store->isInStore(path)) {
+        auto storePath = state.store->toStorePath(path).first;
+        auto info = state.store->queryPathInfo(storePath);
+        if (!info->references.empty())
+            throw EvalError("store path '%s' is not allowed to have references",
+                state.store->printStorePath(storePath));
+    }
+
     PathFilter filter = filterFun ? ([&](const Path & path) {
         auto st = lstat(path);
 
@@ -1876,6 +1907,7 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
     std::optional<StorePath> expectedStorePath;
     if (expectedHash)
         expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
+
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
         dstPath = state.store->printStorePath(settings.readOnlyMode
@@ -1896,11 +1928,6 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context);
-    if (!context.empty())
-        throw EvalError({
-            .msg = hintfmt("string '%1%' cannot refer to other paths", path),
-            .errPos = pos
-        });
 
     state.forceValue(*args[0], pos);
     if (args[0]->type() != nFunction)
@@ -1911,7 +1938,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -1977,18 +2004,13 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
+    PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);
-        if (n == "path") {
-            PathSet context;
+        if (n == "path")
             path = state.coerceToPath(*attr.pos, *attr.value, context);
-            if (!context.empty())
-                throw EvalError({
-                    .msg = hintfmt("string '%1%' cannot refer to other paths", path),
-                    .errPos = *attr.pos
-                });
-        } else if (attr.name == state.sName)
+        else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
             state.forceValue(*attr.value, pos);
@@ -2011,7 +2033,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     if (name.empty())
         name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, method, expectedHash, v);
+    addPath(state, pos, name, path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({
