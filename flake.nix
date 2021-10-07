@@ -444,6 +444,12 @@
           inherit (self) overlay;
         };
 
+        tests.nssPreload = (import ./tests/nss-preload.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          inherit (self) overlay;
+        });
+
         tests.githubFlakes = (import ./tests/github-flakes.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
