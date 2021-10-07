@@ -396,6 +396,8 @@ bool NixRepl::processLine(string line)
 {
     if (line == "") return true;
 
+    _isInterrupted = false;
+
     string command, arg;
 
     if (line[0] == ':') {
