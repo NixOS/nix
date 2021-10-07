@@ -1859,17 +1859,18 @@ static void addPath(
         // be rewritten to the actual output).
         state.realiseContext(context);
 
-        path = evalSettings.pureEval && expectedHash
-            ? path
-            : state.checkSourcePath(path);
-
         if (state.store->isInStore(path)) {
-            auto storePath = state.store->toStorePath(path).first;
+            auto [storePath, subPath] = state.store->toStorePath(path);
             auto info = state.store->queryPathInfo(storePath);
             if (!info->references.empty())
                 throw EvalError("store path '%s' is not allowed to have references",
                     state.store->printStorePath(storePath));
+            path = state.store->toRealPath(storePath) + subPath;
         }
+
+        path = evalSettings.pureEval && expectedHash
+            ? path
+            : state.checkSourcePath(path);
 
         PathFilter filter = filterFun ? ([&](const Path & path) {
             auto st = lstat(path);
@@ -1911,7 +1912,7 @@ static void addPath(
 
         mkString(v, dstPath, {dstPath});
 
-        state.allowPath(v.string.s);
+        state.allowPath(dstPath);
 
     } catch (Error & e) {
         e.addTrace(pos, "while adding path '%s'", path);

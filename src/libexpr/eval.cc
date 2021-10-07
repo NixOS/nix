@@ -445,7 +445,7 @@ EvalState::EvalState(
                     StorePathSet closure;
                     store->computeFSClosure(store->toStorePath(r.second).first, closure);
                     for (auto & path : closure)
-                        allowPath(store->printStorePath(path));
+                        allowPath(path);
                 } catch (InvalidPath &) {
                     allowPath(r.second);
                 }
@@ -486,6 +486,12 @@ void EvalState::allowPath(const Path & path)
 {
     if (allowedPaths)
         allowedPaths->insert(path);
+}
+
+void EvalState::allowPath(const StorePath & storePath)
+{
+    if (allowedPaths)
+        allowedPaths->insert(store->toRealPath(storePath));
 }
 
 Path EvalState::checkSourcePath(const Path & path_)
@@ -1895,9 +1901,9 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         dstPath = store->printStorePath(p);
+        allowPath(p);
         srcToStore.insert_or_assign(path, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
-        allowPath(dstPath);
     }
 
     context.insert(dstPath);
