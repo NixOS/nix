@@ -169,8 +169,7 @@ static void fetchTree(
 
     auto [tree, input2] = input.fetch(state.store);
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(tree.actualPath);
+    state.allowPath(tree.actualPath);
 
     emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
@@ -245,8 +244,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(realPath);
+    state.allowPath(realPath);
 
     auto path = state.store->printStorePath(storePath);
     mkString(v, path, PathSet({path}));

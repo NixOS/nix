@@ -1892,8 +1892,7 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
     mkString(v, dstPath, {dstPath});
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(v.string.s);
+    state.allowPath(v.string.s);
 }
 
 
