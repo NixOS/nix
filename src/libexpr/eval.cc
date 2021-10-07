@@ -1897,6 +1897,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         dstPath = store->printStorePath(p);
         srcToStore.insert_or_assign(path, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
+        allowPath(dstPath);
     }
 
     context.insert(dstPath);
