@@ -156,3 +156,16 @@ option `builders-use-substitutes` in your local `nix.conf`.
 
 To build only on remote builders and disable building on the local
 machine, you can use the option `--max-jobs 0`.
+
+## Troubleshooting
+
+### ssh
+
+If you encounter a problem:
+
+- Add the `-vvv` flags to show more information on the potential problem.
+
+Your store could be reachable with `nix store ping --store your_store_url` but not by the nix-daemon. Since the nix-daemon operates as root:
+
+- Make sure your store is reachable by the root user. `sudo ssh -i "your_ssh_key_path" your_user@your_hostname`.
+- Make sure your ssh_config is set for the root user to access that server or that your builders configuration contains the ssh_key, user and hostname.
