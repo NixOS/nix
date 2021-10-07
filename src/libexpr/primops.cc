@@ -1847,7 +1847,7 @@ static void addPath(
     EvalState & state,
     const Pos & pos,
     const string & name,
-    const Path & path_,
+    Path path,
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
@@ -1855,72 +1855,68 @@ static void addPath(
     const PathSet & context)
 {
     try {
-        // FIXME: handle CA derivation outputs (where path_ needs to
+        // FIXME: handle CA derivation outputs (where path needs to
         // be rewritten to the actual output).
         state.realiseContext(context);
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .msg = hintfmt("cannot add path '%s', since path '%s' is not valid", path_, e.path),
-            .errPos = pos
-        });
+
+        path = evalSettings.pureEval && expectedHash
+            ? path
+            : state.checkSourcePath(path);
+
+        if (state.store->isInStore(path)) {
+            auto storePath = state.store->toStorePath(path).first;
+            auto info = state.store->queryPathInfo(storePath);
+            if (!info->references.empty())
+                throw EvalError("store path '%s' is not allowed to have references",
+                    state.store->printStorePath(storePath));
+        }
+
+        PathFilter filter = filterFun ? ([&](const Path & path) {
+            auto st = lstat(path);
+
+            /* Call the filter function.  The first argument is the path,
+               the second is a string indicating the type of the file. */
+            Value arg1;
+            mkString(arg1, path);
+
+            Value fun2;
+            state.callFunction(*filterFun, arg1, fun2, noPos);
+
+            Value arg2;
+            mkString(arg2,
+                S_ISREG(st.st_mode) ? "regular" :
+                S_ISDIR(st.st_mode) ? "directory" :
+                S_ISLNK(st.st_mode) ? "symlink" :
+                "unknown" /* not supported, will fail! */);
+
+            Value res;
+            state.callFunction(fun2, arg2, res, noPos);
+
+            return state.forceBool(res, pos);
+        }) : defaultPathFilter;
+
+        std::optional<StorePath> expectedStorePath;
+        if (expectedHash)
+            expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
+
+        Path dstPath;
+        if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
+            dstPath = state.store->printStorePath(settings.readOnlyMode
+                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
+                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
+            if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
+                throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
+        } else
+            dstPath = state.store->printStorePath(*expectedStorePath);
+
+        mkString(v, dstPath, {dstPath});
+
+        state.allowPath(v.string.s);
+
     } catch (Error & e) {
-        e.addTrace(pos, "while adding path '%s'", path_);
+        e.addTrace(pos, "while adding path '%s'", path);
         throw;
     }
-
-    const auto path = evalSettings.pureEval && expectedHash
-        ? path_
-        : state.checkSourcePath(path_);
-
-    if (state.store->isInStore(path)) {
-        auto storePath = state.store->toStorePath(path).first;
-        auto info = state.store->queryPathInfo(storePath);
-        if (!info->references.empty())
-            throw EvalError("store path '%s' is not allowed to have references",
-                state.store->printStorePath(storePath));
-    }
-
-    PathFilter filter = filterFun ? ([&](const Path & path) {
-        auto st = lstat(path);
-
-        /* Call the filter function.  The first argument is the path,
-           the second is a string indicating the type of the file. */
-        Value arg1;
-        mkString(arg1, path);
-
-        Value fun2;
-        state.callFunction(*filterFun, arg1, fun2, noPos);
-
-        Value arg2;
-        mkString(arg2,
-            S_ISREG(st.st_mode) ? "regular" :
-            S_ISDIR(st.st_mode) ? "directory" :
-            S_ISLNK(st.st_mode) ? "symlink" :
-            "unknown" /* not supported, will fail! */);
-
-        Value res;
-        state.callFunction(fun2, arg2, res, noPos);
-
-        return state.forceBool(res, pos);
-    }) : defaultPathFilter;
-
-    std::optional<StorePath> expectedStorePath;
-    if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
-
-    Path dstPath;
-    if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-        dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-            : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
-        if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
-            throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
-    } else
-        dstPath = state.store->printStorePath(*expectedStorePath);
-
-    mkString(v, dstPath, {dstPath});
-
-    state.allowPath(v.string.s);
 }
 
 
