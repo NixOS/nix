@@ -239,7 +239,7 @@ void Worker::run(const Goals & _topGoals)
         }
     }
 
-    /* Call queryMissing() efficiently query substitutes. */
+    /* Call queryMissing() to efficiently query substitutes. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
     store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
