@@ -233,11 +233,10 @@ struct ExprLambda : Expr
     Pos pos;
     Symbol name;
     Symbol arg;
-    bool matchAttrs;
     Formals * formals;
     Expr * body;
-    ExprLambda(const Pos & pos, const Symbol & arg, bool matchAttrs, Formals * formals, Expr * body)
-        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
+    ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
+        : pos(pos), arg(arg), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
             throw ParseError({
@@ -247,6 +246,7 @@ struct ExprLambda : Expr
     };
     void setName(Symbol & name);
     string showNamePos() const;
+    inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };
 

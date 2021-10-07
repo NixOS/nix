@@ -135,7 +135,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             if (location) posToXML(xmlAttrs, v.lambda.fun->pos);
             XMLOpenElement _(doc, "function", xmlAttrs);
 
-            if (v.lambda.fun->matchAttrs) {
+            if (v.lambda.fun->hasFormals()) {
                 XMLAttrs attrs;
                 if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
                 if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";

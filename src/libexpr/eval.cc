@@ -1316,13 +1316,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     auto size =
         (lambda.arg.empty() ? 0 : 1) +
-        (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
+        (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
     Env & env2(allocEnv(size));
     env2.up = fun.lambda.env;
 
     size_t displ = 0;
 
-    if (!lambda.matchAttrs)
+    if (!lambda.hasFormals())
         env2.values[displ++] = &arg;
 
     else {
@@ -1402,7 +1402,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         }
     }
 
-    if (!fun.isLambda() || !fun.lambda.fun->matchAttrs) {
+    if (!fun.isLambda() || !fun.lambda.fun->hasFormals()) {
         res = fun;
         return;
     }
