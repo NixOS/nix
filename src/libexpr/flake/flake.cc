@@ -64,7 +64,7 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     debug("got tree '%s' from '%s'",
         state.store->printStorePath(tree.storePath), lockedRef);
 
-    state.allowPath(tree.actualPath);
+    state.allowPath(tree.storePath);
 
     assert(!originalRef.input.getNarHash() || tree.storePath == originalRef.input.computeStorePath(*state.store));
 

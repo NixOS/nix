@@ -169,7 +169,7 @@ static void fetchTree(
 
     auto [tree, input2] = input.fetch(state.store);
 
-    state.allowPath(tree.actualPath);
+    state.allowPath(tree.storePath);
 
     emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
@@ -233,18 +233,16 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto realPath = state.store->toRealPath(storePath);
-
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, realPath);
+            : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
-    state.allowPath(realPath);
+    state.allowPath(storePath);
 
     auto path = state.store->printStorePath(storePath);
     mkString(v, path, PathSet({path}));
