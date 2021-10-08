@@ -40,6 +40,7 @@ perl/Makefile.config
 
 # /src/libstore/
 *.gen.*
+/src/libstore/tests/libstore-tests
 
 # /src/libutil/
 /src/libutil/tests/libutil-tests
