@@ -479,20 +479,35 @@ struct LocalStore::GCState
 };
 
 
+void LocalStore::deleteFromStore(GCState & state, std::string_view baseName)
+{
+    Path path = storeDir + "/" + std::string(baseName);
+    Path realPath = realStoreDir + "/" + std::string(baseName);
+
+    printInfo("deleting '%1%'", path);
+
+    state.results.paths.insert(path);
+
+    uint64_t bytesFreed;
+    deletePath(realPath, bytesFreed);
+    state.results.bytesFreed += bytesFreed;
+
+    if (state.results.bytesFreed > state.options.maxFreed) {
+        printInfo("deleted more than %d bytes; stopping", state.options.maxFreed);
+        throw GCLimitReached();
+    }
+}
+
+
 bool LocalStore::tryToDelete(
     GCState & state,
     StorePathSet & visited,
-    const Path & path,
+    const StorePath & path,
     bool recursive)
 {
     checkInterrupt();
 
-    auto realPath = realStoreDir + "/" + std::string(baseNameOf(path));
-    if (realPath == linksDir) return false;
-
     //Activity act(*logger, lvlDebug, format("considering whether to delete '%1%'") % path);
-
-    auto storePath = maybeParseStorePath(path);
 
     /* Wake up any client waiting for deletion of this path to
        finish. */
@@ -502,89 +517,66 @@ bool LocalStore::tryToDelete(
         state.wakeup.notify_all();
     });
 
-    if (storePath) {
+    if (!visited.insert(path).second) return true;
 
-        if (!visited.insert(*storePath).second) return true;
+    if (state.alive.count(path)) return false;
 
-        if (state.alive.count(*storePath)) return false;
+    if (state.dead.count(path)) return true;
 
-        if (state.dead.count(*storePath)) return true;
-
-        if (state.roots.count(*storePath)) {
-            debug("cannot delete '%s' because it's a root", path);
-            state.alive.insert(*storePath);
-            return false;
-        }
-
-        if (isValidPath(*storePath)) {
-            StorePathSet incoming;
-
-            /* Don't delete this path if any of its referrers are alive. */
-            queryReferrers(*storePath, incoming);
-
-            /* If keep-derivations is set and this is a derivation, then
-               don't delete the derivation if any of the outputs are alive. */
-            if (state.gcKeepDerivations && storePath->isDerivation()) {
-                for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(*storePath))
-                    if (maybeOutPath &&
-                        isValidPath(*maybeOutPath) &&
-                        queryPathInfo(*maybeOutPath)->deriver == *storePath)
-                        incoming.insert(*maybeOutPath);
-            }
-
-            /* If keep-outputs is set, then don't delete this path if there
-               are derivers of this path that are not garbage. */
-            if (state.gcKeepOutputs) {
-                auto derivers = queryValidDerivers(*storePath);
-                for (auto & i : derivers)
-                    incoming.insert(i);
-            }
-
-            for (auto & i : incoming)
-                if (i != *storePath
-                    && (recursive || state.options.pathsToDelete.count(i))
-                    && !tryToDelete(state, visited, printStorePath(i), recursive))
-                {
-                    state.alive.insert(*storePath);
-                    return false;
-                }
-        }
-
-        {
-            auto hashPart = std::string(storePath->hashPart());
-            auto shared(state.shared.lock());
-            if (shared->tempRoots.count(hashPart))
-                return false;
-            shared->pending = hashPart;
-        }
-
-        state.dead.insert(*storePath);
-
-        if (state.shouldDelete)
-            invalidatePathChecked(*storePath);
+    if (state.roots.count(path)) {
+        debug("cannot delete '%s' because it's a root", printStorePath(path));
+        state.alive.insert(path);
+        return false;
     }
 
+    if (isValidPath(path)) {
+        StorePathSet incoming;
+
+        /* Don't delete this path if any of its referrers are alive. */
+        queryReferrers(path, incoming);
+
+        /* If keep-derivations is set and this is a derivation, then
+           don't delete the derivation if any of the outputs are
+           alive. */
+        if (state.gcKeepDerivations && path.isDerivation()) {
+            for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                if (maybeOutPath &&
+                    isValidPath(*maybeOutPath) &&
+                    queryPathInfo(*maybeOutPath)->deriver == path)
+                    incoming.insert(*maybeOutPath);
+        }
+
+        /* If keep-outputs is set, then don't delete this path if
+           there are derivers of this path that are not garbage. */
+        if (state.gcKeepOutputs) {
+            auto derivers = queryValidDerivers(path);
+            for (auto & i : derivers)
+                incoming.insert(i);
+        }
+
+        for (auto & i : incoming)
+            if (i != path
+                && (recursive || state.options.pathsToDelete.count(i))
+                && !tryToDelete(state, visited, i, recursive))
+            {
+                state.alive.insert(path);
+                return false;
+            }
+    }
+
+    {
+        auto hashPart = std::string(path.hashPart());
+        auto shared(state.shared.lock());
+        if (shared->tempRoots.count(hashPart))
+            return false;
+        shared->pending = hashPart;
+    }
+
+    state.dead.insert(path);
+
     if (state.shouldDelete) {
-        Path realPath = realStoreDir + "/" + std::string(baseNameOf(path));
-
-        struct stat st;
-        if (lstat(realPath.c_str(), &st)) {
-            if (errno == ENOENT) return true;
-            throw SysError("getting status of %1%", realPath);
-        }
-
-        printInfo("deleting '%1%'", path);
-
-        state.results.paths.insert(path);
-
-        uint64_t bytesFreed;
-        deletePath(realPath, bytesFreed);
-        state.results.bytesFreed += bytesFreed;
-
-        if (state.results.bytesFreed > state.options.maxFreed) {
-            printInfo("deleted more than %d bytes; stopping", state.options.maxFreed);
-            throw GCLimitReached();
-        }
+        invalidatePathChecked(path);
+        deleteFromStore(state, path.to_string());
     }
 
     return true;
@@ -777,7 +769,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         for (auto & i : options.pathsToDelete) {
             StorePathSet visited;
-            if (!tryToDelete(state, visited, printStorePath(i), false))
+            if (!tryToDelete(state, visited, i, false))
                 throw Error(
                     "cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
@@ -799,14 +791,20 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             /* Read the store and delete all paths that are invalid or
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
+            auto linksName = baseNameOf(linksDir);
             Paths entries;
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
                 string name = dirent->d_name;
-                if (name == "." || name == "..") continue;
-                StorePathSet visited;
-                tryToDelete(state, visited, storeDir + "/" + name, true);
+                if (name == "." || name == ".." || name == linksName) continue;
+
+                if (auto storePath = maybeParseStorePath(storeDir + "/" + name)) {
+                    StorePathSet visited;
+                    tryToDelete(state, visited, *storePath, true);
+                } else
+                    deleteFromStore(state, name);
+
             }
         } catch (GCLimitReached & e) {
         }

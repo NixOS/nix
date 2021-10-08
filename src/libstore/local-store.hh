@@ -243,8 +243,10 @@ private:
     bool tryToDelete(
         GCState & state,
         StorePathSet & visited,
-        const Path & path,
+        const StorePath & path,
         bool recursive);
+
+    void deleteFromStore(GCState & state, std::string_view baseName);
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
