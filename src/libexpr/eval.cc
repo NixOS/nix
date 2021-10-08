@@ -445,12 +445,12 @@ EvalState::EvalState(
                     StorePathSet closure;
                     store->computeFSClosure(store->toStorePath(r.second).first, closure);
                     for (auto & path : closure)
-                        allowedPaths->insert(store->printStorePath(path));
+                        allowPath(path);
                 } catch (InvalidPath &) {
-                    allowedPaths->insert(r.second);
+                    allowPath(r.second);
                 }
             } else
-                allowedPaths->insert(r.second);
+                allowPath(r.second);
         }
     }
 
@@ -480,6 +480,18 @@ void EvalState::requireExperimentalFeatureOnEvaluation(
             .errPos = pos
         });
     }
+}
+
+void EvalState::allowPath(const Path & path)
+{
+    if (allowedPaths)
+        allowedPaths->insert(path);
+}
+
+void EvalState::allowPath(const StorePath & storePath)
+{
+    if (allowedPaths)
+        allowedPaths->insert(store->toRealPath(storePath));
 }
 
 Path EvalState::checkSourcePath(const Path & path_)
@@ -1316,13 +1328,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     auto size =
         (lambda.arg.empty() ? 0 : 1) +
-        (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
+        (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
     Env & env2(allocEnv(size));
     env2.up = fun.lambda.env;
 
     size_t displ = 0;
 
-    if (!lambda.matchAttrs)
+    if (!lambda.hasFormals())
         env2.values[displ++] = &arg;
 
     else {
@@ -1402,7 +1414,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         }
     }
 
-    if (!fun.isLambda() || !fun.lambda.fun->matchAttrs) {
+    if (!fun.isLambda() || !fun.lambda.fun->hasFormals()) {
         res = fun;
         return;
     }
@@ -1889,6 +1901,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         dstPath = store->printStorePath(p);
+        allowPath(p);
         srcToStore.insert_or_assign(path, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
     }

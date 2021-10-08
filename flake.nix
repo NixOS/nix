@@ -78,7 +78,7 @@
 
             # Tests
             buildPackages.git
-            buildPackages.mercurial
+            buildPackages.mercurial # FIXME: remove? only needed for tests
             buildPackages.jq
           ]
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
@@ -126,8 +126,7 @@
           ''
             mkdir -p $out/nix-support
 
-            # Converts /nix/store/50p3qk8kka9dl6wyq40vydq945k0j3kv-nix-2.4pre20201102_550e11f/bin/nix
-            # To 50p3qk8kka9dl6wyq40vydq945k0j3kv/bin/nix
+            # Converts /nix/store/50p3qk8k...-nix-2.4pre20201102_550e11f/bin/nix to 50p3qk8k.../bin/nix.
             tarballPath() {
               # Remove the store prefix
               local path=''${1#${builtins.storeDir}/}
@@ -153,13 +152,15 @@
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
           '';
 
-      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; pkgs.stdenv.mkDerivation {
+      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
-        # Must keep this name short as OSX has a rather strict limit on the
-        # socket path length, and this name appears in the path of the
-        # nix-daemon socket used in the tests
-        name = "nix-tests";
+        name =
+          "nix-tests"
+          + optionalString
+            (versionAtLeast daemon.version "2.4pre20211005" &&
+             versionAtLeast client.version "2.4pre20211005")
+            "-${client.version}-against-${daemon.version}";
         inherit version;
 
         src = self;
@@ -443,6 +444,12 @@
           inherit (self) overlay;
         };
 
+        tests.nssPreload = (import ./tests/nss-preload.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          inherit (self) overlay;
+        });
+
         tests.githubFlakes = (import ./tests/github-flakes.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
@@ -490,7 +497,11 @@
           let pkgs = nixpkgsFor.${system}; in
           pkgs.runCommand "install-tests" {
             againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
-            againstCurrentUnstable = testNixVersions pkgs pkgs.nix pkgs.nixUnstable;
+            againstCurrentUnstable =
+              # FIXME: temporarily disable this on macOS because of #3605.
+              if system == "x86_64-linux"
+              then testNixVersions pkgs pkgs.nix pkgs.nixUnstable
+              else null;
             # Disabled because the latest stable version doesn't handle
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;

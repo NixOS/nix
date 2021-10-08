@@ -346,10 +346,10 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (!v.isLambda() || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
+                if (!v.isLambda() || v.lambda.fun->hasFormals() || std::string(v.lambda.fun->arg) != "final")
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
-                if (!body || body->matchAttrs || std::string(body->arg) != "prev")
+                if (!body || body->hasFormals() || std::string(body->arg) != "prev")
                     throw Error("overlay does not take an argument named 'prev'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
@@ -363,7 +363,7 @@ struct CmdFlakeCheck : FlakeCommand
             try {
                 state->forceValue(v, pos);
                 if (v.isLambda()) {
-                    if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
+                    if (!v.lambda.fun->hasFormals() || !v.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
                 } else if (v.type() == nAttrs) {
                     for (auto & attr : *v.attrs)

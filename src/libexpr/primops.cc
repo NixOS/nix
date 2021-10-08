@@ -56,13 +56,9 @@ void EvalState::realiseContext(const PathSet & context)
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             store->printStorePath(drvs.begin()->drvPath));
 
-    /* For performance, prefetch all substitute info. */
-    StorePathSet willBuild, willSubstitute, unknown;
-    uint64_t downloadSize, narSize;
+    /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
-    store->queryMissing(buildReqs, willBuild, willSubstitute, unknown, downloadSize, narSize);
-
     store->buildPaths(buildReqs);
 
     /* Add the output of this derivations to the allowed
@@ -414,7 +410,7 @@ static RegisterPrimOp primop_isNull({
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
       > **Warning**
-      > 
+      >
       > This function is *deprecated*; just write `e == null` instead.
     )",
     .fun = prim_isNull,
@@ -1851,56 +1847,87 @@ static RegisterPrimOp primop_toFile({
     .fun = prim_toFile,
 });
 
-static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
+static void addPath(
+    EvalState & state,
+    const Pos & pos,
+    const string & name,
+    Path path,
+    Value * filterFun,
+    FileIngestionMethod method,
+    const std::optional<Hash> expectedHash,
+    Value & v,
+    const PathSet & context)
 {
-    const auto path = evalSettings.pureEval && expectedHash ?
-        path_ :
-        state.checkSourcePath(path_);
-    PathFilter filter = filterFun ? ([&](const Path & path) {
-        auto st = lstat(path);
+    try {
+        // FIXME: handle CA derivation outputs (where path needs to
+        // be rewritten to the actual output).
+        state.realiseContext(context);
 
-        /* Call the filter function.  The first argument is the path,
-           the second is a string indicating the type of the file. */
-        Value arg1;
-        mkString(arg1, path);
+        if (state.store->isInStore(path)) {
+            auto [storePath, subPath] = state.store->toStorePath(path);
+            auto info = state.store->queryPathInfo(storePath);
+            if (!info->references.empty())
+                throw EvalError("store path '%s' is not allowed to have references",
+                    state.store->printStorePath(storePath));
+            path = state.store->toRealPath(storePath) + subPath;
+        }
 
-        Value fun2;
-        state.callFunction(*filterFun, arg1, fun2, noPos);
+        path = evalSettings.pureEval && expectedHash
+            ? path
+            : state.checkSourcePath(path);
 
-        Value arg2;
-        mkString(arg2,
-            S_ISREG(st.st_mode) ? "regular" :
-            S_ISDIR(st.st_mode) ? "directory" :
-            S_ISLNK(st.st_mode) ? "symlink" :
-            "unknown" /* not supported, will fail! */);
+        PathFilter filter = filterFun ? ([&](const Path & path) {
+            auto st = lstat(path);
 
-        Value res;
-        state.callFunction(fun2, arg2, res, noPos);
+            /* Call the filter function.  The first argument is the path,
+               the second is a string indicating the type of the file. */
+            Value arg1;
+            mkString(arg1, path);
 
-        return state.forceBool(res, pos);
-    }) : defaultPathFilter;
+            Value fun2;
+            state.callFunction(*filterFun, arg1, fun2, noPos);
 
-    std::optional<StorePath> expectedStorePath;
-    if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-            {
-                .method = method,
-                .hash = *expectedHash,
-            },
-            {},
-        });
-    Path dstPath;
-    if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-        dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-            : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
-        if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
-            throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
-    } else
-        dstPath = state.store->printStorePath(*expectedStorePath);
+            Value arg2;
+            mkString(arg2,
+                S_ISREG(st.st_mode) ? "regular" :
+                S_ISDIR(st.st_mode) ? "directory" :
+                S_ISLNK(st.st_mode) ? "symlink" :
+                "unknown" /* not supported, will fail! */);
 
-    mkString(v, dstPath, {dstPath});
+            Value res;
+            state.callFunction(fun2, arg2, res, noPos);
+
+            return state.forceBool(res, pos);
+        }) : defaultPathFilter;
+
+        std::optional<StorePath> expectedStorePath;
+        if (expectedHash)
+            expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
+                {
+                    .method = method,
+                    .hash = *expectedHash,
+                },
+                {},
+            });
+
+        Path dstPath;
+        if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
+            dstPath = state.store->printStorePath(settings.readOnlyMode
+                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
+                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
+            if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
+                throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
+        } else
+            dstPath = state.store->printStorePath(*expectedStorePath);
+
+        mkString(v, dstPath, {dstPath});
+
+        state.allowPath(dstPath);
+
+    } catch (Error & e) {
+        e.addTrace(pos, "while adding path '%s'", path);
+        throw;
+    }
 }
 
 
@@ -1908,11 +1935,6 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context);
-    if (!context.empty())
-        throw EvalError({
-            .msg = hintfmt("string '%1%' cannot refer to other paths", path),
-            .errPos = pos
-        });
 
     state.forceValue(*args[0], pos);
     if (args[0]->type() != nFunction)
@@ -1923,13 +1945,26 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
     .name = "__filterSource",
     .args = {"e1", "e2"},
     .doc = R"(
+      > **Warning**
+      >
+      > `filterSource` should not be used to filter store paths. Since
+      > `filterSource` uses the name of the input directory while naming
+      > the output directory, doing so will produce a directory name in
+      > the form of `<hash2>-<hash>-<name>`, where `<hash>-<name>` is
+      > the name of the input directory. Since `<hash>` depends on the
+      > unfiltered directory, the name of the output directory will
+      > indirectly depend on files that are filtered out by the
+      > function. This will trigger a rebuild even when a filtered out
+      > file is changed. Use `builtins.path` instead, which allows
+      > specifying the name of the output directory.
+
       This function allows you to copy sources into the Nix store while
       filtering certain files. For instance, suppose that you want to use
       the directory `source-dir` as an input to a Nix expression, e.g.
@@ -1976,18 +2011,13 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
+    PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);
-        if (n == "path") {
-            PathSet context;
+        if (n == "path")
             path = state.coerceToPath(*attr.pos, *attr.value, context);
-            if (!context.empty())
-                throw EvalError({
-                    .msg = hintfmt("string '%1%' cannot refer to other paths", path),
-                    .errPos = *attr.pos
-                });
-        } else if (attr.name == state.sName)
+        else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
             state.forceValue(*attr.value, pos);
@@ -2010,7 +2040,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     if (name.empty())
         name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, method, expectedHash, v);
+    addPath(state, pos, name, path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({
@@ -2375,7 +2405,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    if (!args[0]->lambda.fun->matchAttrs) {
+    if (!args[0]->lambda.fun->hasFormals()) {
         state.mkAttrs(v, 0);
         return;
     }
@@ -2530,7 +2560,7 @@ static RegisterPrimOp primop_tail({
       the argument isn’t a list or is an empty list.
 
       > **Warning**
-      > 
+      >
       > This function should generally be avoided since it's inefficient:
       > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
       > list by repeatedly calling `tail` takes O(n^2) time.

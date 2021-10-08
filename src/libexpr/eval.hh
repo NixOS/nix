@@ -150,6 +150,15 @@ public:
 
     SearchPath getSearchPath() { return searchPath; }
 
+    /* Allow access to a path. */
+    void allowPath(const Path & path);
+
+    /* Allow access to a store path. Note that this gets remapped to
+       the real store path if `store` is a chroot store. */
+    void allowPath(const StorePath & storePath);
+
+    /* Check whether access to a path is allowed and throw an error if
+       not. Otherwise return the canonicalised path. */
     Path checkSourcePath(const Path & path);
 
     void checkURI(const std::string & uri);

@@ -84,8 +84,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
     v.attrs->sort();
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(tree.actualPath);
+    state.allowPath(tree.storePath);
 }
 
 static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);

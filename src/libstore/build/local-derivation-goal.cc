@@ -711,6 +711,7 @@ void LocalDerivationGoal::startBuilder()
     if (!builderOut.readSide)
         throw SysError("opening pseudoterminal master");
 
+    // FIXME: not thread-safe, use ptsname_r
     std::string slaveName(ptsname(builderOut.readSide.get()));
 
     if (buildUser) {
@@ -754,7 +755,6 @@ void LocalDerivationGoal::startBuilder()
     result.startTime = time(0);
 
     /* Fork a child to build the package. */
-    ProcessOptions options;
 
 #if __linux__
     if (useChroot) {
@@ -796,8 +796,6 @@ void LocalDerivationGoal::startBuilder()
             privateNetwork = true;
 
         userNamespaceSync.create();
-
-        options.allowVfork = false;
 
         Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
         static bool userNamespacesEnabled =
@@ -856,7 +854,7 @@ void LocalDerivationGoal::startBuilder()
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
-        }, options);
+        });
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
@@ -920,10 +918,9 @@ void LocalDerivationGoal::startBuilder()
 #endif
     {
     fallback:
-        options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
-        }, options);
+        });
     }
 
     /* parent */
@@ -2140,8 +2137,7 @@ void LocalDerivationGoal::registerOutputs()
 
         /* Pass blank Sink as we are not ready to hash data at this stage. */
         NullSink blank;
-        auto references = worker.store.parseStorePathSet(
-            scanForReferences(blank, actualPath, worker.store.printStorePathSet(referenceablePaths)));
+        auto references = scanForReferences(blank, actualPath, referenceablePaths);
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,
@@ -2208,7 +2204,7 @@ void LocalDerivationGoal::registerOutputs()
         auto rewriteOutput = [&]() {
             /* Apply hash rewriting if necessary. */
             if (!outputRewrites.empty()) {
-                warn("rewriting hashes in '%1%'; cross fingers", actualPath);
+                debug("rewriting hashes in '%1%'; cross fingers", actualPath);
 
                 /* FIXME: this is in-memory. */
                 StringSink sink;

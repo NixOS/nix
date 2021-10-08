@@ -259,10 +259,10 @@ void killUser(uid_t uid);
    pid to the caller. */
 struct ProcessOptions
 {
-    string errorPrefix = "error: ";
+    string errorPrefix = "";
     bool dieWithParent = true;
     bool runExitHandlers = false;
-    bool allowVfork = true;
+    bool allowVfork = false;
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -573,6 +573,12 @@ void commonChildInit(Pipe & logPipe);
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+/* Bind a Unix domain socket to a path. */
+void bind(int fd, const std::string & path);
+
+/* Connect to a Unix domain socket. */
+void connect(int fd, const std::string & path);
 
 
 // A Rust/Python-like enumerate() iterator adapter.

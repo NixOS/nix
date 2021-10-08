@@ -42,7 +42,7 @@ static string caseHackSuffix = "~nix~case~hack~";
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 
-static void dumpContents(const Path & path, size_t size,
+static void dumpContents(const Path & path, off_t size,
     Sink & sink)
 {
     sink << "contents" << size;
@@ -76,7 +76,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
         sink << "type" << "regular";
         if (st.st_mode & S_IXUSR)
             sink << "executable" << "";
-        dumpContents(path, (size_t) st.st_size, sink);
+        dumpContents(path, st.st_size, sink);
     }
 
     else if (S_ISDIR(st.st_mode)) {

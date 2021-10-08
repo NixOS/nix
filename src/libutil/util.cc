@@ -903,7 +903,7 @@ int Pid::wait()
             return status;
         }
         if (errno != EINTR)
-            throw SysError("cannot get child exit status");
+            throw SysError("cannot get exit status of PID %d", pid);
         checkInterrupt();
     }
 }
@@ -939,9 +939,6 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    ProcessOptions options;
-    options.allowVfork = false;
-
     Pid pid = startProcess([&]() {
 
         if (setuid(uid) == -1)
@@ -964,7 +961,7 @@ void killUser(uid_t uid)
         }
 
         _exit(0);
-    }, options);
+    });
 
     int status = pid.wait();
     if (status != 0)
@@ -1085,8 +1082,7 @@ void runProgram2(const RunOptions & options)
     // vfork implies that the environment of the main process and the fork will
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
-    if (options.environment)
-        processOptions.allowVfork = false;
+    processOptions.allowVfork = !options.environment;
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -1686,16 +1682,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 
     closeOnExec(fdSocket.get());
 
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (path.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", path);
-    strcpy(addr.sun_path, path.c_str());
-
-    unlink(path.c_str());
-
-    if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot bind to socket '%1%'", path);
+    bind(fdSocket.get(), path);
 
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
@@ -1704,6 +1691,66 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;
+}
+
+
+void bind(int fd, const std::string & path)
+{
+    unlink(path.c_str());
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            auto dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            strcpy(addr.sun_path, base.c_str());
+            if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot bind to socket '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot bind to socket '%s'", path);
+    } else {
+        strcpy(addr.sun_path, path.c_str());
+        if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot bind to socket '%s'", path);
+    }
+}
+
+
+void connect(int fd, const std::string & path)
+{
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            auto dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            strcpy(addr.sun_path, base.c_str());
+            if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot connect to socket at '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot connect to socket at '%s'", path);
+    } else {
+        strcpy(addr.sun_path, path.c_str());
+        if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot connect to socket at '%s'", path);
+    }
 }
 
 

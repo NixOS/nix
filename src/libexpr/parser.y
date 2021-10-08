@@ -324,13 +324,13 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), true, $2, $5); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), $2, $5); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), true, $2, $7); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), $2, $7); }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), true, $4, $7); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), $4, $7); }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
