@@ -393,6 +393,12 @@ struct CmdDevelop : Common, MixEnvironment
         });
 
         addFlag({
+            .longName = "unpack",
+            .description = "Run the `unpack` phase.",
+            .handler = {&phase, {"unpack"}},
+        });
+
+        addFlag({
             .longName = "configure",
             .description = "Run the `configure` phase.",
             .handler = {&phase, {"configure"}},
