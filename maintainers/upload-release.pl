@@ -12,12 +12,15 @@ use LWP::UserAgent;
 use Net::Amazon::S3;
 
 my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
+my $nixRev = $ARGV[1] or die; # FIXME
 
 my $releasesBucketName = "nix-releases";
 my $channelsBucketName = "nix-channels";
 my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
 
 my $TMPDIR = $ENV{'TMPDIR'} // "/tmp";
+
+my $isLatest = ($ENV{'IS_LATEST'} // "") eq "1";
 
 # FIXME: cut&paste from nixos-channel-scripts.
 sub fetch {
@@ -33,14 +36,15 @@ sub fetch {
 }
 
 my $evalUrl = "https://hydra.nixos.org/eval/$evalId";
-my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
+#my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
 
-my $nixRev = $evalInfo->{jobsetevalinputs}->{nix}->{revision} or die;
+#my $nixRev = $evalInfo->{jobsetevalinputs}->{nix}->{revision} or die;
 
-my $tarballInfo = decode_json(fetch("$evalUrl/job/tarball", 'application/json'));
+my $buildInfo = decode_json(fetch("$evalUrl/job/build.x86_64-linux", 'application/json'));
+#print Dumper($buildInfo);
 
-my $releaseName = $tarballInfo->{releasename};
+my $releaseName = $buildInfo->{nixname};
 $releaseName =~ /nix-(.*)$/ or die;
 my $version = $1;
 
@@ -104,8 +108,6 @@ sub downloadFile {
     return $sha256_expected;
 }
 
-downloadFile("tarball", "2"); # .tar.bz2
-my $tarballHash = downloadFile("tarball", "3"); # .tar.xz
 downloadFile("binaryTarball.i686-linux", "1");
 downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
@@ -134,42 +136,43 @@ for my $fn (glob "$tmpDir/*") {
     }
 }
 
-exit if $version =~ /pre/;
-
 # Update nix-fallback-paths.nix.
-system("cd $nixpkgsDir && git pull") == 0 or die;
+if ($isLatest) {
+    system("cd $nixpkgsDir && git pull") == 0 or die;
 
-sub getStorePath {
-    my ($jobName) = @_;
-    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-    for my $product (values %{$buildInfo->{buildproducts}}) {
-        next unless $product->{type} eq "nix-build";
-        next if $product->{path} =~ /[a-z]+$/;
-        return $product->{path};
+    sub getStorePath {
+        my ($jobName) = @_;
+        my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+        for my $product (values %{$buildInfo->{buildproducts}}) {
+            next unless $product->{type} eq "nix-build";
+            next if $product->{path} =~ /[a-z]+$/;
+            return $product->{path};
+        }
+        die;
     }
-    die;
+
+    write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
+               "{\n" .
+               "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
+               "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+               "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
+               "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+               "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
+               "}\n");
+
+    system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 }
-
-write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
-           "{\n" .
-           "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-           "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-           "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-           "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-           "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
-           "}\n");
-
-system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 
 # Update the "latest" symlink.
 $channelsBucket->add_key(
     "nix-latest/install", "",
     { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/install" })
-    or die $channelsBucket->err . ": " . $channelsBucket->errstr;
+    or die $channelsBucket->err . ": " . $channelsBucket->errstr
+    if $isLatest;
 
 # Tag the release in Git.
 chdir("/home/eelco/Dev/nix-pristine") or die;
 system("git remote update origin") == 0 or die;
 system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
 system("git push --tags") == 0 or die;
-system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die;
+system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
