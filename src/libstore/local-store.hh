@@ -240,11 +240,10 @@ private:
 
     struct GCState;
 
-    bool tryToDelete(
+    bool canReachRoot(
         GCState & state,
         StorePathSet & visited,
-        const StorePath & path,
-        bool recursive);
+        const StorePath & path);
 
     void deleteFromStore(GCState & state, std::string_view baseName);
 

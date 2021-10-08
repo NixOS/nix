@@ -499,34 +499,29 @@ void LocalStore::deleteFromStore(GCState & state, std::string_view baseName)
 }
 
 
-bool LocalStore::tryToDelete(
+bool LocalStore::canReachRoot(
     GCState & state,
     StorePathSet & visited,
-    const StorePath & path,
-    bool recursive)
+    const StorePath & path)
 {
     checkInterrupt();
 
     //Activity act(*logger, lvlDebug, format("considering whether to delete '%1%'") % path);
 
-    /* Wake up any client waiting for deletion of this path to
-       finish. */
-    Finally releasePending([&]() {
-        auto shared(state.shared.lock());
-        shared->pending.reset();
-        state.wakeup.notify_all();
-    });
+    if (state.options.action == GCOptions::gcDeleteSpecific
+        && !state.options.pathsToDelete.count(path))
+        return true;
 
-    if (!visited.insert(path).second) return true;
+    if (!visited.insert(path).second) return false;
 
-    if (state.alive.count(path)) return false;
+    if (state.alive.count(path)) return true;
 
-    if (state.dead.count(path)) return true;
+    if (state.dead.count(path)) return false;
 
     if (state.roots.count(path)) {
         debug("cannot delete '%s' because it's a root", printStorePath(path));
         state.alive.insert(path);
-        return false;
+        return true;
     }
 
     if (isValidPath(path)) {
@@ -555,12 +550,9 @@ bool LocalStore::tryToDelete(
         }
 
         for (auto & i : incoming)
-            if (i != path
-                && (recursive || state.options.pathsToDelete.count(i))
-                && !tryToDelete(state, visited, i, recursive))
-            {
+            if (i != path && canReachRoot(state, visited, i)) {
                 state.alive.insert(path);
-                return false;
+                return true;
             }
     }
 
@@ -568,18 +560,11 @@ bool LocalStore::tryToDelete(
         auto hashPart = std::string(path.hashPart());
         auto shared(state.shared.lock());
         if (shared->tempRoots.count(hashPart))
-            return false;
+            return true;
         shared->pending = hashPart;
     }
 
-    state.dead.insert(path);
-
-    if (state.shouldDelete) {
-        invalidatePathChecked(path);
-        deleteFromStore(state, path.to_string());
-    }
-
-    return true;
+    return false;
 }
 
 
@@ -626,7 +611,6 @@ void LocalStore::removeUnusedLinks(const GCState & state)
     printInfo("note: currently hard linking saves %.2f MiB",
         ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
 }
-
 
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
@@ -769,12 +753,21 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         for (auto & i : options.pathsToDelete) {
             StorePathSet visited;
-            if (!tryToDelete(state, visited, i, false))
+
+            if (canReachRoot(state, visited, i))
                 throw Error(
                     "cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
                     "nix-store --query --roots",
                     printStorePath(i));
+
+            auto sorted = topoSortPaths(visited);
+            for (auto & path : sorted) {
+                if (state.dead.count(path)) continue;
+                invalidatePathChecked(path);
+                deleteFromStore(state, path.to_string());
+                state.dead.insert(path);
+            }
         }
 
     } else if (options.maxFreed > 0) {
@@ -801,7 +794,26 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name)) {
                     StorePathSet visited;
-                    tryToDelete(state, visited, *storePath, true);
+
+                    /* Wake up any GC client waiting for deletion of
+                       the paths in 'visited' to finish. */
+                    Finally releasePending([&]() {
+                        auto shared(state.shared.lock());
+                        shared->pending.reset();
+                        state.wakeup.notify_all();
+                    });
+
+                    if (!canReachRoot(state, visited, *storePath)) {
+                        auto sorted = topoSortPaths(visited);
+                        for (auto & path : sorted) {
+                            if (state.dead.count(path)) continue;
+                            if (state.shouldDelete) {
+                                invalidatePathChecked(path);
+                                deleteFromStore(state, path.to_string());
+                            }
+                            state.dead.insert(path);
+                        }
+                    }
                 } else
                     deleteFromStore(state, name);
 
