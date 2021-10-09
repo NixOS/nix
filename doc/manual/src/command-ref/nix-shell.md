@@ -117,6 +117,12 @@ $ nix-shell '<nixpkgs>' -A pan
 [nix-shell]$ ./pan/gui/pan
 ```
 
+Note: Other packages may override these phases (the unpackPhase,
+configurePhase, buildPhase, etc).
+For those, it may be required to do something like
+`eval "$configurePhase-configurePhase"` or `eval "$configurePhase"`
+depending on how that package's nix files have been written.
+
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
 
