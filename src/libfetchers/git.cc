@@ -439,19 +439,27 @@ struct GitInputScheme : InputScheme
         }
 
         if (submodules) {
-            Path tmpGitDir = createTempDir();
-            AutoDelete delTmpGitDir(tmpGitDir, true);
-
-            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
-            // TODO: repoDir might lack the ref (it only checks if rev
-            // exists, see FIXME above) so use a big hammer and fetch
-            // everything to ensure we get the rev.
-            runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
-
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
-            runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
-            runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+            if (isLocal) {
+                // `git submodule update` modifies the source repo, so do a temporary, cheap clone with its own HEADs
+                runProgram("git", true, { "clone", "--quiet", "--no-checkout", "--shared", "-c", "submodule.alternateLocation=superproject", repoDir, tmpDir });
+                runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
+                // try checking out submodules without fetching first since otherwise git seems to unnecessarily do a fetch when the
+                // submodule commit is present but not reachable
+                try {
+                    runProgram2({
+                        .program ="git",
+                        .args = { "-C", tmpDir, "submodule", "update", "--init", "--recursive", "--quiet", "--no-fetch" }
+                    });
+                } catch (ExecError &) {
+                    // TODO: cache these fetches
+                    runProgram("git", true, { "-C", tmpDir, "submodule", "update", "--init", "--recursive", "--quiet" });
+                }
+            } else {
+                // it's fine to modify `repoDir` HEADs if it is in the Nix cache; otherwise *no* submodule fetches would be cached
+                runProgram("git", true, { "--git-dir", repoDir, "--work-tree", tmpDir, "checkout", "--quiet", input.getRev()->gitRev(), "." });
+                // `-C` should be redundant, probably a bug in `git submodule`
+                runProgram("git", true, { "--git-dir", repoDir, "--work-tree", tmpDir, "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+            }
 
             filter = isNotDotGitDirectory;
         } else {
