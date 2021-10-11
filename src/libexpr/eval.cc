@@ -742,13 +742,13 @@ valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env)
 
 void printEnvPosChain(const Env &env, int lv )
 {
-  std::cout << "printEnvPosChain " << lv << std::endl;
+  // std::cout << "printEnvPosChain " << lv << std::endl;
 
-  std::cout << "env" << env.values[0] << std::endl;
+  // std::cout << "env" << env.values[0] << std::endl;
 
   if (env.values[0] && env.values[0]->type() == nAttrs) {
-    std::cout << "im in the loop" << std::endl;
-    std::cout << "pos " << env.values[0]->attrs->pos << std::endl;
+    // std::cout << "im in the loop" << std::endl;
+    // std::cout << "pos " << env.values[0]->attrs->pos << std::endl;
     if (env.values[0]->attrs->pos) {
       ErrPos ep(*env.values[0]->attrs->pos);
       auto loc = getCodeLines(ep);
@@ -760,7 +760,7 @@ void printEnvPosChain(const Env &env, int lv )
     }
   }
 
-  std::cout << "next env : " << env.up << std::endl;
+  // std::cout << "next env : " << env.up << std::endl;
   
   if (env.up) {
     printEnvPosChain(*env.up, ++lv);
@@ -970,7 +970,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
-    std::cout << "throwUndefinedVarError" << std::endl;
+    // std::cout << "throwUndefinedVarError" << std::endl;
   
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = UndefinedVarError({
@@ -978,7 +978,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
         .errPos = pos
     });
 
-    std::cout << "pre debuggerHook" << std::endl;
+    // std::cout << "pre debuggerHook" << std::endl;
 
     if (debuggerHook && expr)
         debuggerHook(error, env, *expr);
@@ -1038,7 +1038,7 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
-    std::cout << " EvalState::lookupVar" << var << std::endl;
+    // std::cout << " EvalState::lookupVar" << var << std::endl;
 
     for (size_t l = var.level; l; --l, env = env->up) ;
 
@@ -1058,7 +1058,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith) {
-            std::cout << "pre throwUndefinedVarError" << std::endl;
+            // std::cout << "pre throwUndefinedVarError" << std::endl;
             throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, 0);
         }
         for (size_t l = env->prevWith; l; --l, env = env->up) ;

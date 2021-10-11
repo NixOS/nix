@@ -110,10 +110,10 @@ static void mkOutputString(EvalState & state, Value & v,
    argument. */
 static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
-    std::cout << " IMPORT " << std::endl;
-    std::cout << " import " << std::endl;
-    std::cout << " IMPORT " << std::endl;
-    std::cout << " import " << std::endl;
+    // std::cout << " IMPORT " << std::endl;
+    // std::cout << " import " << std::endl;
+    // std::cout << " IMPORT " << std::endl;
+    // std::cout << " import " << std::endl;
   
     PathSet context;
     Path path = state.coerceToPath(pos, vPath, context);

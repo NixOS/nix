@@ -574,9 +574,9 @@ namespace nix {
 Expr * EvalState::parse(const char * text, FileOrigin origin,
     const Path & path, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    std::cout << "EvalState::parse " << text <<  std::endl;
-    for (auto i = staticEnv->vars.begin(); i != staticEnv->vars.end(); ++i) 
-        std::cout << "EvalState::parse staticEnv " << i->first << std::endl;
+    // std::cout << "EvalState::parse " << text <<  std::endl;
+    // for (auto i = staticEnv->vars.begin(); i != staticEnv->vars.end(); ++i) 
+    //     std::cout << "EvalState::parse staticEnv " << i->first << std::endl;
 
     yyscan_t scanner;
     ParseData data(*this);
@@ -602,11 +602,11 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     if (res) throw ParseError(data.error.value());
 
 
-    std::cout << "EvalState::parse pre bindvars " << std::endl;
+    // std::cout << "EvalState::parse pre bindvars " << std::endl;
 
     data.result->bindVars(staticEnv);
 
-    std::cout << "EvalState::parse post bindVars " << std::endl;
+    // std::cout << "EvalState::parse post bindVars " << std::endl;
 
     return data.result;
 }

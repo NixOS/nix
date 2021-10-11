@@ -274,12 +274,12 @@ void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
 
-    std::cout << "ExprVar::bindVars " << name << std::endl;
+    // std::cout << "ExprVar::bindVars " << name << std::endl;
 
     int a = 10;
     if (name == "callPackage") {
       a++;  // try to make code that I can put a breakpoint on...
-      std::cout << "meh" << a + 10 << std::endl;
+      // std::cout << "meh" << a + 10 << std::endl;
       int withLevel = -1;
       fromWith = true;
       // this->level = withLevel;
@@ -310,7 +310,7 @@ void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
            "undefined variable" error now. */
         if (withLevel == -1) 
         {
-            std::cout << " throw UndefinedVarError({" << std::endl;
+            // std::cout << " throw UndefinedVarError({" << std::endl;
             throw UndefinedVarError({
                 .msg = hintfmt("undefined variable (ExprVar bindvars) '%1%'", name),
                 .errPos = pos
@@ -349,18 +349,18 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
     if (debuggerHook)
         staticenv = env;
 
-    std::cout << "ExprAttrs::bindVars" << std::endl;
+    // std::cout << "ExprAttrs::bindVars" << std::endl;
     // auto dynamicEnv(env);
 
     if (recursive) {
-        std::cout << "recursive" << std::endl;
+        // std::cout << "recursive" << std::endl;
         // dynamicEnv = newEnv.get();
         // also make shared_ptr?
         auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get()));  
 
         unsigned int displ = 0;
         for (auto & i : attrs) {
-            std::cout << "newenvvar: " << i.first << std::endl;
+            // std::cout << "newenvvar: " << i.first << std::endl;
             newEnv->vars[i.first] = i.second.displ = displ++;
         }
 
@@ -373,7 +373,7 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
         }
     }
     else {
-        std::cout << "NOT recursive" << std::endl;
+        // std::cout << "NOT recursive" << std::endl;
         for (auto & i : attrs)
             i.second.e->bindVars(env);
 
@@ -383,7 +383,7 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
         }
     }
 
-    std::cout << "ExprAttrs::bindVars end" << std::endl;
+    // std::cout << "ExprAttrs::bindVars end" << std::endl;
 
 }
 
@@ -440,7 +440,7 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
     if (debuggerHook)
         staticenv = env;
 
-    std::cout << " ExprWith::bindVars " << std::endl;
+    // std::cout << " ExprWith::bindVars " << std::endl;
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
@@ -453,24 +453,24 @@ void ExprWith::bindVars(const std::shared_ptr<const StaticEnv> &env)
             break;
         }
 
-    std::cout << " ExprWith::bindVars  1" << std::endl;
-    attrs->show(std::cout);
-    std::cout << std::endl;
+    // std::cout << " ExprWith::bindVars  1" << std::endl;
+    // attrs->show(std::cout);
+    // std::cout << std::endl;
     attrs->bindVars(env);
     auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(true, env.get()));  // also make shared_ptr?
-    std::cout << " ExprWith::bindVars  2" << std::endl;
-    std::cout << " body: " << std::endl;
-    body->show(std::cout);
-    std::cout << std::endl;
+    // std::cout << " ExprWith::bindVars  2" << std::endl;
+    // std::cout << " body: " << std::endl;
+    // body->show(std::cout);
+    // std::cout << std::endl;
 
-    std::cout << "ExprWith::newenv: (iswith, size); (" << newEnv->isWith << ", " << newEnv->vars.size() << ") " << std::endl;
-    for (auto i = newEnv->vars.begin(); i != newEnv->vars.end(); ++i) 
-        std::cout << "EvalState::parse newEnv " << i->first << std::endl;
+    // std::cout << "ExprWith::newenv: (iswith, size); (" << newEnv->isWith << ", " << newEnv->vars.size() << ") " << std::endl;
+    // for (auto i = newEnv->vars.begin(); i != newEnv->vars.end(); ++i) 
+    //     std::cout << "EvalState::parse newEnv " << i->first << std::endl;
 
 
-    std::cout << " body->bindVars(newEnv), iswith: " << newEnv->isWith << std::endl;
+    // std::cout << " body->bindVars(newEnv), iswith: " << newEnv->isWith << std::endl;
     body->bindVars(newEnv);
-    std::cout << " ExprWith::bindVars  3" << std::endl;
+    // std::cout << " ExprWith::bindVars  3" << std::endl;
 }
 
 /*
