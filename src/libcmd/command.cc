@@ -107,10 +107,16 @@ ref<EvalState> EvalCommand::getEvalState()
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env, const Expr & expr) {
                 printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
+
+                printStaticEnvBindings(expr);
+
                 // printEnvPosChain(env);
-                printEnvBindings(env);
-                auto vm = mapEnvBindings(env);
-                runRepl(evalState, *vm);
+                // printEnvBindings(env);
+                if (expr.staticenv) 
+                {
+                  auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
+                  runRepl(evalState, *vm);
+                }
             };
     }
     return ref<EvalState>(evalState);

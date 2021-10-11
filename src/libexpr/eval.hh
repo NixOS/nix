@@ -24,6 +24,7 @@ enum RepairFlag : bool;
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
 extern std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
+void printStaticEnvBindings(const Expr &expr);
 
 struct PrimOp
 {
@@ -47,6 +48,7 @@ struct Env
 void printEnvBindings(const Env &env, int lv = 0);
 valmap * mapEnvBindings(const Env &env);
 void printEnvPosChain(const Env &env, int lv = 0);
+valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env);
 
 Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
 

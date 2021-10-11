@@ -712,6 +712,34 @@ void printStaticEnvBindings(const Expr &expr)
   
 }
 
+void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
+{
+  // add bindings for the next level up first.
+  if (env.up && se.up) {
+    mapStaticEnvBindings( *se.up, *env.up,vm);
+  }
+
+  // iterate through staticenv bindings.
+
+  auto map = valmap();
+  for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter) 
+  {
+    map[iter->first] = env.values[iter->second]; 
+  }
+
+  vm.merge(map);
+ 
+}
+
+
+valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env)
+{
+    auto vm = new valmap();
+    mapStaticEnvBindings(se, env, *vm);
+    return vm;
+}
+
+
 void printEnvPosChain(const Env &env, int lv )
 {
   std::cout << "printEnvPosChain " << lv << std::endl;
