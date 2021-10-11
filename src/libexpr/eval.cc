@@ -36,7 +36,7 @@
 namespace nix {
 
 // std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
-std::function<void(const Error & error, const Env & env)> debuggerHook;
+std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
 
 static char * dupString(const char * s)
 {
@@ -806,17 +806,17 @@ valmap * mapEnvBindings(const Env &env)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, Env & env))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = EvalError(s, s2);
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, Env & env))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = EvalError({
@@ -824,22 +824,24 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, Env & env))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = EvalError(s, s2, s3);
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3, Env & env))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = EvalError({
@@ -847,12 +849,13 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2, Env & env))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2, Env & env, Expr *expr))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     // auto delenv = std::unique_ptr<valmap>(env);
@@ -861,12 +864,13 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
         .errPos = p1
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, Env & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -874,12 +878,13 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, Env &
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, Env & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -887,12 +892,13 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const string &s2, Env & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const string &s2, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -900,12 +906,13 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = TypeError({
@@ -913,12 +920,13 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1, Env & env))
+LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = AssertionError({
@@ -926,12 +934,13 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
     std::cout << "throwUndefinedVarError" << std::endl;
   
@@ -943,12 +952,13 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
 
     std::cout << "pre debuggerHook" << std::endl;
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, Env & env))
+LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
     // auto delenv = std::unique_ptr<valmap>(env);
     auto error = MissingArgumentError({
@@ -956,8 +966,9 @@ LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char
         .errPos = pos
     });
 
-    if (debuggerHook)
-        debuggerHook(error, env);
+    if (debuggerHook && expr)
+        debuggerHook(error, env, *expr);
+
     throw error;
 }
 
@@ -1020,7 +1031,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         if (!env->prevWith) {
             std::cout << "pre throwUndefinedVarError" << std::endl;
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, 0);
         }
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
@@ -1354,7 +1365,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
             throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos,
-                env);
+                env, this);
               // map1("value", &v)); // TODO dynamicAttrs to env?
 
         i.valueExpr->setName(nameSym);
@@ -1445,7 +1456,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name, env);
+                    throwEvalError(pos, "attribute '%1%' missing", name, env, this);
                         // mapBindings(*vAttrs->attrs));
             }
             vAttrs = j->value;
@@ -1573,7 +1584,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
           pos,
           "attempt to call something which is not a function but %1%",
           showType(fun).c_str(),
-          fakeEnv(1));
+          fakeEnv(1), 0);
           // fun.env);
           // map2("fun", &fun, "arg", &arg));
     }
@@ -1612,7 +1623,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                         "%1% called without required argument '%2%'",
                         lambda,
                         i.name,
-                        *fun.lambda.env);
+                        *fun.lambda.env, &lambda);
                         // map2("fun", &fun, "arg", &arg));
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
@@ -1633,7 +1644,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                         "%1% called with unexpected argument '%2%'",
                         lambda,
                         i.name,
-                        *fun.lambda.env);
+                        *fun.lambda.env, &lambda);
                         // map2("fun", &fun, "arg", &arg));
             abort(); // can't happen
         }
@@ -1711,7 +1722,7 @@ this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/#ss-functions.)",
                 i.name,
-                *fun.lambda.env);
+                *fun.lambda.env, fun.lambda.fun);
                 // mapBindings(args));
                 // map1("fun", &fun));  // todo add bindings + fun
             }
@@ -1761,7 +1772,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError(pos, "assertion '%1%' failed", out.str(), env);
+        throwAssertionError(pos, "assertion '%1%' failed", out.str(), env, this);
     }
     body->eval(state, env, v);
 }
@@ -1915,7 +1926,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else {
                 std::cerr << "envtype: " << showType(env.values[0]->type()) << std::endl;
               
-                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), env);
+                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), env, this);
             }
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
@@ -1923,7 +1934,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp), env);
+                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp), env, this);
         } else
             s << state.coerceToString(pos, vTmp, context, false, firstType == nString);
     }
@@ -1984,7 +1995,7 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nInt)
         throwTypeError(pos, "value is %1% while an integer was expected", v,
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map1("value", &v));
     return v.integer;
 }
@@ -1997,7 +2008,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
         return v.integer;
     else if (v.type() != nFloat)
         throwTypeError(pos, "value is %1% while a float was expected", v,
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map1("value", &v));
     return v.fpoint;
 }
@@ -2008,7 +2019,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nBool)
         throwTypeError(pos, "value is %1% while a Boolean was expected", v,	
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map1("value", &v));
     return v.boolean;
 }
@@ -2025,7 +2036,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nFunction && !isFunctor(v))
         throwTypeError(pos, "value is %1% while a function was expected", v,
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map1("value", &v));
 }
 
@@ -2035,7 +2046,7 @@ string EvalState::forceString(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nString) {
         throwTypeError(pos, "value is %1% while a string was expected", v,
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map1("value", &v));
     }
     return string(v.string.s);
@@ -2089,13 +2100,13 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0], 
                   // b.has_value() ? mapBindings(*b.get()) : map0());
-                fakeEnv(1));
+                fakeEnv(1), 0);
                 // map1("value", &v));
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0], 
                   // b.has_value() ? mapBindings(*b.get()) : map0());
-                fakeEnv(1));
+                fakeEnv(1), 0);
                // map1("value", &v));
     }
     return s;
@@ -2169,7 +2180,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
             throwTypeError(pos, "cannot coerce a set to a string", 
-                fakeEnv(1));
+                fakeEnv(1), 0);
                 // map1("value", &v));
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
@@ -2201,7 +2212,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     throwTypeError(pos, "cannot coerce %1% to a string", v, 
-        fakeEnv(1));
+        fakeEnv(1), 0);
         // map1("value", &v));
 }
 
@@ -2211,7 +2222,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in '%1%'",
             drvExtension,
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map0());
 
     Path dstPath;
@@ -2237,7 +2248,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
         throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path, 
-            fakeEnv(1));
+            fakeEnv(1), 0);
             // map1("value", &v));
     return path;
 }
@@ -2320,7 +2331,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             throwEvalError("cannot compare %1% with %2%",
                 showType(v1),
                 showType(v2),
-                fakeEnv(1));
+                fakeEnv(1), 0);
                 // map2("value1", &v1, "value2", &v2));
     }
 }

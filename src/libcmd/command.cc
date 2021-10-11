@@ -97,7 +97,7 @@ EvalCommand::EvalCommand()
     });
 }
 // extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
-extern std::function<void(const Error & error, const Env & env)> debuggerHook;
+extern std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
 
 ref<EvalState> EvalCommand::getEvalState()
 {
@@ -105,7 +105,7 @@ ref<EvalState> EvalCommand::getEvalState()
     if (!evalState) {
         evalState = std::make_shared<EvalState>(searchPath, getStore());
         if (startReplOnEvalErrors)
-            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env) {
+            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env, const Expr & expr) {
                 printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
                 // printEnvPosChain(env);
                 printEnvBindings(env);
