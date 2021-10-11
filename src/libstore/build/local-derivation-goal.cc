@@ -948,7 +948,7 @@ void LocalDerivationGoal::startBuilder()
             FdSource source(builderOut.readSide.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
-            throw;
+            throw ex;
         }
         debug("sandbox setup: " + msg);
         msgs.push_back(std::move(msg));
