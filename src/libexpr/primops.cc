@@ -575,7 +575,7 @@ static Bindings::iterator getAttr(
             // Adding another trace for the function name to make it clear
             // which call received wrong arguments.
             e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
-            throw;
+            throw e;
         }
     }
 
