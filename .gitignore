@@ -35,6 +35,7 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/tests/libexpr-tests
 
 # /src/libstore/
 *.gen.*
