@@ -200,13 +200,13 @@ namespace {
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
+    notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
     for (auto & i : files)
         loadedFiles.push_back(i);
 
     reloadFiles();
-    if (!loadedFiles.empty()) std::cout << std::endl;
+    if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
@@ -481,9 +481,10 @@ bool NixRepl::processLine(string line)
     else if (command == ":t") {
         Value v;
         evalString(arg, v);
-        std::cout << showType(v) << std::endl;
+        logger->cout(showType(v));
+    }
 
-    } else if (command == ":u") {
+    else if (command == ":u") {
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
@@ -500,17 +501,11 @@ bool NixRepl::processLine(string line)
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b") {
-            /* We could do the build in this process using buildPaths(),
-               but doing it in a child makes it easier to recover from
-               problems / SIGINT. */
-            try {
-                runNix("nix", {"build", "--no-link", drvPathRaw});
-                auto drv = state->store->readDerivation(drvPath);
-                std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputsAndOptPaths(*state->store))
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
-            } catch (ExecError &) {
-            }
+            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            auto drv = state->store->readDerivation(drvPath);
+            logger->cout("\nThis derivation produced the following outputs:");
+            for (auto & i : drv.outputsAndOptPaths(*state->store))
+                logger->cout("  %s -> %s", i.first, state->store->printStorePath(*i.second.second));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
         } else {
@@ -543,9 +538,9 @@ bool NixRepl::processLine(string line)
                     + concatStringsSep(" ", args) + "\n\n";
             }
 
-            markdown += trim(stripIndentation(doc->doc));
+            markdown += stripIndentation(doc->doc);
 
-            std::cout << renderMarkdownToTerminal(markdown);
+            logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
     }
@@ -628,9 +623,9 @@ void NixRepl::reloadFiles()
 
     bool first = true;
     for (auto & i : old) {
-        if (!first) std::cout << std::endl;
+        if (!first) notice("");
         first = false;
-        std::cout << format("Loading '%1%'...") % i << std::endl;
+        notice("Loading '%1%'...", i);
         loadFile(i);
     }
 }
@@ -641,7 +636,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
         addVarToScope(i.name, *i.value);
-    std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
+    notice("Added %1% variables.", attrs.attrs->size());
 }
 
 
