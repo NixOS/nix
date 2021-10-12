@@ -725,16 +725,8 @@ ref<FileTransfer> getFileTransfer()
 {
     static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
 
-    // this has to be done in its own scope to make sure that the lock is released
-    // before creating a new fileTransfer instance.
-    auto needsRecreation = [&]() -> bool {
-        auto state = fileTransfer->state_.lock();
-        return state->quit;
-    };
-
-    if (needsRecreation()) {
+    if (fileTransfer->state_.lock()->quit)
         fileTransfer = makeCurlFileTransfer();
-    }
 
     return fileTransfer;
 }
