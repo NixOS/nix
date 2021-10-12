@@ -1,4 +1,3 @@
-#include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "derivation-goal.hh"
