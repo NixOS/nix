@@ -498,17 +498,11 @@ bool NixRepl::processLine(string line)
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b") {
-            /* We could do the build in this process using buildPaths(),
-               but doing it in a child makes it easier to recover from
-               problems / SIGINT. */
-            try {
-                runNix("nix", {"build", "--no-link", drvPathRaw});
-                auto drv = state->store->readDerivation(drvPath);
-                std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputsAndOptPaths(*state->store))
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
-            } catch (ExecError &) {
-            }
+            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            auto drv = state->store->readDerivation(drvPath);
+            logger->cout("\nThis derivation produced the following outputs:");
+            for (auto & i : drv.outputsAndOptPaths(*state->store))
+                logger->cout("  %s -> %s", i.first, state->store->printStorePath(*i.second.second));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
         } else {
