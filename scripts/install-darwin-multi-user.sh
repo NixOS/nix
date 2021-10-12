@@ -78,7 +78,7 @@ poly_service_installed_check() {
 poly_service_uninstall_directions() {
     echo "$1. Remove macOS-specific components:"
     if should_create_volume && test_nix_volume_mountd_installed; then
-        darwin_volume_uninstall_directions
+        nix_volume_mountd_uninstall_directions
     fi
     if test_nix_daemon_installed; then
         nix_daemon_uninstall_directions
