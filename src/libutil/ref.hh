@@ -17,7 +17,7 @@ private:
 
 public:
 
-    ref<T>(const ref<T> & r)
+    ref(const ref<T> & r)
         : p(r.p)
     { }
 
