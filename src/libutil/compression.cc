@@ -67,17 +67,16 @@ struct ArchiveCompressionSink : CompressionSink
     Sink & nextSink;
     struct archive * archive;
 
-    ArchiveCompressionSink(Sink & nextSink, std::string format, bool parallel, int _level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink) {
+    ArchiveCompressionSink(Sink & nextSink, std::string format, bool parallel, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink)
+    {
         archive = archive_write_new();
         if (!archive) throw Error("failed to initialize libarchive");
         check(archive_write_add_filter_by_name(archive, format.c_str()), "couldn't initialize compression (%s)");
         check(archive_write_set_format_raw(archive));
-        if (parallel) {
+        if (parallel)
             check(archive_write_set_filter_option(archive, format.c_str(), "threads", "0"));
-        }
-        if (_level != COMPRESSION_LEVEL_DEFAULT){
-            check(archive_write_set_filter_option(archive, format.c_str(), "compression-level", std::to_string(_level).c_str()));
-        }
+        if (level != COMPRESSION_LEVEL_DEFAULT)
+            check(archive_write_set_filter_option(archive, format.c_str(), "compression-level", std::to_string(level).c_str()));
         // disable internal buffering
         check(archive_write_set_bytes_per_block(archive, 0));
         // disable output padding
@@ -131,9 +130,10 @@ private:
 struct NoneSink : CompressionSink
 {
     Sink & nextSink;
-    NoneSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink) {
+    NoneSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink)
+    {
         if (level != COMPRESSION_LEVEL_DEFAULT)
-            printError("Warning: requested compression level '%d' not supported by compression method 'none'", level);
+            warn("requested compression level '%d' not supported by compression method 'none'", level);
     }
     void finish() override { flush(); }
     void write(std::string_view data) override { nextSink(data); }
