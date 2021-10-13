@@ -29,6 +29,7 @@ R""(
 * Run a particular build phase directly:
 
   ```console
+  # nix develop --unpack
   # nix develop --configure
   # nix develop --build
   # nix develop --check
