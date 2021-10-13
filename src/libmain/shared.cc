@@ -15,9 +15,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#include <gnu/lib-names.h>
+#include <nss.h>
+#include <dlfcn.h>
 
 #include <openssl/crypto.h>
 
@@ -121,21 +121,8 @@ static void preloadNSS() {
        been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
        load its lookup libraries in the parent before any child gets a chance to. */
     std::call_once(dns_resolve_flag, []() {
-        struct addrinfo *res = NULL;
-
-        /* nss will only force the "local" (not through nscd) dns resolution if its on the LOCALDOMAIN.
-           We need the resolution to be done locally, as nscd socket will not be accessible in the
-           sandbox. */
-        char * previous_env = getenv("LOCALDOMAIN");
-        setenv("LOCALDOMAIN", "invalid", 1);
-        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) == 0) {
-            if (res) freeaddrinfo(res);
-        }
-        if (previous_env) {
-             setenv("LOCALDOMAIN", previous_env, 1);
-        } else {
-             unsetenv("LOCALDOMAIN");
-        }
+        dlopen (LIBNSS_DNS_SO, RTLD_NOW);
+        __nss_configure_lookup ("hosts", "dns");
     });
 }
 
