@@ -523,6 +523,17 @@ std::optional<typename T::value_type> remove_begin(T & c)
 }
 
 
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> pop(T & c)
+{
+    if (c.empty()) return {};
+    auto v = std::move(c.front());
+    c.pop();
+    return v;
+}
+
+
 template<typename T>
 class Callback;
 

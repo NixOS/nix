@@ -240,11 +240,6 @@ private:
 
     struct GCState;
 
-    bool canReachRoot(
-        GCState & state,
-        StorePathSet & visited,
-        const StorePath & path);
-
     void deleteFromStore(GCState & state, std::string_view baseName);
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);

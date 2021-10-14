@@ -499,75 +499,6 @@ void LocalStore::deleteFromStore(GCState & state, std::string_view baseName)
 }
 
 
-bool LocalStore::canReachRoot(
-    GCState & state,
-    StorePathSet & visited,
-    const StorePath & path)
-{
-    checkInterrupt();
-
-    //Activity act(*logger, lvlDebug, format("considering whether to delete '%1%'") % path);
-
-    if (state.options.action == GCOptions::gcDeleteSpecific
-        && !state.options.pathsToDelete.count(path))
-        return true;
-
-    if (!visited.insert(path).second) return false;
-
-    if (state.alive.count(path)) return true;
-
-    if (state.dead.count(path)) return false;
-
-    if (state.roots.count(path)) {
-        debug("cannot delete '%s' because it's a root", printStorePath(path));
-        state.alive.insert(path);
-        return true;
-    }
-
-    if (isValidPath(path)) {
-        StorePathSet incoming;
-
-        /* Don't delete this path if any of its referrers are alive. */
-        queryReferrers(path, incoming);
-
-        /* If keep-derivations is set and this is a derivation, then
-           don't delete the derivation if any of the outputs are
-           alive. */
-        if (state.gcKeepDerivations && path.isDerivation()) {
-            for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(path))
-                if (maybeOutPath &&
-                    isValidPath(*maybeOutPath) &&
-                    queryPathInfo(*maybeOutPath)->deriver == path)
-                    incoming.insert(*maybeOutPath);
-        }
-
-        /* If keep-outputs is set, then don't delete this path if
-           there are derivers of this path that are not garbage. */
-        if (state.gcKeepOutputs) {
-            auto derivers = queryValidDerivers(path);
-            for (auto & i : derivers)
-                incoming.insert(i);
-        }
-
-        for (auto & i : incoming)
-            if (i != path && canReachRoot(state, visited, i)) {
-                state.alive.insert(path);
-                return true;
-            }
-    }
-
-    {
-        auto hashPart = std::string(path.hashPart());
-        auto shared(state.shared.lock());
-        if (shared->tempRoots.count(hashPart))
-            return true;
-        shared->pending = hashPart;
-    }
-
-    return false;
-}
-
-
 /* Unlink all files in /nix/store/.links that have a link count of 1,
    which indicates that there are no other links and so they can be
    safely deleted.  FIXME: race condition with optimisePath(): we
@@ -746,28 +677,115 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         state.roots.insert(root.first);
     }
 
-    /* Now either delete all garbage paths, or just the specified
-       paths (for gcDeleteSpecific). */
+    /* Helper function that visits all paths reachable from `start`
+       via the referrers edges and optionally derivers and derivation
+       output edges. If any of those paths is a root, then we cannot
+       delete this path. */
+    auto deleteReferrersClosure = [&](const StorePath & start) {
+        StorePathSet visited;
+        std::queue<StorePath> todo;
 
+        /* Wake up any GC client waiting for deletion of the paths in
+           'visited' to finish. */
+        Finally releasePending([&]() {
+            auto shared(state.shared.lock());
+            shared->pending.reset();
+            state.wakeup.notify_all();
+        });
+
+        auto enqueue = [&](const StorePath & path) {
+            if (visited.insert(path).second)
+                todo.push(path);
+        };
+
+        enqueue(start);
+
+        while (auto path = pop(todo)) {
+            checkInterrupt();
+
+            /* Bail out if we've previously discovered that this path
+               is alive. */
+            if (state.alive.count(*path)) {
+                state.alive.insert(start);
+                return;
+            }
+
+            /* If we've previously deleted this path, we don't have to
+               handle it again. */
+            if (state.dead.count(*path)) continue;
+
+            /* If this is a root, bail out. */
+            if (state.roots.count(*path)) {
+                debug("cannot delete '%s' because it's a root", printStorePath(*path));
+                state.alive.insert(*path);
+                state.alive.insert(start);
+                return;
+            }
+
+            if (state.options.action == GCOptions::gcDeleteSpecific
+                && !state.options.pathsToDelete.count(*path))
+                return;
+
+            {
+                auto hashPart = std::string(path->hashPart());
+                auto shared(state.shared.lock());
+                if (shared->tempRoots.count(hashPart)) {
+                    debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
+                    state.alive.insert(*path);
+                    state.alive.insert(start);
+                    return;
+                }
+                shared->pending = hashPart;
+            }
+
+            if (isValidPath(*path)) {
+
+                /* Visit the referrers of this path. */
+                StorePathSet referrers;
+                queryReferrers(*path, referrers);
+                for (auto & p : referrers)
+                    enqueue(p);
+
+                /* If keep-derivations is set and this is a
+                   derivation, then visit the derivation outputs. */
+                if (state.gcKeepDerivations && path->isDerivation()) {
+                    for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(*path))
+                        if (maybeOutPath &&
+                            isValidPath(*maybeOutPath) &&
+                            queryPathInfo(*maybeOutPath)->deriver == *path)
+                            enqueue(*maybeOutPath);
+                }
+
+                /* If keep-outputs is set, then visit the derivers. */
+                if (state.gcKeepOutputs) {
+                    auto derivers = queryValidDerivers(*path);
+                    for (auto & i : derivers)
+                        enqueue(i);
+                }
+            }
+        }
+
+        for (auto & path : topoSortPaths(visited)) {
+            if (!state.dead.insert(path).second) continue;
+            if (state.shouldDelete) {
+                invalidatePathChecked(path);
+                deleteFromStore(state, path.to_string());
+            }
+        }
+    };
+
+    /* Either delete all garbage paths, or just the specified
+       paths (for gcDeleteSpecific). */
     if (options.action == GCOptions::gcDeleteSpecific) {
 
         for (auto & i : options.pathsToDelete) {
-            StorePathSet visited;
-
-            if (canReachRoot(state, visited, i))
+            deleteReferrersClosure(i);
+            if (!state.dead.count(i))
                 throw Error(
-                    "cannot delete path '%1%' since it is still alive. "
+                    "Cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
                     "nix-store --query --roots",
                     printStorePath(i));
-
-            auto sorted = topoSortPaths(visited);
-            for (auto & path : sorted) {
-                if (state.dead.count(path)) continue;
-                invalidatePathChecked(path);
-                deleteFromStore(state, path.to_string());
-                state.dead.insert(path);
-            }
         }
 
     } else if (options.maxFreed > 0) {
@@ -792,29 +810,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 string name = dirent->d_name;
                 if (name == "." || name == ".." || name == linksName) continue;
 
-                if (auto storePath = maybeParseStorePath(storeDir + "/" + name)) {
-                    StorePathSet visited;
-
-                    /* Wake up any GC client waiting for deletion of
-                       the paths in 'visited' to finish. */
-                    Finally releasePending([&]() {
-                        auto shared(state.shared.lock());
-                        shared->pending.reset();
-                        state.wakeup.notify_all();
-                    });
-
-                    if (!canReachRoot(state, visited, *storePath)) {
-                        auto sorted = topoSortPaths(visited);
-                        for (auto & path : sorted) {
-                            if (state.dead.count(path)) continue;
-                            if (state.shouldDelete) {
-                                invalidatePathChecked(path);
-                                deleteFromStore(state, path.to_string());
-                            }
-                            state.dead.insert(path);
-                        }
-                    }
-                } else
+                if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
+                    deleteReferrersClosure(*storePath);
+                else
                     deleteFromStore(state, name);
 
             }
