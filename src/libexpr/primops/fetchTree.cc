@@ -22,7 +22,7 @@ void emitTreeAttrs(
 {
     assert(input.isLocked());
 
-    auto attrs = state.buildBindings(8);
+    auto attrs = state.buildBindings(10);
 
 
     state.mkStorePathString(tree.storePath, attrs.alloc(state.sOutPath));
@@ -54,6 +54,11 @@ void emitTreeAttrs(
         else if (emptyRevFallback)
             attrs.alloc("revCount").mkInt(0);
 
+    }
+
+    if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
+        attrs.alloc("dirtyRev").mkString(*dirtyRev);
+        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"));
     }
 
     if (auto lastModified = input.getLastModified()) {
