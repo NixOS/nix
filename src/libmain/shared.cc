@@ -15,9 +15,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#include <features.h>
+#ifdef __GLIBC__
 #include <gnu/lib-names.h>
 #include <nss.h>
 #include <dlfcn.h>
+#endif
 
 #include <openssl/crypto.h>
 
@@ -121,8 +124,10 @@ static void preloadNSS() {
        been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
        load its lookup libraries in the parent before any child gets a chance to. */
     std::call_once(dns_resolve_flag, []() {
+#ifdef __GLIBC__
         dlopen (LIBNSS_DNS_SO, RTLD_NOW);
         __nss_configure_lookup ("hosts", "dns");
+#endif
     });
 }
 
