@@ -232,7 +232,6 @@ protected:
 
     struct State
     {
-        // FIXME: fix key
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 

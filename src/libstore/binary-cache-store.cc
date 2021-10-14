@@ -111,15 +111,15 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    std::string hashPart(narInfo->path.hashPart());
-
     {
         auto state_(state.lock());
-        state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
+        state_->pathInfoCache.upsert(
+            std::string(narInfo->path.to_string()),
+            PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
     }
 
     if (diskCache)
-        diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
+        diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
 }
 
 AutoCloseFD openFile(const Path & path)

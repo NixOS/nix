@@ -414,11 +414,9 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 
 bool Store::isValidPath(const StorePath & storePath)
 {
-    std::string hashPart(storePath.hashPart());
-
     {
         auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(hashPart);
+        auto res = state_->pathInfoCache.get(std::string(storePath.to_string()));
         if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
             return res->didExist();
@@ -426,11 +424,11 @@ bool Store::isValidPath(const StorePath & storePath)
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
+        auto res = diskCache->lookupNarInfo(getUri(), std::string(storePath.hashPart()));
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             auto state_(state.lock());
-            state_->pathInfoCache.upsert(hashPart,
+            state_->pathInfoCache.upsert(std::string(storePath.to_string()),
                 res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue { .value = res.second });
             return res.first == NarInfoDiskCache::oValid;
         }
@@ -440,7 +438,7 @@ bool Store::isValidPath(const StorePath & storePath)
 
     if (diskCache && !valid)
         // FIXME: handle valid = true case.
-        diskCache->upsertNarInfo(getUri(), hashPart, 0);
+        diskCache->upsertNarInfo(getUri(), std::string(storePath.hashPart()), 0);
 
     return valid;
 }
@@ -487,13 +485,11 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
 void Store::queryPathInfo(const StorePath & storePath,
     Callback<ref<const ValidPathInfo>> callback) noexcept
 {
-    std::string hashPart;
+    auto hashPart = std::string(storePath.hashPart());
 
     try {
-        hashPart = storePath.hashPart();
-
         {
-            auto res = state.lock()->pathInfoCache.get(hashPart);
+            auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
             if (res && res->isKnownNow()) {
                 stats.narInfoReadAverted++;
                 if (!res->didExist())
@@ -508,7 +504,7 @@ void Store::queryPathInfo(const StorePath & storePath,
                 stats.narInfoReadAverted++;
                 {
                     auto state_(state.lock());
-                    state_->pathInfoCache.upsert(hashPart,
+                    state_->pathInfoCache.upsert(std::string(storePath.to_string()),
                         res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
                     if (res.first == NarInfoDiskCache::oInvalid ||
                         !goodStorePath(storePath, res.second->path))
@@ -523,7 +519,7 @@ void Store::queryPathInfo(const StorePath & storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     queryPathInfoUncached(storePath,
-        {[this, storePathS{printStorePath(storePath)}, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+        {[this, storePath, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
 
             try {
                 auto info = fut.get();
@@ -533,14 +529,12 @@ void Store::queryPathInfo(const StorePath & storePath,
 
                 {
                     auto state_(state.lock());
-                    state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = info });
+                    state_->pathInfoCache.upsert(std::string(storePath.to_string()), PathInfoCacheValue { .value = info });
                 }
-
-                auto storePath = parseStorePath(storePathS);
 
                 if (!info || !goodStorePath(storePath, info->path)) {
                     stats.narInfoMissing++;
-                    throw InvalidPath("path '%s' is not valid", storePathS);
+                    throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
                 }
 
                 (*callbackPtr)(ref<const ValidPathInfo>(info));

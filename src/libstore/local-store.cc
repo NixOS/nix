@@ -834,7 +834,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(std::string(info.path.hashPart()),
+        state_->pathInfoCache.upsert(std::string(info.path.to_string()),
             PathInfoCacheValue{ .value = std::make_shared<const ValidPathInfo>(info) });
     }
 
@@ -1207,7 +1207,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.erase(std::string(path.hashPart()));
+        state_->pathInfoCache.erase(std::string(path.to_string()));
     }
 }
 
