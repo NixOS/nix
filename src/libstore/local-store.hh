@@ -240,8 +240,6 @@ private:
 
     struct GCState;
 
-    void deleteFromStore(GCState & state, std::string_view baseName);
-
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);

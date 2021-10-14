@@ -479,26 +479,6 @@ struct LocalStore::GCState
 };
 
 
-void LocalStore::deleteFromStore(GCState & state, std::string_view baseName)
-{
-    Path path = storeDir + "/" + std::string(baseName);
-    Path realPath = realStoreDir + "/" + std::string(baseName);
-
-    printInfo("deleting '%1%'", path);
-
-    state.results.paths.insert(path);
-
-    uint64_t bytesFreed;
-    deletePath(realPath, bytesFreed);
-    state.results.bytesFreed += bytesFreed;
-
-    if (state.results.bytesFreed > state.options.maxFreed) {
-        printInfo("deleted more than %d bytes; stopping", state.options.maxFreed);
-        throw GCLimitReached();
-    }
-}
-
-
 /* Unlink all files in /nix/store/.links that have a link count of 1,
    which indicates that there are no other links and so they can be
    safely deleted.  FIXME: race condition with optimisePath(): we
@@ -677,10 +657,31 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         state.roots.insert(root.first);
     }
 
+    /* Helper function that deletes a path from the store and throws
+       GCLimitReached if we've deleted enough garbage. */
+    auto deleteFromStore = [&](std::string_view baseName)
+    {
+        Path path = storeDir + "/" + std::string(baseName);
+        Path realPath = realStoreDir + "/" + std::string(baseName);
+
+        printInfo("deleting '%1%'", path);
+
+        state.results.paths.insert(path);
+
+        uint64_t bytesFreed;
+        deletePath(realPath, bytesFreed);
+        state.results.bytesFreed += bytesFreed;
+
+        if (state.results.bytesFreed > state.options.maxFreed) {
+            printInfo("deleted more than %d bytes; stopping", state.options.maxFreed);
+            throw GCLimitReached();
+        }
+    };
+
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation
-       output edges. If any of those paths is a root, then we cannot
-       delete this path. */
+       output edges. If none of those paths are roots, then all
+       visited paths are garbage and are deleted. */
     auto deleteReferrersClosure = [&](const StorePath & start) {
         StorePathSet visited;
         std::queue<StorePath> todo;
@@ -769,7 +770,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (!state.dead.insert(path).second) continue;
             if (state.shouldDelete) {
                 invalidatePathChecked(path);
-                deleteFromStore(state, path.to_string());
+                deleteFromStore(path.to_string());
             }
         }
     };
@@ -813,7 +814,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                     deleteReferrersClosure(*storePath);
                 else
-                    deleteFromStore(state, name);
+                    deleteFromStore(name);
 
             }
         } catch (GCLimitReached & e) {
