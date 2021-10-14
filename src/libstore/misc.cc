@@ -239,12 +239,11 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
     return topoSort(paths,
         {[&](const StorePath & path) {
-            StorePathSet references;
             try {
-                references = queryPathInfo(path)->references;
+                return queryPathInfo(path)->references;
             } catch (InvalidPath &) {
+                return StorePathSet();
             }
-            return references;
         }},
         {[&](const StorePath & path, const StorePath & parent) {
             return BuildError(
