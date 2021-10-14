@@ -448,16 +448,13 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 struct GCLimitReached { };
 
 
-struct LocalStore::GCState
+void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    const GCOptions & options;
-    GCResults & results;
-    StorePathSet roots;
-    StorePathSet dead;
-    StorePathSet alive;
-    bool gcKeepOutputs;
-    bool gcKeepDerivations;
-    bool shouldDelete;
+    bool shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
+    bool gcKeepOutputs = settings.gcKeepOutputs;
+    bool gcKeepDerivations = settings.gcKeepDerivations;
+
+    StorePathSet roots, dead, alive;
 
     struct Shared
     {
@@ -470,81 +467,23 @@ struct LocalStore::GCState
         std::optional<std::string> pending;
     };
 
-    Sync<Shared> shared;
+    Sync<Shared> _shared;
 
     std::condition_variable wakeup;
-
-    GCState(const GCOptions & options, GCResults & results)
-        : options(options), results(results) { }
-};
-
-
-/* Unlink all files in /nix/store/.links that have a link count of 1,
-   which indicates that there are no other links and so they can be
-   safely deleted.  FIXME: race condition with optimisePath(): we
-   might see a link count of 1 just before optimisePath() increases
-   the link count. */
-void LocalStore::removeUnusedLinks(const GCState & state)
-{
-    AutoCloseDir dir(opendir(linksDir.c_str()));
-    if (!dir) throw SysError("opening directory '%1%'", linksDir);
-
-    int64_t actualSize = 0, unsharedSize = 0;
-
-    struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir.get())) {
-        checkInterrupt();
-        string name = dirent->d_name;
-        if (name == "." || name == "..") continue;
-        Path path = linksDir + "/" + name;
-
-        auto st = lstat(path);
-
-        if (st.st_nlink != 1) {
-            actualSize += st.st_size;
-            unsharedSize += (st.st_nlink - 1) * st.st_size;
-            continue;
-        }
-
-        printMsg(lvlTalkative, format("deleting unused link '%1%'") % path);
-
-        if (unlink(path.c_str()) == -1)
-            throw SysError("deleting '%1%'", path);
-
-        state.results.bytesFreed += st.st_size;
-    }
-
-    struct stat st;
-    if (stat(linksDir.c_str(), &st) == -1)
-        throw SysError("statting '%1%'", linksDir);
-    int64_t overhead = st.st_blocks * 512ULL;
-
-    printInfo("note: currently hard linking saves %.2f MiB",
-        ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
-}
-
-
-void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
-{
-    GCState state(options, results);
-    state.gcKeepOutputs = settings.gcKeepOutputs;
-    state.gcKeepDerivations = settings.gcKeepDerivations;
 
     /* Using `--ignore-liveness' with `--delete' can have unintended
        consequences if `keep-outputs' or `keep-derivations' are true
        (the garbage collector will recurse into deleting the outputs
        or derivers, respectively).  So disable them. */
     if (options.action == GCOptions::gcDeleteSpecific && options.ignoreLiveness) {
-        state.gcKeepOutputs = false;
-        state.gcKeepDerivations = false;
+        gcKeepOutputs = false;
+        gcKeepDerivations = false;
     }
 
-    state.shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
-
-    if (state.shouldDelete)
+    if (shouldDelete)
         deletePath(reservedPath);
 
-    /* Acquire the global GC root. Note: we don't use state->fdGCLock
+    /* Acquire the global GC root. Note: we don't use fdGCLock
        here because then in auto-gc mode, another thread could
        downgrade our exclusive lock. */
     auto fdGCLock = openGCLock();
@@ -607,7 +546,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             if (storePath) {
                                 debug("got new GC root '%s'", path);
                                 auto hashPart = std::string(storePath->hashPart());
-                                auto shared(state.shared.lock());
+                                auto shared(_shared.lock());
                                 shared->tempRoots.insert(hashPart);
                                 /* If this path is currently being
                                    deleted, then we have to wait until
@@ -619,7 +558,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                                    poll loop. */
                                 while (shared->pending == hashPart) {
                                     debug("synchronising with deletion of path '%s'", path);
-                                    shared.wait(state.wakeup);
+                                    shared.wait(wakeup);
                                 }
                             } else
                                 printError("received garbage instead of a root from client");
@@ -635,7 +574,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     Finally stopServer([&]() {
         writeFull(shutdownPipe.writeSide.get(), "x", false);
-        state.wakeup.notify_all();
+        wakeup.notify_all();
         if (serverThread.joinable()) serverThread.join();
     });
 
@@ -646,15 +585,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (!options.ignoreLiveness)
         findRootsNoTemp(rootMap, true);
 
-    for (auto & i : rootMap) state.roots.insert(i.first);
+    for (auto & i : rootMap) roots.insert(i.first);
 
     /* Read the temporary roots created before we acquired the global
        GC root. Any new roots will be sent to our socket. */
     Roots tempRoots;
     findTempRoots(tempRoots, true);
     for (auto & root : tempRoots) {
-        state.shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
-        state.roots.insert(root.first);
+        _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
+        roots.insert(root.first);
     }
 
     /* Helper function that deletes a path from the store and throws
@@ -666,14 +605,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         printInfo("deleting '%1%'", path);
 
-        state.results.paths.insert(path);
+        results.paths.insert(path);
 
         uint64_t bytesFreed;
         deletePath(realPath, bytesFreed);
-        state.results.bytesFreed += bytesFreed;
+        results.bytesFreed += bytesFreed;
 
-        if (state.results.bytesFreed > state.options.maxFreed) {
-            printInfo("deleted more than %d bytes; stopping", state.options.maxFreed);
+        if (results.bytesFreed > options.maxFreed) {
+            printInfo("deleted more than %d bytes; stopping", options.maxFreed);
             throw GCLimitReached();
         }
     };
@@ -689,9 +628,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         /* Wake up any GC client waiting for deletion of the paths in
            'visited' to finish. */
         Finally releasePending([&]() {
-            auto shared(state.shared.lock());
+            auto shared(_shared.lock());
             shared->pending.reset();
-            state.wakeup.notify_all();
+            wakeup.notify_all();
         });
 
         auto enqueue = [&](const StorePath & path) {
@@ -706,34 +645,34 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             /* Bail out if we've previously discovered that this path
                is alive. */
-            if (state.alive.count(*path)) {
-                state.alive.insert(start);
+            if (alive.count(*path)) {
+                alive.insert(start);
                 return;
             }
 
             /* If we've previously deleted this path, we don't have to
                handle it again. */
-            if (state.dead.count(*path)) continue;
+            if (dead.count(*path)) continue;
 
             /* If this is a root, bail out. */
-            if (state.roots.count(*path)) {
+            if (roots.count(*path)) {
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
-                state.alive.insert(*path);
-                state.alive.insert(start);
+                alive.insert(*path);
+                alive.insert(start);
                 return;
             }
 
-            if (state.options.action == GCOptions::gcDeleteSpecific
-                && !state.options.pathsToDelete.count(*path))
+            if (options.action == GCOptions::gcDeleteSpecific
+                && !options.pathsToDelete.count(*path))
                 return;
 
             {
                 auto hashPart = std::string(path->hashPart());
-                auto shared(state.shared.lock());
+                auto shared(_shared.lock());
                 if (shared->tempRoots.count(hashPart)) {
                     debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
-                    state.alive.insert(*path);
-                    state.alive.insert(start);
+                    alive.insert(*path);
+                    alive.insert(start);
                     return;
                 }
                 shared->pending = hashPart;
@@ -749,7 +688,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
                 /* If keep-derivations is set and this is a
                    derivation, then visit the derivation outputs. */
-                if (state.gcKeepDerivations && path->isDerivation()) {
+                if (gcKeepDerivations && path->isDerivation()) {
                     for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(*path))
                         if (maybeOutPath &&
                             isValidPath(*maybeOutPath) &&
@@ -758,7 +697,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 }
 
                 /* If keep-outputs is set, then visit the derivers. */
-                if (state.gcKeepOutputs) {
+                if (gcKeepOutputs) {
                     auto derivers = queryValidDerivers(*path);
                     for (auto & i : derivers)
                         enqueue(i);
@@ -767,8 +706,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
 
         for (auto & path : topoSortPaths(visited)) {
-            if (!state.dead.insert(path).second) continue;
-            if (state.shouldDelete) {
+            if (!dead.insert(path).second) continue;
+            if (shouldDelete) {
                 invalidatePathChecked(path);
                 deleteFromStore(path.to_string());
             }
@@ -781,7 +720,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         for (auto & i : options.pathsToDelete) {
             deleteReferrersClosure(i);
-            if (!state.dead.count(i))
+            if (!dead.count(i))
                 throw Error(
                     "Cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
@@ -791,7 +730,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     } else if (options.maxFreed > 0) {
 
-        if (state.shouldDelete)
+        if (shouldDelete)
             printInfo("deleting garbage...");
         else
             printInfo("determining live/dead paths...");
@@ -821,22 +760,61 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     }
 
-    if (state.options.action == GCOptions::gcReturnLive) {
-        for (auto & i : state.alive)
-            state.results.paths.insert(printStorePath(i));
+    if (options.action == GCOptions::gcReturnLive) {
+        for (auto & i : alive)
+            results.paths.insert(printStorePath(i));
         return;
     }
 
-    if (state.options.action == GCOptions::gcReturnDead) {
-        for (auto & i : state.dead)
-            state.results.paths.insert(printStorePath(i));
+    if (options.action == GCOptions::gcReturnDead) {
+        for (auto & i : dead)
+            results.paths.insert(printStorePath(i));
         return;
     }
 
-    /* Clean up the links directory. */
+    /* Unlink all files in /nix/store/.links that have a link count of 1,
+       which indicates that there are no other links and so they can be
+       safely deleted.  FIXME: race condition with optimisePath(): we
+       might see a link count of 1 just before optimisePath() increases
+       the link count. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
         printInfo("deleting unused links...");
-        removeUnusedLinks(state);
+
+        AutoCloseDir dir(opendir(linksDir.c_str()));
+        if (!dir) throw SysError("opening directory '%1%'", linksDir);
+
+        int64_t actualSize = 0, unsharedSize = 0;
+
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(dir.get())) {
+            checkInterrupt();
+            string name = dirent->d_name;
+            if (name == "." || name == "..") continue;
+            Path path = linksDir + "/" + name;
+
+            auto st = lstat(path);
+
+            if (st.st_nlink != 1) {
+                actualSize += st.st_size;
+                unsharedSize += (st.st_nlink - 1) * st.st_size;
+                continue;
+            }
+
+            printMsg(lvlTalkative, format("deleting unused link '%1%'") % path);
+
+            if (unlink(path.c_str()) == -1)
+                throw SysError("deleting '%1%'", path);
+
+            results.bytesFreed += st.st_size;
+        }
+
+        struct stat st;
+        if (stat(linksDir.c_str(), &st) == -1)
+            throw SysError("statting '%1%'", linksDir);
+        int64_t overhead = st.st_blocks * 512ULL;
+
+        printInfo("note: currently hard linking saves %.2f MiB",
+            ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
     }
 
     /* While we're at it, vacuum the database. */
