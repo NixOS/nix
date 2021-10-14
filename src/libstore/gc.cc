@@ -654,12 +654,22 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                handle it again. */
             if (dead.count(*path)) continue;
 
+            auto markAlive = [&]()
+            {
+                alive.insert(*path);
+                alive.insert(start);
+                try {
+                    StorePathSet closure;
+                    computeFSClosure(*path, closure);
+                    for (auto & p : closure)
+                        alive.insert(p);
+                } catch (InvalidPath &) { }
+            };
+
             /* If this is a root, bail out. */
             if (roots.count(*path)) {
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
-                alive.insert(*path);
-                alive.insert(start);
-                return;
+                return markAlive();
             }
 
             if (options.action == GCOptions::gcDeleteSpecific
@@ -671,9 +681,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 auto shared(_shared.lock());
                 if (shared->tempRoots.count(hashPart)) {
                     debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
-                    alive.insert(*path);
-                    alive.insert(start);
-                    return;
+                    return markAlive();
                 }
                 shared->pending = hashPart;
             }
