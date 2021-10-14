@@ -3,6 +3,7 @@
 #include "path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"
+#include "crypto.hh"
 
 namespace nix {
 
@@ -25,8 +26,28 @@ struct Realisation {
     DrvOutput id;
     StorePath outPath;
 
+    StringSet signatures;
+
+    /**
+     * The realisations that are required for the current one to be valid.
+     *
+     * When importing this realisation, the store will first check that all its
+     * dependencies exist, and map to the correct output path
+     */
+    std::map<DrvOutput, StorePath> dependentRealisations;
+
     nlohmann::json toJSON() const;
     static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
+
+    std::string fingerprint() const;
+    void sign(const SecretKey &);
+    bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
+    size_t checkSignatures(const PublicKeys & publicKeys) const;
+
+    static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
+    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation> & res);
+
+    bool isCompatibleWith(const Realisation & other) const;
 
     StorePath getPath() const { return outPath; }
 

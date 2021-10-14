@@ -249,7 +249,6 @@ connected:
         close(5);
 
         assert(sshStore);
-        auto sshStore2 = ref<Store>(sshStore);
 
         std::cerr << "# accept\n" << storeUri << "\n";
 
@@ -271,27 +270,35 @@ connected:
 
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
-        auto copyStorePathImpl = sshStore2->isTrusting ? copyStorePathAdapter : copyOrBuildStorePath;
+        auto copyStorePathImpl = sshStore->isTrusting ? copyStorePathAdapter : copyOrBuildStorePath;
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, sshStore2, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
+            copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
         }
 
         uploadLock = -1;
 
-        BasicDerivation drv = store->readDerivation(*drvPath);
+        auto drv = store->readDerivation(*drvPath);
 
         std::optional<BuildResult> optResult;
-        if (sshStore2->isTrusting || derivationIsCA(drv.type())) {
-            drv.inputSrcs = store->parseStorePathSet(inputs);
-            optResult = sshStore2->buildDerivation(*drvPath, drv);
+        if (sshStore->isTrusting || derivationIsCA(drv.type())) {
+            // Hijack the inputs paths of the derivation to include all the paths
+            // that come from the `inputDrvs` set.
+            // We don’t do that for the derivations whose `inputDrvs` is empty
+            // because
+            // 1. It’s not needed
+            // 2. Changing the `inputSrcs` set changes the associated output ids,
+            //  which break CA derivations
+            if (!drv.inputDrvs.empty())
+                drv.inputSrcs = store->parseStorePathSet(inputs);
+            optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
             if (!result.success())
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
         } else {
-            copyPaths(store, sshStore2, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
-            sshStore2->buildPaths({{*drvPath}});
+            copyPaths(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute, copyStorePathImpl);
+            sshStore->buildPaths({ DerivedPath::Built { *drvPath, {} } });
         }
 
 
@@ -327,7 +334,7 @@ connected:
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
             /* No `copyStorePathImpl` because we always trust ourselves. */
-            copyPaths(ref<Store>(sshStore), store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
+            copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
         }
         // XXX: Should be done as part of `copyPaths`
         for (auto & realisation : missingRealisations) {

@@ -2,9 +2,6 @@ source common.sh
 
 clearStore
 
-export IMPURE_VAR1=foo
-export IMPURE_VAR2=bar
-
 path=$(nix-store -q $(nix-instantiate fixed.nix -A good.0))
 
 echo 'testing bad...'
@@ -17,6 +14,11 @@ nix path-info --json $path | grep fixed:md5:2qk15sxzzjlnpjk9brn7j8ppcd
 
 echo 'testing good...'
 nix-build fixed.nix -A good --no-out-link
+
+if isDaemonNewer "2.4pre20210927"; then
+    echo 'testing --check...'
+    nix-build fixed.nix -A check --check && fail "should fail"
+fi
 
 echo 'testing good2...'
 nix-build fixed.nix -A good2 --no-out-link

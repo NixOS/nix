@@ -180,6 +180,7 @@ struct ExprOpHasAttr : Expr
 struct ExprAttrs : Expr
 {
     bool recursive;
+    Pos pos;
     struct AttrDef {
         bool inherited;
         Expr * e;
@@ -199,7 +200,8 @@ struct ExprAttrs : Expr
     };
     typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
-    ExprAttrs() : recursive(false) { };
+    ExprAttrs(const Pos &pos) : recursive(false), pos(pos) { };
+    ExprAttrs() : recursive(false), pos(noPos) { };
     COMMON_METHODS
 };
 
@@ -231,11 +233,10 @@ struct ExprLambda : Expr
     Pos pos;
     Symbol name;
     Symbol arg;
-    bool matchAttrs;
     Formals * formals;
     Expr * body;
-    ExprLambda(const Pos & pos, const Symbol & arg, bool matchAttrs, Formals * formals, Expr * body)
-        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
+    ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
+        : pos(pos), arg(arg), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
             throw ParseError({
@@ -245,6 +246,7 @@ struct ExprLambda : Expr
     };
     void setName(Symbol & name);
     string showNamePos() const;
+    inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };
 

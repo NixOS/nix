@@ -62,6 +62,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     fetchers::Attrs attrs;
     attrs.insert_or_assign("type", "hg");
     attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
+    attrs.insert_or_assign("name", name);
     if (ref) attrs.insert_or_assign("ref", *ref);
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
@@ -83,8 +84,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
     v.attrs->sort();
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(tree.actualPath);
+    state.allowPath(tree.storePath);
 }
 
 static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);

@@ -4,12 +4,20 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
+#include "pathlocks.hh"
 
 #include <sys/time.h>
+#include <sys/wait.h>
 
 using namespace std::string_literals;
 
 namespace nix::fetchers {
+
+// Explicit initial branch of our bare repo to suppress warnings from new version of git.
+// The value itself does not matter, since we always fetch a specific revision or branch.
+// It is set with `-c init.defaultBranch=` instead of `--initial-branch=` to stay compatible with
+// old version of git, which will ignore unrecognized `-c` options.
+const std::string gitInitialBranch = "__nix_dummy_branch";
 
 static std::string readHead(const Path & path)
 {
@@ -59,7 +67,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -153,20 +161,22 @@ struct GitInputScheme : InputScheme
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
     {
-        // Don't clone file:// URIs (but otherwise treat them the
-        // same as remote URIs, i.e. don't use the working tree or
-        // HEAD).
+        // file:// URIs are normally not cloned (but otherwise treated the
+        // same as remote URIs, i.e. we don't use the working tree or
+        // HEAD). Exception: If _NIX_FORCE_HTTP is set, or the repo is a bare git
+        // repo, treat as a remote URI to force a clone.
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        bool isLocal = url.scheme == "file" && !forceHttp;
+        bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
+        bool isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
         return {isLocal, isLocal ? url.path : url.base};
     }
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        auto name = "source";
-
         Input input(_input);
+
+        std::string name = input.getName();
 
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
         bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
@@ -267,7 +277,7 @@ struct GitInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
@@ -314,10 +324,16 @@ struct GitInputScheme : InputScheme
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
 
+            Path cacheDirLock = cacheDir + ".lock";
+            createDirs(dirOf(cacheDir));
+            AutoCloseFD lock = openLockFile(cacheDirLock, true);
+            lockFile(lock.get(), ltWrite, true);
+
             if (!pathExists(cacheDir)) {
-                createDirs(dirOf(cacheDir));
-                runProgram("git", true, { "init", "--bare", repoDir });
+                runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
             }
+
+            deleteLockFile(cacheDirLock, lock.get());
 
             Path localRefFile =
                 input.getRef()->compare(0, 5, "refs/") == 0
@@ -363,7 +379,9 @@ struct GitInputScheme : InputScheme
                         ? "refs/*"
                         : ref->compare(0, 5, "refs/") == 0
                             ? *ref
-                            : "refs/heads/" + *ref;
+                            : ref == "HEAD"
+                                ? *ref
+                                : "refs/heads/" + *ref;
                     runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
@@ -401,17 +419,14 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        RunOptions checkCommitOpts(
-            "git",
-            { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() }
-        );
-        checkCommitOpts.searchPath = true;
-        checkCommitOpts.mergeStderrToStdout = true;
-
-        auto result = runProgram(checkCommitOpts);
+        auto result = runProgram(RunOptions {
+            .program = "git",
+            .args = { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() },
+            .mergeStderrToStdout = true
+        });
         if (WEXITSTATUS(result.first) == 128
-            && result.second.find("bad file") != std::string::npos
-        ) {
+            && result.second.find("bad file") != std::string::npos)
+        {
             throw Error(
                 "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
                     "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
@@ -427,7 +442,7 @@ struct GitInputScheme : InputScheme
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
-            runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
             // TODO: repoDir might lack the ref (it only checks if rev
             // exists, see FIXME above) so use a big hammer and fetch
             // everything to ensure we get the rev.
@@ -443,9 +458,11 @@ struct GitInputScheme : InputScheme
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getRev()->gitRev() });
-                gitOptions.standardOut = &sink;
-                runProgram2(gitOptions);
+                runProgram2({
+                    .program = "git",
+                    .args = { "-C", repoDir, "archive", input.getRev()->gitRev() },
+                    .standardOut = &sink
+                });
             });
 
             unpackTarfile(*source, tmpDir);

@@ -156,9 +156,6 @@ static void daemonLoop()
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    //  Get rid of children automatically; don't let them become zombies.
-    setSigChldAction(true);
-
     AutoCloseFD fdSocket;
 
     //  Handle socket-based activation by systemd.
@@ -175,6 +172,9 @@ static void daemonLoop()
         createDirs(dirOf(settings.nixDaemonSocketFile));
         fdSocket = createUnixDomainSocket(settings.nixDaemonSocketFile, 0666);
     }
+
+    //  Get rid of children automatically; don't let them become zombies.
+    setSigChldAction(true);
 
     //  Loop accepting connections.
     while (1) {

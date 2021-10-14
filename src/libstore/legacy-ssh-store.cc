@@ -3,6 +3,7 @@
 #include "remote-store.hh"
 #include "serve-protocol.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "worker-protocol.hh"
 #include "ssh.hh"
 #include "derivations.hh"
@@ -15,6 +16,7 @@ struct LegacySSHStoreConfig : virtual StoreConfig
     using StoreConfig::StoreConfig;
     const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
     const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
     const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
@@ -59,6 +61,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress,
@@ -79,9 +82,20 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
             conn->to.flush();
 
-            unsigned int magic = readInt(conn->from);
-            if (magic != SERVE_MAGIC_2)
-                throw Error("protocol mismatch with 'nix-store --serve' on '%s'", host);
+            StringSink saved;
+            try {
+                TeeSource tee(conn->from, saved);
+                unsigned int magic = readInt(tee);
+                if (magic != SERVE_MAGIC_2)
+                    throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
+            } catch (SerialisationError & e) {
+                /* In case the other side is waiting for our input,
+                   close it. */
+                conn->sshConn->in.close();
+                auto msg = conn->from.drain();
+                throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
+                    host, chomp(*saved.s + msg));
+            }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
                 throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
@@ -234,6 +248,10 @@ private:
             conn.to
                 << settings.buildRepeat
                 << settings.enforceDeterminism;
+
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
+            conn.to << ((int) settings.keepFailed);
+        }
     }
 
 public:
@@ -264,14 +282,26 @@ public:
         return status;
     }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
+        if (evalStore && evalStore.get() != this)
+            throw Error("building on an SSH store is incompatible with '--eval-store'");
+
         auto conn(connections->get());
 
         conn->to << cmdBuildPaths;
         Strings ss;
-        for (auto & p : drvPaths)
-            ss.push_back(p.to_string(*this));
+        for (auto & p : drvPaths) {
+            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
+            std::visit(overloaded {
+                [&](const StorePathWithOutputs & s) {
+                    ss.push_back(s.to_string(*this));
+                },
+                [&](const StorePath & drvPath) {
+                    throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
+                },
+            }, sOrDrvPath);
+        }
         conn->to << ss;
 
         putBuildSettings(*conn);

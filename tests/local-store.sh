@@ -15,6 +15,5 @@ PATH1=$(nix path-info --store ./x $CORRECT_PATH)
 PATH2=$(nix path-info --store "$PWD/x" $CORRECT_PATH)
 [ $CORRECT_PATH == $PATH2 ]
 
-# FIXME we could also test the query parameter version:
-# PATH3=$(nix path-info --store "local?store=$PWD/x" $CORRECT_PATH)
-# [ $CORRECT_PATH == $PATH3 ]
+PATH3=$(nix path-info --store "local?root=$PWD/x" $CORRECT_PATH)
+[ $CORRECT_PATH == $PATH3 ]

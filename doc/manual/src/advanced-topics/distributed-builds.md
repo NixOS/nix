@@ -37,7 +37,7 @@ then you need to ensure that the `PATH` of non-interactive login shells
 contains Nix.
 
 > **Warning**
-> 
+>
 > If you are building via the Nix daemon, it is the Nix daemon user
 > account (that is, `root`) that should have SSH access to the remote
 > machine. If you can’t or don’t want to configure `root` to be able to
@@ -52,7 +52,7 @@ example, the following command allows you to build a derivation for
 ```console
 $ uname
 Linux
-    
+
 $ nix build \
   '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
   --builders 'ssh://mac x86_64-darwin'
@@ -103,7 +103,7 @@ default, set it to `-`.
     ```nix
     requiredSystemFeatures = [ "kvm" ];
     ```
-    
+
     will cause the build to be performed on a machine that has the `kvm`
     feature.
 
@@ -111,6 +111,10 @@ default, set it to `-`.
     be used to build a derivation if all of the machine’s mandatory
     features appear in the derivation’s `requiredSystemFeatures`
     attribute..
+
+8.  The (base64-encoded) public host key of the remote machine. If omitted, SSH
+    will use its regular known-hosts file. Specifically, the field is calculated
+    via `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub`.
 
 For example, the machine specification
 

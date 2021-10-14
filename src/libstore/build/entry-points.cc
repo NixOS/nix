@@ -6,16 +6,20 @@
 
 namespace nix {
 
-void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
-    Worker worker(*this);
+    Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (auto & path : drvPaths) {
-        if (path.path.isDerivation())
-            goals.insert(worker.makeDerivationGoal(path.path, path.outputs, buildMode));
-        else
-            goals.insert(worker.makeSubstitutionGoal(path.path, buildMode == bmRepair ? Repair : NoRepair));
+    for (const auto & br : reqs) {
+        std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) {
+                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+            },
+        }, br.raw());
     }
 
     worker.run(goals);
@@ -31,7 +35,7 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, Build
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationGoal *>(i.get())) failed.insert(i2->drvPath);
-            else if (auto i2 = dynamic_cast<SubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
+            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
         }
     }
 
@@ -47,7 +51,7 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, Build
 BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
-    Worker worker(*this);
+    Worker worker(*this, *this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
     BuildResult result;
@@ -89,8 +93,8 @@ void Store::ensurePath(const StorePath & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
-    Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path);
+    Worker worker(*this, *this);
+    GoalPtr goal = worker.makePathSubstitutionGoal(path);
     Goals goals = {goal};
 
     worker.run(goals);
@@ -107,8 +111,8 @@ void Store::ensurePath(const StorePath & path)
 
 void LocalStore::repairPath(const StorePath & path)
 {
-    Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path, Repair);
+    Worker worker(*this, *this);
+    GoalPtr goal = worker.makePathSubstitutionGoal(path, Repair);
     Goals goals = {goal};
 
     worker.run(goals);

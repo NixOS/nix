@@ -61,6 +61,14 @@ MixEvalArgs::MixEvalArgs()
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
         }}
     });
+
+    addFlag({
+        .longName = "eval-store",
+        .description = "The Nix store to use for evaluations.",
+        .category = category,
+        .labels = {"store-url"},
+        .handler = {&evalStoreUrl},
+    });
 }
 
 Bindings * MixEvalArgs::getAutoArgs(EvalState & state)

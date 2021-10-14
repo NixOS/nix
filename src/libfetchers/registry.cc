@@ -114,7 +114,7 @@ static std::shared_ptr<Registry> getSystemRegistry()
 
 Path getUserRegistryPath()
 {
-    return getHome() + "/.config/nix/registry.json";
+    return getConfigDir() + "/nix/registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry()
@@ -122,6 +122,13 @@ std::shared_ptr<Registry> getUserRegistry()
     static auto userRegistry =
         Registry::read(getUserRegistryPath(), Registry::User);
     return userRegistry;
+}
+
+std::shared_ptr<Registry> getCustomRegistry(const Path & p)
+{
+    static auto customRegistry =
+        Registry::read(p, Registry::Custom);
+    return customRegistry;
 }
 
 static std::shared_ptr<Registry> flagRegistry =

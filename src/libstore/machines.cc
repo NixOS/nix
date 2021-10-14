@@ -16,13 +16,18 @@ Machine::Machine(decltype(storeUri) storeUri,
     decltype(mandatoryFeatures) mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey) :
     storeUri(
-        // Backwards compatibility: if the URI is a hostname,
-        // prepend ssh://.
+        // Backwards compatibility: if the URI is schemeless, is not a path,
+        // and is not one of the special store connection words, prepend
+        // ssh://.
         storeUri.find("://") != std::string::npos
-        || hasPrefix(storeUri, "local")
-        || hasPrefix(storeUri, "remote")
-        || hasPrefix(storeUri, "auto")
-        || hasPrefix(storeUri, "/")
+        || storeUri.find("/") != std::string::npos
+        || storeUri == "auto"
+        || storeUri == "daemon"
+        || storeUri == "local"
+        || hasPrefix(storeUri, "auto?")
+        || hasPrefix(storeUri, "daemon?")
+        || hasPrefix(storeUri, "local?")
+        || hasPrefix(storeUri, "?")
         ? storeUri
         : "ssh://" + storeUri),
     systemTypes(systemTypes),
@@ -54,9 +59,15 @@ ref<Store> Machine::openStore() const {
     if (hasPrefix(storeUri, "ssh://")) {
         storeParams["max-connections"] = "1";
         storeParams["log-fd"] = "4";
+    }
+
+    if (hasPrefix(storeUri, "ssh://") || hasPrefix(storeUri, "ssh-ng://")) {
         if (sshKey != "")
             storeParams["ssh-key"] = sshKey;
+        if (sshPublicHostKey != "")
+            storeParams["base64-ssh-public-host-key"] = sshPublicHostKey;
     }
+
     {
         auto & fs = storeParams["system-features"];
         auto append = [&](auto feats) {

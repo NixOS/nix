@@ -6,6 +6,7 @@
 #include "globals.hh"
 #include "names.hh"
 #include "profiles.hh"
+#include "path-with-outputs.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
@@ -418,13 +419,13 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
-    std::vector<StorePathWithOutputs> targets;
+    std::vector<DerivedPath> targets;
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.push_back({state.store->parseStorePath(drvPath)});
+            targets.push_back(DerivedPath::Built{state.store->parseStorePath(drvPath)});
         else
-            targets.push_back({state.store->parseStorePath(i.queryOutPath())});
+            targets.push_back(DerivedPath::Opaque{state.store->parseStorePath(i.queryOutPath())});
     }
 
     printMissing(state.store, targets);
@@ -693,17 +694,18 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     if (globals.forceName != "")
         drv.setName(globals.forceName);
 
-    if (drv.queryDrvPath() != "") {
-        std::vector<StorePathWithOutputs> paths{{globals.state->store->parseStorePath(drv.queryDrvPath())}};
-        printMissing(globals.state->store, paths);
-        if (globals.dryRun) return;
-        globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
-    } else {
-        printMissing(globals.state->store,
-            {{globals.state->store->parseStorePath(drv.queryOutPath())}});
-        if (globals.dryRun) return;
-        globals.state->store->ensurePath(globals.state->store->parseStorePath(drv.queryOutPath()));
-    }
+    std::vector<DerivedPath> paths {
+        (drv.queryDrvPath() != "")
+        ? (DerivedPath) (DerivedPath::Built {
+                globals.state->store->parseStorePath(drv.queryDrvPath())
+            })
+        : (DerivedPath) (DerivedPath::Opaque {
+                globals.state->store->parseStorePath(drv.queryOutPath())
+            }),
+    };
+    printMissing(globals.state->store, paths);
+    if (globals.dryRun) return;
+    globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
     debug(format("switching to new user environment"));
     Path generation = createGeneration(
@@ -1202,37 +1204,6 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static constexpr GenerationNumber prevGen = std::numeric_limits<GenerationNumber>::max();
-
-
-static void switchGeneration(Globals & globals, GenerationNumber dstGen)
-{
-    PathLocks lock;
-    lockProfile(lock, globals.profile);
-
-    auto [gens, curGen] = findGenerations(globals.profile);
-
-    std::optional<Generation> dst;
-    for (auto & i : gens)
-        if ((dstGen == prevGen && i.number < curGen) ||
-            (dstGen >= 0 && i.number == dstGen))
-            dst = i;
-
-    if (!dst) {
-        if (dstGen == prevGen)
-            throw Error("no generation older than the current (%1%) exists", curGen.value_or(0));
-        else
-            throw Error("generation %1% does not exist", dstGen);
-    }
-
-    printInfo("switching from generation %1% to %2%", curGen.value_or(0), dst->number);
-
-    if (globals.dryRun) return;
-
-    switchLink(globals.profile, dst->path);
-}
-
-
 static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
@@ -1241,7 +1212,7 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
         throw UsageError("exactly one argument expected");
 
     if (auto dstGen = string2Int<GenerationNumber>(opArgs.front()))
-        switchGeneration(globals, *dstGen);
+        switchGeneration(globals.profile, *dstGen, globals.dryRun);
     else
         throw UsageError("expected a generation number");
 }
@@ -1254,7 +1225,7 @@ static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
     if (opArgs.size() != 0)
         throw UsageError("no arguments expected");
 
-    switchGeneration(globals, prevGen);
+    switchGeneration(globals.profile, {}, globals.dryRun);
 }
 
 
@@ -1294,12 +1265,12 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     } else if (opArgs.size() == 1 && opArgs.front().find('d') != string::npos) {
         deleteGenerationsOlderThan(globals.profile, opArgs.front(), globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('+') != string::npos) {
-        if(opArgs.front().size() < 2)
-            throw Error("invalid number of generations ‘%1%’", opArgs.front());
+        if (opArgs.front().size() < 2)
+            throw Error("invalid number of generations '%1%'", opArgs.front());
         string str_max = string(opArgs.front(), 1, opArgs.front().size());
         auto max = string2Int<GenerationNumber>(str_max);
         if (!max || *max == 0)
-            throw Error("invalid number of generations to keep ‘%1%’", opArgs.front());
+            throw Error("invalid number of generations to keep '%1%'", opArgs.front());
         deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
     } else {
         std::set<GenerationNumber> gens;

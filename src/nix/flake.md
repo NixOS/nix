@@ -70,7 +70,7 @@ Here are some examples of flake references in their URL-like representation:
 * `/home/alice/src/patchelf`: A flake in some other directory.
 * `nixpkgs`: The `nixpkgs` entry in the flake registry.
 * `nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: The `nixpkgs`
-  entry in the flake registry, with its Git revision overriden to a
+  entry in the flake registry, with its Git revision overridden to a
   specific value.
 * `github:NixOS/nixpkgs`: The `master` branch of the `NixOS/nixpkgs`
   repository on GitHub.
@@ -186,8 +186,8 @@ Currently the `type` attribute can be one of the following:
   attribute `url`.
 
   In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`
-  or `.tar.bz2`.
+  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`,
+  `.tar.bz2` or `.tar.zst`.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -225,7 +225,7 @@ Currently the `type` attribute can be one of the following:
   [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
   ```
 
-  These perform a lookup of `<flake-id>` in the flake registry. or
+  These perform a lookup of `<flake-id>` in the flake registry. For
   example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
   references. The specified `rev` and/or `ref` are merged with the
   entry in the registry; see [nix registry](./nix3-registry.md) for
@@ -377,7 +377,7 @@ outputs = { self, nixpkgs, grcov }: {
 };
 ```
 
-Transitive inputs can be overriden from a `flake.nix` file. For
+Transitive inputs can be overridden from a `flake.nix` file. For
 example, the following overrides the `nixpkgs` input of the `nixops`
 input:
 
@@ -395,7 +395,7 @@ the `nixpkgs` input of the top-level flake to be equal to the
 `nixpkgs` input of the `dwarffs` input of the top-level flake:
 
 ```nix
-inputs.nixops.follows = "dwarffs/nixpkgs";
+inputs.nixpkgs.follows = "dwarffs/nixpkgs";
 ```
 
 The value of the `follows` attribute is a `/`-separated sequence of

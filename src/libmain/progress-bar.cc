@@ -122,6 +122,7 @@ public:
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
+        if (lvl > verbosity) return;
         auto state(state_.lock());
         log(*state, lvl, fs.s);
     }
@@ -483,7 +484,7 @@ Logger * makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+        shouldANSI()
     );
 }
 

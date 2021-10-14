@@ -188,7 +188,6 @@ public:
 class AutoCloseFD
 {
     int fd;
-    void close();
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
@@ -200,6 +199,7 @@ public:
     int get() const;
     explicit operator bool() const;
     int release();
+    void close();
 };
 
 
@@ -216,6 +216,7 @@ class Pipe
 public:
     AutoCloseFD readSide, writeSide;
     void create();
+    void close();
 };
 
 
@@ -258,10 +259,10 @@ void killUser(uid_t uid);
    pid to the caller. */
 struct ProcessOptions
 {
-    string errorPrefix = "error: ";
+    string errorPrefix = "";
     bool dieWithParent = true;
     bool runExitHandlers = false;
-    bool allowVfork = true;
+    bool allowVfork = false;
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -275,28 +276,31 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    Path program;
+    bool searchPath = true;
+    Strings args;
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
     std::optional<std::map<std::string, std::string>> environment;
-    Path program;
-    bool searchPath = true;
-    Strings args;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
-    bool _killStderr = false;
-
-    RunOptions(const Path & program, const Strings & args)
-        : program(program), args(args) { };
-
-    RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
 };
 
-std::pair<int, std::string> runProgram(const RunOptions & options);
+std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
+
+
+/* Change the stack size. */
+void setStackSize(size_t stackSize);
+
+
+/* Restore the original inherited Unix process context (such as signal
+   masks, stack size, CPU affinity). */
+void restoreProcessContext();
 
 
 class ExecError : public Error
@@ -472,6 +476,9 @@ constexpr char treeLast[] = "└───";
 constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
+/* Determine whether ANSI escape sequences are appropriate for the
+   present output. */
+bool shouldANSI();
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,
@@ -511,9 +518,6 @@ class Callback;
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
-
-/* Restore default signal handling. */
-void restoreSignals();
 
 struct InterruptCallback
 {
@@ -569,6 +573,12 @@ void commonChildInit(Pipe & logPipe);
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+/* Bind a Unix domain socket to a path. */
+void bind(int fd, const std::string & path);
+
+/* Connect to a Unix domain socket. */
+void connect(int fd, const std::string & path);
 
 
 // A Rust/Python-like enumerate() iterator adapter.
