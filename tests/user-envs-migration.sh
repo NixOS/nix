@@ -13,7 +13,7 @@ unset NIX_REMOTE
 
 clearStore
 clearProfiles
-rm -r ~/.nix-profile
+rm -rf ~/.nix-profile
 
 # Fill the environment using the older Nix
 PATH_WITH_NEW_NIX="$PATH"
