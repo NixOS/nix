@@ -125,7 +125,9 @@ static void preloadNSS() {
        load its lookup libraries in the parent before any child gets a chance to. */
     std::call_once(dns_resolve_flag, []() {
 #ifdef __GLIBC__
-        dlopen (LIBNSS_DNS_SO, RTLD_NOW);
+        if (dlopen (LIBNSS_DNS_SO, RTLD_NOW) == NULL) {
+            printMsg(Verbosity::lvlWarn, fmt("Unable to load nss_dns backend"));
+        }
         __nss_configure_lookup ("hosts", "dns");
 #endif
     });
