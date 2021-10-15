@@ -1629,10 +1629,34 @@ void setStackSize(size_t stackSize)
     }
     #endif
 }
+static AutoCloseFD fdSavedMountNamespace;
 
-void restoreProcessContext()
+void saveMountNamespace()
+{
+#if __linux__
+    static std::once_flag done;
+    std::call_once(done, []() {
+        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fdSavedMountNamespace)
+            throw SysError("saving parent mount namespace");
+    });
+#endif
+}
+
+void restoreMountNamespace()
+{
+#if __linux__
+    if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
+        throw SysError("restoring parent mount namespace");
+#endif
+}
+
+void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
+    if (restoreMounts) {
+        restoreMountNamespace();
+    }
 
     restoreAffinity();
 
@@ -1766,7 +1790,7 @@ void commonChildInit(Pipe & logPipe)
     logger = makeSimpleLogger();
 
     const static string pathNullDevice = "/dev/null";
-    restoreProcessContext();
+    restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

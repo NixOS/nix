@@ -544,6 +544,14 @@ struct curlFileTransfer : public FileTransfer
             stopWorkerThread();
         });
 
+#ifdef __linux__
+        /* Cause this thread to not share any FS attributes with the main thread,
+           because this causes setns() in restoreMountNamespace() to fail.
+           Ideally, this would happen in the std::thread() constructor. */
+        if (unshare(CLONE_FS) != 0)
+            throw SysError("unsharing filesystem state in download thread");
+#endif
+
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
 
         bool quit = false;
