@@ -26,6 +26,7 @@ if nix-store --delete $outPath; then false; fi
 test -e $outPath
 
 for i in $NIX_STORE_DIR/*; do
+    if [[ $i =~ /trash ]]; then continue; fi # compat with old daemon
     touch $i.lock
     touch $i.chroot
 done
