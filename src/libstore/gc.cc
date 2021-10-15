@@ -536,7 +536,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 auto fdClient_ = fdClient.get();
                 std::thread clientThread([&, fdClient = std::move(fdClient)]() {
                     Finally cleanup([&]() {
-                        connections.lock()->erase(fdClient.get());
+                        auto conn(connections.lock());
+                        auto i = conn->find(fdClient.get());
+                        i->second.detach();
+                        conn->erase(i);
                     });
 
                     while (true) {
