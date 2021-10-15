@@ -14,9 +14,9 @@ echo "making registration..."
 
 set +x
 for ((n = 0; n < $max; n++)); do
-    storePath=$NIX_STORE_DIR/$(printf "%05d\n" $n)aaaaaaaaaaaaaaaaaaaaaaaaaaa-$n
+    storePath=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$n
     echo -n > $storePath
-    ref2=$NIX_STORE_DIR/$(printf "%05d\n" $((n+1)))aaaaaaaaaaaaaaaaaaaaaaaaaaa-$((n+1))
+    ref2=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$((n+1))
     if test $((n+1)) = $max; then
         ref2=$reference
     fi
