@@ -735,6 +735,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
+    /* Synchronisation point for testing, see tests/gc-concurrent.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
+        readFile(*p);
+
     /* Either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */
     if (options.action == GCOptions::gcDeleteSpecific) {

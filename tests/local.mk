@@ -4,6 +4,7 @@ nix_tests = \
   gc.sh \
   ca/gc.sh \
   gc-concurrent.sh \
+  gc-non-blocking.sh \
   gc-auto.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
   gc-runtime.sh check-refs.sh filter-source.sh \
