@@ -97,7 +97,7 @@ static void fetchTree(
     fetchers::Input input;
     PathSet context;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
         state.forceAttrs(*args[0], pos);
