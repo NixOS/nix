@@ -617,6 +617,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
+    std::map<StorePath, StorePathSet> referrersCache;
+
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation
        output edges. If none of those paths are roots, then all
@@ -689,9 +691,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (isValidPath(*path)) {
 
                 /* Visit the referrers of this path. */
-                StorePathSet referrers;
-                queryReferrers(*path, referrers);
-                for (auto & p : referrers)
+                auto i = referrersCache.find(*path);
+                if (i == referrersCache.end()) {
+                    StorePathSet referrers;
+                    queryReferrers(*path, referrers);
+                    referrersCache.emplace(*path, std::move(referrers));
+                    i = referrersCache.find(*path);
+                }
+                for (auto & p : i->second)
                     enqueue(p);
 
                 /* If keep-derivations is set and this is a
@@ -718,6 +725,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (shouldDelete) {
                 invalidatePathChecked(path);
                 deleteFromStore(path.to_string());
+                referrersCache.erase(path);
             }
         }
     };
