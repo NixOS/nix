@@ -15,7 +15,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     std::string name = "source";
     PathSet context;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
 
