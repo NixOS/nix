@@ -538,8 +538,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     Finally cleanup([&]() {
                         auto conn(connections.lock());
                         auto i = conn->find(fdClient.get());
-                        i->second.detach();
-                        conn->erase(i);
+                        if (i != conn->end()) {
+                            i->second.detach();
+                            conn->erase(i);
+                        }
                     });
 
                     while (true) {
