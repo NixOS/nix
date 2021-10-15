@@ -15,7 +15,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#ifdef __linux__
 #include <features.h>
+#endif
 #ifdef __GLIBC__
 #include <gnu/lib-names.h>
 #include <nss.h>
