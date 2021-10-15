@@ -126,7 +126,7 @@ isDaemonNewer () {
   [[ -n "${NIX_DAEMON_PACKAGE:-}" ]] || return 0
   local requiredVersion="$1"
   local daemonVersion=$($NIX_DAEMON_PACKAGE/bin/nix-daemon --version | cut -d' ' -f3)
-  return [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''2.4''") -ge 0 ]]
+  [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
 }
 
 requireDaemonNewerThan () {
