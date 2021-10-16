@@ -24,15 +24,99 @@ static std::string readHead(const Path & path)
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
-static Attrs readSubmodules(const Path & path)
+static string getRootTree(const Path & path, const string & gitrev) {
+    auto commitOutput = runProgram("git", true, { "-C", path, "cat-file", "-p", gitrev });
+    auto lines = tokenizeString<std::vector<string>>(commitOutput, "\n");
+    auto words = tokenizeString<std::vector<string>>(lines[0]);
+    auto rootTree = words[1];
+    return rootTree;
+}
+
+enum gitType {
+  blob,
+  tree,
+  commit
+};
+
+string getBlob(const Path & path, const string & gitrev, const string & blobhash) {
+  return runProgram("git", true, { "-C", path, "cat-file", "-p", blobhash });
+}
+
+static std::map<string, std::pair<gitType, string>> gitTreeList(const Path & path, const string & treehash) {
+  auto treeOutput = runProgram("git", true, { "-C", path, "cat-file", "-p", treehash });
+  auto lines = tokenizeString<std::vector<string>>(treeOutput, "\n");
+  std::map<string, std::pair<gitType, string>> results;
+  for (auto line : lines) {
+    auto words = tokenizeString<std::vector<string>>(line);
+    auto hash = words[2];
+    auto name = words[3];
+    gitType type;
+    if (words[1] == "blob") type = blob;
+    else if (words[1] == "tree") type = tree;
+    else if (words[1] == "commit") type = commit;
+    else assert(0); // FIXME
+    results.insert(std::pair{name, std::pair{type, hash}});
+  }
+
+  return results;
+}
+
+std::map<string,string> parseSubmodules(const string & contents) {
+  auto lines = tokenizeString<std::vector<string>>(contents, "\n");
+  std::map<string,string> results;
+  string path;
+  for (auto line : lines) {
+    auto words = tokenizeString<std::vector<string>>(line);
+    if (words[1] != "=") continue;
+
+    if (words[0] == "path") path = words[2];
+    if (words[0] == "url") {
+      string url = words[2];
+      results.insert(std::pair{path, url});
+    }
+  }
+  return results;
+}
+
+string findCommitHash(const Path & path, const std::map<string, std::pair<gitType, string>> & _entries, const string & pathToFind) {
+  auto entries = _entries;
+
+  auto tokens = tokenizeString<std::vector<string>>(pathToFind, "/");
+  std::pair<gitType, string> x;
+  for (auto token : tokens) {
+    auto i = entries.find(token);
+    if (i == entries.end()) return "fail";
+
+    x = i->second;
+    if (x.first == tree) entries = gitTreeList(path, x.second);
+  }
+  if (x.first != commit) return "fail";
+
+  return x.second;
+}
+
+static Attrs readSubmodules(const Path & path, const string & gitrev)
 {
-    auto output = runProgram("git", true, { "-C", path, "submodule", "status" });
+    auto rootTree = getRootTree(path, gitrev);
+    printTalkative("root tree is %s", rootTree);
+    auto entries = gitTreeList(path, rootTree);
     Attrs attrs;
-    for (auto line : tokenizeString<std::vector<string>>(output, "\n;")) {
-        auto tokens = tokenizeString<std::vector<string>>(line);
-        auto url = tokens[0];
-        auto path = tokens[1];
-        attrs.emplace(path, url);
+
+    auto i = entries.find(".gitmodules");
+
+    if (i == entries.end()) return attrs;
+
+    auto submodules = getBlob(path, gitrev, i->second.second);
+
+    printTalkative("submodule file %s", submodules);
+
+    auto parsedModules = parseSubmodules(submodules);
+    for (auto & [path, url] : parsedModules) {
+      printTalkative("submodule %s fetched from %s", path, url);
+      auto commitHash = findCommitHash(path, entries, path);
+      printTalkative("found %s", commitHash);
+
+      attrs.emplace(path, url + "?rev=" + commitHash);
     }
 
     return attrs;
@@ -201,6 +285,8 @@ struct GitInputScheme : InputScheme
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
 
+        printTalkative("fetch is getting ran");
+
         auto getImmutableAttrs = [&]()
         {
             return Attrs({
@@ -228,7 +314,8 @@ struct GitInputScheme : InputScheme
         if (input.getRev()) {
             if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
                 Path p = store->printStorePath(res->second);
-                auto modulesInfo = readSubmodules(p);
+                printTalkative("case 1");
+                auto modulesInfo = readSubmodules(p, "FIXME");
                 return makeResult(res->first, std::move(res->second), modulesInfo);
             }
         }
@@ -303,6 +390,8 @@ struct GitInputScheme : InputScheme
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
+                auto modulesInfo = readSubmodules(actualUrl, "HEAD");
+                input.modules = modulesInfo;
                 return {
                     Tree(store->toRealPath(storePath), std::move(storePath)),
                     input
@@ -336,7 +425,8 @@ struct GitInputScheme : InputScheme
                 if (!input.getRev() || input.getRev() == rev2) {
                     input.attrs.insert_or_assign("rev", rev2.gitRev());
                     Path p = store->printStorePath(res->second);
-                    auto modulesInfo = readSubmodules(p);
+                    printTalkative("case 2");
+                    auto modulesInfo = readSubmodules(p, "FIXME");
                     return makeResult(res->first, std::move(res->second), modulesInfo);
                 }
             }
@@ -431,8 +521,8 @@ struct GitInputScheme : InputScheme
         /* Now that we know the ref, check again whether we have it in
            the store. */
         if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
-            Path p = store->printStorePath(res->second);
-            auto modulesInfo = readSubmodules(p);
+            printTalkative("case 3");
+            auto modulesInfo = readSubmodules(repoDir, input.getRev()->gitRev());
             return makeResult(res->first, std::move(res->second), modulesInfo);
         }
 
@@ -498,7 +588,8 @@ struct GitInputScheme : InputScheme
             {"lastModified", lastModified},
         });
 
-        auto modulesInfo = readSubmodules(actualUrl);
+        printTalkative("case 4");
+        auto modulesInfo = readSubmodules(actualUrl, "FIXME");
 
         if (!shallow)
             infoAttrs.insert_or_assign("revCount",
