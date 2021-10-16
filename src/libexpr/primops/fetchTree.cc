@@ -189,7 +189,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
 
