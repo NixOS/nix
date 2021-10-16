@@ -121,7 +121,7 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
-            state.forceValue(*attr.value);
+            state.forceValue(*attr.value, *attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false);
                 attrs.emplace(attr.name,
