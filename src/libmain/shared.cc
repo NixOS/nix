@@ -127,6 +127,24 @@ static void preloadNSS() {
        load its lookup libraries in the parent before any child gets a chance to. */
     std::call_once(dns_resolve_flag, []() {
 #ifdef __GLIBC__
+        /* On linux, glibc will run every lookup through the nss layer.
+         * That means every lookup goes, by default, through nscd, which acts as a local
+         * cache.
+         * Because we run builds in a sandbox, we also remove access to nscd otherwise
+         * lookups would leak into the sandbox.
+         *
+         * But now we have a new problem, we need to make sure the nss_dns backend that
+         * does the dns lookups when nscd is not available is loaded or available.
+         *
+         * We can't make it available without leaking nix's environment, so instead we'll
+         * load the backend, and configure nss so it does not try to run dns lookups
+         * through nscd.
+         *
+         * This is technically only used for builtins:fetch* functions so we only care
+         * about dns.
+         *
+         * All other platforms are unaffected.
+         */
         if (dlopen (LIBNSS_DNS_SO, RTLD_NOW) == NULL) {
             printMsg(Verbosity::lvlWarn, fmt("Unable to load nss_dns backend"));
         }
