@@ -54,6 +54,11 @@ The following flake output attributes must be *Nixpkgs overlays*:
 * `overlay`
 * `overlays`.`*name*
 
+The following flake output attributes must be functions for building
+derivations:
+
+* `builders`.`*name*
+
 The following flake output attributes must be *NixOS modules*:
 
 * `nixosModule`

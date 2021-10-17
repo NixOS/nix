@@ -468,7 +468,19 @@ struct CmdFlakeCheck : FlakeCommand
                     !v.lambda.fun->formals->argNames.count(state->symbols.create("system")))
                     throw Error("bundler must take formal arguments 'program' and 'system'");
             } catch (Error & e) {
-                e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
+                e.addTrace(pos, hintfmt("while checking the bundler '%s'", attrPath));
+                reportError(e);
+            }
+        };
+
+        auto checkBuilder = [&](const std::string & attrPath, Value & v, const Pos & pos) {
+            try {
+                state->forceValue(v, pos);
+                if (!v.isLambda()) {
+                    throw Error("builder must be a function");
+                }
+            } catch (Error & e) {
+                e.addTrace(pos, hintfmt("while checking the builder '%s'", attrPath));
                 reportError(e);
             }
         };
@@ -605,6 +617,12 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs)
                                 checkBundler(fmt("%s.%s", name, attr.name),
                                     *attr.value, *attr.pos);
+                        }
+
+                        else if (name == "builders") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs)
+                                checkBuilder(fmt("%s.%s", name, attr.name), *attr.value, *attr.pos);
                         }
 
                         else
