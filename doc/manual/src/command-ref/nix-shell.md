@@ -110,18 +110,18 @@ shell in which to build it:
 
 ```console
 $ nix-shell '<nixpkgs>' -A pan
-[nix-shell]$ unpackPhase
+[nix-shell]$ eval ${unpackPhase:-unpackPhase}
 [nix-shell]$ cd pan-*
-[nix-shell]$ configurePhase
-[nix-shell]$ buildPhase
+[nix-shell]$ eval ${configurePhase:-configurePhase}
+[nix-shell]$ eval ${buildPhase:-buildPhase}
 [nix-shell]$ ./pan/gui/pan
 ```
 
-Note: Other packages may override these phases (the unpackPhase,
-configurePhase, buildPhase, etc).
-For those, it may be required to do something like
-`eval "$configurePhase-configurePhase"` or `eval "$configurePhase"`
-depending on how that package's nix files have been written.
+The reason we use form `eval ${configurePhase:-configurePhase}` here is because
+those packages that override these phases do so by exporting the overridden
+values in the environment variable of the same name.
+Here bash is being told to either evaluate the contents of 'configurePhase',
+if it exists as a variable, otherwise evaluate the configurePhase function.
 
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
