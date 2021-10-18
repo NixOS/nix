@@ -343,6 +343,15 @@ expr_function
         });
       $$ = new ExprLet($2, $4);
     }
+  | INHERIT '(' expr ')' '[' attrs ']'
+    { auto ret = new ExprList;
+      ret->elems.reserve($6->size());
+      /* !!! Should ensure sharing of the expression in $3. */
+      for (auto & i : *$6) {
+          ret->elems.push_back(new ExprSelect(makeCurPos(@6, data), $3, i.symbol));
+      }
+      $$ = ret;
+    }
   | expr_if
   ;
 
