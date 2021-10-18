@@ -22,7 +22,9 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: cachix use nixos-nix-install-tests
     - run: nix-build -A checks.$(nix-instantiate --eval -E '(builtins.currentSystem)')
+    - run: bash scripts/test-against-master.sh
   check_cachix:
     name: Cachix secret present for installer tests
     runs-on: ubuntu-latest

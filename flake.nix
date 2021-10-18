@@ -508,6 +508,12 @@
           } "touch $out";
       });
 
+      lib = {
+        testAgainst = forAllSystems (system:
+          testNixVersions nixpkgsFor.${system} nixpkgsFor.${system}.nix
+        );
+      };
+
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
