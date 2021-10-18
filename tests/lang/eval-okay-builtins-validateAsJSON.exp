@@ -1,0 +1,1 @@
+[ { success = false; value = "invalid JSON-type for a schema for  # , expected: boolean or object"; } { success = false; value = "At '/', required property 'name' not found in object"; } { success = false; value = "At '/name', required property 'last' not found in object"; } { success = true; value = { age = 24; name = { first = "Jane"; last = "Doe"; }; }; } ]
