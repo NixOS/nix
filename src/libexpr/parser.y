@@ -80,6 +80,27 @@ static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
     });
 }
 
+static std::vector<Symbol> uniqueNames(const std::vector<AttrName>& parsed,
+                                       const Pos& pos) {
+
+    // Extract all the names and sort them
+    std::vector<Symbol> names;
+    names.reserve(parsed.size());
+    for (const auto& i : parsed) {
+        names.push_back(i.symbol);
+    }
+    std::sort(names.begin(), names.end());
+
+    // Now that they are sorted, duplicates will be adjacent
+    const auto found = std::adjacent_find(names.begin(), names.end());
+    if (found != names.end()) {
+        // Same as { inherit } - can this provide better position info?
+        dupAttr(*found, pos, pos);
+    }
+
+    return names;
+}
+
 
 static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     Expr * e, const Pos & pos)
@@ -550,6 +571,25 @@ string_attr
 
 expr_list
   : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
+  | expr_list INHERIT attrs ';'
+    {
+      // This is syntactic sugar for `attrValues { inherit attrs; }`
+      const auto names = uniqueNames(*$3, makeCurPos(@3, data));
+      $$->elems.reserve($$->elems.size() + names.size());
+      for (auto & s : names) {
+          $$->elems.push_back(new ExprVar(makeCurPos(@3, data), s));
+      }
+    }
+  | expr_list INHERIT '(' expr ')' attrs ';'
+    {
+      // This is syntactic sugar for `attrValues { inherit (expr) attrs; }`
+      const auto names = uniqueNames(*$6, makeCurPos(@6, data));
+      $$->elems.reserve($$->elems.size() + names.size());
+      for (auto & s : names) {
+          /* !!! Should ensure sharing of the expression in $4. */
+          $$->elems.push_back(new ExprSelect(makeCurPos(@6, data), $4, s));
+      }
+    }
   | { $$ = new ExprList; }
   ;
 
