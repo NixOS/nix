@@ -9,6 +9,8 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
+#include <nlohmann/json.hpp>
+
 using namespace std::string_literals;
 
 namespace nix::fetchers {
@@ -296,7 +298,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath, Attrs modulesInfo)
+        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
             -> std::pair<Tree, Input>
         {
             assert(input.getRev());
@@ -304,7 +306,7 @@ struct GitInputScheme : InputScheme
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-            input.modules = modulesInfo;
+            input.attrs.insert_or_assign("modules", getStrAttr(infoAttrs, "modules"));
             return {
                 Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
@@ -313,10 +315,7 @@ struct GitInputScheme : InputScheme
 
         if (input.getRev()) {
             if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
-                Path p = store->printStorePath(res->second);
-                printTalkative("case 1");
-                auto modulesInfo = readSubmodules(p, "FIXME");
-                return makeResult(res->first, std::move(res->second), modulesInfo);
+                return makeResult(res->first, std::move(res->second));
             }
         }
 
@@ -330,14 +329,11 @@ struct GitInputScheme : InputScheme
 
             /* Check whether this repo has any commits. There are
                probably better ways to do this. */
-            auto gitDir = actualUrl + "/.git";
-            auto commonGitDir = chomp(runProgram(
+            auto gitDir = chomp(runProgram(
                 "git",
                 true,
                 { "-C", actualUrl, "rev-parse", "--git-common-dir" }
             ));
-            if (commonGitDir != ".git")
-                    gitDir = commonGitDir;
 
             bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
 
@@ -390,8 +386,8 @@ struct GitInputScheme : InputScheme
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                auto modulesInfo = readSubmodules(actualUrl, "HEAD");
-                input.modules = modulesInfo;
+                input.attrs.insert_or_assign("modules", "{}");
+
                 return {
                     Tree(store->toRealPath(storePath), std::move(storePath)),
                     input
@@ -424,10 +420,7 @@ struct GitInputScheme : InputScheme
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (!input.getRev() || input.getRev() == rev2) {
                     input.attrs.insert_or_assign("rev", rev2.gitRev());
-                    Path p = store->printStorePath(res->second);
-                    printTalkative("case 2");
-                    auto modulesInfo = readSubmodules(p, "FIXME");
-                    return makeResult(res->first, std::move(res->second), modulesInfo);
+                    return makeResult(res->first, std::move(res->second));
                 }
             }
 
@@ -521,9 +514,7 @@ struct GitInputScheme : InputScheme
         /* Now that we know the ref, check again whether we have it in
            the store. */
         if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
-            printTalkative("case 3");
-            auto modulesInfo = readSubmodules(repoDir, input.getRev()->gitRev());
-            return makeResult(res->first, std::move(res->second), modulesInfo);
+            return makeResult(res->first, std::move(res->second));
         }
 
         Path tmpDir = createTempDir();
@@ -582,18 +573,18 @@ struct GitInputScheme : InputScheme
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+        auto rev = input.getRev()->gitRev();
+        auto modulesInfo = readSubmodules(actualUrl, rev);
 
         Attrs infoAttrs({
-            {"rev", input.getRev()->gitRev()},
+            {"rev", rev},
             {"lastModified", lastModified},
+            {"modules", attrsToJSON(modulesInfo).dump()},
         });
-
-        printTalkative("case 4");
-        auto modulesInfo = readSubmodules(actualUrl, "FIXME");
 
         if (!shallow)
             infoAttrs.insert_or_assign("revCount",
-                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input.getRev()->gitRev() })));
+                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", rev })));
 
         if (!_input.getRev())
             getCache()->add(
@@ -610,7 +601,7 @@ struct GitInputScheme : InputScheme
             storePath,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath), modulesInfo);
+        return makeResult(infoAttrs, std::move(storePath));
     }
 };
 

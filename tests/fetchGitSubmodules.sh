@@ -38,10 +38,6 @@ git -C $rootRepo commit -m "Add submodule"
 
 rev=$(git -C $rootRepo rev-parse HEAD)
 
-nix eval --json --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; }).modules"
-
-false
-
 r1=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
 r2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = false; }).outPath")
 r3=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
@@ -99,3 +95,7 @@ noSubmoduleRepoBaseline=$(nix eval --raw --expr "(builtins.fetchGit { url = file
 noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; submodules = true; }).outPath")
 
 [[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]
+
+subUrl=$(nix eval --raw --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; }).modules.sub")
+
+[[ $subUrl =~ rev=$subRev$ ]]

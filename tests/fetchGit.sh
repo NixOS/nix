@@ -37,6 +37,8 @@ path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; u
 export _NIX_FORCE_HTTP=1
 [[ $(tail -n 1 $path0/hello) = "hello" ]]
 
+ls -l $repo
+nix eval --debug --impure --raw --expr "(builtins.fetchGit file://$repo).outPath"
 # Fetch the default branch.
 path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
