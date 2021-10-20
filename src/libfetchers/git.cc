@@ -113,12 +113,12 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
     printTalkative("submodule file %s", submodules);
 
     auto parsedModules = parseSubmodules(submodules);
-    for (auto & [path, url] : parsedModules) {
-      printTalkative("submodule %s fetched from %s", path, url);
-      auto commitHash = findCommitHash(path, entries, path);
+    for (auto & [subPath, url] : parsedModules) {
+      printTalkative("submodule %s fetched from %s", subPath, url);
+      auto commitHash = findCommitHash(path, entries, subPath);
       printTalkative("found %s", commitHash);
 
-      attrs.emplace(path, url + "?rev=" + commitHash);
+      attrs.emplace(subPath, url + "?rev=" + commitHash);
     }
 
     return attrs;
