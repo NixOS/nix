@@ -329,11 +329,14 @@ struct GitInputScheme : InputScheme
 
             /* Check whether this repo has any commits. There are
                probably better ways to do this. */
-            auto gitDir = chomp(runProgram(
+            auto gitDir = actualUrl + "/.git";
+            auto commonGitDir = chomp(runProgram(
                 "git",
                 true,
                 { "-C", actualUrl, "rev-parse", "--git-common-dir" }
             ));
+            if (commonGitDir != ".git")
+                    gitDir = commonGitDir;
 
             bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
 
@@ -574,7 +577,7 @@ struct GitInputScheme : InputScheme
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
         auto rev = input.getRev()->gitRev();
-        auto modulesInfo = readSubmodules(actualUrl, rev);
+        auto modulesInfo = readSubmodules(repoDir, rev);
 
         Attrs infoAttrs({
             {"rev", rev},
