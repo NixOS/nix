@@ -30,6 +30,7 @@ initGitRepo $subRepo
 addGitContent $subRepo
 
 initGitRepo $rootRepo
+addGitContent $rootRepo
 
 git -C $rootRepo submodule init
 git -C $rootRepo submodule add $subRepo sub
@@ -98,4 +99,12 @@ noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subR
 
 subUrl=$(nix eval --raw --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; }).modules.sub")
 
+[[ $subUrl =~ rev=$subRev$ ]]
+
+# Beschmutzigen...
+echo etwa dreck > $rootRepo/content
+
+subUrl=$(nix eval --impure --raw --expr "(builtins.fetchGit $rootRepo).modules.sub")
+
+# Submodule is still clean so should be the same as above
 [[ $subUrl =~ rev=$subRev$ ]]

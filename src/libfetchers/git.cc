@@ -389,7 +389,10 @@ struct GitInputScheme : InputScheme
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                input.attrs.insert_or_assign("modules", "{}");
+                input.attrs.insert_or_assign(
+                    "modules",
+                    haveCommits ?
+                    attrsToJSON(readSubmodules(actualUrl, "HEAD")).dump() : "{}");
 
                 return {
                     Tree(store->toRealPath(storePath), std::move(storePath)),
