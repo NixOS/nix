@@ -118,7 +118,13 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
       auto commitHash = findCommitHash(path, entries, subPath);
       printTalkative("found %s", commitHash);
 
-      attrs.emplace(subPath, url + "?rev=" + commitHash);
+      static const std::regex barePathRegex("^/.*$");
+      std::string prefix = "git+";
+      if (std::regex_match(url, barePathRegex))
+          prefix = prefix + "file://";
+
+
+      attrs.emplace(subPath, prefix + url + "?allRefs=1&rev=" + commitHash);
     }
 
     return attrs;
