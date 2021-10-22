@@ -45,9 +45,6 @@ struct Env
     Value * values[0];
 };
 
-void printEnvBindings(const Env &env, int lv = 0);
-valmap * mapEnvBindings(const Env &env);
-void printEnvPosChain(const Env &env, int lv = 0);
 valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env);
 
 Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());

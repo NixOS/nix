@@ -54,7 +54,6 @@ void StoreCommand::run()
     run(getStore());
 }
 
-/*
 EvalCommand::EvalCommand()
 {
     addFlag({
@@ -64,39 +63,6 @@ EvalCommand::EvalCommand()
     });
 }
 
-extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
-
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState) {
-        evalState = std::make_shared<EvalState>(searchPath, getStore());
-        if (startReplOnEvalErrors)
-            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const std::map<std::string, Value *> & env) {
-                printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
-                runRepl(evalState, env);
-            };
-    }
-    return ref<EvalState>(evalState);
-}
-*/
-// ref<EvalState> EvalCommand::getEvalState()
-// {
-//     if (!evalState)
-//         evalState = std::make_shared<EvalState>(searchPath, getStore());
-//     return ref<EvalState>(evalState);
-// }
-
-
-EvalCommand::EvalCommand()
-{
-    // std::cout << "EvalCommand::EvalCommand()" << std::endl;
-    addFlag({
-        .longName = "debugger",
-        .description = "start an interactive environment if evaluation fails",
-        .handler = {&startReplOnEvalErrors, true},
-    });
-}
-// extern std::function<void(const Error & error, const std::map<std::string, Value *> & env)> debuggerHook;
 extern std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
 
 ref<EvalState> EvalCommand::getEvalState()
@@ -114,8 +80,6 @@ ref<EvalState> EvalCommand::getEvalState()
                 expr.show(std::cout);
                 std::cout << std::endl;
 
-                // printEnvPosChain(env);
-                // printEnvBindings(env);
                 if (expr.staticenv) 
                 {
                   auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
