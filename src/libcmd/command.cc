@@ -67,7 +67,6 @@ extern std::function<void(const Error & error, const Env & env, const Expr & exp
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    std::cout << "EvalCommand::getEvalState()" << startReplOnEvalErrors << std::endl;
     if (!evalState) {
         evalState = std::make_shared<EvalState>(searchPath, getStore());
         if (startReplOnEvalErrors)
@@ -80,7 +79,7 @@ ref<EvalState> EvalCommand::getEvalState()
                 expr.show(std::cout);
                 std::cout << std::endl;
 
-                if (expr.staticenv) 
+                if (expr.staticenv)
                 {
                   auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
                   runRepl(evalState, *vm);

@@ -249,20 +249,6 @@ void completeFlakeRefWithFragment(
     completeFlakeRef(evalState->store, prefix);
 }
 
-/*
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getStore());
-    return ref<EvalState>(evalState);
-}
-
-EvalCommand::~EvalCommand()
-{
-    if (evalState)
-        evalState->printStats();
-}
-*/
 
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
@@ -618,11 +604,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         if (file)
             state->evalFile(lookupFileArg(*state, *file), *vFile);
         else {
-            // std::cout << "pre parseExprFromString" << std::endl;
             auto e = state->parseExprFromString(*expr, absPath("."));
-
-            // std::cout << "pre eval" << std::endl;
-            
             state->eval(e, *vFile);
         }
 

@@ -54,7 +54,6 @@ struct NixRepl
 
     const static int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
-    // StaticEnv staticEnv;
     Env * env;
     int displ;
     StringSet varNames;
