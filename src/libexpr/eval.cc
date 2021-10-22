@@ -912,6 +912,9 @@ Env & EvalState::allocEnv(size_t size)
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
     env->type = Env::Plain;
+
+    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
+
     return *env;
 }
 
@@ -924,7 +927,6 @@ Env & fakeEnv(size_t size)
 
     return *env;
 }
-
 
 void EvalState::mkList(Value & v, size_t size)
 {
@@ -1291,7 +1293,6 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                     throwEvalError(pos, "attribute '%1%' missing", name, env, this);
-                        // mapBindings(*vAttrs->attrs));
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1419,8 +1420,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
           "attempt to call something which is not a function but %1%",
           showType(fun).c_str(),
           fakeEnv(1), 0);
-          // fun.env);
-          // map2("fun", &fun, "arg", &arg));
     }
 
     ExprLambda & lambda(*fun.lambda.fun);

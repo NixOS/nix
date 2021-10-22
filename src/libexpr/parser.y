@@ -22,8 +22,6 @@
 #include "eval.hh"
 #include "globals.hh"
 
-#include <iostream>
-
 namespace nix {
 
     struct ParseData
