@@ -10,6 +10,6 @@ libcmd_CXXFLAGS += -I src/libutil -I src/libstore -I src/libexpr -I src/libmain 
 
 libcmd_LDFLAGS = $(EDITLINE_LIBS) -llowdown
 
-libcmd_LIBS = libstore libutil libexpr libmain libfetchers libnix libwut
+libcmd_LIBS = libstore libutil libexpr libmain libfetchers libnix
 
 $(eval $(call install-file-in, $(d)/nix-cmd.pc, $(prefix)/lib/pkgconfig, 0644))

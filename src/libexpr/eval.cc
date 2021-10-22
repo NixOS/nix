@@ -406,7 +406,6 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     assert(gcInitialised);
 
-    // static_assert(sizeof(Env) <= 16 + sizeof(std::unique_ptr<void*>), "environment must be <= 16 bytes");
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
     /* Initialise the Nix expression search path. */
@@ -1574,8 +1573,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.up = &env;
     env2.prevWith = prevWith;
     env2.type = Env::HasWithExpr;
-    env2.values[0] = (Value *) attrs;  // ok DAG nasty.  just smoosh this in.
-        // presumably evaluate later, lazily.
+    env2.values[0] = (Value *) attrs;
     
     body->eval(state, env2, v);
 }
