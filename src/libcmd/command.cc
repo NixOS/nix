@@ -110,6 +110,10 @@ ref<EvalState> EvalCommand::getEvalState()
 
                 printStaticEnvBindings(expr);
 
+                std::cout << "expr: " << std::endl;
+                expr.show(std::cout);
+                std::cout << std::endl;
+
                 // printEnvPosChain(env);
                 // printEnvBindings(env);
                 if (expr.staticenv) 
