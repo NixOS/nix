@@ -1302,7 +1302,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, StorePathSet references)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
@@ -1405,6 +1405,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
             ValidPathInfo info { dstPath, narHash.first };
             info.narSize = narHash.second;
+            info.references = references;
             info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }
