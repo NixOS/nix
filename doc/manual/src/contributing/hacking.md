@@ -1,96 +1,126 @@
-# Hacking
+# Hacking Nix itself
 
-This section provides some notes on how to hack on Nix. To get the
-latest version of Nix from GitHub:
+This section provides some notes on how to hack on Nix.
+
+
+### Get the latest version of Nix from GitHub
 
 ```console
 $ git clone https://github.com/NixOS/nix.git
 $ cd nix
 ```
 
-To build Nix for the current operating system/architecture use
+
+### Build the Nix package
+
+**For the current operating system/architecture**:
 
 ```console
 $ nix-build
-```
 
-or if you have a flake-enabled nix:
-
-```console
+$ # or for a flake-enabled nix:
 $ nix build
 ```
+This will build the `defaultPackage.${builtins.currentSystem}` attribute
+defined in the `flake.nix` file.
 
-This will build `defaultPackage` attribute defined in the `flake.nix`
-file. To build for other platforms add one of the following suffixes to
-it: aarch64-linux, i686-linux, x86\_64-darwin, x86\_64-linux. i.e.
+**For another operating system/architecture**:
+
+To build for other platforms use one of the following platform
+identifiers: `aarch64-linux`, `i686-linux`, `x86_64-darwin`, `x86_64-linux`.
+
+For example:
 
 ```console
 $ nix-build -A defaultPackage.x86_64-linux
+
+$ # or for a flake-enabled nix:
+$ nix build .#defaultPackage.x86_64-linux
 ```
 
-To build all dependencies and start a shell in which all environment
-variables are set up so that those dependencies can be found:
+
+### Open a development shell to hack on Nix
+
+To download (or build if they are not available) all dependencies and
+start a shell in which all environment variables are set up so that those
+dependencies can be found:
 
 ```console
 $ nix-shell
-```
+[dev-shell]$ # You are now in a development shell
 
-or if you have a flake-enabled nix:
-
-```console
+$ # or for a flake-enabled nix:
 $ nix develop
+[dev-shell]$ # You are now in a development shell
 ```
 
-To get a shell with a different compilation environment (e.g. stdenv,
-gccStdenv, clangStdenv, clang11Stdenv):
+**To get a shell with a different compilation environment**:
 
+(e.g. stdenv, gccStdenv, clangStdenv, clang11Stdenv):
 ```console
 $ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
-```
 
-or if you have a flake-enabled nix:
-
-```console
+$ # or for a flake-enabled nix:
 $ nix develop .#clang11StdenvPackages
 ```
 
-To build Nix itself in this shell:
+**You can use your prefered shell with**:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
-[nix-shell]$ make -j $NIX_BUILD_CORES
+$ nix-shell --run "$SHELL"
+
+$ # or for a flake-enabled nix:
+$ nix develop -c $SHELL
 ```
 
-To install it in `$(pwd)/outputs` and test it:
+### Build Nix
+
+To build Nix itself in the development shell:
 
 ```console
-[nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
-[nix-shell]$ ./outputs/out/bin/nix --version
+[dev-shell]$ ./bootstrap.sh
+[dev-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[dev-shell]$ make -j $NIX_BUILD_CORES
+... (build log)
+[dev-shell]$ ./outputs/out/bin/nix --version
 nix (Nix) 3.0
 ```
 
-To run a functional test:
+
+### Install (in a local dir)
+
+To install everything (bins, libs, docs, configs) to `$(pwd)/outputs/out` (chosen at the `./configure ...` step above):
 
 ```console
-make tests/test-name-should-auto-complete.sh.test
+[dev-shell]$ make install
 ```
+NOTE: This will also (re-)build the HTML docs if needed.
 
-To run the unit-tests for C++ code:
 
-```
-make check
-```
+### Run tests
 
-If you have a flakes-enabled Nix you can replace:
+Run the unit-tests for C++ code:
 
 ```console
-$ nix-shell
+[dev-shell]$ make check
 ```
 
-by:
+Run all functional tests:
 
 ```console
-$ nix develop
+[dev-shell]$ make install    # need to install first if you haven't
+[dev-shell]$ make installcheck -j $NIX_BUILD_CORES
 ```
+
+Run a functional test (e.g: `tests/flakes.sh`):
+
+```console
+[dev-shell]$ make tests/flakes.sh.test    # note the .test suffix!
+```
+
+
+---
+
+Have fun! 🚀 🚀 🚀
+
+And make the world a better place! (with Nix of course 😀)
