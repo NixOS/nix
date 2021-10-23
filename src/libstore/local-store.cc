@@ -1358,7 +1358,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
     auto [hash, size] = hashSink->finish();
 
-    auto dstPath = makeFixedOutputPath(method, hash, name);
+    auto dstPath = makeFixedOutputPath(method, hash, name, references);
 
     addTempRoot(dstPath);
 

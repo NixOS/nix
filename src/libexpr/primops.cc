@@ -1859,12 +1859,12 @@ static void addPath(
         // be rewritten to the actual output).
         state.realiseContext(context);
 
+        StorePathSet refs = StorePathSet();
+
         if (state.store->isInStore(path)) {
             auto [storePath, subPath] = state.store->toStorePath(path);
-            auto info = state.store->queryPathInfo(storePath);
-            if (!info->references.empty())
-                throw EvalError("store path '%s' is not allowed to have references",
-                    state.store->printStorePath(storePath));
+            // FIXME: we should scanForReferences on the path before adding it
+            refs = state.store->queryPathInfo(storePath)->references;
             path = state.store->toRealPath(storePath) + subPath;
         }
 
@@ -1904,7 +1904,7 @@ static void addPath(
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             dstPath = state.store->printStorePath(settings.readOnlyMode
                 ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
+                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs));
             if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
                 throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
         } else

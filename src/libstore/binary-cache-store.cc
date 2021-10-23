@@ -314,7 +314,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & nam
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name),
+            makeFixedOutputPath(method, nar.first, name, references),
             nar.first,
         };
         info.narSize = nar.second;
@@ -405,7 +405,7 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name),
+            makeFixedOutputPath(method, h, name, references),
             nar.first,
         };
         info.narSize = nar.second;
