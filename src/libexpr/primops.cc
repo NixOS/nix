@@ -1008,7 +1008,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     if (i->name == state.sStructuredAttrs) continue;
 
                     auto placeholder(jsonObject->placeholder(key));
-                    printValueAsJSON(state, true, *i->value, placeholder, context);
+                    printValueAsJSON(state, true, *i->value, pos, placeholder, context);
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, posDrvName);
@@ -1687,7 +1687,7 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     std::ostringstream out;
     PathSet context;
-    printValueAsJSON(state, true, *args[0], out, context);
+    printValueAsJSON(state, true, *args[0], pos, out, context);
     mkString(v, out.str(), context);
 }
 
