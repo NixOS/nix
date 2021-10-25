@@ -18,6 +18,7 @@
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
+#include "experimental-features.hh"
 
 using namespace nix;
 using std::cin;
@@ -295,7 +296,7 @@ connected:
 
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !derivationHasKnownOutputPaths(drv.type())) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
@@ -327,7 +328,7 @@ connected:
         for (auto & realisation : missingRealisations) {
             // Should hold, because if the feature isn't enabled the set
             // of missing realisations should be empty
-            settings.requireExperimentalFeature("ca-derivations");
+            settings.requireExperimentalFeature(Xp::CaDerivations);
             store->registerDrvOutput(realisation);
         }
 

@@ -401,7 +401,7 @@ static void main_nix_build(int argc, char * * argv)
 
         if (dryRun) return;
 
-        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             auto resolvedDrv = drv.tryResolve(*store);
             assert(resolvedDrv && "Successfully resolved the derivation");
             drv = *resolvedDrv;

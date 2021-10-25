@@ -204,7 +204,7 @@ void DerivationGoal::haveDerivation()
     trace("have derivation");
 
     if (drv->type() == DerivationType::CAFloating)
-        settings.requireExperimentalFeature("ca-derivations");
+        settings.requireExperimentalFeature(Xp::CaDerivations);
 
     retrySubstitution = false;
 
@@ -453,7 +453,7 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") &&
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) &&
             ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
             || fullDrv.type() == DerivationType::DeferredInputAddressed)) {
             /* We are be able to resolve this derivation based on the
@@ -1273,7 +1273,7 @@ void DerivationGoal::checkPathValidity()
                     : PathStatus::Corrupt,
             };
         }
-        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             auto drvOutput = DrvOutput{initialOutputs.at(i.first).outputHash, i.first};
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {

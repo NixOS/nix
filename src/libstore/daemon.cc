@@ -230,7 +230,7 @@ struct ClientSettings
                 else if (name == settings.experimentalFeatures.name) {
                     // We don’t want to forward the experimental features to
                     // the daemon, as that could cause some pretty weird stuff
-                    if (tokenizeString<Strings>(value) != settings.experimentalFeatures.get())
+                    if (parseFeatures(tokenizeString<StringSet>(value)) != settings.experimentalFeatures.get())
                         debug("Ignoring the client-specified experimental features");
                 }
                 else if (trusted

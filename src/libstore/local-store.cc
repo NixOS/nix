@@ -309,7 +309,7 @@ LocalStore::LocalStore(const Params & params)
 
     else openDB(*state, false);
 
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
     }
 
@@ -339,7 +339,7 @@ LocalStore::LocalStore(const Params & params)
     state->stmts->QueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
     state->stmts->QueryValidPaths.create(state->db, "select path from ValidPaths");
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         state->stmts->RegisterRealisedOutput.create(state->db,
             R"(
                 insert into Realisations (drvPath, outputName, outputPath, signatures)
@@ -708,7 +708,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 
 void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs)
 {
-    settings.requireExperimentalFeature("ca-derivations");
+    settings.requireExperimentalFeature(Xp::CaDerivations);
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
         registerDrvOutput(info);
     else
@@ -717,7 +717,7 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
 
 void LocalStore::registerDrvOutput(const Realisation & info)
 {
-    settings.requireExperimentalFeature("ca-derivations");
+    settings.requireExperimentalFeature(Xp::CaDerivations);
     retrySQLite<void>([&]() {
         auto state(_state.lock());
         if (auto oldR = queryRealisation_(*state, info.id)) {
@@ -1003,7 +1003,7 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
         return outputs;
     });
 
-    if (!settings.isExperimentalFeatureEnabled("ca-derivations"))
+    if (!settings.isExperimentalFeatureEnabled(Xp::CaDerivations))
         return outputs;
 
     auto drv = readInvalidDerivation(path);

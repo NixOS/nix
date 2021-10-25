@@ -176,7 +176,7 @@ static void fetchTree(
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature("flakes");
+    settings.requireExperimentalFeature(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
@@ -290,7 +290,7 @@ static RegisterPrimOp primop_fetchTarball({
       The fetched tarball is cached for a certain amount of time (1 hour
       by default) in `~/.cache/nix/tarballs/`. You can change the cache
       timeout either on the command line with `--option tarball-ttl number
-      of seconds` or in the Nix configuration file with this option: ` 
+      of seconds` or in the Nix configuration file with this option: `
       number of seconds to cache `.
 
       Note that when obtaining the hash with ` nix-prefetch-url ` the
@@ -393,7 +393,7 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > It is nice to always specify the branch which a revision
           > belongs to. Without the branch being specified, the fetcher
           > might fail if the default branch changes. Additionally, it can
@@ -430,12 +430,12 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > Nix will refetch the branch in accordance with
           > the option `tarball-ttl`.
 
           > **Note**
-          > 
+          >
           > This behavior is disabled in *Pure evaluation mode*.
     )",
     .fun = prim_fetchGit,
