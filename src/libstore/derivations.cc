@@ -187,7 +187,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
                 },
             };
         } else {
-            settings.requireExperimentalFeature("ca-derivations");
+            settings.requireExperimentalFeature(Xp::CaDerivations);
             assert(pathS == "");
             return DerivationOutput {
                 .output = DerivationOutputCAFloating {

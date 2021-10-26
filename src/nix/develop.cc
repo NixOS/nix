@@ -195,7 +195,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
             output.second = {
                 .output = DerivationOutputDeferred{},

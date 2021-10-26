@@ -466,7 +466,7 @@ EvalState::~EvalState()
 
 
 void EvalState::requireExperimentalFeatureOnEvaluation(
-    const std::string & feature,
+    const ExperimentalFeature & feature,
     const std::string_view fName,
     const Pos & pos)
 {

@@ -100,7 +100,7 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                     staticOutputHashes(store, store.readDerivation(p.drvPath));
                 for (auto& [outputName, outputPath] : p.outputs) {
                     if (settings.isExperimentalFeatureEnabled(
-                            "ca-derivations")) {
+                                Xp::CaDerivations)) {
                         auto thisRealisation = store.queryRealisation(
                             DrvOutput{drvHashes.at(outputName), outputName});
                         assert(thisRealisation);  // We’ve built it, so we must h

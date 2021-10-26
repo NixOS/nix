@@ -418,7 +418,7 @@ expr_simple
           new ExprString(data->symbols.create(path)));
   }
   | URI {
-      static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
+      static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
