@@ -1,4 +1,6 @@
 #include "experimental-features.hh"
+#include "util.hh"
+
 #include "nlohmann/json.hpp"
 
 namespace nix {
@@ -14,17 +16,19 @@ std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)
 {
     using ReverseXpMap = std::map<std::string_view, ExperimentalFeature>;
-    static ReverseXpMap * reverseXpMap;
-    if (!reverseXpMap) {
-        reverseXpMap = new ReverseXpMap{};
+
+    static auto reverseXpMap = []()
+    {
+        auto reverseXpMap = std::make_unique<ReverseXpMap>();
         for (auto & [feature, name] : stringifiedXpFeatures)
             (*reverseXpMap)[name] = feature;
-    }
+        return reverseXpMap;
+    }();
 
-    auto featureIter = reverseXpMap->find(name);
-    if (featureIter == reverseXpMap->end())
+    if (auto feature = get(*reverseXpMap, name))
+        return *feature;
+    else
         return std::nullopt;
-    return {featureIter->second};
 }
 
 std::string_view showExperimentalFeature(const ExperimentalFeature feature)
@@ -45,7 +49,7 @@ std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFea
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
     : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", showExperimentalFeature(feature))
     , missingFeature(feature)
-    {}
+{}
 
 std::ostream & operator <<(std::ostream & str, const ExperimentalFeature & feature)
 {
