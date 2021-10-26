@@ -23,7 +23,8 @@ let
                   && !isAbsolutePath node.locked.path;
 
               # FIXME: put parent node reference in lock file and use it here.
-              parentPath = rootSrc + "/${rootSubdir}";
+              parentKey = lockFile.root;
+              parentPath = allNodes.${parentKey}.sourceInfo.outPath;
             in
               if isRelativePathNode
               then { path = parentPath + "/" + node.locked.path; }
@@ -34,7 +35,7 @@ let
           flake = import (sourceInfo + (if subdir != "" then "/" else "") + subdir + "/flake.nix");
 
           inputs = builtins.mapAttrs
-            (inputName: inputSpec: allNodes.${resolveInput inputSpec})
+            (inputName: inputSpec: allNodes.${resolveInput inputSpec}.result)
             (node.inputs or {});
 
           # Resolve a input spec into a node name. An input spec is
@@ -60,14 +61,18 @@ let
 
           result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; };
         in
-          if node.flake or true then
-            assert builtins.isFunction flake.outputs;
-            result
-          else
-            sourceInfo
+          {
+            inherit sourceInfo;
+            result =
+              if node.flake or true then
+                assert builtins.isFunction flake.outputs;
+                result
+              else
+                sourceInfo;
+          }
       )
       lockFile.nodes;
 
   isAbsolutePath = p: builtins.substring 0 1 p == "/";
 
-in allNodes.${lockFile.root}
+in allNodes.${lockFile.root}.result
