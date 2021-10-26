@@ -12,7 +12,22 @@ let
           sourceInfo =
             if key == lockFile.root
             then rootSrc
-            else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+            else fetchTree (node.info or {} // removeAttrs node.locked ["dir"] // resolvePath node);
+
+          # Relative paths are relative to their parent.
+          resolvePath = node:
+            let
+              isRelativePathNode =
+                (node.locked.type or null) == "path"
+                  && node?locked.path
+                  && !isAbsolutePath node.locked.path;
+
+              # FIXME: put parent node reference in lock file and use it here.
+              parentPath = rootSrc + "/${rootSubdir}";
+            in
+              if isRelativePathNode
+              then { path = parentPath + "/" + node.locked.path; }
+              else {};
 
           subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
 
@@ -52,5 +67,7 @@ let
             sourceInfo
       )
       lockFile.nodes;
+
+  isAbsolutePath = p: builtins.substring 0 1 p == "/";
 
 in allNodes.${lockFile.root}
