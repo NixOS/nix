@@ -65,7 +65,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             auto list(out.list());
             for (unsigned int n = 0; n < v.listSize(); ++n) {
                 auto placeholder(list.placeholder());
-                printValueAsJSON(state, strict, *v.listElems()[n], noPos, placeholder, context);
+                printValueAsJSON(state, strict, *v.listElems()[n], pos, placeholder, context);
             }
             break;
         }
