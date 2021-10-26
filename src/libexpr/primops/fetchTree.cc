@@ -287,13 +287,13 @@ static RegisterPrimOp primop_fetchTarball({
       stdenv.mkDerivation { … }
       ```
 
-      The fetched tarball is cached for a certain amount of time (1 hour
-      by default) in `~/.cache/nix/tarballs/`. You can change the cache
-      timeout either on the command line with `--option tarball-ttl number
-      of seconds` or in the Nix configuration file with this option: `
-      number of seconds to cache `.
+      The fetched tarball is cached for a certain amount of time (1
+      hour by default) in `~/.cache/nix/tarballs/`. You can change the
+      cache timeout either on the command line with `--tarball-ttl`
+      *number-of-seconds* or in the Nix configuration file by adding
+      the line `tarball-ttl = ` *number-of-seconds*.
 
-      Note that when obtaining the hash with ` nix-prefetch-url ` the
+      Note that when obtaining the hash with `nix-prefetch-url` the
       option `--unpack` is required.
 
       This function can also verify the contents against a hash. In that
