@@ -1,4 +1,4 @@
-# Release 2.4 (2021-10-XX)
+# Release 2.4 (2021-11-01)
 
 This is the first release in more than two years and is the result of
 more than 2800 commits from 195 contributors since release 2.3.
@@ -286,8 +286,35 @@ more than 2800 commits from 195 contributors since release 2.3.
   to your `nix.conf` if you want to use it, or pass
   `--extra-experimental-features nix-command` on the command line.
 
-* The old `nix run` has been renamed to `nix shell` (and there is a
-  new `nix run` that does something else, as described above).
+* The `nix` command no longer has a syntax for referring to packages
+  in a channel. This means that the following no longer works:
+
+  > nix build nixpkgs.hello # Nix 2.3
+
+  Instead, you can either use the `#` syntax to select a package from
+  a flake, e.g.
+
+  > nix build nixpkgs#hello
+
+  Or, if you want to use the `nixpkgs` channel in the `NIX_PATH`
+  environment variable:
+
+  > nix build -f '<nixpkgs>' hello
+
+* The old `nix run` has been renamed to `nix shell`, while there is a
+  new `nix run` that runs a default command. So instead of
+
+  > nix run nixpkgs.hello -c hello # Nix 2.3
+
+  you should use
+
+  > nix shell nixpkgs#hello -c hello
+
+  or just
+
+  > nix run nixpkgs#hello
+
+  if the command you want to run has the same name as the package.
 
 * It is now an error to modify the `plugin-files` setting via a
   command-line flag that appears after the first non-flag argument to
