@@ -437,39 +437,19 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
-std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
+void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
-    if (diskCache) {
-        auto [cacheOutcome, maybeCachedRealisation] =
-            diskCache->lookupRealisation(getUri(), id);
-        switch (cacheOutcome) {
-            case NarInfoDiskCache::oValid:
-                debug("Returning a cached realisation for %s", id.to_string());
-                return *maybeCachedRealisation;
-            case NarInfoDiskCache::oInvalid:
-                debug("Returning a cached missing realisation for %s", id.to_string());
-                return {};
-            case NarInfoDiskCache::oUnknown:
-                break;
-        }
-    }
-
     auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
     auto rawOutputInfo = getFile(outputInfoFilePath);
 
     if (rawOutputInfo) {
         auto realisation = Realisation::fromJSON(
             nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath);
-
-        if (diskCache)
-            diskCache->upsertRealisation(
-                getUri(), realisation);
-
-        return {realisation};
+        callback(std::make_shared<const Realisation>(realisation));
+        return;
     } else {
-        if (diskCache)
-            diskCache->upsertAbsentRealisation(getUri(), id);
-        return std::nullopt;
+        callback(nullptr);
     }
 }
 

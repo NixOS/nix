@@ -50,8 +50,9 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
-    { unsupported("queryRealisation"); }
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    { callback(nullptr); }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;

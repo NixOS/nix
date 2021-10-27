@@ -367,7 +367,8 @@ public:
         return conn->remoteVersion;
     }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // TODO: Implement
     { unsupported("queryRealisation"); }
 };

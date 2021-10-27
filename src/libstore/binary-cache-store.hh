@@ -108,7 +108,8 @@ public:
 
     void registerDrvOutput(const Realisation & info) override;
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

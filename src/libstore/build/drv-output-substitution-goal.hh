@@ -20,7 +20,7 @@ private:
 
     // The realisation corresponding to the given output id.
     // Will be filled once we can get it.
-    std::optional<Realisation> outputInfo;
+    std::shared_ptr<const Realisation> outputInfo;
 
     /* The remaining substituters. */
     std::list<ref<Store>> subs;

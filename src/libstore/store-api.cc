@@ -542,6 +542,74 @@ void Store::queryPathInfo(const StorePath & storePath,
         }});
 }
 
+void Store::queryRealisation(const DrvOutput & id,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept
+{
+
+    try {
+        if (diskCache) {
+            auto [cacheOutcome, maybeCachedRealisation]
+                = diskCache->lookupRealisation(getUri(), id);
+            switch (cacheOutcome) {
+            case NarInfoDiskCache::oValid:
+                debug("Returning a cached realisation for %s", id.to_string());
+                callback(maybeCachedRealisation);
+                return;
+            case NarInfoDiskCache::oInvalid:
+                debug(
+                    "Returning a cached missing realisation for %s",
+                    id.to_string());
+                callback(nullptr);
+                return;
+            case NarInfoDiskCache::oUnknown:
+                break;
+            }
+        }
+    } catch (...) {
+        return callback.rethrow();
+    }
+
+    auto callbackPtr
+        = std::make_shared<decltype(callback)>(std::move(callback));
+
+    queryRealisationUncached(
+        id,
+        { [this, id, callbackPtr](
+              std::future<std::shared_ptr<const Realisation>> fut) {
+            try {
+                auto info = fut.get();
+
+                if (diskCache) {
+                    if (info)
+                        diskCache->upsertRealisation(getUri(), *info);
+                    else
+                        diskCache->upsertAbsentRealisation(getUri(), id);
+                }
+
+                (*callbackPtr)(std::shared_ptr<const Realisation>(info));
+
+            } catch (...) {
+                callbackPtr->rethrow();
+            }
+        } });
+}
+
+std::shared_ptr<const Realisation> Store::queryRealisation(const DrvOutput & id)
+{
+    using RealPtr = std::shared_ptr<const Realisation>;
+    std::promise<RealPtr> promise;
+
+    queryRealisation(id,
+        {[&](std::future<RealPtr> result) {
+            try {
+                promise.set_value(result.get());
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+        }});
+
+    return promise.get_future().get();
+}
 
 void Store::substitutePaths(const StorePathSet & paths)
 {
