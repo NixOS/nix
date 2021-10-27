@@ -52,7 +52,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context);
             else if (output == okJSON)
-                printValueAsJSON(state, strict, vRes, noPos, std::cout, context);
+                printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
             else {
                 if (strict) state.forceValueDeep(vRes);
                 std::cout << vRes << std::endl;
