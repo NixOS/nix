@@ -752,7 +752,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, path };
         else {
             logWarning({
-                .msg = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }
