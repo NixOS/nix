@@ -616,7 +616,9 @@ void DerivationGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store);
+    bool buildLocally =
+        (buildMode != bmNormal || parsedDrv->willBuildLocally(worker.store))
+        && settings.maxBuildJobs.get() != 0;
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
