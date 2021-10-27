@@ -322,7 +322,7 @@ template<> void BaseSetting<std::set<ExperimentalFeature>>::set(const std::strin
         if (thisXpFeature)
             value.insert(thisXpFeature.value());
         else
-            warn("Unknown experimental feature %s", s);
+            warn("unknown experimental feature '%s'", s);
     }
 }
 
