@@ -40,7 +40,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case nAttrs: {
-            auto maybeString = state.tryAttrsToString(noPos, v, context, false, false);
+            auto maybeString = state.tryAttrsToString(pos, v, context, false, false);
             if (maybeString) {
                 out.write(*maybeString);
                 break;
@@ -79,16 +79,12 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case nThunk:
-            throw TypeError({
-                .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
-                .errPos = pos
-            });
-
         case nFunction:
-            throw TypeError({
+            auto e = TypeError({
                 .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
-                .errPos = pos
+                .errPos = v.determinePos(pos)
             });
+            throw e.addTrace(pos, hintfmt("message for the trace"));
     }
 }
 
