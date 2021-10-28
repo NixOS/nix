@@ -145,7 +145,6 @@ LocalStore::LocalStore(const Params & params)
     , linksDir(realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
-    , trashDir(realStoreDir + "/trash")
     , tempRootsDir(stateDir + "/temproots")
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
     , locksHeld(tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS").value_or("")))
@@ -383,6 +382,16 @@ LocalStore::LocalStore(const Params & params)
                     (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
+}
+
+
+AutoCloseFD LocalStore::openGCLock()
+{
+    Path fnGCLock = stateDir + "/gc.lock";
+    auto fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    if (!fdGCLock)
+        throw SysError("opening global GC lock '%1%'", fnGCLock);
+    return fdGCLock;
 }
 
 
@@ -825,7 +834,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(std::string(info.path.hashPart()),
+        state_->pathInfoCache.upsert(std::string(info.path.to_string()),
             PathInfoCacheValue{ .value = std::make_shared<const ValidPathInfo>(info) });
     }
 
@@ -1198,7 +1207,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.erase(std::string(path.hashPart()));
+        state_->pathInfoCache.erase(std::string(path.to_string()));
     }
 }
 
@@ -1505,7 +1514,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     /* Acquire the global GC lock to get a consistent snapshot of
        existing and valid paths. */
-    AutoCloseFD fdGCLock = openGCLock(ltWrite);
+    auto fdGCLock = openGCLock();
+    FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
     StringSet store;
     for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
@@ -1515,8 +1525,6 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     StorePathSet validPaths;
     PathSet done;
-
-    fdGCLock = -1;
 
     for (auto & i : queryAllValidPaths())
         verifyPath(printStorePath(i), store, done, validPaths, repair, errors);

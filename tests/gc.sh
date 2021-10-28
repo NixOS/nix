@@ -1,5 +1,7 @@
 source common.sh
 
+clearStore
+
 drvPath=$(nix-instantiate dependencies.nix)
 outPath=$(nix-store -rvv "$drvPath")
 
@@ -23,6 +25,12 @@ test -e $inUse
 if nix-store --delete $outPath; then false; fi
 test -e $outPath
 
+for i in $NIX_STORE_DIR/*; do
+    if [[ $i =~ /trash ]]; then continue; fi # compat with old daemon
+    touch $i.lock
+    touch $i.chroot
+done
+
 nix-collect-garbage
 
 # Check that the root and its dependencies haven't been deleted.
@@ -38,3 +46,7 @@ nix-collect-garbage
 
 # Check that the output has been GC'd.
 if test -e $outPath/foobar; then false; fi
+
+# Check that the store is empty.
+rmdir $NIX_STORE_DIR/.links
+rmdir $NIX_STORE_DIR

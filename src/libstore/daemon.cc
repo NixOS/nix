@@ -625,9 +625,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    // Obsolete.
     case wopSyncWithGC: {
         logger->startWork();
-        store->syncWithGC();
         logger->stopWork();
         to << 1;
         break;

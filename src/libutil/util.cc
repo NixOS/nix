@@ -1670,7 +1670,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 }
 
 
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+AutoCloseFD createUnixDomainSocket()
 {
     AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -1679,8 +1679,14 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
         , 0);
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
-
     closeOnExec(fdSocket.get());
+    return fdSocket;
+}
+
+
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+{
+    auto fdSocket = nix::createUnixDomainSocket();
 
     bind(fdSocket.get(), path);
 
@@ -1709,7 +1715,7 @@ void bind(int fd, const std::string & path)
             std::string base(baseNameOf(path));
             if (base.size() + 1 >= sizeof(addr.sun_path))
                 throw Error("socket path '%s' is too long", base);
-            strcpy(addr.sun_path, base.c_str());
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
             if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
                 throw SysError("cannot bind to socket '%s'", path);
             _exit(0);
@@ -1718,7 +1724,7 @@ void bind(int fd, const std::string & path)
         if (status != 0)
             throw Error("cannot bind to socket '%s'", path);
     } else {
-        strcpy(addr.sun_path, path.c_str());
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
         if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
             throw SysError("cannot bind to socket '%s'", path);
     }
@@ -1738,7 +1744,7 @@ void connect(int fd, const std::string & path)
             std::string base(baseNameOf(path));
             if (base.size() + 1 >= sizeof(addr.sun_path))
                 throw Error("socket path '%s' is too long", base);
-            strcpy(addr.sun_path, base.c_str());
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
             if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
                 throw SysError("cannot connect to socket at '%s'", path);
             _exit(0);
@@ -1747,7 +1753,7 @@ void connect(int fd, const std::string & path)
         if (status != 0)
             throw Error("cannot connect to socket at '%s'", path);
     } else {
-        strcpy(addr.sun_path, path.c_str());
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
         if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
             throw SysError("cannot connect to socket at '%s'", path);
     }

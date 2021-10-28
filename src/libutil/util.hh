@@ -511,6 +511,29 @@ std::optional<typename T::mapped_type> get(const T & map, const typename T::key_
 }
 
 
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> remove_begin(T & c)
+{
+    auto i = c.begin();
+    if (i == c.end()) return {};
+    auto v = std::move(*i);
+    c.erase(i);
+    return v;
+}
+
+
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> pop(T & c)
+{
+    if (c.empty()) return {};
+    auto v = std::move(c.front());
+    c.pop();
+    return v;
+}
+
+
 template<typename T>
 class Callback;
 
@@ -570,6 +593,9 @@ extern PathFilter defaultPathFilter;
 
 /* Common initialisation performed in child processes. */
 void commonChildInit(Pipe & logPipe);
+
+/* Create a Unix domain socket. */
+AutoCloseFD createUnixDomainSocket();
 
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);

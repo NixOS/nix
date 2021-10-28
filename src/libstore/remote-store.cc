@@ -797,15 +797,6 @@ void RemoteStore::addIndirectRoot(const Path & path)
 }
 
 
-void RemoteStore::syncWithGC()
-{
-    auto conn(getConnection());
-    conn->to << wopSyncWithGC;
-    conn.processStderr();
-    readInt(conn->from);
-}
-
-
 Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());

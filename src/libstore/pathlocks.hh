@@ -35,4 +35,18 @@ public:
     void setDeletion(bool deletePaths);
 };
 
+struct FdLock
+{
+    int fd;
+    bool acquired = false;
+
+    FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg);
+
+    ~FdLock()
+    {
+        if (acquired)
+            lockFile(fd, ltNone, false);
+    }
+};
+
 }

@@ -176,4 +176,17 @@ void PathLocks::setDeletion(bool deletePaths)
 }
 
 
+FdLock::FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg)
+    : fd(fd)
+{
+    if (wait) {
+        if (!lockFile(fd, lockType, false)) {
+            printInfo("%s", waitMsg);
+            acquired = lockFile(fd, lockType, true);
+        }
+    } else
+        acquired = lockFile(fd, lockType, false);
+}
+
+
 }
