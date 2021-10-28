@@ -22,6 +22,13 @@ builders=(
 chmod -R +w $TEST_ROOT/machine* || true
 rm -rf $TEST_ROOT/machine* || true
 
+out="$(nix-build $file \
+  --builders "ssh://localhost?remote-store=$TEST_ROOT/machine3 x86_64-linux - foo bar" \
+  --store $TEST_ROOT/machine0 \
+  --arg busybox $busybox 2>&1)" || true
+
+[[ "$out" =~ .*"Cannot stoull 'bar'! Argument '5' is supposed to be a 'speed factor'!".* ]]
+
 # Note: ssh://localhost bypasses ssh, directly invoking nix-store as a
 # child process. This allows us to test LegacySSHStore::buildDerivation().
 # ssh-ng://... likewise allows us to test RemoteStore::buildDerivation().

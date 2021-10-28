@@ -83,6 +83,20 @@ ref<Store> Machine::openStore() const {
     return nix::openStore(storeUri, storeParams);
 }
 
+unsigned long long stoull_machine_arg(std::vector<std::string> & machine, int at, const std::string & type)
+{
+    try {
+        return std::stoull(machine[at]);
+    } catch (std::invalid_argument) {
+        throw FormatError(
+            "Cannot " ANSI_BOLD "stoull" ANSI_NORMAL " '%s'! Argument '%d' is supposed to be a '%s'!",
+            machine[at],
+            at + 1,
+            type
+        );
+    }
+}
+
 void parseMachines(const std::string & s, Machines & machines)
 {
     for (auto line : tokenizeString<std::vector<string>>(s, "\n;")) {
@@ -114,8 +128,8 @@ void parseMachines(const std::string & s, Machines & machines)
         machines.emplace_back(tokens[0],
             isSet(1) ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
             isSet(2) ? tokens[2] : "",
-            isSet(3) ? std::stoull(tokens[3]) : 1LL,
-            isSet(4) ? std::stoull(tokens[4]) : 1LL,
+            isSet(3) ? stoull_machine_arg(tokens, 3, "max jobs") : 1LL,
+            isSet(4) ? stoull_machine_arg(tokens, 4, "speed factor") : 1LL,
             isSet(5) ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
             isSet(6) ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{},
             isSet(7) ? tokens[7] : "");
