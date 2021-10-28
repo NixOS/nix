@@ -1,6 +1,7 @@
 #include "config.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "experimental-features.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -313,6 +314,31 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
+template<> void BaseSetting<std::set<ExperimentalFeature>>::set(const std::string & str, bool append)
+{
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<StringSet>(str)) {
+        auto thisXpFeature = parseExperimentalFeature(s);
+        if (thisXpFeature)
+            value.insert(thisXpFeature.value());
+        else
+            warn("unknown experimental feature '%s'", s);
+    }
+}
+
+template<> bool BaseSetting<std::set<ExperimentalFeature>>::isAppendable()
+{
+    return true;
+}
+
+template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
+{
+    StringSet stringifiedXpFeatures;
+    for (auto & feature : value)
+        stringifiedXpFeatures.insert(std::string(showExperimentalFeature(feature)));
+    return concatStringsSep(" ", stringifiedXpFeatures);
+}
+
 template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
 {
     if (!append) value.clear();
@@ -348,6 +374,7 @@ template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
+template class BaseSetting<std::set<ExperimentalFeature>>;
 
 void PathSetting::set(const std::string & str, bool append)
 {

@@ -297,7 +297,7 @@ LockedFlake lockFlake(
     const FlakeRef & topRef,
     const LockFlags & lockFlags)
 {
-    settings.requireExperimentalFeature("flakes");
+    settings.requireExperimentalFeature(Xp::Flakes);
 
     FlakeCache flakeCache;
 
@@ -687,7 +687,7 @@ void callFlake(EvalState & state,
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.requireExperimentalFeatureOnEvaluation("flakes", "builtins.getFlake", pos);
+    state.requireExperimentalFeatureOnEvaluation(Xp::Flakes, "builtins.getFlake", pos);
 
     auto flakeRefS = state.forceStringNoCtx(*args[0], pos);
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);

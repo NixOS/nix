@@ -148,7 +148,8 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
+        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
         if (std::string{SYSTEM} == "x86_64-darwin")
             extraPlatforms.insert("aarch64-darwin");
         else if (std::string{SYSTEM} == "aarch64-darwin")
@@ -159,21 +160,16 @@ StringSet Settings::getDefaultExtraPlatforms()
     return extraPlatforms;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const std::string & name)
+bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
 {
     auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), name) != f.end();
+    return std::find(f.begin(), f.end(), feature) != f.end();
 }
 
-MissingExperimentalFeature::MissingExperimentalFeature(std::string feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", feature)
-    , missingFeature(feature)
-    {}
-
-void Settings::requireExperimentalFeature(const std::string & name)
+void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
 {
-    if (!isExperimentalFeatureEnabled(name))
-        throw MissingExperimentalFeature(name);
+    if (!isExperimentalFeatureEnabled(feature))
+        throw MissingExperimentalFeature(feature);
 }
 
 bool Settings::isWSL1()

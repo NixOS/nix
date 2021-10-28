@@ -418,7 +418,7 @@ expr_simple
           new ExprString(data->symbols.create(path)));
   }
   | URI {
-      static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
+      static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
@@ -752,7 +752,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, path };
         else {
             logWarning({
-                .msg = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }

@@ -50,4 +50,4 @@ exp_cores=$(nix show-config | grep '^cores' | cut -d '=' -f 2 | xargs)
 exp_features=$(nix show-config | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
 [[ $prev != $exp_cores ]]
 [[ $exp_cores == "4242" ]]
-[[ $exp_features == "nix-command flakes" ]]
+[[ $exp_features == "flakes nix-command" ]]

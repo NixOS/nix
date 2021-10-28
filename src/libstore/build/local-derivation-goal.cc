@@ -1259,7 +1259,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             for (auto & [outputName, outputPath] : outputs)
                 if (wantOutput(outputName, bfd.outputs)) {
                     newPaths.insert(outputPath);
-                    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+                    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
                         auto thisRealisation = next->queryRealisation(
                             DrvOutput{drvHashes.at(outputName), outputName}
                         );
@@ -1320,7 +1320,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
 void LocalDerivationGoal::startDaemon()
 {
-    settings.requireExperimentalFeature("recursive-nix");
+    settings.requireExperimentalFeature(Xp::RecursiveNix);
 
     Store::Params params;
     params["path-info-cache-size"] = "0";
@@ -2561,7 +2561,7 @@ void LocalDerivationGoal::registerOutputs()
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
 
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto& [outputName, newInfo] : infos) {
             auto thisRealisation = Realisation{
                 .id = DrvOutput{initialOutputs.at(outputName).outputHash,

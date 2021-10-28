@@ -97,7 +97,7 @@ static void fetchTree(
     fetchers::Input input;
     PathSet context;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
         state.forceAttrs(*args[0], pos);
@@ -121,7 +121,7 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
-            state.forceValue(*attr.value);
+            state.forceValue(*attr.value, *attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false);
                 attrs.emplace(attr.name,
@@ -176,7 +176,7 @@ static void fetchTree(
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature("flakes");
+    settings.requireExperimentalFeature(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
@@ -189,7 +189,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
 
@@ -287,13 +287,13 @@ static RegisterPrimOp primop_fetchTarball({
       stdenv.mkDerivation { … }
       ```
 
-      The fetched tarball is cached for a certain amount of time (1 hour
-      by default) in `~/.cache/nix/tarballs/`. You can change the cache
-      timeout either on the command line with `--option tarball-ttl number
-      of seconds` or in the Nix configuration file with this option: ` 
-      number of seconds to cache `.
+      The fetched tarball is cached for a certain amount of time (1
+      hour by default) in `~/.cache/nix/tarballs/`. You can change the
+      cache timeout either on the command line with `--tarball-ttl`
+      *number-of-seconds* or in the Nix configuration file by adding
+      the line `tarball-ttl = ` *number-of-seconds*.
 
-      Note that when obtaining the hash with ` nix-prefetch-url ` the
+      Note that when obtaining the hash with `nix-prefetch-url` the
       option `--unpack` is required.
 
       This function can also verify the contents against a hash. In that
@@ -393,7 +393,7 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > It is nice to always specify the branch which a revision
           > belongs to. Without the branch being specified, the fetcher
           > might fail if the default branch changes. Additionally, it can
@@ -430,12 +430,12 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > Nix will refetch the branch in accordance with
           > the option `tarball-ttl`.
 
           > **Note**
-          > 
+          >
           > This behavior is disabled in *Pure evaluation mode*.
     )",
     .fun = prim_fetchGit,

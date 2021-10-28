@@ -5,6 +5,7 @@
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <optional>
@@ -141,7 +142,7 @@ public:
     ~EvalState();
 
     void requireExperimentalFeatureOnEvaluation(
-        const std::string & feature,
+        const ExperimentalFeature &,
         const std::string_view fName,
         const Pos & pos
     );

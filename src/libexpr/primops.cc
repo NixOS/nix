@@ -985,7 +985,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
             if (i->name == state.sContentAddressed) {
-                settings.requireExperimentalFeature("ca-derivations");
+                settings.requireExperimentalFeature(Xp::CaDerivations);
                 contentAddressed = state.forceBool(*i->value, pos);
             }
 

@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -43,15 +44,6 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     }
 
     void set(const std::string & str, bool append = false) override;
-};
-
-class MissingExperimentalFeature: public Error
-{
-public:
-    std::string missingFeature;
-
-    MissingExperimentalFeature(std::string feature);
-    virtual const char* sname() const override { return "MissingExperimentalFeature"; }
 };
 
 class Settings : public Config {
@@ -925,12 +917,12 @@ public:
           value.
           )"};
 
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
-    void requireExperimentalFeature(const std::string & name);
+    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<bool> allowDirty{this, true, "allow-dirty",
         "Whether to allow dirty Git/Mercurial trees."};

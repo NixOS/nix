@@ -61,6 +61,7 @@
 
         configureFlags =
           lib.optionals stdenv.isLinux [
+            "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
             "LDFLAGS=-fuse-ld=gold"
           ];

@@ -18,6 +18,7 @@
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
+#include "experimental-features.hh"
 
 using namespace nix;
 using std::cin;
@@ -130,11 +131,14 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
-                    if (m.enabled && std::find(m.systemTypes.begin(),
-                            m.systemTypes.end(),
-                            neededSystem) != m.systemTypes.end() &&
+                    if (m.enabled
+                        && (neededSystem == "builtin"
+                            || std::find(m.systemTypes.begin(),
+                                m.systemTypes.end(),
+                                neededSystem) != m.systemTypes.end()) &&
                         m.allSupported(requiredFeatures) &&
-                        m.mandatoryMet(requiredFeatures)) {
+                        m.mandatoryMet(requiredFeatures))
+                    {
                         rightType = true;
                         AutoCloseFD free;
                         uint64_t load = 0;
@@ -295,7 +299,7 @@ connected:
 
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !derivationHasKnownOutputPaths(drv.type())) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
@@ -327,7 +331,7 @@ connected:
         for (auto & realisation : missingRealisations) {
             // Should hold, because if the feature isn't enabled the set
             // of missing realisations should be empty
-            settings.requireExperimentalFeature("ca-derivations");
+            settings.requireExperimentalFeature(Xp::CaDerivations);
             store->registerDrvOutput(realisation);
         }
 

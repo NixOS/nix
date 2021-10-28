@@ -355,7 +355,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 StringSet StoreConfig::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
-    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations))
         res.insert("ca-derivations");
     return res;
 }
@@ -854,7 +854,7 @@ std::map<StorePath, StorePath> copyPaths(
     for (auto & path : paths) {
         storePaths.insert(path.path());
         if (auto realisation = std::get_if<Realisation>(&path.raw)) {
-            settings.requireExperimentalFeature("ca-derivations");
+            settings.requireExperimentalFeature(Xp::CaDerivations);
             toplevelRealisations.insert(*realisation);
         }
     }
@@ -886,7 +886,7 @@ std::map<StorePath, StorePath> copyPaths(
         // Don't fail if the remote doesn't support CA derivations is it might
         // not be within our control to change that, and we might still want
         // to at least copy the output paths.
-        if (e.missingFeature == "ca-derivations")
+        if (e.missingFeature == Xp::CaDerivations)
             ignoreException();
         else
             throw;
