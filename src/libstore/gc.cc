@@ -123,20 +123,10 @@ void LocalStore::addTempRoot(const StorePath & path)
            collector is running. So we have to connect to the garbage
            collector and inform it about our root. */
         if (!state->fdRootsSocket) {
-            state->fdRootsSocket = createUnixDomainSocket();
-
             auto socketPath = stateDir.get() + gcSocketPath;
-
             debug("connecting to '%s'", socketPath);
-
-            struct sockaddr_un addr;
-            addr.sun_family = AF_UNIX;
-            if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-                throw Error("socket path '%s' is too long", socketPath);
-            strcpy(addr.sun_path, socketPath.c_str());
-
-            if (::connect(state->fdRootsSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-                throw SysError("cannot connect to garbage collector at '%s'", socketPath);
+            state->fdRootsSocket = createUnixDomainSocket();
+            nix::connect(state->fdRootsSocket.get(), socketPath);
         }
 
         try {
