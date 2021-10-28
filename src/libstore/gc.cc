@@ -502,7 +502,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     std::thread serverThread([&]() {
         Sync<std::map<int, std::thread>> connections;
-        std::atomic_bool quit = false;
 
         Finally cleanup([&]() {
             debug("GC roots server shutting down");
