@@ -1,6 +1,8 @@
 #include "drv-output-substitution-goal.hh"
+#include "finally.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
+#include "callback.hh"
 
 namespace nix {
 
@@ -50,14 +52,42 @@ void DrvOutputSubstitutionGoal::tryNext()
         return;
     }
 
-    auto sub = subs.front();
+    sub = subs.front();
     subs.pop_front();
 
     // FIXME: Make async
-    outputInfo = sub->queryRealisation(id);
+    // outputInfo = sub->queryRealisation(id);
+    outPipe.create();
+    promise = decltype(promise)();
+
+    sub->queryRealisation(
+        id, { [&](std::future<std::shared_ptr<const Realisation>> res) {
+            try {
+                Finally updateStats([this]() { outPipe.writeSide.close(); });
+                promise.set_value(res.get());
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+        } });
+
+    worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
+
+    state = &DrvOutputSubstitutionGoal::realisationFetched;
+}
+
+void DrvOutputSubstitutionGoal::realisationFetched()
+{
+    worker.childTerminated(this);
+
+    try {
+        outputInfo = promise.get_future().get();
+    } catch (std::exception & e) {
+        printError(e.what());
+        substituterFailed = true;
+    }
+
     if (!outputInfo) {
-        tryNext();
-        return;
+        return tryNext();
     }
 
     for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
@@ -118,5 +148,11 @@ void DrvOutputSubstitutionGoal::work()
 {
     (this->*state)();
 }
+
+void DrvOutputSubstitutionGoal::handleEOF(int fd)
+{
+    if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
+}
+
 
 }
