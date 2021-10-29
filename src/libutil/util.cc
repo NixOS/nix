@@ -1436,8 +1436,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 }
 
 
-static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-static std::array<char, 256> base64DecodeChars;
+constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 string base64Encode(std::string_view s)
 {
@@ -1462,12 +1461,15 @@ string base64Encode(std::string_view s)
 
 string base64Decode(std::string_view s)
 {
-    static std::once_flag flag;
-    std::call_once(flag, [](){
-        base64DecodeChars = { (char)-1 };
+    constexpr char npos = -1;
+    constexpr std::array<char, 256> base64DecodeChars = [&]() {
+        std::array<char, 256>  result{};
+        for (auto& c : result)
+            c = npos;
         for (int i = 0; i < 64; i++)
-            base64DecodeChars[(int) base64Chars[i]] = i;
-    });
+            result[base64Chars[i]] = i;
+        return result;
+    }();
 
     string res;
     unsigned int d = 0, bits = 0;
@@ -1477,7 +1479,7 @@ string base64Decode(std::string_view s)
         if (c == '\n') continue;
 
         char digit = base64DecodeChars[(unsigned char) c];
-        if (digit == -1)
+        if (digit == npos)
             throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
