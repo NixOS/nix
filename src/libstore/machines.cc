@@ -39,7 +39,8 @@ Machine::Machine(decltype(storeUri) storeUri,
     sshPublicHostKey(sshPublicHostKey)
 {}
 
-bool Machine::allSupported(const std::set<string> & features) const {
+bool Machine::allSupported(const std::set<string> & features) const
+{
     return std::all_of(features.begin(), features.end(),
         [&](const string & feature) {
             return supportedFeatures.count(feature) ||
@@ -47,14 +48,16 @@ bool Machine::allSupported(const std::set<string> & features) const {
         });
 }
 
-bool Machine::mandatoryMet(const std::set<string> & features) const {
+bool Machine::mandatoryMet(const std::set<string> & features) const
+{
     return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
         [&](const string & feature) {
             return features.count(feature);
         });
 }
 
-ref<Store> Machine::openStore() const {
+ref<Store> Machine::openStore() const
+{
     Store::Params storeParams;
     if (hasPrefix(storeUri, "ssh://")) {
         storeParams["max-connections"] = "1";
@@ -83,7 +86,8 @@ ref<Store> Machine::openStore() const {
     return nix::openStore(storeUri, storeParams);
 }
 
-static std::vector<std::string> expandBuilderLines(const std::string& builders) {
+static std::vector<std::string> expandBuilderLines(const std::string & builders)
+{
     std::vector<std::string> result;
     for (auto line : tokenizeString<std::vector<string>>(builders, "\n;")) {
         trim(line);
@@ -111,7 +115,8 @@ static std::vector<std::string> expandBuilderLines(const std::string& builders) 
     return result;
 }
 
-static Machine parseBuilderLine(const std::string& line) {
+static Machine parseBuilderLine(const std::string & line)
+{
     const auto tokens = tokenizeString<std::vector<string>>(line);
 
     auto isSet = [&](size_t fieldIndex) {
@@ -127,27 +132,28 @@ static Machine parseBuilderLine(const std::string& line) {
     };
 
     auto ensureBase64 = [&](size_t fieldIndex) {
-        const auto& str = tokens[fieldIndex];
+        const auto & str = tokens[fieldIndex];
         try {
             base64Decode(str);
-        } catch (const Error& e) {
+        } catch (const Error & e) {
             throw FormatError("bad machine specification: a column #%lu in a row: '%s' is not valid base64 string: %s", fieldIndex, line, e.what());
         }
         return str;
     };
 
-    if (!isSet(0)) {
-        throw FormatError("bad machine specification: store URI was not found at the first column of a row: '%s'", line);
-    }
+    if (!isSet(0))
+        throw FormatError("bad machine specification: store URL was not found at the first column of a row: '%s'", line);
 
-    return {tokens[0],
-            isSet(1) ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
-            isSet(2) ? tokens[2] : "",
-            isSet(3) ? parseUnsignedIntField(3) : 1U,
-            isSet(4) ? parseUnsignedIntField(4) : 1U,
-            isSet(5) ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
-            isSet(6) ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{},
-            isSet(7) ? ensureBase64(7) : ""};
+    return {
+        tokens[0],
+        isSet(1) ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
+        isSet(2) ? tokens[2] : "",
+        isSet(3) ? parseUnsignedIntField(3) : 1U,
+        isSet(4) ? parseUnsignedIntField(4) : 1U,
+        isSet(5) ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
+        isSet(6) ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{},
+        isSet(7) ? ensureBase64(7) : ""
+    };
 }
 
 static Machines parseBuilderLines(const std::vector<std::string>& builders) {
