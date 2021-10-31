@@ -71,6 +71,14 @@ struct CmdBundle : InstallableCommand
 
         auto app = installable->toApp(*evalState).resolve(getEvalStore(), store);
 
+        auto [progFlakeRef, progName] = parseFlakeRefWithFragment(installable->what(), absPath("."));
+        const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
+        auto programInstallable = InstallableFlake(this,
+            evalState, std::move(progFlakeRef),
+            Strings{progName == "" ? "defaultPackage" : progName},
+            Strings({"packages."+settings.thisSystem.get()+".","legacyPackages."+settings.thisSystem.get()+"."}), lockFlagsProg);
+        auto val = programInstallable.toValue(*evalState).first;
+
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         auto bundler = InstallableFlake(this,
@@ -80,10 +88,12 @@ struct CmdBundle : InstallableCommand
 
         auto attrs = evalState->buildBindings(2);
 
-        PathSet context;
-        for (auto & i : app.context)
-            context.insert("=" + store->printStorePath(i.path));
-        attrs.alloc("program").mkString(app.program, context);
+        Value & prog = *evalState->allocAttr(*arg, evalState->symbols.create("program"));
+        evalState->mkAttrs(prog,val->attrs->size());
+        for (auto &j : *(val->attrs)){
+            prog.attrs->push_back(j);
+        }
+        prog.attrs->sort();
 
         attrs.alloc("system").mkString(settings.thisSystem.get());
 
