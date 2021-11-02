@@ -1,5 +1,3 @@
-R""(
-
 # Description
 
 `nix flake` provides subcommands for creating, modifying and querying
