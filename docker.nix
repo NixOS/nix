@@ -19,20 +19,20 @@ let
     }.${crossSystem}
     else pkgs;
 
-  defaultPkgs = [
-    targetPkgs.nix
-    targetPkgs.bashInteractive
-    targetPkgs.coreutils-full
-    targetPkgs.gnutar
-    targetPkgs.gzip
-    targetPkgs.gnugrep
-    targetPkgs.which
-    targetPkgs.curl
-    targetPkgs.less
-    targetPkgs.wget
-    targetPkgs.man
-    targetPkgs.cacert.out
-    targetPkgs.findutils
+  defaultPkgs = with targetPkgs; [
+    nix
+    bashInteractive
+    coreutils-full
+    gnutar
+    gzip
+    gnugrep
+    which
+    curl
+    less
+    wget
+    man
+    cacert.out
+    findutils
   ];
 
   users = {
