@@ -12,7 +12,6 @@ use LWP::UserAgent;
 use Net::Amazon::S3;
 
 my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
-my $nixRev = $ARGV[1] or die; # FIXME
 
 my $releasesBucketName = "nix-releases";
 my $channelsBucketName = "nix-channels";
@@ -36,10 +35,11 @@ sub fetch {
 }
 
 my $evalUrl = "https://hydra.nixos.org/eval/$evalId";
-#my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
+my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
-
-#my $nixRev = $evalInfo->{jobsetevalinputs}->{nix}->{revision} or die;
+my $flakeUrl = $evalInfo->{flake} or die;
+my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die);
+my $nixRev = $flakeInfo->{revision} or die;
 
 my $buildInfo = decode_json(fetch("$evalUrl/job/build.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
@@ -48,7 +48,7 @@ my $releaseName = $buildInfo->{nixname};
 $releaseName =~ /nix-(.*)$/ or die;
 my $version = $1;
 
-print STDERR "Nix revision is $nixRev, version is $version\n";
+print STDERR "Flake URL is $flakeUrl, Nix revision is $nixRev, version is $version\n";
 
 my $releaseDir = "nix/$releaseName";
 
@@ -143,12 +143,7 @@ if ($isLatest) {
     sub getStorePath {
         my ($jobName) = @_;
         my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-        for my $product (values %{$buildInfo->{buildproducts}}) {
-            next unless $product->{type} eq "nix-build";
-            next if $product->{path} =~ /[a-z]+$/;
-            return $product->{path};
-        }
-        die;
+        return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
     }
 
     write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
