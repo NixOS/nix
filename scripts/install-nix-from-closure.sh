@@ -215,7 +215,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
             fi
             added=1
             break
@@ -226,7 +226,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
             fi
             added=1
             break
