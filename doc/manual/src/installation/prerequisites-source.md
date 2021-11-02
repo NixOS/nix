@@ -2,9 +2,8 @@
 
   - GNU Autoconf (<https://www.gnu.org/software/autoconf/>) and the
     autoconf-archive macro collection
-    (<https://www.gnu.org/software/autoconf-archive/>). These are only
-    needed to run the bootstrap script, and are not necessary if your
-    source distribution came with a pre-built `./configure` script.
+    (<https://www.gnu.org/software/autoconf-archive/>). These are
+    needed to run the bootstrap script.
 
   - GNU Make.
 
@@ -52,8 +51,7 @@
     you need version 2.5.35, which is available on
     [SourceForge](http://lex.sourceforge.net/). Slightly older versions
     may also work, but ancient versions like the ubiquitous 2.5.4a
-    won't. Note that these are only required if you modify the parser or
-    when you are building from the Git repository.
+    won't.
 
   - The `libseccomp` is used to provide syscall filtering on Linux. This
     is an optional dependency and can be disabled passing a
