@@ -8,6 +8,7 @@
 #include <map>
 #include <thread>
 #include <iostream>
+#include <memory>
 
 namespace nix {
 
@@ -490,12 +491,12 @@ Logger * makeProgressBar(bool printBuildLogs)
 
 void startProgressBar(bool printBuildLogs)
 {
-    logger = makeProgressBar(printBuildLogs);
+    logger = std::unique_ptr<Logger>(makeProgressBar(printBuildLogs));
 }
 
 void stopProgressBar()
 {
-    auto progressBar = dynamic_cast<ProgressBar *>(logger);
+    auto progressBar = dynamic_cast<ProgressBar *>(logger.get());
     if (progressBar) progressBar->stop();
 
 }

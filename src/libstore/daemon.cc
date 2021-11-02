@@ -944,10 +944,10 @@ void processConnection(
         throw Error("the Nix client version is too old");
 
     auto tunnelLogger = new TunnelLogger(to, clientVersion);
-    auto prevLogger = nix::logger;
+    auto& prevLogger = nix::logger;
     // FIXME
     if (!recursive)
-        logger = tunnelLogger;
+        logger = std::unique_ptr<Logger>(tunnelLogger);
 
     unsigned int opCount = 0;
 

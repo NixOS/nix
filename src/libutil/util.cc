@@ -16,6 +16,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include <memory>
 
 #include <fcntl.h>
 #include <grp.h>
@@ -997,7 +998,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
         if (!options.allowVfork)
-            logger = makeSimpleLogger();
+            logger = std::unique_ptr<Logger>(makeSimpleLogger());
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -1771,7 +1772,7 @@ string showBytes(uint64_t bytes)
 // FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
-    logger = makeSimpleLogger();
+    logger = std::unique_ptr<Logger>(makeSimpleLogger());
 
     const static string pathNullDevice = "/dev/null";
     restoreProcessContext();

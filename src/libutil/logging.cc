@@ -5,6 +5,7 @@
 #include <atomic>
 #include <nlohmann/json.hpp>
 #include <iostream>
+#include <memory>
 
 namespace nix {
 
@@ -23,7 +24,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true);
+std::unique_ptr<Logger> logger(makeSimpleLogger(true));
 
 void Logger::warn(const std::string & msg)
 {

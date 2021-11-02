@@ -4,6 +4,8 @@
 #include "error.hh"
 #include "config.hh"
 
+#include<memory>
+
 namespace nix {
 
 typedef enum {
@@ -160,7 +162,7 @@ struct PushActivity
     ~PushActivity() { setCurActivity(prevAct); }
 };
 
-extern Logger * logger;
+extern std::unique_ptr<Logger> logger;
 
 Logger * makeSimpleLogger(bool printBuildLogs = true);
 
