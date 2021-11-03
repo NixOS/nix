@@ -47,7 +47,7 @@ void setLogFormat(const LogFormat & logFormat) {
 }
 
 void createDefaultLogger() {
-    logger = std::unique_ptr<Logger>(makeDefaultLogger());
+    logger = makeDefaultLogger();
 }
 
 }

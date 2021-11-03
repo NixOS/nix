@@ -998,7 +998,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
         if (!options.allowVfork)
-            logger = std::unique_ptr<Logger>(makeSimpleLogger());
+            logger = makeSimpleLogger();
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -1772,7 +1772,7 @@ string showBytes(uint64_t bytes)
 // FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
-    logger = std::unique_ptr<Logger>(makeSimpleLogger());
+    logger = makeSimpleLogger();
 
     const static string pathNullDevice = "/dev/null";
     restoreProcessContext();

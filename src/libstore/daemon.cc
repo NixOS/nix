@@ -946,6 +946,7 @@ void processConnection(
     auto tunnelLogger = new TunnelLogger(to, clientVersion);
     std::unique_ptr<Logger> _prevLogger;
     std::unique_ptr<Logger>* prevLogger;
+    // FIXME
     if (!recursive) {
         _prevLogger = std::move(nix::logger);
         prevLogger = &_prevLogger;

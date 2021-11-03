@@ -491,7 +491,7 @@ std::unique_ptr<Logger> makeProgressBar(bool printBuildLogs)
 
 void startProgressBar(bool printBuildLogs)
 {
-    logger = std::unique_ptr<Logger>(makeProgressBar(printBuildLogs));
+    logger = makeProgressBar(printBuildLogs);
 }
 
 void stopProgressBar()

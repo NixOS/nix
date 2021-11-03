@@ -4,7 +4,7 @@
 #include "error.hh"
 #include "config.hh"
 
-#include<memory>
+#include <memory>
 
 namespace nix {
 
