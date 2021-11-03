@@ -237,7 +237,7 @@ Derivations can declare some infrequently used optional attributes.
   - `preferLocalBuild`\
     If this attribute is set to `true` and [distributed building is
     enabled](../advanced-topics/distributed-builds.md), then, if
-    possible, the derivaton will be built locally instead of forwarded
+    possible, the derivation will be built locally instead of forwarded
     to a remote machine. This is appropriate for trivial builders
     where the cost of doing a download or remote build would exceed
     the cost of building locally.

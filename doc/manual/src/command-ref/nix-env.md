@@ -401,7 +401,7 @@ of a derivation `x` by looking at their respective `name` attributes.
 The names (e.g., `gcc-3.3.1` are split into two parts: the package name
 (`gcc`), and the version (`3.3.1`). The version part starts after the
 first dash not followed by a letter. `x` is considered an upgrade of `y`
-if their package names match, and the version of `y` is higher that that
+if their package names match, and the version of `y` is higher than that
 of `x`.
 
 The versions are compared by splitting them into contiguous components

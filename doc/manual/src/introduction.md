@@ -127,7 +127,7 @@ $ nix-env --install firefox
 
 _could_ cause quite a bit of build activity, as not only Firefox but
 also all its dependencies (all the way up to the C library and the
-compiler) would have to built, at least if they are not already in the
+compiler) would have to be built, at least if they are not already in the
 Nix store.  This is a _source deployment model_.  For most users,
 building from source is not very pleasant as it takes far too long.
 However, Nix can automatically skip building from source and instead
