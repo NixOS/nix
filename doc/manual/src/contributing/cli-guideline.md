@@ -3,7 +3,7 @@
 ## Goals
 
 Purpose of this document is to provide a clear direction to **help design
-delightful command line** experience. This document contain guidelines to
+delightful command line** experience. This document contains guidelines to
 follow to ensure a consistent and approachable user experience.
 
 ## Overview
@@ -115,7 +115,7 @@ The rules are:
 
 - Help is shown by using `--help` or `help` command (eg `nix` `--``help` or
   `nix help`).
-- For non-COMMANDs (eg. `nix` `--``help`  and `nix store` `--``help`) we **show
+- For non-COMMANDs (eg. `nix` `--``help` and `nix store` `--``help`) we **show
   a summary** of most common use cases. Summary is presented on the STDOUT
   without any use of PAGER.
 - For COMMANDs (eg. `nix init` `--``help` or `nix help init`) we display the
@@ -230,8 +230,8 @@ Now **Learn** part of the output is where you educate users. You should only
 show it when you know that a build will take some time and not annoy users of
 the builds that take only few seconds.
 
-Every feature like this should go though a intensive review and testing to
-collect as much a feedback as possible and to fine tune every little detail. If
+Every feature like this should go through an intensive review and testing to
+collect as much feedback as possible and to fine tune every little detail. If
 done right this can be an awesome features beginners and advance users will
 love, but if not done perfectly it will annoy users and leave bad impression.
 
@@ -272,11 +272,11 @@ not know which `ARGUMENTS` and `OPTIONS` are required or which values are
 possible for those options.
 
 In cases, the user might not provide the input or they provide wrong input,
-rather then show the error, prompt a user with an option to find and select
+rather than show the error, prompt a user with an option to find and select
 correct input (see examples).
 
 Prompting is of course not required when TTY is not attached to STDIN. This
-would mean that scripts wont need to handle prompt, but rather handle errors.
+would mean that scripts won't need to handle prompt, but rather handle errors.
 
 A place to use prompt and provide user with interactive select
 
@@ -300,7 +300,7 @@ going to happen.
 ```shell
 $ nix build --option substitutors https://cache.example.org
 ------------------------------------------------------------------------
-  Warning! A security related question need to be answered.
+  Warning! A security related question needs to be answered.
 ------------------------------------------------------------------------
   The following substitutors will be used to in `my-project`: 
     - https://cache.example.org
@@ -311,14 +311,14 @@ $ nix build --option substitutors https://cache.example.org
 
 # Output
 
-Terminal output can be quite limiting in many ways. Which should forces us to
+Terminal output can be quite limiting in many ways. Which should force us to
 think about the experience even more. As with every design the output is a
 compromise between being terse and being verbose, between showing help to
 beginners and annoying advance users. For this it is important that we know
 what are the priorities.
 
 Nix command line should be first and foremost written with beginners in mind.
-But users wont stay beginners for long and what was once useful might quickly
+But users won't stay beginners for long and what was once useful might quickly
 become annoying. There is no golden rule that we can give in this guideline
 that would make it easier how to draw a line and find best compromise.
 
@@ -508,7 +508,7 @@ can, with a few key strokes, be changed into and advance introspection tool.
 
 ### Progress
 
-For longer running commands we should provide and overview of the progress.
+For longer running commands we should provide and overview the progress.
 This is shown best in `nix build` example:
 
 ```shell
@@ -553,7 +553,7 @@ going to happen.
 ```shell
 $ nix build --option substitutors https://cache.example.org
 ------------------------------------------------------------------------
-  Warning! A security related question need to be answered.
+  Warning! A security related question needs to be answered.
 ------------------------------------------------------------------------
   The following substitutors will be used to in `my-project`: 
     - https://cache.example.org
