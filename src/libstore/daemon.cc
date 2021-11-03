@@ -946,13 +946,18 @@ void processConnection(
     auto _tunnelLogger = std::make_unique<TunnelLogger>(to, clientVersion);
     std::unique_ptr<Logger> _prevLogger;
     // TODO FIXME
+    std::unique_ptr<Logger>* prevLogger;
+    std::unique_ptr<TunnelLogger>* tunnelLogger;
     if (!recursive) {
         _prevLogger = std::move(logger);
         logger = std::move(_tunnelLogger);
+        prevLogger = &_prevLogger;
+        tunnelLogger = &logger;
+    } else {
+        prevLogger = &logger;
+        tunnelLogger = &_tunnelLogger;
     }
-    std::unique_ptr<Logger>& prevLogger = !recursive ? &_prevLogger : &logger;
-    std::unique_ptr<TunnelLogger>& tunnelLogger = !recursive ? dynamic_cast<std::unique_ptr<TunnelLogger>&>(&logger) : _tunnelLogger;
-
+    
     unsigned int opCount = 0;
 
     Finally finally([&]() {

@@ -483,7 +483,7 @@ public:
 
 std::unique_ptr<Logger> makeProgressBar(bool printBuildLogs)
 {
-    return new ProgressBar(
+    return std::make_unique<ProgressBar>(
         printBuildLogs,
         shouldANSI()
     );
