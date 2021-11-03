@@ -3,6 +3,7 @@
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "compute-levels.hh"
 
 #include <algorithm>
 #include <map>
@@ -80,7 +81,7 @@ void loadConfFile()
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverriden();
+    globalConfig.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
@@ -131,16 +132,44 @@ StringSet Settings::getDefaultSystemFeatures()
     return features;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const std::string & name)
+StringSet Settings::getDefaultExtraPlatforms()
 {
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), name) != f.end();
+    StringSet extraPlatforms;
+
+    if (std::string{SYSTEM} == "x86_64-linux" && !isWSL1())
+        extraPlatforms.insert("i686-linux");
+
+#if __linux__
+    StringSet levels = computeLevels();
+    for (auto iter = levels.begin(); iter != levels.end(); ++iter)
+        extraPlatforms.insert(*iter + "-linux");
+#elif __APPLE__
+    // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
+    // machines. Note that we can’t force processes from executing
+    // x86_64 in aarch64 environments or vice versa since they can
+    // always exec with their own binary preferences.
+    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
+        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+        if (std::string{SYSTEM} == "x86_64-darwin")
+            extraPlatforms.insert("aarch64-darwin");
+        else if (std::string{SYSTEM} == "aarch64-darwin")
+            extraPlatforms.insert("x86_64-darwin");
+    }
+#endif
+
+    return extraPlatforms;
 }
 
-void Settings::requireExperimentalFeature(const std::string & name)
+bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
 {
-    if (!isExperimentalFeatureEnabled(name))
-        throw Error("experimental Nix feature '%1%' is disabled; use '--experimental-features %1%' to override", name);
+    auto & f = experimentalFeatures.get();
+    return std::find(f.begin(), f.end(), feature) != f.end();
+}
+
+void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
+{
+    if (!isExperimentalFeatureEnabled(feature))
+        throw MissingExperimentalFeature(feature);
 }
 
 bool Settings::isWSL1()
@@ -206,13 +235,26 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
 void MaxBuildJobsSetting::set(const std::string & str, bool append)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
-    else if (!string2Int(str, value))
-        throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    else {
+        if (auto n = string2Int<decltype(value)>(str))
+            value = *n;
+        else
+            throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    }
+}
+
+
+void PluginFilesSetting::set(const std::string & str, bool append)
+{
+    if (pluginsLoaded)
+        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
+    BaseSetting<Paths>::set(str, append);
 }
 
 
 void initPlugins()
 {
+    assert(!settings.pluginFiles.pluginsLoaded);
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {
@@ -238,6 +280,9 @@ void initPlugins()
        unknown settings. */
     globalConfig.reapplyUnknownSettings();
     globalConfig.warnUnknownSettings();
+
+    /* Tell the user if they try to set plugin-files after we've already loaded */
+    settings.pluginFiles.pluginsLoaded = true;
 }
 
 }

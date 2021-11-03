@@ -19,14 +19,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         addFlag({
             .longName = "profile",
             .shortName = 'p',
-            .description = "the Nix profile to upgrade",
+            .description = "The path to the Nix profile to upgrade.",
             .labels = {"profile-dir"},
             .handler = {&profileDir}
         });
 
         addFlag({
             .longName = "nix-store-paths-url",
-            .description = "URL of the file that contains the store paths of the latest Nix release",
+            .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
             .handler = {&storePathsUrl}
         });
@@ -61,10 +61,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (dryRun) {
             stopProgressBar();
-            logWarning({
-                .name = "Version update",
-                .hint = hintfmt("would upgrade to version %s", version)
-            });
+            warn("would upgrade to version %s", version);
             return;
         }
 

@@ -14,9 +14,8 @@
 #include "util.hh"
 #include "crypto.hh"
 
-#if HAVE_SODIUM
 #include <sodium.h>
-#endif
+#include <nlohmann/json.hpp>
 
 
 using namespace nix;
@@ -121,6 +120,18 @@ SV * queryPathInfo(char * path, int base32)
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+SV * queryRawRealisation(char * outputId)
+    PPCODE:
+      try {
+        auto realisation = store()->queryRealisation(DrvOutput::parse(outputId));
+        if (realisation)
+            XPUSHs(sv_2mortal(newSVpv(realisation->toJSON().dump().c_str(), 0)));
+        else
+            XPUSHs(sv_2mortal(newSVpv("", 0)));
+      } catch (Error & e) {
+        croak("%s", e.what());
+      }
 
 
 SV * queryPathFromHashPart(char * hashPart)
@@ -239,12 +250,8 @@ SV * convertHash(char * algo, char * s, int toBase32)
 SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
-#if HAVE_SODIUM
             auto sig = SecretKey(secretKey_).signDetached(msg);
             XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -253,7 +260,6 @@ SV * signString(char * secretKey_, char * msg)
 int checkSignature(SV * publicKey_, SV * sig_, char * msg)
     CODE:
         try {
-#if HAVE_SODIUM
             STRLEN publicKeyLen;
             unsigned char * publicKey = (unsigned char *) SvPV(publicKey_, publicKeyLen);
             if (publicKeyLen != crypto_sign_PUBLICKEYBYTES)
@@ -265,9 +271,6 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
                 throw Error("signature is not valid");
 
             RETVAL = crypto_sign_verify_detached(sig, (unsigned char *) msg, strlen(msg), publicKey) == 0;
-#else
-            throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
-#endif
         } catch (Error & e) {
             croak("%s", e.what());
         }

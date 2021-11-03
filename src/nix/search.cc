@@ -62,6 +62,7 @@ struct CmdSearch : InstallableCommand, MixJSON
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;
+        evalSettings.enableImportFromDerivation.setDefault(false);
 
         // Empty search string should match all packages
         // Use "^" here instead of ".*" due to differences in resulting highlighting
@@ -81,9 +82,9 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath)
+        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
@@ -94,7 +95,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                         auto cursor2 = cursor.getAttr(attr);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*cursor2, attrPath2);
+                        visit(*cursor2, attrPath2, false);
                     }
                 };
 
@@ -150,6 +151,9 @@ struct CmdSearch : InstallableCommand, MixJSON
                     || (attrPath[0] == "packages" && attrPath.size() <= 2))
                     recurse();
 
+                else if (initialRecurse)
+                    recurse();
+
                 else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
                     auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
                     if (attr && attr->getBool())
@@ -163,7 +167,7 @@ struct CmdSearch : InstallableCommand, MixJSON
         };
 
         for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix));
+            visit(*cursor, parseAttrPath(*state, prefix), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

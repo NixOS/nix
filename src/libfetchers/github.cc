@@ -37,15 +37,29 @@ struct GitArchiveInputScheme : InputScheme
         std::optional<std::string> ref;
         std::optional<std::string> host_url;
 
-        if (path.size() == 2) {
-        } else if (path.size() == 3) {
+        auto size = path.size();
+        if (size == 3) {
             if (std::regex_match(path[2], revRegex))
                 rev = Hash::parseAny(path[2], htSHA1);
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
                 throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
-        } else
+        } else if (size > 3) {
+            std::string rs;
+            for (auto i = std::next(path.begin(), 2); i != path.end(); i++) {
+                rs += *i;
+                if (std::next(i) != path.end()) {
+                    rs += "/";
+                }
+            }
+
+            if (std::regex_match(rs, refRegex)) {
+                ref = rs;
+            } else {
+                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, rs);
+            }
+        } else if (size < 2)
             throw BadURL("URL '%s' is invalid", url.url);
 
         for (auto &[name, value] : url.query) {
@@ -193,7 +207,7 @@ struct GitArchiveInputScheme : InputScheme
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, url.headers);
+        auto [tree, lastModified] = downloadTarball(store, url.url, input.getName(), true, url.headers);
 
         input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
@@ -259,9 +273,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
     void clone(const Input & input, const Path & destDir) override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+        Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
+            .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
 };
@@ -327,9 +341,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
-        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+        Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
+            .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
 };

@@ -188,7 +188,6 @@ public:
 class AutoCloseFD
 {
     int fd;
-    void close();
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
@@ -200,6 +199,7 @@ public:
     int get() const;
     explicit operator bool() const;
     int release();
+    void close();
 };
 
 
@@ -216,6 +216,7 @@ class Pipe
 public:
     AutoCloseFD readSide, writeSide;
     void create();
+    void close();
 };
 
 
@@ -258,10 +259,10 @@ void killUser(uid_t uid);
    pid to the caller. */
 struct ProcessOptions
 {
-    string errorPrefix = "error: ";
+    string errorPrefix = "";
     bool dieWithParent = true;
     bool runExitHandlers = false;
-    bool allowVfork = true;
+    bool allowVfork = false;
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -275,28 +276,31 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    Path program;
+    bool searchPath = true;
+    Strings args;
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
     std::optional<std::map<std::string, std::string>> environment;
-    Path program;
-    bool searchPath = true;
-    Strings args;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
-    bool _killStderr = false;
-
-    RunOptions(const Path & program, const Strings & args)
-        : program(program), args(args) { };
-
-    RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
 };
 
-std::pair<int, std::string> runProgram(const RunOptions & options);
+std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
+
+
+/* Change the stack size. */
+void setStackSize(size_t stackSize);
+
+
+/* Restore the original inherited Unix process context (such as signal
+   masks, stack size, CPU affinity). */
+void restoreProcessContext();
 
 
 class ExecError : public Error
@@ -373,8 +377,9 @@ template<class C> Strings quoteStrings(const C & c)
 }
 
 
-/* Remove trailing whitespace from a string. */
-string chomp(const string & s);
+/* Remove trailing whitespace from a string. FIXME: return
+   std::string_view. */
+string chomp(std::string_view s);
 
 
 /* Remove whitespace from the start and end of a string. */
@@ -397,21 +402,49 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
-template<class N> bool string2Int(const string & s, N & n)
+template<class N>
+std::optional<N> string2Int(const std::string & s)
 {
-    if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return false;
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return std::nullopt;
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return std::nullopt;
+}
+
+/* Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
+   'T' denoting a binary unit prefix. */
+template<class N>
+N string2IntWithUnitPrefix(std::string s)
+{
+    N multiplier = 1;
+    if (!s.empty()) {
+        char u = std::toupper(*s.rbegin());
+        if (std::isalpha(u)) {
+            if (u == 'K') multiplier = 1ULL << 10;
+            else if (u == 'M') multiplier = 1ULL << 20;
+            else if (u == 'G') multiplier = 1ULL << 30;
+            else if (u == 'T') multiplier = 1ULL << 40;
+            else throw UsageError("invalid unit specifier '%1%'", u);
+            s.resize(s.size() - 1);
+        }
+    }
+    if (auto n = string2Int<N>(s))
+        return *n * multiplier;
+    throw UsageError("'%s' is not an integer", s);
 }
 
 /* Parse a string into a float. */
-template<class N> bool string2Float(const string & s, N & n)
+template<class N>
+std::optional<N> string2Float(const string & s)
 {
     std::istringstream str(s);
+    N n;
     str >> n;
-    return str && str.get() == EOF;
+    if (str && str.get() == EOF) return n;
+    return std::nullopt;
 }
 
 
@@ -443,6 +476,9 @@ constexpr char treeLast[] = "└───";
 constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
+/* Determine whether ANSI escape sequences are appropriate for the
+   present output. */
+bool shouldANSI();
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,
@@ -475,6 +511,29 @@ std::optional<typename T::mapped_type> get(const T & map, const typename T::key_
 }
 
 
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> remove_begin(T & c)
+{
+    auto i = c.begin();
+    if (i == c.end()) return {};
+    auto v = std::move(*i);
+    c.erase(i);
+    return v;
+}
+
+
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> pop(T & c)
+{
+    if (c.empty()) return {};
+    auto v = std::move(c.front());
+    c.pop();
+    return v;
+}
+
+
 template<typename T>
 class Callback;
 
@@ -482,9 +541,6 @@ class Callback;
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
-
-/* Restore default signal handling. */
-void restoreSignals();
 
 struct InterruptCallback
 {
@@ -538,8 +594,17 @@ extern PathFilter defaultPathFilter;
 /* Common initialisation performed in child processes. */
 void commonChildInit(Pipe & logPipe);
 
+/* Create a Unix domain socket. */
+AutoCloseFD createUnixDomainSocket();
+
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+/* Bind a Unix domain socket to a path. */
+void bind(int fd, const std::string & path);
+
+/* Connect to a Unix domain socket. */
+void connect(int fd, const std::string & path);
 
 
 // A Rust/Python-like enumerate() iterator adapter.

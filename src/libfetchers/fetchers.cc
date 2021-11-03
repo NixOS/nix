@@ -132,7 +132,14 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }
 
-    auto [tree, input] = scheme->fetch(store, *this);
+    auto [tree, input] = [&]() -> std::pair<Tree, Input> {
+        try {
+            return scheme->fetch(store, *this);
+        } catch (Error & e) {
+            e.addTrace({}, "while fetching the input '%s'", to_string());
+            throw;
+        }
+    }();
 
     if (tree.actualPath == "")
         tree.actualPath = store->toRealPath(tree.storePath);
@@ -193,12 +200,17 @@ void Input::markChangedFile(
     return scheme->markChangedFile(*this, file, commitMsg);
 }
 
+std::string Input::getName() const
+{
+    return maybeGetStrAttr(attrs, "name").value_or("source");
+}
+
 StorePath Input::computeStorePath(Store & store) const
 {
     auto narHash = getNarHash();
     if (!narHash)
         throw Error("cannot compute store path for mutable input '%s'", to_string());
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, "source");
+    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, getName());
 }
 
 std::string Input::getType() const

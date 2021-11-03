@@ -24,6 +24,13 @@ R""(
   …
   ```
 
+* Pin `nixpkgs` in a custom registry to its most recent Git revision:
+
+  ```console
+  # nix registry pin --registry ./custom-flake-registry.json nixpkgs
+  ```
+
+
 # Description
 
 This command adds an entry to the user registry that maps flake

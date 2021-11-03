@@ -1,14 +1,16 @@
 source common.sh
 
+needLocalStore "the sandbox only runs on the builder side, so it makes no sense to test it with the daemon"
+
 clearStore
 
-if ! canUseSandbox; then exit; fi
+if ! canUseSandbox; then exit 99; fi
 
 # Note: we need to bind-mount $SHELL into the chroot. Currently we
 # only support the case where $SHELL is in the Nix store, because
 # otherwise things get complicated (e.g. if it's in /bin, do we need
 # /lib as well?).
-if [[ ! $SHELL =~ /nix/store ]]; then exit; fi
+if [[ ! $SHELL =~ /nix/store ]]; then exit 99; fi
 
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0

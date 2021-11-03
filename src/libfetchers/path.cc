@@ -20,10 +20,10 @@ struct PathInputScheme : InputScheme
             if (name == "rev" || name == "narHash")
                 input.attrs.insert_or_assign(name, value);
             else if (name == "revCount" || name == "lastModified") {
-                uint64_t n;
-                if (!string2Int(value, n))
+                if (auto n = string2Int<uint64_t>(value))
+                    input.attrs.insert_or_assign(name, *n);
+                else
                     throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
-                input.attrs.insert_or_assign(name, n);
             }
             else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
@@ -82,18 +82,38 @@ struct PathInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
     {
+        std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
-        // FIXME: check whether access to 'path' is allowed.
+        if (path[0] != '/') {
+            if (!input.parent)
+                throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
 
-        auto storePath = store->maybeParseStorePath(path);
+            auto parent = canonPath(*input.parent);
+
+            // the path isn't relative, prefix it
+            absPath = nix::absPath(path, parent);
+
+            // for security, ensure that if the parent is a store path, it's inside it
+            if (store->isInStore(parent)) {
+                auto storePath = store->printStorePath(store->toStorePath(parent).first);
+                if (!isInDir(absPath, storePath))
+                    throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
+            }
+        } else
+            absPath = path;
+
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
+
+        // FIXME: check whether access to 'path' is allowed.
+        auto storePath = store->maybeParseStorePath(absPath);
 
         if (storePath)
             store->addTempRoot(*storePath);
 
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
             // FIXME: try to substitute storePath.
-            storePath = store->addToStore("source", path);
+            storePath = store->addToStore("source", absPath);
 
         return {
             Tree(store->toRealPath(*storePath), std::move(*storePath)),

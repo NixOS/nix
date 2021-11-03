@@ -4,16 +4,18 @@
 #include "finally.hh"
 #include "serialise.hh"
 
+#include <array>
 #include <cctype>
 #include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
+#include <future>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
-#include <future>
 
 #include <fcntl.h>
 #include <grp.h>
@@ -32,6 +34,7 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #endif
 
 
@@ -143,16 +146,21 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             s += '/';
             while (i != end && *i != '/') s += *i++;
 
-            /* If s points to a symlink, resolve it and restart (since
-               the symlink target might contain new symlinks). */
+            /* If s points to a symlink, resolve it and continue from there */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = absPath(readLink(s), dirOf(s))
-                    + string(i, end);
-                i = temp.begin(); /* restart */
+                temp = readLink(s) + string(i, end);
+                i = temp.begin();
                 end = temp.end();
-                s = "";
+                if (!temp.empty() && temp[0] == '/') {
+                    s.clear();  /* restart for symlinks pointing to absolute path */
+                } else {
+                    s = dirOf(s);
+                    if (s == "/") {  // we don’t want trailing slashes here, which dirOf only produces if s = /
+                        s.clear();
+                    }
+                }
             }
         }
     }
@@ -407,7 +415,7 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         }
 
         int fd = openat(parentfd, path.c_str(), O_RDONLY);
-        if (!fd)
+        if (fd == -1)
             throw SysError("opening directory '%1%'", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
@@ -429,12 +437,9 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
     if (dir == "")
         dir = "/";
 
-    AutoCloseFD dirfd(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd{open(dir.c_str(), O_RDONLY)};
     if (!dirfd) {
-        // This really shouldn't fail silently, but it's left this way
-        // for backwards compatibility.
         if (errno == ENOENT) return;
-
         throw SysError("opening directory '%1%'", path);
     }
 
@@ -752,13 +757,13 @@ AutoCloseFD::AutoCloseFD() : fd{-1} {}
 AutoCloseFD::AutoCloseFD(int fd) : fd{fd} {}
 
 
-AutoCloseFD::AutoCloseFD(AutoCloseFD&& that) : fd{that.fd}
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
 {
     that.fd = -1;
 }
 
 
-AutoCloseFD& AutoCloseFD::operator =(AutoCloseFD&& that)
+AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
@@ -789,6 +794,7 @@ void AutoCloseFD::close()
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError("closing file descriptor %1%", fd);
+        fd = -1;
     }
 }
 
@@ -821,6 +827,12 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
+
+void Pipe::close()
+{
+    readSide.close();
+    writeSide.close();
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -891,7 +903,7 @@ int Pid::wait()
             return status;
         }
         if (errno != EINTR)
-            throw SysError("cannot get child exit status");
+            throw SysError("cannot get exit status of PID %d", pid);
         checkInterrupt();
     }
 }
@@ -927,9 +939,6 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    ProcessOptions options;
-    options.allowVfork = false;
-
     Pid pid = startProcess([&]() {
 
         if (setuid(uid) == -1)
@@ -946,13 +955,13 @@ void killUser(uid_t uid)
 #else
             if (kill(-1, SIGKILL) == 0) break;
 #endif
-            if (errno == ESRCH) break; /* no more processes */
+            if (errno == ESRCH || errno == EPERM) break; /* no more processes */
             if (errno != EINTR)
                 throw SysError("cannot kill processes for uid '%1%'", uid);
         }
 
         _exit(0);
-    }, options);
+    });
 
     int status = pid.wait();
     if (status != 0)
@@ -1022,17 +1031,10 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
-    RunOptions opts(program, args);
-    opts.searchPath = searchPath;
-    // This allows you to refer to a program with a pathname relative to the
-    // PATH variable.
-    opts.input = input;
-
-    auto res = runProgram(opts);
+    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
@@ -1041,9 +1043,8 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 }
 
 // Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(const RunOptions & options_)
+std::pair<int, std::string> runProgram(RunOptions && options)
 {
-    RunOptions options(options_);
     StringSink sink;
     options.standardOut = &sink;
 
@@ -1081,8 +1082,7 @@ void runProgram2(const RunOptions & options)
     // vfork implies that the environment of the main process and the fork will
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
-    if (options.environment)
-        processOptions.allowVfork = false;
+    processOptions.allowVfork = !options.environment;
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -1109,7 +1109,7 @@ void runProgram2(const RunOptions & options)
         Strings args_(options.args);
         args_.push_front(options.program);
 
-        restoreSignals();
+        restoreProcessContext();
 
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
@@ -1121,7 +1121,7 @@ void runProgram2(const RunOptions & options)
         throw SysError("executing '%1%'", options.program);
     }, processOptions);
 
-    out.writeSide = -1;
+    out.writeSide.close();
 
     std::thread writerThread;
 
@@ -1134,7 +1134,7 @@ void runProgram2(const RunOptions & options)
 
 
     if (source) {
-        in.readSide = -1;
+        in.readSide.close();
         writerThread = std::thread([&]() {
             try {
                 std::vector<char> buf(8 * 1024);
@@ -1151,7 +1151,7 @@ void runProgram2(const RunOptions & options)
             } catch (...) {
                 promise.set_exception(std::current_exception());
             }
-            in.writeSide = -1;
+            in.writeSide.close();
         });
     }
 
@@ -1249,7 +1249,7 @@ template StringSet tokenizeString(std::string_view s, const string & separators)
 template vector<string> tokenizeString(std::string_view s, const string & separators);
 
 
-string chomp(const string & s)
+string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
     return i == string::npos ? "" : string(s, 0, i + 1);
@@ -1359,6 +1359,12 @@ void ignoreException()
     }
 }
 
+bool shouldANSI()
+{
+    return isatty(STDERR_FILENO)
+        && getEnv("TERM").value_or("dumb") != "dumb"
+        && !getEnv("NO_COLOR").has_value();
+}
 
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
 {
@@ -1430,8 +1436,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 }
 
 
-static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
+constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 string base64Encode(std::string_view s)
 {
@@ -1456,15 +1461,15 @@ string base64Encode(std::string_view s)
 
 string base64Decode(std::string_view s)
 {
-    bool init = false;
-    char decode[256];
-    if (!init) {
-        // FIXME: not thread-safe.
-        memset(decode, -1, sizeof(decode));
+    constexpr char npos = -1;
+    constexpr std::array<char, 256> base64DecodeChars = [&]() {
+        std::array<char, 256>  result{};
+        for (auto& c : result)
+            c = npos;
         for (int i = 0; i < 64; i++)
-            decode[(int) base64Chars[i]] = i;
-        init = true;
-    }
+            result[base64Chars[i]] = i;
+        return result;
+    }();
 
     string res;
     unsigned int d = 0, bits = 0;
@@ -1473,8 +1478,8 @@ string base64Decode(std::string_view s)
         if (c == '=') break;
         if (c == '\n') continue;
 
-        char digit = decode[(unsigned char) c];
-        if (digit == -1)
+        char digit = base64DecodeChars[(unsigned char) c];
+        if (digit == npos)
             throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
@@ -1590,7 +1595,7 @@ void startSignalHandlerThread()
     updateWindowSize();
 
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
-        throw SysError("quering signal mask");
+        throw SysError("querying signal mask");
 
     sigset_t set;
     sigemptyset(&set);
@@ -1605,10 +1610,43 @@ void startSignalHandlerThread()
     std::thread(signalHandlerThread, set).detach();
 }
 
-void restoreSignals()
+static void restoreSignals()
 {
     if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
         throw SysError("restoring signals");
+}
+
+#if __linux__
+rlim_t savedStackSize = 0;
+#endif
+
+void setStackSize(size_t stackSize)
+{
+    #if __linux__
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
+        savedStackSize = limit.rlim_cur;
+        limit.rlim_cur = stackSize;
+        setrlimit(RLIMIT_STACK, &limit);
+    }
+    #endif
+}
+
+void restoreProcessContext()
+{
+    restoreSignals();
+
+    restoreAffinity();
+
+    #if __linux__
+    if (savedStackSize) {
+        struct rlimit limit;
+        if (getrlimit(RLIMIT_STACK, &limit) == 0) {
+            limit.rlim_cur = savedStackSize;
+            setrlimit(RLIMIT_STACK, &limit);
+        }
+    }
+    #endif
 }
 
 /* RAII helper to automatically deregister a callback. */
@@ -1634,7 +1672,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 }
 
 
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+AutoCloseFD createUnixDomainSocket()
 {
     AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -1643,19 +1681,16 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
         , 0);
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
-
     closeOnExec(fdSocket.get());
+    return fdSocket;
+}
 
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (path.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", path);
-    strcpy(addr.sun_path, path.c_str());
 
-    unlink(path.c_str());
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+{
+    auto fdSocket = nix::createUnixDomainSocket();
 
-    if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot bind to socket '%1%'", path);
+    bind(fdSocket.get(), path);
 
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
@@ -1667,16 +1702,79 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 }
 
 
+void bind(int fd, const std::string & path)
+{
+    unlink(path.c_str());
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            auto dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+            if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot bind to socket '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot bind to socket '%s'", path);
+    } else {
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
+        if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot bind to socket '%s'", path);
+    }
+}
+
+
+void connect(int fd, const std::string & path)
+{
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            auto dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+            if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot connect to socket at '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot connect to socket at '%s'", path);
+    } else {
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
+        if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot connect to socket at '%s'", path);
+    }
+}
+
+
 string showBytes(uint64_t bytes)
 {
     return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
 
 
+// FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
+    logger = makeSimpleLogger();
+
     const static string pathNullDevice = "/dev/null";
-    restoreSignals();
+    restoreProcessContext();
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

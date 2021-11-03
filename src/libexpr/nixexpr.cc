@@ -124,7 +124,7 @@ void ExprList::show(std::ostream & str) const
 void ExprLambda::show(std::ostream & str) const
 {
     str << "(";
-    if (matchAttrs) {
+    if (hasFormals()) {
         str << "{ ";
         bool first = true;
         for (auto & i : formals->formals) {
@@ -284,7 +284,7 @@ void ExprVar::bindVars(const StaticEnv & env)
        "undefined variable" error now. */
     if (withLevel == -1)
         throw UndefinedVarError({
-            .hint = hintfmt("undefined variable '%1%'", name),
+            .msg = hintfmt("undefined variable '%1%'", name),
             .errPos = pos
         });
     fromWith = true;
@@ -348,7 +348,7 @@ void ExprLambda::bindVars(const StaticEnv & env)
 
     if (!arg.empty()) newEnv.vars[arg] = displ++;
 
-    if (matchAttrs) {
+    if (hasFormals()) {
         for (auto & i : formals->formals)
             newEnv.vars[i.name] = displ++;
 

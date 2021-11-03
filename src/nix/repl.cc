@@ -68,6 +68,7 @@ struct NixRepl
     StorePath getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
+    void loadFlake(const std::string & flakeRef);
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
@@ -102,6 +103,25 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 NixRepl::~NixRepl()
 {
     write_history(historyFile.c_str());
+}
+
+string runNix(Path program, const Strings & args,
+    const std::optional<std::string> & input = {})
+{
+    auto subprocessEnv = getEnv();
+    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
+
+    auto res = runProgram(RunOptions {
+        .program = settings.nixBinDir+ "/" + program,
+        .args = args,
+        .environment = subprocessEnv,
+        .input = input,
+    });
+
+    if (!statusOk(res.first))
+        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+
+    return res.second;
 }
 
 static NixRepl * curRepl; // ugly
@@ -180,13 +200,13 @@ namespace {
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
+    notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
     for (auto & i : files)
         loadedFiles.push_back(i);
 
     reloadFiles();
-    if (!loadedFiles.empty()) std::cout << std::endl;
+    if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
@@ -343,24 +363,6 @@ StringSet NixRepl::completePrefix(string prefix)
 }
 
 
-static int runProgram(const string & program, const Strings & args)
-{
-    Strings args2(args);
-    args2.push_front(program);
-
-    Pid pid;
-    pid = fork();
-    if (pid == -1) throw SysError("forking");
-    if (pid == 0) {
-        restoreAffinity();
-        execvp(program.c_str(), stringsToCharPtrs(args2).data());
-        _exit(1);
-    }
-
-    return pid.wait();
-}
-
-
 bool isVarName(const string & s)
 {
     if (s.size() == 0) return false;
@@ -394,6 +396,8 @@ bool NixRepl::processLine(string line)
 {
     if (line == "") return true;
 
+    _isInterrupted = false;
+
     string command, arg;
 
     if (line[0] == ':') {
@@ -413,9 +417,10 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
-             << "  :e <expr>     Open the derivation in $EDITOR\n"
+             << "  :e <expr>     Open package or function in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :lf <ref>     Load Nix flake and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
@@ -434,6 +439,10 @@ bool NixRepl::processLine(string line)
     else if (command == ":l" || command == ":load") {
         state->resetFileCache();
         loadFile(arg);
+    }
+
+    else if (command == ":lf" || command == ":load-flake") {
+        loadFlake(arg);
     }
 
     else if (command == ":r" || command == ":reload") {
@@ -455,14 +464,14 @@ bool NixRepl::processLine(string line)
             pos = v.lambda.fun->pos;
         } else {
             // assume it's a derivation
-            pos = findDerivationFilename(*state, v, arg);
+            pos = findPackageFilename(*state, v, arg);
         }
 
         // Open in EDITOR
         auto args = editorFor(pos);
         auto editor = args.front();
         args.pop_front();
-        runProgram(editor, args);
+        runProgram(editor, true, args);
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -472,16 +481,17 @@ bool NixRepl::processLine(string line)
     else if (command == ":t") {
         Value v;
         evalString(arg, v);
-        std::cout << showType(v) << std::endl;
+        logger->cout(showType(v));
+    }
 
-    } else if (command == ":u") {
+    else if (command == ":u") {
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
         state->callFunction(f, v, result, Pos());
 
         StorePath drvPath = getDerivationPath(result);
-        runProgram(settings.nixBinDir + "/nix-shell", Strings{state->store->printStorePath(drvPath)});
+        runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
@@ -491,19 +501,15 @@ bool NixRepl::processLine(string line)
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b") {
-            /* We could do the build in this process using buildPaths(),
-               but doing it in a child makes it easier to recover from
-               problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPathRaw}) == 0) {
-                auto drv = state->store->readDerivation(drvPath);
-                std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputsAndOptPaths(*state->store))
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
-            }
+            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            auto drv = state->store->readDerivation(drvPath);
+            logger->cout("\nThis derivation produced the following outputs:");
+            for (auto & i : drv.outputsAndOptPaths(*state->store))
+                logger->cout("  %s -> %s", i.first, state->store->printStorePath(*i.second.second));
         } else if (command == ":i") {
-            runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPathRaw});
+            runNix("nix-env", {"-i", drvPathRaw});
         } else {
-            runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPathRaw});
+            runNix("nix-shell", {drvPathRaw});
         }
     }
 
@@ -532,9 +538,9 @@ bool NixRepl::processLine(string line)
                     + concatStringsSep(" ", args) + "\n\n";
             }
 
-            markdown += trim(stripIndentation(doc->doc));
+            markdown += stripIndentation(doc->doc);
 
-            std::cout << renderMarkdownToTerminal(markdown);
+            logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
     }
@@ -575,6 +581,25 @@ void NixRepl::loadFile(const Path & path)
     addAttrsToScope(v2);
 }
 
+void NixRepl::loadFlake(const std::string & flakeRefS)
+{
+    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
+    if (evalSettings.pureEval && !flakeRef.input.isImmutable())
+        throw Error("cannot use ':load-flake' on mutable flake reference '%s' (use --impure to override)", flakeRefS);
+
+    Value v;
+
+    flake::callFlake(*state,
+        flake::lockFlake(*state, flakeRef,
+            flake::LockFlags {
+                .updateLockFile = false,
+                .useRegistries = !evalSettings.pureEval,
+                .allowMutable  = !evalSettings.pureEval,
+            }),
+        v);
+    addAttrsToScope(v);
+}
+
 
 void NixRepl::initEnv()
 {
@@ -598,9 +623,9 @@ void NixRepl::reloadFiles()
 
     bool first = true;
     for (auto & i : old) {
-        if (!first) std::cout << std::endl;
+        if (!first) notice("");
         first = false;
-        std::cout << format("Loading '%1%'...") % i << std::endl;
+        notice("Loading '%1%'...", i);
         loadFile(i);
     }
 }
@@ -611,7 +636,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
         addVarToScope(i.name, *i.value);
-    std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
+    notice("Added %1% variables.", attrs.attrs->size());
 }
 
 
@@ -679,7 +704,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nString:
-        str << ANSI_YELLOW;
+        str << ANSI_WARNING;
         printStringValue(str, v.string.s);
         str << ANSI_NORMAL;
         break;

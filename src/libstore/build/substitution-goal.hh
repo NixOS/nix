@@ -8,13 +8,13 @@ namespace nix {
 
 class Worker;
 
-struct SubstitutionGoal : public Goal
+struct PathSubstitutionGoal : public Goal
 {
     /* The store path that should be realised through a substitute. */
     StorePath storePath;
 
     /* The path the substituter refers to the path as. This will be
-     * different when the stores have different names. */
+       different when the stores have different names. */
     std::optional<StorePath> subPath;
 
     /* The remaining substituters. */
@@ -47,7 +47,7 @@ struct SubstitutionGoal : public Goal
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
-    typedef void (SubstitutionGoal::*GoalState)();
+    typedef void (PathSubstitutionGoal::*GoalState)();
     GoalState state;
 
     /* Content address for recomputing store path */
@@ -56,8 +56,9 @@ struct SubstitutionGoal : public Goal
     /* Time substitution started. */
     std::chrono::time_point<std::chrono::steady_clock> startTime;
 
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    ~SubstitutionGoal();
+public:
+    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    ~PathSubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
 
@@ -81,6 +82,8 @@ struct SubstitutionGoal : public Goal
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
+
+    void cleanup() override;
 };
 
 }

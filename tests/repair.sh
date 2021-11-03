@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "--repair needs a local store"
+
 clearStore
 
 path=$(nix-build dependencies.nix -o $TEST_ROOT/result)
@@ -28,7 +30,7 @@ nix-store --verify-path $path2
 chmod u+w $path2
 touch $path2/bad
 
-nix-store --delete $(nix-store -qd $path2)
+nix-store --delete $(nix-store -q --referrers-closure $(nix-store -qd $path2))
 
 (! nix-store --verify --check-contents --repair)
 

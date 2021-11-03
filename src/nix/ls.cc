@@ -17,9 +17,26 @@ struct MixLs : virtual Args, MixJSON
 
     MixLs()
     {
-        mkFlag('R', "recursive", "list subdirectories recursively", &recursive);
-        mkFlag('l', "long", "show more file information", &verbose);
-        mkFlag('d', "directory", "show directories rather than their contents", &showDirectory);
+        addFlag({
+            .longName = "recursive",
+            .shortName = 'R',
+            .description = "List subdirectories recursively.",
+            .handler = {&recursive, true},
+        });
+
+        addFlag({
+            .longName = "long",
+            .shortName = 'l',
+            .description = "Show detailed file information.",
+            .handler = {&verbose, true},
+        });
+
+        addFlag({
+            .longName = "directory",
+            .shortName = 'd',
+            .description = "Show directories rather than their contents.",
+            .handler = {&showDirectory, true},
+        });
     }
 
     void listText(ref<FSAccessor> accessor)

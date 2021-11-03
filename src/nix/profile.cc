@@ -8,9 +8,11 @@
 #include "flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
 #include "profiles.hh"
+#include "names.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <iomanip>
 
 using namespace nix;
 
@@ -21,6 +23,13 @@ struct ProfileElementSource
     FlakeRef resolvedRef;
     std::string attrPath;
     // FIXME: output names
+
+    bool operator < (const ProfileElementSource & other) const
+    {
+        return
+            std::pair(originalRef.to_string(), attrPath) <
+            std::pair(other.originalRef.to_string(), other.attrPath);
+    }
 };
 
 struct ProfileElement
@@ -29,6 +38,29 @@ struct ProfileElement
     std::optional<ProfileElementSource> source;
     bool active = true;
     // FIXME: priority
+
+    std::string describe() const
+    {
+        if (source)
+            return fmt("%s#%s", source->originalRef, source->attrPath);
+        StringSet names;
+        for (auto & path : storePaths)
+            names.insert(DrvName(path.name()).name);
+        return concatStringsSep(", ", names);
+    }
+
+    std::string versions() const
+    {
+        StringSet versions;
+        for (auto & path : storePaths)
+            versions.insert(DrvName(path.name()).version);
+        return showVersions(versions);
+    }
+
+    bool operator < (const ProfileElement & other) const
+    {
+        return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
+    }
 };
 
 struct ProfileManifest
@@ -66,10 +98,8 @@ struct ProfileManifest
 
         else if (pathExists(profile + "/manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            if (state.allowedPaths) {
-                state.allowedPaths->insert(state.store->followLinksToStore(profile));
-                state.allowedPaths->insert(state.store->followLinksToStore(profile + "/manifest.nix"));
-            }
+            state.allowPath(state.store->followLinksToStore(profile));
+            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
             auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 
@@ -142,6 +172,46 @@ struct ProfileManifest
 
         return std::move(info.path);
     }
+
+    static void printDiff(const ProfileManifest & prev, const ProfileManifest & cur, std::string_view indent)
+    {
+        auto prevElems = prev.elements;
+        std::sort(prevElems.begin(), prevElems.end());
+
+        auto curElems = cur.elements;
+        std::sort(curElems.begin(), curElems.end());
+
+        auto i = prevElems.begin();
+        auto j = curElems.begin();
+
+        bool changes = false;
+
+        while (i != prevElems.end() || j != curElems.end()) {
+            if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
+                std::cout << fmt("%s%s: ∅ -> %s\n", indent, j->describe(), j->versions());
+                changes = true;
+                ++j;
+            }
+            else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
+                std::cout << fmt("%s%s: %s -> ∅\n", indent, i->describe(), i->versions());
+                changes = true;
+                ++i;
+            }
+            else {
+                auto v1 = i->versions();
+                auto v2 = j->versions();
+                if (v1 != v2) {
+                    std::cout << fmt("%s%s: %s -> %s\n", indent, i->describe(), v1, v2);
+                    changes = true;
+                }
+                ++i;
+                ++j;
+            }
+        }
+
+        if (!changes)
+            std::cout << fmt("%sNo changes.\n", indent);
+    }
 };
 
 struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
@@ -162,7 +232,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<DerivedPath> pathsToBuild;
 
         for (auto & installable : installables) {
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
@@ -178,11 +248,34 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     attrPath,
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
+                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, StringSet{drv.outputName}});
 
                 manifest.elements.emplace_back(std::move(element));
-            } else
-                throw UnimplementedError("'nix profile install' does not support argument '%s'", installable->what());
+            } else {
+                auto buildables = build(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal);
+
+                for (auto & buildable : buildables) {
+                    ProfileElement element;
+
+                    std::visit(overloaded {
+                        [&](const BuiltPath::Opaque & bo) {
+                            pathsToBuild.push_back(bo);
+                            element.storePaths.insert(bo.path);
+                        },
+                        [&](const BuiltPath::Built & bfd) {
+                            // TODO: Why are we querying if we know the output
+                            // names already? Is it just to figure out what the
+                            // default one is?
+                            for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
+                                pathsToBuild.push_back(DerivedPath::Built{bfd.drvPath, {output.first}});
+                                element.storePaths.insert(output.second);
+                            }
+                        },
+                    }, buildable.raw());
+
+                    manifest.elements.emplace_back(std::move(element));
+                }
+            }
         }
 
         store->buildPaths(pathsToBuild);
@@ -209,9 +302,8 @@ public:
         std::vector<Matcher> res;
 
         for (auto & s : _matchers) {
-            size_t n;
-            if (string2Int(s, n))
-                res.push_back(n);
+            if (auto n = string2Int<size_t>(s))
+                res.push_back(*n);
             else if (store->isStorePath(s))
                 res.push_back(s);
             else
@@ -298,7 +390,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         auto matchers = getMatchers(store);
 
         // FIXME: code duplication
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<DerivedPath> pathsToBuild;
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
@@ -309,7 +401,13 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                InstallableFlake installable(getEvalState(), FlakeRef(element.source->originalRef), {element.source->attrPath}, {}, lockFlags);
+                InstallableFlake installable(
+                    this,
+                    getEvalState(),
+                    FlakeRef(element.source->originalRef),
+                    {element.source->attrPath},
+                    {},
+                    lockFlags);
 
                 auto [attrPath, resolvedRef, drv] = installable.toDerivation();
 
@@ -327,7 +425,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     attrPath,
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
+                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {drv.outputName}});
             }
         }
 
@@ -337,7 +435,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
     }
 };
 
-struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
+struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
 {
     std::string description() override
     {
@@ -347,7 +445,7 @@ struct CmdProfileInfo : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
     std::string doc() override
     {
         return
-          #include "profile-info.md"
+          #include "profile-list.md"
           ;
     }
 
@@ -402,6 +500,119 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
     }
 };
 
+struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
+{
+    std::string description() override
+    {
+        return "show all versions of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-history.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto [gens, curGen] = findGenerations(*profile);
+
+        std::optional<std::pair<Generation, ProfileManifest>> prevGen;
+        bool first = true;
+
+        for (auto & gen : gens) {
+            ProfileManifest manifest(*getEvalState(), gen.path);
+
+            if (!first) std::cout << "\n";
+            first = false;
+
+            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+                gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
+                gen.number,
+                std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
+                prevGen ? fmt(" <- %d", prevGen->first.number) : "");
+
+            ProfileManifest::printDiff(
+                prevGen ? prevGen->second : ProfileManifest(),
+                manifest,
+                "  ");
+
+            prevGen = {gen, std::move(manifest)};
+        }
+    }
+};
+
+struct CmdProfileRollback : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<GenerationNumber> version;
+
+    CmdProfileRollback()
+    {
+        addFlag({
+            .longName = "to",
+            .description = "The profile version to roll back to.",
+            .labels = {"version"},
+            .handler = {&version},
+        });
+    }
+
+    std::string description() override
+    {
+        return "roll back to the previous version or a specified version of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-rollback.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        switchGeneration(*profile, version, dryRun);
+    }
+};
+
+struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<std::string> minAge;
+
+    CmdProfileWipeHistory()
+    {
+        addFlag({
+            .longName = "older-than",
+            .description =
+                "Delete versions older than the specified age. *age* "
+                "must be in the format *N*`d`, where *N* denotes a number "
+                "of days.",
+            .labels = {"age"},
+            .handler = {&minAge},
+        });
+    }
+
+    std::string description() override
+    {
+        return "delete non-current versions of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-wipe-history.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        if (minAge)
+            deleteGenerationsOlderThan(*profile, *minAge, dryRun);
+        else
+            deleteOldGenerations(*profile, dryRun);
+    }
+};
+
 struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
@@ -409,8 +620,11 @@ struct CmdProfile : NixMultiCommand
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
-              {"info", []() { return make_ref<CmdProfileInfo>(); }},
+              {"list", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
+              {"history", []() { return make_ref<CmdProfileHistory>(); }},
+              {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
+              {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
           })
     { }
 

@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : BuiltPathsCommand
 {
     std::string srcUri, dstUri;
 
@@ -16,33 +16,35 @@ struct CmdCopy : StorePathsCommand
 
     SubstituteFlag substitute = NoSubstitute;
 
+    using BuiltPathsCommand::run;
+
     CmdCopy()
-        : StorePathsCommand(true)
+        : BuiltPathsCommand(true)
     {
         addFlag({
             .longName = "from",
-            .description = "URI of the source Nix store",
+            .description = "URL of the source Nix store.",
             .labels = {"store-uri"},
             .handler = {&srcUri},
         });
 
         addFlag({
             .longName = "to",
-            .description = "URI of the destination Nix store",
+            .description = "URL of the destination Nix store.",
             .labels = {"store-uri"},
             .handler = {&dstUri},
         });
 
         addFlag({
             .longName = "no-check-sigs",
-            .description = "do not require that paths are signed by trusted keys",
+            .description = "Do not require that paths are signed by trusted keys.",
             .handler = {&checkSigs, NoCheckSigs},
         });
 
         addFlag({
             .longName = "substitute-on-destination",
             .shortName = 's',
-            .description = "whether to try substitutes on the destination store (only supported by SSH)",
+            .description = "Whether to try substitutes on the destination store (only supported by SSH stores).",
             .handler = {&substitute, Substitute},
         });
 
@@ -73,15 +75,22 @@ struct CmdCopy : StorePathsCommand
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
-        StorePathsCommand::run(store);
+        BuiltPathsCommand::run(store);
     }
 
-    void run(ref<Store> srcStore, StorePaths storePaths) override
+    void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, StorePathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs, substitute);
+        RealisedPath::Set stuffToCopy;
+
+        for (auto & builtPath : paths) {
+            auto theseRealisations = builtPath.toRealisedPaths(*srcStore);
+            stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
+        }
+
+        copyPaths(
+            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
     }
 };
 

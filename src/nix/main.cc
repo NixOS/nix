@@ -10,6 +10,7 @@
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
+#include "markdown.hh"
 #include "progress-bar.hh"
 
 #include <sys/types.h>
@@ -53,11 +54,15 @@ static bool haveInternet()
 }
 
 std::string programPath;
+char * * savedArgv;
+
+struct HelpRequested { };
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     bool useNet = true;
     bool refresh = false;
+    bool showVersion = false;
 
     NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
@@ -69,47 +74,34 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         addFlag({
             .longName = "help",
-            .description = "show usage information",
-            .handler = {[&]() { if (!completions) showHelpAndExit(); }},
-        });
-
-        addFlag({
-            .longName = "help-config",
-            .description = "show configuration options",
-            .handler = {[&]() {
-                std::cout << "The following configuration options are available:\n\n";
-                Table2 tbl;
-                std::map<std::string, Config::SettingInfo> settings;
-                globalConfig.getSettings(settings);
-                for (const auto & s : settings)
-                    tbl.emplace_back(s.first, s.second.description);
-                printTable(std::cout, tbl);
-                throw Exit();
-            }},
+            .description = "Show usage information.",
+            .handler = {[&]() { throw HelpRequested(); }},
         });
 
         addFlag({
             .longName = "print-build-logs",
             .shortName = 'L',
-            .description = "print full build logs on stderr",
+            .description = "Print full build logs on standard error.",
+            .category = loggingCategory,
             .handler = {[&]() { progressBarSettings.printBuildLogs = true; }},
         });
 
         addFlag({
             .longName = "version",
-            .description = "show version information",
-            .handler = {[&]() { if (!completions) printVersion(programName); }},
+            .description = "Show version information.",
+            .handler = {[&]() { showVersion = true; }},
         });
 
         addFlag({
-            .longName = "no-net",
-            .description = "disable substituters and consider all previously downloaded files up-to-date",
+            .longName = "offline",
+            .aliases = {"no-net"}, // FIXME: remove
+            .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .handler = {[&]() { useNet = false; }},
         });
 
         addFlag({
             .longName = "refresh",
-            .description = "consider all previously downloaded files out-of-date",
+            .description = "Consider all previously downloaded files out-of-date.",
             .handler = {[&]() { refresh = true; }},
         });
     }
@@ -129,7 +121,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"make-content-addressable", {"store", "make-content-addressable"}},
         {"optimise-store", {"store", "optimise"}},
         {"ping-store", {"store", "ping"}},
-        {"sign-paths", {"store", "sign-paths"}},
+        {"sign-paths", {"store", "sign"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
@@ -153,33 +145,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         return pos;
     }
 
-    void printFlags(std::ostream & out) override
-    {
-        Args::printFlags(out);
-        std::cout <<
-            "\n"
-            "In addition, most configuration settings can be overriden using '--" ANSI_ITALIC "name value" ANSI_NORMAL "'.\n"
-            "Boolean settings can be overriden using '--" ANSI_ITALIC "name" ANSI_NORMAL "' or '--no-" ANSI_ITALIC "name" ANSI_NORMAL "'. See 'nix\n"
-            "--help-config' for a list of configuration settings.\n";
-    }
-
-    void printHelp(const string & programName, std::ostream & out) override
-    {
-        MultiCommand::printHelp(programName, out);
-
-#if 0
-        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-" ANSI_ITALIC "COMMAND" ANSI_NORMAL "'.\n";
-#endif
-
-        std::cout << "\nNote: this program is " ANSI_RED "EXPERIMENTAL" ANSI_NORMAL " and subject to change.\n";
-    }
-
-    void showHelpAndExit()
-    {
-        printHelp(programName, std::cout);
-        throw Exit();
-    }
-
     std::string description() override
     {
         return "a tool for reproducible and declarative configuration management";
@@ -191,11 +156,54 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
           #include "nix.md"
           ;
     }
+
+    // Plugins may add new subcommands.
+    void pluginsInited() override
+    {
+        commands = RegisterCommand::getCommandsFor({});
+    }
 };
 
-static void showHelp(std::vector<std::string> subcommand)
+/* Render the help for the specified subcommand to stdout using
+   lowdown. */
+static void showHelp(std::vector<std::string> subcommand, MultiCommand & toplevel)
 {
-    showManPage(subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand)));
+    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
+
+    evalSettings.restrictEval = false;
+    evalSettings.pureEval = false;
+    EvalState state({}, openStore("dummy://"));
+
+    auto vGenerateManpage = state.allocValue();
+    state.eval(state.parseExprFromString(
+        #include "generate-manpage.nix.gen.hh"
+        , "/"), *vGenerateManpage);
+
+    auto vUtils = state.allocValue();
+    state.cacheFile(
+        "/utils.nix", "/utils.nix",
+        state.parseExprFromString(
+            #include "utils.nix.gen.hh"
+            , "/"),
+        *vUtils);
+
+    auto vArgs = state.allocValue();
+    state.mkAttrs(*vArgs, 16);
+    auto vJson = state.allocAttr(*vArgs, state.symbols.create("command"));
+    mkString(*vJson, toplevel.toJSON().dump());
+    vArgs->attrs->sort();
+
+    auto vRes = state.allocValue();
+    state.callFunction(*vGenerateManpage, *vArgs, *vRes, noPos);
+
+    auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
+    if (!attr)
+        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
+
+    auto markdown = state.forceString(*attr->value);
+
+    RunPager pager;
+    std::cout << renderMarkdownToTerminal(markdown) << "\n";
 }
 
 struct CmdHelp : Command
@@ -224,7 +232,10 @@ struct CmdHelp : Command
 
     void run() override
     {
-        showHelp(subcommand);
+        assert(parent);
+        MultiCommand * toplevel = parent;
+        while (toplevel->parent) toplevel = toplevel->parent;
+        showHelp(subcommand, *toplevel);
     }
 };
 
@@ -232,6 +243,8 @@ static auto rCmdHelp = registerCommand<CmdHelp>("help");
 
 void mainWrapped(int argc, char * * argv)
 {
+    savedArgv = argv;
+
     /* The chroot helper needs to be run before any threads have been
        started. */
     if (argc > 0 && argv[0] == chrootHelperName) {
@@ -291,24 +304,40 @@ void mainWrapped(int argc, char * * argv)
 
     try {
         args.parseCmdline(argvToStrings(argc, argv));
+    } catch (HelpRequested &) {
+        std::vector<std::string> subcommand;
+        MultiCommand * command = &args;
+        while (command) {
+            if (command && command->command) {
+                subcommand.push_back(command->command->first);
+                command = dynamic_cast<MultiCommand *>(&*command->command->second);
+            } else
+                break;
+        }
+        showHelp(subcommand, args);
+        return;
     } catch (UsageError &) {
         if (!completions) throw;
     }
 
     if (completions) return;
 
+    if (args.showVersion) {
+        printVersion(programName);
+        return;
+    }
+
     setLogFormat(LogFormat::bar);
 
     Finally f([] { logger->stop(); });
 
-    initPlugins();
-
-    if (!args.command) args.showHelpAndExit();
+    if (!args.command)
+        throw UsageError("no subcommand specified");
 
     if (args.command->first != "repl"
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
-        settings.requireExperimentalFeature("nix-command");
+        settings.requireExperimentalFeature(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");
@@ -317,18 +346,21 @@ void mainWrapped(int argc, char * * argv)
 
     if (!args.useNet) {
         // FIXME: should check for command line overrides only.
-        if (!settings.useSubstitutes.overriden)
+        if (!settings.useSubstitutes.overridden)
             settings.useSubstitutes = false;
-        if (!settings.tarballTtl.overriden)
+        if (!settings.tarballTtl.overridden)
             settings.tarballTtl = std::numeric_limits<unsigned int>::max();
-        if (!fileTransferSettings.tries.overriden)
+        if (!fileTransferSettings.tries.overridden)
             fileTransferSettings.tries = 0;
-        if (!fileTransferSettings.connectTimeout.overriden)
+        if (!fileTransferSettings.connectTimeout.overridden)
             fileTransferSettings.connectTimeout = 1;
     }
 
-    if (args.refresh)
+    if (args.refresh) {
         settings.tarballTtl = 0;
+        settings.ttlNegativeNarInfoCache = 0;
+        settings.ttlPositiveNarInfoCache = 0;
+    }
 
     args.command->second->prepare();
     args.command->second->run();
@@ -338,6 +370,10 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    // Increase the default stack size for the evaluator and for
+    // libstdc++'s std::regex.
+    nix::setStackSize(64 * 1024 * 1024);
+
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);
     });

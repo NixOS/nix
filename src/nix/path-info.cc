@@ -18,10 +18,32 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
     CmdPathInfo()
     {
-        mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
-        mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
-        mkFlag('h', "human-readable", "with -s and -S, print sizes like 1K 234M 5.67G etc.", &humanReadable);
-        mkFlag(0, "sigs", "show signatures", &showSigs);
+        addFlag({
+            .longName = "size",
+            .shortName = 's',
+            .description = "Print the size of the NAR serialisation of each path.",
+            .handler = {&showSize, true},
+        });
+
+        addFlag({
+            .longName = "closure-size",
+            .shortName = 'S',
+            .description = "Print the sum of the sizes of the NAR serialisations of the closure of each path.",
+            .handler = {&showClosureSize, true},
+        });
+
+        addFlag({
+            .longName = "human-readable",
+            .shortName = 'h',
+            .description = "With `-s` and `-S`, print sizes in a human-friendly format such as `5.67G`.",
+            .handler = {&humanReadable, true},
+        });
+
+        addFlag({
+            .longName = "sigs",
+            .description = "Show signatures.",
+            .handler = {&showSigs, true},
+        });
     }
 
     std::string description() override
@@ -57,7 +79,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         size_t pathLen = 0;
         for (auto & storePath : storePaths)

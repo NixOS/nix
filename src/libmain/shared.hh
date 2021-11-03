@@ -4,6 +4,7 @@
 #include "args.hh"
 #include "common-args.hh"
 #include "path.hh"
+#include "derived-path.hh"
 
 #include <signal.h>
 
@@ -42,7 +43,7 @@ struct StorePathWithOutputs;
 
 void printMissing(
     ref<Store> store,
-    const std::vector<StorePathWithOutputs> & paths,
+    const std::vector<DerivedPath> & paths,
     Verbosity lvl = lvlInfo);
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,
@@ -57,23 +58,7 @@ template<class N> N getIntArg(const string & opt,
 {
     ++i;
     if (i == end) throw UsageError("'%1%' requires an argument", opt);
-    string s = *i;
-    N multiplier = 1;
-    if (allowUnit && !s.empty()) {
-        char u = std::toupper(*s.rbegin());
-        if (std::isalpha(u)) {
-            if (u == 'K') multiplier = 1ULL << 10;
-            else if (u == 'M') multiplier = 1ULL << 20;
-            else if (u == 'G') multiplier = 1ULL << 30;
-            else if (u == 'T') multiplier = 1ULL << 40;
-            else throw UsageError("invalid unit specifier '%1%'", u);
-            s.resize(s.size() - 1);
-        }
-    }
-    N n;
-    if (!string2Int(s, n))
-        throw UsageError("'%1%' requires an integer argument", opt);
-    return n * multiplier;
+    return string2IntWithUnitPrefix<N>(*i);
 }
 
 

@@ -64,7 +64,6 @@ DownloadFileResult downloadFile(
 
     if (res.cached) {
         assert(cached);
-        assert(request.expectedETag == res.etag);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
@@ -179,7 +178,8 @@ struct TarballInputScheme : InputScheme
             && !hasSuffix(url.path, ".tar")
             && !hasSuffix(url.path, ".tar.gz")
             && !hasSuffix(url.path, ".tar.xz")
-            && !hasSuffix(url.path, ".tar.bz2"))
+            && !hasSuffix(url.path, ".tar.bz2")
+            && !hasSuffix(url.path, ".tar.zst"))
             return {};
 
         Input input;
@@ -196,7 +196,7 @@ struct TarballInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash")
+            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash" && name != "name")
                 throw Error("unsupported tarball input attribute '%s'", name);
 
         Input input;
@@ -226,7 +226,7 @@ struct TarballInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
+        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first;
         return {std::move(tree), input};
     }
 };

@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 
 #include <cstring>
 #include <regex>
@@ -19,7 +20,7 @@ DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
 DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
     : state(&state), attrs(nullptr), attrPath("")
 {
-    auto [drvPath, selectedOutputs] = store->parsePathWithOutputs(drvPathWithOutputs);
+    auto [drvPath, selectedOutputs] = parsePathWithOutputs(*store, drvPathWithOutputs);
 
     this->drvPath = store->printStorePath(drvPath);
 
@@ -214,8 +215,8 @@ NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        NixInt n;
-        if (string2Int(v->string.s, n)) return n;
+        if (auto n = string2Int<NixInt>(v->string.s))
+            return *n;
     }
     return def;
 }
@@ -228,8 +229,8 @@ NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        NixFloat n;
-        if (string2Float(v->string.s, n)) return n;
+        if (auto n = string2Float<NixFloat>(v->string.s))
+            return *n;
     }
     return def;
 }

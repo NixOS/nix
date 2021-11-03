@@ -21,9 +21,8 @@ static std::optional<GenerationNumber> parseName(const string & profileName, con
     string s = string(name, profileName.size() + 1);
     string::size_type p = s.find("-link");
     if (p == string::npos) return {};
-    unsigned int n;
-    if (string2Int(string(s, 0, p), n) && n >= 0)
-        return n;
+    if (auto n = string2Int<unsigned int>(s.substr(0, p)))
+        return *n;
     else
         return {};
 }
@@ -127,9 +126,9 @@ void deleteGeneration(const Path & profile, GenerationNumber gen)
 static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
-        printInfo(format("would remove generation %1%") % gen);
+        notice("would remove profile version %1%", gen);
     else {
-        printInfo(format("removing generation %1%") % gen);
+        notice("removing profile version %1%", gen);
         deleteGeneration(profile, gen);
     }
 }
@@ -143,7 +142,7 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
     auto [gens, curGen] = findGenerations(profile);
 
     if (gensToDelete.count(*curGen))
-        throw Error("cannot delete current generation of profile %1%'", profile);
+        throw Error("cannot delete current version of profile %1%'", profile);
 
     for (auto & i : gens) {
         if (!gensToDelete.count(i.number)) continue;
@@ -212,14 +211,17 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
 
 void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun)
 {
+    if (timeSpec.empty() || timeSpec[timeSpec.size() - 1] != 'd')
+        throw UsageError("invalid number of days specifier '%1%', expected something like '14d'", timeSpec);
+
     time_t curTime = time(0);
     string strDays = string(timeSpec, 0, timeSpec.size() - 1);
-    int days;
+    auto days = string2Int<int>(strDays);
 
-    if (!string2Int(strDays, days) || days < 1)
-        throw Error("invalid number of days specifier '%1%'", timeSpec);
+    if (!days || *days < 1)
+        throw UsageError("invalid number of days specifier '%1%'", timeSpec);
 
-    time_t oldTime = curTime - days * 24 * 3600;
+    time_t oldTime = curTime - *days * 24 * 3600;
 
     deleteGenerationsOlderThan(profile, oldTime, dryRun);
 }
@@ -231,6 +233,37 @@ void switchLink(Path link, Path target)
     if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
 
     replaceSymlink(target, link);
+}
+
+
+void switchGeneration(
+    const Path & profile,
+    std::optional<GenerationNumber> dstGen,
+    bool dryRun)
+{
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    auto [gens, curGen] = findGenerations(profile);
+
+    std::optional<Generation> dst;
+    for (auto & i : gens)
+        if ((!dstGen && i.number < curGen) ||
+            (dstGen && i.number == *dstGen))
+            dst = i;
+
+    if (!dst) {
+        if (dstGen)
+            throw Error("profile version %1% does not exist", *dstGen);
+        else
+            throw Error("no profile version older than the current (%1%) exists", curGen.value_or(0));
+    }
+
+    notice("switching profile from version %d to %d", curGen.value_or(0), dst->number);
+
+    if (dryRun) return;
+
+    switchLink(profile, dst->path);
 }
 
 

@@ -43,24 +43,12 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         RepairFlag repair, CheckSigsFlag checkSigs) override
     { unsupported("addToStore"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override
-    { unsupported("addToStore"); }
-
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
-
-    void ensurePath(const StorePath & path) override
-    { unsupported("ensurePath"); }
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override
-    { unsupported("buildDerivation"); }
 
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override
     { unsupported("queryRealisation"); }

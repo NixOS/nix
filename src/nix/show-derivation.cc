@@ -19,7 +19,7 @@ struct CmdShowDerivation : InstallablesCommand
         addFlag({
             .longName = "recursive",
             .shortName = 'r',
-            .description = "include the dependencies of the specified derivations",
+            .description = "Include the dependencies of the specified derivations.",
             .handler = {&recursive, true}
         });
     }
@@ -65,18 +65,18 @@ struct CmdShowDerivation : InstallablesCommand
                     auto & outputName = _outputName; // work around clang bug
                     auto outputObj { outputsObj.object(outputName) };
                     std::visit(overloaded {
-                        [&](DerivationOutputInputAddressed doi) {
+                        [&](const DerivationOutputInputAddressed & doi) {
                             outputObj.attr("path", store->printStorePath(doi.path));
                         },
-                        [&](DerivationOutputCAFixed dof) {
+                        [&](const DerivationOutputCAFixed & dof) {
                             outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
                             outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
                             outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
                         },
-                        [&](DerivationOutputCAFloating dof) {
+                        [&](const DerivationOutputCAFloating & dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
-                        [&](DerivationOutputDeferred) {},
+                        [&](const DerivationOutputDeferred &) {},
                     }, output.output);
                 }
             }

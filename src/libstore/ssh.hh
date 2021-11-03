@@ -12,6 +12,7 @@ private:
     const std::string host;
     bool fakeSSH;
     const std::string keyFile;
+    const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
     const int logFD;
@@ -29,7 +30,7 @@ private:
 
 public:
 
-    SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD = -1);
+    SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD = -1);
 
     struct Connection
     {

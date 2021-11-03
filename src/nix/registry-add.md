@@ -21,6 +21,13 @@ R""(
   # nix registry add nixpkgs/nixos-20.03 ~/Dev/nixpkgs
   ```
 
+* Add `nixpkgs` pointing to `github:nixos/nixpkgs` to your custom flake
+  registry:
+
+  ```console
+  nix registry add --registry ./custom-flake-registry.json nixpkgs github:nixos/nixpkgs
+  ```
+
 # Description
 
 This command adds an entry to the user registry that maps flake

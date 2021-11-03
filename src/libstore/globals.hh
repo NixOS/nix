@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -28,11 +29,30 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     void set(const std::string & str, bool append = false) override;
 };
 
+struct PluginFilesSetting : public BaseSetting<Paths>
+{
+    bool pluginsLoaded = false;
+
+    PluginFilesSetting(Config * options,
+        const Paths & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<Paths>(def, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str, bool append = false) override;
+};
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
 
     StringSet getDefaultSystemFeatures();
+
+    StringSet getDefaultExtraPlatforms();
 
     bool isWSL1();
 
@@ -178,7 +198,10 @@ public:
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
-        "A semicolon-separated list of build machines, in the format of `nix.machines`."};
+        R"(
+          A semicolon-separated list of build machines.
+          For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
+        )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
@@ -545,7 +568,7 @@ public:
 
     Setting<StringSet> extraPlatforms{
         this,
-        std::string{SYSTEM} == "x86_64-linux" && !isWSL1() ? StringSet{"i686-linux"} : StringSet{},
+        getDefaultExtraPlatforms(),
         "extra-platforms",
         R"(
           Platforms other than the native one which this machine is capable of
@@ -586,8 +609,10 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. The default
-          is `https://cache.nixos.org`.
+          A list of URLs of substituters, separated by whitespace. Substituters
+          are tried based on their Priority value, which each substituter can set
+          independently. Lower value means higher priority.
+          The default is `https://cache.nixos.org`, with a Priority of 40.
         )",
         {"binary-caches"}};
 
@@ -613,7 +638,7 @@ public:
           is `root`.
 
           > **Warning**
-          > 
+          >
           > Adding a user to `trusted-users` is essentially equivalent to
           > giving that user root access to the system. For example, the user
           > can set `sandbox-paths` and thereby obtain read access to
@@ -670,7 +695,7 @@ public:
           send a series of commands to modify various settings to stdout. The
           currently recognized commands are:
 
-            - `extra-sandbox-paths`  
+            - `extra-sandbox-paths`\
               Pass a list of files and directories to be included in the
               sandbox for this build. One entry per line, terminated by an
               empty line. Entries have the same format as `sandbox-paths`.
@@ -703,13 +728,13 @@ public:
           The program executes with no arguments. The program's environment
           contains the following environment variables:
 
-            - `DRV_PATH`  
+            - `DRV_PATH`
               The derivation for the built paths.
 
               Example:
               `/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv`
 
-            - `OUT_PATHS`  
+            - `OUT_PATHS`
               Output paths of the built derivation, separated by a space
               character.
 
@@ -740,7 +765,7 @@ public:
           documentation](https://ec.haxx.se/usingcurl-netrc.html).
 
           > **Note**
-          > 
+          >
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.
@@ -817,7 +842,7 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
-    Setting<Paths> pluginFiles{
+    PluginFilesSetting pluginFiles{
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
@@ -828,6 +853,9 @@ public:
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
+
+          Warning! These APIs are inherently unstable and may change from
+          release to release.
 
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix
@@ -889,12 +917,12 @@ public:
           value.
           )"};
 
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
-    void requireExperimentalFeature(const std::string & name);
+    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<bool> allowDirty{this, true, "allow-dirty",
         "Whether to allow dirty Git/Mercurial trees."};
@@ -920,6 +948,9 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
+
+    Setting<bool> useRegistries{this, true, "use-registries",
+        "Whether to use flake registries to resolve flake references."};
 };
 
 

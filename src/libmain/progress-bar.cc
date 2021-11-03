@@ -362,6 +362,7 @@ public:
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
+        if (lvl > verbosity) return;
         auto state(state_.lock());
         log(*state, lvl, fs.s);
     }
@@ -673,7 +674,7 @@ public:
             return
                 ANSI_RED + repeat("█", chars1) +
                 ANSI_GREEN + repeat("█", chars2 - chars1) +
-                ANSI_YELLOW + repeat("▓", chars3 - chars2) +
+                ANSI_WARNING + repeat("▓", chars3 - chars2) +
                 ANSI_NORMAL + repeat("▒", barLength - chars3);
         };
 
@@ -862,12 +863,7 @@ public:
 
 Logger * makeProgressBar()
 {
-    return new ProgressBar(
-        isatty(STDIN_FILENO)
-        && isatty(STDOUT_FILENO)
-        && isatty(STDERR_FILENO)
-        && getEnv("TERM").value_or("dumb") != "dumb"
-    );
+    return new ProgressBar(shouldANSI() && isatty(STDIN_FILENO));
 }
 
 void stopProgressBar()

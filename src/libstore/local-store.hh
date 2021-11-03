@@ -58,8 +58,14 @@ private:
         struct Stmts;
         std::unique_ptr<Stmts> stmts;
 
+        /* The global GC lock  */
+        AutoCloseFD fdGCLock;
+
         /* The file to which we write our temporary roots. */
         AutoCloseFD fdTempRoots;
+
+        /* Connection to the garbage collector. */
+        AutoCloseFD fdRootsSocket;
 
         /* The last time we checked whether to do an auto-GC, or an
            auto-GC finished. */
@@ -83,14 +89,10 @@ private:
 
 public:
 
-    PathSetting realStoreDir_;
-
-    const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
     const Path reservedPath;
     const Path schemaPath;
-    const Path trashDir;
     const Path tempRootsDir;
     const Path fnTempRoots;
 
@@ -127,7 +129,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryDerivationOutputMapNoResolve(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -135,6 +137,9 @@ public:
 
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
+
+    bool pathInfoIsUntrusted(const ValidPathInfo &) override;
+    bool realisationIsUntrusted(const Realisation & ) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -145,27 +150,15 @@ public:
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
-    void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
-        BuildMode buildMode) override;
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override;
-
-    void ensurePath(const StorePath & path) override;
-
     void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
 
-    void syncWithGC() override;
-
 private:
 
-    typedef std::shared_ptr<AutoCloseFD> FDPtr;
-    typedef list<FDPtr> FDs;
+    void findTempRoots(Roots & roots, bool censor);
 
-    void findTempRoots(FDs & fds, Roots & roots, bool censor);
+    AutoCloseFD openGCLock();
 
 public:
 
@@ -198,9 +191,7 @@ public:
 
     void vacuumDB();
 
-    /* Repair the contents of the given path by redownloading it using
-       a substituter (if available). */
-    void repairPath(const StorePath & path);
+    void repairPath(const StorePath & path) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
@@ -211,8 +202,11 @@ public:
     /* Register the store path 'output' as the output named 'outputName' of
        derivation 'deriver'. */
     void registerDrvOutput(const Realisation & info) override;
+    void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
 
+    std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
+    std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
 
 private:
@@ -244,28 +238,11 @@ private:
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    struct GCState;
-
-    void deleteGarbage(GCState & state, const Path & path);
-
-    void tryToDelete(GCState & state, const Path & path);
-
-    bool canReachRoot(GCState & state, StorePathSet & visited, const StorePath & path);
-
-    void deletePathRecursive(GCState & state, const Path & path);
-
-    bool isActiveTempFile(const GCState & state,
-        const Path & path, const string & suffix);
-
-    AutoCloseFD openGCLock(LockType lockType);
-
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
     void findRuntimeRoots(Roots & roots, bool censor);
-
-    void removeUnusedLinks(const GCState & state);
 
     Path createTempDirInStore();
 
@@ -281,16 +258,30 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /* Add signatures to a ValidPathInfo using the secret keys
+    /* Add signatures to a ValidPathInfo or Realisation using the secret keys
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
-
-    Path getRealStoreDir() override { return realStoreDir; }
+    void signRealisation(Realisation &);
 
     void createUser(const std::string & userName, uid_t userId) override;
 
-    friend struct DerivationGoal;
+    // XXX: Make a generic `Store` method
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const StorePath & path);
+
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const Path & path,
+        const std::string_view pathHash
+    );
+
+    friend struct LocalDerivationGoal;
+    friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;
+    friend struct DerivationGoal;
 };
 
 
