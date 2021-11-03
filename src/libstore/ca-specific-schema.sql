@@ -13,6 +13,19 @@ create table if not exists Realisations (
 
 create index if not exists IndexRealisations on Realisations(drvPath, outputName);
 
+-- We can end-up in a weird edge-case where a path depends on itself because
+-- it’s an output of a CA derivation, that happens to be the same as one of its
+-- dependencies.
+-- In that case we have a dependency loop (path -> realisation1 -> realisation2
+-- -> path) that we need to break by removing the dependencies between the
+-- realisations
+create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
+  begin
+    delete from RealisationsRefs where realisationReference = (
+      select id from Realisations where outputPath = old.id
+    );
+  end;
+
 create table if not exists RealisationsRefs (
     referrer integer not null,
     realisationReference integer,
