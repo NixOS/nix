@@ -481,7 +481,7 @@ public:
     }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+std::unique_ptr<Logger> makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,

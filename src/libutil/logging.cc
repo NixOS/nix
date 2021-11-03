@@ -126,9 +126,9 @@ void writeToStderr(const string & s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs)
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger(printBuildLogs);
+    return std::make_unique<SimpleLogger>(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
@@ -141,9 +141,9 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
 }
 
 struct JSONLogger : Logger {
-    Logger & prevLogger;
+    std::unique_ptr<Logger> prevLogger;
 
-    JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+    JSONLogger(std::unique_ptr<Logger>&& prevLogger) : prevLogger(std::move(prevLogger)) { }
 
     bool isVerbose() override {
         return true;
@@ -249,9 +249,9 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Logger & prevLogger)
+std::unique_ptr<Logger> makeJSONLogger(std::unique_ptr<Logger>&& prevLogger)
 {
-    return new JSONLogger(prevLogger);
+    return std::make_unique<JSONLogger>(std::move(prevLogger));
 }
 
 static Logger::Fields getFields(nlohmann::json & json)

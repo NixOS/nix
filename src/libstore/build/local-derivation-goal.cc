@@ -1979,7 +1979,7 @@ void LocalDerivationGoal::runChild()
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
             try {
-                logger = std::unique_ptr<Logger>(makeJSONLogger(*logger));
+                logger = std::unique_ptr<Logger>(makeJSONLogger(std::move(logger)));
 
                 BasicDerivation & drv2(*drv);
                 for (auto & e : drv2.env)

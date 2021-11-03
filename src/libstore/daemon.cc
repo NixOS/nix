@@ -262,7 +262,7 @@ static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int cli
     return reqs;
 }
 
-static void performOp(TunnelLogger * logger, ref<Store> store,
+static void performOp(std::unique_ptr<TunnelLogger>& logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
 {
@@ -943,11 +943,15 @@ void processConnection(
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
-    auto tunnelLogger = new TunnelLogger(to, clientVersion);
-    auto& prevLogger = nix::logger;
-    // FIXME
-    if (!recursive)
-        logger = std::unique_ptr<Logger>(tunnelLogger);
+    auto _tunnelLogger = std::make_unique<TunnelLogger>(to, clientVersion);
+    std::unique_ptr<Logger> _prevLogger;
+    // TODO FIXME
+    if (!recursive) {
+        _prevLogger = std::move(logger);
+        logger = std::move(_tunnelLogger);
+    }
+    std::unique_ptr<Logger>& prevLogger = !recursive ? &_prevLogger : &logger;
+    std::unique_ptr<TunnelLogger>& tunnelLogger = !recursive ? dynamic_cast<std::unique_ptr<TunnelLogger>&>(&logger) : _tunnelLogger;
 
     unsigned int opCount = 0;
 

@@ -164,9 +164,9 @@ struct PushActivity
 
 extern std::unique_ptr<Logger> logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+std::unique_ptr<Logger> makeJSONLogger(std::unique_ptr<Logger> prevLogger);
 
 bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
