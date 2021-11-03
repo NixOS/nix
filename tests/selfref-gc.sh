@@ -1,5 +1,7 @@
 source common.sh
 
+requireDaemonNewerThan "2.6.0pre20211215"
+
 clearStore
 
 nix-build --no-out-link -E '
