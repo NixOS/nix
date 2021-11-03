@@ -11,8 +11,8 @@
   [`--command` *cmd*]
   [`--run` *cmd*]
   [`--exclude` *regexp*]
-  [--pure]
-  [--keep *name*]
+  [`--pure`]
+  [`--keep` *name*]
   {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
 # Description
