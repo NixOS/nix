@@ -504,8 +504,8 @@ bool NixRepl::processLine(string line)
             state->store->buildPaths({DerivedPath::Built{drvPath}});
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & i : drv.outputsAndOptPaths(*state->store))
-                logger->cout("  %s -> %s", i.first, state->store->printStorePath(*i.second.second));
+            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath))
+                logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
         } else {
