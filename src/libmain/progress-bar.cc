@@ -831,7 +831,13 @@ public:
 
     void writeToStdout(std::string_view s) override
     {
-        Logger::writeToStdout(s);
+        auto state(state_.lock());
+
+        if (state->active)
+            // Note: this assumes that stdout == stderr == a terminal
+            draw(*state, s);
+        else
+            Logger::writeToStdout(s);
     }
 
     std::optional<char> ask(std::string_view msg) override
