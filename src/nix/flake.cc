@@ -252,6 +252,14 @@ struct CmdFlakeInfo : CmdFlakeMetadata
     }
 };
 
+static bool argHasName(std::string_view arg, std::string_view expected)
+{
+    return
+        arg == expected
+        || arg == "_"
+        || (hasPrefix(arg, "_") && arg.substr(1) == expected);
+}
+
 struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
@@ -346,14 +354,14 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (!v.isLambda() || v.lambda.fun->hasFormals() ||
-                    (std::string(v.lambda.fun->arg) != "final" &&
-                        std::string(v.lambda.fun->arg) != "_final"))
+                if (!v.isLambda()
+                    || v.lambda.fun->hasFormals()
+                    || !argHasName(v.lambda.fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
-                if (!body || body->hasFormals() ||
-                    (std::string(body->arg) != "prev" &&
-                        std::string(body->arg) != "_prev"))
+                if (!body
+                    || body->hasFormals()
+                    || !argHasName(body->arg, "prev"))
                     throw Error("overlay does not take an argument named 'prev'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
