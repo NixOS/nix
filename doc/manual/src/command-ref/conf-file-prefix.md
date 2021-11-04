@@ -17,7 +17,7 @@ By default Nix reads settings from the following places:
 
     Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS`
     and `XDG_CONFIG_HOME`. If these are unset, it will look in
-    `$HOME/.config/nix.conf`.
+    `$HOME/.config/nix/nix.conf`.
 
   - If `NIX_CONFIG` is set, its contents is treated as the contents of
     a configuration file.
