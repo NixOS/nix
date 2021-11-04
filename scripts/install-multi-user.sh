@@ -599,7 +599,7 @@ manager. This will happen in a few stages:
 1. Make sure your computer doesn't already have Nix. If it does, I
    will show you instructions on how to clean up your old install.
 
-2. Show you what we are going to install and where. Then we will ask
+2. Show you what I am going to install and where. Then I will ask
    if you are ready to continue.
 
 3. Create the system users and groups that the Nix daemon uses to run
@@ -614,14 +614,14 @@ manager. This will happen in a few stages:
 
 EOF
 
-    if ui_confirm "Would you like to see a more detailed list of what we will do?"; then
+    if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
         cat <<EOF
 
-We will:
+I will:
 
  - make sure your computer doesn't already have Nix files
    (if it does, I will tell you how to clean them up.)
- - create local users (see the list above for the users we'll make)
+ - create local users (see the list above for the users I'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT
  - create a configuration file in /etc/nix
@@ -656,7 +656,7 @@ run in a headless fashion, like this:
 
   $ curl -L https://nixos.org/nix/install | sh
 
-or maybe in a CI pipeline. Because of that, we're going to skip the
+or maybe in a CI pipeline. Because of that, I'm going to skip the
 verbose output in the interest of brevity.
 
 If you would like to
@@ -670,7 +670,7 @@ EOF
     fi
 
     cat <<EOF
-This script is going to call sudo a lot. Every time we do, it'll
+This script is going to call sudo a lot. Every time I do, it'll
 output exactly what it'll do, and why.
 
 Just like this:
@@ -682,15 +682,15 @@ EOF
     cat <<EOF
 
 This might look scary, but everything can be undone by running just a
-few commands. We used to ask you to confirm each time sudo ran, but it
+few commands. I used to ask you to confirm each time sudo ran, but it
 was too many times. Instead, I'll just ask you this one time:
 
 EOF
-    if ui_confirm "Can we use sudo?"; then
+    if ui_confirm "Can I use sudo?"; then
         ok "Yay! Thanks! Let's get going!"
     else
         failure <<EOF
-That is okay, but we can't install.
+That is okay, but I can't install.
 EOF
     fi
 }
@@ -811,8 +811,8 @@ main() {
     # pre-Catalina macOS if run as root user.
     if [ $EUID -eq 0 ]; then
         failure <<EOF
-Please do not run this script with root privileges. We will call sudo
-when we need to.
+Please do not run this script with root privileges. I will call sudo
+when I need to.
 EOF
     fi
 
