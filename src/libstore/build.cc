@@ -179,6 +179,8 @@ public:
 
     virtual string key() = 0;
 
+    virtual void cleanup() { }
+
 protected:
 
     virtual void amDone(ExitCode result);
@@ -424,6 +426,8 @@ void Goal::amDone(ExitCode result)
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());
+
+    cleanup();
 }
 
 
@@ -3895,6 +3899,8 @@ public:
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
 
+    void cleanup() override;
+
     Path getStorePath() { return storePath; }
 
     void amDone(ExitCode result) override
@@ -3918,15 +3924,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, Repa
 
 SubstitutionGoal::~SubstitutionGoal()
 {
-    try {
-        if (thr.joinable()) {
-            // FIXME: signal worker thread to quit.
-            thr.join();
-            worker.childTerminated(this);
-        }
-    } catch (...) {
-        ignoreException();
-    }
+    cleanup();
 }
 
 
@@ -3960,6 +3958,8 @@ void SubstitutionGoal::init()
 void SubstitutionGoal::tryNext()
 {
     trace("trying next substituter");
+
+    cleanup();
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
@@ -4088,7 +4088,7 @@ void SubstitutionGoal::tryToRun()
     thr = std::thread([this]() {
         try {
             /* Wake up the worker loop when we're done. */
-            Finally updateStats([this]() { outPipe.writeSide = -1; });
+            Finally updateStats([this]() { outPipe.writeSide.close(); });
 
             Activity act(*logger, actSubstitute, Logger::Fields{storePath, sub->getUri()});
             PushActivity pact(act.id);
@@ -4172,6 +4172,20 @@ void SubstitutionGoal::handleEOF(int fd)
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
 
+void SubstitutionGoal::cleanup()
+{
+    try {
+        if (thr.joinable()) {
+            // FIXME: signal worker thread to quit.
+            thr.join();
+            worker.childTerminated(this);
+        }
+
+        outPipe.close();
+    } catch (...) {
+        ignoreException();
+    }
+}
 
 //////////////////////////////////////////////////////////////////////
 
