@@ -47,6 +47,7 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   flake-local-settings.sh \
+  flakes-with-submodules.sh \
   build.sh \
   repl.sh ca/repl.sh \
   ca/build.sh \
