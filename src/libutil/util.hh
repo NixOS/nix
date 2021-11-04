@@ -190,7 +190,6 @@ public:
 class AutoCloseFD
 {
     int fd;
-    void close();
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
@@ -202,6 +201,7 @@ public:
     int get() const;
     explicit operator bool() const;
     int release();
+    void close();
 };
 
 
@@ -210,6 +210,7 @@ class Pipe
 public:
     AutoCloseFD readSide, writeSide;
     void create();
+    void close();
 };
 
 
