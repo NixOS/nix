@@ -24,6 +24,20 @@ static std::string readHead(const Path & path)
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
+static Attrs readSubmodules(const Path & path)
+{
+    auto output = runProgram("git", true, { "-C", path, "submodule", "status" });
+    Attrs attrs;
+    for (auto line : tokenizeString<std::vector<string>>(output, "\n;")) {
+        auto tokens = tokenizeString<std::vector<string>>(line);
+        auto url = tokens[0];
+        auto path = tokens[1];
+        attrs.emplace(path, url);
+    }
+
+    return attrs;
+}
+
 static bool isNotDotGitDirectory(const Path & path)
 {
     static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
@@ -196,7 +210,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
+        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath, Attrs modulesInfo)
             -> std::pair<Tree, Input>
         {
             assert(input.getRev());
@@ -204,6 +218,7 @@ struct GitInputScheme : InputScheme
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
+            input.modules = modulesInfo;
             return {
                 Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
@@ -211,8 +226,11 @@ struct GitInputScheme : InputScheme
         };
 
         if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
-                return makeResult(res->first, std::move(res->second));
+            if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
+                Path p = store->printStorePath(res->second);
+                auto modulesInfo = readSubmodules(p);
+                return makeResult(res->first, std::move(res->second), modulesInfo);
+            }
         }
 
         auto [isLocal, actualUrl_] = getActualUrl(input);
@@ -317,7 +335,9 @@ struct GitInputScheme : InputScheme
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (!input.getRev() || input.getRev() == rev2) {
                     input.attrs.insert_or_assign("rev", rev2.gitRev());
-                    return makeResult(res->first, std::move(res->second));
+                    Path p = store->printStorePath(res->second);
+                    auto modulesInfo = readSubmodules(p);
+                    return makeResult(res->first, std::move(res->second), modulesInfo);
                 }
             }
 
@@ -410,8 +430,11 @@ struct GitInputScheme : InputScheme
 
         /* Now that we know the ref, check again whether we have it in
            the store. */
-        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
-            return makeResult(res->first, std::move(res->second));
+        if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
+            Path p = store->printStorePath(res->second);
+            auto modulesInfo = readSubmodules(p);
+            return makeResult(res->first, std::move(res->second), modulesInfo);
+        }
 
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
@@ -475,6 +498,8 @@ struct GitInputScheme : InputScheme
             {"lastModified", lastModified},
         });
 
+        auto modulesInfo = readSubmodules(actualUrl);
+
         if (!shallow)
             infoAttrs.insert_or_assign("revCount",
                 std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input.getRev()->gitRev() })));
@@ -494,7 +519,7 @@ struct GitInputScheme : InputScheme
             storePath,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
+        return makeResult(infoAttrs, std::move(storePath), modulesInfo);
     }
 };
 

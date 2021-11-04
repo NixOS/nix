@@ -35,6 +35,7 @@ struct Input
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
+    Attrs modules;
     bool immutable = false;
     bool direct = true;
 
