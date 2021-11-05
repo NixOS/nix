@@ -290,6 +290,10 @@ ConnectionHandle RemoteStore::getConnection()
     return ConnectionHandle(connections->get());
 }
 
+void RemoteStore::setOptions()
+{
+    setOptions(*(getConnection().handle));
+}
 
 bool RemoteStore::isValidPathUncached(const StorePath & path)
 {

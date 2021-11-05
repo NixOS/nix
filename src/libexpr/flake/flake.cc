@@ -307,7 +307,7 @@ LockedFlake lockFlake(
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply();
-        // FIXME: send new config to the daemon.
+        state.store->setOptions();
     }
 
     try {
