@@ -148,7 +148,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             db.exec(R"(
                 create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
                 begin
-                    delete from RealisationsRefs where realisationReference = (
+                    delete from RealisationsRefs where realisationReference in (
                     select id from Realisations where outputPath = old.id
                     );
                 end;
