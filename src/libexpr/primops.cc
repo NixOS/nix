@@ -2386,23 +2386,38 @@ static RegisterPrimOp primop_catAttrs({
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
+
     if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
         state.mkAttrs(v, 0);
         return;
     }
-    if (!args[0]->isLambda())
+
+    if (!args[0]->isLambda() && !args[0]->isPartialApp())
         throw TypeError({
             .msg = hintfmt("'functionArgs' requires a function"),
             .errPos = pos
         });
 
-    if (!args[0]->lambda.fun->hasFormals()) {
+    size_t argsDone = 0;
+    auto lambda = args[0];
+    while (lambda->isPartialApp()) {
+        argsDone++;
+        lambda = lambda->app.left;
+    }
+    assert(lambda->isLambda());
+
+    assert(argsDone < lambda->lambda.fun->args.size());
+
+    // FIXME: handle partially applied functions
+    auto formals = lambda->lambda.fun->args[argsDone].formals;
+
+    if (!formals) {
         state.mkAttrs(v, 0);
         return;
     }
 
-    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals) {
+    state.mkAttrs(v, formals->formals.size());
+    for (auto & i : formals->formals) {
         // !!! should optimise booleans (allocate only once)
         Value * value = state.allocValue();
         v.attrs->push_back(Attr(i.name, value, ptr(&i.pos)));

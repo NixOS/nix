@@ -160,6 +160,24 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
+static Expr * addArg(const Pos & pos, Expr * e, ExprLambda::Arg && arg)
+{
+    if (!arg.arg.empty() && arg.formals && arg.formals->argNames.count(arg.arg))
+        throw ParseError({
+            .msg = hintfmt("duplicate formal function argument '%1%'", arg.arg),
+            .errPos = pos
+        });
+
+    auto e2 = dynamic_cast<ExprLambda *>(e); // FIXME: slow?
+    if (!e2)
+        e2 = new ExprLambda(pos, e);
+    else
+        e2->pos = pos;
+    e2->args.emplace_back(std::move(arg));
+    return e2;
+}
+
+
 static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Expr *> & es)
 {
     if (es.empty()) return new ExprString(symbols.create(""));
@@ -332,13 +350,13 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
+    { $$ = addArg(CUR_POS, $3, {data->symbols.create($1), nullptr}); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), $2, $5); }
+    { $$ = addArg(CUR_POS, $5, {data->state.sEpsilon, $2}); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), $2, $7); }
+    { $$ = addArg(CUR_POS, $7, {data->symbols.create($5), $2}); }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), $4, $7); }
+    { $$ = addArg(CUR_POS, $7, {data->symbols.create($1), $4}); }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
@@ -456,7 +474,7 @@ expr_simple
 string_parts
   : STR
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(data->symbols.create("")); }
+  | { $$ = new ExprString(data->state.sEpsilon); }
   ;
 
 string_parts_interpolated

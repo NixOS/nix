@@ -124,23 +124,26 @@ void ExprList::show(std::ostream & str) const
 void ExprLambda::show(std::ostream & str) const
 {
     str << "(";
-    if (hasFormals()) {
-        str << "{ ";
-        bool first = true;
-        for (auto & i : formals->formals) {
-            if (first) first = false; else str << ", ";
-            str << i.name;
-            if (i.def) str << " ? " << *i.def;
+    for (auto & arg : args) {
+        if (arg.formals) {
+            str << "{ ";
+            bool first = true;
+            for (auto & i : arg.formals->formals) {
+                if (first) first = false; else str << ", ";
+                str << i.name;
+                if (i.def) str << " ? " << *i.def;
+            }
+            if (arg.formals->ellipsis) {
+                if (!first) str << ", ";
+                str << "...";
+            }
+            str << " }";
+            if (!arg.arg.empty()) str << " @ ";
         }
-        if (formals->ellipsis) {
-            if (!first) str << ", ";
-            str << "...";
-        }
-        str << " }";
-        if (!arg.empty()) str << " @ ";
+        if (!arg.arg.empty()) str << arg.arg;
+        str << ": ";
     }
-    if (!arg.empty()) str << arg;
-    str << ": " << *body << ")";
+    str << *body << ")";
 }
 
 void ExprCall::show(std::ostream & str) const
@@ -279,8 +282,7 @@ void ExprVar::bindVars(const StaticEnv & env)
         if (curEnv->isWith) {
             if (withLevel == -1) withLevel = level;
         } else {
-            auto i = curEnv->find(name);
-            if (i != curEnv->vars.end()) {
+            if (auto i = curEnv->get(name)) {
                 fromWith = false;
                 this->level = level;
                 displ = i->second;
@@ -354,24 +356,47 @@ void ExprList::bindVars(const StaticEnv & env)
 
 void ExprLambda::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(
-        false, &env,
-        (hasFormals() ? formals->formals.size() : 0) +
-        (arg.empty() ? 0 : 1));
+    /* The parser adds arguments in reverse order. Let's fix that
+       now. */
+    std::reverse(args.begin(), args.end());
+
+    envSize = 0;
+
+    for (auto & arg :args) {
+        if (!arg.arg.empty()) envSize++;
+        if (arg.formals) envSize += arg.formals->formals.size();
+    }
+
+    StaticEnv newEnv(false, &env, envSize);
 
     Displacement displ = 0;
 
-    if (!arg.empty()) newEnv.vars.emplace_back(arg, displ++);
+    for (auto & arg : args) {
+        if (!arg.arg.empty()) {
+            if (auto i = const_cast<StaticEnv::Vars::value_type *>(newEnv.get(arg.arg)))
+                i->second = displ++;
+            else
+                newEnv.vars.emplace_back(arg.arg, displ++);
+        }
 
-    if (hasFormals()) {
-        for (auto & i : formals->formals)
-            newEnv.vars.emplace_back(i.name, displ++);
+        if (arg.formals) {
+            for (auto & i : arg.formals->formals) {
+                if (auto j = const_cast<StaticEnv::Vars::value_type *>(newEnv.get(i.name)))
+                    j->second = displ++;
+                else
+                    newEnv.vars.emplace_back(i.name, displ++);
+            }
 
-        newEnv.sort();
+            newEnv.sort();
 
-        for (auto & i : formals->formals)
-            if (i.def) i.def->bindVars(newEnv);
+            for (auto & i : arg.formals->formals)
+                if (i.def) i.def->bindVars(newEnv);
+        }
     }
+
+    assert(displ == envSize);
+
+    newEnv.sort();
 
     body->bindVars(newEnv);
 }

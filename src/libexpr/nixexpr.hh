@@ -233,21 +233,24 @@ struct ExprLambda : Expr
 {
     Pos pos;
     Symbol name;
-    Symbol arg;
-    Formals * formals;
-    Expr * body;
-    ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
-        : pos(pos), arg(arg), formals(formals), body(body)
+
+    struct Arg
     {
-        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError({
-                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
-                .errPos = pos
-            });
+        Symbol arg;
+        Formals * formals;
     };
+
+    std::vector<Arg> args;
+
+    Expr * body;
+
+    Displacement envSize = 0; // initialized by bindVars()
+
+    ExprLambda(const Pos & pos, Expr * body)
+        : pos(pos), body(body)
+    { };
     void setName(Symbol & name);
     string showNamePos() const;
-    inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };
 
@@ -368,12 +371,12 @@ struct StaticEnv
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
     }
 
-    Vars::const_iterator find(const Symbol & name) const
+    const Vars::value_type * get(const Symbol & name) const
     {
         Vars::value_type key(name, 0);
         auto i = std::lower_bound(vars.begin(), vars.end(), key);
-        if (i != vars.end() && i->first == name) return i;
-        return vars.end();
+        if (i != vars.end() && i->first == name) return &*i;
+        return {};
     }
 };
 
