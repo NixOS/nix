@@ -64,6 +64,7 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
+// FIXME: optimize
 static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
 {
     string t;

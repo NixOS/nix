@@ -4,8 +4,6 @@
 #include "symbol-table.hh"
 #include "error.hh"
 
-#include <map>
-
 
 namespace nix {
 
@@ -135,6 +133,9 @@ struct ExprPath : Expr
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
+typedef uint32_t Level;
+typedef uint32_t Displacement;
+
 struct ExprVar : Expr
 {
     Pos pos;
@@ -150,8 +151,8 @@ struct ExprVar : Expr
        value is obtained by getting the attribute named `name' from
        the set stored in the environment that is `level' levels up
        from the current one.*/
-    unsigned int level;
-    unsigned int displ;
+    Level level;
+    Displacement displ;
 
     ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
@@ -185,7 +186,7 @@ struct ExprAttrs : Expr
         bool inherited;
         Expr * e;
         Pos pos;
-        unsigned int displ; // displacement
+        Displacement displ; // displacement
         AttrDef(Expr * e, const Pos & pos, bool inherited=false)
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
@@ -250,6 +251,17 @@ struct ExprLambda : Expr
     COMMON_METHODS
 };
 
+struct ExprCall : Expr
+{
+    Expr * fun;
+    std::vector<Expr *> args;
+    Pos pos;
+    ExprCall(const Pos & pos, Expr * fun, std::vector<Expr *> && args)
+        : fun(fun), args(args), pos(pos)
+    { }
+    COMMON_METHODS
+};
+
 struct ExprLet : Expr
 {
     ExprAttrs * attrs;
@@ -308,7 +320,6 @@ struct ExprOpNot : Expr
         void eval(EvalState & state, Env & env, Value & v); \
     };
 
-MakeBinOp(ExprApp, "")
 MakeBinOp(ExprOpEq, "==")
 MakeBinOp(ExprOpNEq, "!=")
 MakeBinOp(ExprOpAnd, "&&")
@@ -342,9 +353,28 @@ struct StaticEnv
 {
     bool isWith;
     const StaticEnv * up;
-    typedef std::map<Symbol, unsigned int> Vars;
+
+    // Note: these must be in sorted order.
+    typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
-    StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
+
+    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+        vars.reserve(expectedSize);
+    };
+
+    void sort()
+    {
+        std::sort(vars.begin(), vars.end(),
+            [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
+    }
+
+    Vars::const_iterator find(const Symbol & name) const
+    {
+        Vars::value_type key(name, 0);
+        auto i = std::lower_bound(vars.begin(), vars.end(), key);
+        if (i != vars.end() && i->first == name) return i;
+        return vars.end();
+    }
 };
 
 

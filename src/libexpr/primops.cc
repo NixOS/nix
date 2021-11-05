@@ -184,13 +184,16 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
-            StaticEnv staticEnv(false, &state.staticBaseEnv);
+            StaticEnv staticEnv(false, &state.staticBaseEnv, vScope->attrs->size());
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
-                staticEnv.vars[attr.name] = displ;
+                staticEnv.vars.emplace_back(attr.name, displ);
                 env->values[displ++] = attr.value;
             }
+
+            // No need to call staticEnv.sort(), because
+            // args[0]->attrs is already sorted.
 
             printTalkative("evaluating file '%1%'", realPath);
             Expr * e = state.parseExprFromFile(resolveExprPath(realPath), staticEnv);
@@ -1880,9 +1883,6 @@ static void addPath(
             Value arg1;
             mkString(arg1, path);
 
-            Value fun2;
-            state.callFunction(*filterFun, arg1, fun2, noPos);
-
             Value arg2;
             mkString(arg2,
                 S_ISREG(st.st_mode) ? "regular" :
@@ -1890,8 +1890,9 @@ static void addPath(
                 S_ISLNK(st.st_mode) ? "symlink" :
                 "unknown" /* not supported, will fail! */);
 
+            Value * args []{&arg1, &arg2};
             Value res;
-            state.callFunction(fun2, arg2, res, noPos);
+            state.callFunction(*filterFun, 2, args, res, pos);
 
             return state.forceBool(res, pos);
         }) : defaultPathFilter;
@@ -2692,10 +2693,9 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
         Value * vCur = args[1];
 
         for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
-            Value vTmp;
-            state.callFunction(*args[0], *vCur, vTmp, pos);
+            Value * vs []{vCur, args[2]->listElems()[n]};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
-            state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
+            state.callFunction(*args[0], 2, vs, *vCur, pos);
         }
         state.forceValue(v, pos);
     } else {
@@ -2816,17 +2816,16 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         v.listElems()[n] = args[1]->listElems()[n];
     }
 
-
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
         if (args[0]->isPrimOp() && args[0]->primOp->fun == prim_lessThan)
             return CompareValues()(a, b);
 
-        Value vTmp1, vTmp2;
-        state.callFunction(*args[0], *a, vTmp1, pos);
-        state.callFunction(vTmp1, *b, vTmp2, pos);
-        return state.forceBool(vTmp2, pos);
+        Value * vs[] = {a, b};
+        Value vBool;
+        state.callFunction(*args[0], 2, vs, vBool, pos);
+        return state.forceBool(vBool, pos);
     };
 
     /* FIXME: std::sort can segfault if the comparator is not a strict
@@ -3727,14 +3726,20 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     sDerivationNix = symbols.create("//builtin/derivation.nix");
-    eval(parse(
-        #include "primops/derivation.nix.gen.hh"
-        , foFile, sDerivationNix, "/", staticBaseEnv), v);
-    addConstant("derivation", v);
+    auto vDerivation = allocValue();
+    addConstant("derivation", vDerivation);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
     baseEnv.values[0]->attrs->sort();
+
+    staticBaseEnv.sort();
+
+    /* Note: we have to initialize the 'derivation' constant *after*
+       building baseEnv/staticBaseEnv because it uses 'builtins'. */
+    eval(parse(
+        #include "primops/derivation.nix.gen.hh"
+        , foFile, sDerivationNix, "/", staticBaseEnv), *vDerivation);
 }
 
 
