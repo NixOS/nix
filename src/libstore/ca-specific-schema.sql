@@ -21,7 +21,7 @@ create index if not exists IndexRealisations on Realisations(drvPath, outputName
 -- realisations
 create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
   begin
-    delete from RealisationsRefs where realisationReference = (
+    delete from RealisationsRefs where realisationReference in (
       select id from Realisations where outputPath = old.id
     );
   end;
