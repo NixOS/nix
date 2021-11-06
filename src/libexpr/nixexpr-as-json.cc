@@ -170,8 +170,8 @@ void ExprLambda::showAsJson(std::ostream & str) const
         str << ",\"line\":" << pos.line;
         str << ",\"column\":" << pos.column;
     }
-    str << ",\"matchAttrs\":" << (matchAttrs ? "true" : "false");
-    if (matchAttrs) {
+    str << ",\"hasFormals\":" << (hasFormals() ? "true" : "false");
+    if (hasFormals()) {
         str << ",\"formals\":[";
         bool first = true;
         for (auto & i : formals->formals) {
