@@ -3732,7 +3732,7 @@ void EvalState::createBaseEnv()
                 .fun = primOp.fun,
                 .arity = std::max(primOp.args.size(), primOp.arity),
                 .name = symbols.create(primOp.name),
-                .args = std::move(primOp.args),
+                .args = primOp.args,
                 .doc = primOp.doc,
             });
 
