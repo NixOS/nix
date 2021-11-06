@@ -21,6 +21,7 @@ typedef enum {
     tListN,
     tThunk,
     tApp,
+    tPartialApp,
     tLambda,
     tBlackhole,
     tPrimOp,
@@ -125,6 +126,7 @@ public:
 
     // type() == nFunction
     inline bool isLambda() const { return internalType == tLambda; };
+    inline bool isPartialApp() const { return internalType == tPartialApp; };
     inline bool isPrimOp() const { return internalType == tPrimOp; };
     inline bool isPrimOpApp() const { return internalType == tPrimOpApp; };
 
@@ -196,7 +198,7 @@ public:
             case tNull: return nNull;
             case tAttrs: return nAttrs;
             case tList1: case tList2: case tListN: return nList;
-            case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
+            case tLambda: case tPartialApp: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
             case tThunk: case tApp: case tBlackhole: return nThunk;
@@ -303,6 +305,13 @@ public:
     inline void mkPrimOpApp(Value * l, Value * r)
     {
         internalType = tPrimOpApp;
+        app.left = l;
+        app.right = r;
+    }
+
+    inline void mkPartialApp(Value * l, Value * r)
+    {
+        internalType = tPartialApp;
         app.left = l;
         app.right = r;
     }

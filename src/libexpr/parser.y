@@ -41,12 +41,6 @@ namespace nix {
             { };
     };
 
-    // Helper to prevent an expensive dynamic_cast call in expr_app.
-    struct App
-    {
-        Expr * e;
-        bool isCall;
-    };
 }
 
 #define YY_DECL int yylex \
@@ -157,6 +151,24 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
             .errPos = pos
         });
     formals->formals.push_front(formal);
+}
+
+
+static Expr * addArg(const Pos & pos, Expr * e, ExprLambda::Arg && arg)
+{
+    if (!arg.arg.empty() && arg.formals && arg.formals->argNames.count(arg.arg))
+        throw ParseError({
+            .msg = hintfmt("duplicate formal function argument '%1%'", arg.arg),
+            .errPos = pos
+        });
+
+    auto e2 = dynamic_cast<ExprLambda *>(e); // FIXME: slow?
+    if (!e2)
+        e2 = new ExprLambda(pos, e);
+    else
+        e2->pos = pos;
+    e2->args.emplace_back(std::move(arg));
+    return e2;
 }
 
 
@@ -286,12 +298,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * uri;
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
-  nix::App app; // bool == whether this is an ExprCall
 }
 
 %type <e> start expr expr_function expr_if expr_op
-%type <e> expr_select expr_simple
-%type <app> expr_app
+%type <e> expr_select expr_simple expr_app
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
@@ -332,13 +342,13 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
+    { $$ = addArg(CUR_POS, $3, {data->symbols.create($1), nullptr}); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), $2, $5); }
+    { $$ = addArg(CUR_POS, $5, {data->state.sEpsilon, $2}); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), $2, $7); }
+    { $$ = addArg(CUR_POS, $7, {data->symbols.create($5), $2}); }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), $4, $7); }
+    { $$ = addArg(CUR_POS, $7, {data->symbols.create($1), $4}); }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
@@ -379,20 +389,18 @@ expr_op
   | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
-  | expr_app { $$ = $1.e; }
+  | expr_app
   ;
 
 expr_app
   : expr_app expr_select {
-      if ($1.isCall) {
-          ((ExprCall *) $1.e)->args.push_back($2);
+      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
+          e2->args.push_back($2);
           $$ = $1;
-      } else {
-          $$.e = new ExprCall(CUR_POS, $1.e, {$2});
-          $$.isCall = true;
-      }
+      } else
+          $$ = new ExprCall(CUR_POS, $1, {$2});
   }
-  | expr_select { $$.e = $1; $$.isCall = false; }
+  | expr_select
   ;
 
 expr_select
@@ -456,7 +464,7 @@ expr_simple
 string_parts
   : STR
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(data->symbols.create("")); }
+  | { $$ = new ExprString(data->state.sEpsilon); }
   ;
 
 string_parts_interpolated
