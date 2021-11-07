@@ -14,14 +14,28 @@ enum class OutputFormat {
 struct CmdParse : Command
 {
     OutputFormat outputFormat = OutputFormat::ATerm;
+    std::string inputExpr;
     Path inputFile;
 
     CmdParse()
     {
         expectArgs({
             .label = "input-file",
+            .optional = true,
             .handler = {&inputFile},
             .completer = completePath // libutil/args.hh
+        });
+
+        addFlag({
+            .longName = "expr",
+            //.shortName = "E", // FIXME error: cannot convert ‘<brace-enclosed initializer list>’ to ‘nix::Args::Flag&&’
+            .description = "Nix expression",
+            .labels = {"expression"},
+            .handler = {[&](std::string exprString) {
+                if (exprString.empty()) throw UsageError("--expr requires one argument");
+                inputExpr = exprString;
+                // TODO move string?
+            }}
         });
 
         addFlag({
@@ -81,13 +95,26 @@ struct CmdParse : Command
         */
 
         //e = state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, inputFile))));
-        e = state->parseExprFromFile(lookupFileArg(*state, inputFile));
+
+        if ((inputExpr == "" && inputFile == "") || (inputExpr != "" && inputFile != "")) {
+            // none or both are set
+            // when none are set, nix-instantiate would read ./default.nix
+            throw UsageError(fmt("'nix parse' requires either input-file or expression"));
+        }
+
+        if (inputFile != "") {
+            e = state->parseExprFromFile(lookupFileArg(*state, inputFile));
+        }
+        else {
+            e = state->parseExprFromString(inputExpr, absPath("."));
+        }
 
         if (outputFormat == OutputFormat::JSON) {
             e->showAsJson(std::cout);
         }
         else {
-            e->show(std::cout);
+            // default format
+            e->showAsAterm(std::cout);
         }
     }
 };
