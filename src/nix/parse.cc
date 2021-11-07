@@ -73,14 +73,11 @@ struct CmdParse : Command
 
     void run() override
     {
-        RepairFlag repair = NoRepair;
-
         auto store = openStore();
 
         Strings searchPath = {"."}; // TODO better?
 
         auto state = std::make_unique<EvalState>(searchPath, store);
-        state->repair = repair;
 
         Expr * e = nullptr;
 
