@@ -198,6 +198,24 @@ void ExprLambda::showAsJson(std::ostream & str) const
     str << '}';
 }
 
+void ExprCall::showAsJson(std::ostream & str) const
+{
+    str << "{\"type\":\"" << NodeTypeName::ExprCall << "\"";
+    if (pos.line > 0) {
+        str << ",\"line\":" << pos.line;
+        str << ",\"column\":" << pos.column;
+    }
+    str << ",\"function\":";
+    fun->showAsJson(str);
+    str << ",\"args\":[";
+    bool first = true;
+    for (auto & e : args) {
+        if (first) first = false; else str << ",";
+        e->showAsJson(str);
+    }
+    str << "]}";
+}
+
 void ExprLet::showAsJson(std::ostream & str) const
 {
     str << "{\"type\":\"" << NodeTypeName::ExprLet << "\"";

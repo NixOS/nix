@@ -68,22 +68,11 @@ std::ostream & operator << (std::ostream & str, const Symbol & sym)
 
 
 
-// format switch
+// default format
 
 void Expr::show(std::ostream & str) const
 {
-    this->showAsAterm(str); // default format
-}
-
-void ExprAsAterm::show(std::ostream & str) const
-{
     this->showAsAterm(str);
-}
-
-void ExprAsJson::show(std::ostream & str) const
-{
-    this->showAsJson(str);
-    // implemented in nixexpr-as-json.cc
 }
 
 
@@ -406,6 +395,13 @@ void ExprLambda::bindVars(const StaticEnv & env)
     }
 
     body->bindVars(newEnv);
+}
+
+void ExprCall::bindVars(const StaticEnv & env)
+{
+    fun->bindVars(env);
+    for (auto e : args)
+        e->bindVars(env);
 }
 
 void ExprLet::bindVars(const StaticEnv & env)
