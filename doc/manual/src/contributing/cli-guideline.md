@@ -240,7 +240,7 @@ love, but if not done perfectly it will annoy users and leave bad impression.
 Input to a command is provided via `ARGUMENTS` and `OPTIONS`. 
 
 `ARGUMENTS` represent a required input for a function. When choosing to use
-`ARGUMENT` over function please be aware of the downsides that come with it:
+`ARGUMENTS` over `OPTIONS` please be aware of the downsides that come with it:
 
 - User will need to remember the order of `ARGUMENTS`. This is not a problem if
   there is only one `ARGUMENT`.
@@ -253,7 +253,7 @@ developer consider the downsides and choose wisely.
 
 ## Naming the `OPTIONS`
 
-Then only naming convention - apart from the ones mentioned in Naming the
+The only naming convention - apart from the ones mentioned in Naming the
 `COMMANDS` section is how flags are named.
 
 Flags are a type of `OPTION` that represent an option that can be turned ON of
@@ -271,7 +271,7 @@ to improve the discoverability of possible input. A new user will most likely
 not know which `ARGUMENTS` and `OPTIONS` are required or which values are
 possible for those options.
 
-In cases, the user might not provide the input or they provide wrong input,
+In case the user does not provide the input or they provide wrong input,
 rather than show the error, prompt a user with an option to find and select
 correct input (see examples).
 
