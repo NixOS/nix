@@ -121,10 +121,14 @@ static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & 
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
+    if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal)) {
+        act.result(resUnexpectBuild, store.printStorePath(drvGoal->drvPath));
         nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
+    }
+    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal)) {
+        act.result(resUnexpectSubstitution, store.printStorePath(subGoal->storePath));
         nix::removeGoal(subGoal, substitutionGoals);
+    }
     else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
     else
@@ -243,6 +247,12 @@ void Worker::run(const Goals & _topGoals)
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
     store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    for (auto & path : willBuild)
+        act.result(resExpectBuild, store.printStorePath(path));
+
+    for (auto & path : willSubstitute)
+        act.result(resExpectSubstitution, store.printStorePath(path));
 
     debug("entered goal loop");
 
@@ -493,6 +503,13 @@ GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
 }
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal) {
     return subGoal;
+}
+
+void Worker::updateProgress()
+{
+    actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
+    actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
+    act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
 }
 
 }

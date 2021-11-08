@@ -525,6 +525,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 {
     auto lockedFlake = getLockedFlake();
 
+    Activity act(*logger, lvlInfo, actEvaluate);
+
     auto cache = openEvalCache(*state, lockedFlake);
     auto root = cache->getRoot();
 

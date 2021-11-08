@@ -753,6 +753,7 @@ void LocalDerivationGoal::startBuilder()
         throw SysError("putting pseudoterminal into raw mode");
 
     result.startTime = time(0);
+    startTime = std::chrono::steady_clock::now();
 
     /* Fork a child to build the package. */
 

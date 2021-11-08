@@ -299,6 +299,8 @@ LockedFlake lockFlake(
 {
     settings.requireExperimentalFeature(Xp::Flakes);
 
+    Activity act(*logger, lvlTalkative, actLockFlake);
+
     FlakeCache flakeCache;
 
     auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);

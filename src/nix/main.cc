@@ -11,6 +11,7 @@
 #include "finally.hh"
 #include "loggers.hh"
 #include "markdown.hh"
+#include "progress-bar.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -59,7 +60,6 @@ struct HelpRequested { };
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
     bool showVersion = false;
@@ -83,7 +83,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
-            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
+            .handler = {[&]() { progressBarSettings.printBuildLogs = true; }},
         });
 
         addFlag({
@@ -267,10 +267,6 @@ void mainWrapped(int argc, char * * argv)
     settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
-    setLogFormat("bar");
-
-    Finally f([] { logger->stop(); });
-
     NixArgs args;
 
     if (argc == 2 && std::string(argv[1]) == "__dump-args") {
@@ -330,6 +326,10 @@ void mainWrapped(int argc, char * * argv)
         printVersion(programName);
         return;
     }
+
+    setLogFormat(LogFormat::bar);
+
+    Finally f([] { logger->stop(); });
 
     if (!args.command)
         throw UsageError("no subcommand specified");

@@ -53,6 +53,9 @@ struct PathSubstitutionGoal : public Goal
     /* Content address for recomputing store path */
     std::optional<ContentAddress> ca;
 
+    /* Time substitution started. */
+    std::chrono::time_point<std::chrono::steady_clock> startTime;
+
 public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
