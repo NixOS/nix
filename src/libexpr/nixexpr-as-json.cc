@@ -8,11 +8,7 @@ namespace nix {
 
 // binary operators are implemented in nixexpr.hh MakeBinOp
 
-// https://stackoverflow.com/questions/7724448
-// note: we use full jump table to make this as fast as possible
-// note: we assume valid input. errors should be handled by the nix parser
-// 93 * 7 = 651 byte
-const char String_showAsJson_replace_array[93][7] = {
+const char* String_showAsJson_replace_array[] = {
   "\\u0000", "\\u0001", "\\u0002", "\\u0003", "\\u0004", // 0 - 4
   "\\u0005", "\\u0006", "\\u0007", "\\b", "\\t", // 5 - 9
   "\\n", "\\u000b", "\\f", "\\r", "\\u000e", // 10 - 14
@@ -34,9 +30,12 @@ const char String_showAsJson_replace_array[93][7] = {
   "Z", "[", "\\\\", // 90 - 92
 };
 
+const std::uint8_t String_showAsJson_replace_array_length =
+  (std::uint8_t) (sizeof(String_showAsJson_replace_array) / sizeof(char*));
+
 void String_showAsJson(std::ostream & o, const std::string & s) {
   for (auto c = s.cbegin(); c != s.cend(); c++) {
-    if ((std::uint8_t) *c <= 92)
+    if ((std::uint8_t) *c < String_showAsJson_replace_array_length)
       o << String_showAsJson_replace_array[(std::uint8_t) *c];
     else
       o << *c;
