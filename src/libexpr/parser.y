@@ -33,11 +33,9 @@ namespace nix {
         Symbol file;
         FileOrigin origin;
         std::optional<ErrorInfo> error;
-        Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
-            , sLetBody(symbols.create("<let-body>"))
             { };
     };
 
