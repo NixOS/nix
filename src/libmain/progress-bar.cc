@@ -103,17 +103,19 @@ public:
     ~ProgressBar()
     {
         stop();
-        updateThread.join();
     }
 
     void stop() override
     {
-        auto state(state_.lock());
-        if (!state->active) return;
-        state->active = false;
-        writeToStderr("\r\e[K");
-        updateCV.notify_one();
-        quitCV.notify_one();
+        {
+            auto state(state_.lock());
+            if (!state->active) return;
+            state->active = false;
+            writeToStderr("\r\e[K");
+            updateCV.notify_one();
+            quitCV.notify_one();
+        }
+        updateThread.join();
     }
 
     bool isVerbose() override {
