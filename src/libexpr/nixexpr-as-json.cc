@@ -12,7 +12,7 @@ namespace nix {
 // note: we use full jump table to make this as fast as possible
 // note: we assume valid input. errors should be handled by the nix parser
 // 93 * 7 = 651 byte
-char String_showAsJson_replace_array[93][7] = {
+const char String_showAsJson_replace_array[93][7] = {
   "\\u0000", "\\u0001", "\\u0002", "\\u0003", "\\u0004", // 0 - 4
   "\\u0005", "\\u0006", "\\u0007", "\\b", "\\t", // 5 - 9
   "\\n", "\\u000b", "\\f", "\\r", "\\u000e", // 10 - 14
