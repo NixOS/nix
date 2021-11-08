@@ -144,7 +144,7 @@ void ExprAttrs::showAsJson(std::ostream & str) const
         else {
             str << '{';
         }
-        str << "\"name\":\""; i.nameExpr->showAsJson(str);
+        str << "\"name\":"; i.nameExpr->showAsJson(str);
         str << ",\"value\":"; i.valueExpr->showAsJson(str);
         str << '}';
     }
