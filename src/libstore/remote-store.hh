@@ -147,6 +147,8 @@ protected:
 
     virtual void setOptions(Connection & conn);
 
+    void setOptions() override;
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
