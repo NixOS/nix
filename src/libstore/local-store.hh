@@ -145,7 +145,7 @@ public:
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair) override;
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;

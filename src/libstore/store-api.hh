@@ -452,7 +452,7 @@ public:
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet());
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -468,7 +468,8 @@ public:
        `dump` may be drained */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is

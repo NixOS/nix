@@ -308,16 +308,17 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 }
 
 StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name),
+            makeFixedOutputPath(method, nar.first, name, references),
             nar.first,
         };
         info.narSize = nar.second;
+        info.references = references;
         return info;
     })->path;
 }
@@ -385,7 +386,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, const StorePathSet & references)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
@@ -404,10 +405,11 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name),
+            makeFixedOutputPath(method, h, name, references),
             nar.first,
         };
         info.narSize = nar.second;
+        info.references = references;
         info.ca = FixedOutputHash {
             .method = method,
             .hash = h,
