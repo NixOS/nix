@@ -1859,7 +1859,7 @@ static void addPath(
         // be rewritten to the actual output).
         state.realiseContext(context);
 
-        StorePathSet refs = StorePathSet();
+        StorePathSet refs;
 
         if (state.store->isInStore(path)) {
             auto [storePath, subPath] = state.store->toStorePath(path);

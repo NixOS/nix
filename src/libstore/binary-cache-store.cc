@@ -308,7 +308,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 }
 
 StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, StorePathSet references)
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
         unsupported("addToStoreFromDump");
@@ -386,7 +386,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, StorePathSet references)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, const StorePathSet & references)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
