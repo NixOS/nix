@@ -666,6 +666,21 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .args = v2->primOp->args,
                 .doc = v2->primOp->doc,
             };
+    } else if (auto functor = isFunctor(v)) {
+        if (auto doc = v.attrs->get(symbols.create("__doc"))) {
+            std::vector<std::string> args;
+            if (auto vArgs = v.attrs->get(symbols.create("__args"))) {
+                forceList(*vArgs->value, *vArgs->pos);
+                for (unsigned int n = 0; n < vArgs->value->listSize(); ++n)
+                    args.push_back(forceString(*vArgs->value->listElems()[n], noPos));
+            }
+            return Doc {
+                .pos = *functor->pos,
+                .arity = args.size(),
+                .args = std::move(args),
+                .doc = forceString(*doc->value, *doc->pos),
+            };
+        }
     }
     return {};
 }

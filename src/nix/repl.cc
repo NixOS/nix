@@ -528,13 +528,17 @@ bool NixRepl::processLine(string line)
         if (auto doc = state->getDoc(v)) {
             std::string markdown;
 
-            if (!doc->args.empty() && doc->name) {
+            if (!doc->args.empty()) {
                 auto args = doc->args;
                 for (auto & arg : args)
                     arg = "*" + arg + "*";
 
                 markdown +=
-                    "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
+                    "**Synopsis:** `"
+                    + (v.isPrimOp()
+                        ? "builtins." + (std::string) (*doc->name)
+                        : arg)
+                    + "` "
                     + concatStringsSep(" ", args) + "\n\n";
             }
 
