@@ -1180,7 +1180,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair,
-        StorePathSet references = StorePathSet()) override
+        const StorePathSet & references = StorePathSet()) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1200,7 +1200,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
     StorePath addToStoreFromDump(Source & dump, const string & name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
-        StorePathSet references = StorePathSet()) override
+        const StorePathSet & references = StorePathSet()) override
     {
         auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
         goal.addDependency(path);

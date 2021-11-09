@@ -578,7 +578,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
 
 StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
-      FileIngestionMethod method, HashType hashType, RepairFlag repair, StorePathSet references)
+      FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
 {
     return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
 }
