@@ -1448,14 +1448,11 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
     forceValue(fun);
 
-    if (fun.type() == nAttrs) {
-        auto found = fun.attrs->find(sFunctor);
-        if (found != fun.attrs->end()) {
-            Value * v = allocValue();
-            callFunction(*found->value, fun, *v, noPos);
-            forceValue(*v);
-            return autoCallFunction(args, *v, res);
-        }
+    if (auto functor = isFunctor(fun)) {
+        Value * v = allocValue();
+        callFunction(*functor->value, fun, *v, *functor->pos);
+        forceValue(*v);
+        return autoCallFunction(args, *v, res);
     }
 
     if (!fun.isLambda() || !fun.lambda.fun->hasFormals()) {
@@ -1768,9 +1765,9 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 }
 
 
-bool EvalState::isFunctor(Value & fun)
+Attr * EvalState::isFunctor(Value & fun)
 {
-    return fun.type() == nAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
+    return fun.type() == nAttrs ? fun.attrs->get(sFunctor) : nullptr;
 }
 
 
