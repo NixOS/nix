@@ -339,6 +339,16 @@ more than 2800 commits from 195 contributors since release 2.3.
 * We no longer release source tarballs. If you want to build from
   source, please build from the tags in the Git repository.
 
+* The Nix evaluator refuses to read from unregistered store paths,
+  to prevent reading garbage files.
+  This breaks builds that run the Nix evaluator in the sandbox using
+  an initially empty `NIX_STATE_DIR` but still using the regular store.
+  Builds that run the evaluator must now use a fresh store dir, where
+  sources can be written, registered and imported as expected.
+  See [#5495](https://github.com/NixOS/nix/issues/5495#issuecomment-964443016)
+  and [Nixpkgs#144197](https://github.com/NixOS/nixpkgs/commit/ca5ecbed4b5775f873fa15d7bf064b00d9e2862a)
+  for an example of a fix.
+
 ## Contributors
 
 This release has contributions from
