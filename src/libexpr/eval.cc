@@ -1433,8 +1433,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     size_t displ = 0;
 
     if (!lambda.matchAttrs){
-        // TODO: what is this arg?  empty argument?
-        // add empty valmap here? 
         env2.values[displ++] = &arg;
     }
     else {
@@ -1457,7 +1455,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                         lambda,
                         i.name,
                         *fun.lambda.env, &lambda);
-                        // map2("fun", &fun, "arg", &arg));
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -1478,7 +1475,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                         lambda,
                         i.name,
                         *fun.lambda.env, &lambda);
-                        // map2("fun", &fun, "arg", &arg));
             abort(); // can't happen
         }
     }
@@ -1971,7 +1967,6 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         if (i == v.attrs->end())
             throwTypeError(pos, "cannot coerce a set to a string", 
                 fakeEnv(1), 0);
-                // map1("value", &v));
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
