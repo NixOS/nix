@@ -78,8 +78,6 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         return;
     }
 
-    str << "internal type: " << v.internalType << std::endl;
-
     switch (v.internalType) {
     case tInt:
         str << v.integer;
@@ -1569,7 +1567,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.prevWith = prevWith;
     env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
-    
+
     body->eval(state, env2, v);
 }
 
@@ -1737,8 +1735,6 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else {
-                std::cerr << "envtype: " << showType(env.values[0]->type()) << std::endl;
-              
                 throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), env, this);
             }
         } else if (firstType == nFloat) {
@@ -1829,7 +1825,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v,	
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v,
             fakeEnv(1), 0);
     return v.boolean;
 }
@@ -1906,12 +1902,10 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], 
-                fakeEnv(1), 0);
+                v.string.s, v.string.context[0], fakeEnv(1), 0);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], 
-                fakeEnv(1), 0);
+                v.string.s, v.string.context[0], fakeEnv(1), 0);
     }
     return s;
 }
@@ -1965,7 +1959,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
-            throwTypeError(pos, "cannot coerce a set to a string", 
+            throwTypeError(pos, "cannot coerce a set to a string",
                 fakeEnv(1), 0);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
@@ -1996,7 +1990,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
     }
 
-    throwTypeError(pos, "cannot coerce %1% to a string", v, 
+    throwTypeError(pos, "cannot coerce %1% to a string", v,
         fakeEnv(1), 0);
 }
 
@@ -2030,7 +2024,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path, 
+        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path,
             fakeEnv(1), 0);
     return path;
 }

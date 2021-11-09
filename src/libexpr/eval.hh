@@ -208,7 +208,6 @@ public:
     string forceString(Value & v, const Pos & pos = noPos);
     string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
     string forceStringNoCtx(Value & v, const Pos & pos = noPos);
-    // string forceStringNoCtx(std::optional<Bindings*> b, Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
