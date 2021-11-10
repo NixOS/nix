@@ -537,12 +537,15 @@ bool NixRepl::processLine(string line)
                     "**Synopsis:** `"
                     + (v.isPrimOp()
                         ? "builtins." + (std::string) (*doc->name)
+                        : doc->name
+                        ? (std::string) (*doc->name)
                         : arg)
                     + "` "
                     + concatStringsSep(" ", args) + "\n\n";
             }
 
-            markdown += stripIndentation(doc->doc);
+            if (doc->doc)
+                markdown += stripIndentation(*doc->doc);
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else

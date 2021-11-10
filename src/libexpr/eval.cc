@@ -656,6 +656,22 @@ Value & EvalState::getBuiltin(const string & name)
 
 std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
+    std::vector<std::string> args;
+
+    auto getLambdaArgs = [&](Expr * expr, bool skipFirst)
+    {
+        while (auto lambda = dynamic_cast<ExprLambda *>(expr)) {
+            // FIXME: handle attrset matches.
+            if (!skipFirst) args.push_back(lambda->arg != sEpsilon ? (std::string) lambda->arg : "_");
+            skipFirst = false;
+            /* Note that we don't evaluate the body, so this only
+               works if it's a lambda AST node. I.e. `x: ...` works,
+               `let f = x: ...; in f` does not. So don't even think
+               about providing getDoc() as a primop! */
+            expr = lambda->body;
+        }
+    };
+
     if (v.isPrimOp()) {
         auto v2 = &v;
         if (v2->primOp->doc)
@@ -666,22 +682,45 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .args = v2->primOp->args,
                 .doc = v2->primOp->doc,
             };
-    } else if (auto functor = isFunctor(v)) {
+    }
+
+    else if (auto functor = isFunctor(v)) {
         if (auto doc = v.attrs->get(symbols.create("__doc"))) {
-            std::vector<std::string> args;
+
+            auto fun = functor->value;
+            forceValue(*fun);
+            if (!fun->isLambda())
+                throwTypeError(*functor->pos, "value is %1% while a function was expected", *fun);
+
             if (auto vArgs = v.attrs->get(symbols.create("__args"))) {
                 forceList(*vArgs->value, *vArgs->pos);
                 for (unsigned int n = 0; n < vArgs->value->listSize(); ++n)
                     args.push_back(forceString(*vArgs->value->listElems()[n], noPos));
+            } else {
+                if (fun->isLambda())
+                    getLambdaArgs(fun->lambda.fun, true);
             }
+
             return Doc {
-                .pos = *functor->pos,
+                .pos = fun->lambda.fun->pos,
                 .arity = args.size(),
                 .args = std::move(args),
                 .doc = forceString(*doc->value, *doc->pos),
             };
         }
     }
+
+    else if (v.isLambda()) {
+        getLambdaArgs(v.lambda.fun, false);
+        auto res = Doc {
+            .pos = v.lambda.fun->pos,
+            .arity = args.size(),
+            .args = std::move(args),
+        };
+        if (v.lambda.fun->name != sEpsilon) res.name = v.lambda.fun->name;
+        return res;
+    }
+
     return {};
 }
 

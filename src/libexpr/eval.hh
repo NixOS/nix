@@ -294,7 +294,7 @@ public:
         std::optional<Symbol> name;
         size_t arity;
         std::vector<std::string> args;
-        std::string doc;
+        std::optional<std::string> doc;
     };
 
     std::optional<Doc> getDoc(Value & v);
