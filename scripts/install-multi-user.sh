@@ -406,8 +406,9 @@ Here's how to clean up the old backup file:
    Nix-related in it. If it does, something is probably quite
    wrong. Please open an issue or get in touch immediately.
 
-3. Once you confirm $profile_target is backed up and doesn't already
-   mention Nix, replace it with $profile_target$PROFILE_BACKUP_SUFFIX.
+3. Once you confirm $profile_target is backed up and
+   $profile_target$PROFILE_BACKUP_SUFFIX doesn't mention Nix, run:
+   mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 EOF
         fi
     done
