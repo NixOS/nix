@@ -528,6 +528,9 @@ bool NixRepl::processLine(string line)
         if (auto doc = state->getDoc(v)) {
             std::string markdown;
 
+            if (doc->pos)
+                markdown += filterANSIEscapes(fmt("**Source**: %s\n\n", doc->pos), true);
+
             if (!doc->args.empty()) {
                 std::vector<std::string> args;
                 for (auto & arg : doc->args) {
@@ -556,7 +559,7 @@ bool NixRepl::processLine(string line)
             if (doc->doc)
                 markdown += stripIndentation(*doc->doc);
 
-            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+            logger->cout(chomp(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
     }
