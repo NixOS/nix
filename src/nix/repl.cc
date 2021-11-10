@@ -529,16 +529,25 @@ bool NixRepl::processLine(string line)
             std::string markdown;
 
             if (!doc->args.empty()) {
-                auto args = doc->args;
-                for (auto & arg : args)
-                    arg = "*" + arg + "*";
+                std::vector<std::string> args;
+                for (auto & arg : doc->args) {
+                    if (arg.attrs) {
+                        std::vector<std::string> attrs;
+                        for (auto & attr : *arg.attrs)
+                            attrs.push_back("`" + attr + "`");
+                        if (arg.ellipsis)
+                            attrs.push_back("...");
+                        args.push_back("{ " + concatStringsSep(", ", attrs) + " }");
+                    } else
+                        args.push_back("*" + arg.name + "*");
+                }
 
                 markdown +=
                     "**Synopsis:** `"
                     + (v.isPrimOp()
-                        ? "builtins." + (std::string) (*doc->name)
-                        : doc->name
-                        ? (std::string) (*doc->name)
+                        ? "builtins." + (std::string) doc->name
+                        : doc->name.set()
+                        ? (std::string) doc->name
                         : arg)
                     + "` "
                     + concatStringsSep(" ", args) + "\n\n";

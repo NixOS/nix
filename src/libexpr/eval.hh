@@ -291,9 +291,15 @@ public:
     struct Doc
     {
         Pos pos;
-        std::optional<Symbol> name;
+        Symbol name;
         size_t arity;
-        std::vector<std::string> args;
+        struct Arg
+        {
+            std::string name;
+            std::optional<std::set<std::string>> attrs;
+            bool ellipsis = false;
+        };
+        std::vector<Arg> args;
         std::optional<std::string> doc;
     };
 

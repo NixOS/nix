@@ -656,13 +656,22 @@ Value & EvalState::getBuiltin(const string & name)
 
 std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
-    std::vector<std::string> args;
+    std::vector<Doc::Arg> args;
 
     auto getLambdaArgs = [&](Expr * expr, bool skipFirst)
     {
         while (auto lambda = dynamic_cast<ExprLambda *>(expr)) {
             // FIXME: handle attrset matches.
-            if (!skipFirst) args.push_back(lambda->arg != sEpsilon ? (std::string) lambda->arg : "_");
+            if (!skipFirst) {
+                Doc::Arg arg { .name = lambda->arg != sEpsilon ? (std::string) lambda->arg : "_" };
+                if (lambda->hasFormals()) {
+                    arg.attrs.emplace();
+                    arg.ellipsis = lambda->formals->ellipsis;
+                    for (auto & formal : lambda->formals->formals)
+                        arg.attrs->insert(formal.name);
+                }
+                args.push_back(std::move(arg));
+            }
             skipFirst = false;
             /* Note that we don't evaluate the body, so this only
                works if it's a lambda AST node. I.e. `x: ...` works,
@@ -672,16 +681,16 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
         }
     };
 
-    if (v.isPrimOp()) {
-        auto v2 = &v;
-        if (v2->primOp->doc)
-            return Doc {
-                .pos = noPos,
-                .name = v2->primOp->name,
-                .arity = v2->primOp->arity,
-                .args = v2->primOp->args,
-                .doc = v2->primOp->doc,
-            };
+    if (v.isPrimOp() && v.primOp->doc) {
+        for (auto & arg : v.primOp->args)
+            args.push_back({.name = arg});
+        return Doc {
+            .pos = noPos,
+            .name = v.primOp->name,
+            .arity = v.primOp->arity,
+            .args = std::move(args),
+            .doc = v.primOp->doc,
+        };
     }
 
     else if (auto functor = isFunctor(v)) {
@@ -695,7 +704,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             if (auto vArgs = v.attrs->get(symbols.create("__args"))) {
                 forceList(*vArgs->value, *vArgs->pos);
                 for (unsigned int n = 0; n < vArgs->value->listSize(); ++n)
-                    args.push_back(forceString(*vArgs->value->listElems()[n], noPos));
+                    args.push_back({.name = forceString(*vArgs->value->listElems()[n], noPos)});
             } else {
                 if (fun->isLambda())
                     getLambdaArgs(fun->lambda.fun, true);
