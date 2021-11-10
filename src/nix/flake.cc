@@ -1052,7 +1052,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         (attrPath.size() == 1 && attrPath[0] == "overlay")
                         || (attrPath.size() == 2 && attrPath[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
-                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? std::make_pair("nixos-module", "NixOS module") :
+                        (attrPath.size() == 1 && attrPath[0] == "nixosModule")
+                        || (attrPath.size() == 2 && attrPath[0] == "nixosModules") ? std::make_pair("nixos-module", "NixOS module") :
                         std::make_pair("unknown", "unknown");
                     if (json) {
                         j.emplace("type", type);
