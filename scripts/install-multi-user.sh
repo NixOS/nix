@@ -387,19 +387,27 @@ EOF
     fi
 
     for profile_target in "${PROFILE_TARGETS[@]}"; do
+        # TODO: I think it would be good to accumulate a list of all
+        #       of the copies so that people don't hit this 2 or 3x in
+        #       a row for different files.
         if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+            # this backup process first released in Nix 2.1
             failure <<EOF
-When this script runs, it backs up the current $profile_target to
-$profile_target$PROFILE_BACKUP_SUFFIX. This backup file already exists, though.
+I back up shell profile/rc scripts before I add Nix to them.
+I need to back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX,
+but the latter already exists.
 
-Please follow these instructions to clean up the old backup file:
+Here's how to clean up the old backup file:
 
-1. Copy $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX to another place, just
-in case.
+1. Back up (copy) $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX
+   to another location, just in case.
 
-2. Take care to make sure that $profile_target$PROFILE_BACKUP_SUFFIX doesn't look like
-it has anything nix-related in it. If it does, something is probably
-quite wrong. Please open an issue or get in touch immediately.
+2. Ensure $profile_target$PROFILE_BACKUP_SUFFIX does not have anything
+   Nix-related in it. If it does, something is probably quite
+   wrong. Please open an issue or get in touch immediately.
+
+3. Once you confirm $profile_target is backed up and doesn't already
+   mention Nix, replace it with $profile_target$PROFILE_BACKUP_SUFFIX.
 EOF
         fi
     done
