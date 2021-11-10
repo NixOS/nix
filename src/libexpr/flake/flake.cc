@@ -462,6 +462,8 @@ LockedFlake lockFlake(
                                those. */
                             FlakeInputs fakeInputs;
 
+                            bool refetch = false;
+
                             for (auto & i : oldLock->inputs) {
                                 if (auto lockedNode = std::get_if<0>(&i.second)) {
                                     fakeInputs.emplace(i.first, FlakeInput {
@@ -469,11 +471,23 @@ LockedFlake lockFlake(
                                         .isFlake = (*lockedNode)->isFlake,
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
+                                    auto o = input.overrides.find(i.first);
+                                    // If the override disappeared, we have to refetch the flake,
+                                    // since some of the inputs may not be present in the lockfile.
+                                    if (o == input.overrides.end()) {
+                                        refetch = true;
+                                        // There's no point populating the rest of the fake inputs,
+                                        // since we'll refetch the flake anyways.
+                                        break;
+                                    }
                                     fakeInputs.emplace(i.first, FlakeInput {
                                         .follows = *follows,
                                     });
                                 }
                             }
+
+                            if (refetch)
+                                fakeInputs = getFlake(state, oldLock->lockedRef, false, flakeCache).inputs;
 
                             computeLocks(fakeInputs, childNode, inputPath, oldLock, parent, parentPath);
                         }
