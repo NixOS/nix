@@ -251,6 +251,10 @@ static Flake getFlake(
             forceTrivialValue(state, *setting.value, *setting.pos);
             if (setting.value->type() == nString)
                 flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
+            else if (setting.value->type() == nPath) {
+                PathSet emptyContext = {};
+                flake.config.settings.insert({setting.name, state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
+            }
             else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
             else if (setting.value->type() == nBool)
