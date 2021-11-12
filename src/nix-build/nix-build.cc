@@ -270,7 +270,12 @@ static void main_nix_build(int argc, char * * argv)
 
     if (packages) {
         std::ostringstream joined;
-        joined << "{...}@args: with import <nixpkgs> args; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
+        joined << "{...}@args: "
+               << "let nixpkgs = import <nixpkgs>; "
+               << "nixpkgsArgs = builtins.intersectAttrs (builtins.functionArgs nixpkgs) args; "
+               << "in "
+               << "with nixpkgs nixpkgsArgs; "
+               << "(pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
         for (const auto & i : left)
             joined << '(' << i << ") ";
         joined << "]; } \"\"";

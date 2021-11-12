@@ -52,6 +52,11 @@ output=$(NIX_PATH=nixpkgs="$shellDotNix" nix-shell --pure -p foo bar --run 'echo
 output=$(NIX_PATH=nixpkgs="$shellDotNix" nix-shell --pure -p foo --argstr fooContents baz --run 'echo "$(foo)"')
 [ "$output" = "baz" ]
 
+# Test nix-shell -p with older versions of Nixpkgs that do not expect
+# the (new) isNixShell attribute.
+output=$(NIX_PATH=nixpkgs=shell-empty-attrs-args.nix nix-shell --pure -p foo --run 'echo "$(foo)"')
+[ "$output" = "zes" ]
+
 # Test nix-shell shebang mode
 sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.sh > $TEST_ROOT/shell.shebang.sh
 chmod a+rx $TEST_ROOT/shell.shebang.sh
