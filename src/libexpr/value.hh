@@ -94,7 +94,8 @@ class ExternalValueBase
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
-        XMLWriter & doc, PathSet & context, PathSet & drvsSeen) const;
+        XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+        const Pos & pos) const;
 
     virtual ~ExternalValueBase()
     {
