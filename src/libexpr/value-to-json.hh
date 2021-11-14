@@ -11,9 +11,9 @@ namespace nix {
 class JSONPlaceholder;
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, JSONPlaceholder & out, PathSet & context);
+    Value & v, JSONPlaceholder & out, PathSet & context, const Pos & pos);
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & str, PathSet & context);
+    Value & v, std::ostream & str, PathSet & context, const Pos & pos);
 
 }

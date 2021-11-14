@@ -10,11 +10,11 @@
 namespace nix {
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, JSONPlaceholder & out, PathSet & context)
+    Value & v, JSONPlaceholder & out, PathSet & context, const Pos & pos)
 {
     checkInterrupt();
 
-    if (strict) state.forceValue(v);
+    if (strict) state.forceValue(v, pos);
 
     switch (v.type()) {
 
@@ -54,10 +54,10 @@ void printValueAsJSON(EvalState & state, bool strict,
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
                     auto placeholder(obj.placeholder(j));
-                    printValueAsJSON(state, strict, *a.value, placeholder, context);
+                    printValueAsJSON(state, strict, *a.value, placeholder, context, *a.pos);
                 }
             } else
-                printValueAsJSON(state, strict, *i->value, out, context);
+                printValueAsJSON(state, strict, *i->value, out, context, *i->pos);
             break;
         }
 
@@ -65,13 +65,13 @@ void printValueAsJSON(EvalState & state, bool strict,
             auto list(out.list());
             for (unsigned int n = 0; n < v.listSize(); ++n) {
                 auto placeholder(list.placeholder());
-                printValueAsJSON(state, strict, *v.listElems()[n], placeholder, context);
+                printValueAsJSON(state, strict, *v.listElems()[n], placeholder, context, pos);
             }
             break;
         }
 
         case nExternal:
-            v.external->printValueAsJSON(state, strict, out, context);
+            v.external->printValueAsJSON(state, strict, out, context, pos);
             break;
 
         case nFloat:
@@ -87,14 +87,14 @@ void printValueAsJSON(EvalState & state, bool strict,
 }
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & str, PathSet & context)
+    Value & v, std::ostream & str, PathSet & context, const Pos & pos)
 {
     JSONPlaceholder out(str);
-    printValueAsJSON(state, strict, v, out, context);
+    printValueAsJSON(state, strict, v, out, context, pos);
 }
 
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
-    JSONPlaceholder & out, PathSet & context) const
+    JSONPlaceholder & out, PathSet & context, const Pos & pos) const
 {
     throw TypeError("cannot convert %1% to JSON", showType());
 }

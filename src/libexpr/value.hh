@@ -90,7 +90,7 @@ class ExternalValueBase
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
     virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+        JSONPlaceholder & out, PathSet & context, const Pos & pos) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
