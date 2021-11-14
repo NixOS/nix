@@ -36,6 +36,7 @@
     - [Values](expressions/language-values.md)
     - [Language Constructs](expressions/language-constructs.md)
     - [Operators](expressions/language-operators.md)
+    - [Fetchers](expressions/fetchers.md)
     - [Derivations](expressions/derivations.md)
       - [Advanced Attributes](expressions/advanced-attributes.md)
     - [Built-in Constants](expressions/builtin-constants.md)

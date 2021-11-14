@@ -14,3 +14,7 @@ For instance, `derivation` is also available as `builtins.derivation`.
       <code>builtins.derivation <var>attrs</var></code></dt>
   <dd><p><var>derivation</var> in described in
          <a href="derivations.md">its own section</a>.</p></dd>
+  <dt><code>fetchTree <var>args</var></code>;
+      <code>builtins.fetchTree <var>args</var></code></dt>
+  <dd><p><var>fetchTree</var> is described in
+         <a href="fetchers.md">its own section</a>.</p></dd>
