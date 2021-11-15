@@ -446,24 +446,18 @@ LockedFlake lockFlake(
                            update it. */
                         auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
 
-                        auto hasChildUpdate =
+                        auto mustRefetch =
                             lb != lockFlags.inputUpdates.end()
                             && lb->size() > inputPath.size()
                             && std::equal(inputPath.begin(), inputPath.end(), lb->begin());
 
-                        if (hasChildUpdate) {
-                            auto inputFlake = getFlake(
-                                state, oldLock->lockedRef, false, flakeCache);
-                            computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, parent, parentPath);
-                        } else {
+                        FlakeInputs fakeInputs;
+
+                        if (!mustRefetch) {
                             /* No need to fetch this flake, we can be
                                lazy. However there may be new overrides on the
                                inputs of this flake, so we need to check
                                those. */
-                            FlakeInputs fakeInputs;
-
-                            bool refetch = false;
-
                             for (auto & i : oldLock->inputs) {
                                 if (auto lockedNode = std::get_if<0>(&i.second)) {
                                     fakeInputs.emplace(i.first, FlakeInput {
@@ -475,7 +469,7 @@ LockedFlake lockFlake(
                                     // If the override disappeared, we have to refetch the flake,
                                     // since some of the inputs may not be present in the lockfile.
                                     if (o == input.overrides.end()) {
-                                        refetch = true;
+                                        mustRefetch = true;
                                         // There's no point populating the rest of the fake inputs,
                                         // since we'll refetch the flake anyways.
                                         break;
@@ -485,12 +479,13 @@ LockedFlake lockFlake(
                                     });
                                 }
                             }
-
-                            if (refetch)
-                                fakeInputs = getFlake(state, oldLock->lockedRef, false, flakeCache).inputs;
-
-                            computeLocks(fakeInputs, childNode, inputPath, oldLock, parent, parentPath);
                         }
+
+                        computeLocks(
+                            mustRefetch
+                            ? getFlake(state, oldLock->lockedRef, false, flakeCache).inputs
+                            : fakeInputs,
+                            childNode, inputPath, oldLock, parent, parentPath);
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
