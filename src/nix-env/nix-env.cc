@@ -879,7 +879,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
                 placeholder.write(nullptr);
             } else {
                 PathSet context;
-                printValueAsJSON(*globals.state, true, *v, placeholder, context);
+                printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
             }
         }
     }
