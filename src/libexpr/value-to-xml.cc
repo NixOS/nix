@@ -18,7 +18,8 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen);
+    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    const Pos & pos);
 
 
 static void posToXML(XMLAttrs & xmlAttrs, const Pos & pos)
@@ -46,17 +47,18 @@ static void showAttrs(EvalState & state, bool strict, bool location,
 
         XMLOpenElement _(doc, "attr", xmlAttrs);
         printValueAsXML(state, strict, location,
-            *a.value, doc, context, drvsSeen);
+            *a.value, doc, context, drvsSeen, *a.pos);
     }
 }
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    const Pos & pos)
 {
     checkInterrupt();
 
-    if (strict) state.forceValue(v);
+    if (strict) state.forceValue(v, pos);
 
     switch (v.type()) {
 
@@ -91,14 +93,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 Path drvPath;
                 a = v.attrs->find(state.sDrvPath);
                 if (a != v.attrs->end()) {
-                    if (strict) state.forceValue(*a->value);
+                    if (strict) state.forceValue(*a->value, *a->pos);
                     if (a->value->type() == nString)
                         xmlAttrs["drvPath"] = drvPath = a->value->string.s;
                 }
 
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
-                    if (strict) state.forceValue(*a->value);
+                    if (strict) state.forceValue(*a->value, *a->pos);
                     if (a->value->type() == nString)
                         xmlAttrs["outPath"] = a->value->string.s;
                 }
@@ -121,7 +123,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
         case nList: {
             XMLOpenElement _(doc, "list");
             for (unsigned int n = 0; n < v.listSize(); ++n)
-                printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen);
+                printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen, pos);
             break;
         }
 
@@ -149,7 +151,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
         }
 
         case nExternal:
-            v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen);
+            v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen, pos);
             break;
 
         case nFloat:
@@ -163,19 +165,20 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
 
 void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
-    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen) const
+    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    const Pos & pos) const
 {
     doc.writeEmptyElement("unevaluated");
 }
 
 
 void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, std::ostream & out, PathSet & context)
+    Value & v, std::ostream & out, PathSet & context, const Pos & pos)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
     PathSet drvsSeen;
-    printValueAsXML(state, strict, location, v, doc, context, drvsSeen);
+    printValueAsXML(state, strict, location, v, doc, context, drvsSeen, pos);
 }
 
 
