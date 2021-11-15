@@ -103,7 +103,7 @@ impacted the most by bad user experience.
 # Help is essential
 
 Help should be built into your command line so that new users can gradually
-discover new features when they need them. 
+discover new features when they need them.
 
 ## Looking for help
 
@@ -176,7 +176,7 @@ $ nix init --template=template#pyton
 ------------------------------------------------------------------------
 Initializing Nix project at `/path/to/here`.
       Select a template for you new project:
-          |> template#pyton
+          |> template#python
              template#python-pip
              template#python-poetry
 ```
@@ -237,7 +237,7 @@ love, but if not done perfectly it will annoy users and leave bad impression.
 
 # Input
 
-Input to a command is provided via `ARGUMENTS` and `OPTIONS`. 
+Input to a command is provided via `ARGUMENTS` and `OPTIONS`.
 
 `ARGUMENTS` represent a required input for a function. When choosing to use
 `ARGUMENTS` over `OPTIONS` please be aware of the downsides that come with it:
@@ -302,7 +302,7 @@ $ nix build --option substitutors https://cache.example.org
 ------------------------------------------------------------------------
   Warning! A security related question needs to be answered.
 ------------------------------------------------------------------------
-  The following substitutors will be used to in `my-project`: 
+  The following substitutors will be used to in `my-project`:
     - https://cache.example.org
 
   Do you allow `my-project` to use above mentioned substitutors?
@@ -342,7 +342,7 @@ also allowing them to redirect content to a file. For example:
 ```shell
 $ nix build > build.txt
 ------------------------------------------------------------------------
-  Error! Atrribute `bin` missing at (1:94) from string.
+  Error! Attribute `bin` missing at (1:94) from string.
 ------------------------------------------------------------------------
 
   1| with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) "shell" { buildInputs = [ (surge.bin) ]; } ""
@@ -408,7 +408,7 @@ Above command clearly states that command successfully completed. And in case
 of `nix build`, which is a command that might take some time to complete, it is
 equally important to also show that a command started.
 
-## Text alignment 
+## Text alignment
 
 Text alignment is the number one design element that will present all of the
 Nix commands as a family and not as separate tools glued together.
@@ -419,7 +419,7 @@ The format we should follow is:
 $ nix COMMAND
    VERB_1 NOUN and other words
   VERB__1 NOUN and other words
-       |> Some details 
+       |> Some details
 ```
 
 Few rules that we can extract from above example:
@@ -444,13 +444,13 @@ is not even notable, therefore relying on it wouldn’t make much sense.
 
 **The bright text is much better supported** across terminals and color
 schemes. Most of the time the difference is perceived as if the bright text
-would be bold. 
+would be bold.
 
 ## Colors
 
 Humans are already conditioned by society to attach certain meaning to certain
 colors. While the meaning is not universal, a simple collection of colors is
-used to represent basic emotions. 
+used to represent basic emotions.
 
 Colors that can be used in output
 
@@ -555,7 +555,7 @@ $ nix build --option substitutors https://cache.example.org
 ------------------------------------------------------------------------
   Warning! A security related question needs to be answered.
 ------------------------------------------------------------------------
-  The following substitutors will be used to in `my-project`: 
+  The following substitutors will be used to in `my-project`:
     - https://cache.example.org
 
   Do you allow `my-project` to use above mentioned substitutors?
@@ -566,7 +566,7 @@ $ nix build --option substitutors https://cache.example.org
 
 There are many ways that you can control verbosity.
 
-Verbosity levels are: 
+Verbosity levels are:
 
 - `ERROR` (level 0)
 - `WARN` (level 1)
@@ -586,4 +586,4 @@ There are also two shortcuts, `--debug` to run in `DEBUG` verbosity level and
 
 # Appendix 1: Commands naming exceptions
 
-`nix init` and `nix repl` are well established 
+`nix init` and `nix repl` are well established
