@@ -707,10 +707,10 @@ cat > $flakeFollowsA/flake.nix <<EOF
         B = {
             url = "path:./flakeB";
             inputs.foobar.follows = "D";
+            inputs.nonFlake.follows = "D";
         };
 
         D.url = "path:./flakeD";
-        foobar.url = "path:./flakeE";
     };
     outputs = { ... }: {};
 }
@@ -720,7 +720,8 @@ cat > $flakeFollowsB/flake.nix <<EOF
 {
     description = "Flake B";
     inputs = {
-        foobar.url = "path:./../flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE";
+        nonFlake.url = "path:$nonFlakeDir";
         C = {
             url = "path:./flakeC";
             inputs.foobar.follows = "foobar";
@@ -734,7 +735,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
 {
     description = "Flake C";
     inputs = {
-        foobar.url = "path:./../../flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE";
     };
     outputs = { ... }: {};
 }
@@ -764,6 +765,27 @@ nix flake lock $flakeFollowsA
 [[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["D"]' ]]
 [[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
+
+# Ensure removing follows from flake.nix removes them from the lockfile
+
+cat > $flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        B = {
+            url = "path:./flakeB";
+            inputs.nonFlake.follows = "D";
+        };
+        D.url = "path:./flakeD";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+nix flake lock $flakeFollowsA
+
+[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
+jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
 
 # Ensure a relative path is not allowed to go outside the store path
 cat > $flakeFollowsA/flake.nix <<EOF
