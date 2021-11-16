@@ -257,9 +257,11 @@ void mainWrapped(int argc, char * * argv)
 
     #if __linux__
     if (getuid() == 0) {
-        saveMountNamespace();
-        if (unshare(CLONE_NEWNS) == -1)
-            throw SysError("setting up a private mount namespace");
+        try {
+            saveMountNamespace();
+            if (unshare(CLONE_NEWNS) == -1)
+                throw SysError("setting up a private mount namespace");
+        } catch (Error & e) { }
     }
     #endif
 
