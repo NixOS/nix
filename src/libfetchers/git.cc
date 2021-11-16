@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
+#include "archive.hh"
 
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -193,17 +194,29 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
 
     auto parsedModules = parseSubmodules(submodules);
     for (auto & [subPath, url] : parsedModules) {
-      printTalkative("submodule %s fetched from %s", subPath, url);
-      auto commitHash = findCommitHash(path, entries, subPath);
-      printTalkative("found %s", commitHash);
+      auto fullPath = path + "/" + subPath;
+      auto initialized = !readDirectory(fullPath).empty();
+      auto clean = isClean(fullPath);
 
-      static const std::regex barePathRegex("^/.*$");
-      std::string prefix = "git+";
-      if (std::regex_match(url, barePathRegex))
-          prefix = prefix + "file://";
+      if (!initialized || clean) {
+        printTalkative("submodule %s fetched from %s", subPath, url);
+        auto commitHash = findCommitHash(path, entries, subPath);
+        printTalkative("found %s", commitHash);
 
+        static const std::regex barePathRegex("^/.*$");
+        std::string prefix = "git+";
+        if (std::regex_match(url, barePathRegex))
+          prefix += "file://";
 
-      attrs.emplace(subPath, prefix + url + "?allRefs=1&rev=" + commitHash);
+        std::string suffix = "?allRefs=1&rev=" + commitHash;
+        attrs.emplace(subPath, prefix + url + suffix);
+      } else {
+        StringSink sink;
+        dumpPath(fullPath, sink);
+
+        auto narHash = hashString(htSHA256, *sink.s);
+        attrs.emplace(subPath, "path://" + fullPath + "?narHash=" + narHash.to_string(SRI, false));
+      }
     }
 
     return attrs;
