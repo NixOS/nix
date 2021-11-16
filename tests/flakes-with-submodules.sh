@@ -110,8 +110,10 @@ git -C $flakeWithSubmodules commit -m'add flake.nix'
 [[ $(nix run $flakeWithSubmodules#cat-submodule-readme) == "FNORD" ]]
 [[ $(nix run $flakeWithSubmodules#use-submodule-as-flake) == "FNORD" ]]
 
-# TODO make the dirty case do the Right Thing as well.
-#echo FSOUTH > $flakeWithSubmodules/nonFlake/README.md
-#[[ $(nix run $flakeWithSubmodules#cat-submodule-readme) == "FSOUTH" ]]
-# [[ $(nix run $flakeWithSubmodules#use-submodule-as-flake) == "FSOUTH" ]]
-# nix run -vv $flakeWithSubmodules#cat-submodule-readme
+# apply dirt
+echo FSUD > $flakeWithSubmodules/nonFlake/README.md
+[[ $(nix run $flakeWithSubmodules#cat-submodule-readme) == "FSUD" ]]
+
+# should work for flake as well
+echo FSUD > $flakeWithSubmodules/flake/README.md
+[[ $(nix run $flakeWithSubmodules#use-submodule-as-flake) == "FSUD" ]]
