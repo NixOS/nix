@@ -1,6 +1,6 @@
 source ./common.sh
 
-requireDaemonNewerThan "2.4pre20210625"
+requireDaemonVersionAtleast "2.4pre20210625"
 
 export REMOTE_STORE_DIR="$TEST_ROOT/remote_store"
 export REMOTE_STORE="file://$REMOTE_STORE_DIR"

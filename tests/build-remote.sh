@@ -1,6 +1,12 @@
 if ! canUseSandbox; then exit 99; fi
 if ! [[ $busybox =~ busybox ]]; then exit 99; fi
 
+# system-features=... store query param is not supported with 2.3; store
+# features is just in the global settings. A bit tricky to feed different
+# nix.conf files to these ssh stores which are processes spawned by the outer
+# Nix, so maybe we should just backport this feature?
+requireDaemonVersionAtleast "2.4pre"
+
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
 

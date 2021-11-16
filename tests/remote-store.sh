@@ -2,8 +2,11 @@ source common.sh
 
 clearStore
 
-# Ensure "fake ssh" remote store works just as legacy fake ssh would.
-nix --store ssh-ng://localhost?remote-store=$TEST_ROOT/other-store doctor
+# Temporary until #5640 is merged.
+if [ ! isDaemonVersionAtleast "2.4pre" ]; then
+  # Ensure "fake ssh" remote store works just as legacy fake ssh would.
+  nix --store "ssh-ng://localhost?remote-store=$TEST_ROOT/other-store" doctor
+fi
 
 startDaemon
 

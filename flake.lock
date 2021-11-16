@@ -16,6 +16,59 @@
         "type": "github"
       }
     },
+    "lowdown-src_2": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1633514407,
+        "narHash": "sha256-Dw32tiMjdK9t3ETl5fzGrutQTzh2rufgZV4A/BbxuD4=",
+        "owner": "kristapsdz",
+        "repo": "lowdown",
+        "rev": "d2c2b44ff6c27b936ec27358a2653caaef8f73b8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kristapsdz",
+        "repo": "lowdown",
+        "type": "github"
+      }
+    },
+    "nix-2_3-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1637690138,
+        "narHash": "sha256-k3y3GNRNhe3IW2xGWkrplAE0EFGTJFH/m47eS9l+KSA=",
+        "owner": "nixos",
+        "repo": "nix",
+        "rev": "addb547b9dab2590a27c37d7605bdd5064701fb5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "2.3-maintenance",
+        "repo": "nix",
+        "type": "github"
+      }
+    },
+    "nix-2_4": {
+      "inputs": {
+        "lowdown-src": "lowdown-src_2",
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1636114943,
+        "narHash": "sha256-Jzz7qWP6huKDBUopAyOLjmPXpikMedJ8VE5Q0cWpUYU=",
+        "owner": "nixos",
+        "repo": "nix",
+        "rev": "8d12084707be9da7a03a33e8de95766854818fcb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "2.4-maintenance",
+        "repo": "nix",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1670461440,
@@ -48,10 +101,27 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1632864508,
+        "narHash": "sha256-d127FIvGR41XbVRDPVvozUPQ/uRHbHwvfyKHwEt5xFM=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "82891b5e2c2359d7e58d08849e4c89511ab94234",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "ref": "nixos-21.05-small",
+        "type": "indirect"
+      }
+    },
     "root": {
       "inputs": {
         "lowdown-src": "lowdown-src",
-        "nixpkgs": "nixpkgs",
+        "nix-2_3-src": "nix-2_3-src",
+        "nix-2_4": "nix-2_4",
+        "nixpkgs": "nixpkgs_2"
         "nixpkgs-regression": "nixpkgs-regression"
       }
     }

@@ -33,20 +33,24 @@ outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:
 
 cmp $outPath fetchurl.sh
 
-# Test that we can substitute from a different store dir.
 clearStore
 
-other_store=file://$TEST_ROOT/other_store?store=/fnord/store
+# In 2.3 we couldn't do this, and had to rely on --hashed-mirrors ad-hoc thing
+# instead.
+if isDaemonVersionAtleast "2.4pre"; then
+  # Test that we can substitute from a different store dir.
+  other_store=file://$TEST_ROOT/other_store?store=/fnord/store
 
-hash=$(nix hash file --type sha256 --base16 ./fetchurl.sh)
+  hash=$(nix hash file --type sha256 --base16 ./fetchurl.sh)
 
-storePath=$(nix --store $other_store store add-file ./fetchurl.sh)
+  storePath=$(nix --store $other_store store add-file ./fetchurl.sh)
 
-outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
+  outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
 
-# Test hashed mirrors with an SRI hash.
-nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix hash to-sri --type sha256 $hash) \
-          --no-out-link --substituters $other_store
+  # Test hashed mirrors with an SRI hash.
+  nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix hash to-sri --type sha256 $hash) \
+            --no-out-link --substituters $other_store
+fi
 
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive

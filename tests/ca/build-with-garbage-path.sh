@@ -4,7 +4,7 @@
 
 source common.sh
 
-requireDaemonNewerThan "2.4pre20210621"
+requireDaemonVersionAtleast "2.4pre20210621"
 
 # Get the output path of `rootCA`, and put some garbage instead
 outPath="$(nix-build ./content-addressed.nix -A rootCA --no-out-link)"

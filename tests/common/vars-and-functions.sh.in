@@ -95,9 +95,15 @@ startDaemon() {
     fi
     # Start the daemon, wait for the socket to appear.
     rm -f $NIX_DAEMON_SOCKET_PATH
-    PATH=$DAEMON_PATH nix-daemon &
+    if isDaemonVersionAtleast 2.4; then
+        local -a daemonProc=(nix daemon)
+    else
+        local -a daemonProc=(nix-daemon)
+    fi
+    PATH=$DAEMON_PATH "${daemonProc[@]}" \
+        1> >(tee "$TEST_ROOT/daemon-out" >&1) \
+        2> >(tee "$TEST_ROOT/daemon-err" >&2) &
     _NIX_TEST_DAEMON_PID=$!
-    export _NIX_TEST_DAEMON_PID
     for ((i = 0; i < 300; i++)); do
         if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then
           DAEMON_STARTED=1
@@ -145,15 +151,19 @@ if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true
     _canUseSandbox=1
 fi
 
-isDaemonNewer () {
+isDaemonVersionAtleast () {
   [[ -n "${NIX_DAEMON_PACKAGE:-}" ]] || return 0
   local requiredVersion="$1"
   local daemonVersion=$($NIX_DAEMON_PACKAGE/bin/nix-daemon --version | cut -d' ' -f3)
-  [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
+  # N.B. We might have have written nix.conf to have nix-command yet.
+  [[ $(nix eval \
+    --extra-experimental-features 'nix-command' \
+    --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
 }
 
-requireDaemonNewerThan () {
-  isDaemonNewer "$1" || exit 99
+requireDaemonVersionAtleast () {
+  echo "Daemon is too old for this test, skipping..."
+  isDaemonVersionAtleast "$1" || exit 99
 }
 
 canUseSandbox() {

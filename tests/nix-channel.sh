@@ -1,5 +1,7 @@
 source common.sh
 
+requireDaemonVersionAtleast "2.4pre"
+
 clearProfiles
 
 rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile

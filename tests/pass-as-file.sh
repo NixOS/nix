@@ -1,5 +1,8 @@
 source common.sh
 
+# TODO debug failure with 2.3
+requireDaemonVersionAtleast "2.4pre"
+
 clearStore
 
 outPath=$(nix-build --no-out-link -E "
