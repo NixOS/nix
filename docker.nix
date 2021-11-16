@@ -2,24 +2,11 @@
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
-, crossSystem ? null
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
 }:
 let
-  buildPkgs = pkgs;
-  targetPkgs =
-    if crossSystem != null && crossSystem != pkgs.system
-    then {
-      aarch64-linux = pkgs.pkgsCross.aarch64-multiplatform;
-      armv7l-linux = pkgs.pkgsCross.armv7l-hf-multiplatform.system;
-      x86_64-linux = pkgs.pkgsCross.gnu64;
-      powerpc64le-linux = pkgs.pkgsCross.musl-power;
-      i686-linux = pkgs.pkgsCross.gnu32;
-    }.${crossSystem}
-    else pkgs;
-
-  defaultPkgs = with targetPkgs; [
+  defaultPkgs = with pkgs; [
     nix
     bashInteractive
     coreutils-full
@@ -140,17 +127,17 @@ let
 
   baseSystem =
     let
-      nixpkgs = targetPkgs.path;
-      channel = targetPkgs.runCommand "channel-nixos" { } ''
+      nixpkgs = pkgs.path;
+      channel = pkgs.runCommand "channel-nixos" { } ''
         mkdir $out
         ln -s ${nixpkgs} $out/nixpkgs
         echo "[]" > $out/manifest.nix
       '';
-      rootEnv = pkgs.buildEnv {
+      rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
         paths = defaultPkgs;
       };
-      profile = targetPkgs.runCommand "user-environment" { } ''
+      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
         mkdir $out
         cp -a ${rootEnv}/* $out/
 
@@ -175,7 +162,7 @@ let
         EOF
       '';
     in
-    targetPkgs.runCommand "base-system"
+    pkgs.runCommand "base-system"
       {
         inherit passwdContents groupContents shadowContents nixConfContents;
         passAsFile = [
@@ -225,12 +212,12 @@ let
       echo "${channelURL} ${channelName}" > $out/root/.nix-channels
 
       mkdir -p $out/bin $out/usr/bin
-      ln -s ${targetPkgs.coreutils}/bin/env $out/usr/bin/env
-      ln -s ${targetPkgs.bashInteractive}/bin/bash $out/bin/sh
+      ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
+      ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
     '';
 
 in
-targetPkgs.dockerTools.buildLayeredImageWithNixDb {
+pkgs.dockerTools.buildLayeredImageWithNixDb {
 
   inherit name tag;
 
