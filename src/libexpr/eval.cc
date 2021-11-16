@@ -1275,6 +1275,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
     };
 
+    Attr * functor;
+
     while (nrArgs > 0) {
 
         if (vCur.isLambda()) {
@@ -1403,16 +1405,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             }
         }
 
-        else if (vCur.type() == nAttrs) {
-            if (auto functor = vCur.attrs->get(sFunctor)) {
-                /* 'vCur" may be allocated on the stack of the calling
-                   function, but for functors we may keep a reference,
-                   so heap-allocate a copy and use that instead. */
-                Value * args2[] = {allocValue()};
-                *args2[0] = vCur;
-                /* !!! Should we use the attr pos here? */
-                callFunction(*functor->value, 1, args2, vCur, pos);
-            }
+        else if (vCur.type() == nAttrs && (functor = vCur.attrs->get(sFunctor))) {
+            /* 'vCur" may be allocated on the stack of the calling
+               function, but for functors we may keep a reference, so
+               heap-allocate a copy and use that instead. */
+            Value * args2[] = {allocValue()};
+            *args2[0] = vCur;
+            /* !!! Should we use the attr pos here? */
+            callFunction(*functor->value, 1, args2, vCur, pos);
         }
 
         else
