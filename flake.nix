@@ -405,6 +405,13 @@
         installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
         installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
 
+        # docker image with Nix inside
+        dockerImage = nixpkgs.lib.genAttrs linux64BitSystems (system:
+          import ./docker.nix {
+            pkgs = nixpkgsFor.${system};
+            tag = version;
+          });
+
         # Line coverage analysis.
         coverage =
           with nixpkgsFor.x86_64-linux;
