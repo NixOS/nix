@@ -1406,13 +1406,15 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else if (vCur.type() == nAttrs && (functor = vCur.attrs->get(sFunctor))) {
-            /* 'vCur" may be allocated on the stack of the calling
+            /* 'vCur' may be allocated on the stack of the calling
                function, but for functors we may keep a reference, so
                heap-allocate a copy and use that instead. */
-            Value * args2[] = {allocValue()};
+            Value * args2[] = {allocValue(), args[0]};
             *args2[0] = vCur;
             /* !!! Should we use the attr pos here? */
-            callFunction(*functor->value, 1, args2, vCur, pos);
+            callFunction(*functor->value, 2, args2, vCur, pos);
+            nrArgs--;
+            args++;
         }
 
         else
