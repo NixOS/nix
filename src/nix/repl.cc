@@ -471,7 +471,10 @@ bool NixRepl::processLine(string line)
         auto args = editorFor(pos);
         auto editor = args.front();
         args.pop_front();
-        runProgram(editor, true, args);
+
+        // runProgram redirects stdout to a StringSink,
+        // using runProgram2 to allow editors to display their UI
+        runProgram2(RunOptions { .program = editor, .searchPath = true, .args = args });
 
         // Reload right after exiting the editor
         state->resetFileCache();
