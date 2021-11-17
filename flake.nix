@@ -12,7 +12,7 @@
 
       officialRelease = false;
 
-      version = lib.fileContents ./.version + versionSuffix;
+      version = lib.fileContents ./nix/.version + versionSuffix;
       versionSuffix =
         if officialRelease
         then ""
@@ -191,7 +191,7 @@
             "-${client.version}-against-${daemon.version}";
         inherit version;
 
-        src = self;
+        src = ./nix;
 
         VERSION_SUFFIX = versionSuffix;
 
@@ -299,7 +299,7 @@
             name = "nix-${version}";
             inherit version;
 
-            src = self;
+            src = ./nix;
 
             VERSION_SUFFIX = versionSuffix;
 
@@ -371,7 +371,7 @@
             passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
               name = "nix-perl-${version}";
 
-              src = self;
+              src = ./.;
 
               nativeBuildInputs =
                 [ buildPackages.autoconf-archive
@@ -484,7 +484,7 @@
           releaseTools.coverageAnalysis {
             name = "nix-coverage-${version}";
 
-            src = self;
+            src = ./nix;
 
             configureFlags = [
               "CXXFLAGS=-I${lib.getDev pkgs.rapidcheck}/extras/gtest/include"

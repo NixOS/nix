@@ -1,6 +1,6 @@
-AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../.version)$VERSION_SUFFIX"]))
+AC_INIT(nix-perl, m4_esyscmd([bash -c "echo -n $(cat ../nix/.version)$VERSION_SUFFIX"]))
 AC_CONFIG_SRCDIR(MANIFEST)
-AC_CONFIG_AUX_DIR(../config)
+AC_CONFIG_AUX_DIR(../nix/config)
 
 CFLAGS=
 CXXFLAGS=
@@ -78,7 +78,7 @@ for name in $ac_subst_vars; do
 done
 
 rm -f Makefile.config
-ln -sfn ../mk mk
+ln -sfn ../nix/mk mk
 
 AC_CONFIG_FILES([])
 AC_OUTPUT

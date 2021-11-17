@@ -1,0 +1,171 @@
+#! @bash@
+
+WORKING_DIRECTORY=$(mktemp -d "${TMPDIR:-/tmp}"/nix-reduce-build-XXXXXX);
+cd "$WORKING_DIRECTORY";
+
+if test -z "$1" || test "a--help" = "a$1" ; then
+	echo 'nix-reduce-build (paths or Nix expressions) -- (package sources)' >&2
+	echo As in: >&2
+	echo nix-reduce-build /etc/nixos/nixos -- ssh://user@somewhere.nowhere.example.org >&2
+	echo nix-reduce-build /etc/nixos/nixos -- \\
+	echo "   " \''http://somewhere.nowhere.example.org/nix/nix-http-export.cgi?needed_path='\' >&2
+	echo "  store path name will be added into the end of the URL" >&2
+	echo nix-reduce-build /etc/nixos/nixos -- file://home/user/nar/ >&2
+	echo "  that should be a directory where gzipped 'nix-store --export' ">&2
+	echo "  files are located (they should have .nar.gz extension)"  >&2
+	echo "        Or all together: " >&2
+	echo -e nix-reduce-build /expr.nix /e2.nix -- \\\\\\\n\
+	"    ssh://a@b.example.com http://n.example.com/get-nar?q= file://nar/" >&2
+	echo "        Also supports best-effort local builds of failing expression set:" >&2
+	echo "nix-reduce-build /e.nix -- nix-daemon:// nix-self://" >&2
+	echo "  nix-daemon:// builds using daemon"
+	echo "  nix-self:// builds directly using nix-store from current installation" >&2
+	echo "  nix-daemon-fixed:// and nix-self-fixed:// do the same, but only for" >&2;
+	echo "derivations with specified output hash (sha256, sha1 or md5)." >&2
+	echo "  nix-daemon-substitute:// and nix-self-substitute:// try to substitute" >&2;
+	echo "maximum amount of paths" >&2;
+	echo "  nix-daemon-build:// and nix-self-build:// try to build (not substitute)" >&2;
+	echo "maximum amount of paths" >&2;
+	echo "        If no package sources are specified, required paths are listed." >&2;
+	exit;
+fi;
+
+while ! test "$1" = "--" || test "$1" = "" ; do 
+	echo "$1" >> initial; >&2
+	shift;
+done
+shift;
+echo Will work on $(cat initial | wc -l) targets. >&2
+
+while read ; do
+	case "$REPLY" in 
+		${NIX_STORE_DIR:-/nix/store}/*)
+			echo "$REPLY" >> paths; >&2
+			;;
+		*)
+			(
+				IFS=: ;
+				nix-instantiate $REPLY >> paths;
+			);
+			;;
+	esac;
+done < initial;
+echo Proceeding $(cat paths | wc -l) paths. >&2
+
+while read; do
+	case "$REPLY" in
+		*.drv)
+			echo "$REPLY" >> derivers; >&2
+			;;
+		*)
+			nix-store --query --deriver "$REPLY" >>derivers;
+			;;
+	esac;
+done < paths;
+echo Found $(cat derivers | wc -l) derivers. >&2
+
+cat derivers | xargs nix-store --query -R > derivers-closure;
+echo Proceeding at most $(cat derivers-closure | wc -l) derivers. >&2
+
+cat derivers-closure | egrep '[.]drv$' | xargs nix-store --query --outputs > wanted-paths;
+cat derivers-closure | egrep -v '[.]drv$' >> wanted-paths;
+echo Prepared $(cat wanted-paths | wc -l) paths to get. >&2
+
+cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
+echo We need $(cat needed-paths | wc -l) paths. >&2
+
+egrep '[.]drv$' derivers-closure > critical-derivers;
+
+if test -z "$1" ; then
+	cat needed-paths;	
+fi;
+
+refresh_critical_derivers() {
+    echo "Finding needed derivers..." >&2;
+    cat critical-derivers | while read; do
+        if ! (nix-store --query --outputs "$REPLY" | xargs nix-store --check-validity &> /dev/null;); then
+            echo "$REPLY";
+        fi;
+    done > new-critical-derivers;
+    mv new-critical-derivers critical-derivers;
+    echo The needed paths are realized by $(cat critical-derivers | wc -l) derivers. >&2
+}
+
+build_here() {
+    cat critical-derivers | while read; do 
+        echo "Realising $REPLY using nix-daemon" >&2
+        @bindir@/nix-store -r "${REPLY}"
+    done;
+}
+
+try_to_substitute(){
+    cat needed-paths | while read ; do 
+        echo "Building $REPLY using nix-daemon" >&2
+        @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
+    done;
+}
+
+for i in "$@"; do 
+	sshHost="${i#ssh://}";
+	httpHost="${i#http://}";
+	httpsHost="${i#https://}";
+	filePath="${i#file:/}";
+	if [ "$i" != "$sshHost" ]; then
+		cat needed-paths | while read; do 
+			echo "Getting $REPLY and its closure over ssh" >&2
+			nix-copy-closure --from "$sshHost" --gzip "$REPLY" </dev/null || true; 
+		done;
+	elif [ "$i" != "$httpHost" ] || [ "$i" != "$httpsHost" ]; then
+		cat needed-paths | while read; do
+			echo "Getting $REPLY over http/https" >&2
+			curl ${BAD_CERTIFICATE:+-k} -L "$i${REPLY##*/}" | gunzip | nix-store --import;
+		done;
+	elif [ "$i" != "$filePath" ] ; then
+		cat needed-paths | while read; do 
+			echo "Installing $REPLY from file" >&2
+			gunzip < "$filePath/${REPLY##*/}".nar.gz | nix-store --import;
+		done;
+	elif [ "$i" = "nix-daemon://" ] ; then
+		NIX_REMOTE=daemon try_to_substitute;
+		refresh_critical_derivers;
+		NIX_REMOTE=daemon build_here;
+	elif [ "$i" = "nix-self://" ] ; then
+		NIX_REMOTE= try_to_substitute;
+		refresh_critical_derivers;
+		NIX_REMOTE= build_here;
+	elif [ "$i" = "nix-daemon-fixed://" ] ; then
+		refresh_critical_derivers;
+
+		cat critical-derivers | while read; do 
+			if egrep '"(md5|sha1|sha256)"' "$REPLY" &>/dev/null; then
+				echo "Realising $REPLY using nix-daemon" >&2
+				NIX_REMOTE=daemon @bindir@/nix-store -r "${REPLY}"
+			fi;
+		done;
+	elif [ "$i" = "nix-self-fixed://" ] ; then
+		refresh_critical_derivers;
+
+		cat critical-derivers | while read; do 
+			if egrep '"(md5|sha1|sha256)"' "$REPLY" &>/dev/null; then
+				echo "Realising $REPLY using direct Nix build" >&2
+				NIX_REMOTE= @bindir@/nix-store -r "${REPLY}"
+			fi;
+		done;
+	elif [ "$i" = "nix-daemon-substitute://" ] ; then
+		NIX_REMOTE=daemon try_to_substitute;
+	elif [ "$i" = "nix-self-substitute://" ] ; then
+		NIX_REMOTE= try_to_substitute;
+	elif [ "$i" = "nix-daemon-build://" ] ; then
+		refresh_critical_derivers;
+		NIX_REMOTE=daemon build_here;
+	elif [ "$i" = "nix-self-build://" ] ; then
+		refresh_critical_derivers;
+		NIX_REMOTE= build_here;
+	fi;
+	mv needed-paths wanted-paths;
+	cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
+	echo We still need $(cat needed-paths | wc -l) paths. >&2
+done;
+
+cd /
+rm -r "$WORKING_DIRECTORY"
