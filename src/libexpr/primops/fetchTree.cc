@@ -74,8 +74,11 @@ std::string fixURI(std::string uri, EvalState & state, const std::string & defau
 
 std::string fixURIForGit(std::string uri, EvalState & state)
 {
+    /* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
+     * them by removing the `:` and assuming a scheme of `ssh://`
+     * */
     static std::regex scp_uri("([^/].*)@(.*):(.*)");
-    if (uri[0] != '/' && std::regex_match(uri, scp_uri))
+    if (uri[0] != '/' && std::regex_match(uri, scp_uri) && uri.find("://") == std::string::npos)
         return fixURI(std::regex_replace(uri, scp_uri, "$1@$2/$3"), state, "ssh");
     else
         return fixURI(uri, state);
