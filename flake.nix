@@ -369,9 +369,20 @@
             hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
             passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
-              name = "nix-perl-${version}";
+              pname = "nix-perl";
+              inherit version;
 
-              src = ./.;
+              src = final.runCommand "nix-perl-src-${version}" {} ''
+                mkdir -p $out
+                cd $out
+                cp -r ${./perl} ./perl
+                cp -r ${./nix/config} ./config
+                mkdir -p nix
+                cp ${builtins.path { name = "version"; path = ./nix/.version; }} ./nix/.version
+                cp -r ${./nix/mk} ./nix/mk
+                mkdir -p nix/src
+                cp -r ${nix/src/nlohmann} ./nix/src/nlohmann
+              '';
 
               nativeBuildInputs =
                 [ buildPackages.autoconf-archive
