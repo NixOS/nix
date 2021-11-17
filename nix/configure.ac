@@ -1,6 +1,6 @@
+AC_CONFIG_SRCDIR(.version)
 AC_INIT([nix],[m4_esyscmd(bash -c "echo -n $(cat ./.version)$VERSION_SUFFIX")])
 AC_CONFIG_MACRO_DIRS([m4])
-AC_CONFIG_SRCDIR(README.md)
 AC_CONFIG_AUX_DIR(config)
 
 AC_PROG_SED
