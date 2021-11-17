@@ -91,3 +91,16 @@ Most Nix commands interpret the following environment variables:
     variable sets the initial size of the heap in bytes. It defaults to
     384 MiB. Setting it to a low value reduces memory consumption, but
     will increase runtime due to the overhead of garbage collection.
+
+## XDG Base Directory
+
+New Nix commands conform to the [XDG Base Directory Specification], and use the following environment variables to determine locations of various state and configuration files:
+
+- [`XDG_CONFIG_HOME`]{#env-XDG_CONFIG_HOME} (default `~/.config`)
+- [`XDG_STATE_HOME`]{#env-XDG_STATE_HOME} (default `~/.local/state`)
+- [`XDG_CACHE_HOME`]{#env-XDG_CACHE_HOME} (default `~/.cache`)
+
+Classic Nix commands can also be made to follow this standard using the [`use-xdg-base-directories`] configuration option.
+
+[XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+[`use-xdg-base-directories`]: ../command-ref/conf-file.md#conf-use-xdg-base-directories

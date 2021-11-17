@@ -608,6 +608,19 @@ Path getDataDir()
     return dataDir ? *dataDir : getHome() + "/.local/share";
 }
 
+Path getStateDir()
+{
+    auto stateDir = getEnv("XDG_STATE_HOME");
+    return stateDir ? *stateDir : getHome() + "/.local/state";
+}
+
+Path createNixStateDir()
+{
+    Path dir = getStateDir() + "/nix";
+    createDirs(dir);
+    return dir;
+}
+
 
 std::optional<Path> getSelfExe()
 {

@@ -56,6 +56,14 @@ nix profile history
 nix profile history | grep "packages.$system.default: ∅ -> 1.0"
 nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
 
+# Test XDG Base Directories support
+
+export NIX_CONFIG="use-xdg-base-directories = true"
+nix profile remove 1
+nix profile install $flake1Dir
+[[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
+unset NIX_CONFIG
+
 # Test upgrading a package.
 printf NixOS > $flake1Dir/who
 printf 2.0 > $flake1Dir/version
