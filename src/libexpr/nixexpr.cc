@@ -135,6 +135,10 @@ void ExprLambda::show(std::ostream & str) const
         if (formals->ellipsis) {
             if (!first) str << ", ";
             str << "...";
+            if (formals->ellipsis->set()) {
+              str << " @ ";
+              str << *formals->ellipsis;
+            }
         }
         str << " }";
         if (!arg.empty()) str << " @ ";
@@ -354,10 +358,7 @@ void ExprList::bindVars(const StaticEnv & env)
 
 void ExprLambda::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(
-        false, &env,
-        (hasFormals() ? formals->formals.size() : 0) +
-        (arg.empty() ? 0 : 1));
+    StaticEnv newEnv(false, &env, getEnvSize());
 
     Displacement displ = 0;
 
@@ -366,6 +367,10 @@ void ExprLambda::bindVars(const StaticEnv & env)
     if (hasFormals()) {
         for (auto & i : formals->formals)
             newEnv.vars.emplace_back(i.name, displ++);
+
+        if (formals->ellipsis->set()) {
+            newEnv.vars.emplace_back(*formals->ellipsis, displ++);
+        }
 
         newEnv.sort();
 
@@ -460,6 +465,13 @@ void ExprLambda::setName(Symbol & name)
     body->setName(name);
 }
 
+size_t ExprLambda::getEnvSize() {
+  size_t s = 0;
+  s += hasFormals() ? formals->formals.size() : 0;
+  s += hasFormals() && formals->ellipsis && formals->ellipsis->set() ? 1 : 0;
+  s += arg.empty() ? 0 : 1;
+  return s;
+}
 
 string ExprLambda::showNamePos() const
 {

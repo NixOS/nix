@@ -224,9 +224,10 @@ struct Formal
 struct Formals
 {
     typedef std::list<Formal> Formals_;
+    typedef std::optional<Symbol> Ellipsis;
     Formals_ formals;
     std::set<Symbol> argNames; // used during parsing
-    bool ellipsis;
+    Ellipsis ellipsis;
 };
 
 struct ExprLambda : Expr
@@ -247,6 +248,7 @@ struct ExprLambda : Expr
     };
     void setName(Symbol & name);
     string showNamePos() const;
+    size_t getEnvSize();
     inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };
