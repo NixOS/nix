@@ -9,7 +9,7 @@ The daemon that handles binary cache requests via HTTP, `nix-serve`, is
 not part of the Nix distribution, but you can install it from Nixpkgs:
 
 ```console
-$ nix-env -i nix-serve
+$ nix-env -iA nixpkgs.nix-serve
 ```
 
 You can then start the server, listening for HTTP connections on
@@ -35,7 +35,7 @@ On the client side, you can tell Nix to use your binary cache using
 `--option extra-binary-caches`, e.g.:
 
 ```console
-$ nix-env -i firefox --option extra-binary-caches http://avalon:8080/
+$ nix-env -iA nixpkgs.firefox --option extra-binary-caches http://avalon:8080/
 ```
 
 The option `extra-binary-caches` tells Nix to use this binary cache in
