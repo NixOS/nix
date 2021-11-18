@@ -54,7 +54,7 @@ void RefScanSink::operator () (std::string_view data)
        fragment, so search in the concatenation of the tail of the
        previous fragment and the start of the current fragment. */
     auto s = tail;
-    s.append(data.data(), refLength);
+    s.append(data.data(), std::min(data.size(), refLength));
     search(s, hashes, seen);
 
     search(data, hashes, seen);
