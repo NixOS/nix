@@ -25,5 +25,10 @@ cat <<EOF > flake.nix
 }
 EOF
 
+# Without --accept-flake-config, the post hook should not run.
+nix build < /dev/null
+(! [[ -f post-hook-ran ]])
+clearStore
+
 nix build --accept-flake-config
 test -f post-hook-ran || fail "The post hook should have ran"
