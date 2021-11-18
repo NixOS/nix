@@ -35,7 +35,7 @@ if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
 fi
 DAEMON_PATH="$PATH"
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
-  DAEMON_PATH="${NIX_DAEMON_PACKAGE}:$DAEMON_PATH"
+  DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
 fi
 coreutils=@coreutils@
 
