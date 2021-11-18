@@ -5,7 +5,7 @@ __ETC_PROFILE_NIX_SOURCED=1
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
 # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
-if [ ! -z "${NIX_SSL_CERT_FILE:-}" ]; then
+if [ -n "${NIX_SSL_CERT_FILE:-}" ]; then
     : # Allow users to override the NIX_SSL_CERT_FILE
 elif [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
     export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
@@ -18,14 +18,14 @@ elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
 else
   # Fall back to what is in the nix profiles, favouring whatever is defined last.
   check_nix_profiles() {
-    if [ "$ZSH_VERSION" ]; then
+    if [ -n "$ZSH_VERSION" ]; then
       # Zsh by default doesn't split words in unquoted parameter expansion.
       # Set local_options for these options to be reverted at the end of the function
       # and shwordsplit to force splitting words in $NIX_PROFILES below.
       setopt local_options shwordsplit
     fi
     for i in $NIX_PROFILES; do
-      if [ -e $i/etc/ssl/certs/ca-bundle.crt ]; then
+      if [ -e "$i/etc/ssl/certs/ca-bundle.crt" ]; then
         export NIX_SSL_CERT_FILE=$i/etc/ssl/certs/ca-bundle.crt
       fi
     done

@@ -15,7 +15,7 @@ readonly SERVICE_OVERRIDE=${SERVICE_DEST}.d/override.conf
 
 create_systemd_override() {
      header "Configuring proxy for the nix-daemon service"
-    _sudo "create directory for systemd unit override" mkdir -p "$(dirname $SERVICE_OVERRIDE)"
+    _sudo "create directory for systemd unit override" mkdir -p "$(dirname "$SERVICE_OVERRIDE")"
     cat <<EOF | _sudo "create systemd unit override" tee "$SERVICE_OVERRIDE"
 [Service]
 $1

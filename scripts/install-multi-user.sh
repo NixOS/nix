@@ -818,7 +818,7 @@ main() {
     # can fail faster in this case. Sourcing install-darwin... now runs
     # `touch /` to detect Read-only root, but it could update times on
     # pre-Catalina macOS if run as root user.
-    if [ $EUID -eq 0 ]; then
+    if [ "$EUID" -eq 0 ]; then
         failure <<EOF
 Please do not run this script with root privileges. I will call sudo
 when I need to.
