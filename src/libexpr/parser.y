@@ -167,6 +167,7 @@ static void setEllipsis(const Pos & pos, Formals * formals, Symbol name) {
     setEllipsis(pos, formals, true);
     formals->ellipsis.emplace(name);
     // Check that the symbol we use is not also a formal argument:
+    settings.requireExperimentalFeature(Xp::NamedEllipsis);
     if (!formals->argNames.insert(name).second)
         throw ParseError({
             .msg = hintfmt("duplicate formal function argument '%1%'", name),
