@@ -25,11 +25,5 @@ cat <<EOF > flake.nix
 }
 EOF
 
-# Ugly hack for testing
-mkdir -p .local/share/nix
-cat <<EOF > .local/share/nix/trusted-settings.json
-{"post-build-hook":{"$PWD/echoing-post-hook.sh":true}}
-EOF
-
-nix build
+nix build --accept-flake-config
 test -f post-hook-ran || fail "The post hook should have ran"
