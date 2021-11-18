@@ -76,7 +76,7 @@ there after an upgrade.  This means that you can _roll back_ to the
 old version:
 
 ```console
-$ nix-env --upgrade some-packages
+$ nix-env --upgrade -A nixpkgs.some-package
 $ nix-env --rollback
 ```
 
@@ -122,7 +122,7 @@ Nix expressions generally describe how to build a package from
 source, so an installation action like
 
 ```console
-$ nix-env --install firefox
+$ nix-env --install -A nixpkgs.firefox
 ```
 
 _could_ cause quite a bit of build activity, as not only Firefox but
