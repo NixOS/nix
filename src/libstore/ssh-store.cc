@@ -16,7 +16,10 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
     using RemoteStoreConfig::RemoteStoreConfig;
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program",
+    const Setting<Path> remoteProgram{
+        (StoreConfig*) this,
+        getEnv("_NIX_TEST_SSH_REMOTE_PROGRAM").value_or("nix-daemon"),
+        "remote-program",
         "Path to the `nix-daemon` executable on the remote machine."};
 
     const std::string name() override { return "Experimental SSH Store"; }

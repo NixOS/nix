@@ -17,7 +17,10 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
+    const Setting<Path> remoteProgram{
+        (StoreConfig*) this,
+        getEnv("_NIX_TEST_LEGACY_SSH_REMOTE_PROGRAM").value_or("nix-store"),
+        "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
     const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
