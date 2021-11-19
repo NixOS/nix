@@ -298,8 +298,8 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
     matches.clear();
     for (auto & [name, match] : newest) {
         if (multiple.find(name) != multiple.end())
-            printInfo(
-                "warning: there are multiple derivations named '%1%'; using the first one",
+            warn(
+                "there are multiple derivations named '%1%'; using the first one",
                 name);
         matches.push_back(match);
     }
