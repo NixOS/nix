@@ -342,7 +342,7 @@ int childEntry(void * arg)
     return 1;
 }
 
-
+#if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
@@ -358,6 +358,7 @@ static void linkOrCopy(const Path & from, const Path & to)
         copyPath(from, to);
     }
 }
+#endif
 
 
 void LocalDerivationGoal::startBuilder()
@@ -917,7 +918,9 @@ void LocalDerivationGoal::startBuilder()
     } else
 #endif
     {
+#if __linux__
     fallback:
+#endif
         pid = startProcess([&]() {
             runChild();
         });
