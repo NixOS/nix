@@ -355,8 +355,13 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 StringSet StoreConfig::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
+
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations))
         res.insert("ca-derivations");
+
+    if (settings.isExperimentalFeatureEnabled(Xp::RecursiveNix))
+        res.insert("recursive-nix");
+
     return res;
 }
 
