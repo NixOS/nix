@@ -81,10 +81,10 @@ if [ "$(uname -s)" != "Darwin" ]; then
     require_util xz "unpack the binary tarball"
 fi
 
-if command -v wget > /dev/null 2>&1; then
-    fetch() { wget "$1" -O "$2"; }
-elif command -v curl > /dev/null 2>&1; then
+if command -v curl > /dev/null 2>&1; then
     fetch() { curl -L "$1" -o "$2"; }
+elif command -v wget > /dev/null 2>&1; then
+    fetch() { wget "$1" -O "$2"; }
 else
     oops "you don't have wget or curl installed, which I need to download the binary tarball"
 fi
