@@ -2710,9 +2710,9 @@ static RegisterPrimOp primop_foldlStrict({
     .args = {"op", "nul", "list"},
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
-      e.g. `foldl’ op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
+      e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
       ...`. The operator is applied strictly, i.e., its arguments are
-      evaluated first. For example, `foldl’ (x: y: x + y) 0 [1 2 3]`
+      evaluated first. For example, `foldl' (x: y: x + y) 0 [1 2 3]`
       evaluates to 6.
     )",
     .fun = prim_foldlStrict,
