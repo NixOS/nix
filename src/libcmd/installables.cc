@@ -521,33 +521,65 @@ InstallableFlake::InstallableFlake(
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
 
+namespace {
+std::optional<Path> getSourceFilePathFromInStorePath(Store & store, const Path & file, const fetchers::Input & flakeInput) {
+    if (!store.isInStore(file)) {
+        return std::nullopt;
+    }
+
+    auto [sourceStorePath, relPath] = store.toStorePath(file);
+    auto realPath = store.toRealPath(sourceStorePath);
+
+    auto maybeFlakeSource = flakeInput.getSourcePath();
+    if (!maybeFlakeSource) {
+        return std::nullopt;
+    }
+
+    auto betterFilePath = replaceStrings(file, realPath, *maybeFlakeSource);
+    if (!pathExists(betterFilePath)) {
+        return std::nullopt;
+    }
+
+    return betterFilePath;
+}
+}
+
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
-    auto lockedFlake = getLockedFlake();
+    try {
+        auto lockedFlake = getLockedFlake();
 
-    auto cache = openEvalCache(*state, lockedFlake);
-    auto root = cache->getRoot();
+        auto cache = openEvalCache(*state, lockedFlake);
+        auto root = cache->getRoot();
 
-    for (auto & attrPath : getActualAttrPaths()) {
-        auto attr = root->findAlongAttrPath(
-            parseAttrPath(*state, attrPath),
-            true
-        );
+        for (auto & attrPath : getActualAttrPaths()) {
+            auto attr = root->findAlongAttrPath(
+                parseAttrPath(*state, attrPath),
+                true
+            );
 
-        if (!attr) continue;
+            if (!attr) continue;
 
-        if (!attr->isDerivation())
-            throw Error("flake output attribute '%s' is not a derivation", attrPath);
+            if (!attr->isDerivation())
+                throw Error("flake output attribute '%s' is not a derivation", attrPath);
 
-        auto drvPath = attr->forceDerivation();
+            auto drvPath = attr->forceDerivation();
 
-        auto drvInfo = DerivationInfo{
-            std::move(drvPath),
-            state->store->maybeParseStorePath(attr->getAttr(state->sOutPath)->getString()),
-            attr->getAttr(state->sOutputName)->getString()
-        };
+            auto drvInfo = DerivationInfo{
+                std::move(drvPath),
+                state->store->maybeParseStorePath(attr->getAttr(state->sOutPath)->getString()),
+                attr->getAttr(state->sOutputName)->getString()
+            };
 
-        return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
+            return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
+        }
+    } catch (BaseError & e) {
+        if (auto pos = e.info().errPos) {
+            if (auto sourceFilePath = getSourceFilePathFromInStorePath(*state->store, pos->file, flakeRef.input)) {
+                e.setBetterErrPosFile(*sourceFilePath);
+            }
+        }
+        throw;
     }
 
     throw Error("flake '%s' does not provide attribute %s",
