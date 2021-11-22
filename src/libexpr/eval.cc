@@ -520,7 +520,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     }
 
     if (!found)
-        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", abspath);
+        throw RestrictedPathError("access to absolute path '%1%' is forbidden in restricted mode", abspath);
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % abspath);
@@ -533,7 +533,7 @@ Path EvalState::checkSourcePath(const Path & path_)
         }
     }
 
-    throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path);
+    throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
 }
 
 

@@ -70,7 +70,7 @@ void EvalState::realiseContext(const PathSet & context)
                 if (outputPaths.count(outputName) == 0)
                     throw Error("derivation '%s' does not have an output named '%s'",
                             store->printStorePath(drvPath), outputName);
-                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
+                allowPath(outputPaths.at(outputName));
             }
         }
     }
