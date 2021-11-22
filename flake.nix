@@ -91,7 +91,7 @@
             libarchive
             boost
             lowdown-nix
-            gmock
+            gtest
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
