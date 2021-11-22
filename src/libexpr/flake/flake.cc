@@ -254,7 +254,7 @@ static Flake getFlake(
             else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
             else if (setting.value->type() == nBool)
-                flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
+                flake.config.settings.insert({setting.name, Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
                 for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
