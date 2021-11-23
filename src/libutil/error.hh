@@ -165,7 +165,7 @@ public:
     const string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
     
-    void setBetterErrPosFile(std::string file) {
+    void replacePosFile(std::string file) {
         if (err.errPos) {
             err.errPos->file = std::move(file);
         }
