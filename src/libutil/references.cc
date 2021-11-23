@@ -12,7 +12,10 @@
 namespace nix {
 
 
-static size_t refLength = 32; /* characters */
+/**
+ * A Nix reference is 32 characters long
+ */
+constexpr size_t refLength = 32;
 
 
 static void search(
@@ -29,15 +32,21 @@ static void search(
     });
 
     for (size_t i = 0; i + refLength <= s.size(); ) {
-        int j;
-        bool match = true;
-        for (j = refLength - 1; j >= 0; --j)
-            if (!isBase32[(unsigned char) s[i + j]]) {
-                i += j + 1;
-                match = false;
+        /* Check whether the next `refLength` bytes are a possible
+           reference (because they are all base-32 characters). */
+        bool possibleReference = true;
+        for (size_t j = refLength; j > 0; --j)
+            if (!isBase32[(unsigned char) s[i + j - 1]]) {
+                /* We found an invalid character at index `i + j - 1`,
+                   the next possible reference (which doesn't contain
+                   it) starts at index `i + j`. */
+                i += j;
+                /* Use variable because we cannot directly continue in
+                   the outer loop in C++. */
+                possibleReference = false;
                 break;
             }
-        if (!match) continue;
+        if (!possibleReference) continue;
         std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
             debug("found reference to '%1%' at offset '%2%'", ref, i);
