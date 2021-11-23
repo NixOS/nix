@@ -1,6 +1,6 @@
 # Building and Testing
 
-You can now try to build Hello. Of course, you could do `nix-env -i
+You can now try to build Hello. Of course, you could do `nix-env -f . -iA
 hello`, but you may not want to install a possibly broken package just
 yet. The best way to test the package is by using the command
 `nix-build`, which builds a Nix expression and creates a symlink named

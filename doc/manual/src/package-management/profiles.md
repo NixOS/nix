@@ -39,7 +39,7 @@ just Subversion 1.1.2 (arrows in the figure indicate symlinks). This
 would be what we would obtain if we had done
 
 ```console
-$ nix-env -i subversion
+$ nix-env -iA nixpkgs.subversion
 ```
 
 on a set of Nix expressions that contained Subversion 1.1.2.
@@ -54,7 +54,7 @@ environment is generated based on the current one. For instance,
 generation 43 was created from generation 42 when we did
 
 ```console
-$ nix-env -i subversion firefox
+$ nix-env -iA nixpkgs.subversion nixpkgs.firefox
 ```
 
 on a set of Nix expressions that contained Firefox and a new version of
@@ -127,7 +127,7 @@ All `nix-env` operations work on the profile pointed to by
 (abbreviation `-p`):
 
 ```console
-$ nix-env -p /nix/var/nix/profiles/other-profile -i subversion
+$ nix-env -p /nix/var/nix/profiles/other-profile -iA nixpkgs.subversion
 ```
 
 This will *not* change the `~/.nix-profile` symlink.
