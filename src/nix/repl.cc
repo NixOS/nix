@@ -771,12 +771,12 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
         str << "[ ";
         if (maxDepth > 0)
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
-                if (seen.find(v.listElems()[n]) != seen.end())
+            for (auto elem : v.listItems()) {
+                if (seen.count(elem))
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *v.listElems()[n], maxDepth - 1, seen);
+                        printValue(str, *elem, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }

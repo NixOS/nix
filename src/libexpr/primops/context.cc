@@ -118,9 +118,8 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
             auto & outputsVal = *state.allocAttr(infoVal, state.sOutputs);
             state.mkList(outputsVal, info.second.outputs.size());
             size_t i = 0;
-            for (const auto & output : info.second.outputs) {
+            for (const auto & output : info.second.outputs)
                 mkString(*(outputsVal.listElems()[i++] = state.allocValue()), output);
-            }
         }
         infoVal.attrs->sort();
     }
@@ -181,8 +180,8 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                     .errPos = *i.pos
                 });
             }
-            for (unsigned int n = 0; n < iter->value->listSize(); ++n) {
-                auto name = state.forceStringNoCtx(*iter->value->listElems()[n], *iter->pos);
+            for (auto elem : iter->value->listItems()) {
+                auto name = state.forceStringNoCtx(*elem, *iter->pos);
                 context.insert("!" + name + "!" + string(i.name));
             }
         }

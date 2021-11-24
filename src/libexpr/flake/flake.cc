@@ -257,8 +257,7 @@ static Flake getFlake(
                 flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
-                for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
-                    auto elem = setting.value->listElems()[n];
+                for (auto elem : setting.value->listItems()) {
                     if (elem->type() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             setting.name, showType(*setting.value));
