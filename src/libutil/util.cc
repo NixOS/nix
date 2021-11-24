@@ -1205,7 +1205,7 @@ void closeOnExec(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
-bool _isInterrupted = false;
+std::atomic<bool> _isInterrupted = false;
 
 static thread_local bool interruptThrown = false;
 thread_local std::function<bool()> interruptCheck;

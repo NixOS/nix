@@ -337,7 +337,7 @@ void closeOnExec(int fd);
 
 /* User interruption. */
 
-extern bool _isInterrupted;
+extern std::atomic<bool> _isInterrupted;
 
 extern thread_local std::function<bool()> interruptCheck;
 
