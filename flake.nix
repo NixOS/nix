@@ -407,10 +407,18 @@
 
         # docker image with Nix inside
         dockerImage = nixpkgs.lib.genAttrs linux64BitSystems (system:
-          import ./docker.nix {
+          let
             pkgs = nixpkgsFor.${system};
-            tag = version;
-          });
+            image = import ./docker.nix { inherit pkgs; tag = version; };
+          in pkgs.runCommand "docker-image-tarball-${version}"
+            { meta.description = "Docker image with Nix for ${system}";
+            }
+            ''
+              mkdir -p $out/nix-support
+              image=$out/image.tar.gz
+              ln -s ${image} $image
+              echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
+            '');
 
         # Line coverage analysis.
         coverage =
@@ -516,6 +524,7 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+        dockerImage = self.hydraJobs.dockerImage.${system};
       });
 
       packages = forAllSystems (system: {
