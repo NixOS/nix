@@ -416,7 +416,7 @@
             ''
               mkdir -p $out/nix-support
               image=$out/image.tar.gz
-              cp ${image} $image
+              ln -s ${image} $image
               echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
             '');
 
