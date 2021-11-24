@@ -517,7 +517,11 @@ static RegisterPrimOp primop_isPath({
 
 struct CompareValues
 {
-    bool operator () (const Value * v1, const Value * v2) const
+    EvalState & state;
+
+    CompareValues(EvalState & state) : state(state) { };
+
+    bool operator () (Value * v1, Value * v2) const
     {
         if (v1->type() == nFloat && v2->type() == nInt)
             return v1->fpoint < v2->integer;
@@ -534,6 +538,17 @@ struct CompareValues
                 return strcmp(v1->string.s, v2->string.s) < 0;
             case nPath:
                 return strcmp(v1->path, v2->path) < 0;
+            case nList:
+                // Lexicographic comparison
+                for (size_t i = 0;; i++) {
+                    if (i == v2->listSize()) {
+                        return false;
+                    } else if (i == v1->listSize()) {
+                        return true;
+                    } else if (!state.eqValues(*v1->listElems()[i], *v2->listElems()[i])) {
+                        return (*this)(v1->listElems()[i], v2->listElems()[i]);
+                    }
+                }
             default:
                 throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
         }
@@ -621,7 +636,8 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     ValueList res;
     // `doneKeys' doesn't need to be a GC root, because its values are
     // reachable from res.
-    set<Value *, CompareValues> doneKeys;
+    auto cmp = CompareValues(state);
+    set<Value *, decltype(cmp)> doneKeys(cmp);
     while (!workSet.empty()) {
         Value * e = *(workSet.begin());
         workSet.pop_front();
@@ -2821,7 +2837,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
         if (args[0]->isPrimOp() && args[0]->primOp->fun == prim_lessThan)
-            return CompareValues()(a, b);
+            return CompareValues(state)(a, b);
 
         Value * vs[] = {a, b};
         Value vBool;
@@ -3103,7 +3119,7 @@ static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    CompareValues comp;
+    CompareValues comp{state};
     mkBool(v, comp(args[0], args[1]));
 }
 
@@ -3693,7 +3709,7 @@ void EvalState::createBaseEnv()
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
-    mkInt(v, 5);
+    mkInt(v, 6);
     addConstant("__langVersion", v);
 
     // Miscellaneous
