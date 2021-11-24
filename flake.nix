@@ -524,6 +524,7 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+        dockerImage = self.hydraJobs.dockerImage.${system};
       });
 
       packages = forAllSystems (system: {
