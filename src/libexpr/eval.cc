@@ -519,8 +519,12 @@ Path EvalState::checkSourcePath(const Path & path_)
         }
     }
 
-    if (!found)
-        throw RestrictedPathError("access to absolute path '%1%' is forbidden in restricted mode", abspath);
+    if (!found) {
+        auto modeInformation = evalSettings.pureEval
+            ? "in pure eval mode (use '--impure' to override)"
+            : "in restricted mode";
+        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", abspath, modeInformation);
+    }
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % abspath);

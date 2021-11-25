@@ -6,7 +6,10 @@ nix eval --expr 'assert 1 + 2 == 3; true'
 
 [[ $(nix eval --impure --expr 'builtins.readFile ./pure-eval.sh') =~ clearStore ]]
 
-(! nix eval --expr 'builtins.readFile ./pure-eval.sh')
+missingImpureErrorMsg=$(! nix eval --expr 'builtins.readFile ./pure-eval.sh' 2>&1)
+
+echo "$missingImpureErrorMsg" | grep -q -- --impure || \
+    fail "The error message should mention the “--impure” flag to unblock users"
 
 (! nix eval --expr builtins.currentTime)
 (! nix eval --expr builtins.currentSystem)
