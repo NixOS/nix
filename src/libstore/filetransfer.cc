@@ -7,7 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 
-#ifdef ENABLE_S3
+#if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
@@ -544,6 +544,14 @@ struct curlFileTransfer : public FileTransfer
             stopWorkerThread();
         });
 
+#ifdef __linux__
+        /* Cause this thread to not share any FS attributes with the main thread,
+           because this causes setns() in restoreMountNamespace() to fail.
+           Ideally, this would happen in the std::thread() constructor. */
+        if (unshare(CLONE_FS) != 0)
+            throw SysError("unsharing filesystem state in download thread");
+#endif
+
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
 
         bool quit = false;
@@ -665,7 +673,7 @@ struct curlFileTransfer : public FileTransfer
         writeFull(wakeupPipe.writeSide.get(), " ");
     }
 
-#ifdef ENABLE_S3
+#if ENABLE_S3
     std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
@@ -688,7 +696,7 @@ struct curlFileTransfer : public FileTransfer
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
             try {
-#ifdef ENABLE_S3
+#if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
                 std::string profile = get(params, "profile").value_or("");
@@ -716,15 +724,24 @@ struct curlFileTransfer : public FileTransfer
     }
 };
 
+ref<curlFileTransfer> makeCurlFileTransfer()
+{
+    return make_ref<curlFileTransfer>();
+}
+
 ref<FileTransfer> getFileTransfer()
 {
-    static ref<FileTransfer> fileTransfer = makeFileTransfer();
+    static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
+
+    if (fileTransfer->state_.lock()->quit)
+        fileTransfer = makeCurlFileTransfer();
+
     return fileTransfer;
 }
 
 ref<FileTransfer> makeFileTransfer()
 {
-    return make_ref<curlFileTransfer>();
+    return makeCurlFileTransfer();
 }
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)

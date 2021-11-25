@@ -1,27 +1,32 @@
 name: "Test"
+
 on:
   pull_request:
   push:
+
 jobs:
+
   tests:
+    needs: [check_cachix]
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-
+    timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v2.3.4
+    - uses: actions/checkout@v2.4.0
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v13
+    - uses: cachix/install-nix-action@v16
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v10
+      if: needs.check_cachix.outputs.secret == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    #- run: nix flake check
-    - run: nix-build -A checks.$(if [[ `uname` = Linux ]]; then echo x86_64-linux; else echo x86_64-darwin; fi)
+    - run: nix-build -A checks.$(nix-instantiate --eval -E '(builtins.currentSystem)')
+
   check_cachix:
     name: Cachix secret present for installer tests
     runs-on: ubuntu-latest
@@ -33,6 +38,7 @@ jobs:
         env:
           _CACHIX_SECRETS: ${{ secrets.CACHIX_SIGNING_KEY }}${{ secrets.CACHIX_AUTH_TOKEN }}
         run: echo "::set-output name=secret::${{ env._CACHIX_SECRETS != '' }}"
+
   installer:
     needs: [tests, check_cachix]
     if: github.event_name == 'push' && needs.check_cachix.outputs.secret == 'true'
@@ -40,11 +46,11 @@ jobs:
     outputs:
       installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
     steps:
-    - uses: actions/checkout@v2.3.4
+    - uses: actions/checkout@v2.4.0
       with:
         fetch-depth: 0
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v13
+    - uses: cachix/install-nix-action@v16
     - uses: cachix/cachix-action@v10
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -52,6 +58,7 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - id: prepare-installer
       run: scripts/prepare-installer-for-github-actions
+
   installer_test:
     needs: [installer, check_cachix]
     if: github.event_name == 'push' && needs.check_cachix.outputs.secret == 'true'
@@ -60,9 +67,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2.3.4
+    - uses: actions/checkout@v2.4.0
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v13
+    - uses: cachix/install-nix-action@v16
       with:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"

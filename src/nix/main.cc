@@ -10,6 +10,7 @@
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
+#include "markdown.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -163,9 +164,46 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     }
 };
 
-static void showHelp(std::vector<std::string> subcommand)
+/* Render the help for the specified subcommand to stdout using
+   lowdown. */
+static void showHelp(std::vector<std::string> subcommand, MultiCommand & toplevel)
 {
-    showManPage(subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand)));
+    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
+
+    evalSettings.restrictEval = false;
+    evalSettings.pureEval = false;
+    EvalState state({}, openStore("dummy://"));
+
+    auto vGenerateManpage = state.allocValue();
+    state.eval(state.parseExprFromString(
+        #include "generate-manpage.nix.gen.hh"
+        , "/"), *vGenerateManpage);
+
+    auto vUtils = state.allocValue();
+    state.cacheFile(
+        "/utils.nix", "/utils.nix",
+        state.parseExprFromString(
+            #include "utils.nix.gen.hh"
+            , "/"),
+        *vUtils);
+
+    auto vArgs = state.allocValue();
+    state.mkAttrs(*vArgs, 16);
+    auto vJson = state.allocAttr(*vArgs, state.symbols.create("command"));
+    mkString(*vJson, toplevel.toJSON().dump());
+    vArgs->attrs->sort();
+
+    auto vRes = state.allocValue();
+    state.callFunction(*vGenerateManpage, *vArgs, *vRes, noPos);
+
+    auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
+    if (!attr)
+        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
+
+    auto markdown = state.forceString(*attr->value);
+
+    RunPager pager;
+    std::cout << renderMarkdownToTerminal(markdown) << "\n";
 }
 
 struct CmdHelp : Command
@@ -194,7 +232,10 @@ struct CmdHelp : Command
 
     void run() override
     {
-        showHelp(subcommand);
+        assert(parent);
+        MultiCommand * toplevel = parent;
+        while (toplevel->parent) toplevel = toplevel->parent;
+        showHelp(subcommand, *toplevel);
     }
 };
 
@@ -213,6 +254,16 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
+
+    #if __linux__
+    if (getuid() == 0) {
+        try {
+            saveMountNamespace();
+            if (unshare(CLONE_NEWNS) == -1)
+                throw SysError("setting up a private mount namespace");
+        } catch (Error & e) { }
+    }
+    #endif
 
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
@@ -277,7 +328,7 @@ void mainWrapped(int argc, char * * argv)
             } else
                 break;
         }
-        showHelp(subcommand);
+        showHelp(subcommand, args);
         return;
     } catch (UsageError &) {
         if (!completions) throw;
@@ -296,7 +347,7 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->first != "repl"
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
-        settings.requireExperimentalFeature("nix-command");
+        settings.requireExperimentalFeature(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

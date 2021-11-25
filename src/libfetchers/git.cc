@@ -4,6 +4,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
+#include "pathlocks.hh"
 
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -11,6 +12,12 @@
 using namespace std::string_literals;
 
 namespace nix::fetchers {
+
+// Explicit initial branch of our bare repo to suppress warnings from new version of git.
+// The value itself does not matter, since we always fetch a specific revision or branch.
+// It is set with `-c init.defaultBranch=` instead of `--initial-branch=` to stay compatible with
+// old version of git, which will ignore unrecognized `-c` options.
+const std::string gitInitialBranch = "__nix_dummy_branch";
 
 static std::string readHead(const Path & path)
 {
@@ -44,7 +51,7 @@ struct GitInputScheme : InputScheme
         for (auto &[name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
-            else if (name == "shallow")
+            else if (name == "shallow" || name == "submodules")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -60,7 +67,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -167,9 +174,9 @@ struct GitInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        auto name = "source";
-
         Input input(_input);
+
+        std::string name = input.getName();
 
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
         bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
@@ -270,7 +277,7 @@ struct GitInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
@@ -317,9 +324,11 @@ struct GitInputScheme : InputScheme
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
 
+            createDirs(dirOf(cacheDir));
+            PathLocks cacheDirLock({cacheDir + ".lock"});
+
             if (!pathExists(cacheDir)) {
-                createDirs(dirOf(cacheDir));
-                runProgram("git", true, { "init", "--bare", repoDir });
+                runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
             }
 
             Path localRefFile =
@@ -386,6 +395,8 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
+
+            // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
@@ -406,17 +417,14 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        RunOptions checkCommitOpts(
-            "git",
-            { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() }
-        );
-        checkCommitOpts.searchPath = true;
-        checkCommitOpts.mergeStderrToStdout = true;
-
-        auto result = runProgram(checkCommitOpts);
+        auto result = runProgram(RunOptions {
+            .program = "git",
+            .args = { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() },
+            .mergeStderrToStdout = true
+        });
         if (WEXITSTATUS(result.first) == 128
-            && result.second.find("bad file") != std::string::npos
-        ) {
+            && result.second.find("bad file") != std::string::npos)
+        {
             throw Error(
                 "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
                     "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
@@ -432,7 +440,7 @@ struct GitInputScheme : InputScheme
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
-            runProgram("git", true, { "init", tmpDir, "--separate-git-dir", tmpGitDir });
+            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
             // TODO: repoDir might lack the ref (it only checks if rev
             // exists, see FIXME above) so use a big hammer and fetch
             // everything to ensure we get the rev.
@@ -448,9 +456,11 @@ struct GitInputScheme : InputScheme
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                RunOptions gitOptions("git", { "-C", repoDir, "archive", input.getRev()->gitRev() });
-                gitOptions.standardOut = &sink;
-                runProgram2(gitOptions);
+                runProgram2({
+                    .program = "git",
+                    .args = { "-C", repoDir, "archive", input.getRev()->gitRev() },
+                    .standardOut = &sink
+                });
             });
 
             unpackTarfile(*source, tmpDir);

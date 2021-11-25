@@ -19,7 +19,7 @@ struct CompareGoalPtrs {
 
 /* Set of goals. */
 typedef set<GoalPtr, CompareGoalPtrs> Goals;
-typedef list<WeakGoalPtr> WeakGoals;
+typedef set<WeakGoalPtr, std::owner_less<WeakGoalPtr>> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
 typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;

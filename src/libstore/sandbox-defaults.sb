@@ -32,7 +32,9 @@
        (literal "/tmp") (subpath TMPDIR))
 
 ; Some packages like to read the system version.
-(allow file-read* (literal "/System/Library/CoreServices/SystemVersion.plist"))
+(allow file-read*
+       (literal "/System/Library/CoreServices/SystemVersion.plist")
+       (literal "/System/Library/CoreServices/SystemVersionCompat.plist"))
 
 ; Without this line clang cannot write to /dev/null, breaking some configure tests.
 (allow file-read-metadata (literal "/dev"))
@@ -95,3 +97,8 @@
 ; This is used by /bin/sh on macOS 10.15 and later.
 (allow file*
        (literal "/private/var/select/sh"))
+
+; Allow Rosetta 2 to run x86_64 binaries on aarch64-darwin.
+(allow file-read*
+       (subpath "/Library/Apple/usr/libexec/oah")
+       (subpath "/System/Library/Apple/usr/libexec/oah"))

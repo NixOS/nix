@@ -186,8 +186,8 @@ Currently the `type` attribute can be one of the following:
   attribute `url`.
 
   In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`
-  or `.tar.bz2`.
+  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`,
+  `.tar.bz2` or `.tar.zst`.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -225,7 +225,7 @@ Currently the `type` attribute can be one of the following:
   [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
   ```
 
-  These perform a lookup of `<flake-id>` in the flake registry. or
+  These perform a lookup of `<flake-id>` in the flake registry. For
   example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
   references. The specified `rev` and/or `ref` are merged with the
   entry in the registry; see [nix registry](./nix3-registry.md) for

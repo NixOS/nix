@@ -227,8 +227,15 @@ struct ClientSettings
             try {
                 if (name == "ssh-auth-sock") // obsolete
                     ;
+                else if (name == settings.experimentalFeatures.name) {
+                    // We don’t want to forward the experimental features to
+                    // the daemon, as that could cause some pretty weird stuff
+                    if (parseFeatures(tokenizeString<StringSet>(value)) != settings.experimentalFeatures.get())
+                        debug("Ignoring the client-specified experimental features");
+                }
                 else if (trusted
                     || name == settings.buildTimeout.name
+                    || name == settings.buildRepeat.name
                     || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
@@ -243,27 +250,10 @@ struct ClientSettings
     }
 };
 
-static void writeValidPathInfo(
-    ref<Store> store,
-    unsigned int clientVersion,
-    Sink & to,
-    std::shared_ptr<const ValidPathInfo> info)
-{
-    to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-       << info->narHash.to_string(Base16, false);
-    worker_proto::write(*store, to, info->references);
-    to << info->registrationTime << info->narSize;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-        to << info->ultimate
-           << info->sigs
-           << renderContentAddress(info->ca);
-    }
-}
-
 static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
 {
     std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
         reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
     } else {
         for (auto & s : readStrings<Strings>(from))
@@ -406,25 +396,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
-                    [&](TextHashMethod &_) {
+                    [&](TextHashMethod &) {
                         // We could stream this by changing Store
                         std::string contents = source.drain();
                         auto path = store->addTextToStore(name, contents, refs, repair);
                         return store->queryPathInfo(path);
                     },
-                    [&](FixedOutputHashMethod &fohm) {
-                        if (!refs.empty())
-                            throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
-                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                    [&](FixedOutputHashMethod & fohm) {
+                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair, refs);
                         return store->queryPathInfo(path);
                     },
                 }, contentAddressMethod);
             }();
             logger->stopWork();
 
-            to << store->printStorePath(pathInfo->path);
-            writeValidPathInfo(store, clientVersion, to, pathInfo);
-
+            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -468,6 +454,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
             to << store->printStorePath(path);
         }
+        break;
+    }
+
+    case wopAddMultipleToStore: {
+        bool repair, dontCheckSigs;
+        from >> repair >> dontCheckSigs;
+        if (!trusted && dontCheckSigs)
+            dontCheckSigs = false;
+
+        logger->startWork();
+        FramedSource source(from);
+        store->addMultipleToStore(source,
+            RepairFlag{repair},
+            dontCheckSigs ? NoCheckSigs : CheckSigs);
+        logger->stopWork();
         break;
     }
 
@@ -622,9 +623,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    // Obsolete.
     case wopSyncWithGC: {
         logger->startWork();
-        store->syncWithGC();
         logger->stopWork();
         to << 1;
         break;
@@ -770,7 +771,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            writeValidPathInfo(store, clientVersion, to, info);
+            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
@@ -885,10 +886,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopRegisterDrvOutput: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(from));
-        auto outputPath = StorePath(readString(from));
-        store->registerDrvOutput(Realisation{
-            .id = outputId, .outPath = outputPath});
+        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+            auto outputId = DrvOutput::parse(readString(from));
+            auto outputPath = StorePath(readString(from));
+            store->registerDrvOutput(Realisation{
+                .id = outputId, .outPath = outputPath});
+        } else {
+            auto realisation = worker_proto::read(*store, from, Phantom<Realisation>());
+            store->registerDrvOutput(realisation);
+        }
         logger->stopWork();
         break;
     }
@@ -898,9 +904,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto outputId = DrvOutput::parse(readString(from));
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
-        std::set<StorePath> outPaths;
-        if (info) outPaths.insert(info->outPath);
-        worker_proto::write(*store, to, outPaths);
+        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+            std::set<StorePath> outPaths;
+            if (info) outPaths.insert(info->outPath);
+            worker_proto::write(*store, to, outPaths);
+        } else {
+            std::set<Realisation> realisations;
+            if (info) realisations.insert(*info);
+            worker_proto::write(*store, to, realisations);
+        }
         break;
     }
 

@@ -11,8 +11,8 @@
   [`--command` *cmd*]
   [`--run` *cmd*]
   [`--exclude` *regexp*]
-  [--pure]
-  [--keep *name*]
+  [`--pure`]
+  [`--keep` *name*]
   {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
 # Description
@@ -78,9 +78,7 @@ All options not listed here are passed to `nix-store
     cleared before the interactive shell is started, so you get an
     environment that more closely corresponds to the “real” Nix build. A
     few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained. Note that (depending on your Bash
-    installation) `/etc/bashrc` is still sourced, so any variables set
-    there will affect the interactive shell.
+    retained.
 
   - `--packages` / `-p` *packages*…\
     Set up an environment in which the specified packages are present.
@@ -112,12 +110,18 @@ shell in which to build it:
 
 ```console
 $ nix-shell '<nixpkgs>' -A pan
-[nix-shell]$ unpackPhase
+[nix-shell]$ eval ${unpackPhase:-unpackPhase}
 [nix-shell]$ cd pan-*
-[nix-shell]$ configurePhase
-[nix-shell]$ buildPhase
+[nix-shell]$ eval ${configurePhase:-configurePhase}
+[nix-shell]$ eval ${buildPhase:-buildPhase}
 [nix-shell]$ ./pan/gui/pan
 ```
+
+The reason we use form `eval ${configurePhase:-configurePhase}` here is because
+those packages that override these phases do so by exporting the overridden
+values in the environment variable of the same name.
+Here bash is being told to either evaluate the contents of 'configurePhase',
+if it exists as a variable, otherwise evaluate the configurePhase function.
 
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:

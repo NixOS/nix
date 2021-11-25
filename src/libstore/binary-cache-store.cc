@@ -52,9 +52,9 @@ void BinaryCacheStore::init()
                     throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
-                wantMassQuery.setDefault(value == "1" ? "true" : "false");
+                wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
-                priority.setDefault(fmt("%d", std::stoi(value)));
+                priority.setDefault(std::stoi(value));
             }
         }
     }
@@ -111,15 +111,15 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    std::string hashPart(narInfo->path.hashPart());
-
     {
         auto state_(state.lock());
-        state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
+        state_->pathInfoCache.upsert(
+            std::string(narInfo->path.to_string()),
+            PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
     }
 
     if (diskCache)
-        diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
+        diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
 }
 
 AutoCloseFD openFile(const Path & path)
@@ -129,17 +129,6 @@ AutoCloseFD openFile(const Path & path)
         throw SysError("opening file '%1%'", path);
     return fd;
 }
-
-struct FileSource : FdSource
-{
-    AutoCloseFD fd2;
-
-    FileSource(const Path & path)
-        : fd2(openFile(path))
-    {
-        fd = fd2.get();
-    }
-};
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
@@ -160,7 +149,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSinkCompressed { fileSink, fileHashSink };
-    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed);
+    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed, parallelCompression, compressionLevel);
     TeeSink teeSinkUncompressed { *compressionSink, narHashSink };
     TeeSource teeSource { narSource, teeSinkUncompressed };
     narAccessor = makeNarAccessor(teeSource);
@@ -319,16 +308,17 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 }
 
 StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name),
+            makeFixedOutputPath(method, nar.first, name, references),
             nar.first,
         };
         info.narSize = nar.second;
+        info.references = references;
         return info;
     })->path;
 }
@@ -396,7 +386,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, const StorePathSet & references)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
@@ -415,10 +405,11 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name),
+            makeFixedOutputPath(method, h, name, references),
             nar.first,
         };
         info.narSize = nar.second;
+        info.references = references;
         info.ca = FixedOutputHash {
             .method = method,
             .hash = h,
@@ -448,20 +439,34 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
-std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
+void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
-    auto rawOutputInfo = getFile(outputInfoFilePath);
 
-    if (rawOutputInfo) {
-        return {Realisation::fromJSON(
-            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath)};
-    } else {
-        return std::nullopt;
-    }
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+    Callback<std::shared_ptr<std::string>> newCallback = {
+        [=](std::future<std::shared_ptr<std::string>> fut) {
+            try {
+                auto data = fut.get();
+                if (!data) return (*callbackPtr)(nullptr);
+
+                auto realisation = Realisation::fromJSON(
+                    nlohmann::json::parse(*data), outputInfoFilePath);
+                return (*callbackPtr)(std::make_shared<const Realisation>(realisation));
+            } catch (...) {
+                callbackPtr->rethrow();
+            }
+        }
+    };
+
+    getFile(outputInfoFilePath, std::move(newCallback));
 }
 
 void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
+    if (diskCache)
+        diskCache->upsertRealisation(getUri(), info);
     auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
     upsertFile(filePath, info.toJSON().dump(), "application/json");
 }

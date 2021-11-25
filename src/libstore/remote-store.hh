@@ -73,19 +73,25 @@ public:
 
     /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
     StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
+
+    void addMultipleToStore(
+        Source & source,
+        RepairFlag repair,
+        CheckSigsFlag checkSigs) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override;
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -95,8 +101,6 @@ public:
     void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
-
-    void syncWithGC() override;
 
     Roots findRoots(bool censor) override;
 
@@ -120,13 +124,14 @@ public:
 
     struct Connection
     {
-        AutoCloseFD fd;
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 
         virtual ~Connection();
+
+        virtual void closeWrite() = 0;
 
         std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };
@@ -143,6 +148,8 @@ protected:
 
     virtual void setOptions(Connection & conn);
 
+    void setOptions() override;
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
@@ -150,8 +157,6 @@ protected:
     virtual ref<FSAccessor> getFSAccessor() override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
-
-    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
 
 private:
 

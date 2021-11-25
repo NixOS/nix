@@ -180,6 +180,8 @@ struct StoreConfig : public Config
 
     StoreConfig() = delete;
 
+    StringSet getDefaultSystemFeatures();
+
     virtual ~StoreConfig() { }
 
     virtual const std::string name() = 0;
@@ -196,7 +198,7 @@ struct StoreConfig : public Config
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
-    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
 
@@ -230,7 +232,6 @@ protected:
 
     struct State
     {
-        // FIXME: fix key
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
@@ -368,6 +369,14 @@ public:
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
+    /* Query the information about a realisation. */
+    std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
+
+    /* Asynchronous version of queryRealisation(). */
+    void queryRealisation(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept;
+
+
     /* Check whether the given valid path info is sufficiently attested, by
        either being signed by a trusted public key or content-addressed, in
        order to be included in the given store.
@@ -392,10 +401,10 @@ protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+    virtual void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
 
 public:
-
-    virtual std::optional<const Realisation> queryRealisation(const DrvOutput &) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -428,9 +437,10 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a map of paths to their optional ca values. If a path
-       does not have substitute info, it's omitted from the resulting
-       ‘infos’ map. */
+       sizes) of a map of paths to their optional ca values. The info
+       of the first succeeding substituter for each path will be
+       returned. If a path does not have substitute info, it's omitted
+       from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) { return; };
 
@@ -438,13 +448,19 @@ public:
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
+    /* Import multiple paths into the store. */
+    virtual void addMultipleToStore(
+        Source & source,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet());
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -460,7 +476,8 @@ public:
        `dump` may be drained */
     // FIXME: remove?
     virtual StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
@@ -495,7 +512,8 @@ public:
        not derivations, substitute them. */
     virtual void buildPaths(
         const std::vector<DerivedPath> & paths,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
 
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).
@@ -541,7 +559,7 @@ public:
     /* Add a store path as a temporary root of the garbage collector.
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
-    { warn("not creating temp root, store doesn't support GC"); }
+    { debug("not creating temporary root, store doesn't support GC"); }
 
     /* Add an indirect root, which is merely a symlink to `path' from
        /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
@@ -550,26 +568,6 @@ public:
        `path' has disappeared. */
     virtual void addIndirectRoot(const Path & path)
     { unsupported("addIndirectRoot"); }
-
-    /* Acquire the global GC lock, then immediately release it.  This
-       function must be called after registering a new permanent root,
-       but before exiting.  Otherwise, it is possible that a running
-       garbage collector doesn't see the new root and deletes the
-       stuff we've just built.  By acquiring the lock briefly, we
-       ensure that either:
-
-       - The collector is already running, and so we block until the
-         collector is finished.  The collector will know about our
-         *temporary* locks, which should include whatever it is we
-         want to register as a permanent lock.
-
-       - The collector isn't running, or it's just started but hasn't
-         acquired the GC lock yet.  In that case we get and release
-         the lock right away, then exit.  The collector scans the
-         permanent root and sees ours.
-
-       In either case the permanent root is seen by the collector. */
-    virtual void syncWithGC() { };
 
     /* Find the roots of the garbage collector.  Each root is a pair
        (link, storepath) where `link' is the path of the symlink
@@ -695,6 +693,11 @@ public:
 
     const Stats & getStats();
 
+    /* Computes the full closure of of a set of store-paths for e.g.
+       derivations that need this information for `exportReferencesGraph`.
+     */
+    StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
+
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
     virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
@@ -730,6 +733,11 @@ public:
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 
+    /*
+     * Synchronises the options of the client with those of the daemon
+     * (a no-op when there’s no daemon)
+     */
+    virtual void setOptions() { }
 protected:
 
     Stats stats;
@@ -744,8 +752,12 @@ protected:
 
 
 /* Copy a path from one store to another. */
-void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+void copyStorePath(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePath & storePath,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs);
 
 
 /* Copy store paths from one store to another. The paths may be copied
@@ -754,17 +766,27 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
    of store paths is not automatically closed; use copyClosure() for
    that. Returns a map of what each path was copied to the dstStore
    as. */
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+std::map<StorePath, StorePath> copyPaths(
+    Store & srcStore, Store & dstStore,
     const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet& paths,
+
+std::map<StorePath, StorePath> copyPaths(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
+/* Copy the closure of `paths` from `srcStore` to `dstStore`. */
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
 
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered
@@ -863,5 +885,10 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath);
 
 }

@@ -125,7 +125,7 @@ Special exit codes:
 
   - `104`\
     Not deterministic, the build succeeded in check mode but the
-    resulting output is not binary reproducable.
+    resulting output is not binary reproducible.
 
 With the `--keep-going` flag it's possible for multiple failures to
 occur, in this case the 1xx status codes are or combined using binary

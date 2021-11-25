@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <iomanip>
 
 using namespace nix;
 
@@ -97,10 +98,8 @@ struct ProfileManifest
 
         else if (pathExists(profile + "/manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            if (state.allowedPaths) {
-                state.allowedPaths->insert(state.store->followLinksToStore(profile));
-                state.allowedPaths->insert(state.store->followLinksToStore(profile + "/manifest.nix"));
-            }
+            state.allowPath(state.store->followLinksToStore(profile));
+            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
             auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 
@@ -253,17 +252,17 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                 manifest.elements.emplace_back(std::move(element));
             } else {
-                auto buildables = build(store, Realise::Outputs, {installable}, bmNormal);
+                auto buildables = build(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal);
 
                 for (auto & buildable : buildables) {
                     ProfileElement element;
 
                     std::visit(overloaded {
-                        [&](DerivedPathWithHints::Opaque bo) {
+                        [&](const BuiltPath::Opaque & bo) {
                             pathsToBuild.push_back(bo);
                             element.storePaths.insert(bo.path);
                         },
-                        [&](DerivedPathWithHints::Built bfd) {
+                        [&](const BuiltPath::Built & bfd) {
                             // TODO: Why are we querying if we know the output
                             // names already? Is it just to figure out what the
                             // default one is?
@@ -426,7 +425,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     attrPath,
                 };
 
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {"out"}}); // FIXME
+                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {drv.outputName}});
             }
         }
 
@@ -528,10 +527,11 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
             if (!first) std::cout << "\n";
             first = false;
 
-            if (prevGen)
-                std::cout << fmt("Version %d -> %d:\n", prevGen->first.number, gen.number);
-            else
-                std::cout << fmt("Version %d:\n", gen.number);
+            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+                gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
+                gen.number,
+                std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
+                prevGen ? fmt(" <- %d", prevGen->first.number) : "");
 
             ProfileManifest::printDiff(
                 prevGen ? prevGen->second : ProfileManifest(),
@@ -540,6 +540,76 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
 
             prevGen = {gen, std::move(manifest)};
         }
+    }
+};
+
+struct CmdProfileRollback : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<GenerationNumber> version;
+
+    CmdProfileRollback()
+    {
+        addFlag({
+            .longName = "to",
+            .description = "The profile version to roll back to.",
+            .labels = {"version"},
+            .handler = {&version},
+        });
+    }
+
+    std::string description() override
+    {
+        return "roll back to the previous version or a specified version of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-rollback.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        switchGeneration(*profile, version, dryRun);
+    }
+};
+
+struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<std::string> minAge;
+
+    CmdProfileWipeHistory()
+    {
+        addFlag({
+            .longName = "older-than",
+            .description =
+                "Delete versions older than the specified age. *age* "
+                "must be in the format *N*`d`, where *N* denotes a number "
+                "of days.",
+            .labels = {"age"},
+            .handler = {&minAge},
+        });
+    }
+
+    std::string description() override
+    {
+        return "delete non-current versions of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-wipe-history.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        if (minAge)
+            deleteGenerationsOlderThan(*profile, *minAge, dryRun);
+        else
+            deleteOldGenerations(*profile, dryRun);
     }
 };
 
@@ -553,6 +623,8 @@ struct CmdProfile : NixMultiCommand
               {"list", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
               {"history", []() { return make_ref<CmdProfileHistory>(); }},
+              {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
+              {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
           })
     { }
 

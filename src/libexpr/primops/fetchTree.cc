@@ -7,6 +7,7 @@
 
 #include <ctime>
 #include <iomanip>
+#include <regex>
 
 namespace nix {
 
@@ -15,7 +16,8 @@ void emitTreeAttrs(
     const fetchers::Tree & tree,
     const fetchers::Input & input,
     Value & v,
-    bool emptyRevFallback)
+    bool emptyRevFallback,
+    bool forceDirty)
 {
     assert(input.isImmutable());
 
@@ -32,24 +34,28 @@ void emitTreeAttrs(
     mkString(*state.allocAttr(v, state.symbols.create("narHash")),
         narHash->to_string(SRI, true));
 
-    if (auto rev = input.getRev()) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
-    } else if (emptyRevFallback) {
-        // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
-        auto emptyHash = Hash(htSHA1);
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
-    }
-
     if (input.getType() == "git")
         mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
-    if (auto revCount = input.getRevCount())
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
-    else if (emptyRevFallback)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+    if (!forceDirty) {
+
+        if (auto rev = input.getRev()) {
+            mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
+            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
+        } else if (emptyRevFallback) {
+            // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
+            auto emptyHash = Hash(htSHA1);
+            mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
+            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
+        }
+
+        if (auto revCount = input.getRevCount())
+            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
+        else if (emptyRevFallback)
+            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+
+    }
 
     if (auto lastModified = input.getLastModified()) {
         mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
@@ -60,47 +66,74 @@ void emitTreeAttrs(
     v.attrs->sort();
 }
 
-std::string fixURI(std::string uri, EvalState &state)
+std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : "file://" + uri;
+    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
 }
 
-void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v)
+std::string fixURIForGit(std::string uri, EvalState & state)
 {
-    string n(name);
-    attrs.emplace(name, n == "url" ? fixURI(v, state) : v);
+    /* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
+     * them by removing the `:` and assuming a scheme of `ssh://`
+     * */
+    static std::regex scp_uri("([^/]*)@(.*):(.*)");
+    if (uri[0] != '/' && std::regex_match(uri, scp_uri))
+        return fixURI(std::regex_replace(uri, scp_uri, "$1@$2/$3"), state, "ssh");
+    else
+        return fixURI(uri, state);
 }
+
+struct FetchTreeParams {
+    bool emptyRevFallback = false;
+    bool allowNameArgument = false;
+};
 
 static void fetchTree(
-    EvalState &state,
-    const Pos &pos,
-    Value **args,
-    Value &v,
-    const std::optional<std::string> type,
-    bool emptyRevFallback = false
+    EvalState & state,
+    const Pos & pos,
+    Value * * args,
+    Value & v,
+    std::optional<std::string> type,
+    const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
     PathSet context;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
         state.forceAttrs(*args[0], pos);
 
         fetchers::Attrs attrs;
 
+        if (auto aType = args[0]->attrs->get(state.sType)) {
+            if (type)
+                throw Error({
+                    .msg = hintfmt("unexpected attribute 'type'"),
+                    .errPos = pos
+                });
+            type = state.forceStringNoCtx(*aType->value, *aType->pos);
+        } else if (!type)
+            throw Error({
+                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .errPos = pos
+            });
+
+        attrs.emplace("type", type.value());
+
         for (auto & attr : *args[0]->attrs) {
-            state.forceValue(*attr.value);
-            if (attr.value->type() == nPath || attr.value->type() == nString)
-                addURI(
-                    state,
-                    attrs,
-                    attr.name,
-                    state.coerceToString(*attr.pos, *attr.value, context, false, false)
-                );
-            else if (attr.value->type() == nString)
-                addURI(state, attrs, attr.name, attr.value->string.s);
+            if (attr.name == state.sType) continue;
+            state.forceValue(*attr.value, *attr.pos);
+            if (attr.value->type() == nPath || attr.value->type() == nString) {
+                auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                attrs.emplace(attr.name,
+                    attr.name == "url"
+                    ? type == "git"
+                      ? fixURIForGit(s, state)
+                      : fixURI(s, state)
+                    : s);
+            }
             else if (attr.value->type() == nBool)
                 attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
@@ -110,26 +143,24 @@ static void fetchTree(
                     attr.name, showType(*attr.value));
         }
 
-        if (type)
-            attrs.emplace("type", type.value());
-
-        if (!attrs.count("type"))
-            throw Error({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = pos
-            });
+        if (!params.allowNameArgument)
+            if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
+                throw Error({
+                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
+                    .errPos = pos
+                });
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = fixURI(state.coerceToString(pos, *args[0], context, false, false), state);
+        auto url = state.coerceToString(pos, *args[0], context, false, false);
 
         if (type == "git") {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", url);
+            attrs.emplace("url", fixURIForGit(url, state));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(fixURI(url, state));
         }
     }
 
@@ -141,16 +172,15 @@ static void fetchTree(
 
     auto [tree, input2] = input.fetch(state.store);
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(tree.actualPath);
+    state.allowPath(tree.storePath);
 
-    emitTreeAttrs(state, tree, input2, v, emptyRevFallback);
+    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature("flakes");
-    fetchTree(state, pos, args, v, std::nullopt);
+    settings.requireExperimentalFeature(Xp::Flakes);
+    fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
 // FIXME: document
@@ -162,7 +192,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
 
-    state.forceValue(*args[0]);
+    state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
 
@@ -206,20 +236,18 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(storePath);
-
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, path);
+            : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(path);
+    state.allowPath(storePath);
 
+    auto path = state.store->printStorePath(storePath);
     mkString(v, path, PathSet({path}));
 }
 
@@ -262,13 +290,13 @@ static RegisterPrimOp primop_fetchTarball({
       stdenv.mkDerivation { … }
       ```
 
-      The fetched tarball is cached for a certain amount of time (1 hour
-      by default) in `~/.cache/nix/tarballs/`. You can change the cache
-      timeout either on the command line with `--option tarball-ttl number
-      of seconds` or in the Nix configuration file with this option: ` 
-      number of seconds to cache `.
+      The fetched tarball is cached for a certain amount of time (1
+      hour by default) in `~/.cache/nix/tarballs/`. You can change the
+      cache timeout either on the command line with `--tarball-ttl`
+      *number-of-seconds* or in the Nix configuration file by adding
+      the line `tarball-ttl = ` *number-of-seconds*.
 
-      Note that when obtaining the hash with ` nix-prefetch-url ` the
+      Note that when obtaining the hash with `nix-prefetch-url` the
       option `--unpack` is required.
 
       This function can also verify the contents against a hash. In that
@@ -292,7 +320,7 @@ static RegisterPrimOp primop_fetchTarball({
 
 static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
 {
-    fetchTree(state, pos, args, v, "git", true);
+    fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }
 
 static RegisterPrimOp primop_fetchGit({
@@ -368,7 +396,7 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > It is nice to always specify the branch which a revision
           > belongs to. Without the branch being specified, the fetcher
           > might fail if the default branch changes. Additionally, it can
@@ -405,12 +433,12 @@ static RegisterPrimOp primop_fetchGit({
           ```
 
           > **Note**
-          > 
+          >
           > Nix will refetch the branch in accordance with
           > the option `tarball-ttl`.
 
           > **Note**
-          > 
+          >
           > This behavior is disabled in *Pure evaluation mode*.
     )",
     .fun = prim_fetchGit,

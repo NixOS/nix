@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -43,15 +44,6 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     }
 
     void set(const std::string & str, bool append = false) override;
-};
-
-class MissingExperimentalFeature: public Error
-{
-public:
-    std::string missingFeature;
-
-    MissingExperimentalFeature(std::string feature);
-    virtual const char* sname() const override { return "MissingExperimentalFeature"; }
 };
 
 class Settings : public Config {
@@ -617,8 +609,10 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. The default
-          is `https://cache.nixos.org`.
+          A list of URLs of substituters, separated by whitespace. Substituters
+          are tried based on their Priority value, which each substituter can set
+          independently. Lower value means higher priority.
+          The default is `https://cache.nixos.org`, with a Priority of 40.
         )",
         {"binary-caches"}};
 
@@ -923,12 +917,12 @@ public:
           value.
           )"};
 
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
-    void requireExperimentalFeature(const std::string & name);
+    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<bool> allowDirty{this, true, "allow-dirty",
         "Whether to allow dirty Git/Mercurial trees."};
@@ -954,6 +948,12 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
+
+    Setting<bool> useRegistries{this, true, "use-registries",
+        "Whether to use flake registries to resolve flake references."};
+
+    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
+        "Whether to accept nix configuration from a flake without prompting."};
 };
 
 

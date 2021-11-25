@@ -47,13 +47,18 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     bool startReplOnEvalErrors = false;
 
-    ref<EvalState> getEvalState();
-
     EvalCommand();
 
-    std::shared_ptr<EvalState> evalState;
-
     ~EvalCommand();
+
+    ref<Store> getEvalStore();
+
+    ref<EvalState> getEvalState();
+
+private:
+    std::shared_ptr<Store> evalStore;
+
+    std::shared_ptr<EvalState> evalState;
 };
 
 struct MixFlakeOptions : virtual Args, EvalCommand
@@ -105,6 +110,8 @@ enum class Realise {
        exists. */
     Derivation,
     /* Evaluate in dry-run mode. Postcondition: nothing. */
+    // FIXME: currently unused, but could be revived if we can
+    // evaluate derivations in-memory.
     Nothing
 };
 
@@ -147,7 +154,7 @@ private:
 };
 
 /* A command that operates on zero or more store paths. */
-struct RealisedPathsCommand : public InstallablesCommand
+struct BuiltPathsCommand : public InstallablesCommand
 {
 private:
 
@@ -160,26 +167,26 @@ protected:
 
 public:
 
-    RealisedPathsCommand(bool recursive = false);
+    BuiltPathsCommand(bool recursive = false);
 
     using StoreCommand::run;
 
-    virtual void run(ref<Store> store, std::vector<RealisedPath> paths) = 0;
+    virtual void run(ref<Store> store, BuiltPaths && paths) = 0;
 
     void run(ref<Store> store) override;
 
     bool useDefaultInstallables() override { return !all; }
 };
 
-struct StorePathsCommand : public RealisedPathsCommand
+struct StorePathsCommand : public BuiltPathsCommand
 {
     StorePathsCommand(bool recursive = false);
 
-    using RealisedPathsCommand::run;
+    using BuiltPathsCommand::run;
 
-    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
+    virtual void run(ref<Store> store, std::vector<StorePath> && storePaths) = 0;
 
-    void run(ref<Store> store, std::vector<RealisedPath> paths) override;
+    void run(ref<Store> store, BuiltPaths && paths) override;
 };
 
 /* A command that operates on exactly one store path. */
@@ -189,7 +196,7 @@ struct StorePathCommand : public StorePathsCommand
 
     virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
-    void run(ref<Store> store, std::vector<StorePath> storePaths) override;
+    void run(ref<Store> store, std::vector<StorePath> && storePaths) override;
 };
 
 /* A helper class for registering commands globally. */
@@ -220,26 +227,37 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-DerivedPathsWithHints build(ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
+BuiltPaths build(
+    ref<Store> evalStore,
+    ref<Store> store, Realise mode,
+    const std::vector<std::shared_ptr<Installable>> & installables,
+    BuildMode bMode = bmNormal);
 
-std::set<StorePath> toStorePaths(ref<Store> store,
-    Realise mode, OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables);
-
-StorePath toStorePath(ref<Store> store,
-    Realise mode, OperateOn operateOn,
-    std::shared_ptr<Installable> installable);
-
-std::set<StorePath> toDerivations(ref<Store> store,
-    std::vector<std::shared_ptr<Installable>> installables,
-    bool useDeriver = false);
-
-std::set<RealisedPath> toRealisedPaths(
+std::set<StorePath> toStorePaths(
+    ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables);
+    const std::vector<std::shared_ptr<Installable>> & installables);
+
+StorePath toStorePath(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode,
+    OperateOn operateOn,
+    std::shared_ptr<Installable> installable);
+
+std::set<StorePath> toDerivations(
+    ref<Store> store,
+    const std::vector<std::shared_ptr<Installable>> & installables,
+    bool useDeriver = false);
+
+BuiltPaths toBuiltPaths(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode,
+    OperateOn operateOn,
+    const std::vector<std::shared_ptr<Installable>> & installables);
 
 /* Helper function to generate args that invoke $EDITOR on
    filename:lineno. */
@@ -256,7 +274,7 @@ struct MixProfile : virtual StoreCommand
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const DerivedPathsWithHints & buildables);
+    void updateProfile(const BuiltPaths & buildables);
 };
 
 struct MixDefaultProfile : MixProfile

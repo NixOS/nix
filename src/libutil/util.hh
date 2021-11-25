@@ -259,10 +259,10 @@ void killUser(uid_t uid);
    pid to the caller. */
 struct ProcessOptions
 {
-    string errorPrefix = "error: ";
+    string errorPrefix = "";
     bool dieWithParent = true;
     bool runExitHandlers = false;
-    bool allowVfork = true;
+    bool allowVfork = false;
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -276,26 +276,20 @@ string runProgram(Path program, bool searchPath = false,
 
 struct RunOptions
 {
+    Path program;
+    bool searchPath = true;
+    Strings args;
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
     std::optional<Path> chdir;
     std::optional<std::map<std::string, std::string>> environment;
-    Path program;
-    bool searchPath = true;
-    Strings args;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
-    bool _killStderr = false;
-
-    RunOptions(const Path & program, const Strings & args)
-        : program(program), args(args) { };
-
-    RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
 };
 
-std::pair<int, std::string> runProgram(const RunOptions & options);
+std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
 
@@ -306,7 +300,15 @@ void setStackSize(size_t stackSize);
 
 /* Restore the original inherited Unix process context (such as signal
    masks, stack size, CPU affinity). */
-void restoreProcessContext();
+void restoreProcessContext(bool restoreMounts = true);
+
+/* Save the current mount namespace. Ignored if called more than
+   once. */
+void saveMountNamespace();
+
+/* Restore the mount namespace saved by saveMountNamespace(). Ignored
+   if saveMountNamespace() was never called. */
+void restoreMountNamespace();
 
 
 class ExecError : public Error
@@ -335,7 +337,7 @@ void closeOnExec(int fd);
 
 /* User interruption. */
 
-extern bool _isInterrupted;
+extern std::atomic<bool> _isInterrupted;
 
 extern thread_local std::function<bool()> interruptCheck;
 
@@ -482,6 +484,9 @@ constexpr char treeLast[] = "└───";
 constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
+/* Determine whether ANSI escape sequences are appropriate for the
+   present output. */
+bool shouldANSI();
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,
@@ -511,6 +516,29 @@ std::optional<typename T::mapped_type> get(const T & map, const typename T::key_
     auto i = map.find(key);
     if (i == map.end()) return {};
     return std::optional<typename T::mapped_type>(i->second);
+}
+
+
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> remove_begin(T & c)
+{
+    auto i = c.begin();
+    if (i == c.end()) return {};
+    auto v = std::move(*i);
+    c.erase(i);
+    return v;
+}
+
+
+/* Remove and return the first item from a container. */
+template <class T>
+std::optional<typename T::value_type> pop(T & c)
+{
+    if (c.empty()) return {};
+    auto v = std::move(c.front());
+    c.pop();
+    return v;
 }
 
 
@@ -574,8 +602,17 @@ extern PathFilter defaultPathFilter;
 /* Common initialisation performed in child processes. */
 void commonChildInit(Pipe & logPipe);
 
+/* Create a Unix domain socket. */
+AutoCloseFD createUnixDomainSocket();
+
 /* Create a Unix domain socket in listen mode. */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+/* Bind a Unix domain socket to a path. */
+void bind(int fd, const std::string & path);
+
+/* Connect to a Unix domain socket. */
+void connect(int fd, const std::string & path);
 
 
 // A Rust/Python-like enumerate() iterator adapter.

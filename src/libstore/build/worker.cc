@@ -9,11 +9,12 @@
 
 namespace nix {
 
-Worker::Worker(Store & store)
+Worker::Worker(Store & store, Store & evalStore)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
+    , evalStore(evalStore)
 {
     /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
@@ -238,7 +239,7 @@ void Worker::run(const Goals & _topGoals)
         }
     }
 
-    /* Call queryMissing() efficiently query substitutes. */
+    /* Call queryMissing() to efficiently query substitutes. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
     store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);

@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "the sandbox only runs on the builder side, so it makes no sense to test it with the daemon"
+
 clearStore
 
 if ! canUseSandbox; then exit 99; fi

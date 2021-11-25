@@ -64,7 +64,7 @@ Nix has the following basic data types:
     the start of each line. To be precise, it strips from each line a
     number of spaces equal to the minimal indentation of the string as a
     whole (disregarding the indentation of empty lines). For instance,
-    the first and second line are indented two space, while the third
+    the first and second line are indented two spaces, while the third
     line is indented four spaces. Thus, two spaces are stripped from
     each line, so the resulting string is
     
@@ -138,6 +138,13 @@ Nix has the following basic data types:
     `<nixpkgs>`. This means that the directories listed in the
     environment variable `NIX_PATH` will be searched for the given file
     or directory name.
+
+    Antiquotation is supported in any paths except those in angle brackets.
+    `./${foo}-${bar}.nix` is a more convenient way of writing 
+    `./. + "/" + foo + "-" + bar + ".nix"` or `./. + "/${foo}-${bar}.nix"`. At
+    least one slash must appear *before* any antiquotations for this to be
+    recognized as a path. `a.${foo}/b.${bar}` is a syntactically valid division
+    operation. `./a.${foo}/b.${bar}` is a path.
 
   - *Booleans* with values `true` and `false`.
 

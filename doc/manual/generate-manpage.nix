@@ -1,4 +1,4 @@
-command:
+{ command, renderLinks ? false }:
 
 with builtins;
 with import ./utils.nix;
@@ -20,7 +20,11 @@ let
            categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues def.commands)));
            listCommands = cmds:
              concatStrings (map (name:
-               "* [`${command} ${name}`](./${appendName filename name}.md) - ${cmds.${name}.description}\n")
+               "* "
+               + (if renderLinks
+                  then "[`${command} ${name}`](./${appendName filename name}.md)"
+                  else "`${command} ${name}`")
+               + " - ${cmds.${name}.description}\n")
                (attrNames cmds));
          in
          "where *subcommand* is one of the following:\n\n"
@@ -89,7 +93,7 @@ let
 in
 
 let
-  manpages = processCommand { filename = "nix"; command = "nix"; def = command; };
+  manpages = processCommand { filename = "nix"; command = "nix"; def = builtins.fromJSON command; };
   summary = concatStrings (map (manpage: "    - [${manpage.command}](command-ref/new-cli/${manpage.name})\n") manpages);
 in
 (listToAttrs manpages) // { "SUMMARY.md" = summary; }

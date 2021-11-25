@@ -138,8 +138,8 @@ struct Derivation : BasicDerivation
 
     /* Return the underlying basic derivation but with these changes:
 
-	   1. Input drvs are emptied, but the outputs of them that were used are
-	      added directly to input sources.
+       1. Input drvs are emptied, but the outputs of them that were used are
+          added directly to input sources.
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);

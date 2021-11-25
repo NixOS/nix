@@ -33,11 +33,9 @@ namespace nix {
         Symbol file;
         FileOrigin origin;
         std::optional<ErrorInfo> error;
-        Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
-            , sLetBody(symbols.create("<let-body>"))
             { };
     };
 
@@ -126,14 +124,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
                         dupAttr(ad.first, j2->second.pos, ad.second.pos);
-                    jAttrs->attrs[ad.first] = ad.second;
+                    jAttrs->attrs.emplace(ad.first, ad.second);
                 }
             } else {
                 dupAttr(attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
-            attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
+            attrs->attrs.emplace(i->symbol, ExprAttrs::AttrDef(e, pos));
             e->setName(i->symbol);
         }
     } else {
@@ -283,20 +281,20 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 }
 
 %type <e> start expr expr_function expr_if expr_op
-%type <e> expr_app expr_select expr_simple
+%type <e> expr_select expr_simple expr_app
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts_interpolated ind_string_parts
-%type <e> string_parts string_attr
+%type <e> path_start string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
-%token <path> PATH HPATH SPATH
+%token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
@@ -324,13 +322,13 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), true, $2, $5); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), $2, $5); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), true, $2, $7); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), $2, $7); }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), true, $4, $7); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), $4, $7); }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
@@ -353,13 +351,13 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-  | '-' expr_op %prec NEGATE { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
+  | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
   | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
@@ -367,17 +365,22 @@ expr_op
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
     { $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>({$1, $3})); }
-  | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
+  | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
   | expr_app
   ;
 
 expr_app
-  : expr_app expr_select
-    { $$ = new ExprApp(CUR_POS, $1, $2); }
-  | expr_select { $$ = $1; }
+  : expr_app expr_select {
+      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
+          e2->args.push_back($2);
+          $$ = $1;
+      } else
+          $$ = new ExprCall(CUR_POS, $1, {$2});
+  }
+  | expr_select
   ;
 
 expr_select
@@ -388,7 +391,7 @@ expr_select
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
+    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, data->symbols.create("or"))}); }
   | expr_simple { $$ = $1; }
   ;
 
@@ -405,17 +408,20 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
-  | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
-  | HPATH { $$ = new ExprPath(getHome() + string{$1 + 1}); }
+  | path_start PATH_END { $$ = $1; }
+  | path_start string_parts_interpolated PATH_END {
+      $2->insert($2->begin(), $1);
+      $$ = new ExprConcatStrings(CUR_POS, false, $2);
+  }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
-      $$ = new ExprApp(CUR_POS,
-          new ExprApp(new ExprVar(data->symbols.create("__findFile")),
-              new ExprVar(data->symbols.create("__nixPath"))),
-          new ExprString(data->symbols.create(path)));
+      $$ = new ExprCall(CUR_POS,
+          new ExprVar(data->symbols.create("__findFile")),
+          {new ExprVar(data->symbols.create("__nixPath")),
+           new ExprString(data->symbols.create(path))});
   }
   | URI {
-      static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
+      static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
@@ -452,6 +458,20 @@ string_parts_interpolated
     }
   ;
 
+path_start
+  : PATH {
+    Path path(absPath($1, data->basePath));
+    /* add back in the trailing '/' to the first segment */
+    if ($1[strlen($1)-1] == '/' && strlen($1) > 1)
+      path += "/";
+    $$ = new ExprPath(path);
+  }
+  | HPATH {
+    Path path(getHome() + string($1 + 1));
+    $$ = new ExprPath(path);
+  }
+  ;
+
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
@@ -466,7 +486,7 @@ binds
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               dupAttr(i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true);
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
@@ -475,7 +495,7 @@ binds
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               dupAttr(i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
-          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data));
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
     }
   | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
@@ -735,7 +755,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, path };
         else {
             logWarning({
-                .msg = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }

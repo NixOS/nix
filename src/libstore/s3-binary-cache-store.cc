@@ -209,7 +209,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & scheme,
+        const std::string & uriScheme,
         const std::string & bucketName,
         const Params & params)
         : StoreConfig(params)
@@ -232,8 +232,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     void init() override
     {
         if (auto cacheInfo = diskCache->cacheExists(getUri())) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
             diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);

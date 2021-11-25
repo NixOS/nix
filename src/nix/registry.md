@@ -41,7 +41,7 @@ A registry is a JSON file with the following format:
 ```json
 {
   "version": 2,
-  [
+  "flakes": [
     {
       "from": {
         "type": "indirect",

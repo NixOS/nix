@@ -5,6 +5,7 @@
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <optional>
@@ -98,8 +99,14 @@ public:
 
     Value vEmptySet;
 
+    /* Store used to materialise .drv files. */
     const ref<Store> store;
 
+    /* Store used to build stuff. */
+    const ref<Store> buildStore;
+
+    RootValue vCallFlake = nullptr;
+    RootValue vImportedDrvToDerivation = nullptr;
 
 private:
     SrcToStore srcToStore;
@@ -132,13 +139,31 @@ private:
 
 public:
 
-    EvalState(const Strings & _searchPath, ref<Store> store);
+    EvalState(
+        const Strings & _searchPath,
+        ref<Store> store,
+        std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
+
+    void requireExperimentalFeatureOnEvaluation(
+        const ExperimentalFeature &,
+        const std::string_view fName,
+        const Pos & pos
+    );
 
     void addToSearchPath(const string & s);
 
     SearchPath getSearchPath() { return searchPath; }
 
+    /* Allow access to a path. */
+    void allowPath(const Path & path);
+
+    /* Allow access to a store path. Note that this gets remapped to
+       the real store path if `store` is a chroot store. */
+    void allowPath(const StorePath & storePath);
+
+    /* Check whether access to a path is allowed and throw an error if
+       not. Otherwise return the canonicalised path. */
     Path checkSourcePath(const Path & path);
 
     void checkURI(const std::string & uri);
@@ -166,6 +191,14 @@ public:
        form. Optionally enforce that the top-level expression is
        trivial (i.e. doesn't require arbitrary computation). */
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
+
+    /* Like `cacheFile`, but with an already parsed expression. */
+    void cacheFile(
+        const Path & path,
+        const Path & resolvedPath,
+        Expr * e,
+        Value & v,
+        bool mustBeTrivial = false);
 
     void resetFileCache();
 
@@ -221,7 +254,8 @@ public:
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
-        bool coerceMore = false, bool copyToStore = true);
+        bool coerceMore = false, bool copyToStore = true,
+        bool canonicalizePath = true);
 
     string copyPathToStore(PathSet & context, const Path & path);
 
@@ -246,6 +280,8 @@ private:
     void createBaseEnv();
 
     Value * addConstant(const string & name, Value & v);
+
+    void addConstant(const string & name, Value * v);
 
     Value * addPrimOp(const string & name,
         size_t arity, PrimOpFun primOp);
@@ -286,8 +322,14 @@ public:
 
     bool isFunctor(Value & fun);
 
-    void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
-    void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
+    // FIXME: use std::span
+    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const Pos & pos);
+
+    void callFunction(Value & fun, Value & arg, Value & vRes, const Pos & pos)
+    {
+        Value * args[] = {&arg};
+        callFunction(fun, 1, args, vRes, pos);
+    }
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
@@ -305,7 +347,7 @@ public:
     void mkList(Value & v, size_t length);
     void mkAttrs(Value & v, size_t capacity);
     void mkThunk_(Value & v, Expr * expr);
-    void mkPos(Value & v, Pos * pos);
+    void mkPos(Value & v, ptr<Pos> pos);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 
@@ -320,8 +362,10 @@ private:
     unsigned long nrValuesInEnvs = 0;
     unsigned long nrValues = 0;
     unsigned long nrListElems = 0;
+    unsigned long nrLookups = 0;
     unsigned long nrAttrsets = 0;
     unsigned long nrAttrsInAttrsets = 0;
+    unsigned long nrAvoided = 0;
     unsigned long nrOpUpdates = 0;
     unsigned long nrOpUpdateValuesCopied = 0;
     unsigned long nrListConcats = 0;
@@ -343,6 +387,11 @@ private:
 
     friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
+    friend struct ExprVar;
+    friend struct ExprString;
+    friend struct ExprInt;
+    friend struct ExprFloat;
+    friend struct ExprPath;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);

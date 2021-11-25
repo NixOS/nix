@@ -15,13 +15,17 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{(StoreConfig*) this, "xz", "compression", "NAR compression method ('xz', 'bzip2', or 'none')"};
+    const Setting<std::string> compression{(StoreConfig*) this, "xz", "compression", "NAR compression method ('xz', 'bzip2', 'gzip', 'zstd', or 'none')"};
     const Setting<bool> writeNARListing{(StoreConfig*) this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
     const Setting<bool> writeDebugInfo{(StoreConfig*) this, false, "index-debug-info", "whether to index DWARF debug info files by build ID"};
     const Setting<Path> secretKeyFile{(StoreConfig*) this, "", "secret-key", "path to secret key used to sign the binary cache"};
     const Setting<Path> localNarCache{(StoreConfig*) this, "", "local-nar-cache", "path to a local cache of NARs"};
     const Setting<bool> parallelCompression{(StoreConfig*) this, false, "parallel-compression",
-        "enable multi-threading compression, available for xz only currently"};
+        "enable multi-threading compression for NARs, available for xz and zstd only currently"};
+    const Setting<int> compressionLevel{(StoreConfig*) this, -1, "compression-level",
+        "specify 'preset level' of compression to be used with NARs: "
+        "meaning and accepted range of values depends on compression method selected, "
+        "other than -1 which we reserve to indicate Nix defaults should be used"};
 };
 
 class BinaryCacheStore : public virtual BinaryCacheStoreConfig, public virtual Store
@@ -34,7 +38,7 @@ private:
 protected:
 
     // The prefix under which realisation infos will be stored
-    const std::string realisationsPrefix = "/realisations";
+    const std::string realisationsPrefix = "realisations";
 
     BinaryCacheStore(const Params & params);
 
@@ -93,18 +97,19 @@ public:
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair) override;
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references ) override;
 
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override;
+        PathFilter & filter, RepairFlag repair, const StorePathSet & references) override;
 
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

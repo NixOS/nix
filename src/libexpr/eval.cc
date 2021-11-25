@@ -65,7 +65,11 @@ static char * dupStringWithLen(const char * s, size_t size)
 
 RootValue allocRootValue(Value * v)
 {
+#if HAVE_BOEHMGC
     return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
+#else
+    return std::make_shared<Value *>(v);
+#endif
 }
 
 
@@ -234,22 +238,34 @@ static void * oomHandler(size_t requested)
 }
 
 class BoehmGCStackAllocator : public StackAllocator {
-  boost::coroutines2::protected_fixedsize_stack stack {
-    // We allocate 8 MB, the default max stack size on NixOS.
-    // A smaller stack might be quicker to allocate but reduces the stack
-    // depth available for source filter expressions etc.
-    std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
+    boost::coroutines2::protected_fixedsize_stack stack {
+        // We allocate 8 MB, the default max stack size on NixOS.
+        // A smaller stack might be quicker to allocate but reduces the stack
+        // depth available for source filter expressions etc.
+        std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
     };
+
+    // This is specific to boost::coroutines2::protected_fixedsize_stack.
+    // The stack protection page is included in sctx.size, so we have to
+    // subtract one page size from the stack size.
+    std::size_t pfss_usable_stack_size(boost::context::stack_context &sctx) {
+        return sctx.size - boost::context::stack_traits::page_size();
+    }
 
   public:
     boost::context::stack_context allocate() override {
         auto sctx = stack.allocate();
-        GC_add_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+
+        // Stacks generally start at a high address and grow to lower addresses.
+        // Architectures that do the opposite are rare; in fact so rare that
+        // boost_routine does not implement it.
+        // So we subtract the stack size.
+        GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         return sctx;
     }
 
     void deallocate(boost::context::stack_context sctx) override {
-        GC_remove_roots(static_cast<char *>(sctx.sp) - sctx.size, sctx.sp);
+        GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
         stack.deallocate(sctx);
     }
 
@@ -363,7 +379,10 @@ static Strings parseNixPath(const string & s)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
+EvalState::EvalState(
+    const Strings & _searchPath,
+    ref<Store> store,
+    std::shared_ptr<Store> buildStore)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -396,6 +415,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
     , store(store)
+    , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(new StaticEnv(false, 0))
@@ -426,12 +446,12 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
                     StorePathSet closure;
                     store->computeFSClosure(store->toStorePath(r.second).first, closure);
                     for (auto & path : closure)
-                        allowedPaths->insert(store->printStorePath(path));
+                        allowPath(path);
                 } catch (InvalidPath &) {
-                    allowedPaths->insert(r.second);
+                    allowPath(r.second);
                 }
             } else
-                allowedPaths->insert(r.second);
+                allowPath(r.second);
         }
     }
 
@@ -445,6 +465,35 @@ EvalState::~EvalState()
 {
 }
 
+
+void EvalState::requireExperimentalFeatureOnEvaluation(
+    const ExperimentalFeature & feature,
+    const std::string_view fName,
+    const Pos & pos)
+{
+    if (!settings.isExperimentalFeatureEnabled(feature)) {
+        throw EvalError({
+            .msg = hintfmt(
+                "Cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
+                feature,
+                fName
+            ),
+            .errPos = pos
+        });
+    }
+}
+
+void EvalState::allowPath(const Path & path)
+{
+    if (allowedPaths)
+        allowedPaths->insert(path);
+}
+
+void EvalState::allowPath(const StorePath & storePath)
+{
+    if (allowedPaths)
+        allowedPaths->insert(store->toRealPath(storePath));
+}
 
 Path EvalState::checkSourcePath(const Path & path_)
 {
@@ -472,7 +521,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     }
 
     if (!found)
-        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", abspath);
+        throw RestrictedPathError("access to absolute path '%1%' is forbidden in restricted mode", abspath);
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % abspath);
@@ -485,7 +534,7 @@ Path EvalState::checkSourcePath(const Path & path_)
         }
     }
 
-    throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path);
+    throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
 }
 
 
@@ -535,11 +584,17 @@ Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv->vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v2;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    addConstant(name, v2);
     return v2;
+}
+
+
+void EvalState::addConstant(const string & name, Value * v)
+{
+    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
+    baseEnv.values[baseEnvDispl++] = v;
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
 }
 
 
@@ -561,7 +616,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
-    staticBaseEnv->vars[symbols.create(name)] = baseEnvDispl;
+    staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
     return v;
@@ -587,7 +642,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(std::move(primOp)));
-    staticBaseEnv->vars[envName] = baseEnvDispl;
+    staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
     return v;
@@ -861,7 +916,7 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
-    for (size_t l = var.level; l; --l, env = env->up) ;
+    for (auto l = var.level; l; --l, env = env->up) ;
 
     if (!var.fromWith) return env->values[var.displ];
 
@@ -875,7 +930,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
-            if (countCalls && j->pos) attrSelects[*j->pos]++;
+            if (countCalls) attrSelects[*j->pos]++;
             return j->value;
         }
         if (!env->prevWith) {
@@ -886,18 +941,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
-std::atomic<uint64_t> nrValuesFreed{0};
-
-void finalizeValue(void * obj, void * data)
-{
-    nrValuesFreed++;
-}
-
 Value * EvalState::allocValue()
 {
     nrValues++;
     auto v = (Value *) allocBytes(sizeof(Value));
-    //GC_register_finalizer_no_order(v, finalizeValue, nullptr, nullptr, nullptr);
     return v;
 }
 
@@ -949,9 +996,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
-void EvalState::mkPos(Value & v, Pos * pos)
+void EvalState::mkPos(Value & v, ptr<Pos> pos)
 {
-    if (pos && pos->file.set()) {
+    if (pos->file.set()) {
         mkAttrs(v, 3);
         mkString(*allocAttr(v, sFile), pos->file);
         mkInt(*allocAttr(v, sLine), pos->line);
@@ -974,39 +1021,37 @@ Value * Expr::maybeThunk(EvalState & state, Env & env)
 }
 
 
-unsigned long nrAvoided = 0;
-
 Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.lookupVar(&env, *this, true);
     /* The value might not be initialised in the environment yet.
        In that case, ignore it. */
-    if (v) { nrAvoided++; return v; }
+    if (v) { state.nrAvoided++; return v; }
     return Expr::maybeThunk(state, env);
 }
 
 
 Value * ExprString::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprInt::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
 Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 {
-    nrAvoided++;
+    state.nrAvoided++;
     return &v;
 }
 
@@ -1021,38 +1066,23 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
         return;
     }
 
-    Path path2 = resolveExprPath(path);
-    if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
+    Path resolvedPath = resolveExprPath(path);
+    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
-    printTalkative("evaluating file '%1%'", path2);
+    printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    auto j = fileParseCache.find(path2);
+    auto j = fileParseCache.find(resolvedPath);
     if (j != fileParseCache.end())
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(checkSourcePath(path2));
+        e = parseExprFromFile(checkSourcePath(resolvedPath));
 
-    fileParseCache[path2] = e;
-
-    try {
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial &&
-            !(dynamic_cast<ExprAttrs *>(e)))
-            throw Error("file '%s' must be an attribute set", path);
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", path2);
-        throw;
-    }
-
-    fileEvalCache[path2] = v;
-    if (path != path2) fileEvalCache[path] = v;
+    cacheFile(path, resolvedPath, e, v, mustBeTrivial);
 }
 
 
@@ -1060,6 +1090,32 @@ void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
     fileParseCache.clear();
+}
+
+
+void EvalState::cacheFile(
+    const Path & path,
+    const Path & resolvedPath,
+    Expr * e,
+    Value & v,
+    bool mustBeTrivial)
+{
+    fileParseCache[resolvedPath] = e;
+
+    try {
+        // Enforce that 'flake.nix' is a direct attrset, not a
+        // computation.
+        if (mustBeTrivial &&
+            !(dynamic_cast<ExprAttrs *>(e)))
+            throw EvalError("file '%s' must be an attribute set", path);
+        eval(e, v);
+    } catch (Error & e) {
+        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
+        throw;
+    }
+
+    fileEvalCache[resolvedPath] = v;
+    if (path != resolvedPath) fileEvalCache[path] = v;
 }
 
 
@@ -1144,7 +1200,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment, while the inherited attributes are evaluated
            in the original environment. */
-        size_t displ = 0;
+        Displacement displ = 0;
         for (auto & i : attrs) {
             Value * vAttr;
             if (hasOverrides && !i.second.inherited) {
@@ -1153,7 +1209,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             } else
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+            v.attrs->push_back(Attr(i.first, vAttr, ptr(&i.second.pos)));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -1185,7 +1241,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
+            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), ptr(&i.second.pos)));
 
     /* Dynamic attrs apply *after* rec and __overrides. */
     for (auto & i : dynamicAttrs) {
@@ -1203,11 +1259,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
+        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), ptr(&i.pos)));
         v.attrs->sort(); // FIXME: inefficient
     }
 
-    v.attrs->pos = &pos;
+    v.attrs->pos = ptr(&pos);
 }
 
 
@@ -1221,7 +1277,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
-    size_t displ = 0;
+    Displacement displ = 0;
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
@@ -1262,12 +1318,10 @@ static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPa
 }
 
 
-unsigned long nrLookups = 0;
-
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos2 = 0;
+    ptr<Pos> pos2(&noPos);
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -1275,7 +1329,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     try {
 
         for (auto & i : attrPath) {
-            nrLookups++;
+            state.nrLookups++;
             Bindings::iterator j;
             Symbol name = getName(i, state, env);
             if (def) {
@@ -1293,13 +1347,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             }
             vAttrs = j->value;
             pos2 = j->pos;
-            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
+            if (state.countCalls) state.attrSelects[*pos2]++;
         }
 
-        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
+        state.forceValue(*vAttrs, (*pos2 != noPos ? *pos2 : this->pos ) );
 
     } catch (Error & e) {
-        if (pos2 && pos2->file != state.sDerivationNix)
+        if (*pos2 != noPos && pos2->file != state.sDerivationNix)
             addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath));
         throw;
@@ -1340,160 +1394,183 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void ExprApp::eval(EvalState & state, Env & env, Value & v)
-{
-    /* FIXME: vFun prevents GCC from doing tail call optimisation. */
-    Value vFun;
-    e1->eval(state, env, vFun);
-    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v, pos);
-}
-
-
-void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
-{
-    /* Figure out the number of arguments still needed. */
-    size_t argsDone = 0;
-    Value * primOp = &fun;
-    while (primOp->isPrimOpApp()) {
-        argsDone++;
-        primOp = primOp->primOpApp.left;
-    }
-    assert(primOp->isPrimOp());
-    auto arity = primOp->primOp->arity;
-    auto argsLeft = arity - argsDone;
-
-    if (argsLeft == 1) {
-        /* We have all the arguments, so call the primop. */
-
-        /* Put all the arguments in an array. */
-        Value * vArgs[arity];
-        auto n = arity - 1;
-        vArgs[n--] = &arg;
-        for (Value * arg = &fun; arg->isPrimOpApp(); arg = arg->primOpApp.left)
-            vArgs[n--] = arg->primOpApp.right;
-
-        /* And call the primop. */
-        nrPrimOpCalls++;
-        if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, pos, vArgs, v);
-    } else {
-        Value * fun2 = allocValue();
-        *fun2 = fun;
-        v.mkPrimOpApp(fun2, &arg);
-    }
-}
-
-
-void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
+void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const Pos & pos)
 {
     auto trace = evalSettings.traceFunctionCalls ? std::make_unique<FunctionCallTrace>(pos) : nullptr;
 
     forceValue(fun, pos);
 
-    if (fun.isPrimOp() || fun.isPrimOpApp()) {
-        callPrimOp(fun, arg, v, pos);
-        return;
-    }
+    Value vCur(fun);
 
-    if (fun.type() == nAttrs) {
-      auto found = fun.attrs->find(sFunctor);
-      if (found != fun.attrs->end()) {
-        /* fun may be allocated on the stack of the calling function,
-         * but for functors we may keep a reference, so heap-allocate
-         * a copy and use that instead.
-         */
-        auto & fun2 = *allocValue();
-        fun2 = fun;
-        /* !!! Should we use the attr pos here? */
-        Value v2;
-        callFunction(*found->value, fun2, v2, pos);
-        return callFunction(v2, arg, v, pos);
-      }
-    }
+    auto makeAppChain = [&]()
+    {
+        vRes = vCur;
+        for (size_t i = 0; i < nrArgs; ++i) {
+            auto fun2 = allocValue();
+            *fun2 = vRes;
+            vRes.mkPrimOpApp(fun2, args[i]);
+        }
+    };
 
-    if (!fun.isLambda()) {
-        throwTypeError(
-          pos,
-          "attempt to call something which is not a function but %1%",
-          showType(fun).c_str(),
-          fakeEnv(1), 0);
-    }
+    Attr * functor;
 
-    ExprLambda & lambda(*fun.lambda.fun);
+    while (nrArgs > 0) {
 
-    auto size =
-        (lambda.arg.empty() ? 0 : 1) +
-        (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
-    Env & env2(allocEnv(size));
-    env2.up = fun.lambda.env;
+        if (vCur.isLambda()) {
 
-    size_t displ = 0;
+            ExprLambda & lambda(*vCur.lambda.fun);
 
-    if (!lambda.matchAttrs){
-        env2.values[displ++] = &arg;
-    }
-    else {
-        forceAttrs(arg, pos);
+            auto size =
+                (lambda.arg.empty() ? 0 : 1) +
+                (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
+            Env & env2(allocEnv(size));
+            env2.up = vCur.lambda.env;
 
-        if (!lambda.arg.empty())
-            env2.values[displ++] = &arg;
+            Displacement displ = 0;
 
-        /* For each formal argument, get the actual argument.  If
-           there is no matching actual argument but the formal
-           argument has a default, use the default. */
-        size_t attrsUsed = 0;
-        for (auto & i : lambda.formals->formals) {
-            Bindings::iterator j = arg.attrs->find(i.name);
-            if (j == arg.attrs->end()) {
-                if (!i.def)
-                    throwTypeError(
-                        pos,
-                        "%1% called without required argument '%2%'",
-                        lambda,
-                        i.name,
-                        *fun.lambda.env, &lambda);
-                env2.values[displ++] = i.def->maybeThunk(*this, env2);
+            if (!lambda.hasFormals())
+                env2.values[displ++] = args[0];
+            else {
+                forceAttrs(*args[0], pos);
+
+                if (!lambda.arg.empty())
+                    env2.values[displ++] = args[0];
+
+                /* For each formal argument, get the actual argument.  If
+                   there is no matching actual argument but the formal
+                   argument has a default, use the default. */
+                size_t attrsUsed = 0;
+                for (auto & i : lambda.formals->formals) {
+                    auto j = args[0]->attrs->get(i.name);
+                    if (!j) {
+                        if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
+                            lambda, i.name, *fun.lambda.env, &lambda);
+                        env2.values[displ++] = i.def->maybeThunk(*this, env2);
+                    } else {
+                        attrsUsed++;
+                        env2.values[displ++] = j->value;
+                    }
+                }
+
+                /* Check that each actual argument is listed as a formal
+                   argument (unless the attribute match specifies a `...'). */
+                if (!lambda.formals->ellipsis && attrsUsed != args[0]->attrs->size()) {
+                    /* Nope, so show the first unexpected argument to the
+                       user. */
+                    for (auto & i : *args[0]->attrs)
+                        if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
+                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                    abort(); // can't happen
+                }
+            }
+
+            nrFunctionCalls++;
+            if (countCalls) incrFunctionCall(&lambda);
+
+            /* Evaluate the body. */
+            try {
+                lambda.body->eval(*this, env2, vCur);
+            } catch (Error & e) {
+                if (loggerSettings.showTrace.get()) {
+                    addErrorTrace(e, lambda.pos, "while evaluating %s",
+                        (lambda.name.set()
+                            ? "'" + (string) lambda.name + "'"
+                            : "anonymous lambda"));
+                    addErrorTrace(e, pos, "from call site%s", "");
+                }
+                throw;
+            }
+
+            nrArgs--;
+            args += 1;
+        }
+
+        else if (vCur.isPrimOp()) {
+
+            size_t argsLeft = vCur.primOp->arity;
+
+            if (nrArgs < argsLeft) {
+                /* We don't have enough arguments, so create a tPrimOpApp chain. */
+                makeAppChain();
+                return;
             } else {
-                attrsUsed++;
-                env2.values[displ++] = j->value;
+                /* We have all the arguments, so call the primop. */
+                nrPrimOpCalls++;
+                if (countCalls) primOpCalls[vCur.primOp->name]++;
+                vCur.primOp->fun(*this, pos, args, vCur);
+
+                nrArgs -= argsLeft;
+                args += argsLeft;
             }
         }
 
+        else if (vCur.isPrimOpApp()) {
+            /* Figure out the number of arguments still needed. */
+            size_t argsDone = 0;
+            Value * primOp = &vCur;
+            while (primOp->isPrimOpApp()) {
+                argsDone++;
+                primOp = primOp->primOpApp.left;
+            }
+            assert(primOp->isPrimOp());
+            auto arity = primOp->primOp->arity;
+            auto argsLeft = arity - argsDone;
 
-        /* Check that each actual argument is listed as a formal
-           argument (unless the attribute match specifies a `...'). */
-        if (!lambda.formals->ellipsis && attrsUsed != arg.attrs->size()) {
-            /* Nope, so show the first unexpected argument to the
-               user. */
-            for (auto & i : *arg.attrs)
-                if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError(pos,
-                        "%1% called with unexpected argument '%2%'",
-                        lambda,
-                        i.name,
-                        *fun.lambda.env, &lambda);
-            abort(); // can't happen
+            if (nrArgs < argsLeft) {
+                /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
+                makeAppChain();
+                return;
+            } else {
+                /* We have all the arguments, so call the primop with
+                   the previous and new arguments. */
+
+                Value * vArgs[arity];
+                auto n = argsDone;
+                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp.left)
+                    vArgs[--n] = arg->primOpApp.right;
+
+                for (size_t i = 0; i < argsLeft; ++i)
+                    vArgs[argsDone + i] = args[i];
+
+                nrPrimOpCalls++;
+                if (countCalls) primOpCalls[primOp->primOp->name]++;
+                primOp->primOp->fun(*this, pos, vArgs, vCur);
+
+                nrArgs -= argsLeft;
+                args += argsLeft;
+            }
         }
+
+        else if (vCur.type() == nAttrs && (functor = vCur.attrs->get(sFunctor))) {
+            /* 'vCur' may be allocated on the stack of the calling
+               function, but for functors we may keep a reference, so
+               heap-allocate a copy and use that instead. */
+            Value * args2[] = {allocValue(), args[0]};
+            *args2[0] = vCur;
+            /* !!! Should we use the attr pos here? */
+            callFunction(*functor->value, 2, args2, vCur, pos);
+            nrArgs--;
+            args++;
+        }
+
+        else
+            throwTypeError(pos, "attempt to call something which is not a function but %1%", vCur);
     }
 
-    nrFunctionCalls++;
-    if (countCalls) incrFunctionCall(&lambda);
+    vRes = vCur;
+}
 
-    /* Evaluate the body.  This is conditional on showTrace, because
-       catching exceptions makes this function not tail-recursive. */
-    if (loggerSettings.showTrace.get())
-        try {
-            lambda.body->eval(*this, env2, v);
-        } catch (Error & e) {
-            addErrorTrace(e, lambda.pos, "while evaluating %s",
-              (lambda.name.set()
-                  ? "'" + (string) lambda.name + "'"
-                  : "anonymous lambda"));
-            addErrorTrace(e, pos, "from call site%s", "");
-            throw;
-        }
-    else
-        fun.lambda.fun->body->eval(*this, env2, v);
+
+void ExprCall::eval(EvalState & state, Env & env, Value & v)
+{
+    Value vFun;
+    fun->eval(state, env, vFun);
+
+    Value * vArgs[args.size()];
+    for (size_t i = 0; i < args.size(); ++i)
+        vArgs[i] = args[i]->maybeThunk(state, env);
+
+    state.callFunction(vFun, args.size(), vArgs, v, pos);
 }
 
 
@@ -1519,7 +1596,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         }
     }
 
-    if (!fun.isLambda() || !fun.lambda.fun->matchAttrs) {
+    if (!fun.isLambda() || !fun.lambda.fun->hasFormals()) {
         res = fun;
         return;
     }
@@ -1722,7 +1799,6 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            and none of the strings are allowed to have contexts. */
         if (first) {
             firstType = vTmp.type();
-            first = false;
         }
 
         if (firstType == nInt) {
@@ -1744,7 +1820,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else
                 throwEvalError(pos, "cannot add %1% to a float", showType(vTmp), env, this);
         } else
-            s << state.coerceToString(pos, vTmp, context, false, firstType == nString);
+            /* skip canonization of first path, which would only be not
+            canonized in the first place if it's coming from a ./${foo} type
+            path */
+            s << state.coerceToString(pos, vTmp, context, false, firstType == nString, !first);
+
+        first = false;
     }
 
     if (firstType == nInt)
@@ -1763,7 +1844,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkPos(v, &pos);
+    state.mkPos(v, ptr(&pos));
 }
 
 
@@ -1935,7 +2016,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
 }
 
 string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
-    bool coerceMore, bool copyToStore)
+    bool coerceMore, bool copyToStore, bool canonicalizePath)
 {
     forceValue(v, pos);
 
@@ -1947,7 +2028,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type() == nPath) {
-        Path path(canonPath(v.path));
+        Path path(canonicalizePath ? canonPath(v.path) : v.path);
         return copyToStore ? copyPathToStore(context, path) : path;
     }
 
@@ -2010,6 +2091,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         dstPath = store->printStorePath(p);
+        allowPath(p);
         srcToStore.insert_or_assign(path, std::move(p));
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
     }

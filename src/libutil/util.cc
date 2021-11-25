@@ -4,16 +4,18 @@
 #include "finally.hh"
 #include "serialise.hh"
 
+#include <array>
 #include <cctype>
 #include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
+#include <future>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
-#include <future>
 
 #include <fcntl.h>
 #include <grp.h>
@@ -155,6 +157,9 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                     s.clear();  /* restart for symlinks pointing to absolute path */
                 } else {
                     s = dirOf(s);
+                    if (s == "/") {  // we don’t want trailing slashes here, which dirOf only produces if s = /
+                        s.clear();
+                    }
                 }
             }
         }
@@ -410,7 +415,7 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         }
 
         int fd = openat(parentfd, path.c_str(), O_RDONLY);
-        if (!fd)
+        if (fd == -1)
             throw SysError("opening directory '%1%'", path);
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
@@ -432,12 +437,9 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
     if (dir == "")
         dir = "/";
 
-    AutoCloseFD dirfd(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd{open(dir.c_str(), O_RDONLY)};
     if (!dirfd) {
-        // This really shouldn't fail silently, but it's left this way
-        // for backwards compatibility.
         if (errno == ENOENT) return;
-
         throw SysError("opening directory '%1%'", path);
     }
 
@@ -560,7 +562,7 @@ Path getConfigDir()
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("");
+    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
     std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
     result.insert(result.begin(), configHome);
     return result;
@@ -901,7 +903,7 @@ int Pid::wait()
             return status;
         }
         if (errno != EINTR)
-            throw SysError("cannot get child exit status");
+            throw SysError("cannot get exit status of PID %d", pid);
         checkInterrupt();
     }
 }
@@ -937,9 +939,6 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    ProcessOptions options;
-    options.allowVfork = false;
-
     Pid pid = startProcess([&]() {
 
         if (setuid(uid) == -1)
@@ -962,7 +961,7 @@ void killUser(uid_t uid)
         }
 
         _exit(0);
-    }, options);
+    });
 
     int status = pid.wait();
     if (status != 0)
@@ -1032,17 +1031,10 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-// Output = "standard out" output stream
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
-    RunOptions opts(program, args);
-    opts.searchPath = searchPath;
-    // This allows you to refer to a program with a pathname relative to the
-    // PATH variable.
-    opts.input = input;
-
-    auto res = runProgram(opts);
+    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
@@ -1051,9 +1043,8 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 }
 
 // Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(const RunOptions & options_)
+std::pair<int, std::string> runProgram(RunOptions && options)
 {
-    RunOptions options(options_);
     StringSink sink;
     options.standardOut = &sink;
 
@@ -1091,8 +1082,7 @@ void runProgram2(const RunOptions & options)
     // vfork implies that the environment of the main process and the fork will
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
-    if (options.environment)
-        processOptions.allowVfork = false;
+    processOptions.allowVfork = !options.environment;
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -1215,7 +1205,7 @@ void closeOnExec(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
-bool _isInterrupted = false;
+std::atomic<bool> _isInterrupted = false;
 
 static thread_local bool interruptThrown = false;
 thread_local std::function<bool()> interruptCheck;
@@ -1369,6 +1359,12 @@ void ignoreException()
     }
 }
 
+bool shouldANSI()
+{
+    return isatty(STDERR_FILENO)
+        && getEnv("TERM").value_or("dumb") != "dumb"
+        && !getEnv("NO_COLOR").has_value();
+}
 
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
 {
@@ -1440,8 +1436,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 }
 
 
-static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
+constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 string base64Encode(std::string_view s)
 {
@@ -1466,15 +1461,15 @@ string base64Encode(std::string_view s)
 
 string base64Decode(std::string_view s)
 {
-    bool init = false;
-    char decode[256];
-    if (!init) {
-        // FIXME: not thread-safe.
-        memset(decode, -1, sizeof(decode));
+    constexpr char npos = -1;
+    constexpr std::array<char, 256> base64DecodeChars = [&]() {
+        std::array<char, 256>  result{};
+        for (auto& c : result)
+            c = npos;
         for (int i = 0; i < 64; i++)
-            decode[(int) base64Chars[i]] = i;
-        init = true;
-    }
+            result[base64Chars[i]] = i;
+        return result;
+    }();
 
     string res;
     unsigned int d = 0, bits = 0;
@@ -1483,8 +1478,8 @@ string base64Decode(std::string_view s)
         if (c == '=') break;
         if (c == '\n') continue;
 
-        char digit = decode[(unsigned char) c];
-        if (digit == -1)
+        char digit = base64DecodeChars[(unsigned char) c];
+        if (digit == npos)
             throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
@@ -1637,9 +1632,39 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
-void restoreProcessContext()
+static AutoCloseFD fdSavedMountNamespace;
+
+void saveMountNamespace()
+{
+#if __linux__
+    static std::once_flag done;
+    std::call_once(done, []() {
+        AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fd)
+            throw SysError("saving parent mount namespace");
+        fdSavedMountNamespace = std::move(fd);
+    });
+#endif
+}
+
+void restoreMountNamespace()
+{
+#if __linux__
+    try {
+        if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
+            throw SysError("restoring parent mount namespace");
+    } catch (Error & e) {
+        debug(e.msg());
+    }
+#endif
+}
+
+void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
+    if (restoreMounts) {
+        restoreMountNamespace();
+    }
 
     restoreAffinity();
 
@@ -1677,7 +1702,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 }
 
 
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+AutoCloseFD createUnixDomainSocket()
 {
     AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -1686,19 +1711,16 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
         , 0);
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
-
     closeOnExec(fdSocket.get());
+    return fdSocket;
+}
 
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (path.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", path);
-    strcpy(addr.sun_path, path.c_str());
 
-    unlink(path.c_str());
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+{
+    auto fdSocket = nix::createUnixDomainSocket();
 
-    if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot bind to socket '%1%'", path);
+    bind(fdSocket.get(), path);
 
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
@@ -1707,6 +1729,66 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;
+}
+
+
+void bind(int fd, const std::string & path)
+{
+    unlink(path.c_str());
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            auto dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+            if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot bind to socket '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot bind to socket '%s'", path);
+    } else {
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
+        if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot bind to socket '%s'", path);
+    }
+}
+
+
+void connect(int fd, const std::string & path)
+{
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            auto dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+            if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot connect to socket at '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot connect to socket at '%s'", path);
+    } else {
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
+        if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot connect to socket at '%s'", path);
+    }
 }
 
 
@@ -1719,8 +1801,10 @@ string showBytes(uint64_t bytes)
 // FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)
 {
+    logger = makeSimpleLogger();
+
     const static string pathNullDevice = "/dev/null";
-    restoreProcessContext();
+    restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

@@ -207,7 +207,7 @@ struct GitArchiveInputScheme : InputScheme
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, url.headers);
+        auto [tree, lastModified] = downloadTarball(store, url.url, input.getName(), true, url.headers);
 
         input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
@@ -273,9 +273,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
     void clone(const Input & input, const Path & destDir) override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+        Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
+            .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
 };
@@ -300,7 +300,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         if ("PAT" == token.substr(0, fldsplit))
             return std::make_pair("Private-token", token.substr(fldsplit+1));
         warn("Unrecognized GitLab token type %s",  token.substr(0, fldsplit));
-        return std::nullopt;
+        return std::make_pair(token.substr(0,fldsplit), token.substr(fldsplit+1));
     }
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
@@ -341,9 +341,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
-        Input::fromURL(fmt("git+ssh://git@%s/%s/%s.git",
+        Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
-            .applyOverrides(input.getRef().value_or("HEAD"), input.getRev())
+            .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
 };

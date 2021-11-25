@@ -6,97 +6,72 @@
 #include "thread-pool.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+#include "closure.hh"
 
 namespace nix {
-
 
 void Store::computeFSClosure(const StorePathSet & startPaths,
     StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
-    struct State
-    {
-        size_t pending;
-        StorePathSet & paths;
-        std::exception_ptr exc;
-    };
+    std::function<std::set<StorePath>(const StorePath & path, std::future<ref<const ValidPathInfo>> &)> queryDeps;
+    if (flipDirection)
+        queryDeps = [&](const StorePath& path,
+                        std::future<ref<const ValidPathInfo>> & fut) {
+            StorePathSet res;
+            StorePathSet referrers;
+            queryReferrers(path, referrers);
+            for (auto& ref : referrers)
+                if (ref != path)
+                    res.insert(ref);
 
-    Sync<State> state_(State{0, paths_, 0});
+            if (includeOutputs)
+                for (auto& i : queryValidDerivers(path))
+                    res.insert(i);
 
-    std::function<void(const StorePath &)> enqueue;
+            if (includeDerivers && path.isDerivation())
+                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                    if (maybeOutPath && isValidPath(*maybeOutPath))
+                        res.insert(*maybeOutPath);
+            return res;
+        };
+    else
+        queryDeps = [&](const StorePath& path,
+                        std::future<ref<const ValidPathInfo>> & fut) {
+            StorePathSet res;
+            auto info = fut.get();
+            for (auto& ref : info->references)
+                if (ref != path)
+                    res.insert(ref);
 
-    std::condition_variable done;
+            if (includeOutputs && path.isDerivation())
+                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                    if (maybeOutPath && isValidPath(*maybeOutPath))
+                        res.insert(*maybeOutPath);
 
-    enqueue = [&](const StorePath & path) -> void {
-        {
-            auto state(state_.lock());
-            if (state->exc) return;
-            if (!state->paths.insert(path).second) return;
-            state->pending++;
-        }
+            if (includeDerivers && info->deriver && isValidPath(*info->deriver))
+                res.insert(*info->deriver);
+            return res;
+        };
 
-        queryPathInfo(path, {[&](std::future<ref<const ValidPathInfo>> fut) {
-            // FIXME: calls to isValidPath() should be async
-
-            try {
-                auto info = fut.get();
-
-                if (flipDirection) {
-
-                    StorePathSet referrers;
-                    queryReferrers(path, referrers);
-                    for (auto & ref : referrers)
-                        if (ref != path)
-                            enqueue(ref);
-
-                    if (includeOutputs)
-                        for (auto & i : queryValidDerivers(path))
-                            enqueue(i);
-
-                    if (includeDerivers && path.isDerivation())
-                        for (auto & i : queryDerivationOutputs(path))
-                            if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                                enqueue(i);
-
-                } else {
-
-                    for (auto & ref : info->references)
-                        if (ref != path)
-                            enqueue(ref);
-
-                    if (includeOutputs && path.isDerivation())
-                        for (auto & i : queryDerivationOutputs(path))
-                            if (isValidPath(i)) enqueue(i);
-
-                    if (includeDerivers && info->deriver && isValidPath(*info->deriver))
-                        enqueue(*info->deriver);
-
-                }
-
-                {
-                    auto state(state_.lock());
-                    assert(state->pending);
-                    if (!--state->pending) done.notify_one();
-                }
-
-            } catch (...) {
-                auto state(state_.lock());
-                if (!state->exc) state->exc = std::current_exception();
-                assert(state->pending);
-                if (!--state->pending) done.notify_one();
-            };
-        }});
-    };
-
-    for (auto & startPath : startPaths)
-        enqueue(startPath);
-
-    {
-        auto state(state_.lock());
-        while (state->pending) state.wait(done);
-        if (state->exc) std::rethrow_exception(state->exc);
-    }
+    computeClosure<StorePath>(
+        startPaths, paths_,
+        [&](const StorePath& path,
+            std::function<void(std::promise<std::set<StorePath>>&)>
+                processEdges) {
+            std::promise<std::set<StorePath>> promise;
+            std::function<void(std::future<ref<const ValidPathInfo>>)>
+                getDependencies =
+                    [&](std::future<ref<const ValidPathInfo>> fut) {
+                        try {
+                            promise.set_value(queryDeps(path, fut));
+                        } catch (...) {
+                            promise.set_exception(std::current_exception());
+                        }
+                    };
+            queryPathInfo(path, getDependencies);
+            processEdges(promise);
+        });
 }
-
 
 void Store::computeFSClosure(const StorePath & startPath,
     StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
@@ -191,7 +166,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
         }
 
         std::visit(overloaded {
-          [&](DerivedPath::Built bfd) {
+          [&](const DerivedPath::Built & bfd) {
             if (!isValidPath(bfd.drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
@@ -224,7 +199,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 mustBuildDrv(bfd.drvPath, *drv);
 
           },
-          [&](DerivedPath::Opaque bo) {
+          [&](const DerivedPath::Opaque & bo) {
 
             if (isValidPath(bo.path)) return;
 
@@ -264,12 +239,11 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
     return topoSort(paths,
         {[&](const StorePath & path) {
-            StorePathSet references;
             try {
-                references = queryPathInfo(path)->references;
+                return queryPathInfo(path)->references;
             } catch (InvalidPath &) {
+                return StorePathSet();
             }
-            return references;
         }},
         {[&](const StorePath & path, const StorePath & parent) {
             return BuildError(
@@ -279,5 +253,44 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }});
 }
 
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    const std::set<Realisation> & inputRealisations,
+    const StorePathSet & pathReferences)
+{
+    std::map<DrvOutput, StorePath> res;
 
+    for (const auto & input : inputRealisations) {
+        if (pathReferences.count(input.outPath)) {
+            res.insert({input.id, input.outPath});
+        }
+    }
+
+    return res;
+}
+
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath)
+{
+    std::set<Realisation> inputRealisations;
+
+    for (const auto& [inputDrv, outputNames] : drv.inputDrvs) {
+        auto outputHashes =
+            staticOutputHashes(store, store.readDerivation(inputDrv));
+        for (const auto& outputName : outputNames) {
+            auto thisRealisation = store.queryRealisation(
+                DrvOutput{outputHashes.at(outputName), outputName});
+            if (!thisRealisation)
+                throw Error(
+                    "output '%s' of derivation '%s' isn’t built", outputName,
+                    store.printStorePath(inputDrv));
+            inputRealisations.insert(*thisRealisation);
+        }
+    }
+
+    auto info = store.queryPathInfo(outputPath);
+
+    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
+}
 }

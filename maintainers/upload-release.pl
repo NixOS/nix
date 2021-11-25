@@ -19,6 +19,8 @@ my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
 
 my $TMPDIR = $ENV{'TMPDIR'} // "/tmp";
 
+my $isLatest = ($ENV{'IS_LATEST'} // "") eq "1";
+
 # FIXME: cut&paste from nixos-channel-scripts.
 sub fetch {
     my ($url, $type) = @_;
@@ -35,16 +37,18 @@ sub fetch {
 my $evalUrl = "https://hydra.nixos.org/eval/$evalId";
 my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
+my $flakeUrl = $evalInfo->{flake} or die;
+my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die);
+my $nixRev = $flakeInfo->{revision} or die;
 
-my $nixRev = $evalInfo->{jobsetevalinputs}->{nix}->{revision} or die;
+my $buildInfo = decode_json(fetch("$evalUrl/job/build.x86_64-linux", 'application/json'));
+#print Dumper($buildInfo);
 
-my $tarballInfo = decode_json(fetch("$evalUrl/job/tarball", 'application/json'));
-
-my $releaseName = $tarballInfo->{releasename};
+my $releaseName = $buildInfo->{nixname};
 $releaseName =~ /nix-(.*)$/ or die;
 my $version = $1;
 
-print STDERR "Nix revision is $nixRev, version is $version\n";
+print STDERR "Flake URL is $flakeUrl, Nix revision is $nixRev, version is $version\n";
 
 my $releaseDir = "nix/$releaseName";
 
@@ -83,12 +87,12 @@ sub downloadFile {
 
     if (!-e $tmpFile) {
         print STDERR "downloading $srcFile to $tmpFile...\n";
-        system("NIX_REMOTE=https://cache.nixos.org/ nix cat-store '$srcFile' > '$tmpFile'") == 0
+        system("NIX_REMOTE=https://cache.nixos.org/ nix store cat '$srcFile' > '$tmpFile'") == 0
             or die "unable to fetch $srcFile\n";
     }
 
     my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
-    my $sha256_actual = `nix hash-file --base16 --type sha256 '$tmpFile'`;
+    my $sha256_actual = `nix hash file --base16 --type sha256 '$tmpFile'`;
     chomp $sha256_actual;
     if ($sha256_expected ne $sha256_actual) {
         print STDERR "file $tmpFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
@@ -104,12 +108,13 @@ sub downloadFile {
     return $sha256_expected;
 }
 
-downloadFile("tarball", "2"); # .tar.bz2
-my $tarballHash = downloadFile("tarball", "3"); # .tar.xz
 downloadFile("binaryTarball.i686-linux", "1");
 downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("binaryTarball.aarch64-darwin", "1");
+downloadFile("binaryTarballCross.x86_64-linux.armv6l-linux", "1");
+downloadFile("binaryTarballCross.x86_64-linux.armv7l-linux", "1");
 downloadFile("installerScript", "1");
 
 for my $fn (glob "$tmpDir/*") {
@@ -131,53 +136,38 @@ for my $fn (glob "$tmpDir/*") {
     }
 }
 
-exit if $version =~ /pre/;
+# Update nix-fallback-paths.nix.
+if ($isLatest) {
+    system("cd $nixpkgsDir && git pull") == 0 or die;
 
-# Update Nixpkgs in a very hacky way.
-system("cd $nixpkgsDir && git pull") == 0 or die;
-my $oldName = `nix-instantiate --eval $nixpkgsDir -A nix.name`; chomp $oldName;
-my $oldHash = `nix-instantiate --eval $nixpkgsDir -A nix.src.outputHash`; chomp $oldHash;
-print STDERR "old stable version in Nixpkgs = $oldName / $oldHash\n";
-
-my $fn = "$nixpkgsDir/pkgs/tools/package-management/nix/default.nix";
-my $oldFile = read_file($fn);
-$oldFile =~ s/$oldName/"$releaseName"/g;
-$oldFile =~ s/$oldHash/"$tarballHash"/g;
-write_file($fn, $oldFile);
-
-$oldName =~ s/nix-//g;
-$oldName =~ s/"//g;
-
-sub getStorePath {
-    my ($jobName) = @_;
-    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-    for my $product (values %{$buildInfo->{buildproducts}}) {
-        next unless $product->{type} eq "nix-build";
-        next if $product->{path} =~ /[a-z]+$/;
-        return $product->{path};
+    sub getStorePath {
+        my ($jobName) = @_;
+        my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+        return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
     }
-    die;
+
+    write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
+               "{\n" .
+               "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
+               "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+               "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
+               "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+               "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
+               "}\n");
+
+    system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 }
-
-write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
-           "{\n" .
-           "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-           "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-           "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-           "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-           "}\n");
-
-system("cd $nixpkgsDir && git commit -a -m 'nix: $oldName -> $version'") == 0 or die;
 
 # Update the "latest" symlink.
 $channelsBucket->add_key(
     "nix-latest/install", "",
     { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/install" })
-    or die $channelsBucket->err . ": " . $channelsBucket->errstr;
+    or die $channelsBucket->err . ": " . $channelsBucket->errstr
+    if $isLatest;
 
 # Tag the release in Git.
 chdir("/home/eelco/Dev/nix-pristine") or die;
 system("git remote update origin") == 0 or die;
 system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
 system("git push --tags") == 0 or die;
-system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die;
+system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;

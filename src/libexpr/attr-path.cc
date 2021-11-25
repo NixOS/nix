@@ -19,7 +19,7 @@ static Strings parseAttrPath(std::string_view s)
             ++i;
             while (1) {
                 if (i == s.end())
-                    throw Error("missing closing quote in selection path '%1%'", s);
+                    throw ParseError("missing closing quote in selection path '%1%'", s);
                 if (*i == '"') break;
                 cur.push_back(*i++);
             }
@@ -100,7 +100,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 }
 
 
-Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
+Pos findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -116,14 +116,14 @@ Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
 
     auto colon = pos.rfind(':');
     if (colon == std::string::npos)
-        throw Error("cannot parse meta.position attribute '%s'", pos);
+        throw ParseError("cannot parse meta.position attribute '%s'", pos);
 
     std::string filename(pos, 0, colon);
     unsigned int lineno;
     try {
         lineno = std::stoi(std::string(pos, colon + 1));
     } catch (std::invalid_argument & e) {
-        throw Error("cannot parse line number '%s'", pos);
+        throw ParseError("cannot parse line number '%s'", pos);
     }
 
     Symbol file = state.symbols.create(filename);
