@@ -380,6 +380,11 @@ cat > $templatesDir/trivial/flake.nix <<EOF
   outputs = { self, nixpkgs }: {
     packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
     defaultPackage.x86_64-linux = self.packages.x86_64-linux.hello;
+    apps.x86_64-linux.helloWorld = {
+        type = "app";
+        program = "\${nixpkgs.legacyPackages.x86_64-linux.hello}/bin/hello";
+    };
+    apps.x86_64-linux.helloWorld2 = nixpkgs.legacyPackages.x86_64-linux.hello;
   };
 }
 EOF

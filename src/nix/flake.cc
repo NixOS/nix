@@ -1024,13 +1024,17 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 2 && attrPath[0] == "defaultApp") ||
                     (attrPath.size() == 3 && attrPath[0] == "apps"))
                 {
-                    auto aType = visitor.maybeGetAttr("type");
-                    if (!aType || aType->getString() != "app")
-                        throw EvalError("not an app definition");
-                    if (json) {
-                        j.emplace("type", "app");
-                    } else {
-                        logger->cout("%s: app", headerPrefix);
+                    if (visitor.isDerivation())
+                        showDerivation();
+                    else {
+                        auto aType = visitor.maybeGetAttr("type");
+                        if (!aType || aType->getString() != "app")
+                            throw EvalError("not an app definition");
+                        if (json) {
+                            j.emplace("type", "app");
+                        } else {
+                            logger->cout("%s: app", headerPrefix);
+                        }
                     }
                 }
 
