@@ -620,7 +620,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
 void printStaticEnvBindings(const StaticEnv &se, int lvl)
 {
-    for (auto i = se.vars.begin(); i != se.vars.end(); ++i) 
+    for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
     {
       std::cout << lvl << i->first << std::endl;
     }
@@ -628,22 +628,21 @@ void printStaticEnvBindings(const StaticEnv &se, int lvl)
     if (se.up) {
       printStaticEnvBindings(*se.up, ++lvl);
     }
- 
+
 }
 
 void printStaticEnvBindings(const Expr &expr)
 {
-  // just print the names for now
-  if (expr.staticenv) 
-  {
-    printStaticEnvBindings(*expr.staticenv.get(), 0);
-  }
-  
+    // just print the names for now
+    if (expr.staticenv)
+    {
+      printStaticEnvBindings(*expr.staticenv.get(), 0);
+    }
 }
 
 void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
 {
-  // add bindings for the next level up first, so that the bindings for this level 
+  // add bindings for the next level up first, so that the bindings for this level
   // override the higher levels.
   if (env.up && se.up) {
     mapStaticEnvBindings( *se.up, *env.up,vm);
@@ -651,13 +650,13 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
 
   // iterate through staticenv bindings and add them.
   auto map = valmap();
-  for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter) 
+  for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
   {
-    map[iter->first] = env.values[iter->second]; 
+    map[iter->first] = env.values[iter->second];
   }
 
   vm.merge(map);
- 
+
 }
 
 

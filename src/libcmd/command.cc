@@ -81,8 +81,8 @@ ref<EvalState> EvalCommand::getEvalState()
 
                 if (expr.staticenv)
                 {
-                  auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
-                  runRepl(evalState, *vm);
+                    auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
+                    runRepl(evalState, *vm);
                 }
             };
     }

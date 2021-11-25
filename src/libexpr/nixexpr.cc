@@ -3,7 +3,6 @@
 #include "util.hh"
 
 #include <cstdlib>
-#include <iostream>
 
 namespace nix {
 
