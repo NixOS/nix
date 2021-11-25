@@ -164,6 +164,7 @@ Strings SourceExprCommand::getDefaultFlakeAttrPaths()
 Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 {
     return {
+        "",
         // As a convenience, look for the attribute in
         // 'outputs.packages'.
         "packages." + settings.thisSystem.get() + ".",
