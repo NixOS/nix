@@ -63,9 +63,9 @@ void printValueAsJSON(EvalState & state, bool strict,
 
         case nList: {
             auto list(out.list());
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
+            for (auto elem : v.listItems()) {
                 auto placeholder(list.placeholder());
-                printValueAsJSON(state, strict, *v.listElems()[n], pos, placeholder, context);
+                printValueAsJSON(state, strict, *elem, pos, placeholder, context);
             }
             break;
         }

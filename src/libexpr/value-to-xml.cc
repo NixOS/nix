@@ -122,8 +122,8 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
         case nList: {
             XMLOpenElement _(doc, "list");
-            for (unsigned int n = 0; n < v.listSize(); ++n)
-                printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen, pos);
+            for (auto v2 : v.listItems())
+                printValueAsXML(state, strict, location, *v2, doc, context, drvsSeen, pos);
             break;
         }
 

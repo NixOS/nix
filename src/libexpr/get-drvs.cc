@@ -102,9 +102,9 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
             state->forceList(*i->value, *i->pos);
 
             /* For each output... */
-            for (unsigned int j = 0; j < i->value->listSize(); ++j) {
+            for (auto elem : i->value->listItems()) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*i->value->listElems()[j], *i->pos);
+                string name = state->forceStringNoCtx(*elem, *i->pos);
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
                 state->forceAttrs(*out->value);
@@ -128,9 +128,9 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
         /* ^ this shows during `nix-env -i` right under the bad derivation */
     if (!outTI->isList()) throw errMsg;
     Outputs result;
-    for (auto i = outTI->listElems(); i != outTI->listElems() + outTI->listSize(); ++i) {
-        if ((*i)->type() != nString) throw errMsg;
-        auto out = outputs.find((*i)->string.s);
+    for (auto elem : outTI->listItems()) {
+        if (elem->type() != nString) throw errMsg;
+        auto out = outputs.find(elem->string.s);
         if (out == outputs.end()) throw errMsg;
         result.insert(*out);
     }
@@ -174,8 +174,8 @@ bool DrvInfo::checkMeta(Value & v)
 {
     state->forceValue(v);
     if (v.type() == nList) {
-        for (unsigned int n = 0; n < v.listSize(); ++n)
-            if (!checkMeta(*v.listElems()[n])) return false;
+        for (auto elem : v.listItems())
+            if (!checkMeta(*elem)) return false;
         return true;
     }
     else if (v.type() == nAttrs) {
@@ -364,10 +364,10 @@ static void getDerivations(EvalState & state, Value & vIn,
     }
 
     else if (v.type() == nList) {
-        for (unsigned int n = 0; n < v.listSize(); ++n) {
-            string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
-                getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+        for (auto [n, elem] : enumerate(v.listItems())) {
+            string pathPrefix2 = addToPath(pathPrefix, fmt("%d", n));
+            if (getDerivation(state, *elem, pathPrefix2, drvs, done, ignoreAssertionFailures))
+                getDerivations(state, *elem, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
         }
     }
 

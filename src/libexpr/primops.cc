@@ -335,9 +335,8 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     PathSet context;
     auto program = state.coerceToString(pos, *elems[0], context, false, false);
     Strings commandArgs;
-    for (unsigned int i = 1; i < args[0]->listSize(); ++i) {
+    for (unsigned int i = 1; i < args[0]->listSize(); ++i)
         commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
-    }
     try {
         state.realiseContext(context);
     } catch (InvalidPathError & e) {
@@ -616,8 +615,8 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
-    for (unsigned int n = 0; n < startSet->value->listSize(); ++n)
-        workSet.push_back(startSet->value->listElems()[n]);
+    for (auto elem : startSet->value->listItems())
+        workSet.push_back(elem);
 
     /* Get the operator. */
     Bindings::iterator op = getAttr(
@@ -662,9 +661,9 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
-        for (unsigned int n = 0; n < call.listSize(); ++n) {
-            state.forceValue(*call.listElems()[n], pos);
-            workSet.push_back(call.listElems()[n]);
+        for (auto elem : call.listItems()) {
+            state.forceValue(*elem, pos);
+            workSet.push_back(elem);
         }
     }
 
@@ -1013,8 +1012,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
-                for (unsigned int n = 0; n < i->value->listSize(); ++n) {
-                    string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
+                for (auto elem : i->value->listItems()) {
+                    string s = state.coerceToString(posDrvName, *elem, context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -1044,8 +1043,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, posDrvName);
                         Strings ss;
-                        for (unsigned int n = 0; n < i->value->listSize(); ++n)
-                            ss.emplace_back(state.forceStringNoCtx(*i->value->listElems()[n], posDrvName));
+                        for (auto elem : i->value->listItems())
+                            ss.emplace_back(state.forceStringNoCtx(*elem, posDrvName));
                         handleOutputs(ss);
                     }
 
@@ -1460,20 +1459,19 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     SearchPath searchPath;
 
-    for (unsigned int n = 0; n < args[0]->listSize(); ++n) {
-        Value & v2(*args[0]->listElems()[n]);
-        state.forceAttrs(v2, pos);
+    for (auto v2 : args[0]->listItems()) {
+        state.forceAttrs(*v2, pos);
 
         string prefix;
-        Bindings::iterator i = v2.attrs->find(state.symbols.create("prefix"));
-        if (i != v2.attrs->end())
+        Bindings::iterator i = v2->attrs->find(state.symbols.create("prefix"));
+        if (i != v2->attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
         i = getAttr(
             state,
             "findFile",
             "path",
-            v2.attrs,
+            v2->attrs,
             pos
         );
 
@@ -2239,9 +2237,9 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
 
     /* Get the attribute names to be removed. */
     std::set<Symbol> names;
-    for (unsigned int i = 0; i < args[1]->listSize(); ++i) {
-        state.forceStringNoCtx(*args[1]->listElems()[i], pos);
-        names.insert(state.symbols.create(args[1]->listElems()[i]->string.s));
+    for (auto elem : args[1]->listItems()) {
+        state.forceStringNoCtx(*elem, pos);
+        names.insert(state.symbols.create(elem->string.s));
     }
 
     /* Copy all attributes not in that set.  Note that we don't need
@@ -2249,7 +2247,7 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
        vector. */
     state.mkAttrs(v, args[0]->attrs->size());
     for (auto & i : *args[0]->attrs) {
-        if (names.find(i.name) == names.end())
+        if (!names.count(i.name))
             v.attrs->push_back(i);
     }
 }
@@ -2283,15 +2281,14 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 
     std::set<Symbol> seen;
 
-    for (unsigned int i = 0; i < args[0]->listSize(); ++i) {
-        Value & v2(*args[0]->listElems()[i]);
-        state.forceAttrs(v2, pos);
+    for (auto v2 : args[0]->listItems()) {
+        state.forceAttrs(*v2, pos);
 
         Bindings::iterator j = getAttr(
             state,
             "listToAttrs",
             state.sName,
-            v2.attrs,
+            v2->attrs,
             pos
         );
 
@@ -2303,7 +2300,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
                 state,
                 "listToAttrs",
                 state.sValue,
-                v2.attrs,
+                v2->attrs,
                 pos
             );
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
@@ -2370,11 +2367,10 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     Value * res[args[1]->listSize()];
     unsigned int found = 0;
 
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        Value & v2(*args[1]->listElems()[n]);
-        state.forceAttrs(v2, pos);
-        Bindings::iterator i = v2.attrs->find(attrName);
-        if (i != v2.attrs->end())
+    for (auto v2 : args[1]->listItems()) {
+        state.forceAttrs(*v2, pos);
+        Bindings::iterator i = v2->attrs->find(attrName);
+        if (i != v2->attrs->end())
             res[found++] = i->value;
     }
 
@@ -2649,8 +2645,8 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     bool res = false;
     state.forceList(*args[1], pos);
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n)
-        if (state.eqValues(*args[0], *args[1]->listElems()[n])) {
+    for (auto elem : args[1]->listItems())
+        if (state.eqValues(*args[0], *elem)) {
             res = true;
             break;
         }
@@ -2709,8 +2705,8 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
     if (args[2]->listSize()) {
         Value * vCur = args[1];
 
-        for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
-            Value * vs []{vCur, args[2]->listElems()[n]};
+        for (auto [n, elem] : enumerate(args[2]->listItems())) {
+            Value * vs []{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
             state.callFunction(*args[0], 2, vs, *vCur, pos);
         }
@@ -2740,8 +2736,8 @@ static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * arg
     state.forceList(*args[1], pos);
 
     Value vTmp;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        state.callFunction(*args[0], *args[1]->listElems()[n], vTmp, pos);
+    for (auto elem : args[1]->listItems()) {
+        state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos);
         if (res == any) {
             mkBool(v, any);
@@ -3470,9 +3466,9 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
     res.reserve((args[1]->listSize() + 32) * sep.size());
     bool first = true;
 
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (auto elem : args[1]->listItems()) {
         if (first) first = false; else res += sep;
-        res += state.coerceToString(pos, *args[1]->listElems()[n], context);
+        res += state.coerceToString(pos, *elem, context);
     }
 
     mkString(v, res, context);
@@ -3501,14 +3497,14 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
 
     vector<string> from;
     from.reserve(args[0]->listSize());
-    for (unsigned int n = 0; n < args[0]->listSize(); ++n)
-        from.push_back(state.forceString(*args[0]->listElems()[n], pos));
+    for (auto elem : args[0]->listItems())
+        from.push_back(state.forceString(*elem, pos));
 
     vector<std::pair<string, PathSet>> to;
     to.reserve(args[1]->listSize());
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (auto elem : args[1]->listItems()) {
         PathSet ctx;
-        auto s = state.forceString(*args[1]->listElems()[n], ctx, pos);
+        auto s = state.forceString(*elem, ctx, pos);
         to.push_back(std::make_pair(std::move(s), std::move(ctx)));
     }
 

@@ -119,8 +119,8 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
     case tList2:
     case tListN:
         str << "[ ";
-        for (unsigned int n = 0; n < v.listSize(); ++n) {
-            printValue(str, active, *v.listElems()[n]);
+        for (auto v2 : v.listItems()) {
+            printValue(str, active, *v2);
             str << " ";
         }
         str << "]";
@@ -1155,8 +1155,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    for (size_t n = 0; n < elems.size(); ++n)
-        v.listElems()[n] = elems[n]->maybeThunk(state, env);
+    for (auto [n, v2] : enumerate(v.listItems()))
+        const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
 }
 
 
@@ -1736,8 +1736,8 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (size_t n = 0; n < v.listSize(); ++n)
-                recurse(*v.listElems()[n]);
+            for (auto v2 : v.listItems())
+                recurse(*v2);
         }
     };
 
@@ -1921,12 +1921,12 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
         if (v.isList()) {
             string result;
-            for (size_t n = 0; n < v.listSize(); ++n) {
-                result += coerceToString(pos, *v.listElems()[n],
+            for (auto [n, v2] : enumerate(v.listItems())) {
+                result += coerceToString(pos, *v2,
                     context, coerceMore, copyToStore);
                 if (n < v.listSize() - 1
                     /* !!! not quite correct */
-                    && (!v.listElems()[n]->isList() || v.listElems()[n]->listSize() != 0))
+                    && (!v2->isList() || v2->listSize() != 0))
                     result += " ";
             }
             return result;
