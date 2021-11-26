@@ -8,3 +8,5 @@
 
 * New built-in function: `builtins.groupBy`, with the same functionality as
   Nixpkgs' `lib.groupBy`, but faster.
+
+* `nix repl` now has a `:log` command.
