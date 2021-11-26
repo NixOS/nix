@@ -356,6 +356,8 @@ StringSet NixRepl::completePrefix(string prefix)
             // Quietly ignore evaluation errors.
         } catch (UndefinedVarError & e) {
             // Quietly ignore undefined variable errors.
+        } catch (BadURL & e) {
+            // Quietly ignore BadURL flake-related errors.
         }
     }
 
