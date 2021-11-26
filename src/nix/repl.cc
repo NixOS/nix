@@ -279,6 +279,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     };
 
     setupSignals();
+    Finally resetTerminal([&]() { rl_deprep_terminal(); });
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
     restoreSignals();
