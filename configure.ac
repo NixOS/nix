@@ -195,10 +195,17 @@ PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
 # Look for libcpuid.
+have_libcpuid=
 if test "$machine_name" = "x86_64"; then
-  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"])
-  have_libcpuid=1
-  AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+    AC_ARG_ENABLE([cpuid],
+                  AS_HELP_STRING([--disable-cpuid], [Do not determine microarchitecture levels with libcpuid (relevant to x86_64 only)]))
+    if test "x$enable_cpuid" != "xno"; then
+      PKG_CHECK_MODULES([LIBCPUID], [libcpuid],
+        [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"
+         have_libcpuid=1
+         AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])]
+      )
+    fi
 fi
 AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 

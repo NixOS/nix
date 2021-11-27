@@ -64,3 +64,5 @@
     (e.g., as whether to have `x86_64-v2-linux` among additional system types).
     The library is available from its homepage
     <http://libcpuid.sourceforge.net>.
+    This is an optional dependency and can be disabled
+    by providing a `--disable-cpuid` to the `configure` script.
