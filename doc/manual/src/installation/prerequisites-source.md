@@ -58,3 +58,9 @@
     `--disable-seccomp-sandboxing` option to the `configure` script (Not
     recommended unless your system doesn't support `libseccomp`). To get
     the library, visit <https://github.com/seccomp/libseccomp>.
+
+  - On 64-bit x86 machines only, `libcpuid` library
+    is used to determine which microarchitecture levels are supported
+    (e.g., as whether to have `x86_64-v2-linux` among additional system types).
+    The library is available from its homepage
+    <http://libcpuid.sourceforge.net>.
