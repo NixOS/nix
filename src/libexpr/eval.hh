@@ -221,7 +221,7 @@ public:
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
-    inline void forceValue(Value & v, const Pos & pos = noPos);
+    inline void forceValue(Value & v, const Pos & pos);
 
     /* Force a value, then recursively force list elements and
        attributes. */

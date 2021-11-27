@@ -1280,7 +1280,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     for (auto & i : attrPath) {
-        state.forceValue(*vAttrs);
+        state.forceValue(*vAttrs, vAttrs->determinePos(noPos));
         Bindings::iterator j;
         Symbol name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
@@ -1494,14 +1494,15 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 
 void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
-    forceValue(fun);
+    Pos pos = fun.determinePos(noPos);
+    forceValue(fun, pos);
 
     if (fun.type() == nAttrs) {
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
             Value * v = allocValue();
-            callFunction(*found->value, fun, *v, noPos);
-            forceValue(*v);
+            callFunction(*found->value, fun, *v, pos);
+            forceValue(*v, pos);
             return autoCallFunction(args, *v, res);
         }
     }
@@ -1787,7 +1788,7 @@ void EvalState::forceValueDeep(Value & v)
     recurse = [&](Value & v) {
         if (!seen.insert(&v).second) return;
 
-        forceValue(v);
+        forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
@@ -1924,7 +1925,7 @@ bool EvalState::isDerivation(Value & v)
     if (v.type() != nAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
     if (i == v.attrs->end()) return false;
-    forceValue(*i->value);
+    forceValue(*i->value, *i->pos);
     if (i->value->type() != nString) return false;
     return strcmp(i->value->string.s, "derivation") == 0;
 }
@@ -2036,8 +2037,8 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 
 bool EvalState::eqValues(Value & v1, Value & v2)
 {
-    forceValue(v1);
-    forceValue(v2);
+    forceValue(v1, v1.determinePos(noPos));
+    forceValue(v2, v2.determinePos(noPos));
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls

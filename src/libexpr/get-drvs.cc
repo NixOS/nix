@@ -172,7 +172,7 @@ StringSet DrvInfo::queryMetaNames()
 
 bool DrvInfo::checkMeta(Value & v)
 {
-    state->forceValue(v);
+    state->forceValue(v, v.determinePos(noPos));
     if (v.type() == nList) {
         for (auto elem : v.listItems())
             if (!checkMeta(*elem)) return false;
@@ -278,7 +278,7 @@ static bool getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v);
+        state.forceValue(v, v.determinePos(noPos));
         if (!state.isDerivation(v)) return true;
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =

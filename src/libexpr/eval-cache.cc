@@ -381,7 +381,7 @@ Value & AttrCursor::forceValue()
     auto & v = getValue();
 
     try {
-        root->state.forceValue(v);
+        root->state.forceValue(v, v.determinePos(noPos));
     } catch (EvalError &) {
         debug("setting '%s' to failed", getAttrPathStr());
         if (root->db)

@@ -198,8 +198,9 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             prefix_ = "";
         }
 
-        Value &v1(*findAlongAttrPath(*state, prefix_, *autoArgs, root).first);
-        state->forceValue(v1);
+        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+        Value &v1(*v);
+        state->forceValue(v1, pos);
         Value v2;
         state->autoCallFunction(*autoArgs, v1, v2);
 
@@ -446,7 +447,7 @@ struct InstallableAttrPath : InstallableValue
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
-        state.forceValue(*vRes);
+        state.forceValue(*vRes, pos);
         return {vRes, pos};
     }
 
@@ -496,7 +497,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceValue(*aOutputs->value);
+    state.forceValue(*aOutputs->value, aOutputs->value->determinePos(noPos));
 
     return aOutputs->value;
 }
@@ -608,7 +609,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
     for (auto & attrPath : getActualAttrPaths()) {
         try {
             auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
-            state.forceValue(*v);
+            state.forceValue(*v, pos);
             return {v, pos};
         } catch (AttrPathNotFound & e) {
         }

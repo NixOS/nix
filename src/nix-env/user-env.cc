@@ -129,7 +129,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel);
+    state.forceValue(topLevel, topLevel.determinePos(noPos));
     PathSet context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
     auto topLevelDrv = state.store->parseStorePath(state.coerceToPath(*aDrvPath.pos, *aDrvPath.value, context));

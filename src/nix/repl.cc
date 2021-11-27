@@ -712,7 +712,7 @@ void NixRepl::evalString(string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v);
+    state->forceValue(v, v.determinePos(noPos));
 }
 
 
@@ -742,7 +742,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v);
+    state->forceValue(v, v.determinePos(noPos));
 
     switch (v.type()) {
 
