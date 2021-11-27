@@ -44,6 +44,11 @@
     obtained from the its repository
     <https://github.com/troglobit/editline>.
 
+  - The `libsodium` library for verifying cryptographic signatures
+    of contents fetched from binary caches.
+    It can be obtained from the official web site
+    <https://libsodium.org>.
+
   - Recent versions of Bison and Flex to build the parser. (This is
     because Nix needs GLR support in Bison and reentrancy support in
     Flex.) For Bison, you need version 2.6, which can be obtained from
