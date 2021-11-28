@@ -1,8 +1,13 @@
 #include <iostream>
 #include <cstring>
 
-#include <openssl/md5.h>
-#include <openssl/sha.h>
+// use SHA-256 and SHA-512 from sodium
+#include <sodium.h>
+// use SHA-1 and MD5 legacy hashes from an bundled implementation
+extern "C" {
+#include "md5.h"
+#include "sha1.h"
+}
 
 #include "args.hh"
 #include "hash.hh"
@@ -276,8 +281,8 @@ union Ctx
 {
     MD5_CTX md5;
     SHA_CTX sha1;
-    SHA256_CTX sha256;
-    SHA512_CTX sha512;
+    crypto_hash_sha256_state sha256;
+    crypto_hash_sha512_state sha512;
 };
 
 
@@ -285,18 +290,19 @@ static void start(HashType ht, Ctx & ctx)
 {
     if (ht == htMD5) MD5_Init(&ctx.md5);
     else if (ht == htSHA1) SHA1_Init(&ctx.sha1);
-    else if (ht == htSHA256) SHA256_Init(&ctx.sha256);
-    else if (ht == htSHA512) SHA512_Init(&ctx.sha512);
+    else if (ht == htSHA256) crypto_hash_sha256_init(&ctx.sha256);
+    else if (ht == htSHA512) crypto_hash_sha512_init(&ctx.sha512);
 }
 
 
-static void update(HashType ht, Ctx & ctx,
-    std::string_view data)
+static void update(HashType ht, Ctx & ctx, std::string_view data)
 {
-    if (ht == htMD5) MD5_Update(&ctx.md5, data.data(), data.size());
-    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
-    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
-    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, data.data(), data.size());
+    const unsigned char* d = (const unsigned char*) data.data();
+    unsigned long long l = data.size();
+    if (ht == htMD5) MD5_Update(&ctx.md5, d, l);
+    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, d, l);
+    else if (ht == htSHA256) crypto_hash_sha256_update(&ctx.sha256, d, l);
+    else if (ht == htSHA512) crypto_hash_sha512_update(&ctx.sha512, d, l);
 }
 
 
@@ -304,8 +310,8 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 {
     if (ht == htMD5) MD5_Final(hash, &ctx.md5);
     else if (ht == htSHA1) SHA1_Final(hash, &ctx.sha1);
-    else if (ht == htSHA256) SHA256_Final(hash, &ctx.sha256);
-    else if (ht == htSHA512) SHA512_Final(hash, &ctx.sha512);
+    else if (ht == htSHA256) crypto_hash_sha256_final(&ctx.sha256, hash);
+    else if (ht == htSHA512) crypto_hash_sha512_final(&ctx.sha512, hash);
 }
 
 

@@ -69,10 +69,6 @@ static void initAWS()
     std::call_once(flag, []() {
         Aws::SDKOptions options;
 
-        /* We install our own OpenSSL locking function (see
-           shared.cc), so don't let aws-sdk-cpp override it. */
-        options.cryptoOptions.initAndCleanupOpenSSL = false;
-
         if (verbosity >= lvlDebug) {
             options.loggingOptions.logLevel =
                 verbosity == lvlDebug

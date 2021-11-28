@@ -16,10 +16,6 @@
     provide it, you can get it from
     <http://www.freedesktop.org/wiki/Software/pkg-config>.
 
-  - The OpenSSL library to calculate cryptographic hashes. If your
-    distribution does not provide it, you can get it from
-    <https://www.openssl.org>.
-
   - The `libbrotlienc` and `libbrotlidec` libraries to provide
     implementation of the Brotli compression algorithm. They are
     available for download from the official repository
@@ -44,8 +40,8 @@
     obtained from the its repository
     <https://github.com/troglobit/editline>.
 
-  - The `libsodium` library for verifying cryptographic signatures
-    of contents fetched from binary caches.
+  - The `libsodium` library for calculating hashes and for verifying
+    cryptographic signatures of contents fetched from binary caches.
     It can be obtained from the official web site
     <https://libsodium.org>.
 

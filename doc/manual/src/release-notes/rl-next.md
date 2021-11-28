@@ -5,3 +5,5 @@
 * `nix develop` now has a flag `--unpack` to run `unpackPhase`.
 
 * Lists can now be compared lexicographically using the `<` operator.
+
+* OpenSSL dependency has been dropped in favour of libsodium.

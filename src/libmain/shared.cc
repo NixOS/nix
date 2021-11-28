@@ -24,8 +24,6 @@
 #include <dlfcn.h>
 #endif
 
-#include <openssl/crypto.h>
-
 #include <sodium.h>
 
 
@@ -103,21 +101,6 @@ string getArg(const string & opt,
 }
 
 
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-/* OpenSSL is not thread-safe by default - it will randomly crash
-   unless the user supplies a mutex locking function. So let's do
-   that. */
-static std::vector<std::mutex> opensslLocks;
-
-static void opensslLockCallback(int mode, int type, const char * file, int line)
-{
-    if (mode & CRYPTO_LOCK)
-        opensslLocks[type].lock();
-    else
-        opensslLocks[type].unlock();
-}
-#endif
-
 static std::once_flag dns_resolve_flag;
 
 static void preloadNSS() {
@@ -162,12 +145,6 @@ void initNix()
 #if HAVE_PUBSETBUF
     static char buf[1024];
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
-#endif
-
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-    /* Initialise OpenSSL locking. */
-    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
-    CRYPTO_set_locking_callback(opensslLockCallback);
 #endif
 
     if (sodium_init() == -1)
