@@ -187,6 +187,11 @@ void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepe
     print(symbols, str, showRepeated ? nullptr : &seen);
 }
 
+// Pretty print types for assertion errors
+std::ostream & operator << (std::ostream & os, const ValueType t) {
+    os << showType(t);
+    return os;
+}
 
 std::string printValue(const EvalState & state, const Value & v)
 {
