@@ -147,7 +147,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         else {
             str << "[ ";
             for (auto v2 : listItems()) {
-                v2->print(symbols, str, seen);
+                if (v2)
+                    v2->print(symbols, str, seen);
+                else
+                    str << "(nullptr)";
                 str << " ";
             }
             str << "]";
