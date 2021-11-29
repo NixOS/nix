@@ -344,8 +344,7 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    if (args.command->first != "repl"
-        && args.command->first != "doctor"
+    if (args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
         settings.requireExperimentalFeature(Xp::NixCommand);
 
