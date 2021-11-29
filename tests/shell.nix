@@ -1,6 +1,12 @@
-{ inNixShell ? false, contentAddressed ? false, fooContents ? "foo" }:
-
-let cfg = import ./config.nix; in
+# This file should resemble the function signature of Nixpkgs as it is used to
+# simulate nixpkgs within the nix-shell tests.
+{ ... }@args:
+let
+  cfg = import ./config.nix;
+  inNixShell = args.inNixShell or false;
+  contentAddressed = args.contentAddressed or false;
+  fooContents = args.fooContents or "foo";
+in
 with cfg;
 
 let
