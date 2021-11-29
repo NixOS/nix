@@ -12,6 +12,8 @@ libmain_LDFLAGS += $(OPENSSL_LIBS)
 
 libmain_LIBS = libstore libutil
 
+libmain_LDFLAGS += -ldl
+
 libmain_ALLOW_UNDEFINED = 1
 
 $(eval $(call install-file-in, $(d)/nix-main.pc, $(libdir)/pkgconfig, 0644))
