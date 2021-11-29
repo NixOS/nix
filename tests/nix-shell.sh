@@ -52,6 +52,18 @@ output=$(NIX_PATH=nixpkgs="$shellDotNix" nix-shell --pure -p foo bar --run 'echo
 output=$(NIX_PATH=nixpkgs="$shellDotNix" nix-shell --pure -p foo --argstr fooContents baz --run 'echo "$(foo)"')
 [ "$output" = "baz" ]
 
+# Test that we are compatible with an old nixpkgs that doesn't accept the
+# inNixShell attribute
+output=$(NIX_PATH=nixpkgs="$PWD/shell-no-in-nix-shell.nix" nix-shell --pure -p foo)
+[ "$output" = "noInNixShell" ]
+
+# Test that passing arguments that aren't part of the formals (of the outer
+# shell expression) are still passed into the expression while *not* passing
+# inNixShell
+output=$(NIX_PATH=nixpkgs="$PWD/shell-no-in-nix-shell.nix" nix-shell --pure -p foo --argstr fooContents zes)
+[ "$output" = "zes" ]
+
+
 # Test nix-shell shebang mode
 sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.sh > $TEST_ROOT/shell.shebang.sh
 chmod a+rx $TEST_ROOT/shell.shebang.sh
