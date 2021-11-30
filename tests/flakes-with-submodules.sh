@@ -20,14 +20,9 @@ for repo in $flakeDir $nonFlakeDir $flakeWithSubmodules; do
     git -C $repo init
     git -C $repo config user.email "foobar@example.com"
     git -C $repo config user.name "Foobar"
-done
-
-for dir in $nonFlakeDir $flakeDir; do
-cat > $dir/README.md <<EOF
-FNORD
-EOF
-git -C $dir add README.md
-git -C $dir commit -m 'Initial'
+    echo FNORD > $repo/README.md
+    git -C $repo add README.md
+    git -C $repo commit -m 'Initial'
 done
 
 cp config.nix $flakeDir
@@ -81,6 +76,11 @@ cat > $flakeWithSubmodules/flake.nix <<EOF
         nonFlake = builtins.fetchTree (traceVal self.modules.nonFlake);
         flake = builtins.getFlake (traceVal self.modules.flake);
 
+        mapAttrsToList = f: attrs:
+          map (name: f name attrs.\${name}) (builtins.attrNames attrs);
+        pipe = val: functions:
+          let reverseApply = x: f: f x;
+          in builtins.foldl' reverseApply val functions;
         writeShellScriptBin = name: script: mkDerivation {
             inherit name;
             buildCommand = ''
@@ -91,12 +91,35 @@ cat > $flakeWithSubmodules/flake.nix <<EOF
                 chmod +x \$bin
             '';
         };
+
+        combineModules = self: let
+          srcs = builtins.mapAttrs (_: url: fetchTree (traceVal url)) self.modules;
+        in mkDerivation {
+          name = "source-with-submodules";
+          buildCommand = ''
+            cp -r \${self} \$out
+            chmod -R +w \$_
+
+            \${
+              pipe srcs [
+                (mapAttrsToList (path: src: "cp -rT \${src} \$out/\${path}"))
+                (builtins.concatStringsSep "\n")
+              ]
+            }
+          '';
+        };
     in {
         packages.$system = {
             cat-submodule-readme = writeShellScriptBin "cat-submodule-readme" ''
                 cat \${nonFlake}/README.md
             '';
             use-submodule-as-flake = flake.packages.$system.cat-own-readme;
+
+            cat-own-readme = writeShellScriptBin "cat-own-readme" ''
+                cat \${self}/README.md
+            '';
+
+            source-with-submodules = combineModules self;
         };
 
         defaultPackage.$system = self.packages.$system.cat-submodule-readme;
@@ -107,12 +130,19 @@ EOF
 git -C $flakeWithSubmodules add .
 git -C $flakeWithSubmodules commit -m'add flake.nix'
 
+[[ $(nix run $flakeWithSubmodules#cat-own-readme) == "FNORD" ]]
 [[ $(nix run $flakeWithSubmodules#cat-submodule-readme) == "FNORD" ]]
 [[ $(nix run $flakeWithSubmodules#use-submodule-as-flake) == "FNORD" ]]
+nix build -o $TEST_ROOT/result $flakeWithSubmodules#source-with-submodules
+[[ $(cat $TEST_ROOT/result/nonFlake/README.md) == "FNORD" ]]
+
+echo FOST > $flakeWithSubmodules/README.md
 
 # apply dirt
 echo FSUD > $flakeWithSubmodules/nonFlake/README.md
 [[ $(nix run $flakeWithSubmodules#cat-submodule-readme) == "FSUD" ]]
+nix build -o $TEST_ROOT/result $flakeWithSubmodules#source-with-submodules
+[[ $(cat $TEST_ROOT/result/nonFlake/README.md) == "FSUD" ]]
 
 # should work for flake as well
 echo FSUD > $flakeWithSubmodules/flake/README.md
