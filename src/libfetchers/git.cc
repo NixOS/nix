@@ -131,18 +131,26 @@ static std::map<string, std::pair<gitType, string>> gitTreeList(const Path & pat
 std::map<string,string> parseSubmodules(const string & contents) {
   auto lines = tokenizeString<std::vector<string>>(contents, "\n");
   std::map<string,string> results;
-  string path;
+  std::optional<string> path, url, branch;
   for (auto line : lines) {
     auto words = tokenizeString<std::vector<string>>(line);
-    if (words[1] != "=") continue;
+    if (words[1] != "=") {
+        if (line != lines[0]) {
+            printTalkative("Saving %s\t%s\t%s\n", *path, *url, branch.value_or("master"));
+
+            results.insert(std::pair{*path, *url + "?ref=" + branch.value_or("master")});
+            path = url = branch = {};
+        }
+        continue;
+    }
 
     if (words[0] == "path") path = words[2];
-    if (words[0] == "url") {
-      string url = words[2];
-      results.insert(std::pair{path, url});
-    }
+    if (words[0] == "branch") branch = words[2];
+    if (words[0] == "url") url = words[2];
+
   }
   printTalkative("Saving %s\t%s\t%s\n", *path, *url, branch.value_or("master"));
+  results.insert(std::pair{*path, *url + "?ref=" + branch.value_or("master")});
   return results;
 }
 
@@ -197,10 +205,9 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
     auto parsedModules = parseSubmodules(submodules);
     for (auto & [subPath, url] : parsedModules) {
       auto fullPath = path + "/" + subPath;
-      auto initialized = !readDirectory(fullPath).empty();
-      auto clean = isClean(fullPath);
+      auto initialized = pathExists(fullPath) && !readDirectory(fullPath).empty();
 
-      if (!initialized || clean) {
+      if (!initialized || isClean(fullPath)) {
         printTalkative("submodule %s fetched from %s", subPath, url);
         auto commitHash = findCommitHash(path, entries, subPath);
         printTalkative("found %s", commitHash);
@@ -210,7 +217,8 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
         if (std::regex_match(url, barePathRegex))
           prefix += "file://";
 
-        std::string suffix = "?allRefs=1&rev=" + commitHash;
+        // std::string suffix = "?allRefs=1&rev=" + commitHash;
+        std::string suffix = "&rev=" + commitHash;
         attrs.emplace(subPath, prefix + url + suffix);
       } else {
         StringSink sink;
