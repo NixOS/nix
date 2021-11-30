@@ -99,6 +99,6 @@
     links.  NARs are generated and unpacked using `nix-store --dump`
     and `nix-store --restore`.
   - `∅` \
-    The empty set symbol. In the context of package history, this denotes a package was not present prior to installation.
+    The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
   - `ε` \
     The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
