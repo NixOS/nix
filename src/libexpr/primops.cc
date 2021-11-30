@@ -188,7 +188,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
-                staticEnv.vars.emplace_back(attr.name, displ);
+                staticEnv->vars.emplace_back(attr.name, displ);
                 env->values[displ++] = attr.value;
             }
 
@@ -3750,7 +3750,7 @@ void EvalState::createBaseEnv()
        because attribute lookups expect it to be sorted. */
     baseEnv.values[0]->attrs->sort();
 
-    staticBaseEnv.sort();
+    staticBaseEnv->sort();
 
     /* Note: we have to initialize the 'derivation' constant *after*
        building baseEnv/staticBaseEnv because it uses 'builtins'. */

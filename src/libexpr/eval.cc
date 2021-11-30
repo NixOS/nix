@@ -591,7 +591,7 @@ Value * EvalState::addConstant(const string & name, Value & v)
 
 void EvalState::addConstant(const string & name, Value * v)
 {
-    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
+    staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
@@ -1459,7 +1459,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                        user. */
                     for (auto & i : *args[0]->attrs)
                         if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                            throwTypeError(pos, "%1% called with unexpected argument '%2%'",
+                                lambda, i.name, *fun.lambda.env, &lambda);
                     abort(); // can't happen
                 }
             }

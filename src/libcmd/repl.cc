@@ -205,6 +205,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     if (!files.empty()) {
         for (auto & i : files)
             loadedFiles.push_back(i);
+    }
 
     reloadFiles();
     if (!loadedFiles.empty()) notice("");
@@ -639,7 +640,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+        addVarToScope(i.name, i.value);
     notice("Added %1% variables.", attrs.attrs->size());
 }
 
@@ -650,7 +651,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value * v)
         throw Error("environment full; cannot add more variables");
     staticEnv->vars.emplace_back(name, displ);
     staticEnv->sort();
-    env->values[displ++] = &v;
+    env->values[displ++] = v;
     varNames.insert((string) name);
 }
 

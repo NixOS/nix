@@ -346,7 +346,7 @@ void ExprAttrs::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
         Displacement displ = 0;
         for (auto & i : attrs)
-            newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
 
         // No need to sort newEnv since attrs is in sorted order.
 
@@ -391,13 +391,13 @@ void ExprLambda::bindVars(const std::shared_ptr<const StaticEnv> &env)
 
     Displacement displ = 0;
 
-    if (!arg.empty()) newEnv.vars.emplace_back(arg, displ++);
+    if (!arg.empty()) newEnv->vars.emplace_back(arg, displ++);
 
     if (hasFormals()) {
         for (auto & i : formals->formals)
-            newEnv.vars.emplace_back(i.name, displ++);
+            newEnv->vars.emplace_back(i.name, displ++);
 
-        newEnv.sort();
+        newEnv->sort();
 
         for (auto & i : formals->formals)
             if (i.def) i.def->bindVars(newEnv);
@@ -406,7 +406,7 @@ void ExprLambda::bindVars(const std::shared_ptr<const StaticEnv> &env)
     body->bindVars(newEnv);
 }
 
-void ExprCall::bindVars(const StaticEnv & env)
+void ExprCall::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     if (debuggerHook)
         staticenv = env;
@@ -416,7 +416,7 @@ void ExprCall::bindVars(const StaticEnv & env)
         e->bindVars(env);
 }
 
-void ExprLet::bindVars(const StaticEnv & env)
+void ExprLet::bindVars(const std::shared_ptr<const StaticEnv> &env)
 {
     if (debuggerHook)
         staticenv = env;
@@ -425,7 +425,7 @@ void ExprLet::bindVars(const StaticEnv & env)
 
     Displacement displ = 0;
     for (auto & i : attrs->attrs)
-        newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+        newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
 
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
