@@ -61,7 +61,7 @@ std::pair<bool, std::string> getActualUrl(const Input &input) {
 std::string getGitDir(const std::string & actualUrl) {
   auto gitDir = actualUrl + "/.git";
   auto commonGitDir = chomp(runProgram(
-      "git", true, {"-C", actualUrl, "rev-parse", "--git-common-dir"}));
+      "git", true, {"-C", actualUrl, "rev-parse", "--path-format=absolute", "--git-common-dir"}));
   if (commonGitDir != ".git")
     gitDir = commonGitDir;
 
