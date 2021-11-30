@@ -1831,4 +1831,18 @@ void commonChildInit(Pipe & logPipe)
     close(fdDevNull);
 }
 
+/* Given two pointers to c strings, return a pointer to the start of the first
+ * non-equivalent part of the first string. */
+const char *removeStartingOverlap(const char *a, const char *b)
+{
+    while (*a == *b) {
+    	a++;
+    	b++;
+
+    	if (*a == '\0' || *b == '\0') break;
+    }
+
+    return a;
+}
+
 }
