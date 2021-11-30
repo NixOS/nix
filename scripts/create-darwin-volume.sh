@@ -303,8 +303,16 @@ generate_mount_daemon() {
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>RunAtLoad</key>
+  <key>LaunchOnlyOnce</key>
   <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>PathState</key>
+    <dict>
+      <key>$NIX_ROOT/store</key>
+      <false/>
+    </dict>
+  </dict>
   <key>Label</key>
   <string>org.nixos.darwin-store</string>
   <key>ProgramArguments</key>
