@@ -431,25 +431,23 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 hashAlgo = parseHashType(hashAlgoRaw);
             }
 
-            StringSink saved;
-            TeeSource savedNARSource(from, saved);
-            RetrieveRegularNARSink savedRegular { saved };
+            auto dumpSource = sinkToSource([&](Sink & saved) {
+                TeeSource savedNARSource(from, saved);
+                RetrieveRegularNARSink savedRegular { saved };
 
-            if (method == FileIngestionMethod::Recursive) {
-                /* Get the entire NAR dump from the client and save it to
-                  a string so that we can pass it to
-                  addToStoreFromDump(). */
-                ParseSink sink; /* null sink; just parse the NAR */
-                parseDump(sink, savedNARSource);
-            } else
-                parseDump(savedRegular, from);
+                if (method == FileIngestionMethod::Recursive) {
+                    /* Get the entire NAR dump from the client and save it to
+                      a string so that we can pass it to
+                      addToStoreFromDump(). */
+                    ParseSink sink; /* null sink; just parse the NAR */
+                    parseDump(sink, savedNARSource);
+                } else
+                    parseDump(savedRegular, from);
 
+                if (!savedRegular.regular) throw Error("regular file expected");
+            });
             logger->startWork();
-            if (!savedRegular.regular) throw Error("regular file expected");
-
-            // FIXME: try to stream directly from `from`.
-            StringSource dumpSource { *saved.s };
-            auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+            auto path = store->addToStoreFromDump(*dumpSource, baseName, method, hashAlgo);
             logger->stopWork();
 
             to << store->printStorePath(path);
