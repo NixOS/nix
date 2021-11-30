@@ -73,6 +73,7 @@ std::string getGitDir(const std::string & actualUrl) {
 bool hasCommits(const std::string & actualUrl) {
   auto gitDir = getGitDir(actualUrl);
 
+  printTalkative("in hasCommits\nactualUrl %s\ngitDir %s", actualUrl, gitDir);
   return !readDirectory(gitDir + "/refs/heads").empty();
 }
 
@@ -141,6 +142,7 @@ std::map<string,string> parseSubmodules(const string & contents) {
       results.insert(std::pair{path, url});
     }
   }
+  printTalkative("Saving %s\t%s\t%s\n", *path, *url, branch.value_or("master"));
   return results;
 }
 
@@ -190,7 +192,7 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
 
     auto submodules = getBlob(path, gitrev, i->second.second);
 
-    printTalkative("submodule file %s", submodules);
+    printTalkative("submodule file\n %s", submodules);
 
     auto parsedModules = parseSubmodules(submodules);
     for (auto & [subPath, url] : parsedModules) {
@@ -216,6 +218,7 @@ static Attrs readSubmodules(const Path & path, const string & gitrev)
 
         auto narHash = hashString(htSHA256, *sink.s);
         attrs.emplace(subPath, "path://" + fullPath + "?narHash=" + narHash.to_string(SRI, false));
+        printTalkative("DIRTY\nsubPath: %s\nurl: %s\ndirtyUrl: %s\n", subPath, url, "path://" + fullPath + "?narHash=" + narHash.to_string(SRI, false));
       }
     }
 
