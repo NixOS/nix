@@ -141,7 +141,9 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                         .query = decodeQuery(match[2]),
                     };
 
-                    if (flakedir) {
+                    if (!flakedir) {
+                        throw Error("path '%s' is not a flake (because its repo doesn't contain a 'flake.nix' file)", path);
+                    } else {
                         if (parsedURL.query.count("dir"))
                             throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
 
