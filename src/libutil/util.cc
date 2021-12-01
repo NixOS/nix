@@ -1836,10 +1836,10 @@ void commonChildInit(Pipe & logPipe)
 const char *removeStartingOverlap(const char *a, const char *b)
 {
     while (*a == *b) {
-    	a++;
-    	b++;
+        a++;
+        b++;
 
-    	if (*a == '\0' || *b == '\0') break;
+        if (*a == '\0' || *b == '\0') break;
     }
 
     return a;

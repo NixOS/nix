@@ -126,7 +126,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
             while (flakeRoot != "/") {
                 if (!flakedir && pathExists(flakeRoot + "/flake.nix")) {
-                	flakedir = flakeRoot;
+                    flakedir = flakeRoot;
                 }
 
                 if (pathExists(flakeRoot + "/.git")) {
