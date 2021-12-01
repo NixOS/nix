@@ -1831,7 +1831,7 @@ void commonChildInit(Pipe & logPipe)
     close(fdDevNull);
 }
 
-/* Given two pointers to c strings, return a pointer to the start of the first
+/* Given two strings, return a pointer to the start of the first
  * non-equivalent part of the first string. This is a non-owning reference to
  * data owned by a, and must not outlive a. */
 const std::string_view removeStartingOverlap(const std::string & a_ref, const std::string & b_ref)
