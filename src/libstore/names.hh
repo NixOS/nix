@@ -19,7 +19,7 @@ struct DrvName
     DrvName(std::string_view s);
     ~DrvName();
 
-    bool matches(DrvName & n);
+    bool matches(const DrvName & n);
 
 private:
     std::unique_ptr<Regex> regex;
