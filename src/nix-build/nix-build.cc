@@ -579,6 +579,19 @@ static void main_nix_build(int argc, char * * argv)
             else
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
+        // Can only free the eval state after all the DrvInfo's have been freed
+        // as they carry a reference to the eval state instance (which isn't
+        // managed in any way).
+        drvs = {};
+        exprs = {};
+        state = nullptr;
+
+        // Collect garbage a couple of times as per Boehm GC docs that suggest
+        // to run it more than just once.
+        // Running it 10 times seems reasonable and doesn't appear to take too
+        // much time.
+        for (int i = 0; i < 10; i++)
+            GC_gcollect();
 
         buildPaths(store, evalStore, buildMode, pathsToBuild, dryRun);
 
