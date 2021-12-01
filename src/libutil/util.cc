@@ -1840,7 +1840,6 @@ const std::string_view removeStartingOverlap(std::string & a_ref, std::string & 
     auto b = std::string_view(b_ref);
 
     auto start = 0;
-    auto end = a.length() > b.length() ? a.length() : b.length();
 
     for (auto ap = a.begin(), bp = b.begin(),
               ae = a.end(),   be = b.end();
@@ -1850,7 +1849,7 @@ const std::string_view removeStartingOverlap(std::string & a_ref, std::string & 
         if (*ap != *bp) break;
     }
 
-    return a.substr(start, end - start);
+    return a.substr(start);
 }
 
 }
