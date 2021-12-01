@@ -8,9 +8,9 @@ libmain_SOURCES := $(wildcard $(d)/*.cc)
 
 libmain_CXXFLAGS += -I src/libutil -I src/libstore
 
-libmain_LDFLAGS += $(OPENSSL_LIBS)
-
 libmain_LIBS = libstore libutil
+
+libmain_LDFLAGS += -ldl
 
 libmain_ALLOW_UNDEFINED = 1
 

@@ -158,11 +158,6 @@ else
   PKG_CONFIG="$PKG_CONFIG --static"
 fi
 
-# Look for OpenSSL, a required dependency. FIXME: this is only (maybe)
-# used by S3BinaryCacheStore.
-PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
-
-
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
