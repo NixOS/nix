@@ -121,7 +121,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
 
             auto flakeRoot = path;
-            std::string subdir;
             std::optional<std::string> flakedir;
 
             while (flakeRoot != "/") {
@@ -145,7 +144,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                     if (flakedir) {
                         if (parsedURL.query.count("dir"))
                             throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
-                        subdir = removeStartingOverlap(flakedir.value(), flakeRoot);
+
+                        std::string subdir = std::string(removeStartingOverlap(flakedir.value(), flakeRoot));
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
@@ -157,7 +157,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                         fragment);
                 }
 
-                subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
                 flakeRoot = dirOf(flakeRoot);
             }
 
