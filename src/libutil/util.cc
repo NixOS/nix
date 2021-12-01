@@ -1832,9 +1832,13 @@ void commonChildInit(Pipe & logPipe)
 }
 
 /* Given two pointers to c strings, return a pointer to the start of the first
- * non-equivalent part of the first string. */
-std::string removeStartingOverlap(std::string & a, std::string & b)
+ * non-equivalent part of the first string. This is a non-owning reference to
+ * data owned by a, and must not outlive a. */
+const std::string_view removeStartingOverlap(std::string & a_ref, std::string & b_ref)
 {
+    auto a = std::string_view(a_ref);
+    auto b = std::string_view(b_ref);
+
     auto start = 0;
     auto end = a.length() > b.length() ? a.length() : b.length();
 
