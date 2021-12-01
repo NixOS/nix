@@ -145,10 +145,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                     if (flakedir) {
                         if (parsedURL.query.count("dir"))
                             throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
-                        const char *subdir = removeStartingOverlap(
-                            flakedir.value().c_str(), flakeRoot.c_str()
-                        );
-                        parsedURL.query.insert_or_assign("dir", std::string(subdir));
+                        subdir = removeStartingOverlap(flakedir.value(), flakeRoot);
+                        parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
                     if (pathExists(flakeRoot + "/.git/shallow"))

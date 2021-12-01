@@ -649,5 +649,5 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
-const char *removeStartingOverlap(const char *a, const char *b);
+std::string removeStartingOverlap(std::string & a, std::string & b);
 }

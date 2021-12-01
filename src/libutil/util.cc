@@ -1833,16 +1833,20 @@ void commonChildInit(Pipe & logPipe)
 
 /* Given two pointers to c strings, return a pointer to the start of the first
  * non-equivalent part of the first string. */
-const char *removeStartingOverlap(const char *a, const char *b)
+std::string removeStartingOverlap(std::string & a, std::string & b)
 {
-    while (*a == *b) {
-        a++;
-        b++;
+    auto start = 0;
+    auto end = a.length() > b.length() ? a.length() : b.length();
 
-        if (*a == '\0' || *b == '\0') break;
+    for (auto ap = a.begin(), bp = b.begin(),
+              ae = a.end(),   be = b.end();
+         ap < ae && bp < be;
+         ++ap, ++bp, ++start
+    ) {
+        if (*ap != *bp) break;
     }
 
-    return a;
+    return a.substr(start, end - start);
 }
 
 }
