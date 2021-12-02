@@ -97,7 +97,7 @@ struct PathInputScheme : InputScheme
             // for security, ensure that if the parent is a store path, it's inside it
             if (store->isInStore(parent)) {
                 auto storePath = store->printStorePath(store->toStorePath(parent).first);
-                if (!isInDir(absPath, storePath))
+                if (!isDirOrInDir(absPath, storePath))
                     throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
             }
         } else
