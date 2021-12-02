@@ -66,11 +66,13 @@ Path dirOf(const Path & path);
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
-/* Check whether 'path' is a descendant of 'dir'. */
-bool isInDir(const Path & path, const Path & dir);
+/* Check whether 'path' is a descendant of 'dir'. Both paths must be
+   canonicalized. */
+bool isInDir(std::string_view path, std::string_view dir);
 
-/* Check whether 'path' is equal to 'dir' or a descendant of 'dir'. */
-bool isDirOrInDir(const Path & path, const Path & dir);
+/* Check whether 'path' is equal to 'dir' or a descendant of
+   'dir'. Both paths must be canonicalized. */
+bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /* Get status of `path'. */
 struct stat lstat(const Path & path);

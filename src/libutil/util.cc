@@ -196,16 +196,16 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
-bool isInDir(const Path & path, const Path & dir)
+bool isInDir(std::string_view path, std::string_view dir)
 {
-    return path[0] == '/'
-        && string(path, 0, dir.size()) == dir
+    return path.substr(0, 1) == "/"
+        && path.substr(0, dir.size()) == dir
         && path.size() >= dir.size() + 2
         && path[dir.size()] == '/';
 }
 
 
-bool isDirOrInDir(const Path & path, const Path & dir)
+bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
 }
