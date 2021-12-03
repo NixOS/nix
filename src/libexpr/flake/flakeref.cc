@@ -114,7 +114,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         std::string fragment = percentDecode(std::string(match[3]));
         fetchers::Attrs attrs;
 
-        if (baseDir) {
+        if (baseDir && !allowMissing) {
             /* Check if 'url' is a path (either absolute or relative
                to 'baseDir'). If so, search upward to the root of the
                repo (i.e. the directory containing .git). The flake.nix
