@@ -149,7 +149,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                     fragment);
             } else {
                 attrs.insert_or_assign("type", "path");
-                attrs.insert_or_assign("path", path);
+                attrs.insert_or_assign("path", absPath(path, baseDir, true));
             }
         } else {
             if (!hasPrefix(path, "/"))

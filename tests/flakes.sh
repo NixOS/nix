@@ -1,5 +1,8 @@
 source common.sh
 
+alias nix='nix --extra-experimental-features flakes --extra-experimental-features nix-command'
+shopt -s expand_aliases
+
 if [[ -z $(type -p git) ]]; then
     echo "Git not installed; skipping flake tests"
     exit 99
