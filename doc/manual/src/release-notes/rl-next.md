@@ -8,3 +8,5 @@
 
 * New built-in function: `builtins.groupBy`, with the same functionality as
   Nixpkgs' `lib.groupBy`, but faster.
+
+* Nix now searches for a flake.nix up until git or filesystem boundary.
