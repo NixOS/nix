@@ -34,7 +34,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
         addFlag({
             .longName = "human-readable",
-            .shortName = 'h',
+            .shortName = 'H',
             .description = "With `-s` and `-S`, print sizes in a human-friendly format such as `5.67G`.",
             .handler = {&humanReadable, true},
         });

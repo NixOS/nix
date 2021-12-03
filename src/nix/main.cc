@@ -74,6 +74,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         addFlag({
             .longName = "help",
+            .shortName = 'h',
             .description = "Show usage information.",
             .handler = {[&]() { throw HelpRequested(); }},
         });
