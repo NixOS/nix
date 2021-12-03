@@ -425,9 +425,11 @@ void mkPath(Value & v, const char * s);
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
 typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
+typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector> > > ValueVectorMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;
+typedef std::map<Symbol, ValueVector> ValueVectorMap;
 #endif
 
 
