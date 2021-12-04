@@ -150,6 +150,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                     FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
                     fragment);
             } else {
+                if (!allowMissing && !pathExists(path + "/flake.nix"))
+                    throw Error("Path '%s' is not a flake (because it doesn't contain a 'flake.nix' file).", dir);
                 attrs.insert_or_assign("type", "path");
                 attrs.insert_or_assign("path", dir);
             }
@@ -158,6 +160,9 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                 throw BadURL("flake reference '%s' is not an absolute path", url);
             auto query = decodeQuery(match[2]);
             path = canonPath(path + "/" + get(query, "dir").value_or(""));
+
+            if (!allowMissing && !pathExists(path + "/flake.nix"))
+                throw Error("Path '%s' is not a flake (because it doesn't contain a 'flake.nix' file).", path);
 
             attrs.insert_or_assign("type", "path");
             attrs.insert_or_assign("path", path);
@@ -232,7 +237,7 @@ static std::pair<std::optional<string>, std::string> findFlakeDirs(
     }
 
     if (!flakeDir)
-        throw Error("Path '%s' is not a flake (because a 'flake.nix' could be found)", prettyPath);
+        throw Error("Path '%s' is not a flake (because it doesn't contain a 'flake.nix' file)", prettyPath);
 
     return std::make_pair(gitRepo, flakeDir.value());
 }
