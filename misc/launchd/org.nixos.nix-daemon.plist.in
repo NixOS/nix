@@ -25,5 +25,10 @@
     <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
     <string>/dev/null</string>
+    <key>SoftResourceLimits</key>
+    <dict>
+      <key>NumberOfFiles</key>
+      <integer>4096</integer>
+    </dict>
   </dict>
 </plist>
