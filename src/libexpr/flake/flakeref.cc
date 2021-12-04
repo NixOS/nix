@@ -120,9 +120,11 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                repo (i.e. the directory containing .git). The flake.nix
                seen earliest is used. */
 
-            auto flakeInfo = findFlakeDirs(absPath(path, baseDir, true), path);
-            if (flakeInfo.first) {
-                // the flake is contained in a git repo
+            auto [gitRepo, dir] = path == "." ?
+                  findFlakeDirs(absPath(path, baseDir, true), path)
+                : std::make_pair(std::nullopt, absPath(path, baseDir, true));
+
+            if (gitRepo) {
                 auto base = std::string("git+file://") + path;
 
                 auto parsedURL = ParsedURL{
@@ -130,18 +132,18 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                     .base = base,
                     .scheme = "git+file",
                     .authority = "",
-                    .path = flakeInfo.first.value(),
+                    .path = gitRepo.value(),
                     .query = decodeQuery(query),
                 };
 
-                if (pathExists(flakeInfo.first.value() + "/.git/shallow"))
+                if (pathExists(gitRepo.value() + "/.git/shallow"))
                     parsedURL.query.insert_or_assign("shallow", "1");
 
                 if (parsedURL.query.count("dir"))
                     throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
 
                 parsedURL.query.insert_or_assign(
-                    "dir", removeStartingOverlap(flakeInfo.second, flakeInfo.first.value())
+                    "dir", removeStartingOverlap(dir, gitRepo.value())
                 );
 
                 return std::make_pair(
@@ -149,7 +151,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                     fragment);
             } else {
                 attrs.insert_or_assign("type", "path");
-                attrs.insert_or_assign("path", absPath(path, baseDir, true));
+                attrs.insert_or_assign("path", dir);
             }
         } else {
             if (!hasPrefix(path, "/"))
