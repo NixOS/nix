@@ -13,12 +13,14 @@
     <string>org.nixos.nix-daemon</string>
     <key>KeepAlive</key>
     <dict>
-      <key>OtherJobEnabled</key>
+      <key>PathState</key>
       <dict>
-        <key>org.nixos.darwin-store</key>
-        <false/>
+        <key>/nix/var/nix/profiles/default/bin/nix-daemon</key>
+        <true/>
       </dict>
     </dict>
+    <key>RunAtLoad</key>
+    <false/>
     <key>ProgramArguments</key>
     <array>
       <string>/nix/var/nix/profiles/default/bin/nix-daemon</string>

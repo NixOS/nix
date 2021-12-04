@@ -303,16 +303,8 @@ generate_mount_daemon() {
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>LaunchOnlyOnce</key>
+  <key>RunAtLoad</key>
   <true/>
-  <key>KeepAlive</key>
-  <dict>
-    <key>PathState</key>
-    <dict>
-      <key>$NIX_ROOT/store</key>
-      <false/>
-    </dict>
-  </dict>
   <key>Label</key>
   <string>org.nixos.darwin-store</string>
   <key>ProgramArguments</key>
@@ -812,6 +804,12 @@ EOF
         # TODO: should probably alert the user if this is disabled?
         _sudo "to launch the Nix volume mounter" \
             launchctl bootstrap system "$NIX_VOLUME_MOUNTD_DEST" || true
+        # TODO: confirm whether kickstart is necessesary?
+        # I feel a little superstitous, but it can guard
+        # against multiple problems (doesn't start, old
+        # version still running for some reason...)
+        _sudo "to launch the Nix volume mounter" \
+            launchctl kickstart -k system/org.nixos.darwin-store
     fi
 }
 
