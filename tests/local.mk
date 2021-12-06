@@ -1,5 +1,6 @@
 nix_tests = \
   hash.sh lang.sh add.sh simple.sh dependencies.sh \
+  nix-prefetch-url-2.3.sh \
   config.sh \
   gc.sh \
   ca/gc.sh \

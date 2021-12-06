@@ -1337,6 +1337,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
             got = source.read(dump.data() + oldSize, want);
         } catch (EndOfFile &) {
             inMemory = true;
+            dump.resize(oldSize);
             break;
         }
         dump.resize(oldSize + got);

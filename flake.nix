@@ -181,7 +181,14 @@
           mkdir -p $out
         '';
 
-        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES";
+        installCheckPhase = ''
+          export PATH=${runCommand "nix-2.3-prefetch" { } ''
+            mkdir -p $out/bin
+            cp ${nixStable}/bin/nix-prefetch-url $out/bin/nix-prefetch-url-2.3
+            $out/bin/nix-prefetch-url-2.3 --version | grep -q 2.3
+          ''}/bin:$PATH
+          make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
+        '';
       };
 
       binaryTarball = buildPackages: nix: pkgs: let
@@ -310,6 +317,13 @@
             echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
           '';
 
+          preInstallCheck = ''
+            export PATH=${runCommand "nix-2.3-prefetch" { } ''
+              mkdir -p $out/bin
+              cp ${nixStable}/bin/nix-prefetch-url $out/bin/nix-prefetch-url-2.3
+              $out/bin/nix-prefetch-url-2.3 --version | grep -q 2.3
+            ''}/bin:$PATH
+          '';
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
 
@@ -627,6 +641,12 @@
               PATH=$prefix/bin:$PATH
               unset PYTHONPATH
               export MANPATH=$out/share/man:$MANPATH
+
+              export PATH=${runCommand "nix-2.3-prefetch" { } ''
+                mkdir -p $out/bin
+                cp ${nixStable}/bin/nix-prefetch-url $out/bin/nix-prefetch-url-2.3
+                $out/bin/nix-prefetch-url-2.3 --version | grep -q 2.3
+              ''}/bin:$PATH
             '';
         });
 
