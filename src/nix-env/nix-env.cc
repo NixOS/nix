@@ -159,7 +159,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
         throw SysError("getting information about '%1%'", path);
 
     if (isNixExpr(path, st))
-        state.evalFile(path, v);
+        state.evalFile(state.rootPath(path), v);
 
     /* The path is a directory.  Put the Nix expressions in the
        directory in a set, with the file name of each expression as

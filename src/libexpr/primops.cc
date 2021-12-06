@@ -96,20 +96,23 @@ struct RealisePathFlags {
     bool checkForPureEval = true;
 };
 
-static Path realisePath(EvalState & state, const Pos & pos, Value & v, const RealisePathFlags flags = {})
+static SourcePath realisePath(EvalState & state, const Pos & pos, Value & v, const RealisePathFlags flags = {})
 {
     PathSet context;
 
     auto path = [&]()
     {
         try {
-            return state.coerceToPath(pos, v, context);
+            return state.unpackPath(state.coerceToPath(pos, v, context));
         } catch (Error & e) {
             e.addTrace(pos, "while realising the context of a path");
             throw;
         }
     }();
 
+    return path;
+
+    #if 0
     try {
         StringMap rewrites = state.realiseContext(context);
 
@@ -122,6 +125,7 @@ static Path realisePath(EvalState & state, const Pos & pos, Value & v, const Rea
         e.addTrace(pos, "while realising the context of path '%s'", path);
         throw;
     }
+    #endif
 }
 
 /* Add and attribute to the given attribute map from the output name to
@@ -161,6 +165,18 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
 {
     auto path = realisePath(state, pos, vPath);
 
+    #if 0
+    // FIXME: use InputAccessor
+    if (path == corepkgsPrefix + "fetchurl.nix") {
+        state.eval(state.parseExprFromString(
+            #include "fetchurl.nix.gen.hh"
+            , "/"), v);
+    }
+    #endif
+
+    state.evalFile(path, v);
+
+#if 0
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
         if (!state.store->isStorePath(path))
@@ -200,6 +216,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         state.forceAttrs(v, pos);
     }
 
+    // FIXME: use InputAccessor
     else if (path == corepkgsPrefix + "fetchurl.nix") {
         state.eval(state.parseExprFromString(
             #include "fetchurl.nix.gen.hh"
@@ -232,6 +249,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             e->eval(state, *env, v);
         }
     }
+#endif
 }
 
 static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
@@ -312,6 +330,9 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    throw UnimplementedError("importNative");
+
+    #if 0
     auto path = realisePath(state, pos, *args[0]);
 
     std::string sym(state.forceStringNoCtx(*args[1], pos));
@@ -334,6 +355,7 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
     (func)(state, v);
 
     /* We don't dlclose because v may be a primop referencing a function in the shared object file */
+    #endif
 }
 
 
@@ -1343,7 +1365,8 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
         });
 
     PathSet context;
-    Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
+    // FIXME: check rootPath
+    Path path = state.coerceToPath(pos, *args[0], context);
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -1381,14 +1404,14 @@ static RegisterPrimOp primop_storePath({
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     /* We don’t check the path right now, because we don’t want to
-      throw if the path isn’t allowed, but just return false (and we
-      can’t just catch the exception here because we still want to
-      throw if something in the evaluation of `*args[0]` tries to
-      access an unauthorized path). */
+       throw if the path isn’t allowed, but just return false (and we
+       can’t just catch the exception here because we still want to
+       throw if something in the evaluation of `*args[0]` tries to
+       access an unauthorized path). */
     auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
 
     try {
-        v.mkBool(pathExists(state.checkSourcePath(path)));
+        v.mkBool(path.accessor->pathExists(path.path));
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1453,16 +1476,15 @@ static RegisterPrimOp primop_dirOf({
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0]);
-    auto s = readFile(path);
+    auto s = path.accessor->readFile(path.path);
     if (s.find((char) 0) != std::string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
-    StorePathSet refs;
-    if (state.store->isInStore(path)) {
-        try {
-            refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->references;
-        } catch (Error &) { // FIXME: should be InvalidPathError
-        }
-    }
+    auto refs =
+        #if 0
+        state.store->isInStore(path) ?
+        state.store->queryPathInfo(state.store->toStorePath(path).first)->references :
+        #endif
+        StorePathSet{};
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
 }
@@ -1480,6 +1502,7 @@ static RegisterPrimOp primop_readFile({
    which are desugared to 'findFile __nixPath "x"'. */
 static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    #if 0
     state.forceList(*args[0], pos);
 
     SearchPath searchPath;
@@ -1500,26 +1523,18 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             pos
         );
 
-        PathSet context;
-        auto path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
-
-        try {
-            auto rewrites = state.realiseContext(context);
-            path = rewriteStrings(path, rewrites);
-        } catch (InvalidPathError & e) {
-            throw EvalError({
-                .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
-                .errPos = pos
-            });
-        }
-
+        auto path = realisePath(state, pos, *i->value, { .requireAbsolutePath = false });
 
         searchPath.emplace_back(prefix, path);
     }
 
     auto path = state.forceStringNoCtx(*args[1], pos);
 
-    v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
+    // FIXME: checkSourcePath?
+    v.mkPath(state.findFile(searchPath, path, pos));
+    #endif
+
+    throw UnimplementedError("findFile");
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
@@ -1541,7 +1556,8 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     auto path = realisePath(state, pos, *args[1]);
 
-    v.mkString(hashFile(*ht, path).to_string(Base16, false));
+    // FIXME: state.toRealPath(path, context)
+    v.mkString(hashString(*ht, path.accessor->readFile(path.path)).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1560,17 +1576,19 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
 {
     auto path = realisePath(state, pos, *args[0]);
 
-    DirEntries entries = readDirectory(path);
-
+    auto entries = path.accessor->readDirectory(path.path);
     auto attrs = state.buildBindings(entries.size());
 
-    for (auto & ent : entries) {
-        if (ent.type == DT_UNKNOWN)
-            ent.type = getFileType(path + "/" + ent.name);
-        attrs.alloc(ent.name).mkString(
-            ent.type == DT_REG ? "regular" :
-            ent.type == DT_DIR ? "directory" :
-            ent.type == DT_LNK ? "symlink" :
+    for (auto & [name, type] : entries) {
+        #if 0
+        // FIXME?
+        if (type == InputAccessor::Type::Misc)
+            ent.type = getFileType(path + "/" + name);
+        #endif
+        attrs.alloc(name).mkString(
+            type == InputAccessor::Type::tRegular ? "regular" :
+            type == InputAccessor::Type::tDirectory ? "directory" :
+            type == InputAccessor::Type::tSymlink ? "symlink" :
             "unknown");
     }
 
@@ -1902,9 +1920,12 @@ static void addPath(
             }
         }
 
+        // FIXME
+        #if 0
         path = evalSettings.pureEval && expectedHash
             ? path
             : state.checkSourcePath(path);
+        #endif
 
         PathFilter filter = filterFun ? ([&](const Path & path) {
             auto st = lstat(path);

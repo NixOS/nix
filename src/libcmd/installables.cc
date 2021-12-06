@@ -184,9 +184,11 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
     if (file) {
         evalSettings.pureEval = false;
         auto state = getEvalState();
-        Expr *e = state->parseExprFromFile(
-            resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
-        );
+        Expr *e =
+            state->parseExprFromFile(
+                resolveExprPath(
+                    state->rootPath(
+                        lookupFileArg(*state, *file))));
 
         Value root;
         state->eval(e, root);
@@ -700,8 +702,9 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         if (file == "-") {
             auto e = state->parseStdin();
             state->eval(e, *vFile);
-        } else if (file)
-            state->evalFile(lookupFileArg(*state, *file), *vFile);
+        }
+        else if (file)
+            state->evalFile(state->rootPath(lookupFileArg(*state, *file)), *vFile);
         else {
             auto e = state->parseExprFromString(*expr, absPath("."));
             state->eval(e, *vFile);

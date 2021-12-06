@@ -22,7 +22,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     Path manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(manifestFile, v);
+        state.evalFile(state.rootPath(manifestFile), v);
         Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }

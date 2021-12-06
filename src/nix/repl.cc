@@ -624,7 +624,7 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.remove(path);
     loadedFiles.push_back(path);
     Value v, v2;
-    state->evalFile(lookupFileArg(*state, path), v);
+    state->evalFile(state->rootPath(lookupFileArg(*state, path)), v);
     state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }

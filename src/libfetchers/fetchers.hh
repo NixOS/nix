@@ -5,6 +5,7 @@
 #include "path.hh"
 #include "attrs.hh"
 #include "url.hh"
+#include "input-accessor.hh"
 
 #include <memory>
 
@@ -27,7 +28,6 @@ struct InputScheme;
  * "fromURL()" or "fromAttrs()" static functions which are provided
  * the url or attrset specified in the flake file.
  */
-
 struct Input
 {
     friend struct InputScheme;
@@ -98,7 +98,6 @@ public:
     std::optional<time_t> getLastModified() const;
 };
 
-
 /* The InputScheme represents a type of fetcher.  Each fetcher
  * registers with nix at startup time.  When processing an input for a
  * flake, each scheme is given an opportunity to "recognize" that
@@ -107,7 +106,6 @@ public:
  * recognized.  The Input object contains the information the fetcher
  * needs to actually perform the "fetch()" when called.
  */
-
 struct InputScheme
 {
     virtual ~InputScheme()
@@ -133,6 +131,11 @@ struct InputScheme
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
     virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
+
+    virtual ref<InputAccessor> getAccessor()
+    {
+        throw UnimplementedError("getAccessor");
+    }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

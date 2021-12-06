@@ -216,7 +216,8 @@ static Flake getFlake(
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
 
     Value vInfo;
-    state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
+    // FIXME: use accessor
+    state.evalFile(state.rootPath(flakeFile), vInfo, true); // FIXME: symlink attack
 
     expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 

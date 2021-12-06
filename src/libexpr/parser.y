@@ -674,10 +674,9 @@ Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
 }
 
 
-Path resolveExprPath(Path path)
+SourcePath resolveExprPath(const SourcePath & path)
 {
-    assert(path[0] == '/');
-
+    #if 0
     unsigned int followCount = 0, maxFollow = 1024;
 
     /* If `path' is a symlink, follow it.  This is so that relative
@@ -697,21 +696,30 @@ Path resolveExprPath(Path path)
         path = canonPath(path + "/default.nix");
 
     return path;
+    #endif
+
+    // FIXME
+    auto path2 = path.path + "/default.nix";
+    if (path.accessor->pathExists(path2))
+        return {path.accessor, path2};
+
+    return path;
 }
 
 
-Expr * EvalState::parseExprFromFile(const Path & path)
+Expr * EvalState::parseExprFromFile(const SourcePath & path)
 {
     return parseExprFromFile(path, staticBaseEnv);
 }
 
 
-Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticEnv)
 {
-    auto buffer = readFile(path);
-    // readFile should have left some extra space for terminators
+    auto packed = packPath(path);
+    auto buffer = path.accessor->readFile(path.path);
+    // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
+    return parse(buffer.data(), buffer.size(), foFile, packed, dirOf(packed), staticEnv);
 }
 
 
