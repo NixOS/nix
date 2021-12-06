@@ -95,6 +95,7 @@ public:
     std::optional<Hash> getRev() const;
     std::optional<uint64_t> getRevCount() const;
     std::optional<time_t> getLastModified() const;
+    std::optional<std::string> getModules() const;
 };
 
 
