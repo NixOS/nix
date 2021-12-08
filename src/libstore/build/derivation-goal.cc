@@ -194,7 +194,7 @@ void DerivationGoal::loadDerivation()
     assert(worker.evalStore.isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = std::make_unique<Derivation>(worker.evalStore.derivationFromPath(drvPath));
+    drv = std::make_unique<Derivation>(worker.evalStore.readDerivation(drvPath));
 
     haveDerivation();
 }
