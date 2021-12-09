@@ -1,6 +1,6 @@
-set -e
+set -eu -o pipefail
 
-if [[ -z "$COMMON_SH_SOURCED" ]]; then
+if [[ -z "${COMMON_SH_SOURCED-}" ]]; then
 
 COMMON_SH_SOURCED=1
 
@@ -24,7 +24,7 @@ if [[ -n $NIX_STORE ]]; then
 fi
 export _NIX_IN_TEST=$TEST_ROOT/shared
 export _NIX_TEST_NO_LSOF=1
-export NIX_REMOTE=$NIX_REMOTE_
+export NIX_REMOTE=${NIX_REMOTE_-}
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
@@ -91,12 +91,14 @@ startDaemon() {
     # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_DAEMON_SOCKET_PATH
     PATH=$DAEMON_PATH nix-daemon &
+    pidDaemon=$!
     for ((i = 0; i < 30; i++)); do
         if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then break; fi
         sleep 1
     done
-    pidDaemon=$!
     trap "killDaemon" EXIT
+    # Save for if daemon is killed
+    NIX_REMOTE_OLD=$NIX_REMOTE
     export NIX_REMOTE=daemon
 }
 
@@ -108,6 +110,8 @@ killDaemon() {
     done
     kill -9 $pidDaemon || true
     wait $pidDaemon || true
+    # Restore old nix remote
+    NIX_REMOTE=$NIX_REMOTE_OLD
     trap "" EXIT
 }
 
@@ -115,7 +119,6 @@ restartDaemon() {
   [[ -z "${pidDaemon:-}" ]] && return 0
 
   killDaemon
-  unset NIX_REMOTE
   startDaemon
 }
 
@@ -146,7 +149,7 @@ requireDaemonNewerThan () {
 }
 
 canUseSandbox() {
-    if [[ ! $_canUseSandbox ]]; then
+    if [[ ! ${_canUseSandbox-} ]]; then
         echo "Sandboxing not supported, skipping this test..."
         return 1
     fi
@@ -159,15 +162,43 @@ fail() {
     exit 1
 }
 
+# Run a command failing if it didn't exit with the expected exit code.
+#
+# Has two advantages over the built-in `!`:
+#
+# 1. `!` conflates all non-0 codes. `expect` allows testing for an exact
+# code.
+#
+# 2. `!` unexpectedly negates `set -e`, and cannot be used on individual
+# pipeline stages with `set -o pipefail`. It only works on the entire
+# pipeline, which is useless if we want, say, `nix ...` invocation to
+# *fail*, but a grep on the error message it outputs to *succeed*.
 expect() {
     local expected res
     expected="$1"
     shift
     set +e
-    "$@"
-    res="$?"
+    "$@" && res=0 || res="$?"
     set -e
-    [[ $res -eq $expected ]]
+    if [[ $res -ne $expected ]]; then
+        echo "Expected '$expected' but got '$res' while running '${*@Q}'" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Better than just doing `expect ... >&2` because the "Expected..."
+# message below will *not* be redirected.
+expectStderr() {
+    local expected res
+    expected="$1"
+    shift
+    "$@" 2>&1 && res=0 || res="$?"
+    if [[ $res -ne $expected ]]; then
+        echo "Expected '$expected' but got '$res' while running '${*@Q}'" >&2
+        return 1
+    fi
+    return 0
 }
 
 needLocalStore() {
@@ -179,7 +210,36 @@ needLocalStore() {
 
 # Just to make it easy to find which tests should be fixed
 buggyNeedLocalStore () {
-  needLocalStore
+  needLocalStore "$1"
+}
+
+# `grep -v` doesn't work well for exit codes. We want `!(exist line l. l
+# matches)`. It gives us `exist line l. !(l matches)`.
+#
+# `!` normally doesn't work well with `set -e`, but when we wrap in a
+# function it *does*.
+grepInverse() {
+    ! grep "$@"
+}
+
+# A shorthand, `> /dev/null` is a bit noisy.
+#
+# `grep -q` would seem to do this, no function necessary, but it is a
+# bad fit with pipes and `set -o pipefail`: `-q` will exit after the
+# first match, and then subsequent writes will result in broken pipes.
+#
+# Note that reproducing the above is a bit tricky as it depends on
+# non-deterministic properties such as the timing between the match and
+# the closing of the pipe, the buffering of the pipe, and the speed of
+# the producer into the pipe. But rest assured we've seen it happen in
+# CI reliably.
+grepQuiet() {
+    grep "$@" > /dev/null
+}
+
+# The previous two, combined
+grepQuietInverse() {
+    ! grep "$@" > /dev/null
 }
 
 set -x

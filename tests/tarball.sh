@@ -13,7 +13,7 @@ cp config.nix dependencies.builder*.sh $tarroot/
 tarball=$TEST_ROOT/tarball.tar.xz
 (cd $TEST_ROOT && tar cf - tarball) | xz > $tarball
 
-nix-env -f file://$tarball -qa --out-path | grep -q dependencies
+nix-env -f file://$tarball -qa --out-path | grepQuiet dependencies
 
 nix-build -o $TEST_ROOT/result file://$tarball
 

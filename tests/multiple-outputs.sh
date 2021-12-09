@@ -13,8 +13,8 @@ echo "evaluating c..."
 # outputs.
 drvPath=$(nix-instantiate multiple-outputs.nix -A c)
 #[ "$drvPath" = "$drvPath2" ]
-grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
-grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
+grepQuiet 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
+grepQuiet 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
 # While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)

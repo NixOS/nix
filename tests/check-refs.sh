@@ -8,14 +8,14 @@ dep=$(nix-build -o $RESULT check-refs.nix -A dep)
 
 # test1 references dep, not itself.
 test1=$(nix-build -o $RESULT check-refs.nix -A test1)
-(! nix-store -q --references $test1 | grep -q $test1)
-nix-store -q --references $test1 | grep -q $dep
+nix-store -q --references $test1 | grepQuietInverse $test1
+nix-store -q --references $test1 | grepQuiet $dep
 
 # test2 references src, not itself nor dep.
 test2=$(nix-build -o $RESULT check-refs.nix -A test2)
-(! nix-store -q --references $test2 | grep -q $test2)
-(! nix-store -q --references $test2 | grep -q $dep)
-nix-store -q --references $test2 | grep -q aux-ref
+nix-store -q --references $test2 | grepQuietInverse $test2
+nix-store -q --references $test2 | grepQuietInverse $dep
+nix-store -q --references $test2 | grepQuiet aux-ref
 
 # test3 should fail (unallowed ref).
 (! nix-build -o $RESULT check-refs.nix -A test3)

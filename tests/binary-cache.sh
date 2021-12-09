@@ -62,8 +62,8 @@ mv $nar $nar.good
 mkdir -p $TEST_ROOT/empty
 nix-store --dump $TEST_ROOT/empty | xz > $nar
 
-nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "hash mismatch" $TEST_ROOT/log
+expect 1 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
+grepQuiet "hash mismatch" $TEST_ROOT/log
 
 mv $nar.good $nar
 
@@ -110,7 +110,7 @@ clearStore
 rm $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
 
 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "copying path" $TEST_ROOT/log
+grepQuiet "copying path" $TEST_ROOT/log
 
 
 if [ -n "$HAVE_SODIUM" ]; then
