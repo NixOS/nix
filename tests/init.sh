@@ -1,14 +1,13 @@
-set -e -o pipefail
+set -eu -o pipefail
 
-source common.sh
+# Don't start the daemon
+source common/vars-and-functions.sh
 
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
     chmod -R u+w "$TEST_ROOT"
     # We would delete any daemon socket, so let's stop the daemon first.
-    if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
-        killDaemon
-    fi
+    killDaemon
     rm -rf "$TEST_ROOT"
 fi
 mkdir "$TEST_ROOT"

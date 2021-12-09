@@ -9,7 +9,6 @@ fi
 source common.sh
 
 killDaemon
-unset NIX_REMOTE
 
 # Fill the db using the older Nix
 PATH_WITH_NEW_NIX="$PATH"
