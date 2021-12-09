@@ -48,4 +48,4 @@ output="$(nix eval --raw --restrict-eval -I "$traverseDir" \
     --expr "builtins.readFile \"$traverseDir/$goUp$(pwd)/restricted-innocent\"" \
     2>&1 || :)"
 echo "$output" | grep "is forbidden"
-! echo "$output" | grep -F restricted-secret
+echo "$output" | grepInverse -F restricted-secret

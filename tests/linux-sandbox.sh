@@ -35,8 +35,8 @@ nix-build dependencies.nix --no-out-link --check --sandbox-paths /nix/store
 nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link
 
 (! nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link --check -K 2> $TEST_ROOT/log)
-if grep -q 'error: renaming' $TEST_ROOT/log; then false; fi
-grep -q 'may not be deterministic' $TEST_ROOT/log
+if grepQuiet 'error: renaming' $TEST_ROOT/log; then false; fi
+grepQuiet 'may not be deterministic' $TEST_ROOT/log
 
 # Test that sandboxed builds cannot write to /etc easily
 (! nix-build -E 'with import ./config.nix; mkDerivation { name = "etc-write"; buildCommand = "echo > /etc/test"; }' --no-out-link --sandbox-paths /nix/store)

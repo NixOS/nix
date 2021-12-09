@@ -4,7 +4,7 @@ clearStore
 clearProfiles
 
 checkRef() {
-    nix-store -q --references $TEST_ROOT/result | grep -q "$1"'$' || fail "missing reference $1"
+    nix-store -q --references $TEST_ROOT/result | grepQuiet "$1"'$' || fail "missing reference $1"
 }
 
 # Test the export of the runtime dependency graph.

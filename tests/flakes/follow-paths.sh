@@ -128,7 +128,7 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
+expect 1 nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
 
 # Non-existant follows should print a warning.
 cat >$flakeFollowsA/flake.nix <<EOF

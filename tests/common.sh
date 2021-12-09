@@ -1,4 +1,4 @@
-set -e
+set -eu -o pipefail
 
 if [[ -z "${COMMON_SH_SOURCED-}" ]]; then
 
