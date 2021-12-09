@@ -1079,7 +1079,7 @@ std::map<StorePath, StorePath> copyPaths(
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore.printStorePath(storePath), e.what()));
+                    printMsg(lvlError, "could not copy %s: %s", dstStore.printStorePath(storePath), e.what());
                     showProgress();
                     return;
                 }

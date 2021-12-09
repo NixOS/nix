@@ -956,7 +956,7 @@ void processConnection(
 
     Finally finally([&]() {
         _isInterrupted = false;
-        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
+        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
@@ -988,6 +988,8 @@ void processConnection(
             } catch (EndOfFile & e) {
                 break;
             }
+
+            printMsgUsing(prevLogger, lvlDebug, "received daemon op %d", op);
 
             opCount++;
 
