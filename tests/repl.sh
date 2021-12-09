@@ -1,6 +1,7 @@
 source common.sh
 
 replCmds="
+simple = 1
 simple = import ./simple.nix
 :b simple
 :log simple
