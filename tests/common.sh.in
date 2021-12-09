@@ -1,6 +1,6 @@
 set -e
 
-export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)
+export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
@@ -11,6 +11,7 @@ export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
+export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/daemon-socket
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
     export _NIX_TEST_NO_SANDBOX=1
@@ -72,7 +73,7 @@ startDaemon() {
     rm -f $NIX_STATE_DIR/daemon-socket/socket
     nix-daemon &
     for ((i = 0; i < 30; i++)); do
-        if [ -e $NIX_STATE_DIR/daemon-socket/socket ]; then break; fi
+        if [ -e $NIX_DAEMON_SOCKET_PATH ]; then break; fi
         sleep 1
     done
     pidDaemon=$!
