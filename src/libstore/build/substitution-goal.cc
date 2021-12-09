@@ -140,6 +140,8 @@ void PathSubstitutionGoal::tryNext()
     {
         warn("substituter '%s' does not have a valid signature for path '%s'",
             sub->getUri(), worker.store.printStorePath(storePath));
+        warn("verify that your nix.conf contains a correct signature in 'trusted-public-keys' for %s",
+            sub->getUri());
         tryNext();
         return;
     }
