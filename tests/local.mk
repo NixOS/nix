@@ -1,4 +1,5 @@
 nix_tests = \
+  init.sh \
   flakes/flakes.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
