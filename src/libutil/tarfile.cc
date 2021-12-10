@@ -93,7 +93,7 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
         else
             archive.check(r);
 
-        archive_entry_set_pathname(entry,
+        archive_entry_copy_pathname(entry,
             (destDir + "/" + name).c_str());
 
         archive.check(archive_read_extract(archive.archive, entry, flags));
