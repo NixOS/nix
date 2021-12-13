@@ -126,7 +126,17 @@ void LocalStore::addTempRoot(const StorePath & path)
             auto socketPath = stateDir.get() + gcSocketPath;
             debug("connecting to '%s'", socketPath);
             state->fdRootsSocket = createUnixDomainSocket();
-            nix::connect(state->fdRootsSocket.get(), socketPath);
+            try {
+                nix::connect(state->fdRootsSocket.get(), socketPath);
+            } catch (SysError & e) {
+                /* The garbage collector may have exited, so we need to
+                   restart. */
+                if (e.errNo == ECONNREFUSED) {
+                    debug("GC socket connection refused");
+                    state->fdRootsSocket.close();
+                    goto restart;
+                }
+            }
         }
 
         try {
