@@ -145,10 +145,10 @@ static void preloadNSS() {
          *
          * All other platforms are unaffected.
          */
-        if (dlopen (LIBNSS_DNS_SO, RTLD_NOW) == NULL) {
-            printMsg(Verbosity::lvlWarn, fmt("Unable to load nss_dns backend"));
-        }
-        __nss_configure_lookup ("hosts", "dns");
+        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
+            warn("unable to load nss_dns backend");
+        // FIXME: get hosts entry from nsswitch.conf.
+        __nss_configure_lookup("hosts", "files dns");
 #endif
     });
 }
