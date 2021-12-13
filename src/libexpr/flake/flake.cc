@@ -155,7 +155,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, pos);
         if (url)
-            input.ref = parseFlakeRef(*url, baseDir, true);
+            input.ref = parseFlakeRef(*url, baseDir, true, input.isFlake);
     }
 
     if (!input.follows && !input.ref)
@@ -194,8 +194,8 @@ static Flake getFlake(
         state, originalRef, allowLookup, flakeCache);
 
     // Guard against symlink attacks.
-    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir);
-    auto flakeFile = canonPath(flakeDir + "/flake.nix");
+    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir, true);
+    auto flakeFile = canonPath(flakeDir + "/flake.nix", true);
     if (!isInDir(flakeFile, sourceInfo.actualPath))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
             lockedRef, state.store->printStorePath(sourceInfo.storePath));
@@ -570,7 +570,7 @@ LockedFlake lockFlake(
         };
 
         // Bring in the current ref for relative path resolution if we have it
-        auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir);
+        auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
 
         computeLocks(
             flake.inputs, newLockFile.root, {},
