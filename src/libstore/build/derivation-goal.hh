@@ -50,8 +50,8 @@ struct DerivationGoal : public Goal
     /* The path of the derivation. */
     StorePath drvPath;
 
-    /* The path of the corresponding resolved derivation */
-    std::optional<BasicDerivation> resolvedDrv;
+    /* The goal for the corresponding resolved derivation */
+    std::shared_ptr<DerivationGoal> resolvedDrvGoal;
 
     /* The specific outputs that we need to build.  Empty means all of
        them. */

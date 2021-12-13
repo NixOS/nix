@@ -151,6 +151,7 @@ struct BuildResult
         DependencyFailed,
         LogLimitExceeded,
         NotDeterministic,
+        ResolvesToAlreadyValid,
     } status = MiscFailure;
     std::string errorMsg;
 
@@ -170,7 +171,7 @@ struct BuildResult
     time_t startTime = 0, stopTime = 0;
 
     bool success() {
-        return status == Built || status == Substituted || status == AlreadyValid;
+        return status == Built || status == Substituted || status == AlreadyValid || status == ResolvesToAlreadyValid;
     }
 };
 

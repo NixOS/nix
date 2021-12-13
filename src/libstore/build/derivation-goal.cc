@@ -464,7 +464,6 @@ void DerivationGoal::inputsRealised()
             Derivation drvResolved { *std::move(attempt) };
 
             auto pathResolved = writeDerivation(worker.store, drvResolved);
-            resolvedDrv = drvResolved;
 
             auto msg = fmt("Resolved derivation: '%s' -> '%s'",
                 worker.store.printStorePath(drvPath),
@@ -475,9 +474,9 @@ void DerivationGoal::inputsRealised()
                        worker.store.printStorePath(pathResolved),
                    });
 
-            auto resolvedGoal = worker.makeDerivationGoal(
+            resolvedDrvGoal = worker.makeDerivationGoal(
                 pathResolved, wantedOutputs, buildMode);
-            addWaitee(resolvedGoal);
+            addWaitee(resolvedDrvGoal);
 
             state = &DerivationGoal::resolvedFinished;
             return;
@@ -938,16 +937,17 @@ void DerivationGoal::buildDone()
 }
 
 void DerivationGoal::resolvedFinished() {
-    assert(resolvedDrv);
+    assert(resolvedDrvGoal);
+    auto resolvedDrv = *resolvedDrvGoal->drv;
 
-    auto resolvedHashes = staticOutputHashes(worker.store, *resolvedDrv);
+    auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
 
     StorePathSet outputPaths;
 
     // `wantedOutputs` might be empty, which means “all the outputs”
     auto realWantedOutputs = wantedOutputs;
     if (realWantedOutputs.empty())
-        realWantedOutputs = resolvedDrv->outputNames();
+        realWantedOutputs = resolvedDrv.outputNames();
 
     for (auto & wantedOutput : realWantedOutputs) {
         assert(initialOutputs.count(wantedOutput) != 0);
@@ -979,9 +979,17 @@ void DerivationGoal::resolvedFinished() {
         outputPaths
     );
 
-    // This is potentially a bit fishy in terms of error reporting. Not sure
-    // how to do it in a cleaner way
-    amDone(nrFailed == 0 ? ecSuccess : ecFailed, ex);
+    auto status = [&]() {
+        auto resolvedResult = resolvedDrvGoal->getResult();
+        switch (resolvedResult.status) {
+            case BuildResult::AlreadyValid:
+                return BuildResult::ResolvesToAlreadyValid;
+            default:
+                return resolvedResult.status;
+        }
+    }();
+
+    done(status);
 }
 
 HookReply DerivationGoal::tryBuildHook()
