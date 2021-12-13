@@ -533,6 +533,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 AutoCloseFD fdClient = accept(fdServer.get(), nullptr, nullptr);
                 if (!fdClient) continue;
 
+                debug("GC roots server accepted new client");
+
                 /* Process the connection in a separate thread. */
                 auto fdClient_ = fdClient.get();
                 std::thread clientThread([&, fdClient = std::move(fdClient)]() {
@@ -575,7 +577,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             } else
                                 printError("received garbage instead of a root from client");
                             writeFull(fdClient.get(), "1", false);
-                        } catch (Error &) { break; }
+                        } catch (Error & e) {
+                            debug("reading GC root from client: %s", e.msg());
+                            break;
+                        }
                     }
                 });
 
