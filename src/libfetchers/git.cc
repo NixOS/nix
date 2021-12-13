@@ -235,7 +235,17 @@ struct GitInputScheme : InputScheme
 
             try {
                 if (hasHead) {
-                    runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
+                    // Using git diff is preferrable over lower-level operations here,
+                    // because its conceptually simpler and we only need the exit code anyways.
+                    auto gitDiffOpts = Strings({ "-C", actualUrl, "diff", "HEAD", "--quiet"});
+                    if (!submodules) {
+                        // Changes in submodules should only make the tree dirty
+                        // when those submodules will be copied as well.
+                        gitDiffOpts.emplace_back("--ignore-submodules");
+                    }
+                    gitDiffOpts.emplace_back("--");
+                    runProgram("git", true, gitDiffOpts);
+
                     clean = true;
                 }
             } catch (ExecError & e) {

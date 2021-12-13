@@ -11,7 +11,7 @@ repo=$TEST_ROOT/git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow $TEST_ROOT/minimal
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -147,8 +147,13 @@ path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 # (check dirty-tree handling was used)
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).shortRev") = 0000000 ]]
+# Making a dirty tree clean again and fetching it should
+# record correct revision information. See: #4140
+echo world > $repo/hello
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = $rev2 ]]
 
 # Committing shouldn't change store path, or switch to using 'master'
+echo dev > $repo/hello
 git -C $repo commit -m 'Bla5' -a
 path4=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [[ $(cat $path4/hello) = dev ]]
