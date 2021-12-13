@@ -646,6 +646,9 @@ struct EvalSettings : Config
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};
+
+    Setting<bool> traceVerbose{this, false, "trace-verbose",
+        "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
 };
 
 extern EvalSettings evalSettings;

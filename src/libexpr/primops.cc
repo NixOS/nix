@@ -970,6 +970,15 @@ static RegisterPrimOp primop_trace({
 });
 
 
+/* Takes two arguments and evaluates to the second one. Used as the
+ * builtins.traceVerbose implementation when --trace-verbose is not enabled
+ */
+static void prim_second(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
+
 /*************************************************************
  * Derivations
  *************************************************************/
@@ -3925,6 +3934,18 @@ void EvalState::createBaseEnv()
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
     }
+
+    addPrimOp({
+        .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
+        .arity = 2,
+        .name = symbols.create("__traceVerbose"),
+        .args = { "e1", "e2" },
+        .doc = R"(
+          Evaluate *e1* and print its abstract syntax representation on standard
+          error if `--trace-verbose` is enabled. Then return *e2*. This function
+          is useful for debugging.
+        )",
+    });
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
