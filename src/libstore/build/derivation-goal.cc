@@ -17,6 +17,7 @@
 #include <regex>
 #include <queue>
 
+#include <fstream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -1337,6 +1338,13 @@ void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
     }
 
     worker.updateProgress();
+
+    auto traceBuiltOutputsFile = getEnv("_NIX_TRACE_BUILT_OUTPUTS").value_or("");
+    if (traceBuiltOutputsFile != "") {
+        std::fstream fs;
+        fs.open(traceBuiltOutputsFile, std::fstream::out);
+        fs << worker.store.printStorePath(drvPath) << "\t" << result.toString() << std::endl;
+    }
 }
 
 

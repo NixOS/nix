@@ -155,6 +155,29 @@ struct BuildResult
     } status = MiscFailure;
     std::string errorMsg;
 
+    std::string toString() const {
+        auto strStatus = [&]() {
+            switch (status) {
+                case Built: return "Built";
+                case Substituted: return "Substituted";
+                case AlreadyValid: return "AlreadyValid";
+                case PermanentFailure: return "PermanentFailure";
+                case InputRejected: return "InputRejected";
+                case OutputRejected: return "OutputRejected";
+                case TransientFailure: return "TransientFailure";
+                case CachedFailure: return "CachedFailure";
+                case TimedOut: return "TimedOut";
+                case MiscFailure: return "MiscFailure";
+                case DependencyFailed: return "DependencyFailed";
+                case LogLimitExceeded: return "LogLimitExceeded";
+                case NotDeterministic: return "NotDeterministic";
+                case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
+                default: return "Unknown";
+            };
+        }();
+        return strStatus + ((errorMsg == "") ? "" : " : " + errorMsg);
+    }
+
     /* How many times this build was performed. */
     unsigned int timesBuilt = 0;
 
