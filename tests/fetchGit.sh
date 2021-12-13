@@ -170,6 +170,14 @@ NIX=$(command -v nix)
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
 
+# Fetching from a repo with only a specific revision and no branches should
+# not fall back to copying files and record correct revision information. See: #5302
+mkdir $TEST_ROOT/minimal
+git -C $TEST_ROOT/minimal init
+git -C $TEST_ROOT/minimal fetch $repo $rev2
+git -C $TEST_ROOT/minimal checkout $rev2
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = $rev2 ]]
+
 # Fetching a shallow repo shouldn't work by default, because we can't
 # return a revCount.
 git clone --depth 1 file://$repo $TEST_ROOT/shallow

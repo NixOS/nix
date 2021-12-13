@@ -220,21 +220,21 @@ struct GitInputScheme : InputScheme
         if (!input.getRef() && !input.getRev() && isLocal) {
             bool clean = false;
 
-            /* Check whether this repo has any commits. There are
-               probably better ways to do this. */
-            auto gitDir = actualUrl + "/.git";
-            auto commonGitDir = chomp(runProgram(
-                "git",
-                true,
-                { "-C", actualUrl, "rev-parse", "--git-common-dir" }
-            ));
-            if (commonGitDir != ".git")
-                    gitDir = commonGitDir;
-
-            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
+            /* Check whether HEAD points to something that looks like a commit,
+               since that is the refrence we want to use later on. */
+            bool hasHead = false;
+            try {
+                runProgram("git", true, { "-C", actualUrl, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" });
+                hasHead = true;
+            } catch (ExecError & e) {
+                // git exits with status 128 here if it does not detect a repository.
+                if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 128) {
+                    throw Error("Git tree '%s' is broken.\n'git rev-parse --verify HEAD' failed with exit code %d.", actualUrl, WEXITSTATUS(e.status));
+                }
+            }
 
             try {
-                if (haveCommits) {
+                if (hasHead) {
                     runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
                     clean = true;
                 }
@@ -280,7 +280,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePath), input};
             }
