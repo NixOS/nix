@@ -58,6 +58,7 @@ struct ConfigFile
 /* The contents of a flake.nix file. */
 struct Flake
 {
+    FlakeId id;
     FlakeRef originalRef; // the original flake specification (by the user)
     FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
     FlakeRef lockedRef; // the specific local store result of invoking the fetcher

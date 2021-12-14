@@ -97,6 +97,8 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
+    virtual Strings getNamedDefaultFlakeAttrPaths(std::string_view name);
+
     void completeInstallable(std::string_view prefix);
 };
 

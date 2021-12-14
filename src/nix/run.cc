@@ -157,6 +157,12 @@ struct CmdRun : InstallableCommand
           ;
     }
 
+    Strings getNamedDefaultFlakeAttrPaths(std::string_view name) override
+    {
+        return {"apps." + settings.thisSystem.get() + "." + std::string(name), "packages." + settings.thisSystem.get() + "." + std::string(name),
+                "defaultApp." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+    }
+
     Strings getDefaultFlakeAttrPaths() override
     {
         Strings res{"defaultApp." + settings.thisSystem.get()};

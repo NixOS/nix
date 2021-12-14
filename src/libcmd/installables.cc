@@ -156,6 +156,12 @@ SourceExprCommand::SourceExprCommand()
     });
 }
 
+Strings SourceExprCommand::getNamedDefaultFlakeAttrPaths(std::string_view name)
+{
+    return {"packages." + settings.thisSystem.get() + "." + std::string(name),
+            "defaultPackage." + settings.thisSystem.get()};
+}
+
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
 {
     return {"defaultPackage." + settings.thisSystem.get()};
@@ -520,6 +526,10 @@ InstallableFlake::InstallableFlake(
       prefixes(prefixes),
       lockFlags(lockFlags)
 {
+    auto flake = flake::lockFlake(
+        *state,
+        flakeRef,
+        { .writeLockFile = false });
     if (cmd && cmd->getAutoArgs(*state)->size())
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
@@ -670,11 +680,16 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
             try {
                 auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
+                auto evalState = getEvalState();
+                auto flake = flake::lockFlake(
+                    *evalState,
+                    flakeRef,
+                    { .writeLockFile = false });
                 result.push_back(std::make_shared<InstallableFlake>(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
-                        fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
+                        fragment == "" ? getNamedDefaultFlakeAttrPaths(flake.flake.id) : Strings{fragment},
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;

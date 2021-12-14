@@ -215,6 +215,14 @@ static Flake getFlake(
 
     expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
 
+    if (auto name = vInfo.attrs->get(state.sName)) {
+        expectType(state, nString, *name->value, *name->pos);
+        flake.id = name->value->string.s;
+    } else {
+        flake.id = "default";
+        warn("flake '%s' lacks attribute 'name'", lockedRef);
+    }
+
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, *description->pos);
         flake.description = description->value->string.s;
@@ -273,6 +281,7 @@ static Flake getFlake(
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != state.sDescription &&
+            attr.name != state.sName &&
             attr.name != sInputs &&
             attr.name != sOutputs &&
             attr.name != sNixConfig)

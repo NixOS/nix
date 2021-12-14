@@ -166,6 +166,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
         if (json) {
             nlohmann::json j;
+            j["id"] = flake.id;
+            // if (flake.id)
             if (flake.description)
                 j["description"] = *flake.description;
             j["originalUrl"] = flake.originalRef.to_string();
@@ -190,6 +192,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             logger->cout(
                 ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s",
                 flake.lockedRef.to_string());
+            //if (flake.id)
+            logger->cout(
+                ANSI_BOLD "ID:" ANSI_NORMAL "            %s",
+                flake.id);
             if (flake.description)
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",

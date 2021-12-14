@@ -323,6 +323,11 @@ struct Common : InstallableCommand, MixProfile
 
         return rewriteStrings(script, rewrites);
     }
+    Strings getNamedDefaultFlakeAttrPaths(std::string_view name) override
+    {
+        return {"devShells." + settings.thisSystem.get() + "." + std::string(name), "packages." + settings.thisSystem.get() + "." + std::string(name),
+                "devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+    }
 
     Strings getDefaultFlakeAttrPaths() override
     {
