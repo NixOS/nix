@@ -80,7 +80,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 2;
+    const int nixCASchemaVersion = 3;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -131,6 +131,17 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             txn.commit();
         }
 
+        if (curCASchema < 3) {
+            SQLiteTxn txn(db);
+            // Apply new indices added in this schema update.
+            db.exec(R"(
+                -- used by QueryRealisationReferences
+                create index if not exists IndexRealisationsRefs on RealisationsRefs(referrer);
+                -- used by cascade deletion when ValidPaths is deleted
+                create index if not exists IndexRealisationsRefsOnOutputPath on Realisations(outputPath);
+            )");
+            txn.commit();
+        }
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
         lockFile(lockFd.get(), ltRead, true);
     }
