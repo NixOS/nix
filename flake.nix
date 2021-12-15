@@ -96,7 +96,7 @@
             buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
-            buildPackages.pkgconfig
+            buildPackages.pkg-config
 
             # Tests
             buildPackages.git
@@ -343,7 +343,7 @@
             nativeBuildInputs =
               [ buildPackages.autoconf-archive
                 buildPackages.autoreconfHook
-                buildPackages.pkgconfig
+                buildPackages.pkg-config
               ];
 
             buildInputs =
