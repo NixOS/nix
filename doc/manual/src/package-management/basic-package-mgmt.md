@@ -40,7 +40,7 @@ $ nix-channel --update
 > 
 > On NixOS, you’re automatically subscribed to a NixOS channel
 > corresponding to your NixOS major release (e.g.
-> <http://nixos.org/channels/nixos-14.12>). A NixOS channel is identical
+> <http://nixos.org/channels/nixos-21.11>). A NixOS channel is identical
 > to the Nixpkgs channel, except that it contains only Linux binaries
 > and is updated only if a set of regression tests succeed.
 

@@ -1656,7 +1656,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     bool first = !forceString;
     ValueType firstType = nString;
 
-    for (auto & i : *es) {
+    for (auto & [i_pos, i] : *es) {
         Value vTmp;
         i->eval(state, env, vTmp);
 
@@ -1677,19 +1677,19 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp));
+                throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp));
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
+                throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
         } else
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
-            s << state.coerceToString(pos, vTmp, context, false, firstType == nString, !first);
+            s << state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
 
         first = false;
     }

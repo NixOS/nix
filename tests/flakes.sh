@@ -249,6 +249,14 @@ cat > $flake3Dir/flake.nix <<EOF
       url = git+file://$nonFlakeDir;
       flake = false;
     };
+    nonFlakeFile = {
+      url = path://$nonFlakeDir/README.md;
+      flake = false;
+    };
+    nonFlakeFile2 = {
+      url = "$nonFlakeDir/README.md";
+      flake = false;
+    };
   };
 
   description = "Fnord";
@@ -265,6 +273,8 @@ cat > $flake3Dir/flake.nix <<EOF
         dummy2 = builtins.readFile (builtins.path { name = "source"; path = inputs.flake1; filter = path: type: baseNameOf path == "simple.nix"; } + "/simple.nix");
         buildCommand = ''
           cat \${inputs.nonFlake}/README.md > \$out
+          [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
+          [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
         '';
       };
   };
@@ -722,6 +732,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
         nonFlake.url = "path:$nonFlakeDir";
+        goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
             inputs.foobar.follows = "foobar";
@@ -736,6 +747,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
     description = "Flake C";
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
+        goodoo.follows = "foobar";
     };
     outputs = { ... }: {};
 }
@@ -760,7 +772,17 @@ EOF
 git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
   flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
 
+nix flake update $flakeFollowsA
+
+oldLock="$(cat "$flakeFollowsA/flake.lock")"
+
+# Ensure that locking twice doesn't change anything
+
 nix flake lock $flakeFollowsA
+
+newLock="$(cat "$flakeFollowsA/flake.lock")"
+
+diff <(echo "$newLock") <(echo "$oldLock")
 
 [[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["D"]' ]]

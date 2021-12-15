@@ -440,7 +440,22 @@ add_nix_vol_fstab_line() {
     # shellcheck disable=SC1003,SC2026
     local escaped_mountpoint="${NIX_ROOT/ /'\\\'040}"
     shift
-    EDITOR="/usr/bin/ex" _sudo "to add nix to fstab" "$@" <<EOF
+
+    # wrap `ex` to work around a problem with vim plugins breaking exit codes;
+    # (see https://github.com/NixOS/nix/issues/5468)
+    # we'd prefer EDITOR="/usr/bin/ex --noplugin" but vifs doesn't word-split
+    # the EDITOR env.
+    #
+    # TODO: at some point we should switch to `--clean`, but it wasn't added
+    # until https://github.com/vim/vim/releases/tag/v8.0.1554 while the macOS
+    # minver 10.12.6 seems to have released with vim 7.4
+    cat > "$SCRATCH/ex_cleanroom_wrapper" <<EOF
+#!/bin/sh
+/usr/bin/ex --noplugin "\$@"
+EOF
+    chmod 755 "$SCRATCH/ex_cleanroom_wrapper"
+
+    EDITOR="$SCRATCH/ex_cleanroom_wrapper" _sudo "to add nix to fstab" "$@" <<EOF
 :a
 UUID=$uuid $escaped_mountpoint apfs rw,noauto,nobrowse,suid,owners
 .
@@ -631,7 +646,7 @@ EOF
         # technically /etc/synthetic.d/nix is supported in Big Sur+
         # but handling both takes even more code...
         _sudo "to add Nix to /etc/synthetic.conf" \
-            /usr/bin/ex /etc/synthetic.conf <<EOF
+            /usr/bin/ex --noplugin /etc/synthetic.conf <<EOF
 :a
 ${NIX_ROOT:1}
 .
@@ -794,7 +809,7 @@ setup_volume_daemon() {
     local volume_uuid="$2"
     if ! test_voldaemon; then
         task "Configuring LaunchDaemon to mount '$NIX_VOLUME_LABEL'" >&2
-        _sudo "to install the Nix volume mounter" /usr/bin/ex "$NIX_VOLUME_MOUNTD_DEST" <<EOF
+        _sudo "to install the Nix volume mounter" /usr/bin/ex --noplugin "$NIX_VOLUME_MOUNTD_DEST" <<EOF
 :a
 $(generate_mount_daemon "$cmd_type" "$volume_uuid")
 .

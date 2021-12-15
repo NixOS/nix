@@ -19,3 +19,8 @@ create table if not exists RealisationsRefs (
     foreign key (referrer) references Realisations(id) on delete cascade,
     foreign key (realisationReference) references Realisations(id) on delete restrict
 );
+
+-- used by QueryRealisationReferences
+create index if not exists IndexRealisationsRefs on RealisationsRefs(referrer);
+-- used by cascade deletion when ValidPaths is deleted
+create index if not exists IndexRealisationsRefsOnOutputPath on Realisations(outputPath);

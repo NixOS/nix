@@ -53,9 +53,12 @@ FlakeRef FlakeRef::resolve(ref<Store> store) const
 }
 
 FlakeRef parseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing)
+    const std::string & url,
+    const std::optional<Path> & baseDir,
+    bool allowMissing,
+    bool isFlake)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
@@ -72,7 +75,10 @@ std::optional<FlakeRef> maybeParseFlakeRef(
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing)
+    const std::string & url,
+    const std::optional<Path> & baseDir,
+    bool allowMissing,
+    bool isFlake)
 {
     using namespace fetchers;
 

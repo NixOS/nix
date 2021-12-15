@@ -47,7 +47,7 @@
     the store object at `P` contains the path `Q` somewhere. The
     *references* of a store path are the set of store paths to which it
     has a reference.
-    
+
     A derivation can reference other derivations and sources (but not
     output paths), whereas an output path only references other output
     paths.
@@ -66,7 +66,7 @@
     is necessary to deploy whole closures, since otherwise at runtime
     files could be missing. The command `nix-store -qR` prints out
     closures of store paths.
-    
+
     As an example, if the store object at path `P` contains a reference
     to path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
@@ -98,3 +98,7 @@
     store. It can contain regular files, directories and symbolic
     links.  NARs are generated and unpacked using `nix-store --dump`
     and `nix-store --restore`.
+  - `∅` \
+    The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
+  - `ε` \
+    The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.

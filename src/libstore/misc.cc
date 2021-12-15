@@ -7,6 +7,7 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "closure.hh"
+#include "filetransfer.hh"
 
 namespace nix {
 
@@ -100,7 +101,8 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
     downloadSize_ = narSize_ = 0;
 
-    ThreadPool pool;
+    // FIXME: make async.
+    ThreadPool pool(fileTransferSettings.httpConnections);
 
     struct State
     {

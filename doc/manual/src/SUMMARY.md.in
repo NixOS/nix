@@ -72,6 +72,7 @@
   - [CLI guideline](contributing/cli-guideline.md)
 - [Release Notes](release-notes/release-notes.md)
   - [Release X.Y (202?-??-??)](release-notes/rl-next.md)
+  - [Release 2.5 (2021-12-13)](release-notes/rl-2.5.md)
   - [Release 2.4 (2021-11-01)](release-notes/rl-2.4.md)
   - [Release 2.3 (2019-09-04)](release-notes/rl-2.3.md)
   - [Release 2.2 (2019-01-11)](release-notes/rl-2.2.md)

@@ -38,7 +38,7 @@ fi
 
 # Determine if we could use the multi-user installer or not
 if [ "$(uname -s)" = "Linux" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
+    echo "Note: a multi-user installation is possible. See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
 fi
 
 case "$(uname -s)" in
@@ -98,7 +98,7 @@ while [ $# -gt 0 ]; do
                 echo "              providing multi-user support and better isolation for local builds."
                 echo "              Both for security and reproducibility, this method is recommended if"
                 echo "              supported on your platform."
-                echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
+                echo "              See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation"
                 echo ""
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
@@ -144,7 +144,7 @@ if ! [ -e "$dest" ]; then
 fi
 
 if ! [ -w "$dest" ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/manual/nix/stable/installation/multi-user.html. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 

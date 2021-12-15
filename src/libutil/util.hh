@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include <atomic>
 #include <functional>
 #include <map>
 #include <sstream>
