@@ -1839,17 +1839,9 @@ const std::string_view removeStartingOverlap(const std::string & a_ref, const st
     auto a = std::string_view(a_ref);
     auto b = std::string_view(b_ref);
 
-    auto start = 0;
+    auto start = std::mismatch(a.begin(), a.end(), b.begin());
 
-    for (auto ap = a.begin(), bp = b.begin(),
-              ae = a.end(),   be = b.end();
-         ap < ae && bp < be;
-         ++ap, ++bp, ++start
-    ) {
-        if (*ap != *bp) break;
-    }
-
-    return a.substr(start);
+    return start.first;
 }
 
 }
