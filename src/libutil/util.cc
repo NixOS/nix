@@ -1660,6 +1660,14 @@ void restoreMountNamespace()
 #endif
 }
 
+void unshareFilesystem()
+{
+#ifdef __linux__
+    if (unshare(CLONE_FS) != 0 && errno != EPERM)
+        throw SysError("unsharing filesystem state in download thread");
+#endif
+}
+
 void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();

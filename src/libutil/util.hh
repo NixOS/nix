@@ -311,6 +311,11 @@ void saveMountNamespace();
    if saveMountNamespace() was never called. */
 void restoreMountNamespace();
 
+/* Cause this thread to not share any FS attributes with the main
+   thread, because this causes setns() in restoreMountNamespace() to
+   fail. */
+void unshareFilesystem();
+
 
 class ExecError : public Error
 {
