@@ -26,6 +26,7 @@ typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, 
 
 extern std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
 void printStaticEnvBindings(const Expr &expr);
+void printStaticEnvBindings(const StaticEnv &se, int lvl = 0);
 
 struct PrimOp
 {

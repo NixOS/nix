@@ -50,6 +50,8 @@ struct NixRepl
     ref<EvalState> state;
     Bindings * autoArgs;
 
+    std::optional<ref<const Error>> debugError;
+
     Strings loadedFiles;
 
     const static int envSize = 32768;
@@ -70,6 +72,7 @@ struct NixRepl
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
+    void loadFiles();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value * v);
@@ -199,6 +202,9 @@ namespace {
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
+    std::cout << "iinitial mainLoop; " << std::endl;
+    // printStaticEnvBindings(*staticEnv, 0);
+
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
@@ -207,7 +213,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             loadedFiles.push_back(i);
     }
 
-    reloadFiles();
+    loadFiles();
     if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
@@ -224,6 +230,9 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 #endif
 
     std::string input;
+
+    std::cout << "pre MAINLOOP; " << std::endl;
+    // printStaticEnvBindings(*staticEnv, 0);
 
     while (true) {
         // When continuing input from previous lines, don't print a prompt, just align to the same
@@ -415,21 +424,40 @@ bool NixRepl::processLine(string line)
         std::cout
              << "The following commands are available:\n"
              << "\n"
-             << "  <expr>        Evaluate and print expression\n"
-             << "  <x> = <expr>  Bind expression to variable\n"
-             << "  :a <expr>     Add attributes from resulting set to scope\n"
-             << "  :b <expr>     Build derivation\n"
-             << "  :e <expr>     Open package or function in $EDITOR\n"
-             << "  :i <expr>     Build derivation, then install result into current profile\n"
-             << "  :l <path>     Load Nix expression and add it to scope\n"
-             << "  :lf <ref>     Load Nix flake and add it to scope\n"
-             << "  :p <expr>     Evaluate and print expression recursively\n"
-             << "  :q            Exit nix-repl\n"
-             << "  :r            Reload all files\n"
-             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n"
-             << "  :doc <expr>   Show documentation of a builtin function\n";
+             << "  <expr>         Evaluate and print expression\n"
+             << "  <x> = <expr>   Bind expression to variable\n"
+             << "  :a <expr>      Add attributes from resulting set to scope\n"
+             << "  :b <expr>      Build derivation\n"
+             << "  :e <expr>      Open package or function in $EDITOR\n"
+             << "  :i <expr>      Build derivation, then install result into current profile\n"
+             << "  :l <path>      Load Nix expression and add it to scope\n"
+             << "  :lf <ref>      Load Nix flake and add it to scope\n"
+             << "  :p <expr>      Evaluate and print expression recursively\n"
+             << "  :q             Exit nix-repl\n"
+             << "  :r             Reload all files\n"
+             << "  :s <expr>      Build dependencies of derivation, then start nix-shell\n"
+             << "  :t <expr>      Describe result of evaluation\n"
+             << "  :u <expr>      Build derivation, then start nix-shell\n"
+             << "  :doc <expr>    Show documentation of a builtin function\n"
+             << "  :d <cmd>       Debug mode commands\n"
+             << "  :d stack       Show call stack\n"
+             << "  :d stack <int> Detail for step N\n"
+             << "  :d error       Show current error\n";
+    }
+
+    else if (command == ":d" || command == ":debug") {
+        std::cout << "debug: '" << arg << "'" <<  std::endl;
+        if (arg == "stack") {
+        }
+        else if (arg == "error") {
+          if (this->debugError.has_value()) {
+            showErrorInfo(std::cout, (*debugError)->info(), true);
+          }
+          else
+          {
+            notice("error information not available");
+          }
+        }
     }
 
     else if (command == ":a" || command == ":add") {
@@ -561,11 +589,13 @@ bool NixRepl::processLine(string line)
             line[p + 1] != '=' &&
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
+            std::cout << "isvarname" << std::endl;
             Expr * e = parseString(string(line, p + 1));
             Value *v = new Value(*state->allocValue());
             v->mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
         } else {
+            std::cout << "evalstring" << std::endl;
             Value v;
             evalString(line, v);
             printValue(std::cout, v, 1) << std::endl;
@@ -623,6 +653,12 @@ void NixRepl::reloadFiles()
 {
     initEnv();
 
+    loadFiles();
+}
+
+
+void NixRepl::loadFiles()
+{
     Strings old = loadedFiles;
     loadedFiles.clear();
 
@@ -649,12 +685,28 @@ void NixRepl::addVarToScope(const Symbol & name, Value * v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
+    if (auto oldVar = staticEnv->find(name); oldVar != staticEnv->vars.end())
+        staticEnv->vars.erase(oldVar);
     staticEnv->vars.emplace_back(name, displ);
     staticEnv->sort();
     env->values[displ++] = v;
     varNames.insert((string) name);
+    notice("Added variable to scope: %1%", name);
+
 }
 
+// version from master.
+// void NixRepl::addVarToScope(const Symbol & name, Value & v)
+// {
+//     if (displ >= envSize)
+//         throw Error("environment full; cannot add more variables");
+//     if (auto oldVar = staticEnv.find(name); oldVar != staticEnv.vars.end())
+//         staticEnv.vars.erase(oldVar);
+//     staticEnv.vars.emplace_back(name, displ);
+//     staticEnv.sort();
+//     env->values[displ++] = &v;
+//     varNames.insert((string) name);
+// }
 
 Expr * NixRepl::parseString(string s)
 {
@@ -665,8 +717,11 @@ Expr * NixRepl::parseString(string s)
 
 void NixRepl::evalString(string s, Value & v)
 {
+            std::cout << "pre partstirns:l" << std::endl;
     Expr * e = parseString(s);
+            std::cout << "pre e->eval" << std::endl;
     e->eval(*state, *env, v);
+            std::cout << "prev fv" << std::endl;
     state->forceValue(v);
 }
 
@@ -817,9 +872,12 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 void runRepl(
     ref<EvalState> evalState,
+    std::optional<ref<const Error>> debugError,
     const std::map<std::string, Value *> & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
+
+    repl->debugError = debugError;
 
     repl->initEnv();
 
@@ -834,6 +892,9 @@ void runRepl(
     printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
     // printError("The following extra variables are in scope: %s\n", concatStringsSep(", ", names));
 
+    std::cout << "    pre repl->mainLoop({});" << std::endl;
+    // printStaticEnvBindings(*repl->staticEnv, 0);
+    
     repl->mainLoop({});
 }
 

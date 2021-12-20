@@ -314,6 +314,8 @@ void printClosureDiff(
 
 void runRepl(
     ref<EvalState> evalState,
+    std::optional<ref<const Error>> debugError,
     const std::map<std::string, Value *> & extraEnv);
+
 
 }
