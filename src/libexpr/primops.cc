@@ -35,9 +35,10 @@ namespace nix {
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
-void EvalState::realiseContext(const PathSet & context)
+StringMap EvalState::realiseContext(const PathSet & context)
 {
     std::vector<DerivedPath::Built> drvs;
+    StringMap res;
 
     for (auto & i : context) {
         auto [ctxS, outputName] = decodeContext(i);
@@ -46,10 +47,12 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back({ctx, {outputName}});
+        } else {
+            res.insert_or_assign(ctxS, ctxS);
         }
     }
 
-    if (drvs.empty()) return;
+    if (drvs.empty()) return {};
 
     if (!evalSettings.enableImportFromDerivation)
         throw Error(
@@ -61,19 +64,29 @@ void EvalState::realiseContext(const PathSet & context)
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     store->buildPaths(buildReqs);
 
+    /* Get all the output paths corresponding to the placeholders we had */
+    for (auto & [drvPath, outputs] : drvs) {
+        auto outputPaths = store->queryDerivationOutputMap(drvPath);
+        for (auto & outputName : outputs) {
+            if (outputPaths.count(outputName) == 0)
+                throw Error("derivation '%s' does not have an output named '%s'",
+                        store->printStorePath(drvPath), outputName);
+            res.insert_or_assign(
+                downstreamPlaceholder(*store, drvPath, outputName),
+                store->printStorePath(outputPaths.at(outputName))
+            );
+        }
+    }
+
     /* Add the output of this derivations to the allowed
        paths. */
     if (allowedPaths) {
-        for (auto & [drvPath, outputs] : drvs) {
-            auto outputPaths = store->queryDerivationOutputMap(drvPath);
-            for (auto & outputName : outputs) {
-                if (outputPaths.count(outputName) == 0)
-                    throw Error("derivation '%s' does not have an output named '%s'",
-                            store->printStorePath(drvPath), outputName);
-                allowPath(outputPaths.at(outputName));
-            }
+        for (auto & [_placeholder, outputPath] : res) {
+            allowPath(outputPath);
         }
     }
+
+    return res;
 }
 
 static Path realisePath(EvalState & state, const Pos & pos, Value & v, bool requireAbsolutePath = true)
@@ -84,9 +97,10 @@ static Path realisePath(EvalState & state, const Pos & pos, Value & v, bool requ
         ? state.coerceToPath(pos, v, context)
         : state.coerceToString(pos, v, context, false, false);
 
-    state.realiseContext(context);
+    StringMap rewrites = state.realiseContext(context);
 
-    return state.checkSourcePath(state.toRealPath(path, context));
+    return state.checkSourcePath(
+            state.toRealPath(rewriteStrings(path, rewrites), context));
 }
 
 /* Add and attribute to the given attribute map from the output name to
@@ -344,7 +358,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     for (unsigned int i = 1; i < args[0]->listSize(); ++i)
         commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
     try {
-        state.realiseContext(context);
+        auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
@@ -1876,7 +1890,8 @@ static void addPath(
     try {
         // FIXME: handle CA derivation outputs (where path needs to
         // be rewritten to the actual output).
-        state.realiseContext(context);
+        auto rewrites = state.realiseContext(context);
+        path = state.toRealPath(rewriteStrings(path, rewrites), context);
 
         StorePathSet refs;
 
