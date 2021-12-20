@@ -29,8 +29,6 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                     for(auto & elem: table) {
 
                         auto & v2 = *state.allocAttr(v, state.symbols.create(elem.first));
-
-                        // TODO: note about creating children here in old code
                         visit(v2, elem.second);
                     }
                 }
@@ -61,7 +59,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
             case toml::value_t::offset_datetime:
             case toml::value_t::local_date:
             case toml::value_t::local_time:
-                // TODO: convert to string?
+                // We fail since Nix doesn't have date and time types
                 throw std::runtime_error("Dates and times are not supported");
                 break;;
             case toml::value_t::empty:
@@ -72,7 +70,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
     };
 
     try {
-        visit(val, toml::parse(tomlStream)); // TODO give filename
+        visit(val, toml::parse(tomlStream, "fromTOML" /* the "filename" */));
     } catch (std::exception & e) { // TODO: toml::syntax_error
         throw EvalError({
             .msg = hintfmt("while parsing a TOML string: %s", e.what()),
