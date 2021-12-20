@@ -133,6 +133,9 @@ private:
     /* Cache used by prim_match(). */
     std::shared_ptr<RegexCache> regexCache;
 
+    /* Allocation cache for GC'd Value objects. */
+    void * valueAllocCache = nullptr;
+
 public:
 
     EvalState(
