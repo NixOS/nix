@@ -24,9 +24,9 @@ else
       # and shwordsplit to force splitting words in $NIX_PROFILES below.
       setopt local_options shwordsplit
     fi
-    for i in $NIX_PROFILES; do
-      if [ -e "$i/etc/ssl/certs/ca-bundle.crt" ]; then
-        export NIX_SSL_CERT_FILE=$i/etc/ssl/certs/ca-bundle.crt
+    for p in $NIX_PROFILES; do
+      if [ -e "$p/etc/ssl/certs/ca-bundle.crt" ]; then
+        export NIX_SSL_CERT_FILE=$p/etc/ssl/certs/ca-bundle.crt
       fi
     done
   }
