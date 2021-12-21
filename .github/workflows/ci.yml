@@ -74,3 +74,33 @@ jobs:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
     - run: nix-instantiate -E 'builtins.currentTime' --eval
+
+  docker_push_image:
+    needs: [check_cachix, tests]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name == 'master' &&
+      needs.check_cachix.outputs.secret == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2.4.0
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v16
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - run: echo NIX_VERSION="$(nix-instantiate --eval -E '(import ./default.nix).defaultPackage.${builtins.currentSystem}.version' | tr -d \")" >> $GITHUB_ENV
+    - uses: cachix/cachix-action@v10
+      if: needs.check_cachix.outputs.secret == 'true'
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: nix-build -A checks.$(nix-instantiate --eval -E 'builtins.currentSystem' --json).dockerImage
+    - run: docker load -i ./result/image.tar.gz
+    - run: docker tag nix:$NIX_VERSION nixos/nix:$NIX_VERSION
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - run: docker push nixos/nix:$NIX_VERSION
