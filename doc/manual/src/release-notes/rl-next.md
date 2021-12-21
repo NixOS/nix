@@ -26,3 +26,6 @@
 
 * Templates can now define a `welcomeText` attribute, which is printed out by
   `nix flake {init,new} --template <template>`.
+
+* Nix can now be built with LTO by passing `--enable-lto` to `configure`.
+  LTO is currently only supported when building with GCC.
