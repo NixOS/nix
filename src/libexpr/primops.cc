@@ -76,6 +76,19 @@ void EvalState::realiseContext(const PathSet & context)
     }
 }
 
+static Path realisePath(EvalState & state, const Pos & pos, Value & v, bool requireAbsolutePath = true)
+{
+    PathSet context;
+
+    Path path = requireAbsolutePath
+        ? state.coerceToPath(pos, v, context)
+        : state.coerceToString(pos, v, context, false, false);
+
+    state.realiseContext(context);
+
+    return state.checkSourcePath(state.toRealPath(path, context));
+}
+
 /* Add and attribute to the given attribute map from the output name to
    the output path, or a placeholder.
 
@@ -109,11 +122,9 @@ static void mkOutputString(EvalState & state, Value & v,
    argument. */
 static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, vPath, context);
-
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, vPath);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
@@ -123,8 +134,6 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         e.addTrace(pos, "while importing '%s'", path);
         throw;
     }
-
-    Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
@@ -177,7 +186,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
 
     else {
         if (!vScope)
-            state.evalFile(realPath, v);
+            state.evalFile(path, v);
         else {
             state.forceAttrs(*vScope);
 
@@ -195,8 +204,8 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             // No need to call staticEnv.sort(), because
             // args[0]->attrs is already sorted.
 
-            printTalkative("evaluating file '%1%'", realPath);
-            Expr * e = state.parseExprFromFile(resolveExprPath(realPath), staticEnv);
+            printTalkative("evaluating file '%1%'", path);
+            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
 
             e->eval(state, *env, v);
         }
@@ -281,21 +290,18 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
-
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
-            .msg = hintfmt(
-                "cannot import '%1%', since path '%2%' is not valid",
-                path, e.path),
+            .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
             .errPos = pos
         });
+    } catch (Error & e) {
+        e.addTrace(pos, "while importing '%s'", path);
+        throw;
     }
-
-    path = state.checkSourcePath(path);
 
     string sym = state.forceStringNoCtx(*args[1], pos);
 
@@ -1349,10 +1355,9 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt(
@@ -1363,7 +1368,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     }
 
     try {
-        mkBool(v, pathExists(state.checkSourcePath(path)));
+        mkBool(v, pathExists(path));
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1426,17 +1431,16 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
             .errPos = pos
         });
     }
-    string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
+    string s = readFile(path);
     if (s.find((char) 0) != string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     mkString(v, s.c_str());
@@ -1475,11 +1479,10 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             pos
         );
 
-        PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false);
+        Path path;
 
         try {
-            state.realiseContext(context);
+            path = realisePath(state, pos, *i->value, false);
         } catch (InvalidPathError & e) {
             throw EvalError({
                 .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
@@ -1512,15 +1515,14 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
             .errPos = pos
         });
 
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[1]);
     } catch (InvalidPathError & e) {
         throw EvalError("cannot read '%s' since path '%s' is not valid, at %s", path, e.path, pos);
     }
 
-    mkString(v, hashFile(*ht, state.checkSourcePath(state.toRealPath(path, context))).to_string(Base16, false));
+    mkString(v, hashFile(*ht, path).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1537,10 +1539,9 @@ static RegisterPrimOp primop_hashFile({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet ctx;
-    Path path = state.coerceToPath(pos, *args[0], ctx);
+    Path path;
     try {
-        state.realiseContext(ctx);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
@@ -1548,7 +1549,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
         });
     }
 
-    DirEntries entries = readDirectory(state.checkSourcePath(path));
+    DirEntries entries = readDirectory(path);
     state.mkAttrs(v, entries.size());
 
     for (auto & ent : entries) {
