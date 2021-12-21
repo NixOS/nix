@@ -139,7 +139,7 @@ or          { return OR_KW; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
 
-{ID}        { yylval->id = strdup(yytext); return ID; }
+{ID}        { yylval->id = {yytext, (size_t) yyleng}; return ID; }
 {INT}       { errno = 0;
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
@@ -221,14 +221,14 @@ or          { return OR_KW; }
 <PATH_START>{PATH_SEG} {
   POP_STATE();
   PUSH_STATE(INPATH_SLASH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return PATH;
 }
 
 <PATH_START>{HPATH_START} {
   POP_STATE();
   PUSH_STATE(INPATH_SLASH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return HPATH;
 }
 
@@ -237,7 +237,7 @@ or          { return OR_KW; }
     PUSH_STATE(INPATH_SLASH);
   else
     PUSH_STATE(INPATH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return PATH;
 }
 {HPATH} {
@@ -245,7 +245,7 @@ or          { return OR_KW; }
     PUSH_STATE(INPATH_SLASH);
   else
     PUSH_STATE(INPATH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return HPATH;
 }
 
@@ -280,8 +280,8 @@ or          { return OR_KW; }
   throw ParseError("path has a trailing slash");
 }
 
-{SPATH}     { yylval->path = strdup(yytext); return SPATH; }
-{URI}       { yylval->uri = strdup(yytext); return URI; }
+{SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }
+{URI}       { yylval->uri = {yytext, (size_t) yyleng}; return URI; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
