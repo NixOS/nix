@@ -34,8 +34,21 @@ struct CmdWhyDepends : SourceExprCommand
 
     CmdWhyDepends()
     {
-        expectArg("package", &_package);
-        expectArg("dependency", &_dependency);
+        expectArgs({
+            .label = "package",
+            .handler = {&_package},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeInstallable(prefix);
+            }}
+        });
+
+        expectArgs({
+            .label = "dependency",
+            .handler = {&_dependency},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeInstallable(prefix);
+            }}
+        });
 
         addFlag({
             .longName = "all",
