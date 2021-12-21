@@ -64,29 +64,32 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-// FIXME: optimize
-static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
+// we make use of the fact that the parser receives a private copy of the input
+// string and can munge around in it.
+static Expr * unescapeStr(SymbolTable & symbols, char * s, size_t length)
 {
-    string t;
-    t.reserve(length);
+    char * result = s;
+    char * t = s;
     char c;
+    // the input string is terminated with *two* NULs, so we can safely take
+    // *one* character after the one being checked against.
     while ((c = *s++)) {
         if (c == '\\') {
-            assert(*s);
             c = *s++;
-            if (c == 'n') t += '\n';
-            else if (c == 'r') t += '\r';
-            else if (c == 't') t += '\t';
-            else t += c;
+            if (c == 'n') *t = '\n';
+            else if (c == 'r') *t = '\r';
+            else if (c == 't') *t = '\t';
+            else *t = c;
         }
         else if (c == '\r') {
             /* Normalise CR and CR/LF into LF. */
-            t += '\n';
+            *t = '\n';
             if (*s == '\n') s++; /* cr/lf */
         }
-        else t += c;
+        else *t = c;
+        t++;
     }
-    return new ExprString(symbols.create(t));
+    return new ExprString(symbols.create({result, size_t(t - result)}));
 }
 
 
