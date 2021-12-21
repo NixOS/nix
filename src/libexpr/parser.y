@@ -596,7 +596,7 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(const char * text, FileOrigin origin,
+Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
     const Path & path, const Path & basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
@@ -616,7 +616,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     data.basePath = basePath;
 
     yylex_init(&scanner);
-    yy_scan_string(text, scanner);
+    yy_scan_buffer(text, length, scanner);
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
@@ -662,26 +662,33 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 
 Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
-    return parse(readFile(path).c_str(), foFile, path, dirOf(path), staticEnv);
+    auto buffer = readFile(path);
+    // readFile should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.data(), foString, "", basePath, staticEnv);
+    s.append("\0\0", 2);
+    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
 {
-    return parseExprFromString(s, basePath, staticBaseEnv);
+    return parseExprFromString(std::move(s), basePath, staticBaseEnv);
 }
 
 
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parse(drainFD(0).data(), foStdin, "", absPath("."), staticBaseEnv);
+    auto buffer = drainFD(0);
+    // drainFD should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
 }
 
 

@@ -296,7 +296,7 @@ static void main_nix_build(int argc, char * * argv)
     else
         for (auto i : left) {
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(i, absPath(".")));
+                exprs.push_back(state->parseExprFromString(std::move(i), absPath(".")));
             else {
                 auto absolute = i;
                 try {

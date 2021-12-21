@@ -350,7 +350,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
     try {
-        parsed = state.parseExprFromString(output, pos.file);
+        parsed = state.parseExprFromString(std::move(output), pos.file);
     } catch (Error & e) {
         e.addTrace(pos, "While parsing the output from '%1%'", program);
         throw;
@@ -3800,9 +3800,12 @@ void EvalState::createBaseEnv()
 
     /* Note: we have to initialize the 'derivation' constant *after*
        building baseEnv/staticBaseEnv because it uses 'builtins'. */
-    eval(parse(
+    char code[] =
         #include "primops/derivation.nix.gen.hh"
-        , foFile, sDerivationNix, "/", staticBaseEnv), *vDerivation);
+        // the parser needs two NUL bytes as terminators; one of them
+        // is implied by being a C string.
+        "\0";
+    eval(parse(code, sizeof(code), foFile, sDerivationNix, "/", staticBaseEnv), *vDerivation);
 }
 
 

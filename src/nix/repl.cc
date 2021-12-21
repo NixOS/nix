@@ -683,7 +683,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 
 Expr * NixRepl::parseString(string s)
 {
-    Expr * e = state->parseExprFromString(s, curDir, staticEnv);
+    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
     return e;
 }
 
