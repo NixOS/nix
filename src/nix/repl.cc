@@ -611,11 +611,11 @@ void NixRepl::loadFile(const Path & path)
 
 void NixRepl::loadFlake(const std::string & flakeRefS)
 {
-    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(flakeRefS, absPath("."), true);
     if (evalSettings.pureEval && !flakeRef.input.isImmutable())
         throw Error("cannot use ':load-flake' on mutable flake reference '%s' (use --impure to override)", flakeRefS);
 
-    Value v;
+    auto v = state->allocValue();
 
     flake::callFlake(*state,
         flake::lockFlake(*state, flakeRef,
@@ -624,8 +624,17 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
                 .useRegistries = !evalSettings.pureEval,
                 .allowMutable  = !evalSettings.pureEval,
             }),
-        v);
-    addAttrsToScope(v);
+        *v);
+
+    auto f = v->attrs->get(state->symbols.create(fragment));
+
+    if (f == 0) {
+        warn("no attribute %s, nothing loaded", fragment);
+        return;
+    };
+
+    fragment != "" ? addAttrsToScope(*f->value) : addAttrsToScope(*v);
+
 }
 
 
@@ -654,7 +663,10 @@ void NixRepl::reloadFiles()
         if (!first) notice("");
         first = false;
         notice("Loading '%1%'...", i);
-        loadFile(i);
+
+        settings.isExperimentalFeatureEnabled(Xp::Flakes)
+        ? loadFlake(i)
+        : loadFile(i);
     }
 }
 
