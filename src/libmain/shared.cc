@@ -427,7 +427,7 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
+    out = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
 }
@@ -438,7 +438,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            dup2(stdout, STDOUT_FILENO);
+            dup2(out, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {
