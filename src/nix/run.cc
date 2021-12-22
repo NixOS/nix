@@ -8,7 +8,6 @@
 #include "finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
-#include "affinity.hh"
 #include "eval.hh"
 
 #if __linux__

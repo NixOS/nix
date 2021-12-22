@@ -5,7 +5,6 @@
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "progress-bar.hh"
 #include "run.hh"
 

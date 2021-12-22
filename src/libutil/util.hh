@@ -300,7 +300,7 @@ void setStackSize(size_t stackSize);
 
 
 /* Restore the original inherited Unix process context (such as signal
-   masks, stack size, CPU affinity). */
+   masks, stack size). */
 void restoreProcessContext(bool restoreMounts = true);
 
 /* Save the current mount namespace. Ignored if called more than

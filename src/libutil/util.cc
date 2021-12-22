@@ -1,5 +1,4 @@
 #include "util.hh"
-#include "affinity.hh"
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
@@ -1004,7 +1003,6 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
-            restoreAffinity();
             fun();
         } catch (std::exception & e) {
             try {
@@ -1674,8 +1672,6 @@ void restoreProcessContext(bool restoreMounts)
     if (restoreMounts) {
         restoreMountNamespace();
     }
-
-    restoreAffinity();
 
     #if __linux__
     if (savedStackSize) {

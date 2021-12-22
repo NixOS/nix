@@ -14,7 +14,6 @@
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
