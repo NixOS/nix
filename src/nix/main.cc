@@ -310,7 +310,14 @@ void mainWrapped(int argc, char * * argv)
     Finally printCompletions([&]()
     {
         if (completions) {
-            std::cout << (pathCompletions ? "filenames\n" : "no-filenames\n");
+            switch (completionType) {
+            case ctNormal:
+                std::cout << "normal\n"; break;
+            case ctFilenames:
+                std::cout << "filenames\n"; break;
+            case ctAttrs:
+                std::cout << "attrs\n"; break;
+            }
             for (auto & s : *completions)
                 std::cout << s.completion << "\t" << s.description << "\n";
         }

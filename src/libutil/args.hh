@@ -237,7 +237,13 @@ public:
     void add(std::string completion, std::string description = "");
 };
 extern std::shared_ptr<Completions> completions;
-extern bool pathCompletions;
+
+enum CompletionType {
+    ctNormal,
+    ctFilenames,
+    ctAttrs
+};
+extern CompletionType completionType;
 
 std::optional<std::string> needsCompletion(std::string_view s);
 

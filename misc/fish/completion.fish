@@ -19,7 +19,6 @@ end
 
 function _nix_accepts_files
   set -l response (_nix_complete)
-  # First line is either filenames or no-filenames.
   test $response[1] = 'filenames'
 end
 
