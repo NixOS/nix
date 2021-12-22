@@ -109,6 +109,8 @@ public:
     RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
+    std::list<Trace> debugTraces;
+
 private:
     SrcToStore srcToStore;
 

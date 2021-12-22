@@ -17,6 +17,7 @@
 #include <sys/resource.h>
 #include <iostream>
 #include <fstream>
+#include <functional>
 
 #include <sys/resource.h>
 
@@ -854,13 +855,20 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
+    std::cout << "throwUndefinedVarError" << std::endl;
+
+    std::cout << "loggerSettings.showTrace: " << loggerSettings.showTrace << std::endl;
+
     auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
+    if (debuggerHook && expr) {
+    
+         std::cout << "throwUndefinedVarError debuggerHook" << std::endl;
         debuggerHook(error, env, *expr);
+    }
 
     throw error;
 }
@@ -887,6 +895,16 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 {
     e.addTrace(pos, s, s2);
 }
+
+// LocalNoInline(void makeErrorTrace(Error & e, const char * s, const string & s2))
+// {
+//     Trace { .pos = e, .hint = hint }
+// }
+
+// LocalNoInline(void makeErrorTrace(Error & e, const Pos & pos, const char * s, const string & s2))
+// {
+//   return Trace { .pos = e, .hint = hintfmt(s, s2); };
+// }
 
 void mkString(Value & v, const char * s)
 {
@@ -934,7 +952,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith) {
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, 0);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, (Expr*)&var);
         }
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
@@ -1092,6 +1110,39 @@ void EvalState::resetFileCache()
     fileParseCache.clear();
 }
 
+class DebugTraceStacker {
+  public:
+   DebugTraceStacker(EvalState &evalState, Trace t)
+    :evalState(evalState), trace(t)
+    {
+        evalState.debugTraces.push_front(t);
+    }
+   ~DebugTraceStacker() {
+     // assert(evalState.debugTraces.front() == trace);
+     evalState.debugTraces.pop_front();
+   }
+   
+   EvalState &evalState;
+   Trace trace;
+                         
+};
+
+// class DebugTraceStacker {
+//    DebugTraceStacker(std::ref<EvalState> evalState, std::ref<Trace> t)
+//     :evalState(evalState), trace(t)
+//     {
+//         evalState->debugTraces.push_front(t);
+//     }
+//    ~DebugTraceStacker() {
+//      assert(evalState->debugTraces.pop_front() == trace);
+//    }
+
+//    std::ref<EvalState> evalState;
+//    std::ref<Trace> trace;
+
+// };
+
+
 
 void EvalState::cacheFile(
     const Path & path,
@@ -1103,6 +1154,15 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
+        std::unique_ptr<DebugTraceStacker> dts = debuggerHook ? 
+          std::unique_ptr<DebugTraceStacker>(new DebugTraceStacker(*this, 
+          Trace { .pos = (e->getPos() ? std::optional(ErrPos(*e->getPos())) : std::nullopt), 
+                  .hint = hintfmt("while evaluating the file '%1%':", resolvedPath)
+                }
+        )) : std::unique_ptr<DebugTraceStacker>();
+
+          // Trace( .pos = (e->getPos() ? std::optional(ErrPos(*e->getPos())): 
+          // 		std::nullopt), hintfmt("while evaluating the file '%1%':", resolvedPath)); 
         // Enforce that 'flake.nix' is a direct attrset, not a
         // computation.
         if (mustBeTrivial &&
@@ -1472,6 +1532,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
+                std::cout << "eval showErrorInfo showTrace: " << loggerSettings.showTrace.get() << std::endl;
                 if (loggerSettings.showTrace.get()) {
                     addErrorTrace(e, lambda.pos, "while evaluating %s",
                         (lambda.name.set()

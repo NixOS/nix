@@ -451,6 +451,7 @@ bool NixRepl::processLine(string line)
         }
         else if (arg == "error") {
           if (this->debugError.has_value()) {
+            // TODO user --show-trace setting?
             showErrorInfo(std::cout, (*debugError)->info(), true);
           }
           else

@@ -221,6 +221,8 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
+    std::cout << "showErrorInfo showTrace: " << showTrace << std::endl;
+  
     std::string prefix;
     switch (einfo.level) {
         case Verbosity::lvlError: {

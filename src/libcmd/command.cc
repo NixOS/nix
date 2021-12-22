@@ -75,6 +75,8 @@ ref<EvalState> EvalCommand::getEvalState()
 
                 printStaticEnvBindings(expr);
 
+                std::cout << evalState->vCallFlake << std::endl;
+
                 std::cout << "expr: " << std::endl;
                 expr.show(std::cout);
                 std::cout << std::endl;
