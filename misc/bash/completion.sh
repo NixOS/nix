@@ -7,8 +7,10 @@ function _complete_nix {
         local completion=${line%%	*}
         if [[ -z $have_type ]]; then
             have_type=1
-            if [[ $completion = filenames ]]; then
+            if [[ $completion == filenames ]]; then
                 compopt -o filenames
+            elif [[ $completion == attrs ]]; then
+                compopt -o nospace
             fi
         else
             COMPREPLY+=("$completion")
