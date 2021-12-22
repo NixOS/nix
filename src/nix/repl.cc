@@ -28,7 +28,6 @@ extern "C" {
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
