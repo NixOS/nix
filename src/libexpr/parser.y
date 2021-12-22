@@ -288,7 +288,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts_interpolated ind_string_parts
-%type <e> path_start string_parts string_attr
+%type <e> path_start string_parts string_attr antiquotation
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
@@ -441,6 +441,10 @@ expr_simple
   | '[' expr_list ']' { $$ = $2; }
   ;
 
+antiquotation
+  : DOLLAR_CURLY expr '}' { $$ = $2; }
+  | DOLLAR_CURLY '}' { $$ = new ExprString(data->symbols.create("")); }
+
 string_parts
   : STR
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
@@ -449,12 +453,12 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
-  | STR DOLLAR_CURLY expr '}' {
+  | string_parts_interpolated antiquotation { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
+  | antiquotation { $$ = new vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $1); }
+  | STR antiquotation {
       $$ = new vector<std::pair<Pos, Expr *> >;
       $$->emplace_back(makeCurPos(@1, data), $1);
-      $$->emplace_back(makeCurPos(@2, data), $3);
+      $$->emplace_back(makeCurPos(@2, data), $2);
     }
   ;
 
@@ -474,7 +478,7 @@ path_start
 
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
+  | ind_string_parts antiquotation { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
   | { $$ = new vector<std::pair<Pos, Expr *> >; }
   ;
 
@@ -548,7 +552,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
-  | DOLLAR_CURLY expr '}' { $$ = $2; }
+  | antiquotation
   ;
 
 expr_list
