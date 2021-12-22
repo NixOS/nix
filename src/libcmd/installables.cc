@@ -191,7 +191,7 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         auto sep = prefix_.rfind('.');
         std::string searchWord;
         if (sep != std::string::npos) {
-            searchWord = prefix_.substr(sep, std::string::npos);
+            searchWord = prefix_.substr(sep + 1, std::string::npos);
             prefix_ = prefix_.substr(0, sep);
         } else {
             searchWord = prefix_;
