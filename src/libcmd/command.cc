@@ -73,8 +73,13 @@ ref<Store> EvalCommand::getEvalStore()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getEvalStore(), getStore());
+    if (!evalState) evalState =
+#if HAVE_BOEHMGC
+        std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+#else
+        std::make_shared<EvalState>(
+#endif
+            searchPath, getEvalStore(), getStore());
     return ref<EvalState>(evalState);
 }
 

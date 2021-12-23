@@ -83,11 +83,14 @@ UnresolvedApp Installable::toApp(EvalState & state)
         auto outPath = cursor->getAttr(state.sOutPath)->getString();
         auto outputName = cursor->getAttr(state.sOutputName)->getString();
         auto name = cursor->getAttr(state.sName)->getString();
+        auto aPname = cursor->maybeGetAttr("pname");
         auto aMeta = cursor->maybeGetAttr("meta");
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
         auto mainProgram =
             aMainProgram
             ? aMainProgram->getString()
+            : aPname
+            ? aPname->getString()
             : DrvName(name).name;
         auto program = outPath + "/bin/" + mainProgram;
         return UnresolvedApp { App {

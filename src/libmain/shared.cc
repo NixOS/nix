@@ -145,10 +145,10 @@ static void preloadNSS() {
          *
          * All other platforms are unaffected.
          */
-        if (dlopen (LIBNSS_DNS_SO, RTLD_NOW) == NULL) {
-            printMsg(Verbosity::lvlWarn, fmt("Unable to load nss_dns backend"));
-        }
-        __nss_configure_lookup ("hosts", "dns");
+        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
+            warn("unable to load nss_dns backend");
+        // FIXME: get hosts entry from nsswitch.conf.
+        __nss_configure_lookup("hosts", "files dns");
 #endif
     });
 }
@@ -427,7 +427,7 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-
+    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
 }
@@ -438,7 +438,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            close(STDOUT_FILENO);
+            dup2(stdout, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {

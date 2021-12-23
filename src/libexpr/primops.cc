@@ -35,9 +35,10 @@ namespace nix {
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
-void EvalState::realiseContext(const PathSet & context)
+StringMap EvalState::realiseContext(const PathSet & context)
 {
     std::vector<DerivedPath::Built> drvs;
+    StringMap res;
 
     for (auto & i : context) {
         auto [ctxS, outputName] = decodeContext(i);
@@ -46,10 +47,12 @@ void EvalState::realiseContext(const PathSet & context)
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back({ctx, {outputName}});
+        } else {
+            res.insert_or_assign(ctxS, ctxS);
         }
     }
 
-    if (drvs.empty()) return;
+    if (drvs.empty()) return {};
 
     if (!evalSettings.enableImportFromDerivation)
         throw Error(
@@ -61,19 +64,53 @@ void EvalState::realiseContext(const PathSet & context)
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     store->buildPaths(buildReqs);
 
+    /* Get all the output paths corresponding to the placeholders we had */
+    for (auto & [drvPath, outputs] : drvs) {
+        auto outputPaths = store->queryDerivationOutputMap(drvPath);
+        for (auto & outputName : outputs) {
+            if (outputPaths.count(outputName) == 0)
+                throw Error("derivation '%s' does not have an output named '%s'",
+                        store->printStorePath(drvPath), outputName);
+            res.insert_or_assign(
+                downstreamPlaceholder(*store, drvPath, outputName),
+                store->printStorePath(outputPaths.at(outputName))
+            );
+        }
+    }
+
     /* Add the output of this derivations to the allowed
        paths. */
     if (allowedPaths) {
-        for (auto & [drvPath, outputs] : drvs) {
-            auto outputPaths = store->queryDerivationOutputMap(drvPath);
-            for (auto & outputName : outputs) {
-                if (outputPaths.count(outputName) == 0)
-                    throw Error("derivation '%s' does not have an output named '%s'",
-                            store->printStorePath(drvPath), outputName);
-                allowPath(outputPaths.at(outputName));
-            }
+        for (auto & [_placeholder, outputPath] : res) {
+            allowPath(outputPath);
         }
     }
+
+    return res;
+}
+
+struct RealisePathFlags {
+    // Whether to check whether the path is a valid absolute path
+    bool requireAbsolutePath = true;
+    // Whether to check that the path is allowed in pure eval mode
+    bool checkForPureEval = true;
+};
+
+static Path realisePath(EvalState & state, const Pos & pos, Value & v, const RealisePathFlags flags = {})
+{
+    PathSet context;
+
+    Path path = flags.requireAbsolutePath
+        ? state.coerceToPath(pos, v, context)
+        : state.coerceToString(pos, v, context, false, false);
+
+    StringMap rewrites = state.realiseContext(context);
+
+    auto realPath = state.toRealPath(rewriteStrings(path, rewrites), context);
+
+    return flags.checkForPureEval
+        ? state.checkSourcePath(realPath)
+        : realPath;
 }
 
 /* Add and attribute to the given attribute map from the output name to
@@ -109,11 +146,9 @@ static void mkOutputString(EvalState & state, Value & v,
    argument. */
 static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, vPath, context);
-
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, vPath);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
@@ -123,8 +158,6 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         e.addTrace(pos, "while importing '%s'", path);
         throw;
     }
-
-    Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
@@ -177,7 +210,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
 
     else {
         if (!vScope)
-            state.evalFile(realPath, v);
+            state.evalFile(path, v);
         else {
             state.forceAttrs(*vScope);
 
@@ -195,8 +228,8 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             // No need to call staticEnv.sort(), because
             // args[0]->attrs is already sorted.
 
-            printTalkative("evaluating file '%1%'", realPath);
-            Expr * e = state.parseExprFromFile(resolveExprPath(realPath), staticEnv);
+            printTalkative("evaluating file '%1%'", path);
+            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
 
             e->eval(state, *env, v);
         }
@@ -281,21 +314,18 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
-
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
-            .msg = hintfmt(
-                "cannot import '%1%', since path '%2%' is not valid",
-                path, e.path),
+            .msg = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
             .errPos = pos
         });
+    } catch (Error & e) {
+        e.addTrace(pos, "while importing '%s'", path);
+        throw;
     }
-
-    path = state.checkSourcePath(path);
 
     string sym = state.forceStringNoCtx(*args[1], pos);
 
@@ -338,7 +368,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     for (unsigned int i = 1; i < args[0]->listSize(); ++i)
         commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
     try {
-        state.realiseContext(context);
+        auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
@@ -1349,10 +1379,14 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path;
     try {
-        state.realiseContext(context);
+        // We don’t check the path right now, because we don’t want to throw if
+        // the path isn’t allowed, but just return false
+        // (and we can’t just catch the exception here because we still want to
+        // throw if something in the evaluation of `*args[0]` tries to access an
+        // unauthorized path)
+        path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt(
@@ -1426,17 +1460,16 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
             .errPos = pos
         });
     }
-    string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
+    string s = readFile(path);
     if (s.find((char) 0) != string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     mkString(v, s.c_str());
@@ -1475,11 +1508,10 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             pos
         );
 
-        PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false);
+        Path path;
 
         try {
-            state.realiseContext(context);
+            path = realisePath(state, pos, *i->value, { .requireAbsolutePath = false });
         } catch (InvalidPathError & e) {
             throw EvalError({
                 .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
@@ -1512,15 +1544,14 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
             .errPos = pos
         });
 
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
+    Path path;
     try {
-        state.realiseContext(context);
+        path = realisePath(state, pos, *args[1]);
     } catch (InvalidPathError & e) {
         throw EvalError("cannot read '%s' since path '%s' is not valid, at %s", path, e.path, pos);
     }
 
-    mkString(v, hashFile(*ht, state.checkSourcePath(state.toRealPath(path, context))).to_string(Base16, false));
+    mkString(v, hashFile(*ht, path).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1537,10 +1568,9 @@ static RegisterPrimOp primop_hashFile({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet ctx;
-    Path path = state.coerceToPath(pos, *args[0], ctx);
+    Path path;
     try {
-        state.realiseContext(ctx);
+        path = realisePath(state, pos, *args[0]);
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
@@ -1548,7 +1578,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
         });
     }
 
-    DirEntries entries = readDirectory(state.checkSourcePath(path));
+    DirEntries entries = readDirectory(path);
     state.mkAttrs(v, entries.size());
 
     for (auto & ent : entries) {
@@ -1875,7 +1905,8 @@ static void addPath(
     try {
         // FIXME: handle CA derivation outputs (where path needs to
         // be rewritten to the actual output).
-        state.realiseContext(context);
+        auto rewrites = state.realiseContext(context);
+        path = state.toRealPath(rewriteStrings(path, rewrites), context);
 
         StorePathSet refs;
 

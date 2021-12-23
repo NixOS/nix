@@ -377,6 +377,11 @@ cure_artifacts() {
 }
 
 validate_starting_assumptions() {
+    task "Checking for artifacts of previous installs"
+    cat <<EOF
+Before I try to install, I'll check for signs Nix already is or has
+been installed on this system.
+EOF
     if type nix-env 2> /dev/null >&2; then
         warning <<EOF
 Nix already appears to be installed. This installer may run into issues.
@@ -385,6 +390,11 @@ If an error occurs, try manually uninstalling, then rerunning this script.
 $(uninstall_directions)
 EOF
     fi
+
+    # TODO: I think it would be good for this step to accumulate more
+    #       knowledge of older obsolete artifacts, if there are any.
+    #       We could issue a "reminder" here that the user might want
+    #       to clean them up?
 
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         # TODO: I think it would be good to accumulate a list of all

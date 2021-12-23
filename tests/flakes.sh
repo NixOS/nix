@@ -249,6 +249,14 @@ cat > $flake3Dir/flake.nix <<EOF
       url = git+file://$nonFlakeDir;
       flake = false;
     };
+    nonFlakeFile = {
+      url = path://$nonFlakeDir/README.md;
+      flake = false;
+    };
+    nonFlakeFile2 = {
+      url = "$nonFlakeDir/README.md";
+      flake = false;
+    };
   };
 
   description = "Fnord";
@@ -265,6 +273,8 @@ cat > $flake3Dir/flake.nix <<EOF
         dummy2 = builtins.readFile (builtins.path { name = "source"; path = inputs.flake1; filter = path: type: baseNameOf path == "simple.nix"; } + "/simple.nix");
         buildCommand = ''
           cat \${inputs.nonFlake}/README.md > \$out
+          [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
+          [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
         '';
       };
   };

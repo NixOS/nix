@@ -38,11 +38,11 @@ void ConfigFile::apply()
 
         // FIXME: Move into libutil/config.cc.
         std::string valueS;
-        if (auto s = std::get_if<std::string>(&value))
+        if (auto* s = std::get_if<std::string>(&value))
             valueS = *s;
-        else if (auto n = std::get_if<int64_t>(&value))
-            valueS = fmt("%d", n);
-        else if (auto b = std::get_if<Explicit<bool>>(&value))
+        else if (auto* n = std::get_if<int64_t>(&value))
+            valueS = fmt("%d", *n);
+        else if (auto* b = std::get_if<Explicit<bool>>(&value))
             valueS = b->t ? "true" : "false";
         else if (auto ss = std::get_if<std::vector<std::string>>(&value))
             valueS = concatStringsSep(" ", *ss); // FIXME: evil

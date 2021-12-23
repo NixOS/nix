@@ -1779,11 +1779,14 @@ void LocalDerivationGoal::runChild()
            i686-linux build on an x86_64-linux machine. */
         struct utsname utsbuf;
         uname(&utsbuf);
-        if (drv->platform == "i686-linux" &&
-            (settings.thisSystem == "x86_64-linux" ||
-             (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
+        if ((drv->platform == "i686-linux"
+                && (settings.thisSystem == "x86_64-linux"
+                    || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
+            || drv->platform == "armv7l-linux"
+            || drv->platform == "armv6l-linux")
+        {
             if (personality(PER_LINUX32) == -1)
-                throw SysError("cannot set i686-linux personality");
+                throw SysError("cannot set 32-bit personality");
         }
 
         /* Impersonate a Linux 2.6 machine to get some determinism in

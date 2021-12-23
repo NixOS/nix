@@ -28,7 +28,6 @@ extern "C" {
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
@@ -430,7 +429,8 @@ bool NixRepl::processLine(string line)
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
-             << "  :doc <expr>   Show documentation of a builtin function\n";
+             << "  :doc <expr>   Show documentation of a builtin function\n"
+             << "  :log <expr>   Show logs for a derivation\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -500,7 +500,7 @@ bool NixRepl::processLine(string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":i" || command == ":s") {
+    else if (command == ":b" || command == ":i" || command == ":s" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
@@ -514,6 +514,27 @@ bool NixRepl::processLine(string line)
                 logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
+        } else if (command == ":log") {
+            settings.readOnlyMode = true;
+            Finally roModeReset([&]() {
+                settings.readOnlyMode = false;
+            });
+            auto subs = getDefaultSubstituters();
+
+            subs.push_front(state->store);
+
+            bool foundLog = false;
+            RunPager pager;
+            for (auto & sub : subs) {
+                auto log = sub->getBuildLog(drvPath);
+                if (log) {
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, sub->getUri());
+                    logger->writeToStdout(*log);
+                    foundLog = true;
+                    break;
+                }
+            }
+            if (!foundLog) throw Error("build log of '%s' is not available", drvPathRaw);
         } else {
             runNix("nix-shell", {drvPathRaw});
         }
@@ -650,6 +671,8 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
+    if (auto oldVar = staticEnv.find(name); oldVar != staticEnv.vars.end())
+        staticEnv.vars.erase(oldVar);
     staticEnv.vars.emplace_back(name, displ);
     staticEnv.sort();
     env->values[displ++] = &v;

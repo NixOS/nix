@@ -821,8 +821,23 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
 Value * EvalState::allocValue()
 {
+    /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
+       GC_malloc_many returns a linked list of objects of the given size, where the first word
+       of each object is also the pointer to the next object in the list. This also means that we
+       have to explicitly clear the first word of every object we take. */
+    if (!valueAllocCache) {
+        valueAllocCache = GC_malloc_many(sizeof(Value));
+        if (!valueAllocCache) throw std::bad_alloc();
+    }
+
+    /* GC_NEXT is a convenience macro for accessing the first word of an object.
+       Take the first list item, advance the list to the next item, and clear the next pointer. */
+    void * p = valueAllocCache;
+    GC_PTR_STORE_AND_DIRTY(&valueAllocCache, GC_NEXT(p));
+    GC_NEXT(p) = nullptr;
+
     nrValues++;
-    auto v = (Value *) allocBytes(sizeof(Value));
+    auto v = (Value *) p;
     return v;
 }
 
@@ -1656,7 +1671,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     bool first = !forceString;
     ValueType firstType = nString;
 
-    for (auto & i : *es) {
+    for (auto & [i_pos, i] : *es) {
         Value vTmp;
         i->eval(state, env, vTmp);
 
@@ -1677,19 +1692,19 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp));
+                throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp));
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp));
+                throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
         } else
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
-            s << state.coerceToString(pos, vTmp, context, false, firstType == nString, !first);
+            s << state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
 
         first = false;
     }

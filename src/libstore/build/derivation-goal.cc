@@ -17,6 +17,7 @@
 #include <regex>
 #include <queue>
 
+#include <fstream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -464,7 +465,6 @@ void DerivationGoal::inputsRealised()
             Derivation drvResolved { *std::move(attempt) };
 
             auto pathResolved = writeDerivation(worker.store, drvResolved);
-            resolvedDrv = drvResolved;
 
             auto msg = fmt("Resolved derivation: '%s' -> '%s'",
                 worker.store.printStorePath(drvPath),
@@ -475,9 +475,9 @@ void DerivationGoal::inputsRealised()
                        worker.store.printStorePath(pathResolved),
                    });
 
-            auto resolvedGoal = worker.makeDerivationGoal(
+            resolvedDrvGoal = worker.makeDerivationGoal(
                 pathResolved, wantedOutputs, buildMode);
-            addWaitee(resolvedGoal);
+            addWaitee(resolvedDrvGoal);
 
             state = &DerivationGoal::resolvedFinished;
             return;
@@ -655,7 +655,7 @@ void DerivationGoal::tryLocalBuild() {
     throw Error(
         "unable to build with a primary store that isn't a local store; "
         "either pass a different '--store' or enable remote builds."
-        "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+        "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
 }
 
 
@@ -938,16 +938,17 @@ void DerivationGoal::buildDone()
 }
 
 void DerivationGoal::resolvedFinished() {
-    assert(resolvedDrv);
+    assert(resolvedDrvGoal);
+    auto resolvedDrv = *resolvedDrvGoal->drv;
 
-    auto resolvedHashes = staticOutputHashes(worker.store, *resolvedDrv);
+    auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
 
     StorePathSet outputPaths;
 
     // `wantedOutputs` might be empty, which means “all the outputs”
     auto realWantedOutputs = wantedOutputs;
     if (realWantedOutputs.empty())
-        realWantedOutputs = resolvedDrv->outputNames();
+        realWantedOutputs = resolvedDrv.outputNames();
 
     for (auto & wantedOutput : realWantedOutputs) {
         assert(initialOutputs.count(wantedOutput) != 0);
@@ -979,9 +980,17 @@ void DerivationGoal::resolvedFinished() {
         outputPaths
     );
 
-    // This is potentially a bit fishy in terms of error reporting. Not sure
-    // how to do it in a cleaner way
-    amDone(nrFailed == 0 ? ecSuccess : ecFailed, ex);
+    auto status = [&]() {
+        auto resolvedResult = resolvedDrvGoal->getResult();
+        switch (resolvedResult.status) {
+            case BuildResult::AlreadyValid:
+                return BuildResult::ResolvesToAlreadyValid;
+            default:
+                return resolvedResult.status;
+        }
+    }();
+
+    done(status);
 }
 
 HookReply DerivationGoal::tryBuildHook()
@@ -1329,6 +1338,13 @@ void DerivationGoal::done(BuildResult::Status status, std::optional<Error> ex)
     }
 
     worker.updateProgress();
+
+    auto traceBuiltOutputsFile = getEnv("_NIX_TRACE_BUILT_OUTPUTS").value_or("");
+    if (traceBuiltOutputsFile != "") {
+        std::fstream fs;
+        fs.open(traceBuiltOutputsFile, std::fstream::out);
+        fs << worker.store.printStorePath(drvPath) << "\t" << result.toString() << std::endl;
+    }
 }
 
 

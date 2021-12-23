@@ -93,8 +93,15 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
         else
             archive.check(r);
 
-        archive_entry_set_pathname(entry,
+        archive_entry_copy_pathname(entry,
             (destDir + "/" + name).c_str());
+
+        // Patch hardlink path
+        const char *original_hardlink = archive_entry_hardlink(entry);
+        if (original_hardlink) {
+            archive_entry_copy_hardlink(entry,
+                (destDir + "/" + original_hardlink).c_str());
+        }
 
         archive.check(archive_read_extract(archive.archive, entry, flags));
     }

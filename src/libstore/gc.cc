@@ -126,7 +126,17 @@ void LocalStore::addTempRoot(const StorePath & path)
             auto socketPath = stateDir.get() + gcSocketPath;
             debug("connecting to '%s'", socketPath);
             state->fdRootsSocket = createUnixDomainSocket();
-            nix::connect(state->fdRootsSocket.get(), socketPath);
+            try {
+                nix::connect(state->fdRootsSocket.get(), socketPath);
+            } catch (SysError & e) {
+                /* The garbage collector may have exited, so we need to
+                   restart. */
+                if (e.errNo == ECONNREFUSED) {
+                    debug("GC socket connection refused");
+                    state->fdRootsSocket.close();
+                    goto restart;
+                }
+            }
         }
 
         try {
@@ -523,6 +533,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 AutoCloseFD fdClient = accept(fdServer.get(), nullptr, nullptr);
                 if (!fdClient) continue;
 
+                debug("GC roots server accepted new client");
+
                 /* Process the connection in a separate thread. */
                 auto fdClient_ = fdClient.get();
                 std::thread clientThread([&, fdClient = std::move(fdClient)]() {
@@ -534,6 +546,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             conn->erase(i);
                         }
                     });
+
+                    /* On macOS, accepted sockets inherit the
+                       non-blocking flag from the server socket, so
+                       explicitly make it blocking. */
+                    if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) & ~O_NONBLOCK) == -1)
+                        abort();
 
                     while (true) {
                         try {
@@ -559,7 +577,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             } else
                                 printError("received garbage instead of a root from client");
                             writeFull(fdClient.get(), "1", false);
-                        } catch (Error &) { break; }
+                        } catch (Error & e) {
+                            debug("reading GC root from client: %s", e.msg());
+                            break;
+                        }
                     }
                 });
 

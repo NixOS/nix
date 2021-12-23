@@ -39,7 +39,7 @@ void Completions::add(std::string completion, std::string description)
 bool Completion::operator<(const Completion & other) const
 { return completion < other.completion || (completion == other.completion && description < other.description); }
 
-bool pathCompletions = false;
+CompletionType completionType = ctNormal;
 std::shared_ptr<Completions> completions;
 
 std::string completionMarker = "___COMPLETE___";
@@ -277,7 +277,7 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
 
 static void _completePath(std::string_view prefix, bool onlyDirs)
 {
-    pathCompletions = true;
+    completionType = ctFilenames;
     glob_t globbuf;
     int flags = GLOB_NOESCAPE | GLOB_TILDE;
     #ifdef GLOB_ONLYDIR

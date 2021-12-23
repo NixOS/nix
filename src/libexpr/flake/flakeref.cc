@@ -48,9 +48,12 @@ FlakeRef FlakeRef::resolve(ref<Store> store) const
 }
 
 FlakeRef parseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing)
+    const std::string & url,
+    const std::optional<Path> & baseDir,
+    bool allowMissing,
+    bool isFlake)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
@@ -67,7 +70,10 @@ std::optional<FlakeRef> maybeParseFlakeRef(
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing)
+    const std::string & url,
+    const std::optional<Path> & baseDir,
+    bool allowMissing,
+    bool isFlake)
 {
     using namespace fetchers;
 
@@ -112,10 +118,9 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                to 'baseDir'). If so, search upward to the root of the
                repo (i.e. the directory containing .git). */
 
-            path = absPath(path, baseDir, true);
+            path = absPath(path, baseDir);
 
-            if (!S_ISDIR(lstat(path).st_mode))
-                throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+            if (isFlake) {
 
             if (!allowMissing && !pathExists(path + "/flake.nix")){
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
@@ -138,39 +143,45 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                 if (!found)
                     throw BadURL("could not find a flake.nix file");
             }
+                if (!S_ISDIR(lstat(path).st_mode))
+                    throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
 
-            auto flakeRoot = path;
-            std::string subdir;
+                if (!allowMissing && !pathExists(path + "/flake.nix"))
+                    throw BadURL("path '%s' is not a flake (because it doesn't contain a 'flake.nix' file)", path);
 
-            while (flakeRoot != "/") {
-                if (pathExists(flakeRoot + "/.git")) {
-                    auto base = std::string("git+file://") + flakeRoot;
+                auto flakeRoot = path;
+                std::string subdir;
 
-                    auto parsedURL = ParsedURL{
-                        .url = base, // FIXME
-                        .base = base,
-                        .scheme = "git+file",
-                        .authority = "",
-                        .path = flakeRoot,
-                        .query = decodeQuery(match[2]),
-                    };
+                while (flakeRoot != "/") {
+                    if (pathExists(flakeRoot + "/.git")) {
+                        auto base = std::string("git+file://") + flakeRoot;
 
-                    if (subdir != "") {
-                        if (parsedURL.query.count("dir"))
-                            throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
-                        parsedURL.query.insert_or_assign("dir", subdir);
+                        auto parsedURL = ParsedURL{
+                            .url = base, // FIXME
+                            .base = base,
+                            .scheme = "git+file",
+                            .authority = "",
+                            .path = flakeRoot,
+                            .query = decodeQuery(match[2]),
+                        };
+
+                        if (subdir != "") {
+                            if (parsedURL.query.count("dir"))
+                                throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+                            parsedURL.query.insert_or_assign("dir", subdir);
+                        }
+
+                        if (pathExists(flakeRoot + "/.git/shallow"))
+                            parsedURL.query.insert_or_assign("shallow", "1");
+
+                        return std::make_pair(
+                            FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+                            fragment);
                     }
 
-                    if (pathExists(flakeRoot + "/.git/shallow"))
-                        parsedURL.query.insert_or_assign("shallow", "1");
-
-                    return std::make_pair(
-                        FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
-                        fragment);
+                    subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
+                    flakeRoot = dirOf(flakeRoot);
                 }
-
-                subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
-                flakeRoot = dirOf(flakeRoot);
             }
 
         } else {

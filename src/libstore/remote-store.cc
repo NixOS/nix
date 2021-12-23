@@ -5,7 +5,6 @@
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "derivations.hh"
 #include "pool.hh"
@@ -184,11 +183,8 @@ void RemoteStore::initConnection(Connection & conn)
         conn.to << PROTOCOL_VERSION;
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
-            int cpu = sameMachine() && settings.lockCPU ? lockToCurrentCPU() : -1;
-            if (cpu != -1)
-                conn.to << 1 << cpu;
-            else
-                conn.to << 0;
+            // Obsolete CPU affinity.
+            conn.to << 0;
         }
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
@@ -684,6 +680,14 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto conn(getConnection());
+
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+        warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
+        try {
+            callback(nullptr);
+        } catch (...) { return callback.rethrow(); }
+    }
+
     conn->to << wopQueryRealisation;
     conn->to << id.to_string();
     conn.processStderr();

@@ -80,7 +80,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 2;
+    const int nixCASchemaVersion = 3;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -131,6 +131,17 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             txn.commit();
         }
 
+        if (curCASchema < 3) {
+            SQLiteTxn txn(db);
+            // Apply new indices added in this schema update.
+            db.exec(R"(
+                -- used by QueryRealisationReferences
+                create index if not exists IndexRealisationsRefs on RealisationsRefs(referrer);
+                -- used by cascade deletion when ValidPaths is deleted
+                create index if not exists IndexRealisationsRefsOnOutputPath on Realisations(outputPath);
+            )");
+            txn.commit();
+        }
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
         lockFile(lockFd.get(), ltRead, true);
     }
@@ -590,9 +601,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
             throw SysError("querying extended attributes of '%s'", path);
 
         for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            /* Ignore SELinux security labels since these cannot be
-               removed even by root. */
-            if (eaName == "security.selinux") continue;
+            if (settings.ignoredAcls.get().count(eaName)) continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
