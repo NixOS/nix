@@ -47,10 +47,10 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 mkBool(v, toml::get<bool>(t));
                 break;;
             case toml::value_t::integer:
-                mkInt(v, toml::get<long>(t));
+                mkInt(v, toml::get<int64_t>(t));
                 break;;
             case toml::value_t::floating:
-                mkFloat(v, toml::get<double>(t));
+                mkFloat(v, toml::get<NixFloat>(t));
                 break;;
             case toml::value_t::string:
                 mkString(v, toml::get<std::string>(t));
