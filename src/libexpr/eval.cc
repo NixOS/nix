@@ -1542,18 +1542,18 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             /* Evaluate the body. */
             try {
                 std::unique_ptr<DebugTraceStacker> dts = 
-                  debuggerHook ? 
-                  std::unique_ptr<DebugTraceStacker>(
-                      new DebugTraceStacker(
-                              *this, 
-                              Trace { .pos = lambda.pos, 
-                                      .hint = hintfmt(
-                                        "while evaluating %s",
-                        (lambda.name.set()
-                            ? "'" + (string) lambda.name + "'"
-                            : "anonymous lambda"))
-                                    }))
-                  : std::unique_ptr<DebugTraceStacker>();
+                    debuggerHook ? 
+                        std::unique_ptr<DebugTraceStacker>(
+                            new DebugTraceStacker(
+                                *this,
+                                Trace {.pos = lambda.pos,
+                                       .hint = hintfmt(
+                                           "while evaluating %s",
+                                           (lambda.name.set()
+                                               ? "'" + (string) lambda.name + "'"
+                                               : "anonymous lambda"))
+                                      }))
+                        : std::unique_ptr<DebugTraceStacker>();
 
               
                 lambda.body->eval(*this, env2, vCur);
