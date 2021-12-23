@@ -74,6 +74,12 @@ struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
 
+struct DebugTrace {
+    std::optional<ErrPos> pos;
+    Expr &expr;
+    hintformat hint;
+};
+
 
 class EvalState
 {
@@ -109,7 +115,7 @@ public:
     RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
-    std::list<Trace> debugTraces;
+    std::list<DebugTrace> debugTraces;
 
 private:
     SrcToStore srcToStore;

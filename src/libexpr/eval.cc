@@ -40,7 +40,7 @@ std::function<void(const Error & error, const Env & env, const Expr & expr)> deb
 
 class DebugTraceStacker {
   public:
-   DebugTraceStacker(EvalState &evalState, Trace t)
+   DebugTraceStacker(EvalState &evalState, DebugTrace t)
     :evalState(evalState), trace(t)
     {
         evalState.debugTraces.push_front(t);
@@ -50,7 +50,7 @@ class DebugTraceStacker {
      evalState.debugTraces.pop_front();
    }
    EvalState &evalState;
-   Trace trace;
+   DebugTrace trace;
 };
 
 static char * dupString(const char * s)
@@ -911,12 +911,14 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 }
 
 LocalNoInline(std::unique_ptr<DebugTraceStacker>
-  makeDebugTraceStacker(EvalState &state, std::optional<ErrPos> pos, const char * s, const string & s2))
+  makeDebugTraceStacker(EvalState &state, Expr &expr, std::optional<ErrPos> pos, const char * s, const string & s2))
 {
   return std::unique_ptr<DebugTraceStacker>(
       new DebugTraceStacker(
           state,
-          Trace {.pos = pos,
+          DebugTrace 
+                {.pos = pos,
+                 .expr = expr,
                  .hint = hintfmt(s, s2)
                 }));
 }
@@ -1143,6 +1145,7 @@ void EvalState::cacheFile(
             debuggerHook ?
                 makeDebugTraceStacker(
                     *this,
+                    *e,
                     (e->getPos() ? std::optional(ErrPos(*e->getPos())) : std::nullopt),
                     "while evaluating the file '%1%':", resolvedPath)
                 : std::unique_ptr<DebugTraceStacker>();
@@ -1375,6 +1378,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
           debuggerHook ?
               makeDebugTraceStacker(
                   state,
+                  *this,
                   *pos2,
                   "while evaluating the attribute '%1%'",
                   showAttrPath(state, env, attrPath))
@@ -1524,7 +1528,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 std::unique_ptr<DebugTraceStacker> dts =
                     debuggerHook ?
-                        makeDebugTraceStacker(*this, lambda.pos,
+                        makeDebugTraceStacker(*this, *lambda.body, lambda.pos,
                                            "while evaluating %s",
                                            (lambda.name.set()
                                                ? "'" + (string) lambda.name + "'"
@@ -1925,10 +1929,14 @@ void EvalState::forceValueDeep(Value & v)
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
                 try {
+
                     std::unique_ptr<DebugTraceStacker> dts =
                       debuggerHook ?
-                          makeDebugTraceStacker(*this, *i.pos,
-                                            "while evaluating the attribute '%1%'", i.name)
+                          // if the value is a thunk, we're evaling.  otherwise no trace necessary.
+                          (i.value->isThunk() ? 
+                              makeDebugTraceStacker(*this, *v.thunk.expr, *i.pos,
+                                                "while evaluating the attribute '%1%'", i.name)
+                              : std::unique_ptr<DebugTraceStacker>())
                       : std::unique_ptr<DebugTraceStacker>();
 
                     recurse(*i.value);

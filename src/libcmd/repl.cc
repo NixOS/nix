@@ -50,7 +50,7 @@ struct NixRepl
     ref<EvalState> state;
     Bindings * autoArgs;
 
-    std::optional<ref<const Error>> debugError;
+    const Error *debugError;
 
     Strings loadedFiles;
 
@@ -470,13 +470,12 @@ bool NixRepl::processLine(string line)
 
         }
         else if (arg == "error") {
-          if (this->debugError.has_value()) {
-            // TODO user --show-trace setting?
-            showErrorInfo(std::cout, (*debugError)->info(), true);
+          if (this->debugError) {
+              showErrorInfo(std::cout, debugError->info(), true);
           }
           else
           {
-            notice("error information not available");
+              notice("error information not available");
           }
         }
     }
@@ -893,7 +892,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 void runRepl(
     ref<EvalState> evalState,
-    std::optional<ref<const Error>> debugError,
+    const Error *debugError,
     const std::map<std::string, Value *> & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
