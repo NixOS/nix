@@ -89,18 +89,28 @@ StringMap EvalState::realiseContext(const PathSet & context)
     return res;
 }
 
-static Path realisePath(EvalState & state, const Pos & pos, Value & v, bool requireAbsolutePath = true)
+struct RealisePathFlags {
+    // Whether to check whether the path is a valid absolute path
+    bool requireAbsolutePath = true;
+    // Whether to check that the path is allowed in pure eval mode
+    bool checkForPureEval = true;
+};
+
+static Path realisePath(EvalState & state, const Pos & pos, Value & v, const RealisePathFlags flags = {})
 {
     PathSet context;
 
-    Path path = requireAbsolutePath
+    Path path = flags.requireAbsolutePath
         ? state.coerceToPath(pos, v, context)
         : state.coerceToString(pos, v, context, false, false);
 
     StringMap rewrites = state.realiseContext(context);
 
-    return state.checkSourcePath(
-            state.toRealPath(rewriteStrings(path, rewrites), context));
+    auto realPath = state.toRealPath(rewriteStrings(path, rewrites), context);
+
+    return flags.checkForPureEval
+        ? state.checkSourcePath(realPath)
+        : realPath;
 }
 
 /* Add and attribute to the given attribute map from the output name to
@@ -1371,7 +1381,12 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
 {
     Path path;
     try {
-        path = realisePath(state, pos, *args[0]);
+        // We don’t check the path right now, because we don’t want to throw if
+        // the path isn’t allowed, but just return false
+        // (and we can’t just catch the exception here because we still want to
+        // throw if something in the evaluation of `*args[0]` tries to access an
+        // unauthorized path)
+        path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
     } catch (InvalidPathError & e) {
         throw EvalError({
             .msg = hintfmt(
@@ -1382,7 +1397,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     }
 
     try {
-        mkBool(v, pathExists(path));
+        mkBool(v, pathExists(state.checkSourcePath(path)));
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1496,7 +1511,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         Path path;
 
         try {
-            path = realisePath(state, pos, *i->value, false);
+            path = realisePath(state, pos, *i->value, { .requireAbsolutePath = false });
         } catch (InvalidPathError & e) {
             throw EvalError({
                 .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
