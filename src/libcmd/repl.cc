@@ -448,6 +448,26 @@ bool NixRepl::processLine(string line)
     else if (command == ":d" || command == ":debug") {
         std::cout << "debug: '" << arg << "'" <<  std::endl;
         if (arg == "stack") {
+            std::cout << "eval stack:" << std::endl;
+            for (auto iter = this->state->debugTraces.begin();
+                 iter !=  this->state->debugTraces.end(); ++iter) {
+                  std::cout << "\n" << "… " << iter->hint.str() << "\n";
+
+                  if (iter->pos.has_value() && (*iter->pos)) {
+                      auto pos = iter->pos.value();
+                      std::cout << "\n";
+                      printAtPos(pos, std::cout);
+
+                      auto loc = getCodeLines(pos);
+                      if (loc.has_value()) {
+                          std::cout << "\n";
+                          printCodeLines(std::cout, "", pos, *loc);
+                          std::cout << "\n";
+                      }
+                  }
+              }                   
+                 
+
         }
         else if (arg == "error") {
           if (this->debugError.has_value()) {

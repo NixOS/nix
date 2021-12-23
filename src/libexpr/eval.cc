@@ -38,6 +38,23 @@ namespace nix {
 
 std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
 
+class DebugTraceStacker {
+  public:
+   DebugTraceStacker(EvalState &evalState, Trace t)
+    :evalState(evalState), trace(t)
+    {
+        evalState.debugTraces.push_front(t);
+    }
+   ~DebugTraceStacker() {
+     // assert(evalState.debugTraces.front() == trace);
+     evalState.debugTraces.pop_front();
+   }
+   
+   EvalState &evalState;
+   Trace trace;
+                         
+};
+
 static char * dupString(const char * s)
 {
     char * t;
@@ -1110,23 +1127,6 @@ void EvalState::resetFileCache()
     fileParseCache.clear();
 }
 
-class DebugTraceStacker {
-  public:
-   DebugTraceStacker(EvalState &evalState, Trace t)
-    :evalState(evalState), trace(t)
-    {
-        evalState.debugTraces.push_front(t);
-    }
-   ~DebugTraceStacker() {
-     // assert(evalState.debugTraces.front() == trace);
-     evalState.debugTraces.pop_front();
-   }
-   
-   EvalState &evalState;
-   Trace trace;
-                         
-};
-
 // class DebugTraceStacker {
 //    DebugTraceStacker(std::ref<EvalState> evalState, std::ref<Trace> t)
 //     :evalState(evalState), trace(t)
@@ -1387,6 +1387,17 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
+        std::unique_ptr<DebugTraceStacker> dts = 
+          debuggerHook ? 
+          std::unique_ptr<DebugTraceStacker>(
+              new DebugTraceStacker(
+                      state, 
+                      Trace { .pos = *pos2, 
+                              .hint = hintfmt(
+                                "while evaluating the attribute '%1%'",
+                                showAttrPath(state, env, attrPath))
+                            }))
+          : std::unique_ptr<DebugTraceStacker>();
 
         for (auto & i : attrPath) {
             state.nrLookups++;
@@ -1530,6 +1541,21 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             /* Evaluate the body. */
             try {
+                std::unique_ptr<DebugTraceStacker> dts = 
+                  debuggerHook ? 
+                  std::unique_ptr<DebugTraceStacker>(
+                      new DebugTraceStacker(
+                              *this, 
+                              Trace { .pos = lambda.pos, 
+                                      .hint = hintfmt(
+                                        "while evaluating %s",
+                        (lambda.name.set()
+                            ? "'" + (string) lambda.name + "'"
+                            : "anonymous lambda"))
+                                    }))
+                  : std::unique_ptr<DebugTraceStacker>();
+
+              
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 std::cout << "eval showErrorInfo showTrace: " << loggerSettings.showTrace.get() << std::endl;
@@ -1924,6 +1950,18 @@ void EvalState::forceValueDeep(Value & v)
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
                 try {
+                    std::unique_ptr<DebugTraceStacker> dts = 
+                      debuggerHook ? 
+                      std::unique_ptr<DebugTraceStacker>(
+                          new DebugTraceStacker(
+                                  *this, 
+                                  Trace { .pos = *i.pos, 
+                                          .hint = hintfmt(
+                                            "while evaluating the attribute '%1%'", i.name)
+                                        }))
+                      : std::unique_ptr<DebugTraceStacker>();
+
+                  
                     recurse(*i.value);
                 } catch (Error & e) {
                     addErrorTrace(e, *i.pos, "while evaluating the attribute '%1%'", i.name);

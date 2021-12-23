@@ -106,6 +106,9 @@ void printCodeLines(std::ostream & out,
     const ErrPos & errPos,
     const LinesOfCode & loc);
 
+void printAtPos(const ErrPos & pos, std::ostream & out);
+
+
 struct Trace {
     std::optional<ErrPos> pos;
     hintformat hint;
