@@ -438,8 +438,10 @@ EvalState::EvalState(
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #else
     , valueAllocCache(std::make_shared<void *>(nullptr))
+    , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -892,7 +894,24 @@ Env & EvalState::allocEnv(size_t size)
 {
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+
+    Env * env;
+
+    if (size != 1)
+        env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+    else {
+        /* see allocValue for explanations. */
+        if (!*env1AllocCache) {
+            *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
+            if (!*env1AllocCache) throw std::bad_alloc();
+        }
+
+        void * p = *env1AllocCache;
+        *env1AllocCache = GC_NEXT(p);
+        GC_NEXT(p) = nullptr;
+        env = (Env *) p;
+    }
+
     env->type = Env::Plain;
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
