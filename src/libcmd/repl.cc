@@ -402,7 +402,6 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     return drvPath;
 }
 
-
 bool NixRepl::processLine(string line)
 {
     if (line == "") return true;
@@ -441,7 +440,8 @@ bool NixRepl::processLine(string line)
              << "  :doc <expr>    Show documentation of a builtin function\n"
              << "  :d <cmd>       Debug mode commands\n"
              << "  :d stack       Show call stack\n"
-             << "  :d stack <int> Detail for step N\n"
+             // << "  :d stack <int> Detail for stack level N\n"
+             << "  :d env         Show env stack\n"
              << "  :d error       Show current error\n";
     }
 
@@ -466,17 +466,21 @@ bool NixRepl::processLine(string line)
                       }
                   }
               }                   
-                 
-
+        } else if (arg == "env") {
+            std::cout << "env stack:" << std::endl;
+            auto iter = this->state->debugTraces.begin();
+            if (iter != this->state->debugTraces.end()) {
+               printStaticEnvBindings(iter->expr);
+            }                   
         }
         else if (arg == "error") {
-          if (this->debugError) {
-              showErrorInfo(std::cout, debugError->info(), true);
-          }
-          else
-          {
-              notice("error information not available");
-          }
+            if (this->debugError) {
+                showErrorInfo(std::cout, debugError->info(), true);
+            }
+            else
+            {
+                notice("error information not available");
+            }
         }
     }
 

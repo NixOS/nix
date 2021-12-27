@@ -691,10 +691,14 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
 void printStaticEnvBindings(const StaticEnv &se, int lvl)
 {
+    std::cout << "Env level " << lvl << std::endl;
+  
     for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
     {
-      std::cout << lvl << i->first << std::endl;
+      std::cout << i->first << " ";
     }
+    std::cout << std::endl;
+    std::cout << std::endl;
 
     if (se.up) {
       printStaticEnvBindings(*se.up, ++lvl);
@@ -729,7 +733,6 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
       vm.merge(map);
   }
 }
-
 
 valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env)
 {
