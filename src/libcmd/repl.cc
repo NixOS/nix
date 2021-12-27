@@ -75,7 +75,7 @@ struct NixRepl
     void loadFiles();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
-    void addVarToScope(const Symbol & name, Value * v);
+    void addVarToScope(const Symbol & name, Value & v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
 
@@ -613,7 +613,7 @@ bool NixRepl::processLine(string line)
             Expr * e = parseString(string(line, p + 1));
             Value *v = new Value(*state->allocValue());
             v->mkThunk(env, e);
-            addVarToScope(state->symbols.create(name), v);
+            addVarToScope(state->symbols.create(name), *v);
         } else {
             std::cout << "evalstring" << std::endl;
             Value v;
@@ -696,12 +696,12 @@ void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, i.value);
+        addVarToScope(i.name, *i.value);
     notice("Added %1% variables.", attrs.attrs->size());
 }
 
 
-void NixRepl::addVarToScope(const Symbol & name, Value * v)
+void NixRepl::addVarToScope(const Symbol & name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
@@ -709,7 +709,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value * v)
         staticEnv->vars.erase(oldVar);
     staticEnv->vars.emplace_back(name, displ);
     staticEnv->sort();
-    env->values[displ++] = v;
+    env->values[displ++] = &v;
     varNames.insert((string) name);
     notice("Added variable to scope: %1%", name);
 
@@ -906,7 +906,7 @@ void runRepl(
     for (auto & [name, value] : extraEnv) {
         // names.insert(ANSI_BOLD + name + ANSI_NORMAL);
         names.insert(name);
-        repl->addVarToScope(repl->state->symbols.create(name), value);
+        repl->addVarToScope(repl->state->symbols.create(name), *value);
     }
 
     printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
