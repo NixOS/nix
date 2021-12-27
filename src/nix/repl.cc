@@ -661,8 +661,16 @@ void NixRepl::reloadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
-    for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+    if (displ + attrs.attrs->size() >= envSize)
+        throw Error("environment full; cannot add more variables");
+
+    for (auto & i : *attrs.attrs) {
+        staticEnv.vars.emplace_back(i.name, displ);
+        env->values[displ++] = i.value;
+        varNames.insert((string) i.name);
+    }
+    staticEnv.sort();
+    staticEnv.deduplicate();
     notice("Added %1% variables.", attrs.attrs->size());
 }
 

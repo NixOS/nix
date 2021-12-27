@@ -368,6 +368,13 @@ struct StaticEnv
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
     }
 
+    void deduplicate()
+    {
+        const auto last = std::unique(vars.begin(), vars.end(),
+            [] (const Vars::value_type & a, const Vars::value_type & b) { return a.first == b.first; });
+        vars.erase(last, vars.end());
+    }
+
     Vars::const_iterator find(const Symbol & name) const
     {
         Vars::value_type key(name, 0);
