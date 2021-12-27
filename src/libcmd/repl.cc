@@ -901,8 +901,8 @@ void runRepl(
 
     repl->initEnv();
 
+    // add 'extra' vars.
     std::set<std::string> names;
-
     for (auto & [name, value] : extraEnv) {
         // names.insert(ANSI_BOLD + name + ANSI_NORMAL);
         names.insert(name);
@@ -951,6 +951,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
         auto repl = std::make_unique<NixRepl>(evalState);
         repl->autoArgs = getAutoArgs(*repl->state);
+        repl->initEnv();
         repl->mainLoop(files);
     }
 };

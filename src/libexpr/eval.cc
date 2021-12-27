@@ -715,31 +715,15 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
 {
   // add bindings for the next level up first, so that the bindings for this level
   // override the higher levels.
+  // The top level bindings (builtins) are skipped since they are added for us by initEnv() 
   if (env.up && se.up) {
-      mapStaticEnvBindings( *se.up, *env.up,vm);
+      mapStaticEnvBindings(*se.up, *env.up,vm);
 
       // iterate through staticenv bindings and add them.
       auto map = valmap();
       for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
       {
         map[iter->first] = env.values[iter->second];
-      }
-
-      vm.merge(map);
-  }
-  else
-  {
-      std::cout << " -------------------- " << std::endl; 
-      // iterate through staticenv bindings and add them, 
-      // except for the __* ones.
-      auto map = valmap();
-      for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
-      {
-          std::cout << iter->first << std::endl; 
-          std::string s = iter->first;
-          if (s.substr(0,2) != "__") {
-              map[iter->first] = env.values[iter->second];
-          }
       }
 
       vm.merge(map);
