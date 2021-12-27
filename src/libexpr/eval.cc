@@ -36,6 +36,19 @@
 namespace nix {
 
 
+static char * allocString(size_t size)
+{
+    char * t;
+#if HAVE_BOEHMGC
+    t = (char *) GC_MALLOC_ATOMIC(size);
+#else
+    t = malloc(size);
+#endif
+    if (!t) throw std::bad_alloc();
+    return t;
+}
+
+
 static char * dupString(const char * s)
 {
     char * t;
@@ -771,17 +784,28 @@ void Value::mkString(std::string_view s)
 }
 
 
+static void copyContextToValue(Value & v, const PathSet & context)
+{
+    if (!context.empty()) {
+        size_t n = 0;
+        v.string.context = (const char * *)
+            allocBytes((context.size() + 1) * sizeof(char *));
+        for (auto & i : context)
+            v.string.context[n++] = dupString(i.c_str());
+        v.string.context[n] = 0;
+    }
+}
+
 void Value::mkString(std::string_view s, const PathSet & context)
 {
     mkString(s);
-    if (!context.empty()) {
-        size_t n = 0;
-        string.context = (const char * *)
-            allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            string.context[n++] = dupString(i.c_str());
-        string.context[n] = 0;
-    }
+    copyContextToValue(*this, context);
+}
+
+void Value::mkStringMove(const char * s, const PathSet & context)
+{
+    mkString(s);
+    copyContextToValue(*this, context);
 }
 
 
@@ -1660,12 +1684,33 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     PathSet context;
-    std::ostringstream s;
+    std::vector<std::string> s;
+    size_t sSize = 0;
     NixInt n = 0;
     NixFloat nf = 0;
 
     bool first = !forceString;
     ValueType firstType = nString;
+
+    const auto str = [&] {
+        std::string result;
+        result.reserve(sSize);
+        for (const auto & part : s) result += part;
+        return result;
+    };
+    /* c_str() is not str().c_str() because we want to create a string
+       Value. allocating a GC'd string directly and moving it into a
+       Value lets us avoid an allocation and copy. */
+    const auto c_str = [&] {
+        char * result = allocString(sSize + 1);
+        char * tmp = result;
+        for (const auto & part : s) {
+            memcpy(tmp, part.c_str(), part.size());
+            tmp += part.size();
+        }
+        *tmp = 0;
+        return result;
+    };
 
     for (auto & [i_pos, i] : *es) {
         Value vTmp;
@@ -1696,11 +1741,15 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf += vTmp.fpoint;
             } else
                 throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
-        } else
+        } else {
+            if (s.empty()) s.reserve(es->size());
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
-            s << state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
+            s.emplace_back(
+                state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first));
+            sSize += s.back().size();
+        }
 
         first = false;
     }
@@ -1712,9 +1761,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
-        v.mkPath(canonPath(s.str()));
+        v.mkPath(canonPath(str()));
     } else
-        v.mkString(s.str(), context);
+        v.mkStringMove(c_str(), context);
 }
 
 
