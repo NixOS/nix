@@ -25,7 +25,7 @@ const string & BaseError::calcWhat() const
         err.name = sname();
 
         std::ostringstream oss;
-        showErrorInfo(oss, err, false);
+        showErrorInfo(oss, err, loggerSettings.showTrace);
         what_ = oss.str();
 
         return *what_;
