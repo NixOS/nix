@@ -38,7 +38,6 @@ typedef uint64_t ActivityId;
 struct LoggerSettings : Config
 {
     Setting<bool> showTrace{
-        // this, false, "show-trace",
         this, false, "show-trace",
         R"(
           Where Nix should print out a stack trace in case of Nix

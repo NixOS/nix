@@ -434,7 +434,6 @@ bool NixRepl::processLine(string line)
              << "  :doc <expr>    Show documentation of a builtin function\n"
              << "  :d <cmd>       Debug mode commands\n"
              << "  :d stack       Show call stack\n"
-             // << "  :d stack <int> Detail for stack level N\n"
              << "  :d env         Show env stack\n"
              << "  :d error       Show current error\n";
     }
@@ -707,19 +706,6 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
     env->values[displ++] = &v;
     varNames.insert((string) name);
 }
-
-// version from master.
-// void NixRepl::addVarToScope(const Symbol & name, Value & v)
-// {
-//     if (displ >= envSize)
-//         throw Error("environment full; cannot add more variables");
-//     if (auto oldVar = staticEnv.find(name); oldVar != staticEnv.vars.end())
-//         staticEnv.vars.erase(oldVar);
-//     staticEnv.vars.emplace_back(name, displ);
-//     staticEnv.sort();
-//     env->values[displ++] = &v;
-//     varNames.insert((string) name);
-// }
 
 Expr * NixRepl::parseString(string s)
 {

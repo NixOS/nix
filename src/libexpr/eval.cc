@@ -672,8 +672,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     return {};
 }
 
-
-
 void printStaticEnvBindings(const StaticEnv &se, int lvl)
 {
     std::cout << "Env level " << lvl << std::endl;
@@ -1110,8 +1108,6 @@ void EvalState::resetFileCache()
     fileEvalCache.clear();
     fileParseCache.clear();
 }
-
-
 
 
 void EvalState::cacheFile(

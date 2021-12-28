@@ -73,14 +73,6 @@ ref<EvalState> EvalCommand::getEvalState()
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env, const Expr & expr) {
                 printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
 
-                // printStaticEnvBindings(expr);
-
-                // std::cout << evalState->vCallFlake << std::endl;
-
-                // std::cout << "expr: " << std::endl;
-                // expr.show(std::cout);
-                // std::cout << std::endl;
-
                 if (expr.staticenv)
                 {
                     auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
