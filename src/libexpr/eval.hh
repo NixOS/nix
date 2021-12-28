@@ -350,8 +350,8 @@ public:
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
     /* Allocation primitives. */
-    Value * allocValue();
-    Env & allocEnv(size_t size);
+    inline Value * allocValue();
+    inline Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
     Value * allocAttr(Value & vAttrs, std::string_view name);
@@ -512,3 +512,5 @@ extern EvalSettings evalSettings;
 static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 }
+
+#include "eval-inline.hh"
