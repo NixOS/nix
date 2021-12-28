@@ -38,21 +38,6 @@ namespace nix {
 
 std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
 
-class DebugTraceStacker {
-  public:
-   DebugTraceStacker(EvalState &evalState, DebugTrace t)
-    :evalState(evalState), trace(t)
-    {
-        evalState.debugTraces.push_front(t);
-    }
-   ~DebugTraceStacker() {
-     // assert(evalState.debugTraces.front() == trace);
-     evalState.debugTraces.pop_front();
-   }
-   EvalState &evalState;
-   DebugTrace trace;
-};
-
 static char * dupString(const char * s)
 {
     char * t;
@@ -701,7 +686,7 @@ void printStaticEnvBindings(const StaticEnv &se, int lvl)
     std::cout << std::endl;
 
     if (se.up) {
-      printStaticEnvBindings(*se.up, ++lvl);
+        printStaticEnvBindings(*se.up, ++lvl);
     }
 
 }

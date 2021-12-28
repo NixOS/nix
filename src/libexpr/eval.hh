@@ -76,10 +76,9 @@ std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
     std::optional<ErrPos> pos;
-    Expr &expr;
+    const Expr &expr;
     hintformat hint;
 };
-
 
 class EvalState
 {
@@ -406,6 +405,21 @@ private:
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
+class DebugTraceStacker {
+    public:
+        DebugTraceStacker(EvalState &evalState, DebugTrace t)
+        :evalState(evalState), trace(t)
+        {
+            evalState.debugTraces.push_front(t);
+        }
+        ~DebugTraceStacker() 
+        {
+            // assert(evalState.debugTraces.front() == trace);
+            evalState.debugTraces.pop_front();
+        }
+        EvalState &evalState;
+        DebugTrace trace;
+};
 
 /* Return a string representing the type of the value `v'. */
 string showType(ValueType type);

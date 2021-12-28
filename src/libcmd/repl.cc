@@ -897,6 +897,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 void runRepl(
     ref<EvalState> evalState,
     const Error *debugError,
+    const Expr &expr,
     const std::map<std::string, Value *> & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
@@ -904,6 +905,15 @@ void runRepl(
     repl->debugError = debugError;
 
     repl->initEnv();
+
+    // tack on a final DebugTrace for the error position.
+    DebugTraceStacker ldts(
+          *evalState,
+          DebugTrace 
+                {.pos = debugError->info().errPos,
+                 .expr = expr,
+                 .hint = debugError->info().msg
+                });
 
     // add 'extra' vars.
     std::set<std::string> names;
