@@ -344,7 +344,8 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const LockParent & parent,
-            const Path & parentPath)>
+            const Path & parentPath,
+            bool trustLock)>
             computeLocks;
 
         computeLocks = [&](
@@ -353,7 +354,8 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const LockParent & parent,
-            const Path & parentPath)
+            const Path & parentPath,
+            bool trustLock)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
 
@@ -464,14 +466,20 @@ LockedFlake lockFlake(
                                         .isFlake = (*lockedNode)->isFlake,
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
-                                    auto o = input.overrides.find(i.first);
-                                    // If the override disappeared, we have to refetch the flake,
-                                    // since some of the inputs may not be present in the lockfile.
-                                    if (o == input.overrides.end()) {
-                                        mustRefetch = true;
-                                        // There's no point populating the rest of the fake inputs,
-                                        // since we'll refetch the flake anyways.
-                                        break;
+                                    if (! trustLock) {
+                                        // It is possible that the flake has changed,
+                                        // so we must confirm all the follows that are in the lockfile are also in the flake.
+                                        auto overridePath(inputPath);
+                                        overridePath.push_back(i.first);
+                                        auto o = overrides.find(overridePath);
+                                        // If the override disappeared, we have to refetch the flake,
+                                        // since some of the inputs may not be present in the lockfile.
+                                        if (o == overrides.end()) {
+                                            mustRefetch = true;
+                                            // There's no point populating the rest of the fake inputs,
+                                            // since we'll refetch the flake anyways.
+                                            break;
+                                        }
                                     }
                                     fakeInputs.emplace(i.first, FlakeInput {
                                         .follows = *follows,
@@ -482,14 +490,14 @@ LockedFlake lockFlake(
 
                         LockParent newParent {
                             .path = inputPath,
-                            .absolute = false
+                            .absolute = true
                         };
 
                         computeLocks(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache).inputs
                             : fakeInputs,
-                            childNode, inputPath, oldLock, newParent, parentPath);
+                            childNode, inputPath, oldLock, newParent, parentPath, !mustRefetch);
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
@@ -546,7 +554,7 @@ LockedFlake lockFlake(
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : LockFile::read(
                                     inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
-                                newParent, localPath);
+                                newParent, localPath, false);
                         }
 
                         else {
@@ -574,7 +582,7 @@ LockedFlake lockFlake(
 
         computeLocks(
             flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, parent, parentPath);
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, parent, parentPath, false);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
