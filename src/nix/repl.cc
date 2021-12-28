@@ -430,7 +430,8 @@ bool NixRepl::processLine(string line)
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
              << "  :doc <expr>   Show documentation of a builtin function\n"
-             << "  :log <expr>   Show logs for a derivation\n";
+             << "  :log <expr>   Show logs for a derivation\n"
+             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -570,6 +571,18 @@ bool NixRepl::processLine(string line)
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
+    }
+
+    else if (command == ":st" || command == ":show-trace") {
+        if (arg == "false" || (arg == "" && loggerSettings.showTrace)) {
+            std::cout << "not showing error traces\n";
+            loggerSettings.showTrace = false;
+        } else if (arg == "true" || (arg == "" && !loggerSettings.showTrace)) {
+            std::cout << "showing error traces\n";
+            loggerSettings.showTrace = true;
+        } else {
+            throw Error("unexpected argument '%s' to %s", arg, command);
+        };
     }
 
     else if (command != "")
