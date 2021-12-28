@@ -858,17 +858,12 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
 
 LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
-    std::cout << "throwUndefinedVarError" << std::endl;
-
-    std::cout << "loggerSettings.showTrace: " << loggerSettings.showTrace << std::endl;
-
     auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
 
     if (debuggerHook && expr) {
-        std::cout << "throwUndefinedVarError debuggerHook" << std::endl;
         debuggerHook(error, env, *expr);
     }
 
@@ -1525,7 +1520,6 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
-                std::cout << "eval showErrorInfo showTrace: " << loggerSettings.showTrace.get() << std::endl;
                 if (loggerSettings.showTrace.get()) {
                     addErrorTrace(e, lambda.pos, "while evaluating %s",
                         (lambda.name.set()

@@ -616,10 +616,6 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
 
     if (res) throw ParseError(data.error.value());
 
-    std::cout << "    data.result->bindVars(staticEnv); " << std::endl;
-
-    // printStaticEnvBindings(*staticEnv, 0);
-    
     data.result->bindVars(staticEnv);
 
     return data.result;

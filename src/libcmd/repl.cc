@@ -202,9 +202,6 @@ namespace {
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
-    std::cout << "iinitial mainLoop; " << std::endl;
-    // printStaticEnvBindings(*staticEnv, 0);
-
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
@@ -230,9 +227,6 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 #endif
 
     std::string input;
-
-    std::cout << "pre MAINLOOP; " << std::endl;
-    // printStaticEnvBindings(*staticEnv, 0);
 
     while (true) {
         // When continuing input from previous lines, don't print a prompt, just align to the same
@@ -446,7 +440,6 @@ bool NixRepl::processLine(string line)
     }
 
     else if (command == ":d" || command == ":debug") {
-        std::cout << "debug: '" << arg << "'" <<  std::endl;
         if (arg == "stack") {
             std::cout << "eval stack:" << std::endl;
             for (auto iter = this->state->debugTraces.begin();
@@ -613,13 +606,11 @@ bool NixRepl::processLine(string line)
             line[p + 1] != '=' &&
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
-            std::cout << "isvarname" << std::endl;
             Expr * e = parseString(string(line, p + 1));
             Value *v = new Value(*state->allocValue());
             v->mkThunk(env, e);
             addVarToScope(state->symbols.create(name), *v);
         } else {
-            std::cout << "evalstring" << std::endl;
             Value v;
             evalString(line, v);
             printValue(std::cout, v, 1) << std::endl;
@@ -715,8 +706,6 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
     staticEnv->sort();
     env->values[displ++] = &v;
     varNames.insert((string) name);
-    notice("Added variable to scope: %1%", name);
-
 }
 
 // version from master.
@@ -741,11 +730,8 @@ Expr * NixRepl::parseString(string s)
 
 void NixRepl::evalString(string s, Value & v)
 {
-            std::cout << "pre partstirns:l" << std::endl;
     Expr * e = parseString(s);
-            std::cout << "pre e->eval" << std::endl;
     e->eval(*state, *env, v);
-            std::cout << "prev fv" << std::endl;
     state->forceValue(v);
 }
 
@@ -924,10 +910,6 @@ void runRepl(
     }
 
     printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
-    // printError("The following extra variables are in scope: %s\n", concatStringsSep(", ", names));
-
-    std::cout << "    pre repl->mainLoop({});" << std::endl;
-    // printStaticEnvBindings(*repl->staticEnv, 0);
     
     repl->mainLoop({});
 }
