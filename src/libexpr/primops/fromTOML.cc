@@ -31,6 +31,8 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                         auto & v2 = *state.allocAttr(v, state.symbols.create(elem.first));
                         visit(v2, elem.second);
                     }
+
+                    v.attrs->sort();
                 }
                 break;;
             case toml::value_t::array:
