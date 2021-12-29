@@ -879,7 +879,7 @@ Value * EvalState::allocValue()
     /* GC_NEXT is a convenience macro for accessing the first word of an object.
        Take the first list item, advance the list to the next item, and clear the next pointer. */
     void * p = *valueAllocCache;
-    GC_PTR_STORE_AND_DIRTY(&*valueAllocCache, GC_NEXT(p));
+    *valueAllocCache = GC_NEXT(p);
     GC_NEXT(p) = nullptr;
 
     nrValues++;
