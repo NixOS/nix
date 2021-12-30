@@ -158,6 +158,7 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << v.fpoint;
         break;
     default:
+        debug(format("invalid value %1%, aborting") % showType(v));
         abort();
     }
 
@@ -197,6 +198,7 @@ string showType(ValueType type)
         case nFloat: return "a float";
         case nThunk: return "a thunk";
     }
+    debug(format("invalid type id %1%, aborting") % type);
     abort();
 }
 
