@@ -682,7 +682,14 @@ std::string drainFD(int fd, bool block, const size_t reserveSize)
 
 void drainFD(int fd, Sink & sink, bool block)
 {
-    int saved;
+    // silence GCC maybe-uninitialized warning in finally
+    int saved = 0;
+
+    if (!block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
 
     Finally finally([&]() {
         if (!block) {
@@ -690,12 +697,6 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("making file descriptor blocking");
         }
     });
-
-    if (!block) {
-        saved = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
-            throw SysError("making file descriptor non-blocking");
-    }
 
     std::vector<unsigned char> buf(64 * 1024);
     while (1) {
