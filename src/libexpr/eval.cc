@@ -157,6 +157,9 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
     case tFloat:
         str << v.fpoint;
         break;
+    case tBlackhole:
+        str << "<BLACKHOLE>";
+        break;
     default:
         debug(format("invalid value %1%, aborting") % showType(v));
         abort();
