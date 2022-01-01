@@ -206,3 +206,11 @@ rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$
 # The name argument should be handled
 path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; name = \"foo\"; }).outPath")
 [[ $path9 =~ -foo$ ]]
+
+# should fail if there is no repo
+rm -rf $repo/.git
+(! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
+
+# should succeed for a repo without commits
+git init $repo
+path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")

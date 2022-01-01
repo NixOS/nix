@@ -222,17 +222,25 @@ struct GitInputScheme : InputScheme
 
             /* Check whether HEAD points to something that looks like a commit,
                since that is the refrence we want to use later on. */
-            bool hasHead = false;
-            try {
-                runProgram("git", true, { "-C", actualUrl, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" });
-                hasHead = true;
-            } catch (ExecError & e) {
-                // git exits with status 128 here if it does not detect a repository.
-                if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 128) {
-                    throw Error("Git tree '%s' is broken.\n'git rev-parse --verify HEAD' failed with exit code %d.", actualUrl, WEXITSTATUS(e.status));
-                }
+            auto result = runProgram(RunOptions {
+                .program = "git",
+                .args = { "-C", actualUrl, "--git-dir=.git", "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+                .mergeStderrToStdout = true
+            });
+            auto exitCode = WEXITSTATUS(result.first);
+            auto errorMessage = result.second;
+
+            if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
+                throw Error("'%s' is not a git repository.", actualUrl);
+            } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
+                // indicates that the repo does not have any commits
+                // we want to proceed and will consider it dirty later
+            } else if (exitCode != 0) {
+                // any other errors should lead to a failure
+                throw Error("Getting the HEAD of the git tree '%s' failed with exit code %d:\n%s", actualUrl, exitCode, errorMessage);
             }
 
+            bool hasHead = exitCode == 0;
             try {
                 if (hasHead) {
                     // Using git diff is preferrable over lower-level operations here,
