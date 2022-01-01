@@ -3528,18 +3528,20 @@ static RegisterPrimOp primop_match({
 
 /* Split a string with a regular expression, and return a list of the
    non-matching parts interleaved by the lists of the matching groups. */
-static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        std::regex regex(re, std::regex::extended);
+        auto regex = state.regexCache->cache.find(re);
+        if (regex == state.regexCache->cache.end())
+            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
 
-        auto begin = std::sregex_iterator(str.begin(), str.end(), regex);
+        auto begin = std::sregex_iterator(str.begin(), str.end(), regex->second);
         auto end = std::sregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
