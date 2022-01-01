@@ -232,6 +232,9 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
     rm -rf nix-support
     ln -s /nix/var/nix/profiles nix/var/nix/gcroots/profiles
   '';
+  fakeRootCommands = ''
+    chmod 1777 tmp
+  '';
 
   config = {
     Cmd = [ "/root/.nix-profile/bin/bash" ];
