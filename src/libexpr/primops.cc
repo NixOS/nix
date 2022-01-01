@@ -12,6 +12,8 @@
 #include "value-to-xml.hh"
 #include "primops.hh"
 
+#include <boost/container/small_vector.hpp>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -2270,21 +2272,25 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     state.forceAttrs(*args[0], pos);
     state.forceList(*args[1], pos);
 
-    /* Get the attribute names to be removed. */
-    std::set<Symbol> names;
+    /* Get the attribute names to be removed.
+       We keep them as Attrs instead of Symbols so std::set_difference
+       can be used to remove them from attrs[0]. */
+    boost::container::small_vector<Attr, 64> names;
+    names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos);
-        names.insert(state.symbols.create(elem->string.s));
+        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
     }
+    std::sort(names.begin(), names.end());
 
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
     auto attrs = state.buildBindings(args[0]->attrs->size());
-    for (auto & i : *args[0]->attrs) {
-        if (!names.count(i.name))
-            attrs.insert(i);
-    }
+    std::set_difference(
+        args[0]->attrs->begin(), args[0]->attrs->end(),
+        names.begin(), names.end(),
+        std::back_inserter(attrs));
     v.mkAttrs(attrs.alreadySorted());
 }
 

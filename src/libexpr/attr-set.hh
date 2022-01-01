@@ -121,6 +121,8 @@ class BindingsBuilder
     Bindings * bindings;
 
 public:
+    // needed by std::back_inserter
+    using value_type = Attr;
 
     EvalState & state;
 
@@ -134,6 +136,11 @@ public:
     }
 
     void insert(const Attr & attr)
+    {
+        push_back(attr);
+    }
+
+    void push_back(const Attr & attr)
     {
         bindings->push_back(attr);
     }
