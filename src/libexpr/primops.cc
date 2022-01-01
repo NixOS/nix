@@ -1079,10 +1079,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 } else {
                     auto s = state.coerceToString(*i->pos, *i->value, context, true);
                     drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder) drv.builder = s;
-                    else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sOutputHash) outputHash = s;
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
+                    if (i->name == state.sBuilder) drv.builder = std::move(s);
+                    else if (i->name == state.sSystem) drv.platform = std::move(s);
+                    else if (i->name == state.sOutputHash) outputHash = std::move(s);
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = std::move(s);
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
