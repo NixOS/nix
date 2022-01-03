@@ -82,7 +82,7 @@ StringMap EvalState::realiseContext(const PathSet & context)
        paths. */
     if (allowedPaths) {
         for (auto & [_placeholder, outputPath] : res) {
-            allowPath(outputPath);
+            allowPath(store->toRealPath(outputPath));
         }
     }
 
