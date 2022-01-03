@@ -190,7 +190,7 @@ void ExprConcatStrings::show(std::ostream & str) const
     str << "(";
     for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << *i;
+        str << i.second;
     }
     str << ")";
 }
@@ -490,7 +490,7 @@ void ExprConcatStrings::bindVars(const std::shared_ptr<const StaticEnv> &env)
         staticenv = env;
 
     for (auto & i : *es)
-        i->bindVars(env);
+        i.second->bindVars(env);
 }
 
 void ExprPos::bindVars(const std::shared_ptr<const StaticEnv> &env)

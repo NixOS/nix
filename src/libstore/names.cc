@@ -42,7 +42,7 @@ DrvName::~DrvName()
 { }
 
 
-bool DrvName::matches(DrvName & n)
+bool DrvName::matches(const DrvName & n)
 {
     if (name != "*") {
         if (!regex) {

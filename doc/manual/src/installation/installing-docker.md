@@ -3,7 +3,7 @@
 To run the latest stable release of Nix with Docker run the following command:
 
 ```console
-$ docker -ti run nixos/nix
+$ docker run -ti nixos/nix
 Unable to find image 'nixos/nix:latest' locally
 latest: Pulling from nixos/nix
 5843afab3874: Pull complete
@@ -16,7 +16,7 @@ nix (Nix) 2.3.12
 35ca4ada6e96:/# exit
 ```
 
-# What is included in Nix' Docker image?
+# What is included in Nix's Docker image?
 
 The official Docker image is created using `pkgs.dockerTools.buildLayeredImage`
 (and not with `Dockerfile` as it is usual with Docker images). You can still
@@ -54,6 +54,6 @@ You can also build a Docker image from source yourself:
 
 ```console
 $ nix build ./\#hydraJobs.dockerImage.x86_64-linux
-$ docker load -i ./result
+$ docker load -i ./result/image.tar.gz
 $ docker run -ti nix:2.5pre20211105
 ```

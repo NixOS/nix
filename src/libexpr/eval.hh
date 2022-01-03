@@ -145,6 +145,9 @@ private:
     /* Cache used by prim_match(). */
     std::shared_ptr<RegexCache> regexCache;
 
+    /* Allocation cache for GC'd Value objects. */
+    void * valueAllocCache = nullptr;
+
 public:
 
     EvalState(
@@ -362,7 +365,10 @@ public:
     /* Print statistics. */
     void printStats();
 
-    void realiseContext(const PathSet & context);
+    /* Realise the given context, and return a mapping from the placeholders
+     * used to construct the associated value to their final store path
+     */
+    [[nodiscard]] StringMap realiseContext(const PathSet & context);
 
 private:
 

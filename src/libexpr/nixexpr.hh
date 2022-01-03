@@ -354,8 +354,8 @@ struct ExprConcatStrings : Expr
 {
     Pos pos;
     bool forceString;
-    vector<Expr *> * es;
-    ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
+    vector<std::pair<Pos, Expr *> > * es;
+    ExprConcatStrings(const Pos & pos, bool forceString, vector<std::pair<Pos, Expr *> > * es)
         : pos(pos), forceString(forceString), es(es) { };
     Pos* getPos() { return &pos; }
     COMMON_METHODS
@@ -390,6 +390,13 @@ struct StaticEnv
     {
         std::sort(vars.begin(), vars.end(),
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
+    }
+
+    void deduplicate()
+    {
+        const auto last = std::unique(vars.begin(), vars.end(),
+            [] (const Vars::value_type & a, const Vars::value_type & b) { return a.first == b.first; });
+        vars.erase(last, vars.end());
     }
 
     Vars::const_iterator find(const Symbol & name) const

@@ -96,6 +96,18 @@ ref<Store> EvalCommand::getEvalStore()
     return ref<Store>(evalStore);
 }
 
+ref<EvalState> EvalCommand::getEvalState()
+{
+    if (!evalState) evalState =
+#if HAVE_BOEHMGC
+        std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+#else
+        std::make_shared<EvalState>(
+#endif
+            searchPath, getEvalStore(), getStore());
+    return ref<EvalState>(evalState);
+}
+
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     : recursive(recursive)
 {

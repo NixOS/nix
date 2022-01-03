@@ -4,7 +4,6 @@
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
-#include "affinity.hh"
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
@@ -431,25 +430,30 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 hashAlgo = parseHashType(hashAlgoRaw);
             }
 
-            StringSink saved;
-            TeeSource savedNARSource(from, saved);
-            RetrieveRegularNARSink savedRegular { saved };
-
-            if (method == FileIngestionMethod::Recursive) {
-                /* Get the entire NAR dump from the client and save it to
-                  a string so that we can pass it to
-                  addToStoreFromDump(). */
-                ParseSink sink; /* null sink; just parse the NAR */
-                parseDump(sink, savedNARSource);
-            } else
-                parseDump(savedRegular, from);
-
+            auto dumpSource = sinkToSource([&](Sink & saved) {
+                if (method == FileIngestionMethod::Recursive) {
+                    /* We parse the NAR dump through into `saved` unmodified,
+                       so why all this extra work? We still parse the NAR so
+                       that we aren't sending arbitrary data to `saved`
+                       unwittingly`, and we know when the NAR ends so we don't
+                       consume the rest of `from` and can't parse another
+                       command. (We don't trust `addToStoreFromDump` to not
+                       eagerly consume the entire stream it's given, past the
+                       length of the Nar. */
+                    TeeSource savedNARSource(from, saved);
+                    ParseSink sink; /* null sink; just parse the NAR */
+                    parseDump(sink, savedNARSource);
+                } else {
+                    /* Incrementally parse the NAR file, stripping the
+                       metadata, and streaming the sole file we expect into
+                       `saved`. */
+                    RetrieveRegularNARSink savedRegular { saved };
+                    parseDump(savedRegular, from);
+                    if (!savedRegular.regular) throw Error("regular file expected");
+                }
+            });
             logger->startWork();
-            if (!savedRegular.regular) throw Error("regular file expected");
-
-            // FIXME: try to stream directly from `from`.
-            StringSource dumpSource { *saved.s };
-            auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+            auto path = store->addToStoreFromDump(*dumpSource, baseName, method, hashAlgo);
             logger->stopWork();
 
             to << store->printStorePath(path);
@@ -951,12 +955,12 @@ void processConnection(
 
     Finally finally([&]() {
         _isInterrupted = false;
-        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
+        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
-        auto affinity = readInt(from);
-        setAffinityTo(affinity);
+        // Obsolete CPU affinity.
+        readInt(from);
     }
 
     readInt(from); // obsolete reserveSpace
@@ -983,6 +987,8 @@ void processConnection(
             } catch (EndOfFile & e) {
                 break;
             }
+
+            printMsgUsing(prevLogger, lvlDebug, "received daemon op %d", op);
 
             opCount++;
 

@@ -249,6 +249,14 @@ cat > $flake3Dir/flake.nix <<EOF
       url = git+file://$nonFlakeDir;
       flake = false;
     };
+    nonFlakeFile = {
+      url = path://$nonFlakeDir/README.md;
+      flake = false;
+    };
+    nonFlakeFile2 = {
+      url = "$nonFlakeDir/README.md";
+      flake = false;
+    };
   };
 
   description = "Fnord";
@@ -265,6 +273,8 @@ cat > $flake3Dir/flake.nix <<EOF
         dummy2 = builtins.readFile (builtins.path { name = "source"; path = inputs.flake1; filter = path: type: baseNameOf path == "simple.nix"; } + "/simple.nix");
         buildCommand = ''
           cat \${inputs.nonFlake}/README.md > \$out
+          [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
+          [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
         '';
       };
   };
@@ -706,11 +716,10 @@ cat > $flakeFollowsA/flake.nix <<EOF
     inputs = {
         B = {
             url = "path:./flakeB";
-            inputs.foobar.follows = "D";
-            inputs.nonFlake.follows = "D";
+            inputs.foobar.follows = "foobar";
         };
 
-        D.url = "path:./flakeD";
+        foobar.url = "path:$flakeFollowsA/flakeE";
     };
     outputs = { ... }: {};
 }
@@ -721,7 +730,6 @@ cat > $flakeFollowsB/flake.nix <<EOF
     description = "Flake B";
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
-        nonFlake.url = "path:$nonFlakeDir";
         C = {
             url = "path:./flakeC";
             inputs.foobar.follows = "foobar";
@@ -760,10 +768,20 @@ EOF
 git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
   flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
 
+nix flake update $flakeFollowsA
+
+oldLock="$(cat "$flakeFollowsA/flake.lock")"
+
+# Ensure that locking twice doesn't change anything
+
 nix flake lock $flakeFollowsA
 
+newLock="$(cat "$flakeFollowsA/flake.lock")"
+
+diff <(echo "$newLock") <(echo "$oldLock")
+
 [[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["D"]' ]]
+[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["foobar"]' ]]
 [[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
 
 # Ensure removing follows from flake.nix removes them from the lockfile

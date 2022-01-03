@@ -35,14 +35,17 @@ R""(
   nix-repl> emacs.drvPath
   "/nix/store/lp0sjrhgg03y2n0l10n70rg0k7hhyz0l-emacs-27.1.drv"
 
-  nix-repl> drv = runCommand "hello" { buildInputs = [ hello ]; } "hello > $out"
+  nix-repl> drv = runCommand "hello" { buildInputs = [ hello ]; } "hello; hello > $out"
 
-  nix-repl> :b x
+  nix-repl> :b drv
   this derivation produced the following outputs:
     out -> /nix/store/0njwbgwmkwls0w5dv9mpc1pq5fj39q0l-hello
 
   nix-repl> builtins.readFile drv
   "Hello, world!\n"
+
+  nix-repl> :log drv
+  Hello, world!
   ```
 
 # Description

@@ -191,7 +191,7 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         auto sep = prefix_.rfind('.');
         std::string searchWord;
         if (sep != std::string::npos) {
-            searchWord = prefix_.substr(sep, std::string::npos);
+            searchWord = prefix_.substr(sep + 1, std::string::npos);
             prefix_ = prefix_.substr(0, sep);
         } else {
             searchWord = prefix_;
@@ -202,6 +202,8 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         state->forceValue(v1);
         Value v2;
         state->autoCallFunction(*autoArgs, v1, v2);
+
+        completionType = ctAttrs;
 
         if (v2.type() == nAttrs) {
             for (auto & i : *v2.attrs) {
@@ -232,7 +234,9 @@ void completeFlakeRefWithFragment(
        prefix. */
     try {
         auto hash = prefix.find('#');
-        if (hash != std::string::npos) {
+        if (hash == std::string::npos) {
+            completeFlakeRef(evalState->store, prefix);
+        } else {
             auto fragment = prefix.substr(hash + 1);
             auto flakeRefS = std::string(prefix.substr(0, hash));
             // FIXME: do tilde expansion.
@@ -247,6 +251,8 @@ void completeFlakeRefWithFragment(
                attrpath prefixes as well as the root of the
                flake. */
             attrPathPrefixes.push_back("");
+
+            completionType = ctAttrs;
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
                 auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
@@ -285,12 +291,13 @@ void completeFlakeRefWithFragment(
     } catch (Error & e) {
         warn(e.msg());
     }
-
-    completeFlakeRef(evalState->store, prefix);
 }
 
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
+    if (!settings.isExperimentalFeatureEnabled(Xp::Flakes))
+        return;
+
     if (prefix == "")
         completions->add(".");
 

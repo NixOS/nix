@@ -28,7 +28,6 @@ extern "C" {
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
@@ -284,6 +283,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     };
 
     setupSignals();
+    Finally resetTerminal([&]() { rl_deprep_terminal(); });
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
     restoreSignals();
@@ -361,6 +361,8 @@ StringSet NixRepl::completePrefix(string prefix)
             // Quietly ignore evaluation errors.
         } catch (UndefinedVarError & e) {
             // Quietly ignore undefined variable errors.
+        } catch (BadURL & e) {
+            // Quietly ignore BadURL flake-related errors.
         }
     }
 
@@ -417,25 +419,27 @@ bool NixRepl::processLine(string line)
         std::cout
              << "The following commands are available:\n"
              << "\n"
-             << "  <expr>         Evaluate and print expression\n"
-             << "  <x> = <expr>   Bind expression to variable\n"
-             << "  :a <expr>      Add attributes from resulting set to scope\n"
-             << "  :b <expr>      Build derivation\n"
-             << "  :e <expr>      Open package or function in $EDITOR\n"
-             << "  :i <expr>      Build derivation, then install result into current profile\n"
-             << "  :l <path>      Load Nix expression and add it to scope\n"
-             << "  :lf <ref>      Load Nix flake and add it to scope\n"
-             << "  :p <expr>      Evaluate and print expression recursively\n"
-             << "  :q             Exit nix-repl\n"
-             << "  :r             Reload all files\n"
-             << "  :s <expr>      Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>      Describe result of evaluation\n"
-             << "  :u <expr>      Build derivation, then start nix-shell\n"
-             << "  :doc <expr>    Show documentation of a builtin function\n"
-             << "  :d <cmd>       Debug mode commands\n"
-             << "  :d stack       Show call stack\n"
-             << "  :d env         Show env stack\n"
-             << "  :d error       Show current error\n";
+             << "  <expr>        Evaluate and print expression\n"
+             << "  <x> = <expr>  Bind expression to variable\n"
+             << "  :a <expr>     Add attributes from resulting set to scope\n"
+             << "  :b <expr>     Build derivation\n"
+             << "  :e <expr>     Open package or function in $EDITOR\n"
+             << "  :i <expr>     Build derivation, then install result into current profile\n"
+             << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :lf <ref>     Load Nix flake and add it to scope\n"
+             << "  :p <expr>     Evaluate and print expression recursively\n"
+             << "  :q            Exit nix-repl\n"
+             << "  :r            Reload all files\n"
+             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
+             << "  :t <expr>     Describe result of evaluation\n"
+             << "  :u <expr>     Build derivation, then start nix-shell\n"
+             << "  :doc <expr>   Show documentation of a builtin function\n"
+             << "  :log <expr>   Show logs for a derivation\n"
+             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n";
+             << "  :d <cmd>      Debug mode commands\n"
+             << "  :d stack      Show call stack\n"
+             << "  :d env        Show env stack\n"
+             << "  :d error      Show current error\n";
     }
 
     else if (command == ":d" || command == ":debug") {
@@ -543,7 +547,7 @@ bool NixRepl::processLine(string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":i" || command == ":s") {
+    else if (command == ":b" || command == ":i" || command == ":s" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
@@ -557,6 +561,27 @@ bool NixRepl::processLine(string line)
                 logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
+        } else if (command == ":log") {
+            settings.readOnlyMode = true;
+            Finally roModeReset([&]() {
+                settings.readOnlyMode = false;
+            });
+            auto subs = getDefaultSubstituters();
+
+            subs.push_front(state->store);
+
+            bool foundLog = false;
+            RunPager pager;
+            for (auto & sub : subs) {
+                auto log = sub->getBuildLog(drvPath);
+                if (log) {
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, sub->getUri());
+                    logger->writeToStdout(*log);
+                    foundLog = true;
+                    break;
+                }
+            }
+            if (!foundLog) throw Error("build log of '%s' is not available", drvPathRaw);
         } else {
             runNix("nix-shell", {drvPathRaw});
         }
@@ -592,6 +617,18 @@ bool NixRepl::processLine(string line)
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
+    }
+
+    else if (command == ":st" || command == ":show-trace") {
+        if (arg == "false" || (arg == "" && loggerSettings.showTrace)) {
+            std::cout << "not showing error traces\n";
+            loggerSettings.showTrace = false;
+        } else if (arg == "true" || (arg == "" && !loggerSettings.showTrace)) {
+            std::cout << "showing error traces\n";
+            loggerSettings.showTrace = true;
+        } else {
+            throw Error("unexpected argument '%s' to %s", arg, command);
+        };
     }
 
     else if (command != "")
@@ -689,8 +726,16 @@ void NixRepl::loadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
-    for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+    if (displ + attrs.attrs->size() >= envSize)
+        throw Error("environment full; cannot add more variables");
+
+    for (auto & i : *attrs.attrs) {
+        staticEnv.vars.emplace_back(i.name, displ);
+        env->values[displ++] = i.value;
+        varNames.insert((string) i.name);
+    }
+    staticEnv.sort();
+    staticEnv.deduplicate();
     notice("Added %1% variables.", attrs.attrs->size());
 }
 
@@ -824,12 +869,12 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
         str << "[ ";
         if (maxDepth > 0)
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
-                if (seen.find(v.listElems()[n]) != seen.end())
+            for (auto elem : v.listItems()) {
+                if (seen.count(elem))
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *v.listElems()[n], maxDepth - 1, seen);
+                        printValue(str, *elem, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }

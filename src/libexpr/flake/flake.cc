@@ -155,7 +155,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, pos);
         if (url)
-            input.ref = parseFlakeRef(*url, baseDir, true);
+            input.ref = parseFlakeRef(*url, baseDir, true, input.isFlake);
     }
 
     if (!input.follows && !input.ref)
@@ -194,8 +194,8 @@ static Flake getFlake(
         state, originalRef, allowLookup, flakeCache);
 
     // Guard against symlink attacks.
-    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir);
-    auto flakeFile = canonPath(flakeDir + "/flake.nix");
+    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir, true);
+    auto flakeFile = canonPath(flakeDir + "/flake.nix", true);
     if (!isInDir(flakeFile, sourceInfo.actualPath))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
             lockedRef, state.store->printStorePath(sourceInfo.storePath));
@@ -254,11 +254,10 @@ static Flake getFlake(
             else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
             else if (setting.value->type() == nBool)
-                flake.config.settings.insert({setting.name, state.forceBool(*setting.value, *setting.pos)});
+                flake.config.settings.insert({setting.name, Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
-                for (unsigned int n = 0; n < setting.value->listSize(); ++n) {
-                    auto elem = setting.value->listElems()[n];
+                for (auto elem : setting.value->listItems()) {
                     if (elem->type() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             setting.name, showType(*setting.value));
@@ -345,7 +344,8 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const LockParent & parent,
-            const Path & parentPath)>
+            const Path & parentPath,
+            bool trustLock)>
             computeLocks;
 
         computeLocks = [&](
@@ -354,7 +354,8 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const LockParent & parent,
-            const Path & parentPath)
+            const Path & parentPath,
+            bool trustLock)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
 
@@ -465,14 +466,20 @@ LockedFlake lockFlake(
                                         .isFlake = (*lockedNode)->isFlake,
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
-                                    auto o = input.overrides.find(i.first);
-                                    // If the override disappeared, we have to refetch the flake,
-                                    // since some of the inputs may not be present in the lockfile.
-                                    if (o == input.overrides.end()) {
-                                        mustRefetch = true;
-                                        // There's no point populating the rest of the fake inputs,
-                                        // since we'll refetch the flake anyways.
-                                        break;
+                                    if (! trustLock) {
+                                        // It is possible that the flake has changed,
+                                        // so we must confirm all the follows that are in the lockfile are also in the flake.
+                                        auto overridePath(inputPath);
+                                        overridePath.push_back(i.first);
+                                        auto o = overrides.find(overridePath);
+                                        // If the override disappeared, we have to refetch the flake,
+                                        // since some of the inputs may not be present in the lockfile.
+                                        if (o == overrides.end()) {
+                                            mustRefetch = true;
+                                            // There's no point populating the rest of the fake inputs,
+                                            // since we'll refetch the flake anyways.
+                                            break;
+                                        }
                                     }
                                     fakeInputs.emplace(i.first, FlakeInput {
                                         .follows = *follows,
@@ -481,11 +488,16 @@ LockedFlake lockFlake(
                             }
                         }
 
+                        LockParent newParent {
+                            .path = inputPath,
+                            .absolute = true
+                        };
+
                         computeLocks(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache).inputs
                             : fakeInputs,
-                            childNode, inputPath, oldLock, parent, parentPath);
+                            childNode, inputPath, oldLock, newParent, parentPath, !mustRefetch);
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
@@ -542,7 +554,7 @@ LockedFlake lockFlake(
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : LockFile::read(
                                     inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
-                                newParent, localPath);
+                                newParent, localPath, false);
                         }
 
                         else {
@@ -566,11 +578,11 @@ LockedFlake lockFlake(
         };
 
         // Bring in the current ref for relative path resolution if we have it
-        auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir);
+        auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
 
         computeLocks(
             flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, parent, parentPath);
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, parent, parentPath, false);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))

@@ -18,6 +18,7 @@ chmod +x echoing-post-hook.sh
 cat <<EOF > flake.nix
 {
     nixConfig.post-build-hook = "$PWD/echoing-post-hook.sh";
+    nixConfig.allow-dirty = false; # See #5621
 
     outputs = a: {
        defaultPackage.$system = import ./simple.nix;

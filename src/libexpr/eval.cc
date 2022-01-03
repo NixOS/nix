@@ -121,8 +121,8 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
     case tList2:
     case tListN:
         str << "[ ";
-        for (unsigned int n = 0; n < v.listSize(); ++n) {
-            printValue(str, active, *v.listElems()[n]);
+        for (auto v2 : v.listItems()) {
+            printValue(str, active, *v2);
             str << " ";
         }
         str << "]";
@@ -521,8 +521,12 @@ Path EvalState::checkSourcePath(const Path & path_)
         }
     }
 
-    if (!found)
-        throw RestrictedPathError("access to absolute path '%1%' is forbidden in restricted mode", abspath);
+    if (!found) {
+        auto modeInformation = evalSettings.pureEval
+            ? "in pure eval mode (use '--impure' to override)"
+            : "in restricted mode";
+        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", abspath, modeInformation);
+    }
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % abspath);
@@ -960,8 +964,23 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
 Value * EvalState::allocValue()
 {
+    /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
+       GC_malloc_many returns a linked list of objects of the given size, where the first word
+       of each object is also the pointer to the next object in the list. This also means that we
+       have to explicitly clear the first word of every object we take. */
+    if (!valueAllocCache) {
+        valueAllocCache = GC_malloc_many(sizeof(Value));
+        if (!valueAllocCache) throw std::bad_alloc();
+    }
+
+    /* GC_NEXT is a convenience macro for accessing the first word of an object.
+       Take the first list item, advance the list to the next item, and clear the next pointer. */
+    void * p = valueAllocCache;
+    GC_PTR_STORE_AND_DIRTY(&valueAllocCache, GC_NEXT(p));
+    GC_NEXT(p) = nullptr;
+
     nrValues++;
-    auto v = (Value *) allocBytes(sizeof(Value));
+    auto v = (Value *) p;
     return v;
 }
 
@@ -1314,8 +1333,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    for (size_t n = 0; n < elems.size(); ++n)
-        v.listElems()[n] = elems[n]->maybeThunk(state, env);
+    for (auto [n, v2] : enumerate(v.listItems()))
+        const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
 }
 
 
@@ -1834,7 +1853,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     bool first = !forceString;
     ValueType firstType = nString;
 
-    for (auto & i : *es) {
+    for (auto & [i_pos, i] : *es) {
         Value vTmp;
         i->eval(state, env, vTmp);
 
@@ -1855,7 +1874,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else {
-                throwEvalError(pos, "cannot add %1% to an integer", showType(vTmp), env, this);
+                throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp), env, this);
             }
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
@@ -1863,12 +1882,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(pos, "cannot add %1% to a float", showType(vTmp), env, this);
+                throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp), env, this);
         } else
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
-            s << state.coerceToString(pos, vTmp, context, false, firstType == nString, !first);
+            s << state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
 
         first = false;
     }
@@ -1925,8 +1944,8 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (size_t n = 0; n < v.listSize(); ++n)
-                recurse(*v.listElems()[n]);
+            for (auto v2 : v.listItems())
+                recurse(*v2);
         }
     };
 
@@ -2113,12 +2132,12 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
         if (v.isList()) {
             string result;
-            for (size_t n = 0; n < v.listSize(); ++n) {
-                result += coerceToString(pos, *v.listElems()[n],
+            for (auto [n, v2] : enumerate(v.listItems())) {
+                result += coerceToString(pos, *v2,
                     context, coerceMore, copyToStore);
                 if (n < v.listSize() - 1
                     /* !!! not quite correct */
-                    && (!v.listElems()[n]->isList() || v.listElems()[n]->listSize() != 0))
+                    && (!v2->isList() || v2->listSize() != 0))
                     result += " ";
             }
             return result;

@@ -137,11 +137,8 @@ let
         name = "root-profile-env";
         paths = defaultPkgs;
       };
-      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
-        mkdir $out
-        cp -a ${rootEnv}/* $out/
-
-        cat > $out/manifest.nix <<EOF
+      manifest = pkgs.buildPackages.runCommand "manifest.nix" { } ''
+        cat > $out <<EOF
         [
         ${lib.concatStringsSep "\n" (builtins.map (drv: let
           outputs = drv.outputsToInstall or [ "out" ];
@@ -161,6 +158,11 @@ let
         ]
         EOF
       '';
+      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
+        mkdir $out
+        cp -a ${rootEnv}/* $out/
+        ln -s ${manifest} $out/manifest.nix
+      '';
     in
     pkgs.runCommand "base-system"
       {
@@ -177,6 +179,9 @@ let
       env
       set -x
       mkdir -p $out/etc
+
+      mkdir -p $out/etc/ssl/certs
+      ln -s /nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs
 
       cat $passwdContentsPath > $out/etc/passwd
       echo "" >> $out/etc/passwd
@@ -226,6 +231,9 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
   extraCommands = ''
     rm -rf nix-support
     ln -s /nix/var/nix/profiles nix/var/nix/gcroots/profiles
+  '';
+  fakeRootCommands = ''
+    chmod 1777 tmp
   '';
 
   config = {
