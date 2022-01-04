@@ -257,6 +257,13 @@ std::optional<time_t> Input::getLastModified() const
     return {};
 }
 
+std::optional<std::string> Input::getModules() const
+{
+    if (auto s = maybeGetStrAttr(attrs, "modules"))
+        return *s;
+    return {};
+}
+
 ParsedURL InputScheme::toURL(const Input & input)
 {
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));

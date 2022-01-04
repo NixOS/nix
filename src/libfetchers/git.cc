@@ -5,9 +5,12 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
+#include "archive.hh"
 
 #include <sys/time.h>
 #include <sys/wait.h>
+
+#include <nlohmann/json.hpp>
 
 using namespace std::string_literals;
 
@@ -22,6 +25,212 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 static std::string readHead(const Path & path)
 {
     return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+}
+
+static string getRootTree(const Path & path, const string & gitrev) {
+    auto commitOutput = runProgram("git", true, { "-C", path, "cat-file", "-p", gitrev });
+    auto lines = tokenizeString<std::vector<string>>(commitOutput, "\n");
+    auto words = tokenizeString<std::vector<string>>(lines[0]);
+    auto rootTree = words[1];
+    return rootTree;
+}
+
+enum gitType {
+  blob,
+  tree,
+  commit
+};
+
+string getBlob(const Path & path, const string & gitrev, const string & blobhash) {
+  return runProgram("git", true, { "-C", path, "cat-file", "-p", blobhash });
+}
+
+std::pair<bool, std::string> getActualUrl(const Input &input) {
+  // file:// URIs are normally not cloned (but otherwise treated the
+  // same as remote URIs, i.e. we don't use the working tree or
+  // HEAD). Exception: If _NIX_FORCE_HTTP is set, or the repo is a bare git
+  // repo, treat as a remote URI to force a clone.
+  static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
+  auto url = parseURL(getStrAttr(input.attrs, "url"));
+  bool isBareRepository =
+      url.scheme == "file" && !pathExists(url.path + "/.git");
+  bool isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
+  return {isLocal, isLocal ? url.path : url.base};
+}
+
+std::string getGitDir(const std::string & actualUrl) {
+  auto gitDir = actualUrl + "/.git";
+  auto commonGitDir = chomp(runProgram(
+      "git", true, {"-C", actualUrl, "rev-parse", "--path-format=absolute", "--git-common-dir"}));
+  if (commonGitDir != ".git")
+    gitDir = commonGitDir;
+
+  return gitDir;
+}
+
+/* Check whether this repo has any commits. There are
+   probably better ways to do this. */
+bool hasCommits(const std::string & actualUrl) {
+  auto gitDir = getGitDir(actualUrl);
+
+  printTalkative("in hasCommits\nactualUrl %s\ngitDir %s", actualUrl, gitDir);
+  return !readDirectory(gitDir + "/refs/heads").empty();
+}
+
+Tree copyTrackedFiles(ref<Store> store, const std::string & inputName, const std::string & actualUrl, bool submodules) {
+  auto gitDir = getGitDir(actualUrl);
+  auto gitOpts = Strings({"-C", actualUrl, "ls-files", "-z"});
+
+  if (submodules)
+    gitOpts.emplace_back("--recurse-submodules");
+
+  auto files = tokenizeString<std::set<std::string>>(
+      runProgram("git", true, gitOpts), "\0"s);
+
+  PathFilter filter = [&](const Path &p) -> bool {
+    assert(hasPrefix(p, actualUrl));
+    std::string file(p, actualUrl.size() + 1);
+
+    auto st = lstat(p);
+
+    if (S_ISDIR(st.st_mode)) {
+      auto prefix = file + "/";
+      auto i = files.lower_bound(prefix);
+      return i != files.end() && hasPrefix(*i, prefix);
+    }
+
+    return files.count(file);
+  };
+
+  auto storePath =
+      store->addToStore(inputName, actualUrl,
+                        FileIngestionMethod::Recursive, htSHA256, filter);
+
+  return Tree(store->toRealPath(storePath), std::move(storePath));
+}
+
+static std::map<string, std::pair<gitType, string>> gitTreeList(const Path & path, const string & treehash) {
+  auto treeOutput = runProgram("git", true, { "-C", path, "cat-file", "-p", treehash });
+  auto lines = tokenizeString<std::vector<string>>(treeOutput, "\n");
+  std::map<string, std::pair<gitType, string>> results;
+  for (auto line : lines) {
+    auto words = tokenizeString<std::vector<string>>(line);
+    auto hash = words[2];
+    auto name = words[3];
+    gitType type;
+    if (words[1] == "blob") type = blob;
+    else if (words[1] == "tree") type = tree;
+    else if (words[1] == "commit") type = commit;
+    else assert(0); // FIXME
+    results.insert(std::pair{name, std::pair{type, hash}});
+  }
+
+  return results;
+}
+
+std::map<string,string> parseSubmodules(const string & contents) {
+  auto lines = tokenizeString<std::vector<string>>(contents, "\n");
+  std::map<string,string> results;
+  std::optional<string> path, url, branch;
+  for (auto line : lines) {
+    auto words = tokenizeString<std::vector<string>>(line);
+    if (words[1] != "=") {
+        if (line != lines[0]) {
+            printTalkative("Saving %s\t%s\t%s\n", *path, *url, branch.value_or("master"));
+
+            results.insert(std::pair{*path, *url + "?ref=" + branch.value_or("master")});
+            path = url = branch = {};
+        }
+        continue;
+    }
+
+    if (words[0] == "path") path = words[2];
+    if (words[0] == "branch") branch = words[2];
+    if (words[0] == "url") url = words[2];
+
+  }
+  printTalkative("Saving %s\t%s\t%s\n", *path, *url, branch.value_or("master"));
+  results.insert(std::pair{*path, *url + "?ref=" + branch.value_or("master")});
+  return results;
+}
+
+bool isClean(const string & actualUrl) {
+  bool haveCommits = hasCommits(actualUrl);
+
+  try {
+    if (haveCommits) {
+      runProgram("git", true,
+                 {"-C", actualUrl, "diff-index", "--quiet", "HEAD", "--"});
+      return true;
+    }
+  } catch (ExecError &e) {
+    if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1)
+      throw;
+  }
+  return false;
+}
+
+string findCommitHash(const Path & path, const std::map<string, std::pair<gitType, string>> & _entries, const string & pathToFind) {
+  auto entries = _entries;
+
+  auto tokens = tokenizeString<std::vector<string>>(pathToFind, "/");
+  std::pair<gitType, string> x;
+  for (auto token : tokens) {
+    auto i = entries.find(token);
+    if (i == entries.end()) return "fail";
+
+    x = i->second;
+    if (x.first == tree) entries = gitTreeList(path, x.second);
+  }
+  if (x.first != commit) return "fail";
+
+  return x.second;
+}
+
+static Attrs readSubmodules(const Path & path, const string & gitrev)
+{
+    auto rootTree = getRootTree(path, gitrev);
+    printTalkative("root tree is %s", rootTree);
+    auto entries = gitTreeList(path, rootTree);
+    Attrs attrs;
+
+    auto i = entries.find(".gitmodules");
+
+    if (i == entries.end()) return attrs;
+
+    auto submodules = getBlob(path, gitrev, i->second.second);
+
+    printTalkative("submodule file\n %s", submodules);
+
+    auto parsedModules = parseSubmodules(submodules);
+    for (auto & [subPath, url] : parsedModules) {
+      auto fullPath = path + "/" + subPath;
+      auto initialized = pathExists(fullPath) && !readDirectory(fullPath).empty();
+
+      if (!initialized || isClean(fullPath)) {
+        printTalkative("submodule %s fetched from %s", subPath, url);
+        auto commitHash = findCommitHash(path, entries, subPath);
+        printTalkative("found %s", commitHash);
+
+        static const std::regex barePathRegex("^/.*$");
+        std::string prefix = "git+";
+        if (std::regex_match(url, barePathRegex))
+          prefix += "file://";
+
+        // std::string suffix = "?allRefs=1&rev=" + commitHash;
+        std::string suffix = "&rev=" + commitHash;
+        attrs.emplace(subPath, prefix + url + suffix);
+      } else {
+        StringSink sink;
+        dumpPath(fullPath, sink);
+
+        auto narHash = hashString(htSHA256, *sink.s);
+        attrs.emplace(subPath, "path://" + fullPath + "?narHash=" + narHash.to_string(SRI, false));
+        printTalkative("DIRTY\nsubPath: %s\nurl: %s\ndirtyUrl: %s\n", subPath, url, "path://" + fullPath + "?narHash=" + narHash.to_string(SRI, false));
+      }
+    }
+
+    return attrs;
 }
 
 static bool isNotDotGitDirectory(const Path & path)
@@ -67,7 +276,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "modules")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -159,19 +368,6 @@ struct GitInputScheme : InputScheme
                 { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
     }
 
-    std::pair<bool, std::string> getActualUrl(const Input & input) const
-    {
-        // file:// URIs are normally not cloned (but otherwise treated the
-        // same as remote URIs, i.e. we don't use the working tree or
-        // HEAD). Exception: If _NIX_FORCE_HTTP is set, or the repo is a bare git
-        // repo, treat as a remote URI to force a clone.
-        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
-        auto url = parseURL(getStrAttr(input.attrs, "url"));
-        bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
-        bool isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
-        return {isLocal, isLocal ? url.path : url.base};
-    }
-
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
@@ -186,6 +382,8 @@ struct GitInputScheme : InputScheme
         if (shallow) cacheType += "-shallow";
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
+
+        printTalkative("fetch is getting ran");
 
         auto getImmutableAttrs = [&]()
         {
@@ -204,6 +402,7 @@ struct GitInputScheme : InputScheme
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
+            input.attrs.insert_or_assign("modules", getStrAttr(infoAttrs, "modules"));
             return {
                 Tree(store->toRealPath(storePath), std::move(storePath)),
                 input
@@ -211,8 +410,9 @@ struct GitInputScheme : InputScheme
         };
 
         if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+            if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
                 return makeResult(res->first, std::move(res->second));
+            }
         }
 
         auto [isLocal, actualUrl_] = getActualUrl(input);
@@ -221,31 +421,7 @@ struct GitInputScheme : InputScheme
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
         if (!input.getRef() && !input.getRev() && isLocal) {
-            bool clean = false;
-
-            /* Check whether this repo has any commits. There are
-               probably better ways to do this. */
-            auto gitDir = actualUrl + "/.git";
-            auto commonGitDir = chomp(runProgram(
-                "git",
-                true,
-                { "-C", actualUrl, "rev-parse", "--git-common-dir" }
-            ));
-            if (commonGitDir != ".git")
-                    gitDir = commonGitDir;
-
-            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
-
-            try {
-                if (haveCommits) {
-                    runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
-                    clean = true;
-                }
-            } catch (ExecError & e) {
-                if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
-            }
-
-            if (!clean) {
+            if (!isClean(actualUrl)) {
 
                 /* This is an unclean working tree. So copy all tracked files. */
 
@@ -255,40 +431,21 @@ struct GitInputScheme : InputScheme
                 if (settings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
-                auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
-                if (submodules)
-                    gitOpts.emplace_back("--recurse-submodules");
-
-                auto files = tokenizeString<std::set<std::string>>(
-                    runProgram("git", true, gitOpts), "\0"s);
-
-                PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
-
-                    auto st = lstat(p);
-
-                    if (S_ISDIR(st.st_mode)) {
-                        auto prefix = file + "/";
-                        auto i = files.lower_bound(prefix);
-                        return i != files.end() && hasPrefix(*i, prefix);
-                    }
-
-                    return files.count(file);
-                };
-
-                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto tree = copyTrackedFiles(store, input.getName(), actualUrl, submodules);
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
+                bool haveCommits = hasCommits(actualUrl);
                 input.attrs.insert_or_assign(
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
-                    input
-                };
+                input.attrs.insert_or_assign(
+                    "modules",
+                    haveCommits ?
+                    attrsToJSON(readSubmodules(actualUrl, "HEAD")).dump() : "{}");
+
+                return { tree, input };
             }
         }
 
@@ -410,8 +567,9 @@ struct GitInputScheme : InputScheme
 
         /* Now that we know the ref, check again whether we have it in
            the store. */
-        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+        if (auto res = getCache()->lookup(store, getImmutableAttrs())) {
             return makeResult(res->first, std::move(res->second));
+        }
 
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
@@ -469,15 +627,18 @@ struct GitInputScheme : InputScheme
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+        auto rev = input.getRev()->gitRev();
+        auto modulesInfo = readSubmodules(repoDir, rev);
 
         Attrs infoAttrs({
-            {"rev", input.getRev()->gitRev()},
+            {"rev", rev},
             {"lastModified", lastModified},
+            {"modules", attrsToJSON(modulesInfo).dump()},
         });
 
         if (!shallow)
             infoAttrs.insert_or_assign("revCount",
-                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input.getRev()->gitRev() })));
+                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", rev })));
 
         if (!_input.getRev())
             getCache()->add(

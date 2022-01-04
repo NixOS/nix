@@ -9,6 +9,8 @@
 #include <iomanip>
 #include <regex>
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 void emitTreeAttrs(
@@ -20,8 +22,7 @@ void emitTreeAttrs(
     bool forceDirty)
 {
     assert(input.isImmutable());
-
-    state.mkAttrs(v, 8);
+    state.mkAttrs(v, 9);
 
     auto storePath = state.store->printStorePath(tree.storePath);
 
@@ -34,9 +35,22 @@ void emitTreeAttrs(
     mkString(*state.allocAttr(v, state.symbols.create("narHash")),
         narHash->to_string(SRI, true));
 
-    if (input.getType() == "git")
+    if (input.getType() == "git") {
+        Value *modules = state.allocAttr(v, state.symbols.create("modules"));
+
+        auto modulesJson = fetchers::getStrAttr(input.attrs, "modules");
+        auto modulesInfo = fetchers::jsonToAttrs(nlohmann::json::parse(modulesJson));
+
+        state.mkAttrs(*modules, modulesInfo.size());
+        for (auto & [path, url] : modulesInfo) {
+            Value *vUrl = state.allocValue();
+            mkString(*vUrl, std::get<string>(url).c_str());
+            modules->attrs->push_back(Attr(state.symbols.create(path), vUrl));
+        }
+        modules->attrs->sort();
         mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+    }
 
     if (!forceDirty) {
 

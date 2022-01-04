@@ -735,9 +735,10 @@ Fingerprint LockedFlake::getFingerprint() const
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
-        fmt("%s;%s;%d;%d;%s",
+        fmt("%s;%s;%s;%d;%d;%s",
             flake.sourceInfo->storePath.to_string(),
             flake.lockedRef.subdir,
+            flake.lockedRef.input.getModules().value_or(""),
             flake.lockedRef.input.getRevCount().value_or(0),
             flake.lockedRef.input.getLastModified().value_or(0),
             lockFile));
