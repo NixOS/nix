@@ -413,6 +413,7 @@ EvalState::EvalState(
     , sSelf(symbols.create("self"))
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
+    , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
@@ -453,8 +454,6 @@ EvalState::EvalState(
                 allowPath(r.second);
         }
     }
-
-    vEmptySet.mkAttrs(allocBindings(0));
 
     createBaseEnv();
 }

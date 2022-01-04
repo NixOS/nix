@@ -91,7 +91,7 @@ public:
        mode. */
     std::optional<PathSet> allowedPaths;
 
-    Value vEmptySet;
+    Bindings emptyBindings;
 
     /* Store used to materialise .drv files. */
     const ref<Store> store;

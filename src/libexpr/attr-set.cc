@@ -12,6 +12,8 @@ namespace nix {
    structure. */
 Bindings * EvalState::allocBindings(size_t capacity)
 {
+    if (capacity == 0)
+        return &emptyBindings;
     if (capacity > std::numeric_limits<Bindings::size_t>::max())
         throw Error("attribute set of size %d is too big", capacity);
     return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
@@ -20,10 +22,6 @@ Bindings * EvalState::allocBindings(size_t capacity)
 
 void EvalState::mkAttrs(Value & v, size_t capacity)
 {
-    if (capacity == 0) {
-        v = vEmptySet;
-        return;
-    }
     v.mkAttrs(allocBindings(capacity));
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;
@@ -63,7 +61,7 @@ Value & BindingsBuilder::alloc(std::string_view name, ptr<Pos> pos)
 
 void Bindings::sort()
 {
-    std::sort(begin(), end());
+    if (size_) std::sort(begin(), end());
 }
 
 
