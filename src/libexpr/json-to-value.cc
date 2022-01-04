@@ -76,39 +76,42 @@ class JSONSax : nlohmann::json_sax<json> {
     EvalState & state;
     std::unique_ptr<JSONState> rs;
 
-    template<typename T, typename... Args> inline bool handle_value(T f, Args... args)
-    {
-        f(rs->value(state), args...);
-        rs->add();
-        return true;
-    }
-
 public:
     JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
 
     bool null()
     {
-        return handle_value(mkNull);
+        rs->value(state).mkNull();
+        rs->add();
+        return true;
     }
 
     bool boolean(bool val)
     {
-        return handle_value(mkBool, val);
+        rs->value(state).mkBool(val);
+        rs->add();
+        return true;
     }
 
     bool number_integer(number_integer_t val)
     {
-        return handle_value(mkInt, val);
+        rs->value(state).mkInt(val);
+        rs->add();
+        return true;
     }
 
     bool number_unsigned(number_unsigned_t val)
     {
-        return handle_value(mkInt, val);
+        rs->value(state).mkInt(val);
+        rs->add();
+        return true;
     }
 
     bool number_float(number_float_t val, const string_t & s)
     {
-        return handle_value(mkFloat, val);
+        rs->value(state).mkFloat(val);
+        rs->add();
+        return true;
     }
 
     bool string(string_t & val)

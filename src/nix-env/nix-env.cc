@@ -408,7 +408,7 @@ static void queryInstSources(EvalState & state,
                 Expr * eFun = state.parseExprFromString(i, absPath("."));
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
-                mkApp(vTmp, vFun, vArg);
+                vTmp.mkApp(&vFun, &vArg);
                 getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
             }
 

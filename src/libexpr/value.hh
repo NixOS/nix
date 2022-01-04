@@ -393,31 +393,6 @@ public:
 
 
 // TODO: Remove these static functions, replace call sites with v.mk* instead
-static inline void mkInt(Value & v, NixInt n)
-{
-    v.mkInt(n);
-}
-
-static inline void mkFloat(Value & v, NixFloat n)
-{
-    v.mkFloat(n);
-}
-
-static inline void mkBool(Value & v, bool b)
-{
-    v.mkBool(b);
-}
-
-static inline void mkNull(Value & v)
-{
-    v.mkNull();
-}
-
-static inline void mkApp(Value & v, Value & left, Value & right)
-{
-    v.mkApp(&left, &right);
-}
-
 static inline void mkString(Value & v, const Symbol & s)
 {
     v.mkString(((const string &) s).c_str());

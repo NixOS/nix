@@ -43,13 +43,13 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 }
                 break;;
             case toml::value_t::boolean:
-                mkBool(v, toml::get<bool>(t));
+                v.mkBool(toml::get<bool>(t));
                 break;;
             case toml::value_t::integer:
-                mkInt(v, toml::get<int64_t>(t));
+                v.mkInt(toml::get<int64_t>(t));
                 break;;
             case toml::value_t::floating:
-                mkFloat(v, toml::get<NixFloat>(t));
+                v.mkFloat(toml::get<NixFloat>(t));
                 break;;
             case toml::value_t::string:
                 v.mkString(toml::get<std::string>(t));
@@ -62,7 +62,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 throw std::runtime_error("Dates and times are not supported");
                 break;;
             case toml::value_t::empty:
-                mkNull(v);
+                v.mkNull();
                 break;;
 
         }

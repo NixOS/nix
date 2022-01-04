@@ -94,7 +94,7 @@ struct ExprInt : Expr
 {
     NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -103,7 +103,7 @@ struct ExprFloat : Expr
 {
     NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
+    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

@@ -196,7 +196,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         }
 
         state.forceFunction(**state.vImportedDrvToDerivation, pos);
-        mkApp(v, **state.vImportedDrvToDerivation, *w);
+        v.mkApp(*state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos);
     }
 
@@ -430,7 +430,7 @@ static RegisterPrimOp primop_typeOf({
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nNull);
+    v.mkBool(args[0]->type() == nNull);
 }
 
 static RegisterPrimOp primop_isNull({
@@ -450,7 +450,7 @@ static RegisterPrimOp primop_isNull({
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nFunction);
+    v.mkBool(args[0]->type() == nFunction);
 }
 
 static RegisterPrimOp primop_isFunction({
@@ -466,7 +466,7 @@ static RegisterPrimOp primop_isFunction({
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nInt);
+    v.mkBool(args[0]->type() == nInt);
 }
 
 static RegisterPrimOp primop_isInt({
@@ -482,7 +482,7 @@ static RegisterPrimOp primop_isInt({
 static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nFloat);
+    v.mkBool(args[0]->type() == nFloat);
 }
 
 static RegisterPrimOp primop_isFloat({
@@ -498,7 +498,7 @@ static RegisterPrimOp primop_isFloat({
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nString);
+    v.mkBool(args[0]->type() == nString);
 }
 
 static RegisterPrimOp primop_isString({
@@ -514,7 +514,7 @@ static RegisterPrimOp primop_isString({
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nBool);
+    v.mkBool(args[0]->type() == nBool);
 }
 
 static RegisterPrimOp primop_isBool({
@@ -530,7 +530,7 @@ static RegisterPrimOp primop_isBool({
 static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nPath);
+    v.mkBool(args[0]->type() == nPath);
 }
 
 static RegisterPrimOp primop_isPath({
@@ -685,7 +685,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, *op->value, *e);
+        call.mkApp(op->value, e);
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
@@ -761,7 +761,7 @@ static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
 static void prim_ceil(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
-    mkInt(v, ceil(value));
+    v.mkInt(ceil(value));
 }
 
 static RegisterPrimOp primop_ceil({
@@ -780,7 +780,7 @@ static RegisterPrimOp primop_ceil({
 static void prim_floor(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
-    mkInt(v, floor(value));
+    v.mkInt(floor(value));
 }
 
 static RegisterPrimOp primop_floor({
@@ -804,10 +804,10 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
-        mkBool(attrs.alloc("success"), true);
+        attrs.alloc("success").mkBool(true);
     } catch (AssertionError & e) {
-        mkBool(attrs.alloc(state.sValue), false);
-        mkBool(attrs.alloc("success"), false);
+        attrs.alloc(state.sValue).mkBool(false);
+        attrs.alloc("success").mkBool(false);
     }
     v.mkAttrs(attrs);
 }
@@ -1395,13 +1395,13 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     }
 
     try {
-        mkBool(v, pathExists(state.checkSourcePath(path)));
+        v.mkBool(pathExists(state.checkSourcePath(path)));
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
-        mkBool(v, false);
+        v.mkBool(false);
     } catch (RestrictedPathError & e) {
-        mkBool(v, false);
+        v.mkBool(false);
     }
 }
 
@@ -2213,7 +2213,7 @@ static void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[1], pos);
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
-        mkNull(v);
+        v.mkNull();
     else
         state.mkPos(v, i->pos);
 }
@@ -2229,7 +2229,7 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
+    v.mkBool(args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
 
 static RegisterPrimOp primop_hasAttr({
@@ -2247,7 +2247,7 @@ static RegisterPrimOp primop_hasAttr({
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nAttrs);
+    v.mkBool(args[0]->type() == nAttrs);
 }
 
 static RegisterPrimOp primop_isAttrs({
@@ -2446,7 +2446,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     auto attrs = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
     for (auto & i : args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
-        mkBool(attrs.alloc(i.name, ptr(&i.pos)), i.def);
+        attrs.alloc(i.name, ptr(&i.pos)).mkBool(i.def);
     v.mkAttrs(attrs);
 }
 
@@ -2478,8 +2478,8 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
         mkString(*vName, i.name);
-        mkApp(*vFun2, *args[0], *vName);
-        mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
+        vFun2->mkApp(args[0], vName);
+        state.allocAttr(v, i.name)->mkApp(vFun2, i.value);
     }
 }
 
@@ -2542,10 +2542,10 @@ static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args
     for (auto & attr : *v.attrs) {
         Value * name = state.allocValue();
         mkString(*name, attr.name);
-        Value * call1 = state.allocValue();
-        mkApp(*call1, *args[0], *name);
-        Value * call2 = state.allocValue();
-        mkApp(*call2, *call1, *attr.value);
+        auto call1 = state.allocValue();
+        call1->mkApp(args[0], name);
+        auto call2 = state.allocValue();
+        call2->mkApp(call1, attr.value);
         attr.value = call2;
     }
 }
@@ -2592,7 +2592,7 @@ static RegisterPrimOp primop_zipAttrsWith({
 static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type() == nList);
+    v.mkBool(args[0]->type() == nList);
 }
 
 static RegisterPrimOp primop_isList({
@@ -2690,8 +2690,8 @@ static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value &
     state.mkList(v, args[1]->listSize());
 
     for (unsigned int n = 0; n < v.listSize(); ++n)
-        mkApp(*(v.listElems()[n] = state.allocValue()),
-            *args[0], *args[1]->listElems()[n]);
+        (v.listElems()[n] = state.allocValue())->mkApp(
+            args[0], args[1]->listElems()[n]);
 }
 
 static RegisterPrimOp primop_map({
@@ -2760,7 +2760,7 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
             res = true;
             break;
         }
-    mkBool(v, res);
+    v.mkBool(res);
 }
 
 static RegisterPrimOp primop_elem({
@@ -2793,7 +2793,7 @@ static RegisterPrimOp primop_concatLists({
 static void prim_length(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
-    mkInt(v, args[0]->listSize());
+    v.mkInt(args[0]->listSize());
 }
 
 static RegisterPrimOp primop_length({
@@ -2850,12 +2850,12 @@ static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * arg
         state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos);
         if (res == any) {
-            mkBool(v, any);
+            v.mkBool(any);
             return;
         }
     }
 
-    mkBool(v, !any);
+    v.mkBool(!any);
 }
 
 
@@ -2902,9 +2902,9 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
     state.mkList(v, len);
 
     for (unsigned int n = 0; n < (unsigned int) len; ++n) {
-        Value * arg = state.allocValue();
-        mkInt(*arg, n);
-        mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
+        auto arg = state.allocValue();
+        arg->mkInt(n);
+        (v.listElems()[n] = state.allocValue())->mkApp(args[0], arg);
     }
 }
 
@@ -3140,9 +3140,9 @@ static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value &
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
-        mkFloat(v, state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
+        v.mkFloat(state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
     else
-        mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
+        v.mkInt(state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_add({
@@ -3159,9 +3159,9 @@ static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value &
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
-        mkFloat(v, state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
+        v.mkFloat(state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
     else
-        mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
+        v.mkInt(state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_sub({
@@ -3178,9 +3178,9 @@ static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value &
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
-        mkFloat(v, state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
+        v.mkFloat(state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
     else
-        mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
+        v.mkInt(state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_mul({
@@ -3205,7 +3205,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
         });
 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat) {
-        mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
+        v.mkFloat(state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
     } else {
         NixInt i1 = state.forceInt(*args[0], pos);
         NixInt i2 = state.forceInt(*args[1], pos);
@@ -3216,7 +3216,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
                 .errPos = pos
             });
 
-        mkInt(v, i1 / i2);
+        v.mkInt(i1 / i2);
     }
 }
 
@@ -3231,7 +3231,7 @@ static RegisterPrimOp primop_div({
 
 static void prim_bitAnd(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
+    v.mkInt(state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_bitAnd({
@@ -3245,7 +3245,7 @@ static RegisterPrimOp primop_bitAnd({
 
 static void prim_bitOr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
+    v.mkInt(state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_bitOr({
@@ -3259,7 +3259,7 @@ static RegisterPrimOp primop_bitOr({
 
 static void prim_bitXor(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
+    v.mkInt(state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_bitXor({
@@ -3276,7 +3276,7 @@ static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Va
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     CompareValues comp{state};
-    mkBool(v, comp(args[0], args[1]));
+    v.mkBool(comp(args[0], args[1]));
 }
 
 static RegisterPrimOp primop_lessThan({
@@ -3374,7 +3374,7 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 {
     PathSet context;
     string s = state.coerceToString(pos, *args[0], context);
-    mkInt(v, s.size());
+    v.mkInt(s.size());
 }
 
 static RegisterPrimOp primop_stringLength({
@@ -3440,7 +3440,7 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 
         std::smatch match;
         if (!std::regex_match(str, match, regex->second)) {
-            mkNull(v);
+            v.mkNull();
             return;
         }
 
@@ -3449,7 +3449,7 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
         state.mkList(v, len);
         for (size_t i = 0; i < len; ++i) {
             if (!match[i+1].matched)
-                mkNull(*(v.listElems()[i] = state.allocValue()));
+                (v.listElems()[i] = state.allocValue())->mkNull();
             else
                 (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
@@ -3547,7 +3547,7 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
             state.mkList(*elem, slen);
             for (size_t si = 0; si < slen; ++si) {
                 if (!match[si + 1].matched)
-                    mkNull(*(elem->listElems()[si] = state.allocValue()));
+                    (elem->listElems()[si] = state.allocValue())->mkNull();
                 else
                     (elem->listElems()[si] = state.allocValue())->mkString(match[si + 1].str());
             }
@@ -3750,7 +3750,7 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 {
     string version1 = state.forceStringNoCtx(*args[0], pos);
     string version2 = state.forceStringNoCtx(*args[1], pos);
-    mkInt(v, compareVersions(version1, version2));
+    v.mkInt(compareVersions(version1, version2));
 }
 
 static RegisterPrimOp primop_compareVersions({
@@ -3832,17 +3832,17 @@ void EvalState::createBaseEnv()
     mkAttrs(v, 128);
     addConstant("builtins", v);
 
-    mkBool(v, true);
+    v.mkBool(true);
     addConstant("true", v);
 
-    mkBool(v, false);
+    v.mkBool(false);
     addConstant("false", v);
 
-    mkNull(v);
+    v.mkNull();
     addConstant("null", v);
 
     if (!evalSettings.pureEval) {
-        mkInt(v, time(0));
+        v.mkInt(time(0));
         addConstant("__currentTime", v);
 
         v.mkString(settings.thisSystem.get());
@@ -3859,7 +3859,7 @@ void EvalState::createBaseEnv()
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
-    mkInt(v, 6);
+    v.mkInt(6);
     addConstant("__langVersion", v);
 
     // Miscellaneous

@@ -613,7 +613,7 @@ Value * EvalState::addPrimOp(const string & name,
         auto vPrimOp = allocValue();
         vPrimOp->mkPrimOp(new PrimOp { .fun = primOp, .arity = 1, .name = sym });
         Value v;
-        mkApp(v, *vPrimOp, *vPrimOp);
+        v.mkApp(vPrimOp, vPrimOp);
         return addConstant(name, v);
     }
 
@@ -635,7 +635,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         auto vPrimOp = allocValue();
         vPrimOp->mkPrimOp(new PrimOp(std::move(primOp)));
         Value v;
-        mkApp(v, *vPrimOp, *vPrimOp);
+        v.mkApp(vPrimOp, vPrimOp);
         return addConstant(primOp.name, v);
     }
 
@@ -887,7 +887,7 @@ void EvalState::mkPos(Value & v, ptr<Pos> pos)
         attrs.alloc(sColumn).mkInt(pos->column);
         v.mkAttrs(attrs);
     } else
-        mkNull(v);
+        v.mkNull();
 }
 
 
@@ -1258,14 +1258,14 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
         if (vAttrs->type() != nAttrs ||
             (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
-            mkBool(v, false);
+            v.mkBool(false);
             return;
         } else {
             vAttrs = j->value;
         }
     }
 
-    mkBool(v, true);
+    v.mkBool(true);
 }
 
 
@@ -1544,7 +1544,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e));
+    v.mkBool(!state.evalBool(env, e));
 }
 
 
@@ -1552,7 +1552,7 @@ void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    mkBool(v, state.eqValues(v1, v2));
+    v.mkBool(state.eqValues(v1, v2));
 }
 
 
@@ -1560,25 +1560,25 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    mkBool(v, !state.eqValues(v1, v2));
+    v.mkBool(!state.eqValues(v1, v2));
 }
 
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
+    v.mkBool(state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.mkBool(state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.mkBool(!state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
@@ -1705,9 +1705,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     }
 
     if (firstType == nInt)
-        mkInt(v, n);
+        v.mkInt(n);
     else if (firstType == nFloat)
-        mkFloat(v, nf);
+        v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
             throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");

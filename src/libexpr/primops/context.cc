@@ -17,7 +17,7 @@ static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, 
 {
     PathSet context;
     state.forceString(*args[0], context, pos);
-    mkBool(v, !context.empty());
+    v.mkBool(!context.empty());
 }
 
 static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
@@ -109,9 +109,9 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
     for (const auto & info : contextInfos) {
         auto infoAttrs = state.buildBindings(3);
         if (info.second.path)
-            mkBool(infoAttrs.alloc(sPath), true);
+            infoAttrs.alloc(sPath).mkBool(true);
         if (info.second.allOutputs)
-            mkBool(infoAttrs.alloc(sAllOutputs), true);
+            infoAttrs.alloc(sAllOutputs).mkBool(true);
         if (!info.second.outputs.empty()) {
             auto & outputsVal = infoAttrs.alloc(state.sOutputs);
             state.mkList(outputsVal, info.second.outputs.size());
