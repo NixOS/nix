@@ -1441,7 +1441,7 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
 {
     PathSet context;
     Path dir = dirOf(state.coerceToString(pos, *args[0], context, false, false));
-    if (args[0]->type() == nPath) mkPath(v, dir.c_str()); else v.mkString(dir, context);
+    if (args[0]->type() == nPath) v.mkPath(dir); else v.mkString(dir, context);
 }
 
 static RegisterPrimOp primop_dirOf({
@@ -1522,7 +1522,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     string path = state.forceStringNoCtx(*args[1], pos);
 
-    mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
+    v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {

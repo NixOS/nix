@@ -786,9 +786,9 @@ void Value::mkString(std::string_view s, const PathSet & context)
 }
 
 
-void mkPath(Value & v, const char * s)
+void Value::mkPath(std::string_view s)
 {
-    v.mkPath(dupString(s));
+    mkPath(dupStringWithLen(s.data(), s.size()));
 }
 
 
@@ -1711,8 +1711,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
-        auto path = canonPath(s.str());
-        mkPath(v, path.c_str());
+        v.mkPath(canonPath(s.str()));
     } else
         v.mkString(s.str(), context);
 }

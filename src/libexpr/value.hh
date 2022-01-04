@@ -248,6 +248,8 @@ public:
         path = s;
     }
 
+    void mkPath(std::string_view s);
+
     inline void mkNull()
     {
         clearValue();
@@ -397,9 +399,6 @@ static inline void mkString(Value & v, const Symbol & s)
 {
     v.mkString(((const string &) s).c_str());
 }
-
-
-void mkPath(Value & v, const char * s);
 
 
 #if HAVE_BOEHMGC
