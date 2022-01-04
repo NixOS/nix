@@ -103,27 +103,26 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
         }
     }
 
-    state.mkAttrs(v, contextInfos.size());
+    auto attrs = state.buildBindings(contextInfos.size());
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
     for (const auto & info : contextInfos) {
-        auto & infoVal = *state.allocAttr(v, state.symbols.create(info.first));
-        state.mkAttrs(infoVal, 3);
+        auto infoAttrs = state.buildBindings(3);
         if (info.second.path)
-            mkBool(*state.allocAttr(infoVal, sPath), true);
+            mkBool(infoAttrs.alloc(sPath), true);
         if (info.second.allOutputs)
-            mkBool(*state.allocAttr(infoVal, sAllOutputs), true);
+            mkBool(infoAttrs.alloc(sAllOutputs), true);
         if (!info.second.outputs.empty()) {
-            auto & outputsVal = *state.allocAttr(infoVal, state.sOutputs);
+            auto & outputsVal = infoAttrs.alloc(state.sOutputs);
             state.mkList(outputsVal, info.second.outputs.size());
-            size_t i = 0;
-            for (const auto & output : info.second.outputs)
-                mkString(*(outputsVal.listElems()[i++] = state.allocValue()), output);
+            for (const auto & [i, output] : enumerate(info.second.outputs))
+                (outputsVal.listElems()[i] = state.allocValue())->mkString(output);
         }
-        infoVal.attrs->sort();
+        attrs.alloc(info.first).mkAttrs(infoAttrs);
     }
-    v.attrs->sort();
+
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);

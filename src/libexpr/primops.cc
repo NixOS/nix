@@ -125,13 +125,15 @@ static Path realisePath(EvalState & state, const Pos & pos, Value & v, const Rea
    the actual path.
 
    The 'drv' and 'drvPath' outputs must correspond. */
-static void mkOutputString(EvalState & state, Value & v,
-    const StorePath & drvPath, const BasicDerivation & drv,
-    std::pair<string, DerivationOutput> o)
+static void mkOutputString(
+    EvalState & state,
+    BindingsBuilder & attrs,
+    const StorePath & drvPath,
+    const BasicDerivation & drv,
+    const std::pair<string, DerivationOutput> & o)
 {
     auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
-    mkString(
-        *state.allocAttr(v, state.symbols.create(o.first)),
+    attrs.alloc(o.first).mkString(
         optOutputPath
             ? state.store->printStorePath(*optOutputPath)
             /* Downstream we would substitute this for an actual path once
@@ -172,23 +174,19 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
     if (auto optStorePath = isValidDerivationInStore()) {
         auto storePath = *optStorePath;
         Derivation drv = state.store->readDerivation(storePath);
-        Value & w = *state.allocValue();
-        state.mkAttrs(w, 3 + drv.outputs.size());
-        Value * v2 = state.allocAttr(w, state.sDrvPath);
-        mkString(*v2, path, {"=" + path});
-        v2 = state.allocAttr(w, state.sName);
-        mkString(*v2, drv.env["name"]);
-        Value * outputsVal =
-            state.allocAttr(w, state.symbols.create("outputs"));
-        state.mkList(*outputsVal, drv.outputs.size());
-        unsigned int outputs_index = 0;
+        auto attrs = state.buildBindings(3 + drv.outputs.size());
+        attrs.alloc(state.sDrvPath).mkString(path, {"=" + path});
+        attrs.alloc(state.sName).mkString(drv.env["name"]);
+        auto & outputsVal = attrs.alloc(state.sOutputs);
+        state.mkList(outputsVal, drv.outputs.size());
 
-        for (const auto & o : drv.outputs) {
-            mkOutputString(state, w, storePath, drv, o);
-            outputsVal->listElems()[outputs_index] = state.allocValue();
-            mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
+        for (const auto & [i, o] : enumerate(drv.outputs)) {
+            mkOutputString(state, attrs, storePath, drv, o);
+            (outputsVal.listElems()[i] = state.allocValue())->mkString(o.first);
         }
-        w.attrs->sort();
+
+        auto w = state.allocValue();
+        w->mkAttrs(attrs);
 
         if (!state.vImportedDrvToDerivation) {
             state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
@@ -198,7 +196,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         }
 
         state.forceFunction(**state.vImportedDrvToDerivation, pos);
-        mkApp(v, **state.vImportedDrvToDerivation, w);
+        mkApp(v, **state.vImportedDrvToDerivation, *w);
         state.forceAttrs(v, pos);
     }
 
@@ -802,16 +800,16 @@ static RegisterPrimOp primop_floor({
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.mkAttrs(v, 2);
+    auto attrs = state.buildBindings(2);
     try {
         state.forceValue(*args[0], pos);
-        v.attrs->push_back(Attr(state.sValue, args[0]));
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
+        attrs.insert(state.sValue, args[0]);
+        mkBool(attrs.alloc("success"), true);
     } catch (AssertionError & e) {
-        mkBool(*state.allocAttr(v, state.sValue), false);
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
+        mkBool(attrs.alloc(state.sValue), false);
+        mkBool(attrs.alloc("success"), false);
     }
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_tryEval({
@@ -839,7 +837,7 @@ static RegisterPrimOp primop_tryEval({
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
+    v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
 static RegisterPrimOp primop_getEnv({
@@ -1265,11 +1263,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         drvHashes.lock()->insert_or_assign(drvPath, h);
     }
 
-    state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
+    auto attrs = state.buildBindings(1 + drv.outputs.size());
+    attrs.alloc(state.sDrvPath).mkString(drvPathS, {"=" + drvPathS});
     for (auto & i : drv.outputs)
-        mkOutputString(state, v, drvPath, drv, i);
-    v.attrs->sort();
+        mkOutputString(state, attrs, drvPath, drv, i);
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
@@ -1579,20 +1577,20 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     }
 
     DirEntries entries = readDirectory(path);
-    state.mkAttrs(v, entries.size());
+
+    auto attrs = state.buildBindings(entries.size());
 
     for (auto & ent : entries) {
-        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path + "/" + ent.name);
-        ent_val->mkString(
+        attrs.alloc(ent.name).mkString(
             ent.type == DT_REG ? "regular" :
             ent.type == DT_DIR ? "directory" :
             ent.type == DT_LNK ? "symlink" :
             "unknown");
     }
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_readDir({
@@ -2308,7 +2306,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 {
     state.forceList(*args[0], pos);
 
-    state.mkAttrs(v, args[0]->listSize());
+    auto attrs = state.buildBindings(args[0]->listSize());
 
     std::set<Symbol> seen;
 
@@ -2334,11 +2332,11 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
                 v2->attrs,
                 pos
             );
-            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            attrs.insert(sym, j2->value, j2->pos);
         }
     }
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_listToAttrs({
@@ -2445,14 +2443,11 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
         return;
     }
 
-    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals) {
+    auto attrs = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
+    for (auto & i : args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
-        Value * value = state.allocValue();
-        v.attrs->push_back(Attr(i.name, value, ptr(&i.pos)));
-        mkBool(*value, i.def);
-    }
-    v.attrs->sort();
+        mkBool(attrs.alloc(i.name, ptr(&i.pos)), i.def);
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_functionArgs({
@@ -3003,21 +2998,21 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
             wrong.push_back(vElem);
     }
 
-    state.mkAttrs(v, 2);
+    auto attrs = state.buildBindings(2);
 
-    Value * vRight = state.allocAttr(v, state.sRight);
+    auto & vRight = attrs.alloc(state.sRight);
     auto rsize = right.size();
-    state.mkList(*vRight, rsize);
+    state.mkList(vRight, rsize);
     if (rsize)
-        memcpy(vRight->listElems(), right.data(), sizeof(Value *) * rsize);
+        memcpy(vRight.listElems(), right.data(), sizeof(Value *) * rsize);
 
-    Value * vWrong = state.allocAttr(v, state.sWrong);
+    auto & vWrong = attrs.alloc(state.sWrong);
     auto wsize = wrong.size();
-    state.mkList(*vWrong, wsize);
+    state.mkList(vWrong, wsize);
     if (wsize)
-        memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wsize);
+        memcpy(vWrong.listElems(), wrong.data(), sizeof(Value *) * wsize);
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_partition({
@@ -3734,10 +3729,10 @@ static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args
 {
     string name = state.forceStringNoCtx(*args[0], pos);
     DrvName parsed(name);
-    state.mkAttrs(v, 2);
-    mkString(*state.allocAttr(v, state.sName), parsed.name);
-    mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
-    v.attrs->sort();
+    auto attrs = state.buildBindings(2);
+    attrs.alloc(state.sName).mkString(parsed.name);
+    attrs.alloc("version").mkString(parsed.version);
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_parseDrvName({
@@ -3883,11 +3878,10 @@ void EvalState::createBaseEnv()
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
-        auto v2 = v.listElems()[n++] = allocValue();
-        mkAttrs(*v2, 2);
-        mkString(*allocAttr(*v2, symbols.create("path")), i.second);
-        mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
-        v2->attrs->sort();
+        auto attrs = buildBindings(2);
+        attrs.alloc("path").mkString(i.second);
+        attrs.alloc("prefix").mkString(i.first);
+        (v.listElems()[n++] = allocValue())->mkAttrs(attrs);
     }
     addConstant("__nixPath", v);
 

@@ -21,49 +21,48 @@ void emitTreeAttrs(
 {
     assert(input.isImmutable());
 
-    state.mkAttrs(v, 8);
+    auto attrs = state.buildBindings(8);
 
     auto storePath = state.store->printStorePath(tree.storePath);
 
-    mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
+    attrs.alloc(state.sOutPath).mkString(storePath, {storePath});
 
     // FIXME: support arbitrary input attributes.
 
     auto narHash = input.getNarHash();
     assert(narHash);
-    mkString(*state.allocAttr(v, state.symbols.create("narHash")),
-        narHash->to_string(SRI, true));
+    attrs.alloc("narHash").mkString(narHash->to_string(SRI, true));
 
     if (input.getType() == "git")
-        mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
+        attrs.alloc("submodules").mkBool(
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
-            mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
-            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
+            attrs.alloc("rev").mkString(rev->gitRev());
+            attrs.alloc("shortRev").mkString(rev->gitShortRev());
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
             auto emptyHash = Hash(htSHA1);
-            mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
+            attrs.alloc("rev").mkString(emptyHash.gitRev());
+            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
         }
 
         if (auto revCount = input.getRevCount())
-            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
+            attrs.alloc("revCount").mkInt(*revCount);
         else if (emptyRevFallback)
-            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+            attrs.alloc("revCount").mkInt(0);
 
     }
 
     if (auto lastModified = input.getLastModified()) {
-        mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
-        mkString(*state.allocAttr(v, state.symbols.create("lastModifiedDate")),
+        attrs.alloc("lastModified").mkInt(*lastModified);
+        attrs.alloc("lastModifiedDate").mkString(
             fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
     }
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")

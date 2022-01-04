@@ -772,18 +772,30 @@ void mkString(Value & v, const char * s)
 }
 
 
+void Value::mkString(std::string_view s)
+{
+    mkString(dupStringWithLen(s.data(), s.size()));
+}
+
+
 Value & mkString(Value & v, std::string_view s, const PathSet & context)
 {
-    v.mkString(dupStringWithLen(s.data(), s.size()));
+    v.mkString(s, context);
+    return v;
+}
+
+
+void Value::mkString(std::string_view s, const PathSet & context)
+{
+    mkString(s);
     if (!context.empty()) {
         size_t n = 0;
-        v.string.context = (const char * *)
+        string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
-            v.string.context[n++] = dupString(i.c_str());
-        v.string.context[n] = 0;
+            string.context[n++] = dupString(i.c_str());
+        string.context[n] = 0;
     }
-    return v;
 }
 
 
@@ -882,11 +894,11 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, ptr<Pos> pos)
 {
     if (pos->file.set()) {
-        mkAttrs(v, 3);
-        mkString(*allocAttr(v, sFile), pos->file);
-        mkInt(*allocAttr(v, sLine), pos->line);
-        mkInt(*allocAttr(v, sColumn), pos->column);
-        v.attrs->sort();
+        auto attrs = buildBindings(3);
+        attrs.alloc(sFile).mkString(pos->file);
+        attrs.alloc(sLine).mkInt(pos->line);
+        attrs.alloc(sColumn).mkInt(pos->column);
+        v.mkAttrs(attrs);
     } else
         mkNull(v);
 }
@@ -1341,7 +1353,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
+                        if (!lambda.formals->argNames.count(i.name))
                             throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
                     abort(); // can't happen
                 }
@@ -1484,22 +1496,20 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         return;
     }
 
-    Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
 
     if (fun.lambda.fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
-        for (auto& v : args) {
-            actualArgs->attrs->push_back(v);
-        }
+        for (auto & v : args)
+            attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
         for (auto & i : fun.lambda.fun->formals->formals) {
             Bindings::iterator j = args.find(i.name);
             if (j != args.end()) {
-                actualArgs->attrs->push_back(*j);
+                attrs.insert(*j);
             } else if (!i.def) {
                 throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
 
@@ -1512,9 +1522,7 @@ https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
         }
     }
 
-    actualArgs->attrs->sort();
-
-    callFunction(fun, *actualArgs, res, noPos);
+    callFunction(fun, allocValue()->mkAttrs(attrs), res, noPos);
 }
 
 
@@ -1719,7 +1727,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         auto path = canonPath(s.str());
         mkPath(v, path.c_str());
     } else
-        mkString(v, s.str(), context);
+        v.mkString(s.str(), context);
 }
 
 

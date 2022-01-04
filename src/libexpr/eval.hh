@@ -339,9 +339,14 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
-    Value * allocAttr(Value & vAttrs, const std::string & name);
+    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
+
+    BindingsBuilder buildBindings(size_t capacity)
+    {
+        return BindingsBuilder(*this, allocBindings(capacity));
+    }
 
     void mkList(Value & v, size_t length);
     void mkAttrs(Value & v, size_t capacity);

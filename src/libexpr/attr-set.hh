@@ -113,5 +113,39 @@ public:
     friend class EvalState;
 };
 
+/* A wrapper around Bindings that ensures that its always in sorted
+   order at the end. The only way to consume a BindingsBuilder is to
+   call finish(), which sorts the bindings. */
+class BindingsBuilder
+{
+    EvalState & state;
+    Bindings * bindings;
+
+public:
+
+    BindingsBuilder(EvalState & state, Bindings * bindings)
+        : state(state), bindings(bindings)
+    { }
+
+    void insert(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
+    {
+        insert(Attr(name, value, pos));
+    }
+
+    void insert(const Attr & attr)
+    {
+        bindings->push_back(attr);
+    }
+
+    Value & alloc(const Symbol & name, ptr<Pos> pos = ptr(&noPos));
+
+    Value & alloc(std::string_view name, ptr<Pos> pos = ptr(&noPos));
+
+    Bindings * finish()
+    {
+        bindings->sort();
+        return bindings;
+    }
+};
 
 }

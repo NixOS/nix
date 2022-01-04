@@ -98,8 +98,11 @@ static bool isNixExpr(const Path & path, struct stat & st)
 }
 
 
+static constexpr size_t maxAttrs = 1024;
+
+
 static void getAllExprs(EvalState & state,
-    const Path & path, StringSet & attrs, Value & v)
+    const Path & path, StringSet & seen, BindingsBuilder & attrs)
 {
     StringSet namesSorted;
     for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
@@ -124,22 +127,21 @@ static void getAllExprs(EvalState & state,
             string attrName = i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
-            if (!attrs.insert(attrName).second) {
+            if (!seen.insert(attrName).second) {
                 printError("warning: name collision in input Nix expressions, skipping '%1%'", path2);
                 continue;
             }
             /* Load the expression on demand. */
-            Value & vFun = state.getBuiltin("import");
-            Value & vArg(*state.allocValue());
-            mkString(vArg, path2);
-            if (v.attrs->size() == v.attrs->capacity())
+            auto vArg = state.allocValue();
+            vArg->mkString(path2);
+            if (seen.size() == maxAttrs)
                 throw Error("too many Nix expressions in directory '%1%'", path);
-            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
+            attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
         }
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
-            getAllExprs(state, path2, attrs, v);
+            getAllExprs(state, path2, seen, attrs);
     }
 }
 
@@ -161,11 +163,11 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
        ~/.nix-defexpr directory that includes some system-wide
        directory). */
     else if (S_ISDIR(st.st_mode)) {
-        state.mkAttrs(v, 1024);
-        state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);
-        StringSet attrs;
-        getAllExprs(state, path, attrs, v);
-        v.attrs->sort();
+        auto attrs = state.buildBindings(maxAttrs);
+        attrs.alloc("_combineChannels").mkList(0);
+        StringSet seen;
+        getAllExprs(state, path, seen, attrs);
+        v.mkAttrs(attrs);
     }
 
     else throw Error("path '%s' is not a directory or a Nix expression", path);

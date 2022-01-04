@@ -10,6 +10,8 @@
 
 namespace nix {
 
+class BindingsBuilder;
+
 
 typedef enum {
     tInt = 1,
@@ -235,6 +237,10 @@ public:
         string.context = context;
     }
 
+    void mkString(std::string_view s);
+
+    void mkString(std::string_view s, const PathSet & context);
+
     inline void mkPath(const char * s)
     {
         clearValue();
@@ -254,6 +260,8 @@ public:
         internalType = tAttrs;
         attrs = a;
     }
+
+    Value & mkAttrs(BindingsBuilder & bindings);
 
     inline void mkList(size_t size)
     {
