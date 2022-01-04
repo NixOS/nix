@@ -20,6 +20,7 @@ let
     man
     cacert.out
     findutils
+    iana-etc
   ];
 
   users = {
