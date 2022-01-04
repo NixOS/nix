@@ -112,7 +112,7 @@ struct ExprString : Expr
 {
     Symbol s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
+    ExprString(const Symbol & s) : s(s) { v.mkString(s); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

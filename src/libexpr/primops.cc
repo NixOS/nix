@@ -412,7 +412,7 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
         case nFloat: t = "float"; break;
         case nThunk: abort();
     }
-    mkString(v, state.symbols.create(t));
+    v.mkString(state.symbols.create(t));
 }
 
 static RegisterPrimOp primop_typeOf({
@@ -2129,7 +2129,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 
     size_t n = 0;
     for (auto & i : *args[0]->attrs)
-        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
+        (v.listElems()[n++] = state.allocValue())->mkString(i.name);
 
     std::sort(v.listElems(), v.listElems() + n,
               [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
@@ -2477,7 +2477,7 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     for (auto & i : *args[1]->attrs) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
-        mkString(*vName, i.name);
+        vName->mkString(i.name);
         vFun2->mkApp(args[0], vName);
         state.allocAttr(v, i.name)->mkApp(vFun2, i.value);
     }
@@ -2540,8 +2540,8 @@ static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args
     }
 
     for (auto & attr : *v.attrs) {
-        Value * name = state.allocValue();
-        mkString(*name, attr.name);
+        auto name = state.allocValue();
+        name->mkString(attr.name);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
         auto call2 = state.allocValue();

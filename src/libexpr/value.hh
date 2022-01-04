@@ -241,6 +241,11 @@ public:
 
     void mkString(std::string_view s, const PathSet & context);
 
+    inline void mkString(const Symbol & s)
+    {
+        mkString(((const std::string &) s).c_str());
+    }
+
     inline void mkPath(const char * s)
     {
         clearValue();
@@ -391,14 +396,6 @@ public:
         return ConstListIterable { begin, begin + listSize() };
     }
 };
-
-
-
-// TODO: Remove these static functions, replace call sites with v.mk* instead
-static inline void mkString(Value & v, const Symbol & s)
-{
-    v.mkString(((const string &) s).c_str());
-}
 
 
 #if HAVE_BOEHMGC
