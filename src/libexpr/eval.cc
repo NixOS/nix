@@ -680,15 +680,27 @@ void printStaticEnvBindings(const StaticEnv &se, int lvl)
 {
     std::cout << "Env level " << lvl << std::endl;
   
-    for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
-    {
-      std::cout << i->first << " ";
-    }
-    std::cout << std::endl;
-    std::cout << std::endl;
-
     if (se.up) {
+        for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
+        {
+          std::cout << i->first << " ";
+        }
+        std::cout << std::endl;
+        std::cout << std::endl;
+
         printStaticEnvBindings(*se.up, ++lvl);
+    }
+    else 
+    {
+        // for the top level, don't print the double underscore ones; they are in builtins.
+        for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
+        {
+            if (((string)i->first).substr(0,2) != "__")
+                std::cout << i->first << " ";
+        }
+        std::cout << std::endl;
+        std::cout << std::endl;
+
     }
 
 }
