@@ -2503,6 +2503,90 @@ static RegisterPrimOp primop_mapAttrs({
     .fun = prim_mapAttrs,
 });
 
+static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    // we will first count how many values are present for each given key.
+    // we then allocate a single attrset and pre-populate it with lists of
+    // appropriate sizes, stash the pointers to the list elements of each,
+    // and populate the lists. after that we replace the list in the every
+    // attribute with the merge function application. this way we need not
+    // use (slightly slower) temporary storage the GC does not know about.
+
+    std::map<Symbol, std::pair<size_t, Value * *>> attrsSeen;
+
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+    const auto listSize = args[1]->listSize();
+    const auto listElems = args[1]->listElems();
+
+    for (unsigned int n = 0; n < listSize; ++n) {
+        Value * vElem = listElems[n];
+        try {
+            state.forceAttrs(*vElem);
+            for (auto & attr : *vElem->attrs)
+                attrsSeen[attr.name].first++;
+        } catch (TypeError & e) {
+            e.addTrace(pos, hintfmt("while invoking '%s'", "zipAttrsWith"));
+            throw;
+        }
+    }
+
+    state.mkAttrs(v, attrsSeen.size());
+    for (auto & [sym, elem] : attrsSeen) {
+        Value * list = state.allocAttr(v, sym);
+        state.mkList(*list, elem.first);
+        elem.second = list->listElems();
+    }
+
+    for (unsigned int n = 0; n < listSize; ++n) {
+        Value * vElem = listElems[n];
+        for (auto & attr : *vElem->attrs)
+            *attrsSeen[attr.name].second++ = attr.value;
+    }
+
+    for (auto & attr : *v.attrs) {
+        Value * name = state.allocValue();
+        mkString(*name, attr.name);
+        Value * call1 = state.allocValue();
+        mkApp(*call1, *args[0], *name);
+        Value * call2 = state.allocValue();
+        mkApp(*call2, *call1, *attr.value);
+        attr.value = call2;
+    }
+}
+
+static RegisterPrimOp primop_zipAttrsWith({
+    .name = "__zipAttrsWith",
+    .args = {"f", "list"},
+    .doc = R"(
+      Transpose a list of attribute sets into an attribute set of lists,
+      then apply `mapAttrs`.
+
+      `f` receives two arguments: the attribute name and a non-empty
+      list of all values encountered for that attribute name.
+
+      The result is an attribute set where the attribute names are the
+      union of the attribute names in each element of `list`. The attribute
+      values are the return values of `f`.
+
+      ```nix
+      builtins.zipAttrsWith
+        (name: values: { inherit name values; })
+        [ { a = "x"; } { a = "y"; b = "z"; } ]
+      ```
+
+      evaluates to
+
+      ```
+      {
+        a = { name = "a"; values = [ "x" "y" ]; };
+        b = { name = "b"; values = [ "z" ]; };
+      }
+      ```
+    )",
+    .fun = prim_zipAttrsWith,
+});
+
 
 /*************************************************************
  * Lists
