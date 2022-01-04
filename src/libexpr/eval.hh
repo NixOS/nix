@@ -44,8 +44,6 @@ struct Env
 };
 
 
-Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
-
 void copyContext(const Value & v, PathSet & context);
 
 

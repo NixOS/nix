@@ -79,7 +79,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
         if (i.second[0] == 'E')
             state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
         else
-            mkString(*v, string(i.second, 1));
+            v->mkString(((std::string_view) i.second).substr(1));
         res.insert(state.symbols.create(i.first), v);
     }
     return res.finish();

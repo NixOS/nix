@@ -678,8 +678,8 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 static void setMetaFlag(EvalState & state, DrvInfo & drv,
     const string & name, const string & value)
 {
-    Value * v = state.allocValue();
-    mkString(*v, value.c_str());
+    auto v = state.allocValue();
+    v->mkString(value);
     drv.setMeta(name, v);
 }
 

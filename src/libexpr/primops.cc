@@ -1285,7 +1285,7 @@ static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
    ‘out’. */
 static void prim_placeholder(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkString(v, hashPlaceholder(state.forceStringNoCtx(*args[0], pos)));
+    v.mkString(hashPlaceholder(state.forceStringNoCtx(*args[0], pos)));
 }
 
 static RegisterPrimOp primop_placeholder({
@@ -1310,7 +1310,7 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    mkString(v, canonPath(path), context);
+    v.mkString(canonPath(path), context);
 }
 
 static RegisterPrimOp primop_toPath({
@@ -1354,7 +1354,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(state.store->printStorePath(path2));
-    mkString(v, path, context);
+    v.mkString(path, context);
 }
 
 static RegisterPrimOp primop_storePath({
@@ -1420,7 +1420,7 @@ static RegisterPrimOp primop_pathExists({
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
+    v.mkString(baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
 }
 
 static RegisterPrimOp primop_baseNameOf({
@@ -1441,7 +1441,7 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
 {
     PathSet context;
     Path dir = dirOf(state.coerceToString(pos, *args[0], context, false, false));
-    if (args[0]->type() == nPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
+    if (args[0]->type() == nPath) mkPath(v, dir.c_str()); else v.mkString(dir, context);
 }
 
 static RegisterPrimOp primop_dirOf({
@@ -1470,7 +1470,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     string s = readFile(path);
     if (s.find((char) 0) != string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
-    mkString(v, s.c_str());
+    v.mkString(s);
 }
 
 static RegisterPrimOp primop_readFile({
@@ -1549,7 +1549,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
         throw EvalError("cannot read '%s' since path '%s' is not valid, at %s", path, e.path, pos);
     }
 
-    mkString(v, hashFile(*ht, path).to_string(Base16, false));
+    v.mkString(hashFile(*ht, path).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1626,7 +1626,7 @@ static void prim_toXML(EvalState & state, const Pos & pos, Value * * args, Value
     std::ostringstream out;
     PathSet context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    mkString(v, out.str(), context);
+    v.mkString(out.str(), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -1734,7 +1734,7 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
     std::ostringstream out;
     PathSet context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    mkString(v, out.str(), context);
+    v.mkString(out.str(), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -1808,7 +1808,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
-    mkString(v, storePath, {storePath});
+    v.mkString(storePath, {storePath});
 }
 
 static RegisterPrimOp primop_toFile({
@@ -1925,10 +1925,10 @@ static void addPath(
             /* Call the filter function.  The first argument is the path,
                the second is a string indicating the type of the file. */
             Value arg1;
-            mkString(arg1, path);
+            arg1.mkString(path);
 
             Value arg2;
-            mkString(arg2,
+            arg2.mkString(
                 S_ISREG(st.st_mode) ? "regular" :
                 S_ISDIR(st.st_mode) ? "directory" :
                 S_ISLNK(st.st_mode) ? "symlink" :
@@ -1955,7 +1955,7 @@ static void addPath(
         } else
             dstPath = state.store->printStorePath(*expectedStorePath);
 
-        mkString(v, dstPath, {dstPath});
+        v.mkString(dstPath, {dstPath});
 
         state.allowPath(dstPath);
 
@@ -3303,7 +3303,7 @@ static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Va
 {
     PathSet context;
     string s = state.coerceToString(pos, *args[0], context, true, false);
-    mkString(v, s, context);
+    v.mkString(s, context);
 }
 
 static RegisterPrimOp primop_toString({
@@ -3347,7 +3347,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
             .errPos = pos
         });
 
-    mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
+    v.mkString((unsigned int) start >= s.size() ? "" : string(s, start, len), context);
 }
 
 static RegisterPrimOp primop_substring({
@@ -3401,7 +3401,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(*ht, s).to_string(Base16, false));
+    v.mkString(hashString(*ht, s).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({
@@ -3451,7 +3451,7 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
             if (!match[i+1].matched)
                 mkNull(*(v.listElems()[i] = state.allocValue()));
             else
-                mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
+                (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
     } catch (std::regex_error &e) {
@@ -3526,7 +3526,6 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
         const size_t len = std::distance(begin, end);
         state.mkList(v, 2 * len + 1);
         size_t idx = 0;
-        Value * elem;
 
         if (len == 0) {
             v.listElems()[idx++] = args[1];
@@ -3538,12 +3537,11 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
             std::smatch match = *i;
 
             // Add a string for non-matched characters.
-            elem = v.listElems()[idx++] = state.allocValue();
-            mkString(*elem, match.prefix().str().c_str());
+            (v.listElems()[idx++] = state.allocValue())->mkString(match.prefix().str());
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
-            elem = v.listElems()[idx++] = state.allocValue();
+            auto elem = v.listElems()[idx++] = state.allocValue();
 
             // Start at 1, beacause the first match is the whole string.
             state.mkList(*elem, slen);
@@ -3551,15 +3549,14 @@ static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value
                 if (!match[si + 1].matched)
                     mkNull(*(elem->listElems()[si] = state.allocValue()));
                 else
-                    mkString(*(elem->listElems()[si] = state.allocValue()), match[si + 1].str().c_str());
+                    (elem->listElems()[si] = state.allocValue())->mkString(match[si + 1].str());
             }
 
             // Add a string for non-matched suffix characters.
-            if (idx == 2 * len) {
-                elem = v.listElems()[idx++] = state.allocValue();
-                mkString(*elem, match.suffix().str().c_str());
-            }
+            if (idx == 2 * len)
+                (v.listElems()[idx++] = state.allocValue())->mkString(match.suffix().str());
         }
+
         assert(idx == 2 * len + 1);
 
     } catch (std::regex_error &e) {
@@ -3631,7 +3628,7 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
         res += state.coerceToString(pos, *elem, context);
     }
 
-    mkString(v, res, context);
+    v.mkString(res, context);
 }
 
 static RegisterPrimOp primop_concatStringsSep({
@@ -3700,7 +3697,7 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
         }
     }
 
-    mkString(v, res, context);
+    v.mkString(res, context);
 }
 
 static RegisterPrimOp primop_replaceStrings({
@@ -3781,11 +3778,8 @@ static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args
         components.emplace_back(std::move(component));
     }
     state.mkList(v, components.size());
-    unsigned int n = 0;
-    for (auto & component : components) {
-        auto listElem = v.listElems()[n++] = state.allocValue();
-        mkString(*listElem, std::move(component));
-    }
+    for (const auto & [n, component] : enumerate(components))
+        (v.listElems()[n] = state.allocValue())->mkString(std::move(component));
 }
 
 static RegisterPrimOp primop_splitVersion({
@@ -3851,14 +3845,14 @@ void EvalState::createBaseEnv()
         mkInt(v, time(0));
         addConstant("__currentTime", v);
 
-        mkString(v, settings.thisSystem.get());
+        v.mkString(settings.thisSystem.get());
         addConstant("__currentSystem", v);
     }
 
-    mkString(v, nixVersion);
+    v.mkString(nixVersion);
     addConstant("__nixVersion", v);
 
-    mkString(v, store->storeDir);
+    v.mkString(store->storeDir);
     addConstant("__storeDir", v);
 
     /* Language version.  This should be increased every time a new

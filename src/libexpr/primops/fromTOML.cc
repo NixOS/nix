@@ -52,7 +52,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 mkFloat(v, toml::get<NixFloat>(t));
                 break;;
             case toml::value_t::string:
-                mkString(v, toml::get<std::string>(t));
+                v.mkString(toml::get<std::string>(t));
                 break;;
             case toml::value_t::local_datetime:
             case toml::value_t::offset_datetime:

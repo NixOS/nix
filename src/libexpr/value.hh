@@ -424,9 +424,6 @@ static inline void mkString(Value & v, const Symbol & s)
 }
 
 
-void mkString(Value & v, const char * s);
-
-
 void mkPath(Value & v, const char * s);
 
 

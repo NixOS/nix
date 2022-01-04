@@ -113,8 +113,11 @@ public:
 
     bool string(string_t & val)
     {
-        return handle_value<void(Value&, const char*)>(mkString, val.c_str());
+        rs->value(state).mkString(val);
+        rs->add();
+        return true;
     }
+
 #if NLOHMANN_JSON_VERSION_MAJOR >= 3 && NLOHMANN_JSON_VERSION_MINOR >= 8
     bool binary(binary_t&)
     {

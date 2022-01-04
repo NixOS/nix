@@ -247,7 +247,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     state.allowPath(storePath);
 
     auto path = state.store->printStorePath(storePath);
-    mkString(v, path, PathSet({path}));
+    v.mkString(path, PathSet({path}));
 }
 
 static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)

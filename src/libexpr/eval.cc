@@ -766,22 +766,9 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 }
 
 
-void mkString(Value & v, const char * s)
-{
-    v.mkString(dupString(s));
-}
-
-
 void Value::mkString(std::string_view s)
 {
     mkString(dupStringWithLen(s.data(), s.size()));
-}
-
-
-Value & mkString(Value & v, std::string_view s, const PathSet & context)
-{
-    v.mkString(s, context);
-    return v;
 }
 
 

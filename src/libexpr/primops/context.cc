@@ -7,8 +7,7 @@ namespace nix {
 static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    mkString(v, s, PathSet());
+    v.mkString(state.coerceToString(pos, *args[0], context));
 }
 
 static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
@@ -39,7 +38,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
     for (auto & p : context)
         context2.insert(p.at(0) == '=' ? string(p, 1) : p);
 
-    mkString(v, s, context2);
+    v.mkString(s, context2);
 }
 
 static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
@@ -186,7 +185,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
         }
     }
 
-    mkString(v, orig, context);
+    v.mkString(orig, context);
 }
 
 static RegisterPrimOp primop_appendContext("__appendContext", 2, prim_appendContext);
