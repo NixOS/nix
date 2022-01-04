@@ -145,7 +145,7 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << v.fpoint;
         break;
     default:
-        throw Error("invalid value");
+        abort();
     }
 
     active.erase(&v);
@@ -1065,8 +1065,8 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
-    Env *dynamicEnv = &env;
+    v.mkAttrs(state.buildBindings(attrs.size() + dynamicAttrs.size()).finish());
+    auto dynamicEnv = &env;
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
@@ -1592,7 +1592,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
+    auto attrs = state.buildBindings(v1.attrs->size() + v2.attrs->size());
 
     /* Merge the sets, preferring values from the second set.  Make
        sure to keep the resulting vector in sorted order. */
@@ -1601,17 +1601,19 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
     while (i != v1.attrs->end() && j != v2.attrs->end()) {
         if (i->name == j->name) {
-            v.attrs->push_back(*j);
+            attrs.insert(*j);
             ++i; ++j;
         }
         else if (i->name < j->name)
-            v.attrs->push_back(*i++);
+            attrs.insert(*i++);
         else
-            v.attrs->push_back(*j++);
+            attrs.insert(*j++);
     }
 
-    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
-    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    while (i != v1.attrs->end()) attrs.insert(*i++);
+    while (j != v2.attrs->end()) attrs.insert(*j++);
+
+    v.mkAttrs(attrs.alreadySorted());
 
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }

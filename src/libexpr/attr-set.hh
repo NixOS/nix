@@ -118,13 +118,14 @@ public:
    call finish(), which sorts the bindings. */
 class BindingsBuilder
 {
-    EvalState & state;
     Bindings * bindings;
 
 public:
 
+    EvalState & state;
+
     BindingsBuilder(EvalState & state, Bindings * bindings)
-        : state(state), bindings(bindings)
+        : bindings(bindings), state(state)
     { }
 
     void insert(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
@@ -144,6 +145,11 @@ public:
     Bindings * finish()
     {
         bindings->sort();
+        return bindings;
+    }
+
+    Bindings * alreadySorted()
+    {
         return bindings;
     }
 };

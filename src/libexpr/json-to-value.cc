@@ -37,10 +37,10 @@ class JSONSax : nlohmann::json_sax<json> {
         ValueMap attrs;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            Value & v = parent->value(state);
-            state.mkAttrs(v, attrs.size());
+            auto attrs2 = state.buildBindings(attrs.size());
             for (auto & i : attrs)
-                v.attrs->push_back(Attr(i.first, i.second));
+                attrs2.insert(i.first, i.second);
+            parent->value(state).mkAttrs(attrs2.alreadySorted());
             return std::move(parent);
         }
         void add() override { v = nullptr; }

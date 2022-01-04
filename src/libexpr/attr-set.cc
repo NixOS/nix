@@ -7,6 +7,7 @@
 namespace nix {
 
 
+
 /* Allocate a new array of attributes for an attribute set with a specific
    capacity. The space is implicitly reserved after the Bindings
    structure. */
@@ -16,15 +17,9 @@ Bindings * EvalState::allocBindings(size_t capacity)
         return &emptyBindings;
     if (capacity > std::numeric_limits<Bindings::size_t>::max())
         throw Error("attribute set of size %d is too big", capacity);
-    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
-}
-
-
-void EvalState::mkAttrs(Value & v, size_t capacity)
-{
-    v.mkAttrs(allocBindings(capacity));
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;
+    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
 }
 
 
@@ -67,9 +62,7 @@ void Bindings::sort()
 
 Value & Value::mkAttrs(BindingsBuilder & bindings)
 {
-    clearValue();
-    internalType = tAttrs;
-    attrs = bindings.finish();
+    mkAttrs(bindings.finish());
     return *this;
 }
 

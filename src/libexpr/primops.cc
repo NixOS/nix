@@ -2274,11 +2274,12 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
-    state.mkAttrs(v, args[0]->attrs->size());
+    auto attrs = state.buildBindings(args[0]->attrs->size());
     for (auto & i : *args[0]->attrs) {
         if (!names.count(i.name))
-            v.attrs->push_back(i);
+            attrs.insert(i);
     }
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_removeAttrs({
@@ -2369,13 +2370,15 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
     state.forceAttrs(*args[0], pos);
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
+    auto attrs = state.buildBindings(std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
     for (auto & i : *args[0]->attrs) {
         Bindings::iterator j = args[1]->attrs->find(i.name);
         if (j != args[1]->attrs->end())
-            v.attrs->push_back(*j);
+            attrs.insert(*j);
     }
+
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_intersectAttrs({
@@ -2429,7 +2432,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 {
     state.forceValue(*args[0], pos);
     if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
-        state.mkAttrs(v, 0);
+        v.mkAttrs(&state.emptyBindings);
         return;
     }
     if (!args[0]->isLambda())
@@ -2439,7 +2442,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
         });
 
     if (!args[0]->lambda.fun->hasFormals()) {
-        state.mkAttrs(v, 0);
+        v.mkAttrs(&state.emptyBindings);
         return;
     }
 
@@ -2472,15 +2475,17 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, args[1]->attrs->size());
+    auto attrs = state.buildBindings(args[1]->attrs->size());
 
     for (auto & i : *args[1]->attrs) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
         vName->mkString(i.name);
         vFun2->mkApp(args[0], vName);
-        state.allocAttr(v, i.name)->mkApp(vFun2, i.value);
+        attrs.alloc(i.name).mkApp(vFun2, i.value);
     }
+
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_mapAttrs({
@@ -2526,12 +2531,13 @@ static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args
         }
     }
 
-    state.mkAttrs(v, attrsSeen.size());
+    auto attrs = state.buildBindings(attrsSeen.size());
     for (auto & [sym, elem] : attrsSeen) {
-        Value * list = state.allocAttr(v, sym);
-        state.mkList(*list, elem.first);
-        elem.second = list->listElems();
+        auto & list = attrs.alloc(sym);
+        state.mkList(list, elem.first);
+        elem.second = list.listElems();
     }
+    v.mkAttrs(attrs.alreadySorted());
 
     for (unsigned int n = 0; n < listSize; ++n) {
         Value * vElem = listElems[n];
@@ -3054,14 +3060,16 @@ static void prim_groupBy(EvalState & state, const Pos & pos, Value * * args, Val
         vector->second.push_back(vElem);
     }
 
-    state.mkAttrs(v, attrs.size());
+    auto attrs2 = state.buildBindings(attrs.size());
 
     for (auto & i : attrs) {
-        Value * list = state.allocAttr(v, i.first);
+        auto & list = attrs2.alloc(i.first);
         auto size = i.second.size();
-        state.mkList(*list, size);
-        memcpy(list->listElems(), i.second.data(), sizeof(Value *) * size);
+        state.mkList(list, size);
+        memcpy(list.listElems(), i.second.data(), sizeof(Value *) * size);
     }
+
+    v.mkAttrs(attrs2.alreadySorted());
 }
 
 static RegisterPrimOp primop_groupBy({
@@ -3829,7 +3837,7 @@ void EvalState::createBaseEnv()
     Value v;
 
     /* `builtins' must be first! */
-    mkAttrs(v, 128);
+    v.mkAttrs(buildBindings(128).finish());
     addConstant("builtins", v);
 
     v.mkBool(true);
