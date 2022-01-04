@@ -68,7 +68,13 @@ extern std::function<void(const Error & error, const Env & env, const Expr & exp
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
-        evalState = std::make_shared<EvalState>(searchPath, getEvalStore(), getStore());
+        evalState =
+#if HAVE_BOEHMGC
+            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+#else
+            std::make_shared<EvalState>(
+#endif
+                searchPath, getEvalStore(), getStore());
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env, const Expr & expr) {
                 printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
@@ -94,18 +100,6 @@ ref<Store> EvalCommand::getEvalStore()
     if (!evalStore)
         evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
     return ref<Store>(evalStore);
-}
-
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState) evalState =
-#if HAVE_BOEHMGC
-        std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-#else
-        std::make_shared<EvalState>(
-#endif
-            searchPath, getEvalStore(), getStore());
-    return ref<EvalState>(evalState);
 }
 
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)

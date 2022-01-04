@@ -435,7 +435,7 @@ bool NixRepl::processLine(string line)
              << "  :u <expr>     Build derivation, then start nix-shell\n"
              << "  :doc <expr>   Show documentation of a builtin function\n"
              << "  :log <expr>   Show logs for a derivation\n"
-             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n";
+             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n"
              << "  :d <cmd>      Debug mode commands\n"
              << "  :d stack      Show call stack\n"
              << "  :d env        Show env stack\n"
@@ -730,12 +730,12 @@ void NixRepl::addAttrsToScope(Value & attrs)
         throw Error("environment full; cannot add more variables");
 
     for (auto & i : *attrs.attrs) {
-        staticEnv.vars.emplace_back(i.name, displ);
+        staticEnv->vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
         varNames.insert((string) i.name);
     }
-    staticEnv.sort();
-    staticEnv.deduplicate();
+    staticEnv->sort();
+    staticEnv->deduplicate();
     notice("Added %1% variables.", attrs.attrs->size());
 }
 
