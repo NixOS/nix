@@ -1151,14 +1151,14 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
-        std::unique_ptr<DebugTraceStacker> dts =
+        auto dts =
             debuggerHook ?
                 makeDebugTraceStacker(
                     *this,
                     *e,
                     (e->getPos() ? std::optional(ErrPos(*e->getPos())) : std::nullopt),
                     "while evaluating the file '%1%':", resolvedPath)
-                : std::unique_ptr<DebugTraceStacker>();
+                : nullptr;
 
         // Enforce that 'flake.nix' is a direct attrset, not a
         // computation.
@@ -1384,7 +1384,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
-        std::unique_ptr<DebugTraceStacker> dts =
+        auto dts =
           debuggerHook ?
               makeDebugTraceStacker(
                   state,
@@ -1392,7 +1392,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                   *pos2,
                   "while evaluating the attribute '%1%'",
                   showAttrPath(state, env, attrPath))
-          : std::unique_ptr<DebugTraceStacker>();
+          : nullptr;
 
         for (auto & i : attrPath) {
             state.nrLookups++;
@@ -1536,14 +1536,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             /* Evaluate the body. */
             try {
-                std::unique_ptr<DebugTraceStacker> dts =
+                auto dts =
                     debuggerHook ?
                         makeDebugTraceStacker(*this, *lambda.body, lambda.pos,
                                            "while evaluating %s",
                                            (lambda.name.set()
                                                ? "'" + (string) lambda.name + "'"
                                                : "anonymous lambda"))
-                        : std::unique_ptr<DebugTraceStacker>();
+                        : nullptr;
 
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
@@ -1939,14 +1939,14 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs)
                 try {
 
-                    std::unique_ptr<DebugTraceStacker> dts =
+                    auto dts =
                       debuggerHook ?
                           // if the value is a thunk, we're evaling.  otherwise no trace necessary.
                           (i.value->isThunk() ? 
                               makeDebugTraceStacker(*this, *v.thunk.expr, *i.pos,
                                                 "while evaluating the attribute '%1%'", i.name)
-                              : std::unique_ptr<DebugTraceStacker>())
-                      : std::unique_ptr<DebugTraceStacker>();
+                              : nullptr)
+                      : nullptr;
 
                     recurse(*i.value);
                 } catch (Error & e) {
