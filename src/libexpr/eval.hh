@@ -133,11 +133,13 @@ private:
     /* Cache used by prim_match(). */
     std::shared_ptr<RegexCache> regexCache;
 
+#if HAVE_BOEHMGC
     /* Allocation cache for GC'd Value objects. */
     std::shared_ptr<void *> valueAllocCache;
 
     /* Allocation cache for size-1 Env objects. */
     std::shared_ptr<void *> env1AllocCache;
+#endif
 
 public:
 
