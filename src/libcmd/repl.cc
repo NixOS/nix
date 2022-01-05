@@ -444,7 +444,6 @@ bool NixRepl::processLine(string line)
 
     else if (command == ":d" || command == ":debug") {
         if (arg == "stack") {
-            std::cout << "eval stack:" << std::endl;
             for (auto iter = this->state->debugTraces.begin();
                  iter !=  this->state->debugTraces.end(); ++iter) {
                   std::cout << "\n" << "… " << iter->hint.str() << "\n";
@@ -463,7 +462,6 @@ bool NixRepl::processLine(string line)
                   }
               }                   
         } else if (arg == "env") {
-            std::cout << "env stack:" << std::endl;
             auto iter = this->state->debugTraces.begin();
             if (iter != this->state->debugTraces.end()) {
                printStaticEnvBindings(iter->expr);

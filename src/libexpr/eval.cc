@@ -679,12 +679,15 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 void printStaticEnvBindings(const StaticEnv &se, int lvl)
 {
     std::cout << "Env level " << lvl << std::endl;
-  
+
     if (se.up) {
+        std::cout << ANSI_MAGENTA;
         for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
         {
           std::cout << i->first << " ";
         }
+        std::cout << ANSI_NORMAL;
+
         std::cout << std::endl;
         std::cout << std::endl;
 
@@ -692,12 +695,14 @@ void printStaticEnvBindings(const StaticEnv &se, int lvl)
     }
     else 
     {
+        std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones; they are in builtins.
         for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
         {
             if (((string)i->first).substr(0,2) != "__")
                 std::cout << i->first << " ";
         }
+        std::cout << ANSI_NORMAL;
         std::cout << std::endl;
         std::cout << std::endl;
 
