@@ -682,7 +682,7 @@ void callFlake(EvalState & state,
     auto vTmp1 = state.allocValue();
     auto vTmp2 = state.allocValue();
 
-    mkString(*vLocks, lockedFlake.lockFile.to_string());
+    vLocks->mkString(lockedFlake.lockFile.to_string());
 
     emitTreeAttrs(
         state,
@@ -692,7 +692,7 @@ void callFlake(EvalState & state,
         false,
         lockedFlake.flake.forceDirty);
 
-    mkString(*vRootSubdir, lockedFlake.flake.lockedRef.subdir);
+    vRootSubdir->mkString(lockedFlake.flake.lockedRef.subdir);
 
     if (!state.vCallFlake) {
         state.vCallFlake = allocRootValue(state.allocValue());

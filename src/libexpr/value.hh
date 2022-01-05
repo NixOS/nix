@@ -10,6 +10,8 @@
 
 namespace nix {
 
+class BindingsBuilder;
+
 
 typedef enum {
     tInt = 1,
@@ -235,12 +237,23 @@ public:
         string.context = context;
     }
 
+    void mkString(std::string_view s);
+
+    void mkString(std::string_view s, const PathSet & context);
+
+    inline void mkString(const Symbol & s)
+    {
+        mkString(((const std::string &) s).c_str());
+    }
+
     inline void mkPath(const char * s)
     {
         clearValue();
         internalType = tPath;
         path = s;
     }
+
+    void mkPath(std::string_view s);
 
     inline void mkNull()
     {
@@ -254,6 +267,8 @@ public:
         internalType = tAttrs;
         attrs = a;
     }
+
+    Value & mkAttrs(BindingsBuilder & bindings);
 
     inline void mkList(size_t size)
     {
@@ -381,45 +396,6 @@ public:
         return ConstListIterable { begin, begin + listSize() };
     }
 };
-
-
-
-// TODO: Remove these static functions, replace call sites with v.mk* instead
-static inline void mkInt(Value & v, NixInt n)
-{
-    v.mkInt(n);
-}
-
-static inline void mkFloat(Value & v, NixFloat n)
-{
-    v.mkFloat(n);
-}
-
-static inline void mkBool(Value & v, bool b)
-{
-    v.mkBool(b);
-}
-
-static inline void mkNull(Value & v)
-{
-    v.mkNull();
-}
-
-static inline void mkApp(Value & v, Value & left, Value & right)
-{
-    v.mkApp(&left, &right);
-}
-
-static inline void mkString(Value & v, const Symbol & s)
-{
-    v.mkString(((const string &) s).c_str());
-}
-
-
-void mkString(Value & v, const char * s);
-
-
-void mkPath(Value & v, const char * s);
 
 
 #if HAVE_BOEHMGC

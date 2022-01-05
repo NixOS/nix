@@ -258,13 +258,10 @@ static void main_nix_build(int argc, char * * argv)
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     if (runEnv) {
-        auto newArgs = state->allocBindings(autoArgs->size() + 1);
-        auto tru = state->allocValue();
-        mkBool(*tru, true);
-        newArgs->push_back(Attr(state->symbols.create("inNixShell"), tru));
-        for (auto & i : *autoArgs) newArgs->push_back(i);
-        newArgs->sort();
-        autoArgs = newArgs;
+        auto newArgs = state->buildBindings(autoArgs->size() + 1);
+        newArgs.alloc("inNixShell").mkBool(true);
+        for (auto & i : *autoArgs) newArgs.insert(i);
+        autoArgs = newArgs.finish();
     }
 
     if (packages) {

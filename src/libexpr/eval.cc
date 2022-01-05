@@ -145,7 +145,7 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << v.fpoint;
         break;
     default:
-        throw Error("invalid value");
+        abort();
     }
 
     active.erase(&v);
@@ -413,6 +413,7 @@ EvalState::EvalState(
     , sSelf(symbols.create("self"))
     , sEpsilon(symbols.create(""))
     , repair(NoRepair)
+    , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
@@ -453,8 +454,6 @@ EvalState::EvalState(
                 allowPath(r.second);
         }
     }
-
-    vEmptySet.mkAttrs(allocBindings(0));
 
     createBaseEnv();
 }
@@ -613,7 +612,7 @@ Value * EvalState::addPrimOp(const string & name,
         auto vPrimOp = allocValue();
         vPrimOp->mkPrimOp(new PrimOp { .fun = primOp, .arity = 1, .name = sym });
         Value v;
-        mkApp(v, *vPrimOp, *vPrimOp);
+        v.mkApp(vPrimOp, vPrimOp);
         return addConstant(name, v);
     }
 
@@ -635,7 +634,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         auto vPrimOp = allocValue();
         vPrimOp->mkPrimOp(new PrimOp(std::move(primOp)));
         Value v;
-        mkApp(v, *vPrimOp, *vPrimOp);
+        v.mkApp(vPrimOp, vPrimOp);
         return addConstant(primOp.name, v);
     }
 
@@ -766,30 +765,29 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 }
 
 
-void mkString(Value & v, const char * s)
+void Value::mkString(std::string_view s)
 {
-    v.mkString(dupString(s));
+    mkString(dupStringWithLen(s.data(), s.size()));
 }
 
 
-Value & mkString(Value & v, std::string_view s, const PathSet & context)
+void Value::mkString(std::string_view s, const PathSet & context)
 {
-    v.mkString(dupStringWithLen(s.data(), s.size()));
+    mkString(s);
     if (!context.empty()) {
         size_t n = 0;
-        v.string.context = (const char * *)
+        string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
-            v.string.context[n++] = dupString(i.c_str());
-        v.string.context[n] = 0;
+            string.context[n++] = dupString(i.c_str());
+        string.context[n] = 0;
     }
-    return v;
 }
 
 
-void mkPath(Value & v, const char * s)
+void Value::mkPath(std::string_view s)
 {
-    v.mkPath(dupString(s));
+    mkPath(dupStringWithLen(s.data(), s.size()));
 }
 
 
@@ -882,13 +880,13 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, ptr<Pos> pos)
 {
     if (pos->file.set()) {
-        mkAttrs(v, 3);
-        mkString(*allocAttr(v, sFile), pos->file);
-        mkInt(*allocAttr(v, sLine), pos->line);
-        mkInt(*allocAttr(v, sColumn), pos->column);
-        v.attrs->sort();
+        auto attrs = buildBindings(3);
+        attrs.alloc(sFile).mkString(pos->file);
+        attrs.alloc(sLine).mkInt(pos->line);
+        attrs.alloc(sColumn).mkInt(pos->column);
+        v.mkAttrs(attrs);
     } else
-        mkNull(v);
+        v.mkNull();
 }
 
 
@@ -1067,8 +1065,8 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
-    Env *dynamicEnv = &env;
+    v.mkAttrs(state.buildBindings(attrs.size() + dynamicAttrs.size()).finish());
+    auto dynamicEnv = &env;
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
@@ -1259,14 +1257,14 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
         if (vAttrs->type() != nAttrs ||
             (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
-            mkBool(v, false);
+            v.mkBool(false);
             return;
         } else {
             vAttrs = j->value;
         }
     }
 
-    mkBool(v, true);
+    v.mkBool(true);
 }
 
 
@@ -1341,7 +1339,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
+                        if (!lambda.formals->argNames.count(i.name))
                             throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
                     abort(); // can't happen
                 }
@@ -1484,22 +1482,20 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         return;
     }
 
-    Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda.fun->formals->formals.size()), args.size()));
 
     if (fun.lambda.fun->formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
-        for (auto& v : args) {
-            actualArgs->attrs->push_back(v);
-        }
+        for (auto & v : args)
+            attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
         for (auto & i : fun.lambda.fun->formals->formals) {
             Bindings::iterator j = args.find(i.name);
             if (j != args.end()) {
-                actualArgs->attrs->push_back(*j);
+                attrs.insert(*j);
             } else if (!i.def) {
                 throwMissingArgumentError(i.pos, R"(cannot evaluate a function that has an argument without a value ('%1%')
 
@@ -1512,9 +1508,7 @@ https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
         }
     }
 
-    actualArgs->attrs->sort();
-
-    callFunction(fun, *actualArgs, res, noPos);
+    callFunction(fun, allocValue()->mkAttrs(attrs), res, noPos);
 }
 
 
@@ -1549,7 +1543,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e));
+    v.mkBool(!state.evalBool(env, e));
 }
 
 
@@ -1557,7 +1551,7 @@ void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    mkBool(v, state.eqValues(v1, v2));
+    v.mkBool(state.eqValues(v1, v2));
 }
 
 
@@ -1565,25 +1559,25 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    mkBool(v, !state.eqValues(v1, v2));
+    v.mkBool(!state.eqValues(v1, v2));
 }
 
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
+    v.mkBool(state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.mkBool(state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.mkBool(!state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
@@ -1598,7 +1592,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
+    auto attrs = state.buildBindings(v1.attrs->size() + v2.attrs->size());
 
     /* Merge the sets, preferring values from the second set.  Make
        sure to keep the resulting vector in sorted order. */
@@ -1607,17 +1601,19 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
     while (i != v1.attrs->end() && j != v2.attrs->end()) {
         if (i->name == j->name) {
-            v.attrs->push_back(*j);
+            attrs.insert(*j);
             ++i; ++j;
         }
         else if (i->name < j->name)
-            v.attrs->push_back(*i++);
+            attrs.insert(*i++);
         else
-            v.attrs->push_back(*j++);
+            attrs.insert(*j++);
     }
 
-    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
-    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    while (i != v1.attrs->end()) attrs.insert(*i++);
+    while (j != v2.attrs->end()) attrs.insert(*j++);
+
+    v.mkAttrs(attrs.alreadySorted());
 
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
@@ -1710,16 +1706,15 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     }
 
     if (firstType == nInt)
-        mkInt(v, n);
+        v.mkInt(n);
     else if (firstType == nFloat)
-        mkFloat(v, nf);
+        v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
             throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
-        auto path = canonPath(s.str());
-        mkPath(v, path.c_str());
+        v.mkPath(canonPath(s.str()));
     } else
-        mkString(v, s.str(), context);
+        v.mkString(s.str(), context);
 }
 
 

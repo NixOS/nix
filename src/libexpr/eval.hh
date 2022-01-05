@@ -44,8 +44,6 @@ struct Env
 };
 
 
-Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
-
 void copyContext(const Value & v, PathSet & context);
 
 
@@ -93,7 +91,7 @@ public:
        mode. */
     std::optional<PathSet> allowedPaths;
 
-    Value vEmptySet;
+    Bindings emptyBindings;
 
     /* Store used to materialise .drv files. */
     const ref<Store> store;
@@ -339,12 +337,16 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
-    Value * allocAttr(Value & vAttrs, const std::string & name);
+    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
 
+    BindingsBuilder buildBindings(size_t capacity)
+    {
+        return BindingsBuilder(*this, allocBindings(capacity));
+    }
+
     void mkList(Value & v, size_t length);
-    void mkAttrs(Value & v, size_t capacity);
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, ptr<Pos> pos);
 
@@ -397,6 +399,8 @@ private:
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+    friend struct Value;
 };
 
 

@@ -24,15 +24,12 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                     size_t size = 0;
                     for (auto & i : table) { (void) i; size++; }
 
-                    state.mkAttrs(v, size);
+                    auto attrs = state.buildBindings(size);
 
-                    for(auto & elem: table) {
+                    for(auto & elem : table)
+                        visit(attrs.alloc(elem.first), elem.second);
 
-                        auto & v2 = *state.allocAttr(v, state.symbols.create(elem.first));
-                        visit(v2, elem.second);
-                    }
-
-                    v.attrs->sort();
+                    v.mkAttrs(attrs);
                 }
                 break;;
             case toml::value_t::array:
@@ -46,16 +43,16 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 }
                 break;;
             case toml::value_t::boolean:
-                mkBool(v, toml::get<bool>(t));
+                v.mkBool(toml::get<bool>(t));
                 break;;
             case toml::value_t::integer:
-                mkInt(v, toml::get<int64_t>(t));
+                v.mkInt(toml::get<int64_t>(t));
                 break;;
             case toml::value_t::floating:
-                mkFloat(v, toml::get<NixFloat>(t));
+                v.mkFloat(toml::get<NixFloat>(t));
                 break;;
             case toml::value_t::string:
-                mkString(v, toml::get<std::string>(t));
+                v.mkString(toml::get<std::string>(t));
                 break;;
             case toml::value_t::local_datetime:
             case toml::value_t::offset_datetime:
@@ -65,7 +62,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
                 throw std::runtime_error("Dates and times are not supported");
                 break;;
             case toml::value_t::empty:
-                mkNull(v);
+                v.mkNull();
                 break;;
 
         }

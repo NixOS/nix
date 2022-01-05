@@ -254,15 +254,14 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
 void DrvInfo::setMeta(const string & name, Value * v)
 {
     getMeta();
-    Bindings * old = meta;
-    meta = state->allocBindings(1 + (old ? old->size() : 0));
+    auto attrs = state->buildBindings(1 + (meta ? meta->size() : 0));
     Symbol sym = state->symbols.create(name);
-    if (old)
-        for (auto i : *old)
+    if (meta)
+        for (auto i : *meta)
             if (i.name != sym)
-                meta->push_back(i);
-    if (v) meta->push_back(Attr(sym, v));
-    meta->sort();
+                attrs.insert(i);
+    if (v) attrs.insert(sym, v);
+    meta = attrs.finish();
 }
 
 

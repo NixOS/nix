@@ -50,7 +50,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     StorePathSet references;
     Value manifest;
     state.mkList(manifest, elems.size());
-    unsigned int n = 0;
+    size_t n = 0;
     for (auto & i : elems) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
@@ -59,28 +59,25 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         DrvInfo::Outputs outputs = i.queryOutputs(true);
         StringSet metaNames = i.queryMetaNames();
 
-        Value & v(*state.allocValue());
-        manifest.listElems()[n++] = &v;
-        state.mkAttrs(v, 7 + outputs.size());
+        auto attrs = state.buildBindings(7 + outputs.size());
 
-        mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.queryName());
+        attrs.alloc(state.sType).mkString("derivation");
+        attrs.alloc(state.sName).mkString(i.queryName());
         auto system = i.querySystem();
         if (!system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), system);
-        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
+            attrs.alloc(state.sSystem).mkString(system);
+        attrs.alloc(state.sOutPath).mkString(i.queryOutPath());
         if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
+            attrs.alloc(state.sDrvPath).mkString(i.queryDrvPath());
 
         // Copy each output meant for installation.
-        Value & vOutputs = *state.allocAttr(v, state.sOutputs);
+        auto & vOutputs = attrs.alloc(state.sOutputs);
         state.mkList(vOutputs, outputs.size());
-        unsigned int m = 0;
-        for (auto & j : outputs) {
-            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
-            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
-            state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
+        for (const auto & [m, j] : enumerate(outputs)) {
+            (vOutputs.listElems()[m] = state.allocValue())->mkString(j.first);
+            auto outputAttrs = state.buildBindings(2);
+            outputAttrs.alloc(state.sOutPath).mkString(j.second);
+            attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
@@ -91,15 +88,16 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         // Copy the meta attributes.
-        Value & vMeta = *state.allocAttr(v, state.sMeta);
-        state.mkAttrs(vMeta, metaNames.size());
+        auto meta = state.buildBindings(metaNames.size());
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            meta.insert(state.symbols.create(j), v);
         }
-        vMeta.attrs->sort();
-        v.attrs->sort();
+
+        attrs.alloc(state.sMeta).mkAttrs(meta);
+
+        (manifest.listElems()[n++] = state.allocValue())->mkAttrs(attrs);
 
         if (drvPath != "") references.insert(state.store->parseStorePath(drvPath));
     }
@@ -118,13 +116,16 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
-    Value args, topLevel;
-    state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
-        state.store->printStorePath(manifestFile), {state.store->printStorePath(manifestFile)});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
-    args.attrs->sort();
-    mkApp(topLevel, envBuilder, args);
+    auto attrs = state.buildBindings(3);
+    attrs.alloc("manifest").mkString(
+        state.store->printStorePath(manifestFile),
+        {state.store->printStorePath(manifestFile)});
+    attrs.insert(state.symbols.create("derivations"), &manifest);
+    Value args;
+    args.mkAttrs(attrs);
+
+    Value topLevel;
+    topLevel.mkApp(&envBuilder, &args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
