@@ -80,7 +80,7 @@ struct MercurialInputScheme : InputScheme
         parseURL(getStrAttr(attrs, "url"));
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (!std::regex_match(*ref, refRegex))
+            if (!std::regex_match(*ref, mercurialRefRegex))
                 throw BadURL("invalid Mercurial branch/tag name '%s'", *ref);
         }
 

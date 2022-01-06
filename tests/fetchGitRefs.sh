@@ -70,6 +70,7 @@ valid_ref "$(printf 'heads/fu\303\237')"
 valid_ref 'foo-bar-baz'
 valid_ref '$1'
 valid_ref 'foo.locke'
+valid_ref '`!@#$%&()-=_+{}/|;"<>.,áÁπ𐌀𠀡 😃⅜'
 
 invalid_ref 'refs///heads/foo'
 invalid_ref 'heads/foo/'
@@ -109,3 +110,4 @@ invalid_ref 'foo/*/*'
 invalid_ref '*/foo/*'
 invalid_ref '/foo'
 invalid_ref ''
+invalid_ref 'foo bar'

@@ -20,13 +20,9 @@ struct IndirectInputScheme : InputScheme
         } else if (path.size() == 2) {
             if (std::regex_match(path[1], revRegex))
                 rev = Hash::parseAny(path[1], htSHA1);
-            else if (std::regex_match(path[1], refRegex))
-                ref = path[1];
             else
-                throw BadURL("in flake URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[1]);
+                ref = path[1];
         } else if (path.size() == 3) {
-            if (!std::regex_match(path[1], refRegex))
-                throw BadURL("in flake URL '%s', '%s' is not a branch/tag name", url.url, path[1]);
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
                 throw BadURL("in flake URL '%s', '%s' is not a commit hash", url.url, path[2]);
