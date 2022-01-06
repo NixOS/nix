@@ -273,7 +273,7 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 static void printString(string & res, std::string_view s)
 {
     size_t bufSize = s.size() * 2 + 2;
-    withBuffer<void, char>(bufSize, [&](char buf[]) {
+    withBuffer(bufSize, [&](char *buf) {
         char * p = buf;
         *p++ = '"';
         for (auto c : s)

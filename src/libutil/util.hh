@@ -671,7 +671,10 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
-template<typename R = void, typename T = char> inline R withBuffer(size_t size, std::function<R (T[])> fun) {
+template<typename T = char, typename Fn>
+inline auto withBuffer(size_t size, Fn fun)
+  -> std::invoke_result_t<Fn, T *>
+{
     if (size < 0x10000) {
         T buf[size];
         return fun(buf);
