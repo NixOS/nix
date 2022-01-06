@@ -272,25 +272,19 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 
 static void printString(string & res, std::string_view s)
 {
-    char * buf;
     size_t bufSize = s.size() * 2 + 2;
-    std::unique_ptr<char[]> dynBuf;
-    if (bufSize < 0x10000) {
-        buf = (char *)alloca(bufSize);
-    } else {
-        dynBuf = decltype(dynBuf)(new char[bufSize]);
-        buf = dynBuf.get();
-    }
-    char * p = buf;
-    *p++ = '"';
-    for (auto c : s)
-        if (c == '\"' || c == '\\') { *p++ = '\\'; *p++ = c; }
-        else if (c == '\n') { *p++ = '\\'; *p++ = 'n'; }
-        else if (c == '\r') { *p++ = '\\'; *p++ = 'r'; }
-        else if (c == '\t') { *p++ = '\\'; *p++ = 't'; }
-        else *p++ = c;
-    *p++ = '"';
-    res.append(buf, p - buf);
+    withBuffer<void, char>(bufSize, [&](char buf[]) {
+        char * p = buf;
+        *p++ = '"';
+        for (auto c : s)
+            if (c == '\"' || c == '\\') { *p++ = '\\'; *p++ = c; }
+            else if (c == '\n') { *p++ = '\\'; *p++ = 'n'; }
+            else if (c == '\r') { *p++ = '\\'; *p++ = 'r'; }
+            else if (c == '\t') { *p++ = '\\'; *p++ = 't'; }
+            else *p++ = c;
+        *p++ = '"';
+        res.append(buf, p - buf);
+    });
 }
 
 

@@ -671,5 +671,14 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
+template<typename R = void, typename T = char> inline R withBuffer(size_t size, std::function<R (T[])> fun) {
+    if (size < 0x10000) {
+        T buf[size];
+        return fun(buf);
+    } else {
+        auto buf = std::unique_ptr<T[]>(new T[size]);
+        return fun(buf.get());
+    }
+}
 
 }
