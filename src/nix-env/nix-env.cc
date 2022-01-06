@@ -907,7 +907,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
+static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutPath)
 {
     JSONObject topObj(cout, true);
     for (auto & i : elems) {
@@ -918,6 +918,14 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         pkgObj.attr("pname", drvName.name);
         pkgObj.attr("version", drvName.version);
         pkgObj.attr("system", i.querySystem());
+
+        if (printOutPath) {
+            DrvInfo::Outputs outputs = i.queryOutputs();
+            JSONObject outputObj = pkgObj.object("outputs");
+            for (auto & j : outputs) {
+                outputObj.attr(j.first, j.second);
+            }
+        }
 
         JSONObject metaObj = pkgObj.object("meta");
         StringSet metaNames = i.queryMetaNames();
@@ -1035,7 +1043,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
-        queryJSON(globals, elems);
+        queryJSON(globals, elems, printOutPath);
         return;
     }
 
