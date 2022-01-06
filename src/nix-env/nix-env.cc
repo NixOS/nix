@@ -907,7 +907,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutPath)
+static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
 {
     JSONObject topObj(cout, true);
     for (auto & i : elems) {
@@ -927,17 +927,19 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutP
             }
         }
 
-        JSONObject metaObj = pkgObj.object("meta");
-        StringSet metaNames = i.queryMetaNames();
-        for (auto & j : metaNames) {
-            auto placeholder = metaObj.placeholder(j);
-            Value * v = i.queryMeta(j);
-            if (!v) {
-                printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
-                placeholder.write(nullptr);
-            } else {
-                PathSet context;
-                printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
+        if (printMeta) {
+            JSONObject metaObj = pkgObj.object("meta");
+            StringSet metaNames = i.queryMetaNames();
+            for (auto & j : metaNames) {
+                auto placeholder = metaObj.placeholder(j);
+                Value * v = i.queryMeta(j);
+                if (!v) {
+                    printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
+                    placeholder.write(nullptr);
+                } else {
+                    PathSet context;
+                    printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
+                }
             }
         }
     }
@@ -1043,7 +1045,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
-        queryJSON(globals, elems, printOutPath);
+        queryJSON(globals, elems, printOutPath, printMeta);
         return;
     }
 
