@@ -77,6 +77,7 @@ std::shared_ptr<RegexCache> makeRegexCache();
 struct DebugTrace {
     std::optional<ErrPos> pos;
     const Expr &expr;
+    const Env &env;
     hintformat hint;
 };
 
@@ -203,7 +204,7 @@ public:
        trivial (i.e. doesn't require arbitrary computation). */
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
-    /* Like `cacheFile`, but with an already parsed expression. */
+    /* Like `evalFile`, but with an already parsed expression. */
     void cacheFile(
         const Path & path,
         const Path & resolvedPath,
@@ -416,6 +417,9 @@ class DebugTraceStacker {
         DebugTraceStacker(EvalState &evalState, DebugTrace t)
         :evalState(evalState), trace(t)
         {
+         
+            // evalState.debuggerHook(const Error & error, const Env & env, const Expr & expr);
+
             evalState.debugTraces.push_front(t);
         }
         ~DebugTraceStacker() 

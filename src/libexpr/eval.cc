@@ -913,7 +913,7 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 }
 
 LocalNoInline(std::unique_ptr<DebugTraceStacker>
-  makeDebugTraceStacker(EvalState &state, Expr &expr, std::optional<ErrPos> pos, const char * s, const string & s2))
+  makeDebugTraceStacker(EvalState &state, Expr &expr, Env &env, std::optional<ErrPos> pos, const char * s, const string & s2))
 {
   return std::unique_ptr<DebugTraceStacker>(
       new DebugTraceStacker(
@@ -921,6 +921,7 @@ LocalNoInline(std::unique_ptr<DebugTraceStacker>
           DebugTrace 
                 {.pos = pos,
                  .expr = expr,
+                 .env = env,
                  .hint = hintfmt(s, s2)
                 }));
 }
@@ -1161,6 +1162,7 @@ void EvalState::cacheFile(
                 makeDebugTraceStacker(
                     *this,
                     *e,
+                    this->baseEnv,
                     (e->getPos() ? std::optional(ErrPos(*e->getPos())) : std::nullopt),
                     "while evaluating the file '%1%':", resolvedPath)
                 : nullptr;
@@ -1394,6 +1396,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
               makeDebugTraceStacker(
                   state,
                   *this,
+                  env,
                   *pos2,
                   "while evaluating the attribute '%1%'",
                   showAttrPath(state, env, attrPath))
@@ -1543,7 +1546,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 auto dts =
                     debuggerHook ?
-                        makeDebugTraceStacker(*this, *lambda.body, lambda.pos,
+                        makeDebugTraceStacker(*this, *lambda.body, env2, lambda.pos,
                                            "while evaluating %s",
                                            (lambda.name.set()
                                                ? "'" + (string) lambda.name + "'"
@@ -1948,7 +1951,7 @@ void EvalState::forceValueDeep(Value & v)
                       debuggerHook ?
                           // if the value is a thunk, we're evaling.  otherwise no trace necessary.
                           (i.value->isThunk() ? 
-                              makeDebugTraceStacker(*this, *v.thunk.expr, *i.pos,
+                              makeDebugTraceStacker(*this, *v.thunk.expr, *v.thunk.env, *i.pos,
                                                 "while evaluating the attribute '%1%'", i.name)
                               : nullptr)
                       : nullptr;

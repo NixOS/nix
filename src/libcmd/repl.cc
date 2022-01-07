@@ -927,6 +927,7 @@ void runRepl(
           DebugTrace 
                 {.pos = debugError->info().errPos,
                  .expr = expr,
+                 .env = *repl->env,
                  .hint = debugError->info().msg
                 });
 
