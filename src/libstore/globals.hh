@@ -46,6 +46,24 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     Paths parse(const std::string & str) const override;
 };
 
+struct EnvironmentSetting : public BaseSetting<StringMap>
+{
+    std::map<std::string, std::optional<std::string>> oldEnvironment;
+    bool hasInherited = false;
+
+    EnvironmentSetting(Config * options,
+        const StringMap & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<StringMap>(def, true, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str, bool append = false) override;
+};
+
 const uint32_t maxIdsPerBuild =
     #if __linux__
     1 << 16
@@ -1052,6 +1070,23 @@ public:
           ```
         )"
     };
+
+    EnvironmentSetting environment{this, {}, "environment",
+        R"(
+          Extra environments variables to use. A list of items, each in the
+          format of:
+
+          - `name=value`: Set environment variable `name` to `value`.
+          - `name`: Inherit environment variable `name` from current
+            environment.
+
+          If the user is trusted (see `trusted-users` option), the daemon will
+          also have these environment variables set.
+
+          This option is useful for, e.g., setting `https_proxy` for
+          fixed-output derivations and substituter downloads in a multi-user
+          Nix installation.
+        )"};
 };
 
 
