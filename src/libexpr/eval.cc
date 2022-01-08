@@ -36,7 +36,7 @@
 
 namespace nix {
 
-std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
+std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
 
 static char * dupString(const char * s)
 {
@@ -756,7 +756,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, Env
     auto error = EvalError(s, s2);
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
     throw error;
 }
 
@@ -768,7 +768,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -778,7 +778,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
     auto error = EvalError(s, s2, s3);
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -791,7 +791,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -805,7 +805,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -818,7 +818,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, Env &
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -831,7 +831,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -844,7 +844,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -857,7 +857,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -870,7 +870,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -883,7 +883,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 
     if (debuggerHook && expr) {
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
     }
 
     throw error;
@@ -897,7 +897,7 @@ LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char
     });
 
     if (debuggerHook && expr)
-        debuggerHook(error, env, *expr);
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -926,6 +926,13 @@ LocalNoInline(std::unique_ptr<DebugTraceStacker>
                 }));
 }
 
+DebugTraceStacker::DebugTraceStacker(EvalState &evalState, DebugTrace t)
+:evalState(evalState), trace(t)
+{
+    evalState.debugTraces.push_front(t);
+    if (debuggerHook)
+        debuggerHook(0, t.env, t.expr);
+}
 
 void mkString(Value & v, const char * s)
 {

@@ -24,7 +24,7 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
-extern std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
+extern std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
 void printStaticEnvBindings(const Expr &expr);
 void printStaticEnvBindings(const StaticEnv &se, int lvl = 0);
 
@@ -414,14 +414,7 @@ private:
 
 class DebugTraceStacker {
     public:
-        DebugTraceStacker(EvalState &evalState, DebugTrace t)
-        :evalState(evalState), trace(t)
-        {
-         
-            // evalState.debuggerHook(const Error & error, const Env & env, const Expr & expr);
-
-            evalState.debugTraces.push_front(t);
-        }
+        DebugTraceStacker(EvalState &evalState, DebugTrace t);
         ~DebugTraceStacker() 
         {
             // assert(evalState.debugTraces.front() == trace);

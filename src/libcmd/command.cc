@@ -63,7 +63,7 @@ EvalCommand::EvalCommand()
     });
 }
 
-extern std::function<void(const Error & error, const Env & env, const Expr & expr)> debuggerHook;
+extern std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
 
 ref<EvalState> EvalCommand::getEvalState()
 {
@@ -76,13 +76,14 @@ ref<EvalState> EvalCommand::getEvalState()
 #endif
                 searchPath, getEvalStore(), getStore());
         if (startReplOnEvalErrors)
-            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error & error, const Env & env, const Expr & expr) {
-                printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error.what());
+            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
+                if (error)
+                    printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
 
                 if (expr.staticenv)
                 {
                     auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
-                    runRepl(evalState,  &error, expr, *vm);
+                    runRepl(evalState, error, expr, *vm);
                 }
             };
     }
