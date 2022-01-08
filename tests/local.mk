@@ -60,7 +60,8 @@ nix_tests = \
   ca/concurrent-builds.sh \
   ca/nix-copy.sh \
   eval-store.sh \
-  readfile-context.sh
+  readfile-context.sh \
+  environment.sh
   # parallel.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
