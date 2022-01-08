@@ -83,6 +83,8 @@ void loadConfFile()
        ~/.nix/nix.conf or the command line. */
     globalConfig.resetOverridden();
 
+    settings.environment.overridden = settings.environment.hasInherited;
+
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
         globalConfig.applyConfigFile(*file);
@@ -249,6 +251,47 @@ void PluginFilesSetting::set(const std::string & str, bool append)
     if (pluginsLoaded)
         throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
     BaseSetting<Paths>::set(str, append);
+}
+
+
+void EnvironmentSetting::set(const std::string & str, bool append)
+{
+    if (! append) {
+        for (auto & [name, oldValue] : oldEnvironment) {
+            if (oldValue.has_value()) {
+                setenv(name.c_str(), oldValue->c_str(), 1);
+            } else {
+                unsetenv(name.c_str());
+            }
+        }
+        oldEnvironment.clear();
+        value.clear();
+        hasInherited = false;
+    }
+
+    StringMap newValues;
+
+    for (auto & elem : tokenizeString<Strings>(str)) {
+        size_t pos = elem.find('=');
+        if (pos == std::string::npos) {
+            // name
+            char * value = getenv(elem.c_str());
+            if (value) {
+                newValues.insert_or_assign(elem, std::string(value));
+                hasInherited = true;
+                overridden = true;
+            }
+        } else {
+            // name=value
+            newValues.insert_or_assign(elem.substr(0, pos), elem.substr(pos + 1));
+        }
+    }
+
+    for (auto & [name, newValue] : newValues) {
+        oldEnvironment.emplace(name, getEnv(name));
+        setenv(name.c_str(), newValue.c_str(), 1);
+        value.insert_or_assign(name, newValue);
+    }
 }
 
 
