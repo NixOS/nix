@@ -1427,7 +1427,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
-            debug("bind-mounting %s -> %s", source, target);
+            debug("bind-mounting %s -> %s", target, source);
 
             if (pathExists(target))
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
