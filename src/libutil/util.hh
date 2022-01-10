@@ -671,15 +671,28 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
+/**
+  `withBuffer(size, fun)` applies `fun` to a temporary `char` array of size `size`.
+  The array will be allocated either on the stack or on the heap depending on its size
+*/
 template<typename T = char, typename Fn>
-inline auto withBuffer(size_t size, Fn fun)
+inline auto withBuffer(size_t n, Fn fun)
   -> std::invoke_result_t<Fn, T *>
 {
-    if (size < 0x10000) {
-        T buf[size];
+    // Large stack allocations can skip past the stack protection page.
+    const size_t stack_protection_size = 4096;
+    // We reduce the max stack allocated buffer by an extra amount to increase
+    // the chance of hitting it, even when `fun`'s first access is some distance
+    // into its *further* stack frame, particularly if the call was inlined and
+    // therefore not writing a frame pointer.
+    const size_t play = 64 * sizeof(char *); // 512B on 64b archs
+    size_t size_bytes = n * sizeof(T);
+
+    if (size_bytes < stack_protection_size - play) {
+        T buf[n];
         return fun(buf);
     } else {
-        auto buf = std::unique_ptr<T[]>(new T[size]);
+        auto buf = std::unique_ptr<T[]>(new T[n]);
         return fun(buf.get());
     }
 }
