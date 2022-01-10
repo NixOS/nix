@@ -260,6 +260,7 @@ void LocalDerivationGoal::cleanupHookFinally()
 void LocalDerivationGoal::cleanupPreChildKill()
 {
     sandboxMountNamespace = -1;
+    sandboxUserNamespace = -1;
 }
 
 
@@ -906,11 +907,14 @@ void LocalDerivationGoal::startBuilder()
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
-        /* Save the mount namespace of the child. We have to do this
+        /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
+        sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
+        if (sandboxUserNamespace.get() == -1)
+            throw SysError("getting sandbox user namespace");
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -1423,7 +1427,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
-            debug("bind-mounting %s -> %s", target, source);
+            debug("bind-mounting %s -> %s", source, target);
 
             if (pathExists(target))
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
@@ -1437,6 +1441,9 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
                    in multithreaded programs. So we do this in a
                    child process.*/
                 Pid child(startProcess([&]() {
+
+                    if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
+                        throw SysError("entering sandbox user namespace");
 
                     if (setns(sandboxMountNamespace.get(), 0) == -1)
                         throw SysError("entering sandbox mount namespace");
