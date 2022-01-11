@@ -74,3 +74,50 @@ if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     echo "path not repaired properly" >&2
     exit 1
 fi
+
+# Check that --repair-path also checks content of optimised symlinks (1/2)
+nix-store --verify-path $path2
+
+if (! nix-store --optimize); then
+    echo "nix-store --optimize failed to optimize the store" >&2
+    exit 1
+fi
+chmod u+w $path2/bar
+echo 'rabrab' > $path2/bar # different length
+
+if nix-store --verify-path $path2; then
+    echo "nix-store --verify-path did not detect .links file corruption" >&2
+    exit 1
+fi
+
+nix-store --repair-path $path2 --option auto-optimise-store true
+
+if [ "$(nix-hash $path2)" != "$hash" -o "BAR" != "$(< $path2/bar)" ]; then
+    echo "path not repaired properly" >&2
+    exit 1
+fi
+
+# Check that --repair-path also checks content of optimised symlinks (2/2)
+nix-store --verify-path $path2
+
+if (! nix-store --optimize); then
+    echo "nix-store --optimize failed to optimize the store" >&2
+    exit 1
+fi
+chmod u+w $path2
+chmod u+w $path2/bar
+sed -e 's/./X/g' < $path2/bar > $path2/tmp # same length, different content.
+cp $path2/tmp $path2/bar
+rm $path2/tmp
+
+if nix-store --verify-path $path2; then
+    echo "nix-store --verify-path did not detect .links file corruption" >&2
+    exit 1
+fi
+
+nix-store --repair-path $path2 --substituters "file://$cacheDir" --no-require-sigs --option auto-optimise-store true
+
+if [ "$(nix-hash $path2)" != "$hash" -o "BAR" != "$(< $path2/bar)" ]; then
+    echo "path not repaired properly" >&2
+    exit 1
+fi

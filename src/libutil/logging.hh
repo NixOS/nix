@@ -40,7 +40,7 @@ struct LoggerSettings : Config
     Setting<bool> showTrace{
         this, false, "show-trace",
         R"(
-          Where Nix should print out a stack trace in case of Nix
+          Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
 };

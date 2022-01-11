@@ -172,8 +172,9 @@ public:
 
     void optimiseStore() override;
 
-    /* Optimise a single store path. */
-    void optimisePath(const Path & path);
+    /* Optimise a single store path. Optionally, test the encountered
+       symlinks for corruption. */
+    void optimisePath(const Path & path, bool repair);
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -253,7 +254,7 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
+    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, bool repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);

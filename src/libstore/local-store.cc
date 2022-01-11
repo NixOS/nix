@@ -1307,7 +1307,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             canonicalisePathMetaData(realPath, -1);
 
-            optimisePath(realPath); // FIXME: combine with hashPath()
+            optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
             registerValidPath(info);
         }
@@ -1419,7 +1419,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
             canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
 
-            optimisePath(realPath);
+            optimisePath(realPath, repair);
 
             ValidPathInfo info { dstPath, narHash.first };
             info.narSize = narHash.second;
@@ -1463,7 +1463,7 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
             dumpString(s, sink);
             auto narHash = hashString(htSHA256, *sink.s);
 
-            optimisePath(realPath);
+            optimisePath(realPath, repair);
 
             ValidPathInfo info { dstPath, narHash };
             info.narSize = sink.s->size();
