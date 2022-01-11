@@ -2460,7 +2460,7 @@ void LocalDerivationGoal::registerOutputs()
         }
 
         if (curRound == nrRounds) {
-            localStore.optimisePath(actualPath, false); // FIXME: combine with scanForReferences()
+            localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
             worker.markContentsGood(newInfo.path);
         }
 

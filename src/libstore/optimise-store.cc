@@ -88,7 +88,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
 
 void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
-    const Path & path, InodeHash & inodeHash, bool repair)
+    const Path & path, InodeHash & inodeHash, RepairFlag repair)
 {
     checkInterrupt();
 
@@ -267,7 +267,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, false);
+            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());
@@ -285,7 +285,7 @@ void LocalStore::optimiseStore()
         stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const Path & path, bool repair)
+void LocalStore::optimisePath(const Path & path, RepairFlag repair)
 {
     OptimiseStats stats;
     InodeHash inodeHash;
