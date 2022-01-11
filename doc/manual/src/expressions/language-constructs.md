@@ -276,6 +276,7 @@ stdenv.mkDerivation {
   ...
 }
 ```
+("->" is a boolean operation known as [logical implication](https://en.wikipedia.org/wiki/Truth_table#Logical_implication))
 
 The points of interest are:
 
