@@ -994,12 +994,20 @@ public:
           - `name`: Inherit environment variable `name` from current
             environment.
 
-          If the user is trusted (see `trusted-users` option), the daemon will
-          also have these environment variables set.
+          If the user is trusted (see `trusted-users` option), the daemon
+          worker process that handles the operation will also have these
+          environment variables set.
 
           This option is useful for, e.g., setting `https_proxy` for
           fixed-output derivations and substituter downloads in a multi-user
           Nix installation.
+
+          > **Warning**
+          >
+          > Arbitrarily modifying the environment can lead to unexpected
+          > behavior. Modifying the environment variables of a daemon worker
+          > process can have security consequences, so this option is only
+          > available for trusted users.
         )"};
 };
 
