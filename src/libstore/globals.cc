@@ -83,6 +83,9 @@ void loadConfFile()
        ~/.nix/nix.conf or the command line. */
     globalConfig.resetOverridden();
 
+    /* If the environment config has elements inherited from the environment,
+       consider it overridden, so that when we connect to the daemon we send
+       these elements over. */
     settings.environment.overridden = settings.environment.hasInherited;
 
     auto files = settings.nixUserConfFiles;
