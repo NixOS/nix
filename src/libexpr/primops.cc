@@ -592,16 +592,16 @@ typedef list<Value *> ValueList;
 
 static Bindings::iterator getAttr(
     EvalState & state,
-    string funcName,
-    string attrName,
+    std::string_view funcName,
+    Symbol attrSym,
     Bindings * attrSet,
     const Pos & pos)
 {
-    Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
+    Bindings::iterator value = attrSet->find(attrSym);
     if (value == attrSet->end()) {
         hintformat errorMsg = hintfmt(
             "attribute '%s' missing for call to '%s'",
-            attrName,
+            attrSym,
             funcName
         );
 
@@ -635,7 +635,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator startSet = getAttr(
         state,
         "genericClosure",
-        "startSet",
+        state.sStartSet,
         args[0]->attrs,
         pos
     );
@@ -650,7 +650,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator op = getAttr(
         state,
         "genericClosure",
-        "operator",
+        state.sOperator,
         args[0]->attrs,
         pos
     );
@@ -672,7 +672,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         state.forceAttrs(*e, pos);
 
         Bindings::iterator key =
-            e->attrs->find(state.symbols.create("key"));
+            e->attrs->find(state.sKey);
         if (key == e->attrs->end())
             throw EvalError({
                 .msg = hintfmt("attribute 'key' required"),
@@ -1498,14 +1498,14 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         state.forceAttrs(*v2, pos);
 
         string prefix;
-        Bindings::iterator i = v2->attrs->find(state.symbols.create("prefix"));
+        Bindings::iterator i = v2->attrs->find(state.sPrefix);
         if (i != v2->attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
         i = getAttr(
             state,
             "findFile",
-            "path",
+            state.sPath,
             v2->attrs,
             pos
         );
@@ -2184,11 +2184,10 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = getAttr(
         state,
         "getAttr",
-        attr,
+        state.symbols.create(attr),
         args[1]->attrs,
         pos
     );
