@@ -241,6 +241,8 @@ public:
 
     void mkString(std::string_view s, const PathSet & context);
 
+    void mkStringMove(const char * s, const PathSet & context);
+
     inline void mkString(const Symbol & s)
     {
         mkString(((const std::string &) s).c_str());
