@@ -2163,7 +2163,10 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
         v.listElems()[n++] = (Value *) &i;
 
     std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
+        [](Value * v1, Value * v2) {
+            std::string_view s1 = ((Attr *) v1)->name, s2 = ((Attr *) v2)->name;
+            return s1 < s2;
+        });
 
     for (unsigned int i = 0; i < n; ++i)
         v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
