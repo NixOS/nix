@@ -22,6 +22,7 @@ typedef std::map<string, string> StringMap;
 /* Paths are just strings. */
 
 typedef string Path;
+typedef std::string_view PathView;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
 

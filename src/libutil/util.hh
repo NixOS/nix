@@ -56,7 +56,7 @@ Path absPath(Path path,
    double or trailing slashes.  Optionally resolves all symlink
    components such that each component of the resulting path is *not*
    a symbolic link. */
-Path canonPath(const Path & path, bool resolveSymlinks = false);
+Path canonPath(PathView path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
@@ -368,20 +368,32 @@ MakeError(FormatError, Error);
 
 
 /* String tokenizer. */
-template<class C> C tokenizeString(std::string_view s, const string & separators = " \t\n\r");
+template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 
 /* Concatenate the given strings with a separator between the
    elements. */
 template<class C>
-string concatStringsSep(const string & sep, const C & ss)
+string concatStringsSep(const std::string_view sep, const C & ss)
 {
+    size_t size = 0;
+    // need a cast to string_view since this is also called with Symbols
+    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
     string s;
+    s.reserve(size);
     for (auto & i : ss) {
         if (s.size() != 0) s += sep;
         s += i;
     }
     return s;
+}
+
+template<class ... Parts>
+auto concatStrings(Parts && ... parts)
+    -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), string>
+{
+    std::string_view views[sizeof...(parts)] = { parts... };
+    return concatStringsSep({}, views);
 }
 
 
