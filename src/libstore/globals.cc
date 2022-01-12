@@ -278,9 +278,9 @@ void EnvironmentSetting::set(const std::string & str, bool append)
         size_t pos = elem.find('=');
         if (pos == std::string::npos) {
             // name
-            char * value = getenv(elem.c_str());
-            if (value) {
-                newValues.insert_or_assign(elem, std::string(value));
+            auto envValue = getEnv(elem.c_str());
+            if (envValue.has_value()) {
+                newValues.insert_or_assign(elem, envValue.value());
                 hasInherited = true;
                 overridden = true;
             }
