@@ -633,12 +633,24 @@ LockedFlake lockFlake(
 
                         newLockFile.write(path);
 
+                        std::optional<std::string> commitMessage = std::nullopt;
+                        if (lockFlags.commitLockFile) {
+                            std::string cm;
+
+                            cm = settings.commitLockFileSummary.get();
+
+                            if (cm == "") {
+                                cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
+                            }
+
+                            cm += "\n\nFlake lock file updates:\n\n";
+                            cm += filterANSIEscapes(diff, true);
+                            commitMessage = cm;
+                        }
+
                         topRef.input.markChangedFile(
                             (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
-                            lockFlags.commitLockFile
-                            ? std::optional<std::string>(fmt("%s: %s\n\nFlake lock file changes:\n\n%s",
-                                    relPath, lockFileExists ? "Update" : "Add", filterANSIEscapes(diff, true)))
-                            : std::nullopt);
+                            commitMessage);
 
                         /* Rewriting the lockfile changed the top-level
                            repo, so we should re-read it. FIXME: we could
