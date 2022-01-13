@@ -85,7 +85,7 @@ private:
 public:
 
     ProgressBar(bool printBuildLogs, bool isTTY)
-        : printBuildLogs(printBuildLogs)
+        : printBuildLogs(printBuildLogs || !isTTY)
         , isTTY(isTTY)
     {
         state_.lock()->active = isTTY;
