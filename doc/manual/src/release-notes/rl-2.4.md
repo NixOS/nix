@@ -276,6 +276,9 @@ more than 2800 commits from 195 contributors since release 2.3.
 
 * Plugins can now register `nix` subcommands.
 
+* The `--indirect` flag to `nix-store --add-root` has become a no-op.
+  `--add-root` will always generate indirect GC roots from now on.
+
 ## Incompatible changes
 
 * The `nix` command is now marked as an experimental feature. This
