@@ -299,6 +299,8 @@
 
           propagatedBuildInputs = propagatedDeps;
 
+          disallowedReferences = [ boost ];
+
           preConfigure =
             ''
               # Copy libboost_context so we don't get all of Boost in our closure.
