@@ -136,7 +136,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                         throw Error("unable to find a flake before encountering git boundary at '%s'", path);
                     else {
                         if (lstat(path).st_dev != device)
-                            throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                        throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", origPath);
                     }
                     path = dirOf(path);
                 }
