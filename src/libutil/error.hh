@@ -164,6 +164,12 @@ public:
 
     const string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
+    
+    void replacePosFile(std::string file) {
+        if (err.errPos) {
+            err.errPos->file = std::move(file);
+        }
+    }
 
     template<typename... Args>
     BaseError & addTrace(std::optional<ErrPos> e, const string &fs, const Args & ... args)
