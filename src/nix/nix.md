@@ -57,9 +57,33 @@ the Nix store. Here are the recognised types of installables:
   These have the form *flakeref*[`#`*attrpath*], where *flakeref* is a
   flake reference and *attrpath* is an optional attribute path. For
   more information on flakes, see [the `nix flake` manual
-  page](./nix3-flake.md). Flake references are most commonly a flake
-  identifier in the flake registry (e.g. `nixpkgs`) or a path
-  (e.g. `/path/to/my-flake` or `.`).
+  page](./nix3-flake.md).  Flake references are most commonly a flake
+  identifier in the flake registry (e.g. `nixpkgs`), or a raw path
+  (e.g. `/path/to/my-flake` or `.` or `../foo`), or a full URL
+  (e.g. `github:nixos/nixpkgs` or `path:.`)
+
+  When the flake reference is a raw path (a path without any URL
+  scheme), it is interpreted in the following way:
+
+  - If the supplied path does not contain `flake.nix`, then Nix
+    searches for a directory containing `flake.nix` upwards of the
+    supplied path (until a filesystem boundary or a git repository
+    root). For example, if `/foo/bar/flake.nix` exists, then supplying
+    `/foo/bar/baz/` will find the directory `/foo/bar/`;
+  - If `flake.nix` is in a Git repository, then this is essentially
+    equivalent to `git+file://<directory>` (see [the `nix flake`
+    manual page](./nix3-flake.md)), except that the `dir` parameter is
+    derived automatically. For example, if `/foo/bar` is a Git
+    repository and `/foo/bar/baz` contains `flake.nix`, then the flake
+    reference `/foo/bar/baz` is equivalent to
+    `git+file:///foo/bar?dir=baz`. Note that it will only include
+    files indexed by git. In particular, files which are matched by
+    `.gitignore` will not be available in the flake. If this is
+    undesireable, specify `path:<directory>` explicitly;
+  - If the directory is not inside a Git repository, then it is
+    equivalent to `path:<directory>` (see [the `nix flake` manual
+    page](./nix3-flake.md)), which includes the entire contents of the
+    path.
 
   If *attrpath* is omitted, Nix tries some default values; for most
   subcommands, the default is `defaultPackage.`*system*
