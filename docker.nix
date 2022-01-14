@@ -21,6 +21,7 @@ let
     cacert.out
     findutils
     iana-etc
+    git
   ];
 
   users = {
