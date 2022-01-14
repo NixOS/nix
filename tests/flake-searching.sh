@@ -18,11 +18,14 @@ EOF
 mkdir subdir
 pushd subdir
 
-for i in "" . .# .#test ../subdir ../subdir#test "$PWD"; do
+success=("" . .# .#test ../subdir ../subdir#test "$PWD")
+failure=("path:$PWD")
+
+for i in "${success[@]}"; do
     nix build $i || fail "flake should be found by searching up directories"
 done
 
-for i in "path:$PWD"; do
+for i in "${failure[@]}"; do
     ! nix build $i || fail "flake should not search up directories when using 'path:'"
 done
 
@@ -32,3 +35,11 @@ nix build --override-input foo . || fail "flake should search up directories whe
 
 sed "s,$PWD/foo,$PWD/foo/subdir,g" -i flake.nix
 ! nix build || fail "flake should not search upwards when part of inputs"
+
+pushd subdir
+git init
+for i in "${success[@]}" "${failure[@]}"; do
+    ! nix build $i || fail "flake should not search past a git repository"
+done
+rm -rf .git
+popd
