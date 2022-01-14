@@ -239,7 +239,6 @@ struct CmdWhyDepends : SourceExprCommand
 
             visitPath(pathS);
 
-            RunPager pager;
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
 
@@ -259,6 +258,7 @@ struct CmdWhyDepends : SourceExprCommand
             }
         };
 
+        RunPager pager;
         try {
             printNode(graph.at(packagePath), "", "");
         } catch (BailOut & ) { }
