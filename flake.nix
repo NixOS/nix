@@ -312,6 +312,13 @@
                 chmod u+w $out/lib/*.so.*
                 patchelf --set-rpath $out/lib:${currentStdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
               ''}
+              ${lib.optionalString currentStdenv.isDarwin ''
+                for LIB in $out/lib/*.dylib; do
+                  chmod u+w $LIB
+                  install_name_tool -id $LIB $LIB
+                done
+                install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
+              ''}
             '';
 
           configureFlags = configureFlags ++
@@ -328,6 +335,12 @@
           postInstall = ''
             mkdir -p $doc/nix-support
             echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+            ${lib.optionalString currentStdenv.isDarwin ''
+            install_name_tool \
+              -change ${boost}/lib/libboost_context.dylib \
+              $out/lib/libboost_context.dylib \
+              $out/lib/libnixutil.dylib
+            ''}
           '';
 
           doInstallCheck = true;
