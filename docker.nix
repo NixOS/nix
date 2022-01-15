@@ -201,7 +201,7 @@ let
 
       mkdir $out/tmp
 
-      mkdir $out/var/tmp
+      mkdir -p $out/var/tmp
 
       mkdir -p $out/etc/nix
       cat $nixConfContentsPath > $out/etc/nix/nix.conf
