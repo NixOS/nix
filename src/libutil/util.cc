@@ -668,7 +668,9 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 
 string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink(reserveSize);
+    // the parser needs two extra bytes to append terminating characters, other users will
+    // not care very much about the extra memory.
+    StringSink sink(reserveSize + 2);
     drainFD(fd, sink, block);
     return std::move(*sink.s);
 }

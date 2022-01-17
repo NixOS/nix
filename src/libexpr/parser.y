@@ -273,9 +273,16 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Formal * formal;
   nix::NixInt n;
   nix::NixFloat nf;
-  const char * id; // !!! -> Symbol
-  char * path;
-  char * uri;
+  // using C a struct allows us to avoid having to define the special
+  // members that using string_view here would implicitly delete.
+  struct StringToken {
+    const char * p;
+    size_t l;
+    operator std::string_view() const { return {p, l}; }
+  };
+  StringToken id; // !!! -> Symbol
+  StringToken path;
+  StringToken uri;
   std::vector<nix::AttrName> * attrNames;
   std::vector<std::pair<nix::Pos, nix::Expr *> > * string_parts;
 }
@@ -397,7 +404,7 @@ expr_select
 
 expr_simple
   : ID {
-      if (strcmp($1, "__curPos") == 0)
+      if (strncmp($1.p, "__curPos", $1.l) == 0)
           $$ = new ExprPos(CUR_POS);
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
@@ -414,7 +421,7 @@ expr_simple
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
-      string path($1 + 1, strlen($1) - 2);
+      string path($1.p + 1, $1.l - 2);
       $$ = new ExprCall(CUR_POS,
           new ExprVar(data->symbols.create("__findFile")),
           {new ExprVar(data->symbols.create("__nixPath")),
@@ -460,14 +467,14 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    Path path(absPath($1, data->basePath));
+    Path path(absPath({$1.p, $1.l}, data->basePath));
     /* add back in the trailing '/' to the first segment */
-    if ($1[strlen($1)-1] == '/' && strlen($1) > 1)
+    if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
     $$ = new ExprPath(path);
   }
   | HPATH {
-    Path path(getHome() + string($1 + 1));
+    Path path(getHome() + string($1.p + 1, $1.l - 1));
     $$ = new ExprPath(path);
   }
   ;
@@ -543,7 +550,7 @@ attrpath
 
 attr
   : ID { $$ = $1; }
-  | OR_KW { $$ = "or"; }
+  | OR_KW { $$ = {"or", 2}; }
   ;
 
 string_attr
@@ -589,7 +596,7 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(const char * text, FileOrigin origin,
+Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
     const Path & path, const Path & basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
@@ -609,7 +616,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     data.basePath = basePath;
 
     yylex_init(&scanner);
-    yy_scan_string(text, scanner);
+    yy_scan_buffer(text, length, scanner);
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
@@ -655,26 +662,33 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 
 Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
-    return parse(readFile(path).c_str(), foFile, path, dirOf(path), staticEnv);
+    auto buffer = readFile(path);
+    // readFile should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.data(), foString, "", basePath, staticEnv);
+    s.append("\0\0", 2);
+    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
 {
-    return parseExprFromString(s, basePath, staticBaseEnv);
+    return parseExprFromString(std::move(s), basePath, staticBaseEnv);
 }
 
 
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parse(drainFD(0).data(), foStdin, "", absPath("."), staticBaseEnv);
+    auto buffer = drainFD(0);
+    // drainFD should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
 }
 
 

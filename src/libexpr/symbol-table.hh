@@ -1,7 +1,8 @@
 #pragma once
 
+#include <list>
 #include <map>
-#include <unordered_set>
+#include <unordered_map>
 
 #include "types.hh"
 
@@ -70,15 +71,21 @@ public:
 class SymbolTable
 {
 private:
-    typedef std::unordered_set<string> Symbols;
-    Symbols symbols;
+    std::unordered_map<std::string_view, Symbol> symbols;
+    std::list<string> store;
 
 public:
     Symbol create(std::string_view s)
     {
-        // FIXME: avoid allocation if 's' already exists in the symbol table.
-        std::pair<Symbols::iterator, bool> res = symbols.emplace(std::string(s));
-        return Symbol(&*res.first);
+        // Most symbols are looked up more than once, so we trade off insertion performance
+        // for lookup performance.
+        // TODO: could probably be done more efficiently with transparent Hash and Equals
+        // on the original implementation using unordered_set
+        auto it = symbols.find(s);
+        if (it != symbols.end()) return it->second;
+
+        const string & rawSym = store.emplace_back(s);
+        return symbols.emplace(rawSym, Symbol(&rawSym)).first->second;
     }
 
     size_t size() const
@@ -91,7 +98,7 @@ public:
     template<typename T>
     void dump(T callback)
     {
-        for (auto & s : symbols)
+        for (auto & s : store)
             callback(s);
     }
 };
