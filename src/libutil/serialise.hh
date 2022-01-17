@@ -167,9 +167,9 @@ struct StringSink : Sink
 /* A source that reads data from a string. */
 struct StringSource : Source
 {
-    const string & s;
+    std::string_view s;
     size_t pos;
-    StringSource(const string & _s) : s(_s), pos(0) { }
+    StringSource(std::string_view s) : s(s), pos(0) { }
     size_t read(char * data, size_t len) override;
 };
 
