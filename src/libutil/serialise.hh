@@ -317,10 +317,10 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     return sink;
 }
 
-Sink & operator << (Sink & sink, const string & s);
+Sink & operator << (Sink & in, const Error & ex);
+Sink & operator << (Sink & sink, std::string_view s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
-Sink & operator << (Sink & in, const Error & ex);
 
 
 MakeError(SerialisationError, Error);

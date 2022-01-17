@@ -137,7 +137,7 @@ public:
     { }
 
     template<typename... Args>
-    BaseError(const std::string & fs, const Args & ... args)
+    explicit BaseError(const std::string & fs, const Args & ... args)
         : err { .level = lvlError, .msg = hintfmt(fs, args...) }
     { }
 

@@ -325,7 +325,7 @@ void writeString(std::string_view data, Sink & sink)
 }
 
 
-Sink & operator << (Sink & sink, const string & s)
+Sink & operator << (Sink & sink, std::string_view s)
 {
     writeString(s, sink);
     return sink;
