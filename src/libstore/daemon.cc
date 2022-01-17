@@ -468,10 +468,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             dontCheckSigs = false;
 
         logger->startWork();
-        FramedSource source(from);
-        store->addMultipleToStore(source,
-            RepairFlag{repair},
-            dontCheckSigs ? NoCheckSigs : CheckSigs);
+        {
+            FramedSource source(from);
+            store->addMultipleToStore(source,
+                RepairFlag{repair},
+                dontCheckSigs ? NoCheckSigs : CheckSigs);
+        }
         logger->stopWork();
         break;
     }
@@ -917,6 +919,22 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (info) realisations.insert(*info);
             worker_proto::write(*store, to, realisations);
         }
+        break;
+    }
+
+    case wopAddBuildLog: {
+        StorePath path{readString(from)};
+        logger->startWork();
+        if (!trusted)
+            throw Error("you are not privileged to add logs");
+        {
+            FramedSource source(from);
+            StringSink sink;
+            source.drainInto(sink);
+            store->addBuildLog(path, sink.s);
+        }
+        logger->stopWork();
+        to << 1;
         break;
     }
 

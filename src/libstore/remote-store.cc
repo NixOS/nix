@@ -908,6 +908,18 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 }
 
 
+void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    auto conn(getConnection());
+    conn->to << wopAddBuildLog << drvPath.to_string();
+    StringSource source(log);
+    conn.withFramedSink([&](Sink & sink) {
+        source.drainInto(sink);
+    });
+    readInt(conn->from);
+}
+
+
 void RemoteStore::connect()
 {
     auto conn(getConnection());

@@ -4,7 +4,7 @@
 
 using namespace nix;
 
-struct CmdCopy : CopyCommand
+struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
 {
     CheckSigsFlag checkSigs = CheckSigs;
 
@@ -45,8 +45,10 @@ struct CmdCopy : CopyCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> srcStore, ref<Store> dstStore, BuiltPaths && paths) override
+    void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
+        auto dstStore = getDstStore();
+
         RealisedPath::Set stuffToCopy;
 
         for (auto & builtPath : paths) {
