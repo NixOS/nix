@@ -176,6 +176,23 @@ public:
     bool useDefaultInstallables() override { return !all; }
 };
 
+/* A command that copies something between `--from` and `--to`
+   stores. */
+struct CopyCommand : virtual BuiltPathsCommand
+{
+    std::string srcUri, dstUri;
+
+    CopyCommand();
+
+    ref<Store> createStore() override;
+
+    void run(ref<Store> store) override;
+
+    void run(ref<Store> srcStore, BuiltPaths && paths) override;
+
+    virtual void run(ref<Store> srcStore, ref<Store> dstStore, BuiltPaths && paths) = 0;
+};
+
 struct StorePathsCommand : public BuiltPathsCommand
 {
     StorePathsCommand(bool recursive = false);

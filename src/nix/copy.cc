@@ -1,17 +1,11 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "sync.hh"
-#include "thread-pool.hh"
-
-#include <atomic>
 
 using namespace nix;
 
-struct CmdCopy : BuiltPathsCommand
+struct CmdCopy : CopyCommand
 {
-    std::string srcUri, dstUri;
-
     CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
@@ -21,20 +15,6 @@ struct CmdCopy : BuiltPathsCommand
     CmdCopy()
         : BuiltPathsCommand(true)
     {
-        addFlag({
-            .longName = "from",
-            .description = "URL of the source Nix store.",
-            .labels = {"store-uri"},
-            .handler = {&srcUri},
-        });
-
-        addFlag({
-            .longName = "to",
-            .description = "URL of the destination Nix store.",
-            .labels = {"store-uri"},
-            .handler = {&dstUri},
-        });
-
         addFlag({
             .longName = "no-check-sigs",
             .description = "Do not require that paths are signed by trusted keys.",
@@ -65,23 +45,8 @@ struct CmdCopy : BuiltPathsCommand
 
     Category category() override { return catSecondary; }
 
-    ref<Store> createStore() override
+    void run(ref<Store> srcStore, ref<Store> dstStore, BuiltPaths && paths) override
     {
-        return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
-    }
-
-    void run(ref<Store> store) override
-    {
-        if (srcUri.empty() && dstUri.empty())
-            throw UsageError("you must pass '--from' and/or '--to'");
-
-        BuiltPathsCommand::run(store);
-    }
-
-    void run(ref<Store> srcStore, BuiltPaths && paths) override
-    {
-        ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-
         RealisedPath::Set stuffToCopy;
 
         for (auto & builtPath : paths) {

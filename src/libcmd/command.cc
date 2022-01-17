@@ -73,13 +73,16 @@ ref<Store> EvalCommand::getEvalStore()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState) evalState =
-#if HAVE_BOEHMGC
-        std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-#else
-        std::make_shared<EvalState>(
-#endif
-            searchPath, getEvalStore(), getStore());
+    if (!evalState)
+        evalState =
+            #if HAVE_BOEHMGC
+            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+                searchPath, getEvalStore(), getStore())
+            #else
+            std::make_shared<EvalState>(
+                searchPath, getEvalStore(), getStore())
+            #endif
+            ;
     return ref<EvalState>(evalState);
 }
 
@@ -154,6 +157,43 @@ void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
     std::reverse(sorted.begin(), sorted.end());
 
     run(store, std::move(sorted));
+}
+
+CopyCommand::CopyCommand()
+    : BuiltPathsCommand(true)
+{
+    addFlag({
+        .longName = "from",
+        .description = "URL of the source Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&srcUri},
+    });
+
+    addFlag({
+        .longName = "to",
+        .description = "URL of the destination Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&dstUri},
+    });
+}
+
+ref<Store> CopyCommand::createStore()
+{
+    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+}
+
+void CopyCommand::run(ref<Store> store)
+{
+    if (srcUri.empty() && dstUri.empty())
+        throw UsageError("you must pass '--from' and/or '--to'");
+
+    BuiltPathsCommand::run(store);
+}
+
+void CopyCommand::run(ref<Store> srcStore, BuiltPaths && paths)
+{
+    ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+    run(srcStore, dstStore, std::move(paths));
 }
 
 void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
