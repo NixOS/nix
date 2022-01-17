@@ -385,7 +385,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         auto compress = [&](std::string compression)
         {
             auto compressed = nix::compress(compression, StreamToSourceAdapter(istream).drain());
-            return std::make_shared<std::stringstream>(std::move(*compressed));
+            return std::make_shared<std::stringstream>(std::move(compressed));
         };
 
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))

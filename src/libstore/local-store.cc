@@ -1461,12 +1461,12 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
             StringSink sink;
             dumpString(s, sink);
-            auto narHash = hashString(htSHA256, *sink.s);
+            auto narHash = hashString(htSHA256, sink.s);
 
             optimisePath(realPath, repair);
 
             ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s->size();
+            info.narSize = sink.s.size();
             info.references = references;
             info.ca = TextHash { .hash = hash };
             registerValidPath(info);

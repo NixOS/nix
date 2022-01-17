@@ -154,12 +154,13 @@ private:
 /* A sink that writes data to a string. */
 struct StringSink : Sink
 {
-    ref<std::string> s;
-    StringSink() : s(make_ref<std::string>()) { };
-    explicit StringSink(const size_t reservedSize) : s(make_ref<std::string>()) {
-      s->reserve(reservedSize);
+    std::string s;
+    StringSink() { }
+    explicit StringSink(const size_t reservedSize)
+    {
+      s.reserve(reservedSize);
     };
-    StringSink(ref<std::string> s) : s(s) { };
+    StringSink(std::string && s) : s(std::move(s)) { };
     void operator () (std::string_view data) override;
 };
 

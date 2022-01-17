@@ -106,7 +106,7 @@ struct curlFileTransfer : public FileTransfer
                         this->request.dataCallback(data);
                     }
                 } else
-                    this->result.data->append(data);
+                    this->result.data.append(data);
               })
         {
             if (!request.expectedETag.empty())
@@ -195,7 +195,7 @@ struct curlFileTransfer : public FileTransfer
             std::smatch match;
             if (std::regex_match(line, match, statusLine)) {
                 result.etag = "";
-                result.data = std::make_shared<std::string>();
+                result.data.clear();
                 result.bodySize = 0;
                 statusMsg = trim(match[1]);
                 acceptRanges = false;
@@ -340,7 +340,7 @@ struct curlFileTransfer : public FileTransfer
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
-            result.data = std::make_shared<std::string>();
+            result.data.clear();
             result.bodySize = 0;
         }
 
@@ -434,21 +434,21 @@ struct curlFileTransfer : public FileTransfer
 
                 attempt++;
 
-                std::shared_ptr<std::string> response;
+                std::optional<std::string> response;
                 if (errorSink)
-                    response = errorSink->s;
+                    response = std::move(errorSink->s);
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, response, "%s of '%s' was interrupted", request.verb(), request.uri)
+                    ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
                     ? FileTransferError(err,
-                        response,
+                        std::move(response),
                         fmt("unable to %s '%s': HTTP error %d ('%s')",
                             request.verb(), request.uri, httpStatus, statusMsg)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
                     : FileTransferError(err,
-                        response,
+                        std::move(response),
                         fmt("unable to %s '%s': %s (%d)",
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
@@ -705,7 +705,7 @@ struct curlFileTransfer : public FileTransfer
                 FileTransferResult res;
                 if (!s3Res.data)
                     throw FileTransferError(NotFound, nullptr, "S3 object '%s' does not exist", request.uri);
-                res.data = s3Res.data;
+                res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else
                 throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
@@ -859,7 +859,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
 }
 
 template<typename... Args>
-FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args)
+FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args)
     : Error(args...), error(error), response(response)
 {
     const auto hf = hintfmt(args...);
