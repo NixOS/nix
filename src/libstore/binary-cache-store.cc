@@ -512,4 +512,14 @@ std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
     return getFile(logPath);
 }
 
+void BinaryCacheStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    assert(drvPath.isDerivation());
+
+    upsertFile(
+        "log/" + std::string(drvPath.to_string()),
+        (std::string) log, // FIXME: don't copy
+        "text/plain; charset=utf-8");
+}
+
 }
