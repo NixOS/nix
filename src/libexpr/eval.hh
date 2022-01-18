@@ -80,7 +80,8 @@ public:
         sContentAddressed,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
-        sDescription, sSelf, sEpsilon;
+        sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
+        sPrefix;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -399,6 +400,7 @@ private:
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v);
 
     friend struct Value;
 };

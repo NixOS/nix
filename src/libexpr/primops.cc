@@ -12,6 +12,8 @@
 #include "value-to-xml.hh"
 #include "primops.hh"
 
+#include <boost/container/small_vector.hpp>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -592,16 +594,16 @@ typedef list<Value *> ValueList;
 
 static Bindings::iterator getAttr(
     EvalState & state,
-    string funcName,
-    string attrName,
+    std::string_view funcName,
+    Symbol attrSym,
     Bindings * attrSet,
     const Pos & pos)
 {
-    Bindings::iterator value = attrSet->find(state.symbols.create(attrName));
+    Bindings::iterator value = attrSet->find(attrSym);
     if (value == attrSet->end()) {
         hintformat errorMsg = hintfmt(
             "attribute '%s' missing for call to '%s'",
-            attrName,
+            attrSym,
             funcName
         );
 
@@ -635,7 +637,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator startSet = getAttr(
         state,
         "genericClosure",
-        "startSet",
+        state.sStartSet,
         args[0]->attrs,
         pos
     );
@@ -650,7 +652,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     Bindings::iterator op = getAttr(
         state,
         "genericClosure",
-        "operator",
+        state.sOperator,
         args[0]->attrs,
         pos
     );
@@ -672,7 +674,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         state.forceAttrs(*e, pos);
 
         Bindings::iterator key =
-            e->attrs->find(state.symbols.create("key"));
+            e->attrs->find(state.sKey);
         if (key == e->attrs->end())
             throw EvalError({
                 .msg = hintfmt("attribute 'key' required"),
@@ -1079,10 +1081,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 } else {
                     auto s = state.coerceToString(*i->pos, *i->value, context, true);
                     drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder) drv.builder = s;
-                    else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sOutputHash) outputHash = s;
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
+                    if (i->name == state.sBuilder) drv.builder = std::move(s);
+                    else if (i->name == state.sSystem) drv.platform = std::move(s);
+                    else if (i->name == state.sOutputHash) outputHash = std::move(s);
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = std::move(s);
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
@@ -1498,14 +1500,14 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         state.forceAttrs(*v2, pos);
 
         string prefix;
-        Bindings::iterator i = v2->attrs->find(state.symbols.create("prefix"));
+        Bindings::iterator i = v2->attrs->find(state.sPrefix);
         if (i != v2->attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
         i = getAttr(
             state,
             "findFile",
-            "path",
+            state.sPath,
             v2->attrs,
             pos
         );
@@ -2163,7 +2165,10 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
         v.listElems()[n++] = (Value *) &i;
 
     std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
+        [](Value * v1, Value * v2) {
+            std::string_view s1 = ((Attr *) v1)->name, s2 = ((Attr *) v2)->name;
+            return s1 < s2;
+        });
 
     for (unsigned int i = 0; i < n; ++i)
         v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
@@ -2184,11 +2189,10 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = getAttr(
         state,
         "getAttr",
-        attr,
+        state.symbols.create(attr),
         args[1]->attrs,
         pos
     );
@@ -2268,21 +2272,25 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     state.forceAttrs(*args[0], pos);
     state.forceList(*args[1], pos);
 
-    /* Get the attribute names to be removed. */
-    std::set<Symbol> names;
+    /* Get the attribute names to be removed.
+       We keep them as Attrs instead of Symbols so std::set_difference
+       can be used to remove them from attrs[0]. */
+    boost::container::small_vector<Attr, 64> names;
+    names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos);
-        names.insert(state.symbols.create(elem->string.s));
+        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
     }
+    std::sort(names.begin(), names.end());
 
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
     auto attrs = state.buildBindings(args[0]->attrs->size());
-    for (auto & i : *args[0]->attrs) {
-        if (!names.count(i.name))
-            attrs.insert(i);
-    }
+    std::set_difference(
+        args[0]->attrs->begin(), args[0]->attrs->end(),
+        names.begin(), names.end(),
+        std::back_inserter(attrs));
     v.mkAttrs(attrs.alreadySorted());
 }
 
@@ -3520,18 +3528,20 @@ static RegisterPrimOp primop_match({
 
 /* Split a string with a regular expression, and return a list of the
    non-matching parts interleaved by the lists of the matching groups. */
-static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        std::regex regex(re, std::regex::extended);
+        auto regex = state.regexCache->cache.find(re);
+        if (regex == state.regexCache->cache.end())
+            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
 
         PathSet context;
         const std::string str = state.forceString(*args[1], context, pos);
 
-        auto begin = std::sregex_iterator(str.begin(), str.end(), regex);
+        auto begin = std::sregex_iterator(str.begin(), str.end(), regex->second);
         auto end = std::sregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
