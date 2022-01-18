@@ -345,6 +345,18 @@ Installable::getCursor(EvalState & state)
     return cursors[0];
 }
 
+static StorePath getDeriver(
+    ref<Store> store,
+    const Installable & i,
+    const StorePath & drvPath)
+{
+    auto derivers = store->queryValidDerivers(drvPath);
+    if (derivers.empty())
+        throw Error("'%s' does not have a known deriver", i.what());
+    // FIXME: use all derivers?
+    return *derivers.begin();
+}
+
 struct InstallableStorePath : Installable
 {
     ref<Store> store;
@@ -353,7 +365,7 @@ struct InstallableStorePath : Installable
     InstallableStorePath(ref<Store> store, StorePath && storePath)
         : store(store), storePath(std::move(storePath)) { }
 
-    std::string what() override { return store->printStorePath(storePath); }
+    std::string what() const override { return store->printStorePath(storePath); }
 
     DerivedPaths toDerivedPaths() override
     {
@@ -371,6 +383,15 @@ struct InstallableStorePath : Installable
                     .path = storePath,
                 }
             };
+        }
+    }
+
+    StorePathSet toDrvPaths(ref<Store> store) override
+    {
+        if (storePath.isDerivation()) {
+            return {storePath};
+        } else {
+            return {getDeriver(store, *this, storePath)};
         }
     }
 
@@ -402,6 +423,14 @@ DerivedPaths InstallableValue::toDerivedPaths()
     return res;
 }
 
+StorePathSet InstallableValue::toDrvPaths(ref<Store> store)
+{
+    StorePathSet res;
+    for (auto & drv : toDerivations())
+        res.insert(drv.drvPath);
+    return res;
+}
+
 struct InstallableAttrPath : InstallableValue
 {
     SourceExprCommand & cmd;
@@ -412,7 +441,7 @@ struct InstallableAttrPath : InstallableValue
         : InstallableValue(state), cmd(cmd), v(allocRootValue(v)), attrPath(attrPath)
     { }
 
-    std::string what() override { return attrPath; }
+    std::string what() const override { return attrPath; }
 
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
@@ -836,11 +865,7 @@ StorePathSet toDerivations(
                 [&](const DerivedPath::Opaque & bo) {
                     if (!useDeriver)
                         throw Error("argument '%s' did not evaluate to a derivation", i->what());
-                    auto derivers = store->queryValidDerivers(bo.path);
-                    if (derivers.empty())
-                        throw Error("'%s' does not have a known deriver", i->what());
-                    // FIXME: use all derivers?
-                    drvPaths.insert(*derivers.begin());
+                    drvPaths.insert(getDeriver(store, *i, bo.path));
                 },
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);

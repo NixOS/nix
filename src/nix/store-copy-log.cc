@@ -28,11 +28,17 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
     {
         auto dstStore = getDstStore();
 
-        for (auto & path : toDerivations(srcStore, installables, true)) {
-            if (auto log = srcStore->getBuildLog(path))
-                dstStore->addBuildLog(path, *log);
+        StorePathSet drvPaths;
+
+        for (auto & i : installables)
+            for (auto & drvPath : i->toDrvPaths(getEvalStore()))
+                drvPaths.insert(drvPath);
+
+        for (auto & drvPath : drvPaths) {
+            if (auto log = srcStore->getBuildLog(drvPath))
+                dstStore->addBuildLog(drvPath, *log);
             else
-                throw Error("build log for '%s' is not available", srcStore->printStorePath(path));
+                throw Error("build log for '%s' is not available", srcStore->printStorePath(drvPath));
         }
     }
 };
