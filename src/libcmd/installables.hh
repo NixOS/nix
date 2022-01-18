@@ -33,9 +33,14 @@ struct Installable
 {
     virtual ~Installable() { }
 
-    virtual std::string what() = 0;
+    virtual std::string what() const = 0;
 
     virtual DerivedPaths toDerivedPaths() = 0;
+
+    virtual StorePathSet toDrvPaths(ref<Store> store)
+    {
+        throw Error("'%s' cannot be converted to a derivation path", what());
+    }
 
     DerivedPath toDerivedPath();
 
@@ -81,6 +86,8 @@ struct InstallableValue : Installable
     virtual std::vector<DerivationInfo> toDerivations() = 0;
 
     DerivedPaths toDerivedPaths() override;
+
+    StorePathSet toDrvPaths(ref<Store> store) override;
 };
 
 struct InstallableFlake : InstallableValue
@@ -99,7 +106,7 @@ struct InstallableFlake : InstallableValue
         Strings && prefixes,
         const flake::LockFlags & lockFlags);
 
-    std::string what() override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
+    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
 
     std::vector<std::string> getActualAttrPaths();
 

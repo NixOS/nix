@@ -56,6 +56,7 @@ typedef enum {
     wopRegisterDrvOutput = 42,
     wopQueryRealisation = 43,
     wopAddMultipleToStore = 44,
+    wopAddBuildLog = 45,
 } WorkerOp;
 
 

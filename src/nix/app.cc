@@ -19,7 +19,7 @@ struct InstallableDerivedPath : Installable
     }
 
 
-    std::string what() override { return derivedPath.to_string(*store); }
+    std::string what() const override { return derivedPath.to_string(*store); }
 
     DerivedPaths toDerivedPaths() override
     {

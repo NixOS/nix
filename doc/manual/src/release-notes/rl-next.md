@@ -7,3 +7,5 @@
   set or toggle display of error traces.
 * New builtin function `builtins.zipAttrsWith` with same functionality
   as `lib.zipAttrsWith` from nixpkgs, but much more efficient.
+* New command `nix store copy-log` to copy build logs from one store
+  to another.

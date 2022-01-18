@@ -727,6 +727,9 @@ public:
     virtual std::optional<std::string> getBuildLog(const StorePath & path)
     { return std::nullopt; }
 
+    virtual void addBuildLog(const StorePath & path, std::string_view log)
+    { unsupported("addBuildLog"); }
+
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
     void clearPathInfoCache()

@@ -51,6 +51,7 @@ public:
         const std::string & mimeType) = 0;
 
     void upsertFile(const std::string & path,
+        // FIXME: use std::string_view
         std::string && data,
         const std::string & mimeType);
 
@@ -119,6 +120,8 @@ public:
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     std::optional<std::string> getBuildLog(const StorePath & path) override;
+
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
 };
 
