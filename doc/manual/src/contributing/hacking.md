@@ -20,6 +20,16 @@ or if you have a flake-enabled nix:
 $ nix build
 ```
 
+If you do not have access to nix yet or are building for a distribution
+nix can be compiled like any other autotools project
+
+```console
+$ ./bootstrap.sh
+$ ./configure
+$ make
+$ make install
+```
+
 This will build `defaultPackage` attribute defined in the `flake.nix`
 file. To build for other platforms add one of the following suffixes to
 it: aarch64-linux, i686-linux, x86\_64-darwin, x86\_64-linux. i.e.
