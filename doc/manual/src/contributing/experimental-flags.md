@@ -1,7 +1,7 @@
 This section describes the notion of a Nix's "experimental
 features", and how it fits into the big picture of the development of Nix.
 
-# What are these xp flags?
+# What are these xp features?
 
 Since Nix 2.4, some features of Nix can be flagged as
 experimental. This means that they can be changed or removed at any time.
@@ -10,9 +10,9 @@ the `experimental-features` configuration option. This is really handy
 as it makes it harder to accidentally use an experimental feature
 without knowing it.
 
-# When should an experimental flag be used
+# When should an experimental feature be used
 
-A change in the Nix codebase should be guarded by an experimental flag
+A change in the Nix codebase should be guarded by an experimental feature flag
 if it is likely to either introduce a regression of any kind, or if it
 implies a non-trivial change in the external interface of Nix (be it the language, the cli or
 anything else that's considered as "public").
@@ -36,7 +36,7 @@ not be worth doing that.
 
 Experimental features being, well, experimental, they all have to be
 treated on a case-by-case basis.However, the standard workflow for an
-experimental flag is as follows:
+experimental feature is as follows:
 
 -   The feature is merged, under an experimental flag (possibly over a
     long period of time)
@@ -57,7 +57,7 @@ refactoring)
 
 # Relation to the RFC process
 
-Xp flags and RFCs attack a similar problem in that they both exist to
+Experimental features and RFCs attack a similar problem in that they both exist to
 make it possible to carry-out substantial changes while minimizing the
 risk.However − as far as Nix is concerned at least − they attack it
 under a different (and complementary) angle:
@@ -68,19 +68,19 @@ under a different (and complementary) angle:
     *design* and *communication* issue, targeted towards the community
     in general (and not specifically the Nix developpers).
 
--   The goal of an experimental flag is to make it possible new and
+-   The goal of an experimental feature is to make it possible new and
     possibly complex developments without requiring a (costly)
     long-running fork but also without sacrificing the stability of the
     main branch.It is primarily an *implementation* issue, targeted
     towards the Nix developpers and early testers.
 
-In practice, this means that having an experimental flag and having an
+In practice, this means that having an experimental feature and having an
 RFC are two separate concerns. It can be legitimate to have a
 development guarded by an experimental flag but without an RFC (for
 example a non-trivial refactoring that doesn't change the interface but
 might introduce some bugs because of the code churn). Conversely it is
 possible (though probably less likely) to have an RFC that yields a
-change in the Nix codebase but without requirering an experimental flag.
-Or an RFC that yields several experimental flags because the end-goal
+change in the Nix codebase but without requirering an experimental feature.
+Or an RFC that yields several experimental features because the end-goal
 described by the RFC has several parts that can be implemented and used
 independently.
