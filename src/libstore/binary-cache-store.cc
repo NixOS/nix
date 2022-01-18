@@ -498,10 +498,10 @@ std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
-            if (!info->deriver) return nullptr;
+            if (!info->deriver) return std::nullopt;
             drvPath = *info->deriver;
         } catch (InvalidPath &) {
-            return nullptr;
+            return std::nullopt;
         }
     }
 
