@@ -1,13 +1,11 @@
-This section aims at describing the notion of a Nix "experimental
-flag", and how it fits into the big picture of the developpement of Nix.
+This section describes the notion of a Nix's "experimental
+features", and how it fits into the big picture of the development of Nix.
 
 # What are these xp flags?
 
 Since Nix 2.4, some features of Nix can be flagged as
-experimental.Conceptually, this means that these features are not
-considered as part of Nix proper, but are only included in the code to
-make their developpement and testing easier.Practically, these require
-an explicit opt-in, by adding the name of the experimental feature to
+experimental. This means that they can be changed or removed at any time.
+Users must explicitly opt in to them by adding the name of the experimental feature to
 the `experimental-features` configuration option. This is really handy
 as it makes it harder to accidentally use an experimental feature
 without knowing it.
@@ -16,7 +14,7 @@ without knowing it.
 
 A change in the Nix codebase should be guarded by an experimental flag
 if it is likely to either introduce a regression of any kind, or if it
-changes the external interface of Nix (be it the language, the cli or
+implies a non-trivial change in the external interface of Nix (be it the language, the cli or
 anything else that's considered as "public").
 
 For example, these changes need to be guarded by an experimental flag:
@@ -34,7 +32,7 @@ refactoring changes a low-level interface and keeping both versions
 around essentially means duplicating half of the codebase, then it might
 not be worth doing that.
 
-# Life flow of an experimental flag
+# Lifecycle of an experimental feature
 
 Experimental features being, well, experimental, they all have to be
 treated on a case-by-case basis.However, the standard workflow for an
@@ -53,8 +51,7 @@ experimental flag is as follows:
 
 This is obviously just indicative. In particular the third step is only
 useful if the feature is susceptible to introduce some significant and
-hard to work-around regression (for example the addition of a new
-language builtin). Conversely, the second is useless if people have no
+hard to work-around regression (for example if it requires some non-trivial changes in existing codepaths). Conversely, the second is useless if people have no
 compelling reason to switch the flag (for example a purely internal
 refactoring)
 
