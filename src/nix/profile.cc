@@ -157,17 +157,17 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, sink.s);
 
         ValidPathInfo info {
             store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
             narHash,
         };
         info.references = std::move(references);
-        info.narSize = sink.s->size();
+        info.narSize = sink.s.size();
         info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
-        auto source = StringSource { *sink.s };
+        StringSource source(sink.s);
         store->addToStore(info, source);
 
         return std::move(info.path);

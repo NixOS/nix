@@ -172,7 +172,7 @@ void RemoteStore::initConnection(Connection & conn)
                it. */
             conn.closeWrite();
             auto msg = conn.from.drain();
-            throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
+            throw Error("protocol mismatch, got '%s'", chomp(saved.s + msg));
         }
 
         conn.from >> conn.daemonVersion;

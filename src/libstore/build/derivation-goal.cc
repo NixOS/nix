@@ -278,7 +278,7 @@ void DerivationGoal::outputsSubstitutionTried()
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
         done(BuildResult::TransientFailure,
-            fmt("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
+            Error("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
                 worker.store.printStorePath(drvPath)));
         return;
     }

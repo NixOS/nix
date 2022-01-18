@@ -724,8 +724,8 @@ public:
 
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
-    virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
-    { return nullptr; }
+    virtual std::optional<std::string> getBuildLog(const StorePath & path)
+    { return std::nullopt; }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */

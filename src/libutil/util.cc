@@ -672,7 +672,7 @@ string drainFD(int fd, bool block, const size_t reserveSize)
     // not care very much about the extra memory.
     StringSink sink(reserveSize + 2);
     drainFD(fd, sink, block);
-    return std::move(*sink.s);
+    return std::move(sink.s);
 }
 
 
@@ -1057,7 +1057,7 @@ std::pair<int, std::string> runProgram(RunOptions && options)
         status = e.status;
     }
 
-    return {status, std::move(*sink.s)};
+    return {status, std::move(sink.s)};
 }
 
 void runProgram2(const RunOptions & options)
