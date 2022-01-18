@@ -57,9 +57,47 @@ the Nix store. Here are the recognised types of installables:
   These have the form *flakeref*[`#`*attrpath*], where *flakeref* is a
   flake reference and *attrpath* is an optional attribute path. For
   more information on flakes, see [the `nix flake` manual
-  page](./nix3-flake.md). Flake references are most commonly a flake
-  identifier in the flake registry (e.g. `nixpkgs`) or a path
-  (e.g. `/path/to/my-flake` or `.`).
+  page](./nix3-flake.md).  Flake references are most commonly a flake
+  identifier in the flake registry (e.g. `nixpkgs`), or a raw path
+  (e.g. `/path/to/my-flake` or `.` or `../foo`), or a full URL
+  (e.g. `github:nixos/nixpkgs` or `path:.`)
+
+  When the flake reference is a raw path (a path without any URL
+  scheme), it is interpreted as a `path:` or `git+file:` url in the following
+  way:
+  
+  - If the path is within a Git repository, then the url will be of the form
+    `git+file://[GIT_REPO_ROOT]?dir=[RELATIVE_FLAKE_DIR_PATH]`
+    where `GIT_REPO_ROOT` is the path to the root of the git repository,
+    and `RELATIVE_FLAKE_DIR_PATH` is the path (relative to the directory
+    root) of the closest parent of the given path that contains a `flake.nix` within
+    the git repository.
+    If no such directory exists, then Nix will error-out.
+    
+    Note that the search will only include files indexed by git. In particular, files
+    which are matched by `.gitignore` or have never been `git add`-ed will not be
+    available in the flake. If this is undesireable, specify `path:<directory>` explicitly;
+    
+    For example, if `/foo/bar` is a git repository with the following structure:
+    ```
+    .
+    └── baz
+        ├── blah
+        │   └── file.txt
+        └── flake.nix
+    ```
+
+  Then `/foo/bar/baz/blah` will resolve to `git+file:///foo/bar?dir=baz`
+
+  - If the supplied path is not a git repository, then the url will have the form
+    `path:FLAKE_DIR_PATH` where `FLAKE_DIR_PATH` is the closest parent
+    of the supplied path that contains a `flake.nix` file (within the same file-system).
+    If no such directory exists, then Nix will error-out.
+    
+    For example, if `/foo/bar/flake.nix` exists, then `/foo/bar/baz/` will resolve to
+   `path:/foo/bar`
+
+
 
   If *attrpath* is omitted, Nix tries some default values; for most
   subcommands, the default is `defaultPackage.`*system*
