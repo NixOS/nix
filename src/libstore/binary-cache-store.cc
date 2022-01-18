@@ -371,7 +371,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
             try {
                 auto data = fut.get();
 
-                if (!data) return (*callbackPtr)(nullptr);
+                if (!data) return (*callbackPtr)({});
 
                 stats.narInfoRead++;
 
@@ -450,7 +450,7 @@ void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
         [=](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
-                if (!data) return (*callbackPtr)(nullptr);
+                if (!data) return (*callbackPtr)({});
 
                 auto realisation = Realisation::fromJSON(
                     nlohmann::json::parse(*data), outputInfoFilePath);
