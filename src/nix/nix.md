@@ -80,11 +80,11 @@ the Nix store. Here are the recognised types of installables:
     
     For example, if `/foo/bar` is a git repository with the following structure:
     ```
-   .
-   └── baz
-       ├── blah
-       │   └── file.txt
-       └── flake.nix
+    .
+    └── baz
+        ├── blah
+        │   └── file.txt
+        └── flake.nix
     ```
 
   Then `/foo/bar/baz/blah` will resolve to `git+file:///foo/bar?dir=baz`
