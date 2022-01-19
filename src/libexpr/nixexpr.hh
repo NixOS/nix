@@ -110,9 +110,9 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    Symbol s;
+    string s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { v.mkString(s); };
+    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

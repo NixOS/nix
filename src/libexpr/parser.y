@@ -166,7 +166,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
     vector<std::pair<Pos, std::variant<Expr *, StringToken> > > & es)
 {
-    if (es.empty()) return new ExprString(symbols.create(""));
+    if (es.empty()) return new ExprString("");
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -244,7 +244,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
                 s2 = string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(symbols.create(s2)));
+        es2->emplace_back(i->first, new ExprString(s2));
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
@@ -434,7 +434,7 @@ expr_simple
       $$ = new ExprCall(CUR_POS,
           new ExprVar(data->symbols.create("__findFile")),
           {new ExprVar(data->symbols.create("__nixPath")),
-           new ExprString(data->symbols.create(path))});
+           new ExprString(path)});
   }
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
@@ -443,7 +443,7 @@ expr_simple
               .msg = hintfmt("URL literals are disabled"),
               .errPos = CUR_POS
           });
-      $$ = new ExprString(data->symbols.create($1));
+      $$ = new ExprString(string($1));
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -458,19 +458,19 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = new ExprString(data->symbols.create($1)); }
+  : STR { $$ = new ExprString(string($1)); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(data->symbols.create("")); }
+  | { $$ = new ExprString(""); }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(data->symbols.create($2))); }
+  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
   | DOLLAR_CURLY expr '}' { $$ = new vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new vector<std::pair<Pos, Expr *> >;
-      $$->emplace_back(makeCurPos(@1, data), new ExprString(data->symbols.create($1)));
+      $$->emplace_back(makeCurPos(@1, data), new ExprString(string($1)));
       $$->emplace_back(makeCurPos(@2, data), $3);
     }
   ;
@@ -524,7 +524,7 @@ attrs
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($2);
       if (str) {
-          $$->push_back(AttrName(str->s));
+          $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
           throw ParseError({
@@ -541,7 +541,7 @@ attrpath
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($3);
       if (str) {
-          $$->push_back(AttrName(str->s));
+          $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
           $$->push_back(AttrName($3));
@@ -551,7 +551,7 @@ attrpath
     { $$ = new vector<AttrName>;
       ExprString *str = dynamic_cast<ExprString *>($1);
       if (str) {
-          $$->push_back(AttrName(str->s));
+          $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
           $$->push_back(AttrName($1));
