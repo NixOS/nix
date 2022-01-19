@@ -41,6 +41,11 @@ namespace nix {
             { };
     };
 
+    struct ParserFormals {
+        std::vector<Formal> formals;
+        bool ellipsis = false;
+    };
+
 }
 
 // using C a struct allows us to avoid having to define the special
@@ -151,15 +156,39 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 }
 
 
-static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
+static Formals * toFormals(ParseData & data, ParserFormals * formals,
+    Pos pos = noPos, Symbol arg = {})
 {
-    if (!formals->argNames.insert(formal.name).second)
+    std::sort(formals->formals.begin(), formals->formals.end(),
+        [] (const auto & a, const auto & b) {
+            return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
+        });
+
+    std::optional<std::pair<Symbol, Pos>> duplicate;
+    for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
+        if (formals->formals[i].name != formals->formals[i + 1].name)
+            continue;
+        std::pair thisDup{formals->formals[i].name, formals->formals[i + 1].pos};
+        duplicate = std::min(thisDup, duplicate.value_or(thisDup));
+    }
+    if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'",
-                formal.name),
+            .msg = hintfmt("duplicate formal function argument '%1%'", duplicate->first),
+            .errPos = duplicate->second
+        });
+
+    Formals result;
+    result.ellipsis = formals->ellipsis;
+    result.formals = std::move(formals->formals);
+
+    if (arg.set() && result.has(arg))
+        throw ParseError({
+            .msg = hintfmt("duplicate formal function argument '%1%'", arg),
             .errPos = pos
         });
-    formals->formals.push_front(formal);
+
+    delete formals;
+    return new Formals(std::move(result));
 }
 
 
@@ -282,7 +311,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Expr * e;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
-  nix::Formals * formals;
+  nix::ParserFormals * formals;
   nix::Formal * formal;
   nix::NixInt n;
   nix::NixFloat nf;
@@ -340,11 +369,17 @@ expr_function
   : ID ':' expr_function
     { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), $2, $5); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), toFormals(*data, $2), $5); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), $2, $7); }
+    {
+      Symbol arg = data->symbols.create($5);
+      $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $2, CUR_POS, arg), $7);
+    }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), $4, $7); }
+    {
+      Symbol arg = data->symbols.create($1);
+      $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $4, CUR_POS, arg), $7);
+    }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
@@ -575,13 +610,13 @@ expr_list
 
 formals
   : formal ',' formals
-    { $$ = $3; addFormal(CUR_POS, $$, *$1); }
+    { $$ = $3; $$->formals.push_back(*$1); }
   | formal
-    { $$ = new Formals; addFormal(CUR_POS, $$, *$1); $$->ellipsis = false; }
+    { $$ = new ParserFormals; $$->formals.push_back(*$1); $$->ellipsis = false; }
   |
-    { $$ = new Formals; $$->ellipsis = false; }
+    { $$ = new ParserFormals; $$->ellipsis = false; }
   | ELLIPSIS
-    { $$ = new Formals; $$->ellipsis = true; }
+    { $$ = new ParserFormals; $$->ellipsis = true; }
   ;
 
 formal

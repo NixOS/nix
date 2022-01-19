@@ -1368,7 +1368,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (!lambda.formals->argNames.count(i.name))
+                        if (!lambda.formals->has(i.name))
                             throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
                     abort(); // can't happen
                 }

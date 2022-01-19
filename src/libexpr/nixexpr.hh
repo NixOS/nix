@@ -216,10 +216,25 @@ struct Formal
 
 struct Formals
 {
-    typedef std::list<Formal> Formals_;
+    typedef std::vector<Formal> Formals_;
     Formals_ formals;
-    std::set<Symbol> argNames; // used during parsing
     bool ellipsis;
+
+    bool has(Symbol arg) const {
+        auto it = std::lower_bound(formals.begin(), formals.end(), arg,
+            [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+
+    std::vector<Formal> lexicographicOrder() const
+    {
+        std::vector<Formal> result(formals.begin(), formals.end());
+        std::sort(result.begin(), result.end(),
+            [] (const Formal & a, const Formal & b) {
+                return std::string_view(a.name) < std::string_view(b.name);
+            });
+        return result;
+    }
 };
 
 struct ExprLambda : Expr
@@ -232,11 +247,6 @@ struct ExprLambda : Expr
     ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
-        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError({
-                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
-                .errPos = pos
-            });
     };
     void setName(Symbol & name);
     string showNamePos() const;

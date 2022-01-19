@@ -476,8 +476,8 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
                 if (!v.lambda.fun->formals ||
-                    !v.lambda.fun->formals->argNames.count(state->symbols.create("program")) ||
-                    !v.lambda.fun->formals->argNames.count(state->symbols.create("system")))
+                    !v.lambda.fun->formals->has(state->symbols.create("program")) ||
+                    !v.lambda.fun->formals->has(state->symbols.create("system")))
                     throw Error("bundler must take formal arguments 'program' and 'system'");
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
