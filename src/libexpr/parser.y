@@ -16,6 +16,8 @@
 #ifndef BISON_HEADER
 #define BISON_HEADER
 
+#include <variant>
+
 #include "util.hh"
 
 #include "nixexpr.hh"
@@ -40,6 +42,15 @@ namespace nix {
     };
 
 }
+
+// using C a struct allows us to avoid having to define the special
+// members that using string_view here would implicitly delete.
+struct StringToken {
+  const char * p;
+  size_t l;
+  bool hasIndentation;
+  operator std::string_view() const { return {p, l}; }
+};
 
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParseData * data)
@@ -152,7 +163,8 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
-static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<std::pair<Pos, Expr *> > & es)
+static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
+    vector<std::pair<Pos, std::variant<Expr *, StringToken> > > & es)
 {
     if (es.empty()) return new ExprString(symbols.create(""));
 
@@ -163,20 +175,20 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<st
     size_t minIndent = 1000000;
     size_t curIndent = 0;
     for (auto & [i_pos, i] : es) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
-        if (!e) {
-            /* Anti-quotations end the current start-of-line whitespace. */
+        auto * str = std::get_if<StringToken>(&i);
+        if (!str || !str->hasIndentation) {
+            /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
             if (atStartOfLine) {
                 atStartOfLine = false;
                 if (curIndent < minIndent) minIndent = curIndent;
             }
             continue;
         }
-        for (size_t j = 0; j < e->s.size(); ++j) {
+        for (size_t j = 0; j < str->l; ++j) {
             if (atStartOfLine) {
-                if (e->s[j] == ' ')
+                if (str->p[j] == ' ')
                     curIndent++;
-                else if (e->s[j] == '\n') {
+                else if (str->p[j] == '\n') {
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -184,7 +196,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<st
                     atStartOfLine = false;
                     if (curIndent < minIndent) minIndent = curIndent;
                 }
-            } else if (e->s[j] == '\n') {
+            } else if (str->p[j] == '\n') {
                 atStartOfLine = true;
                 curIndent = 0;
             }
@@ -196,33 +208,31 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<st
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
-    for (vector<std::pair<Pos, Expr *> >::iterator i = es.begin(); i != es.end(); ++i, --n) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(i->second);
-        if (!e) {
-            atStartOfLine = false;
-            curDropped = 0;
-            es2->push_back(*i);
-            continue;
-        }
-
+    auto i = es.begin();
+    const auto trimExpr = [&] (Expr * e) {
+        atStartOfLine = false;
+        curDropped = 0;
+        es2->emplace_back(i->first, e);
+    };
+    const auto trimString = [&] (const StringToken & t) {
         string s2;
-        for (size_t j = 0; j < e->s.size(); ++j) {
+        for (size_t j = 0; j < t.l; ++j) {
             if (atStartOfLine) {
-                if (e->s[j] == ' ') {
+                if (t.p[j] == ' ') {
                     if (curDropped++ >= minIndent)
-                        s2 += e->s[j];
+                        s2 += t.p[j];
                 }
-                else if (e->s[j] == '\n') {
+                else if (t.p[j] == '\n') {
                     curDropped = 0;
-                    s2 += e->s[j];
+                    s2 += t.p[j];
                 } else {
                     atStartOfLine = false;
                     curDropped = 0;
-                    s2 += e->s[j];
+                    s2 += t.p[j];
                 }
             } else {
-                s2 += e->s[j];
-                if (e->s[j] == '\n') atStartOfLine = true;
+                s2 += t.p[j];
+                if (t.p[j] == '\n') atStartOfLine = true;
             }
         }
 
@@ -235,6 +245,9 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<st
         }
 
         es2->emplace_back(i->first, new ExprString(symbols.create(s2)));
+    };
+    for (; i != es.end(); ++i, --n) {
+        std::visit(overloaded { trimExpr, trimString }, i->second);
     }
 
     /* If this is a single string, then don't do a concatenation. */
@@ -273,18 +286,13 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Formal * formal;
   nix::NixInt n;
   nix::NixFloat nf;
-  // using C a struct allows us to avoid having to define the special
-  // members that using string_view here would implicitly delete.
-  struct StringToken {
-    const char * p;
-    size_t l;
-    operator std::string_view() const { return {p, l}; }
-  };
   StringToken id; // !!! -> Symbol
   StringToken path;
   StringToken uri;
+  StringToken str;
   std::vector<nix::AttrName> * attrNames;
   std::vector<std::pair<nix::Pos, nix::Expr *> > * string_parts;
+  std::vector<std::pair<nix::Pos, std::variant<nix::Expr *, StringToken> > > * ind_string_parts;
 }
 
 %type <e> start expr expr_function expr_if expr_op
@@ -294,11 +302,12 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formals> formals
 %type <formal> formal
 %type <attrNames> attrs attrpath
-%type <string_parts> string_parts_interpolated ind_string_parts
+%type <string_parts> string_parts_interpolated
+%type <ind_string_parts> ind_string_parts
 %type <e> path_start string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
-%token <e> STR IND_STR
+%token <str> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH PATH_END
@@ -449,18 +458,19 @@ expr_simple
   ;
 
 string_parts
-  : STR
+  : STR { $$ = new ExprString(data->symbols.create($1)); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
   | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 string_parts_interpolated
-  : string_parts_interpolated STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
+  : string_parts_interpolated STR
+  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(data->symbols.create($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
   | DOLLAR_CURLY expr '}' { $$ = new vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new vector<std::pair<Pos, Expr *> >;
-      $$->emplace_back(makeCurPos(@1, data), $1);
+      $$->emplace_back(makeCurPos(@1, data), new ExprString(data->symbols.create($1)));
       $$->emplace_back(makeCurPos(@2, data), $3);
     }
   ;
@@ -482,7 +492,7 @@ path_start
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | { $$ = new vector<std::pair<Pos, Expr *> >; }
+  | { $$ = new vector<std::pair<Pos, std::variant<Expr *, StringToken> > >; }
   ;
 
 binds

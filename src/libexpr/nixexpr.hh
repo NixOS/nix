@@ -117,13 +117,6 @@ struct ExprString : Expr
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
-/* Temporary class used during parsing of indented strings. */
-struct ExprIndStr : Expr
-{
-    string s;
-    ExprIndStr(const string & s) : s(s) { };
-};
-
 struct ExprPath : Expr
 {
     string s;
