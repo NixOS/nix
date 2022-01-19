@@ -4,6 +4,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
+#include <boost/container/small_vector.hpp>
 
 namespace nix {
 
@@ -272,19 +273,27 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 
 static void printString(string & res, std::string_view s)
 {
-    size_t bufSize = s.size() * 2 + 2;
-    withBuffer(bufSize, [&](char *buf) {
-        char * p = buf;
-        *p++ = '"';
-        for (auto c : s)
-            if (c == '\"' || c == '\\') { *p++ = '\\'; *p++ = c; }
-            else if (c == '\n') { *p++ = '\\'; *p++ = 'n'; }
-            else if (c == '\r') { *p++ = '\\'; *p++ = 'r'; }
-            else if (c == '\t') { *p++ = '\\'; *p++ = 't'; }
-            else *p++ = c;
-        *p++ = '"';
-        res.append(buf, p - buf);
-    });
+    // Large stack allocations can skip past the stack protection page.
+    const size_t stack_protection_size = 4096;
+    // We reduce the max stack allocated buffer by an extra amount to increase
+    // the chance of hitting it, even when `fun`'s first access is some distance
+    // into its *further* stack frame, particularly if the call was inlined and
+    // therefore not writing a frame pointer.
+    const size_t play = 64 * sizeof(char *); // 512B on 64b archs
+
+    boost::container::small_vector<char, stack_protection_size - play> buffer;
+    buffer.reserve(s.size() * 2 + 2);
+    char * buf = buffer.data();
+    char * p = buf;
+    *p++ = '"';
+    for (auto c : s)
+        if (c == '\"' || c == '\\') { *p++ = '\\'; *p++ = c; }
+        else if (c == '\n') { *p++ = '\\'; *p++ = 'n'; }
+        else if (c == '\r') { *p++ = '\\'; *p++ = 'r'; }
+        else if (c == '\t') { *p++ = '\\'; *p++ = 't'; }
+        else *p++ = c;
+    *p++ = '"';
+    res.append(buf, p - buf);
 }
 
 
