@@ -10,6 +10,7 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 
+#include <iterator>
 #include <regex>
 #include <fstream>
 
@@ -48,7 +49,7 @@ std::string hilite_all(const std::string &s, std::vector<std::smatch> matches, s
     for (size_t i = 0; i < matches.size(); i++) {
         auto m = matches[i];
         size_t start = m.position();
-        out.append(m.prefix().str().substr(last_end));
+        out.append(s.substr(last_end, m.position() - last_end));
         // Merge continous matches
         ssize_t end = start + m.length();
         while(i + 1 < matches.size() && matches[i+1].position() <= end) {
@@ -150,21 +151,18 @@ struct CmdSearch : InstallableCommand, MixJSON
                     bool found = false;
 
                     for (auto & regex : regexes) {
-                        std::smatch tmp;
                         found = false;
+                        auto add_all = [&found](std::sregex_iterator it, std::vector<std::smatch>& vec){
+                            const auto end = std::sregex_iterator();
+                            while(it != end) {
+                                vec.push_back(*it++);
+                                found = true;
+                            }
+                        };
 
-                        if(std::regex_search(attrPath2, tmp, regex)) {
-                            attrPathMatches.push_back(tmp);
-                            found = true;
-                        }
-                        if(std::regex_search(name.name, tmp, regex)) {
-                            nameMatches.push_back(tmp);
-                            found = true;
-                        }
-                        if(std::regex_search(description, tmp, regex)) {
-                            descriptionMatches.push_back(tmp);
-                            found = true;
-                        }
+                        add_all(std::sregex_iterator(attrPath2.begin(), attrPath2.end(), regex), attrPathMatches);
+                        add_all(std::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
+                        add_all(std::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
 
                         if(!found)
                             break;
