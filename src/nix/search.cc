@@ -20,14 +20,50 @@ std::string wrap(std::string prefix, std::string s)
     return prefix + s + ANSI_NORMAL;
 }
 
+#define HILITE_COLOR ANSI_GREEN
+
 std::string hilite(const std::string & s, const std::smatch & m, std::string postfix)
 {
     return
         m.empty()
         ? s
         : std::string(m.prefix())
-          + ANSI_GREEN + std::string(m.str()) + postfix
+          + HILITE_COLOR + std::string(m.str()) + postfix
           + std::string(m.suffix());
+}
+
+std::string hilite_all(const std::string &s, std::vector<std::smatch> matches, std::string postfix) {
+    // Don't waste time on trivial highlights
+    if (matches.size() == 0)
+        return s;
+    else if (matches.size() == 1)
+        return hilite(s, matches[0], postfix);
+
+    std::sort(matches.begin(), matches.end(), [](const auto &a, const auto &b) {
+        return a.position() < b.position();
+    });
+
+    std::string out;
+    ssize_t last_end = 0;
+    for (size_t i = 0; i < matches.size(); i++) {
+        auto m = matches[i];
+        size_t start = m.position();
+        out.append(m.prefix().str().substr(last_end));
+        // Merge continous matches
+        ssize_t end = start + m.length();
+        while(i + 1 < matches.size() && matches[i+1].position() <= end) {
+            auto n = matches[++i];
+            ssize_t nend = start + (n.position() - start + n.length());
+            if(nend > end)
+                end = nend;
+        }
+        out.append(HILITE_COLOR);
+        out.append(s.substr(start, end - start));
+        out.append(postfix);
+        last_end = end;
+    }
+    out.append(s.substr(last_end));
+    return out;
 }
 
 struct CmdSearch : InstallableCommand, MixJSON
@@ -100,8 +136,6 @@ struct CmdSearch : InstallableCommand, MixJSON
                 };
 
                 if (cursor.isDerivation()) {
-                    size_t found = 0;
-
                     DrvName name(cursor.getAttr("name")->getString());
 
                     auto aMeta = cursor.maybeGetAttr("meta");
@@ -110,21 +144,34 @@ struct CmdSearch : InstallableCommand, MixJSON
                     std::replace(description.begin(), description.end(), '\n', ' ');
                     auto attrPath2 = concatStringsSep(".", attrPath);
 
-                    std::smatch attrPathMatch;
-                    std::smatch descriptionMatch;
-                    std::smatch nameMatch;
+                    std::vector<std::smatch> attrPathMatches;
+                    std::vector<std::smatch> descriptionMatches;
+                    std::vector<std::smatch> nameMatches;
+                    bool found = false;
 
                     for (auto & regex : regexes) {
-                        std::regex_search(attrPath2, attrPathMatch, regex);
-                        std::regex_search(name.name, nameMatch, regex);
-                        std::regex_search(description, descriptionMatch, regex);
-                        if (!attrPathMatch.empty()
-                            || !nameMatch.empty()
-                            || !descriptionMatch.empty())
-                            found++;
+                        std::smatch tmp;
+                        found = false;
+
+                        if(std::regex_search(attrPath2, tmp, regex)) {
+                            attrPathMatches.push_back(tmp);
+                            found = true;
+                        }
+                        if(std::regex_search(name.name, tmp, regex)) {
+                            nameMatches.push_back(tmp);
+                            found = true;
+                        }
+                        if(std::regex_search(description, tmp, regex)) {
+                            descriptionMatches.push_back(tmp);
+                            found = true;
+                        }
+
+                        if(!found)
+                            break;
                     }
 
-                    if (found == res.size()) {
+                    if (found)
+                    {
                         results++;
                         if (json) {
                             auto jsonElem = jsonOut->object(attrPath2);
@@ -132,15 +179,15 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
+                            auto name2 = hilite_all(name.name, nameMatches, "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
+                                wrap("\e[0;1m", hilite_all(attrPath2, attrPathMatches, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->cout(
-                                    "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
+                                    "  %s", hilite_all(description, descriptionMatches, ANSI_NORMAL));
                         }
                     }
                 }
