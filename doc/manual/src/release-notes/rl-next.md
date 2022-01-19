@@ -9,3 +9,7 @@
   as `lib.zipAttrsWith` from nixpkgs, but much more efficient.
 * New command `nix store copy-log` to copy build logs from one store
   to another.
+* The `commit-lockfile-summary` option can be set to a non-empty string
+  to override the commit summary used when commiting an updated lockfile.
+  This may be used in conjunction with the nixConfig attribute in
+  `flake.nix` to better conform to repository conventions.
