@@ -33,27 +33,27 @@ std::string hilite(const std::string & s, const std::smatch & m, std::string pos
           + std::string(m.suffix());
 }
 
-std::string hilite_all(const std::string &s, std::vector<std::smatch> matches, std::string postfix) {
-    // Don't waste time on trivial highlights
-    if (matches.size() == 0)
+template<class Iter>
+std::string hilite_all(const std::string &s, Iter matches_first, Iter matches_last, std::string postfix) {
+    // Avoid copy on zero matches
+    if (matches_first == matches_last)
         return s;
-    else if (matches.size() == 1)
-        return hilite(s, matches[0], postfix);
 
-    std::sort(matches.begin(), matches.end(), [](const auto &a, const auto &b) {
+    std::sort(matches_first, matches_last, [](const auto &a, const auto &b) {
         return a.position() < b.position();
     });
 
     std::string out;
     ssize_t last_end = 0;
-    for (size_t i = 0; i < matches.size(); i++) {
-        auto m = matches[i];
+
+    for (Iter it = matches_first; it != matches_last; ++it) {
+        auto m = *it;
         size_t start = m.position();
         out.append(s.substr(last_end, m.position() - last_end));
         // Merge continous matches
         ssize_t end = start + m.length();
-        while(i + 1 < matches.size() && matches[i+1].position() <= end) {
-            auto n = matches[++i];
+        while(it + 1 != matches_last && (*(it + 1)).position() <= end) {
+            auto n = *++it;
             ssize_t nend = start + (n.position() - start + n.length());
             if(nend > end)
                 end = nend;
@@ -177,15 +177,15 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hilite_all(name.name, nameMatches, "\e[0;2m");
+                            auto name2 = hilite_all(name.name, nameMatches.begin(), nameMatches.end(), "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hilite_all(attrPath2, attrPathMatches, "\e[0;1m")),
+                                wrap("\e[0;1m", hilite_all(attrPath2, attrPathMatches.begin(), attrPathMatches.end(), "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->cout(
-                                    "  %s", hilite_all(description, descriptionMatches, ANSI_NORMAL));
+                                    "  %s", hilite_all(description, descriptionMatches.begin(), descriptionMatches.end(), ANSI_NORMAL));
                         }
                     }
                 }
