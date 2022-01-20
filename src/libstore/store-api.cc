@@ -1042,6 +1042,21 @@ void copyClosure(
     copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
+void copyClosure(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePathSet & storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
+{
+    if (&srcStore == &dstStore) return;
+
+    StorePathSet closure;
+    srcStore.computeFSClosure(storePaths, closure);
+    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
+}
+
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {
     std::string path;
