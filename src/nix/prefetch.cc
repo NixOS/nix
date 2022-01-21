@@ -38,7 +38,7 @@ string resolveMirrorUrl(EvalState & state, string url)
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
 
-    auto mirror = state.forceString(*mirrorList->value->listElems()[0]);
+    string mirror(state.forceString(*mirrorList->value->listElems()[0]));
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
 }
 

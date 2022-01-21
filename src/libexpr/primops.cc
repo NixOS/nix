@@ -314,7 +314,7 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
 {
     auto path = realisePath(state, pos, *args[0]);
 
-    string sym = state.forceStringNoCtx(*args[1], pos);
+    string sym(state.forceStringNoCtx(*args[1], pos));
 
     void *handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (!handle)
@@ -825,7 +825,7 @@ static RegisterPrimOp primop_tryEval({
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name = state.forceStringNoCtx(*args[0], pos);
+    string name(state.forceStringNoCtx(*args[0], pos));
     v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
@@ -975,7 +975,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         const string & key = i->name;
         vomit("processing attribute '%1%'", key);
 
-        auto handleHashMode = [&](const std::string & s) {
+        auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
             else
@@ -1502,7 +1502,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         searchPath.emplace_back(prefix, path);
     }
 
-    string path = state.forceStringNoCtx(*args[1], pos);
+    auto path = state.forceStringNoCtx(*args[1], pos);
 
     v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
 }
@@ -1516,7 +1516,7 @@ static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string type = state.forceStringNoCtx(*args[0], pos);
+    auto type = state.forceStringNoCtx(*args[0], pos);
     std::optional<HashType> ht = parseHashType(type);
     if (!ht)
         throw Error({
@@ -1723,7 +1723,7 @@ static RegisterPrimOp primop_toJSON({
 /* Parse a JSON string to a value. */
 static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string s = state.forceStringNoCtx(*args[0], pos);
+    auto s = state.forceStringNoCtx(*args[0], pos);
     try {
         parseJSON(state, s, v);
     } catch (JSONParseError &e) {
@@ -1752,8 +1752,8 @@ static RegisterPrimOp primop_fromJSON({
 static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string name = state.forceStringNoCtx(*args[0], pos);
-    string contents = state.forceString(*args[1], context, pos);
+    string name(state.forceStringNoCtx(*args[0], pos));
+    string contents(state.forceString(*args[1], context, pos));
 
     StorePathSet refs;
 
@@ -2153,7 +2153,7 @@ static RegisterPrimOp primop_attrValues({
 /* Dynamic version of the `.' operator. */
 void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0], pos);
+    auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     Bindings::iterator i = getAttr(
         state,
@@ -2183,7 +2183,7 @@ static RegisterPrimOp primop_getAttr({
 /* Return position information of the specified attribute. */
 static void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0], pos);
+    auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
@@ -2201,7 +2201,7 @@ static RegisterPrimOp primop_unsafeGetAttrPos(RegisterPrimOp::Info {
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0], pos);
+    auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     v.mkBool(args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
@@ -2300,7 +2300,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
             pos
         );
 
-        string name = state.forceStringNoCtx(*j->value, *j->pos);
+        auto name = state.forceStringNoCtx(*j->value, *j->pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
@@ -3032,7 +3032,7 @@ static void prim_groupBy(EvalState & state, const Pos & pos, Value * * args, Val
     for (auto vElem : args[1]->listItems()) {
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
-        string name = state.forceStringNoCtx(res, pos);
+        auto name = state.forceStringNoCtx(res, pos);
         Symbol sym = state.symbols.create(name);
         auto vector = attrs.try_emplace(sym, ValueVector()).first;
         vector->second.push_back(vElem);
@@ -3376,7 +3376,7 @@ static RegisterPrimOp primop_stringLength({
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string type = state.forceStringNoCtx(*args[0], pos);
+    auto type = state.forceStringNoCtx(*args[0], pos);
     std::optional<HashType> ht = parseHashType(type);
     if (!ht)
         throw Error({
@@ -3385,7 +3385,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
         });
 
     PathSet context; // discarded
-    string s = state.forceString(*args[1], context, pos);
+    auto s = state.forceString(*args[1], context, pos);
 
     v.mkString(hashString(*ht, s).to_string(Base16, false));
 }
@@ -3403,7 +3403,18 @@ static RegisterPrimOp primop_hashString({
 
 struct RegexCache
 {
-    std::unordered_map<std::string, std::regex> cache;
+    // TODO use C++20 transparent comparison when available
+    std::unordered_map<std::string_view, std::regex> cache;
+    std::list<std::string> keys;
+
+    std::regex get(std::string_view re)
+    {
+        auto it = cache.find(re);
+        if (it != cache.end())
+            return it->second;
+        keys.emplace_back(re);
+        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+    }
 };
 
 std::shared_ptr<RegexCache> makeRegexCache()
@@ -3417,15 +3428,13 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 
     try {
 
-        auto regex = state.regexCache->cache.find(re);
-        if (regex == state.regexCache->cache.end())
-            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
+        auto regex = state.regexCache->get(re);
 
         PathSet context;
-        const std::string str = state.forceString(*args[1], context, pos);
+        const auto str = state.forceString(*args[1], context, pos);
 
-        std::smatch match;
-        if (!std::regex_match(str, match, regex->second)) {
+        std::cmatch match;
+        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
             v.mkNull();
             return;
         }
@@ -3500,15 +3509,13 @@ void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
 
     try {
 
-        auto regex = state.regexCache->cache.find(re);
-        if (regex == state.regexCache->cache.end())
-            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
+        auto regex = state.regexCache->get(re);
 
         PathSet context;
-        const std::string str = state.forceString(*args[1], context, pos);
+        const auto str = state.forceString(*args[1], context, pos);
 
-        auto begin = std::sregex_iterator(str.begin(), str.end(), regex->second);
-        auto end = std::sregex_iterator();
+        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
+        auto end = std::cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
@@ -3520,9 +3527,9 @@ void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
             return;
         }
 
-        for (std::sregex_iterator i = begin; i != end; ++i) {
+        for (auto i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
-            std::smatch match = *i;
+            auto match = *i;
 
             // Add a string for non-matched characters.
             (v.listElems()[idx++] = state.allocValue())->mkString(match.prefix().str());
@@ -3643,14 +3650,14 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     vector<string> from;
     from.reserve(args[0]->listSize());
     for (auto elem : args[0]->listItems())
-        from.push_back(state.forceString(*elem, pos));
+        from.emplace_back(state.forceString(*elem, pos));
 
     vector<std::pair<string, PathSet>> to;
     to.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         PathSet ctx;
         auto s = state.forceString(*elem, ctx, pos);
-        to.push_back(std::make_pair(std::move(s), std::move(ctx)));
+        to.emplace_back(s, std::move(ctx));
     }
 
     PathSet context;
@@ -3712,7 +3719,7 @@ static RegisterPrimOp primop_replaceStrings({
 
 static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name = state.forceStringNoCtx(*args[0], pos);
+    auto name = state.forceStringNoCtx(*args[0], pos);
     DrvName parsed(name);
     auto attrs = state.buildBindings(2);
     attrs.alloc(state.sName).mkString(parsed.name);
@@ -3736,8 +3743,8 @@ static RegisterPrimOp primop_parseDrvName({
 
 static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string version1 = state.forceStringNoCtx(*args[0], pos);
-    string version2 = state.forceStringNoCtx(*args[1], pos);
+    auto version1 = state.forceStringNoCtx(*args[0], pos);
+    auto version2 = state.forceStringNoCtx(*args[1], pos);
     v.mkInt(compareVersions(version1, version2));
 }
 
@@ -3756,14 +3763,14 @@ static RegisterPrimOp primop_compareVersions({
 
 static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string version = state.forceStringNoCtx(*args[0], pos);
+    auto version = state.forceStringNoCtx(*args[0], pos);
     auto iter = version.cbegin();
     Strings components;
     while (iter != version.cend()) {
         auto component = nextComponent(iter, version.cend());
         if (component.empty())
             break;
-        components.emplace_back(std::move(component));
+        components.emplace_back(component);
     }
     state.mkList(v, components.size());
     for (const auto & [n, component] : enumerate(components))

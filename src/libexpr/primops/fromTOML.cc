@@ -9,7 +9,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
 {
     auto toml = state.forceStringNoCtx(*args[0], pos);
 
-    std::istringstream tomlStream(toml);
+    std::istringstream tomlStream(string{toml});
 
     std::function<void(Value &, toml::value)> visit;
 

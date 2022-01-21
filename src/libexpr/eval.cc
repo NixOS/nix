@@ -1857,7 +1857,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 }
 
 
-string EvalState::forceString(Value & v, const Pos & pos)
+std::string_view EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nString) {
@@ -1866,7 +1866,7 @@ string EvalState::forceString(Value & v, const Pos & pos)
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
-    return string(v.string.s);
+    return v.string.s;
 }
 
 
@@ -1901,17 +1901,17 @@ std::vector<std::pair<Path, std::string>> Value::getContext()
 }
 
 
-string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
+std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {
-    string s = forceString(v, pos);
+    auto s = forceString(v, pos);
     copyContext(v, context);
     return s;
 }
 
 
-string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
+std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
-    string s = forceString(v, pos);
+    auto s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",

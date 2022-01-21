@@ -180,7 +180,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             }
             for (auto elem : iter->value->listItems()) {
                 auto name = state.forceStringNoCtx(*elem, *iter->pos);
-                context.insert("!" + name + "!" + string(i.name));
+                context.insert(concatStrings("!", name, "!", i.name));
             }
         }
     }

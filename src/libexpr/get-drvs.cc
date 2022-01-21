@@ -104,7 +104,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
             /* For each output... */
             for (auto elem : i->value->listItems()) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*elem, *i->pos);
+                string name(state->forceStringNoCtx(*elem, *i->pos));
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
                 state->forceAttrs(*out->value);

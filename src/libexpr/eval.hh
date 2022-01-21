@@ -201,8 +201,8 @@ public:
     void resetFileCache();
 
     /* Look up a file in the search path. */
-    Path findFile(const string & path);
-    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
+    Path findFile(const std::string_view path);
+    Path findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
@@ -236,9 +236,9 @@ public:
     inline void forceList(Value & v);
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
-    string forceString(Value & v, const Pos & pos = noPos);
-    string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
-    string forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    std::string_view forceString(Value & v, const Pos & pos = noPos);
+    std::string_view forceString(Value & v, PathSet & context, const Pos & pos = noPos);
+    std::string_view forceStringNoCtx(Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */

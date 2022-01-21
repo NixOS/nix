@@ -709,24 +709,24 @@ void EvalState::addToSearchPath(const string & s)
 }
 
 
-Path EvalState::findFile(const string & path)
+Path EvalState::findFile(const std::string_view path)
 {
     return findFile(searchPath, path);
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos & pos)
+Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos)
 {
     for (auto & i : searchPath) {
         std::string suffix;
         if (i.first.empty())
-            suffix = "/" + path;
+            suffix = concatStrings("/", path);
         else {
             auto s = i.first.size();
             if (path.compare(0, s, i.first) != 0 ||
                 (path.size() > s && path[s] != '/'))
                 continue;
-            suffix = path.size() == s ? "" : "/" + string(path, s);
+            suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
         }
         auto r = resolveSearchPathElem(i);
         if (!r.first) continue;
@@ -735,7 +735,7 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
     }
 
     if (hasPrefix(path, "nix/"))
-        return corepkgsPrefix + path.substr(4);
+        return concatStrings(corepkgsPrefix, path.substr(4));
 
     throw ThrownError({
         .msg = hintfmt(evalSettings.pureEval
