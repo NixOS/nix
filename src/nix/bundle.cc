@@ -69,39 +69,24 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto app = installable->toApp(*evalState).resolve(getEvalStore(), store);
-
         auto [progFlakeRef, progName] = parseFlakeRefWithFragment(installable->what(), absPath("."));
         const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
         auto programInstallable = InstallableFlake(this,
             evalState, std::move(progFlakeRef),
-            Strings{progName == "" ? "defaultPackage" : progName},
-            Strings({"packages."+settings.thisSystem.get()+".","legacyPackages."+settings.thisSystem.get()+"."}), lockFlagsProg);
+            Strings{progName == "" ? "defaultApp" : progName},
+            Strings(this->getDefaultFlakeAttrPathPrefixes()),
+            lockFlagsProg);
         auto val = programInstallable.toValue(*evalState).first;
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         auto bundler = InstallableFlake(this,
             evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
+            Strings{bundlerName == "" ? "defaultBundler." + settings.thisSystem.get() : settings.thisSystem.get() + "." + bundlerName},
             Strings({"bundlers."}), lockFlags);
 
-        auto attrs = evalState->buildBindings(2);
-
-        Value & prog = *evalState->allocAttr(*arg, evalState->symbols.create("program"));
-        evalState->mkAttrs(prog,val->attrs->size());
-        for (auto &j : *(val->attrs)){
-            prog.attrs->push_back(j);
-        }
-        prog.attrs->sort();
-
-        attrs.alloc("system").mkString(settings.thisSystem.get());
-
         auto vRes = evalState->allocValue();
-        evalState->callFunction(
-            *bundler.toValue(*evalState).first,
-            evalState->allocValue()->mkAttrs(attrs),
-            *vRes, noPos);
+        evalState->callFunction(*bundler.toValue(*evalState).first, *val, *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
@@ -123,9 +108,12 @@ struct CmdBundle : InstallableCommand
 
         auto outPathS = store->printStorePath(outPath);
 
-        if (!outLink)
-            outLink = baseNameOf(app.program);
+        if (!outLink) {
+            auto &attr = vRes->attrs->need(evalState->sName);
+            outLink = evalState->forceStringNoCtx(*attr.value,*attr.pos);
+        }
 
+        // TODO: will crash if not a localFSStore?
         store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink));
     }
 };
