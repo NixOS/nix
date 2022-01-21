@@ -43,6 +43,19 @@ private:
     std::shared_ptr<Store> _store;
 };
 
+/* A command that copies something between `--from` and `--to`
+   stores. */
+struct CopyCommand : virtual StoreCommand
+{
+    std::string srcUri, dstUri;
+
+    CopyCommand();
+
+    ref<Store> createStore() override;
+
+    ref<Store> getDstStore();
+};
+
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     EvalCommand();

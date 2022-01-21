@@ -59,7 +59,6 @@ struct HelpRequested { };
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
     bool showVersion = false;
@@ -270,11 +269,15 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = lvlNotice;
-    settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
     setLogFormat("bar");
+    settings.verboseBuild = false;
+    if (isatty(STDERR_FILENO)) {
+        verbosity = lvlNotice;
+    } else {
+        verbosity = lvlInfo;
+    }
 
     Finally f([] { logger->stop(); });
 

@@ -473,7 +473,7 @@ string ExprLambda::showNamePos() const
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    for (auto & i : symbols)
+    for (auto & i : store)
         n += i.size();
     return n;
 }

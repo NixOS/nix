@@ -31,7 +31,7 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
 
     StringSink sink;
     sink << narVersionMagic1;
-    narMagic = *sink.s;
+    narMagic = sink.s;
 }
 
 void BinaryCacheStore::init()
@@ -68,7 +68,7 @@ void BinaryCacheStore::upsertFile(const std::string & path,
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
-    Callback<std::shared_ptr<std::string>> callback) noexcept
+    Callback<std::optional<std::string>> callback) noexcept
 {
     try {
         callback(getFile(path));
@@ -77,9 +77,9 @@ void BinaryCacheStore::getFile(const std::string & path,
 
 void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
 {
-    std::promise<std::shared_ptr<std::string>> promise;
+    std::promise<std::optional<std::string>> promise;
     getFile(path,
-        {[&](std::future<std::shared_ptr<std::string>> result) {
+        {[&](std::future<std::optional<std::string>> result) {
             try {
                 promise.set_value(result.get());
             } catch (...) {
@@ -89,15 +89,15 @@ void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
     sink(*promise.get_future().get());
 }
 
-std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
+std::optional<std::string> BinaryCacheStore::getFile(const std::string & path)
 {
     StringSink sink;
     try {
         getFile(path, sink);
     } catch (NoSuchBinaryCacheFile &) {
-        return nullptr;
+        return std::nullopt;
     }
-    return sink.s;
+    return std::move(sink.s);
 }
 
 std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
@@ -367,11 +367,11 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     getFile(narInfoFile,
-        {[=](std::future<std::shared_ptr<std::string>> fut) {
+        {[=](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
 
-                if (!data) return (*callbackPtr)(nullptr);
+                if (!data) return (*callbackPtr)({});
 
                 stats.narInfoRead++;
 
@@ -429,7 +429,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
 
     StringSink sink;
     dumpString(s, sink);
-    auto source = StringSource { *sink.s };
+    StringSource source(sink.s);
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info { path, nar.first };
         info.narSize = nar.second;
@@ -446,11 +446,11 @@ void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    Callback<std::shared_ptr<std::string>> newCallback = {
-        [=](std::future<std::shared_ptr<std::string>> fut) {
+    Callback<std::optional<std::string>> newCallback = {
+        [=](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
-                if (!data) return (*callbackPtr)(nullptr);
+                if (!data) return (*callbackPtr)({});
 
                 auto realisation = Realisation::fromJSON(
                     nlohmann::json::parse(*data), outputInfoFilePath);
@@ -490,7 +490,7 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
     writeNarInfo(narInfo);
 }
 
-std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
+std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
     auto drvPath = path;
 
@@ -498,10 +498,10 @@ std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & pat
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
-            if (!info->deriver) return nullptr;
+            if (!info->deriver) return std::nullopt;
             drvPath = *info->deriver;
         } catch (InvalidPath &) {
-            return nullptr;
+            return std::nullopt;
         }
     }
 
@@ -510,6 +510,16 @@ std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & pat
     debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
 
     return getFile(logPath);
+}
+
+void BinaryCacheStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    assert(drvPath.isDerivation());
+
+    upsertFile(
+        "log/" + std::string(drvPath.to_string()),
+        (std::string) log, // FIXME: don't copy
+        "text/plain; charset=utf-8");
 }
 
 }

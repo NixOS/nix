@@ -51,6 +51,7 @@ public:
         const std::string & mimeType) = 0;
 
     void upsertFile(const std::string & path,
+        // FIXME: use std::string_view
         std::string && data,
         const std::string & mimeType);
 
@@ -62,10 +63,11 @@ public:
 
     /* Fetch the specified file and call the specified callback with
        the result. A subclass may implement this asynchronously. */
-    virtual void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) noexcept;
+    virtual void getFile(
+        const std::string & path,
+        Callback<std::optional<std::string>> callback) noexcept;
 
-    std::shared_ptr<std::string> getFile(const std::string & path);
+    std::optional<std::string> getFile(const std::string & path);
 
 public:
 
@@ -117,7 +119,9 @@ public:
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLog(const StorePath & path) override;
+
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
 };
 

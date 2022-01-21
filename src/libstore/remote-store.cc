@@ -172,7 +172,7 @@ void RemoteStore::initConnection(Connection & conn)
                it. */
             conn.closeWrite();
             auto msg = conn.from.drain();
-            throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
+            throw Error("protocol mismatch, got '%s'", chomp(saved.s + msg));
         }
 
         conn.from >> conn.daemonVersion;
@@ -905,6 +905,18 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
  fallback:
     return Store::queryMissing(targets, willBuild, willSubstitute,
         unknown, downloadSize, narSize);
+}
+
+
+void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    auto conn(getConnection());
+    conn->to << wopAddBuildLog << drvPath.to_string();
+    StringSource source(log);
+    conn.withFramedSink([&](Sink & sink) {
+        source.drainInto(sink);
+    });
+    readInt(conn->from);
 }
 
 

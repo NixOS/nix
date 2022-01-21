@@ -47,6 +47,7 @@ nix_tests = \
   describe-stores.sh \
   flakes.sh \
   flake-local-settings.sh \
+  flake-searching.sh \
   build.sh \
   repl.sh ca/repl.sh \
   ca/build.sh \
@@ -60,7 +61,8 @@ nix_tests = \
   ca/concurrent-builds.sh \
   ca/nix-copy.sh \
   eval-store.sh \
-  readfile-context.sh
+  readfile-context.sh \
+  why-depends.sh
   # parallel.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)

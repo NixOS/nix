@@ -96,6 +96,7 @@ void LocalBinaryCacheStore::init()
     createDirs(binaryCacheDir + "/" + realisationsPrefix);
     if (writeDebugInfo)
         createDirs(binaryCacheDir + "/debuginfo");
+    createDirs(binaryCacheDir + "/log");
     BinaryCacheStore::init();
 }
 

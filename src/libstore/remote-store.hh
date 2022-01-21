@@ -116,6 +116,8 @@ public:
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
 
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
+
     void connect() override;
 
     unsigned int getProtocol() override;

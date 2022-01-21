@@ -2226,8 +2226,8 @@ void LocalDerivationGoal::registerOutputs()
                 StringSink sink;
                 dumpPath(actualPath, sink);
                 deletePath(actualPath);
-                sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
-                StringSource source(*sink.s);
+                sink.s = rewriteStrings(sink.s, outputRewrites);
+                StringSource source(sink.s);
                 restorePath(actualPath, source);
             }
         };
@@ -2295,7 +2295,7 @@ void LocalDerivationGoal::registerOutputs()
                     StringSink sink;
                     dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
-                    rsink2(*sink.s);
+                    rsink2(sink.s);
                     rsink2.flush();
                 });
                 Path tmpPath = actualPath + ".tmp";

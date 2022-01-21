@@ -9,6 +9,7 @@
 #include "callback.hh"
 #include "topo-sort.hh"
 #include "finally.hh"
+#include "compression.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -1461,12 +1462,12 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
             StringSink sink;
             dumpString(s, sink);
-            auto narHash = hashString(htSHA256, *sink.s);
+            auto narHash = hashString(htSHA256, sink.s);
 
             optimisePath(realPath, repair);
 
             ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s->size();
+            info.narSize = sink.s.size();
             info.references = references;
             info.ca = TextHash { .hash = hash };
             registerValidPath(info);
@@ -1896,6 +1897,26 @@ FixedOutputHash LocalStore::hashCAPath(
         .method = method,
         .hash = hash,
     };
+}
+
+void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    assert(drvPath.isDerivation());
+
+    auto baseName = drvPath.to_string();
+
+    auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+
+    if (pathExists(logPath)) return;
+
+    createDirs(dirOf(logPath));
+
+    auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
+
+    writeFile(tmpFile, compress("bzip2", log));
+
+    if (rename(tmpFile.c_str(), logPath.c_str()) != 0)
+        throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
 }
 
 }  // namespace nix

@@ -18,7 +18,7 @@ if nix-store --gc --print-dead | grep -E $outPath$; then false; fi
 
 nix-store --gc --print-dead
 
-inUse=$(readLink $outPath/input-2)
+inUse=$(readLink $outPath/reference-to-input-2)
 if nix-store --delete $inUse; then false; fi
 test -e $inUse
 
@@ -35,7 +35,7 @@ nix-collect-garbage
 
 # Check that the root and its dependencies haven't been deleted.
 cat $outPath/foobar
-cat $outPath/input-2/bar
+cat $outPath/reference-to-input-2/bar
 
 # Check that the derivation has been GC'd.
 if test -e $drvPath; then false; fi

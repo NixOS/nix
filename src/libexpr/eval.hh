@@ -80,7 +80,8 @@ public:
         sContentAddressed,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
-        sDescription, sSelf, sEpsilon;
+        sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
+        sPrefix;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -179,8 +180,8 @@ public:
     Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv);
-    Expr * parseExprFromString(std::string_view s, const Path & basePath);
+    Expr * parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv);
+    Expr * parseExprFromString(std::string s, const Path & basePath);
 
     Expr * parseStdin();
 
@@ -308,7 +309,7 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(const char * text, FileOrigin origin, const Path & path,
+    Expr * parse(char * text, size_t length, FileOrigin origin, const Path & path,
         const Path & basePath, StaticEnv & staticEnv);
 
 public:
@@ -399,6 +400,7 @@ private:
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v);
 
     friend struct Value;
 };

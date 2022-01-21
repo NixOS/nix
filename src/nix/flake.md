@@ -137,15 +137,6 @@ Currently the `type` attribute can be one of the following:
   *path* must be a directory in the file system containing a file
   named `flake.nix`.
 
-  If the directory or any of its parents is a Git repository, then
-  this is essentially equivalent to `git+file://<path>` (see below),
-  except that the `dir` parameter is derived automatically. For
-  example, if `/foo/bar` is a Git repository, then the flake reference
-  `/foo/bar/flake` is equivalent to `/foo/bar?dir=flake`.
-
-  If the directory is not inside a Git repository, then the flake
-  contents is the entire contents of *path*.
-
   *path* generally must be an absolute path. However, on the command
   line, it can be a relative path (e.g. `.` or `./foo`) which is
   interpreted as relative to the current directory. In this case, it
