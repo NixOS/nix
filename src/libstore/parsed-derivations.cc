@@ -170,7 +170,7 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
         if (value.is_string())
-            return shellEscape(value);
+            return shellEscape(value.get<std::string_view>());
 
         if (value.is_number()) {
             auto f = value.get<float>();

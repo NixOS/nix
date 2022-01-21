@@ -598,7 +598,7 @@ namespace nix {
 
 
 Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const Path & path, const Path & basePath, StaticEnv & staticEnv)
+    const PathView path, const PathView basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);

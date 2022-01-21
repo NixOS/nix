@@ -309,8 +309,8 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(char * text, size_t length, FileOrigin origin, const Path & path,
-        const Path & basePath, StaticEnv & staticEnv);
+    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
+        const PathView basePath, StaticEnv & staticEnv);
 
 public:
 

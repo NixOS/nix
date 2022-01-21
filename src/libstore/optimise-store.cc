@@ -26,7 +26,7 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    MakeReadOnly(const PathView path) : path(path) { }
     ~MakeReadOnly()
     {
         try {
@@ -205,12 +205,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    bool mustToggle = dirOf(path) != realStoreDir.get();
-    if (mustToggle) makeWritable(dirOf(path));
+    const Path dirOfPath(dirOf(path));
+    bool mustToggle = dirOfPath != realStoreDir.get();
+    if (mustToggle) makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % realStoreDir % getpid() % random()).str();
