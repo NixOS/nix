@@ -33,7 +33,7 @@ string resolveMirrorUrl(EvalState & state, string url)
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
         throw Error("unknown mirror name '%s'", mirrorName);
-    state.forceList(*mirrorList->value);
+    state.forceList(*mirrorList->value, noPos);
 
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
@@ -200,7 +200,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
             /* Extract the URL. */
             auto & attr = v.attrs->need(state->symbols.create("urls"));
-            state->forceList(*attr.value);
+            state->forceList(*attr.value, noPos);
             if (attr.value->listSize() < 1)
                 throw Error("'urls' list is empty");
             url = state->forceString(*attr.value->listElems()[0]);
