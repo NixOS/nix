@@ -336,7 +336,7 @@ Value & AttrCursor::getValue()
     if (!_value) {
         if (parent) {
             auto & vParent = parent->first->getValue();
-            root->state.forceAttrs(vParent, vParent.determinePos(noPos));
+            root->state.forceAttrs(vParent, noPos);
             auto attr = vParent.attrs->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
@@ -381,7 +381,7 @@ Value & AttrCursor::forceValue()
     auto & v = getValue();
 
     try {
-        root->state.forceValue(v, v.determinePos(noPos));
+        root->state.forceValue(v, noPos);
     } catch (EvalError &) {
         debug("setting '%s' to failed", getAttrPathStr());
         if (root->db)

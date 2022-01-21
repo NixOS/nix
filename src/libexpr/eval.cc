@@ -1280,7 +1280,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     for (auto & i : attrPath) {
-        state.forceValue(*vAttrs, vAttrs->determinePos(noPos));
+        state.forceValue(*vAttrs, noPos);
         Bindings::iterator j;
         Symbol name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
@@ -2037,8 +2037,8 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 
 bool EvalState::eqValues(Value & v1, Value & v2)
 {
-    forceValue(v1, v1.determinePos(noPos));
-    forceValue(v2, v2.determinePos(noPos));
+    forceValue(v1, noPos);
+    forceValue(v2, noPos);
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls

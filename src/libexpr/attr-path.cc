@@ -58,7 +58,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v, v->determinePos(vIn.determinePos(noPos)));
+        state.forceValue(*v, noPos);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
