@@ -515,7 +515,7 @@ static void main_nix_build(int argc, char * * argv)
                 shellEscape(*shell),
                 (getenv("TZ") ? (string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
                 envCommand);
-        vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
+        debug("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);
 
         Strings envStrs;
