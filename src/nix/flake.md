@@ -301,6 +301,11 @@ The following attributes are supported in `flake.nix`:
   value (e.g. `packages.x86_64-linux` must be an attribute set of
   derivations built for the `x86_64-linux` platform).
 
+* `nixConfig`: An attribute set specifying configuration options for nix the
+  same as you would set in [`nix.conf`](./how-do-i-reference/conf-file.md).
+  These options will be enabled when building outputs from this flake. Options
+  that may compromise security must be approved by the user.
+
 ## Flake inputs
 
 The attribute `inputs` specifies the dependencies of a flake, as an
@@ -414,6 +419,244 @@ not useful to eliminate transitive `nixpkgs` flake inputs in this
 way. Most flakes provide their functionality through Nixpkgs overlays
 or NixOS modules, which are composed into the top-level flake's
 `nixpkgs` input; so their own `nixpkgs` input is usually irrelevant.
+
+## Flake outputs
+
+While the technical specification of a flake does not include any details about
+the outputs, there are some common conventions, and tools that expect certain
+outputs. These are documented here, including how they are typically used,
+whether they are recognized by [`nix flake check`](./flake-check.md), and what
+type they should be.
+
+### checks
+Used-by: `nix flake check`
+Checked: Yes
+Type: systemAttrs (attrsOf (derivation))
+
+Additional checks that get run by `nix flake check`. These can include lints,
+NixOS tests, and anything else that makes sure the flake is correct. The
+`checks` attribute is an attrset which maps system architectures to the package
+derivations for the tests to run on that system.
+
+### packages
+Used-by: `nix build`, `nix run`
+Checked: Yes
+Type: systemAttrs (attrsOf derivation)
+
+Packages allows you to specify multiple named packages. They can be built with
+`nix build <flake>#<package-name>`. The `packages` attribute is an attrset which
+maps system architecture to the package derivations defined for that system.
+
+See [`defaultPackage`](#defaultPackage) for marking one package as default.
+
+### defaultPackage
+Used-by `nix build`, `nix run`
+Checked: Yes
+Type: systemAttrs derivation
+
+The package for `nix build` to build when no specific package is specified at
+the command line. It takes the form of a set mapping system architecture to the
+default package derivation for that system. (e.g.  `defaultPackage.x86_64 =
+pkgs.callPackage ./package.nix;`)
+
+The [`flake-utils`](https://github.com/numtide/flake-utils) function
+`eachDefaultSystem` is often used to generate an output for a set of common
+systems.
+
+See [`packages`](#packages) if you would like to expose multiple packages.
+
+### apps
+Used-by: `nix run`
+Checked: Yes
+Type: systemAttrs (attrsOf {type; program;})
+
+Easy access to certain apps or commands. Takes the form of a set mapping system
+architecture to the apps available on that system. For now `type` must be
+`"app"`, and `program` is the path to an executable in a nix package.
+
+See [`defaultApp`](#defaultApp) if you would like to mark one app as defaault.
+
+### defaultApp
+Used-by: `nix run`
+Checked: Yes
+Type: attrsof {type; program;}
+
+The app for `nix run` to run when no specific app is specified at the command
+line. It takes the form of a set mapping system architecture to the
+default app for that system. For now `type` must be `"app"`, and `program` is
+the path to an executable in a nix package.
+
+See [`apps`](#apps) if you would like to expose multiple apps.
+
+### legacyPackages
+Used-by: `nix build`
+Checked: Yes
+type: systemAttrs (attrsOf^N derivation)
+
+`legacyPackages` is just like [`packages`](#packages), except that packages do
+not need to be at the top level. There can be nested attrsets that have packages
+at the leaves. Where possible, `packages` is preferred, as it's more efficient
+for some purposes.
+
+### overlay
+Used-by: Downstream flakes
+Checked: Yes
+Type: Overlay (final: prev: package set)
+
+Overlay specifies the default overlay for this Flake. It can be used to add
+packages to a nixpkgs set with `import <nixpkgs> { overlays = [ self.overlay ];}`.
+
+If it is specified in the flake file itself, `nix flake check` requires the
+function arguments to be named `final` and `prev` (rather than, for example, the
+previous convention of `self` and `super` ).
+
+See [`overlays`](#overlays) for when you need multiple overlays.
+
+### overlays
+Used-by: Downstream flakes
+Checked: Yes
+Type: attrsOf Overlay
+
+Overlays allows you to specify multiple named overlays. It can be used to add
+packages to a nixpkgs set in two ways.  First, a single overlay can be selected:
+`import <nixpkgs> { overlays = [ self.overlay.foo ]; }` Second, all overlays can
+be applied: `import <nixpkgs> { overlays = builtins.attrValues self.overlays }`
+
+If the overlays should only ever be applied together, and/or if the order
+they're applied in is important, one can use the [`overlay`](#overlay) output
+and join the overlays with `lib.composeExtensions` or
+`lib.composeManyExtensions`.
+
+See [`overlay`](#overlay) for when you only need one overlay, or want to
+designate a default.
+
+### nixosModule
+Used-by: Downstream flakes
+Checked: Yes
+Type: NixOS Module
+
+A module for use in NixOS configurations by adding it to the
+`imports` attribute.
+
+See [`nixosModules`](#nixosModules) for when you want to provide multiple
+modules.
+
+### nixosModules
+Used-by: Downstream flakes
+Checked: Yes
+Type: attrsOf (NixOS Module)
+
+An attrset of NixOS modules, for use in NixOS configurations.
+
+See [`nixosModule`](#nixosModule) for when you have only one, or a default
+module to provide.
+
+### nixosConfigurations
+Used-by: `nixos-rebuild`
+Checked: Yes
+Type: NixOS Module
+
+An attrset mapping hostnames to nixos configurations. Call `nixos-rebuild` with
+the `--flake <URI>` argument to rebuild with the
+`nixosConfigurations.<current hostname>` configuration. A specific hostname can
+also be specified by `--flake <URI>.<hostname>`.
+
+### hmModule
+Used-by: home-manager
+Checked: No
+Type: Home-manager Module
+
+A module for use in
+[home-manager](https://github.com/nix-community/home-manager) configurations by
+adding it to the `imports` attribute.
+
+See [`hmModules`](#hmModules) for when you want to provide multiple modules.
+
+### hmModules
+Used-by: home-manager
+Checked: No
+Type: attrsOf (Home-manager Module)
+
+An attrset of home-manager modules, for use in home-manager configurations.
+
+See [`hmModule`](#hmModule) for when you have only one, or a default module to
+provide.
+
+### defaultBundler
+Used-by: `nix bundle`
+Checked: Yes
+Type: Bundler
+
+left blank until #5456 is resolved
+
+### bundlers
+Used-by: `nix bundle`
+Checked: Yes
+Type: attrsOf Bundler
+
+left blank until #5456 is resolved
+
+### devShell
+Used-by: `nix develop`
+Checked: Yes
+Type: systemAttrs derivation
+
+A shell derivation (created with functions like `nixpkgs#mkShell`) to set up the
+environment for hacking on the flake.
+
+See [`devShells`](#devShells) for when you want to provide multiple development
+environments.
+
+### devShells
+Used-by: `nix develop`
+Checked: Yes
+Type: systemAttrs (attrsOf derivation)
+
+Shell derivations (created with functions like `nixpkgs#mkShell`) to set up the
+environments for hacking on the flake.
+
+See [`devShell`](#devShell) for when you only need to provide one, or want to
+provide a default.
+
+### hydraJobs
+Used-by: Hydra
+Checked: Yes
+Type: systemAttrs (attrsOf (???))
+
+???
+
+### defaultTemplate
+Used-by: `nix flake init`
+Checked: Yes
+Type: {path; description;}
+
+A default starting point for developing another flake. This is meant to
+communicate the intended way to depend on a flake, and/or provide a quick
+starting point for developers. Running `nix-flake -t <flake>` will copy the
+contents specified by the `path` attribute into the current directory.
+
+To specify multiple templates, use [`templates`](#templates)
+
+### templates
+Used-by: `nix flake init`
+Checked: Yes
+Type: attrsOf {path; description;}
+
+Starting points for developing another flake. This is meant to communicate the
+intended ways to depend on a flake, and/or provide a quick starting point for
+developers. Running `nix-flake -t <flake>#<template>` will copy the contents
+specified by the `path` attribute into the current directory.
+
+If there is one primary template, use [`defaultTemplate`](#defaulttemplate).
+
+### lib
+Used-by: Downstream flakes
+Checked: No
+Type: attrset
+
+The `lib` output is typically the right location for functions designed to be
+used in downstream flakes, except where they have a specific use that fits more
+in another category (for instance a [bundler](#bundler))
 
 # Lock files
 
