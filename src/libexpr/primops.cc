@@ -350,10 +350,11 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
         });
     }
     PathSet context;
-    auto program = state.coerceToString(pos, *elems[0], context, false, false);
+    auto program = state.coerceToString(pos, *elems[0], context, false, false).toOwned();
     Strings commandArgs;
-    for (unsigned int i = 1; i < args[0]->listSize(); ++i)
-        commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
+    for (unsigned int i = 1; i < args[0]->listSize(); ++i) {
+        commandArgs.push_back(state.coerceToString(pos, *elems[i], context, false, false).toOwned());
+    }
     try {
         auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
@@ -706,7 +707,7 @@ static RegisterPrimOp primop_abort({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         PathSet context;
-        string s = state.coerceToString(pos, *args[0], context);
+        string s = state.coerceToString(pos, *args[0], context).toOwned();
         throw Abort("evaluation aborted with the following error message: '%1%'", s);
     }
 });
@@ -724,7 +725,7 @@ static RegisterPrimOp primop_throw({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
       PathSet context;
-      string s = state.coerceToString(pos, *args[0], context);
+      string s = state.coerceToString(pos, *args[0], context).toOwned();
       throw ThrownError(s);
     }
 });
@@ -736,7 +737,7 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context));
+        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context).toOwned());
         throw;
     }
 }
@@ -1030,7 +1031,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (auto elem : i->value->listItems()) {
-                    string s = state.coerceToString(posDrvName, *elem, context, true);
+                    string s = state.coerceToString(posDrvName, *elem, context, true).toOwned();
                     drv.args.push_back(s);
                 }
             }
@@ -1066,7 +1067,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     }
 
                 } else {
-                    auto s = state.coerceToString(*i->pos, *i->value, context, true);
+                    auto s = state.coerceToString(*i->pos, *i->value, context, true).toOwned();
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
@@ -1399,7 +1400,7 @@ static RegisterPrimOp primop_pathExists({
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    v.mkString(baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
+    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context, false, false)), context);
 }
 
 static RegisterPrimOp primop_baseNameOf({
@@ -1419,7 +1420,8 @@ static RegisterPrimOp primop_baseNameOf({
 static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path dir = dirOf(state.coerceToString(pos, *args[0], context, false, false));
+    auto path = state.coerceToString(pos, *args[0], context, false, false);
+    auto dir = dirOf(*path);
     if (args[0]->type() == nPath) v.mkPath(dir); else v.mkString(dir, context);
 }
 
@@ -1486,7 +1488,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         );
 
         PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false);
+        string path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
 
         try {
             auto rewrites = state.realiseContext(context);
@@ -3288,8 +3290,8 @@ static RegisterPrimOp primop_lessThan({
 static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context, true, false);
-    v.mkString(s, context);
+    auto s = state.coerceToString(pos, *args[0], context, true, false);
+    v.mkString(*s, context);
 }
 
 static RegisterPrimOp primop_toString({
@@ -3325,7 +3327,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     int start = state.forceInt(*args[0], pos);
     int len = state.forceInt(*args[1], pos);
     PathSet context;
-    string s = state.coerceToString(pos, *args[2], context);
+    auto s = state.coerceToString(pos, *args[2], context);
 
     if (start < 0)
         throw EvalError({
@@ -3333,7 +3335,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
             .errPos = pos
         });
 
-    v.mkString((unsigned int) start >= s.size() ? "" : string(s, start, len), context);
+    v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
 }
 
 static RegisterPrimOp primop_substring({
@@ -3359,8 +3361,8 @@ static RegisterPrimOp primop_substring({
 static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    v.mkInt(s.size());
+    auto s = state.coerceToString(pos, *args[0], context);
+    v.mkInt(s->size());
 }
 
 static RegisterPrimOp primop_stringLength({
@@ -3620,7 +3622,7 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
 
     for (auto elem : args[1]->listItems()) {
         if (first) first = false; else res += sep;
-        res += state.coerceToString(pos, *elem, context);
+        res += *state.coerceToString(pos, *elem, context);
     }
 
     v.mkString(res, context);

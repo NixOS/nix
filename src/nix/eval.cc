@@ -107,7 +107,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else if (raw) {
             stopProgressBar();
-            std::cout << state->coerceToString(noPos, *v, context);
+            std::cout << *state->coerceToString(noPos, *v, context);
         }
 
         else if (json) {

@@ -24,7 +24,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         for (auto & attr : *args[0]->attrs) {
             std::string_view n(attr.name);
             if (n == "url")
-                url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                url = state.coerceToString(*attr.pos, *attr.value, context, false, false).toOwned();
             else if (n == "rev") {
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
@@ -50,7 +50,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
             });
 
     } else
-        url = state.coerceToString(pos, *args[0], context, false, false);
+        url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
 
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
