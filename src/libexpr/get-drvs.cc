@@ -107,7 +107,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
                 string name = state->forceStringNoCtx(*elem, *i->pos);
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value);
+                state->forceAttrs(*out->value, *i->pos);
 
                 /* And evaluate its ‘outPath’ attribute. */
                 Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
