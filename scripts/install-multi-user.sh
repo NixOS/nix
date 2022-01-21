@@ -576,18 +576,37 @@ create_directories() {
         # since this bit is cross-platform:
         # - first try with `command -vp` to try and find
         #   chown in the usual places
+        #   * to work around some sort of deficiency in
+        #     `command -p` in macOS bash 3.2, we also add
+        #     PATH="$(getconf PATH 2>/dev/null)". As long as
+        #     getconf is found, this should set a sane PATH
+        #     which `command -p` in bash 3.2 appears to use.
+        #     A bash with a properly-working `command -p`
+        #     should ignore this hard-set PATH in favor of
+        #     whatever it obtains internally. See
+        #     github.com/NixOS/nix/issues/5768
         # - fall back on `command -v` which would find
         #   any chown on path
         # if we don't find one, the command is already
         # hiding behind || true, and the general state
         # should be one the user can repair once they
         # figure out where chown is...
-        local get_chr_own="$(command -vp chown)"
+        local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
         if [[ -z "$get_chr_own" ]]; then
             get_chr_own="$(command -v chown)"
         fi
-        _sudo "to take root ownership of existing Nix store files" \
-              "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+
+        if [[ -z "$get_chr_own" ]]; then
+            reminder <<EOF
+I wanted to take root ownership of existing Nix store files,
+but I couldn't locate 'chown'. (You may need to fix your PATH.)
+To manually change file ownership, you can run:
+    sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT'
+EOF
+        else
+            _sudo "to take root ownership of existing Nix store files" \
+                  "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+        fi
     fi
     _sudo "to make the basic directory structure of Nix (part 1)" \
           install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
