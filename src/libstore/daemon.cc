@@ -403,9 +403,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                         return store->queryPathInfo(path);
                     },
                     [&](FixedOutputHashMethod & fohm) {
-                        if (!refs.empty())
-                            throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
-                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair, refs);
                         return store->queryPathInfo(path);
                     },
                 }, contentAddressMethod);
