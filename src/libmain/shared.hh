@@ -88,7 +88,7 @@ public:
 
 private:
     Pid pid;
-    int stdout;
+    int out;
 };
 
 extern volatile ::sig_atomic_t blockInt;

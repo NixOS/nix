@@ -268,7 +268,14 @@ AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation
 AC_SUBST(doc_generate)
 
 # Look for lowdown library.
-PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.8.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
+PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.8.0], [
+  CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"
+  AC_DEFINE([HAVE_LOWDOWN], [1], [Use lowdown]
+  have_lowdown=1)
+], [
+  have_lowdown=0
+  doc_generate=no
+])
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])

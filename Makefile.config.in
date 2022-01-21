@@ -23,6 +23,7 @@ PACKAGE_VERSION = @PACKAGE_VERSION@
 SHELL = @bash@
 SODIUM_LIBS = @SODIUM_LIBS@
 SQLITE3_LIBS = @SQLITE3_LIBS@
+LOWDOWN_LIBS = @LOWDOWN_LIBS@
 bash = @bash@
 bindir = @bindir@
 datadir = @datadir@
