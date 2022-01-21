@@ -273,15 +273,7 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 
 static void printString(string & res, std::string_view s)
 {
-    // Large stack allocations can skip past the stack protection page.
-    const size_t stack_protection_size = 4096;
-    // We reduce the max stack allocated buffer by an extra amount to increase
-    // the chance of hitting it, even when `fun`'s first access is some distance
-    // into its *further* stack frame, particularly if the call was inlined and
-    // therefore not writing a frame pointer.
-    const size_t play = 64 * sizeof(char *); // 512B on 64b archs
-
-    boost::container::small_vector<char, stack_protection_size - play> buffer;
+    boost::container::small_vector<char, 64 * 1024> buffer;
     buffer.reserve(s.size() * 2 + 2);
     char * buf = buffer.data();
     char * p = buf;
