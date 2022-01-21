@@ -815,6 +815,13 @@ void copyClosure(
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */
