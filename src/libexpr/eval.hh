@@ -231,9 +231,7 @@ public:
     NixInt forceInt(Value & v, const Pos & pos);
     NixFloat forceFloat(Value & v, const Pos & pos);
     bool forceBool(Value & v, const Pos & pos);
-    inline void forceAttrs(Value & v);
     inline void forceAttrs(Value & v, const Pos & pos);
-    inline void forceList(Value & v);
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
     string forceString(Value & v, const Pos & pos = noPos);
