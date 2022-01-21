@@ -60,7 +60,7 @@ struct CmdWhyDepends : SourceExprCommand
 
         addFlag({
             .longName = "precise",
-            .description = "For each edge of the graph, inspect the parent node to display the exact location in the path that causes the dependency",
+            .description = "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
             .handler = {&precise, true},
         });
     }
