@@ -2,6 +2,7 @@
 
 #include <boost/format.hpp>
 #include <string>
+#include <regex>
 #include "ansicolor.hh"
 
 
@@ -154,4 +155,6 @@ inline hintformat hintfmt(std::string plain_string)
     // we won't be receiving any args in this case, so just print the original string
     return hintfmt("%s", normaltxt(plain_string));
 }
+
+std::string hiliteMatches(const std::string &s, std::vector<std::smatch> matches, std::string prefix, std::string postfix);
 }

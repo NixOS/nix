@@ -9,8 +9,8 @@
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
+#include "fmt.hh"
 
-#include <iterator>
 #include <regex>
 #include <fstream>
 
@@ -19,52 +19,6 @@ using namespace nix;
 std::string wrap(std::string prefix, std::string s)
 {
     return prefix + s + ANSI_NORMAL;
-}
-
-#define HILITE_COLOR ANSI_GREEN
-
-std::string hilite(const std::string & s, const std::smatch & m, std::string postfix)
-{
-    return
-        m.empty()
-        ? s
-        : std::string(m.prefix())
-          + HILITE_COLOR + std::string(m.str()) + postfix
-          + std::string(m.suffix());
-}
-
-template<class Iter>
-std::string hilite_all(const std::string &s, Iter matches_first, Iter matches_last, std::string postfix) {
-    // Avoid copy on zero matches
-    if (matches_first == matches_last)
-        return s;
-
-    std::sort(matches_first, matches_last, [](const auto &a, const auto &b) {
-        return a.position() < b.position();
-    });
-
-    std::string out;
-    ssize_t last_end = 0;
-
-    for (Iter it = matches_first; it != matches_last; ++it) {
-        auto m = *it;
-        size_t start = m.position();
-        out.append(s.substr(last_end, m.position() - last_end));
-        // Merge continous matches
-        ssize_t end = start + m.length();
-        while(it + 1 != matches_last && (*(it + 1)).position() <= end) {
-            auto n = *++it;
-            ssize_t nend = start + (n.position() - start + n.length());
-            if(nend > end)
-                end = nend;
-        }
-        out.append(HILITE_COLOR);
-        out.append(s.substr(start, end - start));
-        out.append(postfix);
-        last_end = end;
-    }
-    out.append(s.substr(last_end));
-    return out;
 }
 
 struct CmdSearch : InstallableCommand, MixJSON
@@ -177,15 +131,15 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hilite_all(name.name, nameMatches.begin(), nameMatches.end(), "\e[0;2m");
+                            auto name2 = hiliteMatches(name.name, std::move(nameMatches), ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hilite_all(attrPath2, attrPathMatches.begin(), attrPathMatches.end(), "\e[0;1m")),
+                                wrap("\e[0;1m", hiliteMatches(attrPath2, std::move(attrPathMatches), ANSI_GREEN, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->cout(
-                                    "  %s", hilite_all(description, descriptionMatches.begin(), descriptionMatches.end(), ANSI_NORMAL));
+                                    "  %s", hiliteMatches(description, std::move(descriptionMatches), ANSI_GREEN, ANSI_NORMAL));
                         }
                     }
                 }
