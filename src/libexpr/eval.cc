@@ -435,6 +435,11 @@ EvalState::EvalState(
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , regexCache(makeRegexCache())
+#if HAVE_BOEHMGC
+    , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+#else
+    , valueAllocCache(std::make_shared<void *>(nullptr))
+#endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -852,15 +857,15 @@ Value * EvalState::allocValue()
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
        have to explicitly clear the first word of every object we take. */
-    if (!valueAllocCache) {
-        valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!valueAllocCache) throw std::bad_alloc();
+    if (!*valueAllocCache) {
+        *valueAllocCache = GC_malloc_many(sizeof(Value));
+        if (!*valueAllocCache) throw std::bad_alloc();
     }
 
     /* GC_NEXT is a convenience macro for accessing the first word of an object.
        Take the first list item, advance the list to the next item, and clear the next pointer. */
-    void * p = valueAllocCache;
-    GC_PTR_STORE_AND_DIRTY(&valueAllocCache, GC_NEXT(p));
+    void * p = *valueAllocCache;
+    GC_PTR_STORE_AND_DIRTY(&*valueAllocCache, GC_NEXT(p));
     GC_NEXT(p) = nullptr;
 
     nrValues++;
