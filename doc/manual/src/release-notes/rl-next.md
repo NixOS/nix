@@ -1,6 +1,8 @@
 # Release X.Y (202?-??-??)
 
-* The Nix cli now searches for a flake.nix up until the root of the current git repository or a filesystem boundary rather than just in the current directory
+* The Nix cli now searches for a `flake.nix` up until the root of the current
+  git repository or a filesystem boundary rather than just in the current
+  directory.
 * The TOML parser used by `builtins.fromTOML` has been replaced by [a
   more compliant one](https://github.com/ToruNiina/toml11).
 * Added `:st`/`:show-trace` commands to nix repl, which are used to
@@ -13,3 +15,5 @@
   to override the commit summary used when commiting an updated lockfile.
   This may be used in conjunction with the nixConfig attribute in
   `flake.nix` to better conform to repository conventions.
+* `docker run -ti nixos/nix:master` will place you in the docker container with
+  the latest version of Nix from the `master` branch.
