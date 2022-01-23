@@ -483,7 +483,7 @@ static void main_nix_build(int argc, char * * argv)
            lose the current $PATH directories. */
         auto rcfile = (Path) tmpDir + "/rc";
         std::string rc = fmt(
-                R"(_nix_shell_clean_tmpdir() { rm -rf %1%; }; )"s +
+                R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; }; )"s +
                 (keepTmp ?
                     "trap _nix_shell_clean_tmpdir EXIT; "
                     "exitHooks+=(_nix_shell_clean_tmpdir); "
