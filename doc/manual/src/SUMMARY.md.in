@@ -72,7 +72,6 @@
   - [Hacking](contributing/hacking.md)
   - [CLI guideline](contributing/cli-guideline.md)
 - [Release Notes](release-notes/release-notes.md)
-  - [Release X.Y (202?-??-??)](release-notes/rl-next.md)
   - [Release 2.11 (2022-08-25)](release-notes/rl-2.11.md)
   - [Release 2.10 (2022-07-11)](release-notes/rl-2.10.md)
   - [Release 2.9 (2022-05-30)](release-notes/rl-2.9.md)
