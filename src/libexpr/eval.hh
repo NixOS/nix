@@ -133,7 +133,7 @@ private:
     std::shared_ptr<RegexCache> regexCache;
 
     /* Allocation cache for GC'd Value objects. */
-    void * valueAllocCache = nullptr;
+    std::shared_ptr<void *> valueAllocCache;
 
 public:
 
