@@ -404,7 +404,8 @@ expr_select
 
 expr_simple
   : ID {
-      if (strncmp($1.p, "__curPos", $1.l) == 0)
+      std::string_view s = "__curPos";
+      if (strncmp($1.p, s.data(), s.size()) == 0)
           $$ = new ExprPos(CUR_POS);
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
