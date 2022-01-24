@@ -191,7 +191,7 @@ void ExprConcatStrings::show(std::ostream & str) const
     str << "(";
     for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << i.second;
+        str << *i.second;
     }
     str << ")";
 }
