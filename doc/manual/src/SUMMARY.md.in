@@ -108,7 +108,6 @@
   - [CLI guideline](contributing/cli-guideline.md)
   - [C++ style guide](contributing/cxx.md)
 - [Release Notes](release-notes/release-notes.md)
-  - [Release X.Y (202?-??-??)](release-notes/rl-next.md)
   - [Release 2.17 (2023-07-24)](release-notes/rl-2.17.md)
   - [Release 2.16 (2023-05-31)](release-notes/rl-2.16.md)
   - [Release 2.15 (2023-04-11)](release-notes/rl-2.15.md)
