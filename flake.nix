@@ -9,7 +9,7 @@
 
     let
 
-      officialRelease = false;
+      officialRelease = true;
 
       version = nixpkgs.lib.fileContents ./.version + versionSuffix;
       versionSuffix =
