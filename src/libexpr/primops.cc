@@ -1445,9 +1445,13 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     string s = readFile(path);
     if (s.find((char) 0) != string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
-    auto refs = state.store->isInStore(path) ?
-        state.store->queryPathInfo(state.store->toStorePath(path).first)->references :
-        StorePathSet{};
+    StorePathSet refs;
+    if (state.store->isInStore(path)) {
+        try {
+            refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->references;
+        } catch (Error &) { // FIXME: should be InvalidPathError
+        }
+    }
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
 }
@@ -1866,10 +1870,13 @@ static void addPath(
         StorePathSet refs;
 
         if (state.store->isInStore(path)) {
-            auto [storePath, subPath] = state.store->toStorePath(path);
-            // FIXME: we should scanForReferences on the path before adding it
-            refs = state.store->queryPathInfo(storePath)->references;
-            path = state.store->toRealPath(storePath) + subPath;
+            try {
+                auto [storePath, subPath] = state.store->toStorePath(path);
+                // FIXME: we should scanForReferences on the path before adding it
+                refs = state.store->queryPathInfo(storePath)->references;
+                path = state.store->toRealPath(storePath) + subPath;
+            } catch (Error &) { // FIXME: should be InvalidPathError
+            }
         }
 
         path = evalSettings.pureEval && expectedHash
