@@ -3822,7 +3822,7 @@ void EvalState::createBaseEnv()
         addConstant("__currentSystem", v);
     }
 
-    v.mkString(nixVersion);
+    v.mkString(evalSettings.pureEval ? "2.6.0" : nixVersion);
     addConstant("__nixVersion", v);
 
     v.mkString(store->storeDir);
