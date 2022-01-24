@@ -106,19 +106,19 @@ struct CmdSearch : InstallableCommand, MixJSON
 
                     for (auto & regex : regexes) {
                         found = false;
-                        auto add_all = [&found](std::sregex_iterator it, std::vector<std::smatch>& vec){
+                        auto addAll = [&found](std::sregex_iterator it, std::vector<std::smatch> & vec) {
                             const auto end = std::sregex_iterator();
-                            while(it != end) {
+                            while (it != end) {
                                 vec.push_back(*it++);
                                 found = true;
                             }
                         };
 
-                        add_all(std::sregex_iterator(attrPath2.begin(), attrPath2.end(), regex), attrPathMatches);
-                        add_all(std::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
-                        add_all(std::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
+                        addAll(std::sregex_iterator(attrPath2.begin(), attrPath2.end(), regex), attrPathMatches);
+                        addAll(std::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
+                        addAll(std::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
 
-                        if(!found)
+                        if (!found)
                             break;
                     }
 
