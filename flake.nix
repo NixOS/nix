@@ -13,7 +13,7 @@
     let
       inherit (nixpkgs) lib;
 
-      officialRelease = false;
+      officialRelease = true;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
