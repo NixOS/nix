@@ -4,6 +4,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
+#include <boost/container/small_vector.hpp>
 
 namespace nix {
 
@@ -272,7 +273,9 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 
 static void printString(string & res, std::string_view s)
 {
-    char buf[s.size() * 2 + 2];
+    boost::container::small_vector<char, 64 * 1024> buffer;
+    buffer.reserve(s.size() * 2 + 2);
+    char * buf = buffer.data();
     char * p = buf;
     *p++ = '"';
     for (auto c : s)
