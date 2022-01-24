@@ -2,9 +2,10 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-21.05-small";
+  inputs.nixpkgs-regression.url = "nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
-  outputs = { self, nixpkgs, lowdown-src }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src }:
 
     let
 
@@ -518,29 +519,23 @@
               inherit (self) overlay;
             });
 
-        /*
-        # Check whether we can still evaluate all of Nixpkgs.
+        # Make sure that nix-env still produces the exact same result
+        # on a particular version of Nixpkgs.
         tests.evalNixpkgs =
-          import (nixpkgs + "/pkgs/top-level/make-tarball.nix") {
-            # FIXME: fix pkgs/top-level/make-tarball.nix in NixOS to not require a revCount.
-            inherit nixpkgs;
-            pkgs = nixpkgsFor.x86_64-linux;
-            officialRelease = false;
-          };
-
-        # Check whether we can still evaluate NixOS.
-        tests.evalNixOS =
           with nixpkgsFor.x86_64-linux;
           runCommand "eval-nixos" { buildInputs = [ nix ]; }
             ''
-              export NIX_STATE_DIR=$TMPDIR
-
-              nix-instantiate ${nixpkgs}/nixos/release-combined.nix -A tested --dry-run \
-                --arg nixpkgs '{ outPath = ${nixpkgs}; revCount = 123; shortRev = "abcdefgh"; }'
-
-              touch $out
+              type -p nix-env
+              # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
+              time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+              [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
+              mkdir $out
             '';
-        */
+
+        metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
+          pkgs = nixpkgsFor.x86_64-linux;
+          nixpkgs = nixpkgs-regression;
+        };
 
         installTests = forAllSystems (system:
           let pkgs = nixpkgsFor.${system}; in
