@@ -1,5 +1,10 @@
 source common.sh
 
+if [[ -z $(type -p git) ]]; then
+    echo "Git not installed; skipping flake search tests"
+    exit 99
+fi
+
 clearStore
 
 cp ./simple.nix ./simple.builder.sh ./config.nix $TEST_HOME
