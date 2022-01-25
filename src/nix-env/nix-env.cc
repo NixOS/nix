@@ -948,7 +948,8 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutP
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            printMsg(lvlError, "skipping derivation named '%1%' which gives an error '%2%'", i.queryName(), e.msg());
+            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
+            throw;
         }
     }
 }
