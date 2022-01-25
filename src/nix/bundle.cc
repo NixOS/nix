@@ -51,7 +51,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultApp." + settings.thisSystem.get()};
+        Strings res{"defaultPackage." + settings.thisSystem.get()};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;
@@ -59,7 +59,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"apps." + settings.thisSystem.get() + "."};
+        Strings res{"packages." + settings.thisSystem.get() + "."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -73,7 +73,7 @@ struct CmdBundle : InstallableCommand
         const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
         auto programInstallable = InstallableFlake(this,
             evalState, std::move(progFlakeRef),
-            Strings{progName == "" ? "defaultApp" : progName},
+            Strings{progName == "" ? "defaultPackage" : progName},
             Strings(this->getDefaultFlakeAttrPathPrefixes()),
             lockFlagsProg);
         auto val = programInstallable.toValue(*evalState).first;
@@ -82,8 +82,8 @@ struct CmdBundle : InstallableCommand
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         auto bundler = InstallableFlake(this,
             evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? "defaultBundler." + settings.thisSystem.get() : settings.thisSystem.get() + "." + bundlerName},
-            Strings({"bundlers."}), lockFlags);
+            Strings{bundlerName == "" ? "defaultBundler." + settings.thisSystem.get() : settings.thisSystem.get() + "." + bundlerName, bundlerName},
+            Strings({"","bundlers."}), lockFlags);
 
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *val, *vRes, noPos);
