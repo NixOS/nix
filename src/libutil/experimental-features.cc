@@ -1,7 +1,7 @@
 #include "experimental-features.hh"
 #include "util.hh"
 
-#include "nlohmann/json.hpp"
+#include "nix-nlohmann/json.hpp"
 
 namespace nix {
 

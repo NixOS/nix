@@ -5,7 +5,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix::fetchers {
 

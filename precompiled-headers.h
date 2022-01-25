@@ -57,4 +57,4 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>

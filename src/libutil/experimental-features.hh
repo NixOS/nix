@@ -2,7 +2,7 @@
 
 #include "comparator.hh"
 #include "error.hh"
-#include "nlohmann/json_fwd.hpp"
+#include "nix-nlohmann/json_fwd.hpp"
 #include "types.hh"
 
 namespace nix {

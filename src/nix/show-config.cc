@@ -3,7 +3,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 using namespace nix;
 

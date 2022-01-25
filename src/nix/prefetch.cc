@@ -10,7 +10,7 @@
 #include "eval-inline.hh"
 #include "legacy.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 using namespace nix;
 

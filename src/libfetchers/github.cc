@@ -7,7 +7,7 @@
 #include "url-parts.hh"
 
 #include <optional>
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix::fetchers {
 

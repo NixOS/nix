@@ -3,7 +3,7 @@
 #include "config.hh"
 
 #include <atomic>
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 #include <iostream>
 
 namespace nix {

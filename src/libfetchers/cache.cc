@@ -3,7 +3,7 @@
 #include "sync.hh"
 #include "store-api.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix::fetchers {
 

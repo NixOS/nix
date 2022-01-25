@@ -5,7 +5,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 extern char * * environ __attribute__((weak));
 

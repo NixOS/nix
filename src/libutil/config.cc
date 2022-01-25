@@ -3,7 +3,7 @@
 #include "abstract-setting-to-json.hh"
 #include "experimental-features.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix {
 

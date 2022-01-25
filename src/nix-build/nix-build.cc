@@ -7,7 +7,7 @@
 #include <vector>
 #include <map>
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 #include "parsed-derivations.hh"
 #include "store-api.hh"

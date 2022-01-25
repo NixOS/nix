@@ -1,7 +1,7 @@
 #include "attrs.hh"
 #include "fetchers.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix::fetchers {
 

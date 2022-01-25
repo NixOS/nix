@@ -16,7 +16,7 @@
 #include <regex>
 #include <queue>
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix {
 

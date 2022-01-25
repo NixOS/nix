@@ -4,7 +4,7 @@
 #include "globals.hh"
 
 #include <sqlite3.h>
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix {
 

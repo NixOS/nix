@@ -4,7 +4,7 @@
 
 #include "types.hh"
 
-#include <nlohmann/json_fwd.hpp>
+#include <nix-nlohmann/json_fwd.hpp>
 
 #pragma once
 

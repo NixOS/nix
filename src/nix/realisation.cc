@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "common-args.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 using namespace nix;
 

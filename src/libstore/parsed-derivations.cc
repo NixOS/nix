@@ -1,6 +1,6 @@
 #include "parsed-derivations.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 #include <regex>
 #include "json.hh"
 

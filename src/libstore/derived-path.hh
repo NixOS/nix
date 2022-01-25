@@ -6,7 +6,7 @@
 
 #include <optional>
 
-#include <nlohmann/json_fwd.hpp>
+#include <nix-nlohmann/json_fwd.hpp>
 
 namespace nix {
 

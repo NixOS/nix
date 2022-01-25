@@ -4,7 +4,7 @@
 
 #include <iomanip>
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix::flake {
 

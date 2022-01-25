@@ -1,7 +1,7 @@
 #include "flake.hh"
 #include "globals.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix::flake {
 

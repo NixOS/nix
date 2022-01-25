@@ -3,7 +3,7 @@
 
 #include <sstream>
 #include <gtest/gtest.h>
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 namespace nix {
 

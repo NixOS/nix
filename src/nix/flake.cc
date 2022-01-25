@@ -14,7 +14,7 @@
 #include "json.hh"
 #include "eval-cache.hh"
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 #include <queue>
 #include <iomanip>
 

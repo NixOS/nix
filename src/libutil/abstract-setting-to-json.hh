@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 #include "config.hh"
 
 namespace nix {

@@ -1,7 +1,7 @@
 #include "json-to-value.hh"
 
 #include <variant>
-#include <nlohmann/json.hpp>
+#include <nix-nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
