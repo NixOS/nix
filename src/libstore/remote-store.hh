@@ -118,6 +118,8 @@ public:
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
+    std::optional<std::string> getVersion() override;
+
     void connect() override;
 
     unsigned int getProtocol() override;
@@ -129,6 +131,7 @@ public:
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
+        std::optional<std::string> daemonNixVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 
         virtual ~Connection();

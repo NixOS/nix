@@ -765,6 +765,9 @@ public:
      * (a no-op when there’s no daemon)
      */
     virtual void setOptions() { }
+
+    virtual std::optional<std::string> getVersion() { return {}; }
+
 protected:
 
     Stats stats;

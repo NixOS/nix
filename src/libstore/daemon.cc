@@ -981,7 +981,11 @@ void processConnection(
         readInt(from);
     }
 
-    readInt(from); // obsolete reserveSpace
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+        readInt(from); // obsolete reserveSpace
+
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
+        to << nixVersion;
 
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();
