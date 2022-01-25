@@ -911,36 +911,45 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutP
 {
     JSONObject topObj(cout, true);
     for (auto & i : elems) {
-        JSONObject pkgObj = topObj.object(i.attrPath);
+        try {
+            if (i.hasFailed()) continue;
 
-        auto drvName = DrvName(i.queryName());
-        pkgObj.attr("name", drvName.fullName);
-        pkgObj.attr("pname", drvName.name);
-        pkgObj.attr("version", drvName.version);
-        pkgObj.attr("system", i.querySystem());
+            JSONObject pkgObj = topObj.object(i.attrPath);
 
-        if (printOutPath) {
-            DrvInfo::Outputs outputs = i.queryOutputs();
-            JSONObject outputObj = pkgObj.object("outputs");
-            for (auto & j : outputs) {
-                outputObj.attr(j.first, j.second);
-            }
-        }
+            auto drvName = DrvName(i.queryName());
+            pkgObj.attr("name", drvName.fullName);
+            pkgObj.attr("pname", drvName.name);
+            pkgObj.attr("version", drvName.version);
+            pkgObj.attr("system", i.querySystem());
 
-        if (printMeta) {
-            JSONObject metaObj = pkgObj.object("meta");
-            StringSet metaNames = i.queryMetaNames();
-            for (auto & j : metaNames) {
-                auto placeholder = metaObj.placeholder(j);
-                Value * v = i.queryMeta(j);
-                if (!v) {
-                    printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
-                    placeholder.write(nullptr);
-                } else {
-                    PathSet context;
-                    printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
+            if (printOutPath) {
+                DrvInfo::Outputs outputs = i.queryOutputs();
+                JSONObject outputObj = pkgObj.object("outputs");
+                for (auto & j : outputs) {
+                    outputObj.attr(j.first, j.second);
                 }
             }
+
+            if (printMeta) {
+                JSONObject metaObj = pkgObj.object("meta");
+                StringSet metaNames = i.queryMetaNames();
+                for (auto & j : metaNames) {
+                    auto placeholder = metaObj.placeholder(j);
+                    Value * v = i.queryMeta(j);
+                    if (!v) {
+                        printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
+                        placeholder.write(nullptr);
+                    } else {
+                        PathSet context;
+                        printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
+                    }
+                }
+            }
+        } catch (AssertionError & e) {
+            printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
+        } catch (Error & e) {
+            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
+            throw;
         }
     }
 }
