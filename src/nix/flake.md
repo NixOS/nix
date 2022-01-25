@@ -294,7 +294,7 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `brash-prompt-suffix`,
+  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
   and `flake-registry`) are allowed to be set without confirmation so long as
   `accept-flake-config` is not set in the global configuration.
 
