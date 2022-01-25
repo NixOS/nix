@@ -29,9 +29,9 @@ R""(
 
 # Description
 
-`nix bundle`, by default, packs the closure of the [Nix app](./nix3-run.md)
-*installable* into a single self-extracting executable. See the [`nix-bundle`
-homepage](https://github.com/matthewbauer/nix-bundle) for more details.
+`nix bundle`, by default, packs the closure of the *installable* into a single
+self-extracting executable. See the [`bundlers`
+homepage](https://github.com/NixOS/bundlers) for more details.
 
 > **Note**
 >
