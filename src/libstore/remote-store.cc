@@ -188,7 +188,12 @@ void RemoteStore::initConnection(Connection & conn)
         }
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
-            conn.to << false;
+            conn.to << false; // obsolete reserveSpace
+
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
+            conn.to.flush();
+            conn.daemonNixVersion = readString(conn.from);
+        }
 
         auto ex = conn.processStderr();
         if (ex) std::rethrow_exception(ex);
@@ -917,6 +922,13 @@ void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
         source.drainInto(sink);
     });
     readInt(conn->from);
+}
+
+
+std::optional<std::string> RemoteStore::getVersion()
+{
+    auto conn(getConnection());
+    return conn->daemonNixVersion;
 }
 
 

@@ -1919,4 +1919,10 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
         throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
 }
 
+std::optional<std::string> LocalStore::getVersion()
+{
+    return nixVersion;
+}
+
+
 }  // namespace nix

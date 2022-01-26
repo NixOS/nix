@@ -211,6 +211,8 @@ public:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
+    std::optional<std::string> getVersion() override;
+
 private:
 
     int getSchema();
