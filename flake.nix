@@ -133,6 +133,7 @@
                 ./boehmgc-coroutine-sp-fallback.diff
               ];
             }))
+            nlohmann_json
           ];
 
         perlDeps =
