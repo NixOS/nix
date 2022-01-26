@@ -37,7 +37,7 @@ do
   docker tag nix:$VERSION nixos/nix:$VERSION-$DOCKER_PLATFORM
   if [ $PUSH_AS_LATEST -eq 1 ]; then
     echo "=> Tagging docker image of version latest for $PLATFORM platform ..."
-    docker tag nix:$VERSION nixos/nix:latest
+    docker tag nix:$VERSION nixos/nix:latest-$DOCKER_PLATFORM
   fi
 
   echo "=> Pushing docker image of version $VERSION for $PLATFORM platform ..."
@@ -45,7 +45,7 @@ do
   docker push nixos/nix:$VERSION-$DOCKER_PLATFORM
   if [ $PUSH_AS_LATEST -eq 1 ]; then
     echo "=> Pushing docker image of version latest for $PLATFORM platform ..."
-    docker push nixos/nix:latest
+    docker push nixos/nix:latest-$DOCKER_PLATFORM
   fi
 
   DOCKER_MANIFEST="$DOCKER_MANIFEST --amend nixos/nix:$VERSION-$DOCKER_PLATFORM"
