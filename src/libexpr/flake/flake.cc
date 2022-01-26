@@ -244,36 +244,8 @@ static Flake getFlake(
 
     auto sNixConfig = state.symbols.create("nixConfig");
 
-    if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
-        expectType(state, nAttrs, *nixConfig->value, *nixConfig->pos);
-
-        for (auto & setting : *nixConfig->value->attrs) {
-            forceTrivialValue(state, *setting.value, *setting.pos);
-            if (setting.value->type() == nString)
-                flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
-            else if (setting.value->type() == nPath) {
-                PathSet emptyContext = {};
-                flake.config.settings.insert({setting.name, state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
-            }
-            else if (setting.value->type() == nInt)
-                flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
-            else if (setting.value->type() == nBool)
-                flake.config.settings.insert({setting.name, Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
-            else if (setting.value->type() == nList) {
-                std::vector<std::string> ss;
-                for (auto elem : setting.value->listItems()) {
-                    if (elem->type() != nString)
-                        throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
-                            setting.name, showType(*setting.value));
-                    ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
-                }
-                flake.config.settings.insert({setting.name, ss});
-            }
-            else
-                throw TypeError("flake configuration setting '%s' is %s",
-                    setting.name, showType(*setting.value));
-        }
-    }
+    if (auto nixConfig = vInfo.attrs->get(sNixConfig))
+        flake.config.parseAttrs(state, *nixConfig);
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != state.sDescription &&
@@ -285,6 +257,39 @@ static Flake getFlake(
     }
 
     return flake;
+}
+
+void ConfigFile::parseAttrs(EvalState & state, Attr & attrs)
+{
+    expectType(state, nAttrs, *attrs.value, *attrs.pos);
+
+    for (auto & setting : *attrs.value->attrs) {
+        forceTrivialValue(state, *setting.value, *setting.pos);
+
+        if (setting.value->type() == nString) {
+            settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
+        } else if (setting.value->type() == nPath) {
+            PathSet emptyContext = {};
+            settings.insert({setting.name, state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
+        } else if (setting.value->type() == nInt) {
+            settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
+        } else if (setting.value->type() == nBool) {
+            settings.insert({setting.name, Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
+        } else if (setting.value->type() == nList) {
+            std::vector<std::string> ss;
+            for (auto elem : setting.value->listItems()) {
+                if (elem->type() != nString)
+                    throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
+                        setting.name, showType(*setting.value));
+                ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
+            }
+
+            settings.insert({setting.name, ss});
+        } else {
+            throw TypeError("flake configuration setting '%s' is %s",
+                setting.name, showType(*setting.value));
+        }
+    }
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)

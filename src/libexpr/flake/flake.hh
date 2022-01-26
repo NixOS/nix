@@ -1,5 +1,6 @@
 #pragma once
 
+#include "attr-set.hh"
 #include "types.hh"
 #include "flakeref.hh"
 #include "lockfile.hh"
@@ -53,6 +54,8 @@ struct ConfigFile
     std::map<std::string, ConfigValue> settings;
 
     void apply();
+
+    void parseAttrs(EvalState & state, Attr & attrs);
 };
 
 /* The contents of a flake.nix file. */
