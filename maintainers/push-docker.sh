@@ -17,6 +17,13 @@ DOCKER_MANIFEST_LATEST=""
 
 for PLATFORM in $PLATFORMS;
 do
+  if   [ "$PLATFORM" = "x86_64-linux" ];  then DOCKER_PLATFORM="amd64"
+  elif [ "$PLATFORM" = "aarch64-linux" ]; then DOCKER_PLATFORM="arm64"
+  else
+    echo "EROROR: No docker platform found for $PLATFORM platform"
+    exit 1
+  fi
+
   echo "=> Loading docker image for $PLATFORM platform ..."
 
   DOCKER_IMAGE_TMP_FILE="$PWD/image-$PLATFORM.tar.gz"
@@ -24,13 +31,6 @@ do
     curl -L https://hydra.nixos.org/job/nix/maintenance-$MAINTENANCE_VERSION/dockerImage.$PLATFORM/latest/download/1 > $DOCKER_IMAGE_TMP_FILE
   fi
   docker load -i $DOCKER_IMAGE_TMP_FILE
-
-  if   [ "$PLATFORM" = "x86_64-linux" ];  then DOCKER_PLATFORM="amd64"
-  elif [ "$PLATFORM" = "aarch64-linux" ]; then DOCKER_PLATFORM="arm64"
-  else
-    echo "EROROR: No docker platform found for $PLATFORM platform"
-    exit 1
-  fi
 
   echo "=> Tagging docker image of version $VERSION for $PLATFORM platform ..."
 
