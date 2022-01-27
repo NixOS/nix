@@ -21,7 +21,7 @@ void emitTreeAttrs(
 {
     assert(input.isImmutable());
 
-    state.mkAttrs(v, 8);
+    state.mkAttrs(v, 10);
 
     auto storePath = state.store->printStorePath(tree.storePath);
 
@@ -43,11 +43,21 @@ void emitTreeAttrs(
         if (auto rev = input.getRev()) {
             mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
             mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
-        } else if (emptyRevFallback) {
-            // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
-            auto emptyHash = Hash(htSHA1);
-            mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
+        } else {
+            if (emptyRevFallback) {
+                // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
+                auto emptyHash = Hash(htSHA1);
+                mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
+                mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
+            }
+
+            // `dirtyRev` does not exist only when there are no commits
+            // OR when `builtins.getFlake` is called
+            if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
+                mkString(*state.allocAttr(v, state.symbols.create("dirtyRev")), *dirtyRev);
+                mkString(*state.allocAttr(v, state.symbols.create("dirtyShortRev")),
+                    std::string(*dirtyRev, 0, 7) + "-dirty");
+            }
         }
 
         if (auto revCount = input.getRevCount())

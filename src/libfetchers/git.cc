@@ -67,7 +67,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -284,6 +284,12 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign(
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+
+                // QUESTION: should this just return an empty hash if there are no commits?
+                if (haveCommits) {
+                    input.attrs.insert_or_assign("dirtyRev", chomp(
+                        runProgram("git", true, { "-C", actualUrl, "describe", "--always", "--match=''", "--abbrev=0", "--dirty" })));
+                }
 
                 return {
                     Tree(store->toRealPath(storePath), std::move(storePath)),

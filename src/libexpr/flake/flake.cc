@@ -622,6 +622,8 @@ LockedFlake lockFlake(
                         FlakeCache dummyCache;
                         flake = getFlake(state, topRef, useRegistries, dummyCache);
 
+                        // QUESTION: should we maintain `dirtyRef` here?
+
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
                             prevLockedRef.input.getRev() != flake.lockedRef.input.getRev())
