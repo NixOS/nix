@@ -37,7 +37,7 @@ homepage](https://github.com/NixOS/bundlers) for more details.
 >
 > This command only works on Linux.
 
-# Bundler definitions
+# Flake output attributes
 
 If no flake output attribute is given, `nix bundle` tries the following
 flake output attributes:
@@ -51,7 +51,7 @@ output attributes:
 
 # Bundlers
 
-An bundlers is specified by a flake output attribute named
+A bundler is specified by a flake output attribute named
 `bundlers.<system>.<name>` or `defaultBundler.<system>`. It looks like this:
 
 ```nix
@@ -62,6 +62,7 @@ bundlers.x86_64-linux.blender_2_79 = drv: self.packages.x86_64-linux.blender_2_7
 defaultBundler.x86_64-linux = drv: drv;
 ```
 
-A bundler must be a function that accepts a derivation and returns a derivation.
+A bundler must be a function that accepts an arbitrary value (typically a
+derivation or app definition) and returns a derivation.
 
 )""
