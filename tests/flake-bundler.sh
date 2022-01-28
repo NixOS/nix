@@ -10,8 +10,15 @@ cd $TEST_HOME
 cat <<EOF > flake.nix
 {
     outputs = {self}: {
-       defaultBundler.$system = drv: drv;
+       defaultBundler.$system = drv:
+          if drv?type && drv.type == "derivation"
+          then drv
+          else self.defaultPackage.$system;
        defaultPackage.$system = import ./simple.nix;
+       defaultApp.$system = {
+         type = "app";
+         program = "\${import ./simple.nix}/hello";
+       };
     };
 }
 EOF

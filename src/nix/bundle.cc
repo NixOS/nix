@@ -51,7 +51,9 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultPackage." + settings.thisSystem.get()};
+        Strings res{
+            "defaultApp." + settings.thisSystem.get()
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;
@@ -59,7 +61,10 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"packages." + settings.thisSystem.get() + "."};
+        Strings res{
+            "apps." + settings.thisSystem.get() + "."
+
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -73,7 +78,7 @@ struct CmdBundle : InstallableCommand
         const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
         auto programInstallable = InstallableFlake(this,
             evalState, std::move(progFlakeRef),
-            Strings{progName == "" ? "defaultPackage" : progName},
+            Strings{progName == "" ? "defaultApp" : progName},
             Strings(this->getDefaultFlakeAttrPathPrefixes()),
             lockFlagsProg);
         auto val = programInstallable.toValue(*evalState).first;
