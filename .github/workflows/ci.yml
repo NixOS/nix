@@ -25,7 +25,7 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: nix-build -A checks.$(nix-instantiate --eval -E '(builtins.currentSystem)')
+    - run: nix --experimental-features 'nix-command flakes' flake check -L
 
   check_cachix:
     name: Cachix secret present for installer tests
@@ -95,7 +95,7 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: nix-build -A checks.$(nix-instantiate --eval -E 'builtins.currentSystem' --json).dockerImage
+    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION nixos/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION nixos/nix:master

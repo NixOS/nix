@@ -92,8 +92,6 @@ StringMap EvalState::realiseContext(const PathSet & context)
 }
 
 struct RealisePathFlags {
-    // Whether to check whether the path is a valid absolute path
-    bool requireAbsolutePath = true;
     // Whether to check that the path is allowed in pure eval mode
     bool checkForPureEval = true;
 };
@@ -105,9 +103,7 @@ static Path realisePath(EvalState & state, const Pos & pos, Value & v, const Rea
     auto path = [&]()
     {
         try {
-            return flags.requireAbsolutePath
-                ? state.coerceToPath(pos, v, context)
-                : state.coerceToString(pos, v, context, false, false);
+            return state.coerceToPath(pos, v, context);
         } catch (Error & e) {
             e.addTrace(pos, "while realising the context of a path");
             throw;
@@ -1183,7 +1179,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             drv.outputs.insert_or_assign(i, DerivationOutput {
                 .output = DerivationOutputCAFloating {
                     .method = ingestionMethod,
-                    .hashType = std::move(ht),
+                    .hashType = ht,
                 },
             });
         }
@@ -1489,7 +1485,19 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             pos
         );
 
-        auto path = realisePath(state, pos, *i->value, { .requireAbsolutePath = false });
+        PathSet context;
+        string path = state.coerceToString(pos, *i->value, context, false, false);
+
+        try {
+            auto rewrites = state.realiseContext(context);
+            path = rewriteStrings(path, rewrites);
+        } catch (InvalidPathError & e) {
+            throw EvalError({
+                .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
+                .errPos = pos
+            });
+        }
+
 
         searchPath.emplace_back(prefix, path);
     }

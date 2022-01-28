@@ -63,6 +63,8 @@ nix_tests = \
   ca/nix-copy.sh \
   eval-store.sh \
   readfile-context.sh \
+  store-ping.sh \
+  nix_path.sh \
   why-depends.sh
   # parallel.sh
 

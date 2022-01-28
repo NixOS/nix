@@ -6,3 +6,4 @@
   new [repository](https://github.com/NixOS/bundlers) has various bundlers
   implemented.
 
+* `nix store ping` now reports the version of the remote Nix daemon.

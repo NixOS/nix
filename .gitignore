@@ -120,3 +120,7 @@ GTAGS
 compile_commands.json
 
 nix-rust/target
+
+result
+
+.vscode/
