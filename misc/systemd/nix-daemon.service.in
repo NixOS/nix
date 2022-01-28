@@ -6,7 +6,6 @@ ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
 
 [Service]
 ExecStart=@@bindir@/nix-daemon nix-daemon --daemon
-KillMode=process
 
 [Install]
 WantedBy=multi-user.target
