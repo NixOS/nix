@@ -1179,7 +1179,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             drv.outputs.insert_or_assign(i, DerivationOutput {
                 .output = DerivationOutputCAFloating {
                     .method = ingestionMethod,
-                    .hashType = std::move(ht),
+                    .hashType = ht,
                 },
             });
         }
