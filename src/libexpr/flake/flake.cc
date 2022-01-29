@@ -244,8 +244,9 @@ static Flake getFlake(
 
     auto sNixConfig = state.symbols.create("nixConfig");
 
-    if (auto nixConfig = vInfo.attrs->get(sNixConfig))
-        flake.config.parseAttrs(state, *nixConfig);
+    if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
+        flake.config.parseAttrs(state, *nixConfig, std::nullopt);
+    }
 
     for (auto & attr : *vInfo.attrs) {
         if (attr.name != state.sDescription &&
@@ -259,23 +260,40 @@ static Flake getFlake(
     return flake;
 }
 
-void ConfigFile::parseAttrs(EvalState & state, Attr & attrs)
+void ConfigFile::parseAttrs(EvalState & state, Attr & attrs, std::optional<std::string> sys)
 {
     expectType(state, nAttrs, *attrs.value, *attrs.pos);
 
     for (auto & setting : *attrs.value->attrs) {
         forceTrivialValue(state, *setting.value, *setting.pos);
 
-        if (setting.value->type() == nString) {
-            settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
-        } else if (setting.value->type() == nPath) {
+        switch (setting.value->type()) {
+        case nAttrs: {
+            // Check that we're parsing global settings, then recurse to scan the
+            // given attribute set.
+            if (!sys) {
+                state.forceAttrs(*setting.value);
+                auto sysConf = Attr(setting.name, setting.value, attrs.pos);
+                auto name = std::string(setting.name);
+                parseAttrs(state, sysConf, name);
+                break;
+            } else
+                throw TypeError("flake configuration setting '%s' is %s",
+                    setting.name, showType(*setting.value));
+        } case nString: {
+            insertBySys(sys, setting.name, {state.forceStringNoCtx(*setting.value, *setting.pos)});
+            break;
+        } case nPath: {
             PathSet emptyContext = {};
-            settings.insert({setting.name, state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
-        } else if (setting.value->type() == nInt) {
-            settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
-        } else if (setting.value->type() == nBool) {
-            settings.insert({setting.name, Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
-        } else if (setting.value->type() == nList) {
+            insertBySys(sys, setting.name, {state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
+            break;
+        } case nInt: {
+            insertBySys(sys, setting.name, {state.forceInt(*setting.value, *setting.pos)});
+            break;
+        } case nBool: {
+            insertBySys(sys, setting.name, {Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
+            break;
+        } case nList: {
             std::vector<std::string> ss;
             for (auto elem : setting.value->listItems()) {
                 if (elem->type() != nString)
@@ -284,12 +302,20 @@ void ConfigFile::parseAttrs(EvalState & state, Attr & attrs)
                 ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
             }
 
-            settings.insert({setting.name, ss});
-        } else {
+            insertBySys(sys, setting.name, {ss});
+            break;
+        } default: {
             throw TypeError("flake configuration setting '%s' is %s",
                 setting.name, showType(*setting.value));
-        }
+        }}
     }
+}
+
+void ConfigFile::insertBySys(std::optional<std::string> sys, std::string name, ConfigFile::ConfigValue setting)
+{
+    settingsBySys
+        .insert({sys, std::map<std::string, ConfigFile::ConfigValue>()})
+        .first->second.insert({name, setting});
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
