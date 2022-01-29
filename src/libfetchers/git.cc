@@ -16,14 +16,15 @@
 using namespace std::string_literals;
 
 namespace nix::fetchers {
+namespace {
 
 // Explicit initial branch of our bare repo to suppress warnings from new version of git.
 // The value itself does not matter, since we always fetch a specific revision or branch.
 // It is set with `-c init.defaultBranch=` instead of `--initial-branch=` to stay compatible with
 // old version of git, which will ignore unrecognized `-c` options.
-static const std::string gitInitialBranch = "__nix_dummy_branch";
+const std::string gitInitialBranch = "__nix_dummy_branch";
 
-static std::string getGitDir()
+std::string getGitDir()
 {
     auto gitDir = getEnv("GIT_DIR");
     if (!gitDir) {
@@ -32,11 +33,11 @@ static std::string getGitDir()
     return *gitDir;
 }
 
-static bool isCacheFileWithinTtl(const time_t now, const struct stat& st) {
+bool isCacheFileWithinTtl(const time_t now, const struct stat& st) {
     return st.st_mtime + settings.tarballTtl > now;
 }
 
-static Path getCachePath(std::string key) {
+Path getCachePath(std::string key) {
     return getCacheDir() + "/nix/gitv3/" +
         hashString(htSHA256, key).to_string(Base32, false);
 }
@@ -48,7 +49,7 @@ static Path getCachePath(std::string key) {
 //
 //   ref: refs/heads/main       HEAD
 //   ...
-static std::optional<std::string> readHead(const Path & path)
+std::optional<std::string> readHead(const Path & path)
 {
     auto [exit_code, output] = runProgram(RunOptions {
         .program = "git",
@@ -79,7 +80,7 @@ static std::optional<std::string> readHead(const Path & path)
     return std::nullopt;
 }
 
-static std::optional<std::string> readHeadCached(std::string actualUrl)
+std::optional<std::string> readHeadCached(std::string actualUrl)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
@@ -120,10 +121,119 @@ static std::optional<std::string> readHeadCached(std::string actualUrl)
     return std::nullopt;
 }
 
-static bool isNotDotGitDirectory(const Path & path)
+bool isNotDotGitDirectory(const Path & path)
 {
     return baseNameOf(path) != ".git";
 }
+
+struct WorkdirInfo
+{
+    bool clean = false;
+    bool hasHead = false;
+};
+
+// Returns whether a git workdir is clean and has commits.
+WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
+{
+    const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    auto gitDir = getGitDir();
+
+    auto env = getEnv();
+    // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
+    // that way unknown errors can lead to a failure instead of continuing through the wrong code path
+    env["LC_ALL"] = "C";
+
+    /* Check whether HEAD points to something that looks like a commit,
+       since that is the refrence we want to use later on. */
+    auto result = runProgram(RunOptions {
+        .program = "git",
+        .args = { "-C", workdir, "--git-dir", gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+        .environment = env,
+        .mergeStderrToStdout = true
+    });
+    auto exitCode = WEXITSTATUS(result.first);
+    auto errorMessage = result.second;
+
+    if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
+        throw Error("'%s' is not a Git repository", workdir);
+    } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
+        // indicates that the repo does not have any commits
+        // we want to proceed and will consider it dirty later
+    } else if (exitCode != 0) {
+        // any other errors should lead to a failure
+        throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", workdir, exitCode, errorMessage);
+    }
+
+    bool clean = false;
+    bool hasHead = exitCode == 0;
+
+    try {
+        if (hasHead) {
+            // Using git diff is preferrable over lower-level operations here,
+            // because its conceptually simpler and we only need the exit code anyways.
+            auto gitDiffOpts = Strings({ "-C", workdir, "diff", "HEAD", "--quiet"});
+            if (!submodules) {
+                // Changes in submodules should only make the tree dirty
+                // when those submodules will be copied as well.
+                gitDiffOpts.emplace_back("--ignore-submodules");
+            }
+            gitDiffOpts.emplace_back("--");
+            runProgram("git", true, gitDiffOpts);
+
+            clean = true;
+        }
+    } catch (ExecError & e) {
+        if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
+    }
+
+    return WorkdirInfo { .clean = clean, .hasHead = hasHead };
+}
+
+std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, const Path & workdir, const WorkdirInfo & workdirInfo)
+{
+    const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+
+    if (!fetchSettings.allowDirty)
+        throw Error("Git tree '%s' is dirty", workdir);
+
+    if (fetchSettings.warnDirty)
+        warn("Git tree '%s' is dirty", workdir);
+
+    auto gitOpts = Strings({ "-C", workdir, "ls-files", "-z" });
+    if (submodules)
+        gitOpts.emplace_back("--recurse-submodules");
+
+    auto files = tokenizeString<std::set<std::string>>(
+        runProgram("git", true, gitOpts), "\0"s);
+
+    Path actualPath(absPath(workdir));
+
+    PathFilter filter = [&](const Path & p) -> bool {
+        assert(hasPrefix(p, actualPath));
+        std::string file(p, actualPath.size() + 1);
+
+        auto st = lstat(p);
+
+        if (S_ISDIR(st.st_mode)) {
+            auto prefix = file + "/";
+            auto i = files.lower_bound(prefix);
+            return i != files.end() && hasPrefix(*i, prefix);
+        }
+
+        return files.count(file);
+    };
+
+    auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
+
+    // FIXME: maybe we should use the timestamp of the last
+    // modified dirty file?
+    input.attrs.insert_or_assign(
+        "lastModified",
+        workdirInfo.hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+
+    return {std::move(storePath), input};
+}
+}  // end namespace
 
 struct GitInputScheme : InputScheme
 {
@@ -319,100 +429,12 @@ struct GitInputScheme : InputScheme
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
 
-        // If this is a local directory and no ref or revision is
-        // given, then allow the use of an unclean working tree.
+        /* If this is a local directory and no ref or revision is given,
+           allow fetching directly from a dirty workdir. */
         if (!input.getRef() && !input.getRev() && isLocal) {
-            bool clean = false;
-
-            auto env = getEnv();
-            // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
-            // that way unknown errors can lead to a failure instead of continuing through the wrong code path
-            env["LC_ALL"] = "C";
-
-            /* Check whether HEAD points to something that looks like a commit,
-               since that is the refrence we want to use later on. */
-            auto result = runProgram(RunOptions {
-                .program = "git",
-                .args = { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
-                .environment = env,
-                .mergeStderrToStdout = true
-            });
-            auto exitCode = WEXITSTATUS(result.first);
-            auto errorMessage = result.second;
-
-            if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
-                throw Error("'%s' is not a Git repository", actualUrl);
-            } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
-                // indicates that the repo does not have any commits
-                // we want to proceed and will consider it dirty later
-            } else if (exitCode != 0) {
-                // any other errors should lead to a failure
-                throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", actualUrl, exitCode, errorMessage);
-            }
-
-            bool hasHead = exitCode == 0;
-            try {
-                if (hasHead) {
-                    // Using git diff is preferrable over lower-level operations here,
-                    // because its conceptually simpler and we only need the exit code anyways.
-                    auto gitDiffOpts = Strings({ "-C", actualUrl, "--git-dir", gitDir, "diff", "HEAD", "--quiet"});
-                    if (!submodules) {
-                        // Changes in submodules should only make the tree dirty
-                        // when those submodules will be copied as well.
-                        gitDiffOpts.emplace_back("--ignore-submodules");
-                    }
-                    gitDiffOpts.emplace_back("--");
-                    runProgram("git", true, gitDiffOpts);
-
-                    clean = true;
-                }
-            } catch (ExecError & e) {
-                if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
-            }
-
-            if (!clean) {
-
-                /* This is an unclean working tree. So copy all tracked files. */
-
-                if (!fetchSettings.allowDirty)
-                    throw Error("Git tree '%s' is dirty", actualUrl);
-
-                if (fetchSettings.warnDirty)
-                    warn("Git tree '%s' is dirty", actualUrl);
-
-                auto gitOpts = Strings({ "-C", actualUrl, "--git-dir", gitDir, "ls-files", "-z" });
-                if (submodules)
-                    gitOpts.emplace_back("--recurse-submodules");
-
-                auto files = tokenizeString<std::set<std::string>>(
-                    runProgram("git", true, gitOpts), "\0"s);
-
-                Path actualPath(absPath(actualUrl));
-
-                PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualPath));
-                    std::string file(p, actualPath.size() + 1);
-
-                    auto st = lstat(p);
-
-                    if (S_ISDIR(st.st_mode)) {
-                        auto prefix = file + "/";
-                        auto i = files.lower_bound(prefix);
-                        return i != files.end() && hasPrefix(*i, prefix);
-                    }
-
-                    return files.count(file);
-                };
-
-                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
-
-                // FIXME: maybe we should use the timestamp of the last
-                // modified dirty file?
-                input.attrs.insert_or_assign(
-                    "lastModified",
-                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
-
-                return {std::move(storePath), input};
+            auto workdirInfo = getWorkdirInfo(input, actualUrl);
+            if (!workdirInfo.clean) {
+                return fetchFromWorkdir(store, input, actualUrl, workdirInfo);
             }
         }
 
@@ -425,7 +447,7 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign("ref", *head);
         }
 
-        Attrs unlockedAttrs({
+        const Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
