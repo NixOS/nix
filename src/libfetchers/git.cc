@@ -10,6 +10,7 @@
 #include "fetch-settings.hh"
 
 #include <regex>
+#include <string.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -37,7 +38,19 @@ bool isCacheFileWithinTtl(const time_t now, const struct stat& st) {
     return st.st_mtime + settings.tarballTtl > now;
 }
 
-Path getCachePath(std::string key) {
+bool touchCacheFile(const Path& path, const time_t& touch_time)
+{
+  struct timeval times[2];
+  times[0].tv_sec = touch_time;
+  times[0].tv_usec = 0;
+  times[1].tv_sec = touch_time;
+  times[1].tv_usec = 0;
+
+  return lutimes(path.c_str(), times) == 0;
+}
+
+Path getCachePath(std::string key)
+{
     return getCacheDir() + "/nix/gitv3/" +
         hashString(htSHA256, key).to_string(Base32, false);
 }
@@ -80,32 +93,42 @@ std::optional<std::string> readHead(const Path & path)
     return std::nullopt;
 }
 
-std::optional<std::string> readHeadCached(std::string actualUrl)
+// Persist the HEAD ref from the remote repo in the local cached repo.
+bool storeCachedHead(const std::string& actualUrl, const std::string& headRef)
+{
+    Path cacheDir = getCachePath(actualUrl);
+    try {
+        runProgram("git", true, { "-C", cacheDir, "symbolic-ref", "--", "HEAD", headRef });
+    } catch (ExecError &e) {
+        if (!WIFEXITED(e.status)) throw;
+        return false;
+    }
+    /* No need to touch refs/HEAD, because `git symbolic-ref` updates the mtime. */
+    return true;
+}
+
+std::optional<std::string> readHeadCached(const std::string& actualUrl)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
-    Path cachePath = getCachePath("<ref>|" + actualUrl);
+    Path cacheDir = getCachePath(actualUrl);
+    Path headRefFile = cacheDir + "/HEAD";
+
     time_t now = time(0);
     struct stat st;
     std::optional<std::string> cachedRef;
-    if (stat(cachePath.c_str(), &st) == 0 &&
-        // The file may be empty, because writeFile() is not atomic.
-        st.st_size > 0) {
-
-        // The cached ref is persisted unconditionally (see below).
-        cachedRef = readFile(cachePath);
-        if (isCacheFileWithinTtl(now, st)) {
+    if (stat(headRefFile.c_str(), &st) == 0) {
+        cachedRef = readHead(cacheDir);
+        if (cachedRef != std::nullopt &&
+            *cachedRef != gitInitialBranch &&
+            isCacheFileWithinTtl(now, st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
             return cachedRef;
         }
     }
 
     auto ref = readHead(actualUrl);
-
     if (ref) {
-        debug("storing cached HEAD ref '%s' for repo '%s' at '%s'", *ref, actualUrl, cachePath);
-        createDirs(dirOf(cachePath));
-        writeFile(cachePath, *ref);
         return ref;
     }
 
@@ -438,15 +461,6 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        if (!input.getRef()) {
-            auto head = isLocal ? readHead(actualUrl) : readHeadCached(actualUrl);
-            if (!head) {
-                warn("could not read HEAD ref from repo at '%s', using 'master'", actualUrl);
-                head = "master";
-            }
-            input.attrs.insert_or_assign("ref", *head);
-        }
-
         const Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
@@ -457,14 +471,30 @@ struct GitInputScheme : InputScheme
         Path repoDir;
 
         if (isLocal) {
+            if (!input.getRef()) {
+                auto head = readHead(actualUrl);
+                if (!head) {
+                    warn("could not read HEAD ref from repo at '%s', using 'master'", actualUrl);
+                    head = "master";
+                }
+                input.attrs.insert_or_assign("ref", *head);
+            }
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev",
                     Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
-
         } else {
+            const bool useHeadRef = !input.getRef();
+            if (useHeadRef) {
+                auto head = readHeadCached(actualUrl);
+                if (!head) {
+                    warn("could not read HEAD ref from repo at '%s', using 'master'", actualUrl);
+                    head = "master";
+                }
+                input.attrs.insert_or_assign("ref", *head);
+            }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
@@ -538,13 +568,10 @@ struct GitInputScheme : InputScheme
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
                 }
 
-                struct timeval times[2];
-                times[0].tv_sec = now;
-                times[0].tv_usec = 0;
-                times[1].tv_sec = now;
-                times[1].tv_usec = 0;
-
-                utimes(localRefFile.c_str(), times);
+                if (!touchCacheFile(localRefFile, now))
+                    warn("could not update mtime for file '%s': %s", localRefFile, strerror(errno));
+                if (useHeadRef && !storeCachedHead(actualUrl, *input.getRef()))
+                    warn("could not update cached head '%s' for '%s'", *input.getRef(), actualUrl);
             }
 
             if (!input.getRev())
