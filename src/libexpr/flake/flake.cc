@@ -245,7 +245,7 @@ static Flake getFlake(
     auto sNixConfig = state.symbols.create("nixConfig");
 
     if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
-        flake.config.parseAttrs(state, *nixConfig, std::nullopt);
+        flake.config.parseAttrs(state, *nixConfig, std::nullopt, true);
     }
 
     for (auto & attr : *vInfo.attrs) {
@@ -260,8 +260,9 @@ static Flake getFlake(
     return flake;
 }
 
-void ConfigFile::parseAttrs(EvalState & state, Attr & attrs, std::optional<std::string> sys)
-{
+void ConfigFile::parseAttrs(
+    EvalState & state, Attr & attrs, std::optional<std::string> sys, bool withPerSys
+) {
     expectType(state, nAttrs, *attrs.value, *attrs.pos);
 
     for (auto & setting : *attrs.value->attrs) {
@@ -269,17 +270,22 @@ void ConfigFile::parseAttrs(EvalState & state, Attr & attrs, std::optional<std::
 
         switch (setting.value->type()) {
         case nAttrs: {
-            // Check that we're parsing global settings, then recurse to scan the
-            // given attribute set.
-            if (!sys) {
-                state.forceAttrs(*setting.value);
-                auto sysConf = Attr(setting.name, setting.value, attrs.pos);
-                auto name = std::string(setting.name);
-                parseAttrs(state, sysConf, name);
-                break;
-            } else
+            state.forceAttrs(*setting.value);
+            auto name = std::string(setting.name);
+            auto contents = Attr(setting.name, setting.value, attrs.pos);
+
+            if (withPerSys && name == "perSystem") {
+                parseAttrs(state, contents, std::nullopt, false);
+            } else if (!withPerSys && !sys) {
+                parseAttrs(state, contents, name, false);
+            } else {
+                // If we get here, someone would have had to specify an
+                // attribute set as a regular nix.conf setting.
                 throw TypeError("flake configuration setting '%s' is %s",
                     setting.name, showType(*setting.value));
+            }
+
+            break;
         } case nString: {
             insertBySys(sys, setting.name, {state.forceStringNoCtx(*setting.value, *setting.pos)});
             break;

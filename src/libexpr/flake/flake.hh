@@ -59,7 +59,7 @@ struct ConfigFile
 
     // Parse an attribute set in the given system identifier for nix.conf
     // settings. If sys is nil, the settings read are taken to be global.
-    void parseAttrs(EvalState & state, Attr & attrs, std::optional<std::string> sys);
+    void parseAttrs(EvalState & state, Attr & attrs, std::optional<std::string> sys, bool withPerSys);
 
     void insertBySys(std::optional<std::string> sys, std::string name, ConfigValue setting);
 };
