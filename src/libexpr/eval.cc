@@ -1334,9 +1334,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             ExprLambda & lambda(*vCur.lambda.fun);
 
-            auto size =
-                (lambda.arg.empty() ? 0 : 1) +
-                (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
+            auto size = lambda.getEnvSize();
             Env & env2(allocEnv(size));
             env2.up = vCur.lambda.env;
 
@@ -1376,6 +1374,21 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         if (!lambda.formals->argNames.count(i.name))
                             throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
                     abort(); // can't happen
+                }
+
+                if (lambda.formals->ellipsis && lambda.formals->ellipsis->set()) {
+                    Value *otherAttrs = new Value();
+                    Bindings *bindings = new Bindings(args[0]->attrs->size());
+
+                    otherAttrs->mkAttrs(bindings);
+
+                    for (auto &i : *args[0]->attrs) {
+                        if (lambda.formals->argNames.find(i.name) ==
+                            lambda.formals->argNames.end()) {
+                        otherAttrs->attrs->push_back(i);
+                        }
+                    }
+                    env2.values[displ++] = otherAttrs;
                 }
             }
 

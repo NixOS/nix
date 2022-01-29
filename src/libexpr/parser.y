@@ -151,6 +151,24 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
     formals->formals.push_front(formal);
 }
 
+static void setEllipsis(const Pos &, Formals * formals, bool ellipsis)
+{
+    if (ellipsis) formals->ellipsis.emplace();
+    else formals->ellipsis.reset();
+}
+
+static void setEllipsis(const Pos & pos, Formals * formals, Symbol name) {
+    setEllipsis(pos, formals, true);
+    formals->ellipsis.emplace(name);
+    // Check that the symbol we use is not also a formal argument:
+    settings.requireExperimentalFeature(Xp::NamedEllipsis);
+    if (!formals->argNames.insert(name).second)
+        throw ParseError({
+            .msg = hintfmt("duplicate formal function argument '%1%'", name),
+            .errPos = pos
+        });
+}
+
 
 static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<std::pair<Pos, Expr *> > & es)
 {
@@ -568,11 +586,13 @@ formals
   : formal ',' formals
     { $$ = $3; addFormal(CUR_POS, $$, *$1); }
   | formal
-    { $$ = new Formals; addFormal(CUR_POS, $$, *$1); $$->ellipsis = false; }
+    { $$ = new Formals; addFormal(CUR_POS, $$, *$1); setEllipsis(CUR_POS, $$, false); }
   |
-    { $$ = new Formals; $$->ellipsis = false; }
+    { $$ = new Formals; setEllipsis(CUR_POS, $$, false); }
+  | ELLIPSIS '@' ID
+    { $$ = new Formals; setEllipsis(CUR_POS, $$, data->symbols.create($3)); }
   | ELLIPSIS
-    { $$ = new Formals; $$->ellipsis = true; }
+    { $$ = new Formals; setEllipsis(CUR_POS, $$, true); }
   ;
 
 formal
