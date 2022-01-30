@@ -1,7 +1,7 @@
 R"MdBoundary(
 # Description
 
-Display some informations about the given realisation
+Display some information about the given realisation
 
 # Examples
 
