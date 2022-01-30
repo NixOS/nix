@@ -13,6 +13,8 @@ $ cd nix
 
 ### Build the Nix package
 
+Note: Do not use this build method for local development, as you would loose any incrementality in the build. See [below](#open-a-development-shell-to-hack-on-nix) for a development shell.
+
 **For the current operating system/architecture**:
 
 ```console
@@ -56,7 +58,7 @@ $ nix develop
 
 **To get a shell with a different compilation environment**:
 
-(e.g. stdenv, gccStdenv, clangStdenv, clang11Stdenv):
+(e.g. stdenv, gccStdenv, clangStdenv, clang11Stdenv)
 ```console
 $ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
 
@@ -80,26 +82,20 @@ To build Nix itself in the development shell:
 ```console
 [dev-shell]$ ./bootstrap.sh
 [dev-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
-[dev-shell]$ make -j $NIX_BUILD_CORES
+[dev-shell]$ make install -j $NIX_BUILD_CORES
 ... (build log)
+```
+
+Build artefacts like binaries, libraries and documentation are put in `./outputs/`, for example:
+```console
 [dev-shell]$ ./outputs/out/bin/nix --version
 nix (Nix) 3.0
 ```
 
 
-### Install (in a local dir)
-
-To install everything (bins, libs, docs, configs) to `$(pwd)/outputs/out` (chosen at the `./configure ...` step above):
-
-```console
-[dev-shell]$ make install
-```
-NOTE: This will also (re-)build the HTML docs if needed.
-
-
 ### Run tests
 
-Run the unit-tests for C++ code:
+Run the unit tests for C++ code:
 
 ```console
 [dev-shell]$ make check
@@ -118,9 +114,9 @@ Run a functional test (e.g: `tests/flakes.sh`):
 [dev-shell]$ make tests/flakes.sh.test    # note the .test suffix!
 ```
 
+You can also run it manually, to see all command outputs:
+```console
+[dev-shell]$ cd tests && bash init.sh && bash flakes.sh
+```
 
----
-
-Have fun! 🚀 🚀 🚀
-
-And make the world a better place! (with Nix of course 😀)
+The list of all the available functional tests is defined in `tests/local.mk`.
