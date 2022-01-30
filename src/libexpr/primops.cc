@@ -1269,7 +1269,7 @@ static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
    substituted by the corresponding output path at build time. For
    example, 'placeholder "out"' returns the string
    /1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9. At build
-   time, any occurence of this string in an derivation attribute will
+   time, any occurrence of this string in an derivation attribute will
    be replaced with the concrete path in the Nix store of the output
    ‘out’. */
 static void prim_placeholder(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -2279,7 +2279,7 @@ static RegisterPrimOp primop_removeAttrs({
 /* Builds a set from a list specifying (name, value) pairs.  To be
    precise, a list [{name = "name1"; value = value1;} ... {name =
    "nameN"; value = valueN;}] is transformed to {name1 = value1;
-   ... nameN = valueN;}.  In case of duplicate occurences of the same
+   ... nameN = valueN;}.  In case of duplicate occurrences of the same
    name, the first takes precedence. */
 static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
