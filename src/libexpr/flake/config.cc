@@ -36,7 +36,8 @@ void ConfigFile::apply()
         if (sys && sys != settings.thisSystem.get()) continue;
 
         for (auto & [name, value] : opts) {
-            auto baseName = hasPrefix(name, "extra-") ? std::string(name, 6) : name;
+            auto baseName = !sys && hasPrefix(name, "extra-")
+                ? std::string(name, 6) : name;
 
             // FIXME: Move into libutil/config.cc.
             std::string valueS;
