@@ -298,6 +298,12 @@ The following attributes are supported in `flake.nix`:
   and `flake-registry`) are allowed to be set without confirmation so long as
   `accept-flake-config` is not set in the global configuration.
 
+  `nixConfig` may contain a `perSystem` attribute, wherein one can specify
+  different nix configurations for each system identifier.
+
+  `nixConfig` values override global settings, but `perSystem` settings are
+  merged with those specified at the top level of `nixConfig`.
+
 ## Flake inputs
 
 The attribute `inputs` specifies the dependencies of a flake, as an
