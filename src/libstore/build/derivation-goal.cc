@@ -1175,10 +1175,10 @@ bool DerivationGoal::isReadDesc(int fd)
     return fd == hook->builderOut.readSide.get();
 }
 
-
 void DerivationGoal::handleChildOutput(int fd, std::string_view data)
 {
-    if (isReadDesc(fd))
+    auto isWrittenToLog = isReadDesc(fd);
+    if (isWrittenToLog)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
@@ -1207,7 +1207,14 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
-                handleJSONLogMessage(currentHookLine, worker.act, hook->activities, true);
+                auto s = handleJSONLogMessage(currentHookLine, worker.act, hook->activities, true);
+                if (s && !isWrittenToLog && logSink) {
+                    auto json = nlohmann::json::parse(std::string(currentHookLine, 5));
+                    if (json["type"] == resBuildLogLine) {
+                        auto f = json["fields"];
+                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                    }
+                }
                 currentHookLine.clear();
             } else
                 currentHookLine += c;
