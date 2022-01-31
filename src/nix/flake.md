@@ -292,6 +292,12 @@ The following attributes are supported in `flake.nix`:
   value (e.g. `packages.x86_64-linux` must be an attribute set of
   derivations built for the `x86_64-linux` platform).
 
+* `nixConfig`: a set of `nix.conf` options to be set when evaluating any
+  part of a flake. In the interests of security, only a small set of
+  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
+  and `flake-registry`) are allowed to be set without confirmation so long as
+  `accept-flake-config` is not set in the global configuration.
+
 ## Flake inputs
 
 The attribute `inputs` specifies the dependencies of a flake, as an
