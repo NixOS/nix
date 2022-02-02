@@ -683,17 +683,80 @@ Value & EvalState::getBuiltin(const string & name)
 
 std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
-    if (v.isPrimOp()) {
-        auto v2 = &v;
-        if (v2->primOp->doc)
-            return Doc {
-                .pos = noPos,
-                .name = v2->primOp->name,
-                .arity = v2->primOp->arity,
-                .args = v2->primOp->args,
-                .doc = v2->primOp->doc,
-            };
+    std::vector<Doc::Arg> args;
+
+    auto getLambdaArgs = [&](Expr * expr, bool skipFirst)
+    {
+        while (auto lambda = dynamic_cast<ExprLambda *>(expr)) {
+            // FIXME: handle attrset matches.
+            if (!skipFirst) {
+                Doc::Arg arg { .name = lambda->arg != sEpsilon ? (std::string) lambda->arg : "_" };
+                if (lambda->hasFormals()) {
+                    arg.attrs.emplace();
+                    arg.ellipsis = lambda->formals->ellipsis;
+                    for (auto & formal : lambda->formals->formals)
+                        arg.attrs->insert(formal.name);
+                }
+                args.push_back(std::move(arg));
+            }
+            skipFirst = false;
+            /* Note that we don't evaluate the body, so this only
+               works if it's a lambda AST node. I.e. `x: ...` works,
+               `let f = x: ...; in f` does not. So don't even think
+               about providing getDoc() as a primop! */
+            expr = lambda->body;
+        }
+    };
+
+    if (v.isPrimOp() && v.primOp->doc) {
+        for (auto & arg : v.primOp->args)
+            args.push_back({.name = arg});
+        return Doc {
+            .pos = noPos,
+            .name = v.primOp->name,
+            .arity = v.primOp->arity,
+            .args = std::move(args),
+            .doc = v.primOp->doc,
+        };
     }
+
+    else if (auto functor = isFunctor(v)) {
+        if (auto doc = v.attrs->get(symbols.create("__doc"))) {
+
+            auto fun = functor->value;
+            forceValue(*fun);
+            if (!fun->isLambda())
+                throwTypeError(*functor->pos, "value is %1% while a function was expected", *fun);
+
+            if (auto vArgs = v.attrs->get(symbols.create("__args"))) {
+                forceList(*vArgs->value, *vArgs->pos);
+                for (unsigned int n = 0; n < vArgs->value->listSize(); ++n)
+                    args.push_back({.name = forceString(*vArgs->value->listElems()[n], noPos)});
+            } else {
+                if (fun->isLambda())
+                    getLambdaArgs(fun->lambda.fun, true);
+            }
+
+            return Doc {
+                .pos = fun->lambda.fun->pos,
+                .arity = args.size(),
+                .args = std::move(args),
+                .doc = forceString(*doc->value, *doc->pos),
+            };
+        }
+    }
+
+    else if (v.isLambda()) {
+        getLambdaArgs(v.lambda.fun, false);
+        auto res = Doc {
+            .pos = v.lambda.fun->pos,
+            .arity = args.size(),
+            .args = std::move(args),
+        };
+        if (v.lambda.fun->name != sEpsilon) res.name = v.lambda.fun->name;
+        return res;
+    }
+
     return {};
 }
 
@@ -1502,14 +1565,11 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
     forceValue(fun);
 
-    if (fun.type() == nAttrs) {
-        auto found = fun.attrs->find(sFunctor);
-        if (found != fun.attrs->end()) {
-            Value * v = allocValue();
-            callFunction(*found->value, fun, *v, noPos);
-            forceValue(*v);
-            return autoCallFunction(args, *v, res);
-        }
+    if (auto functor = isFunctor(fun)) {
+        Value * v = allocValue();
+        callFunction(*functor->value, fun, *v, *functor->pos);
+        forceValue(*v);
+        return autoCallFunction(args, *v, res);
     }
 
     if (!fun.isLambda() || !fun.lambda.fun->hasFormals()) {
@@ -1847,9 +1907,9 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 }
 
 
-bool EvalState::isFunctor(Value & fun)
+Attr * EvalState::isFunctor(Value & fun)
 {
-    return fun.type() == nAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
+    return fun.type() == nAttrs ? fun.attrs->get(sFunctor) : nullptr;
 }
 
 

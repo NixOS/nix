@@ -294,10 +294,16 @@ public:
     struct Doc
     {
         Pos pos;
-        std::optional<Symbol> name;
+        Symbol name;
         size_t arity;
-        std::vector<std::string> args;
-        const char * doc;
+        struct Arg
+        {
+            std::string name;
+            std::optional<std::set<std::string>> attrs;
+            bool ellipsis = false;
+        };
+        std::vector<Arg> args;
+        std::optional<std::string> doc;
     };
 
     std::optional<Doc> getDoc(Value & v);
@@ -319,7 +325,9 @@ public:
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
 
-    bool isFunctor(Value & fun);
+    /* Return the __functor attribute of 'fun' if it exists, otherwise
+       return null. */
+    Attr * isFunctor(Value & fun);
 
     // FIXME: use std::span
     void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const Pos & pos);

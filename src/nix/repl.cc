@@ -556,19 +556,38 @@ bool NixRepl::processLine(string line)
         if (auto doc = state->getDoc(v)) {
             std::string markdown;
 
-            if (!doc->args.empty() && doc->name) {
-                auto args = doc->args;
-                for (auto & arg : args)
-                    arg = "*" + arg + "*";
+            if (doc->pos)
+                markdown += filterANSIEscapes(fmt("**Source**: %s\n\n", doc->pos), true);
+
+            if (!doc->args.empty()) {
+                std::vector<std::string> args;
+                for (auto & arg : doc->args) {
+                    if (arg.attrs) {
+                        std::vector<std::string> attrs;
+                        for (auto & attr : *arg.attrs)
+                            attrs.push_back("`" + attr + "`");
+                        if (arg.ellipsis)
+                            attrs.push_back("...");
+                        args.push_back("{ " + concatStringsSep(", ", attrs) + " }");
+                    } else
+                        args.push_back("*" + arg.name + "*");
+                }
 
                 markdown +=
-                    "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
+                    "**Synopsis:** `"
+                    + (v.isPrimOp()
+                        ? "builtins." + (std::string) doc->name
+                        : doc->name.set()
+                        ? (std::string) doc->name
+                        : arg)
+                    + "` "
                     + concatStringsSep(" ", args) + "\n\n";
             }
 
-            markdown += stripIndentation(doc->doc);
+            if (doc->doc)
+                markdown += stripIndentation(*doc->doc);
 
-            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+            logger->cout(chomp(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
     }
