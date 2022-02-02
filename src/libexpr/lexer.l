@@ -66,7 +66,7 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.
-static Expr * unescapeStr(SymbolTable & symbols, char * s, size_t length)
+static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 {
     char * result = s;
     char * t = s;
@@ -89,7 +89,7 @@ static Expr * unescapeStr(SymbolTable & symbols, char * s, size_t length)
         else *t = c;
         t++;
     }
-    return new ExprString(symbols.create({result, size_t(t - result)}));
+    return {result, size_t(t - result)};
 }
 
 
@@ -176,7 +176,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->e = unescapeStr(data->symbols, yytext, yyleng);
+                yylval->str = unescapeStr(data->symbols, yytext, yyleng);
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -191,26 +191,26 @@ or          { return OR_KW; }
 
 \'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
-                   yylval->e = new ExprIndStr(yytext);
+                   yylval->str = {yytext, (size_t) yyleng, true};
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ |
 <IND_STRING>\$   {
-                   yylval->e = new ExprIndStr("$");
+                   yylval->str = {"$", 1};
                    return IND_STR;
                  }
 <IND_STRING>\'\'\' {
-                   yylval->e = new ExprIndStr("''");
+                   yylval->str = {"''", 2};
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
+                   yylval->str = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { POP_STATE(); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
-                   yylval->e = new ExprIndStr("'");
+                   yylval->str = {"'", 1};
                    return IND_STR;
                  }
 
@@ -264,7 +264,7 @@ or          { return OR_KW; }
       PUSH_STATE(INPATH_SLASH);
   else
       PUSH_STATE(INPATH);
-  yylval->e = new ExprString(data->symbols.create(string(yytext)));
+  yylval->str = {yytext, (size_t) yyleng};
   return STR;
 }
 <INPATH>{ANY} |
