@@ -245,34 +245,7 @@ static Flake getFlake(
     auto sNixConfig = state.symbols.create("nixConfig");
 
     if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
-        expectType(state, nAttrs, *nixConfig->value, *nixConfig->pos);
-
-        for (auto & setting : *nixConfig->value->attrs) {
-            forceTrivialValue(state, *setting.value, *setting.pos);
-            if (setting.value->type() == nString)
-                flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
-            else if (setting.value->type() == nPath) {
-                PathSet emptyContext = {};
-                flake.config.settings.insert({setting.name, state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
-            }
-            else if (setting.value->type() == nInt)
-                flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
-            else if (setting.value->type() == nBool)
-                flake.config.settings.insert({setting.name, Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
-            else if (setting.value->type() == nList) {
-                std::vector<std::string> ss;
-                for (auto elem : setting.value->listItems()) {
-                    if (elem->type() != nString)
-                        throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
-                            setting.name, showType(*setting.value));
-                    ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
-                }
-                flake.config.settings.insert({setting.name, ss});
-            }
-            else
-                throw TypeError("flake configuration setting '%s' is %s",
-                    setting.name, showType(*setting.value));
-        }
+        flake.config.parseAttrs(state, *nixConfig, std::nullopt, true);
     }
 
     for (auto & attr : *vInfo.attrs) {
@@ -285,6 +258,70 @@ static Flake getFlake(
     }
 
     return flake;
+}
+
+void ConfigFile::parseAttrs(
+    EvalState & state, Attr & attrs, std::optional<std::string> sys, bool withPerSys
+) {
+    expectType(state, nAttrs, *attrs.value, *attrs.pos);
+
+    for (auto & setting : *attrs.value->attrs) {
+        forceTrivialValue(state, *setting.value, *setting.pos);
+
+        switch (setting.value->type()) {
+        case nAttrs: {
+            state.forceAttrs(*setting.value);
+            auto name = std::string(setting.name);
+            auto contents = Attr(setting.name, setting.value, attrs.pos);
+
+            if (withPerSys && name == "perSystem") {
+                parseAttrs(state, contents, std::nullopt, false);
+            } else if (!withPerSys && !sys) {
+                parseAttrs(state, contents, name, false);
+            } else {
+                // If we get here, someone would have had to specify an
+                // attribute set as a regular nix.conf setting.
+                throw TypeError("flake configuration setting '%s' is %s",
+                    setting.name, showType(*setting.value));
+            }
+
+            break;
+        } case nString: {
+            insertBySys(sys, setting.name, {state.forceStringNoCtx(*setting.value, *setting.pos)});
+            break;
+        } case nPath: {
+            PathSet emptyContext = {};
+            insertBySys(sys, setting.name, {state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
+            break;
+        } case nInt: {
+            insertBySys(sys, setting.name, {state.forceInt(*setting.value, *setting.pos)});
+            break;
+        } case nBool: {
+            insertBySys(sys, setting.name, {Explicit<bool> { state.forceBool(*setting.value, *setting.pos) }});
+            break;
+        } case nList: {
+            std::vector<std::string> ss;
+            for (auto elem : setting.value->listItems()) {
+                if (elem->type() != nString)
+                    throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
+                        setting.name, showType(*setting.value));
+                ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
+            }
+
+            insertBySys(sys, setting.name, {ss});
+            break;
+        } default: {
+            throw TypeError("flake configuration setting '%s' is %s",
+                setting.name, showType(*setting.value));
+        }}
+    }
+}
+
+void ConfigFile::insertBySys(std::optional<std::string> sys, std::string name, ConfigFile::ConfigValue setting)
+{
+    settingsBySys
+        .insert({sys, std::map<std::string, ConfigFile::ConfigValue>()})
+        .first->second.insert({name, setting});
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "attr-set.hh"
 #include "types.hh"
 #include "flakeref.hh"
 #include "lockfile.hh"
@@ -50,9 +51,17 @@ struct ConfigFile
 {
     using ConfigValue = std::variant<std::string, int64_t, Explicit<bool>, std::vector<std::string>>;
 
-    std::map<std::string, ConfigValue> settings;
+    // Store a map of string system identifiers to a store of settings. If a system identifier is nil,
+    // it is meant to apply to any system.
+    std::map<std::optional<std::string>, std::map<std::string, ConfigValue>> settingsBySys;
 
     void apply();
+
+    // Parse an attribute set in the given system identifier for nix.conf
+    // settings. If sys is nil, the settings read are taken to be global.
+    void parseAttrs(EvalState & state, Attr & attrs, std::optional<std::string> sys, bool withPerSys);
+
+    void insertBySys(std::optional<std::string> sys, std::string name, ConfigValue setting);
 };
 
 /* The contents of a flake.nix file. */
