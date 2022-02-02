@@ -236,7 +236,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
    It is used as a placeholder to allow derivations to refer to their
    own outputs without needing to use the hash of a derivation in
    itself, making the hash near-impossible to calculate. */
-std::string hashPlaceholder(const std::string & outputName);
+std::string hashPlaceholder(const std::string_view outputName);
 
 /* This creates an opaque and almost certainly unique string
    deterministically from a derivation path and output name.

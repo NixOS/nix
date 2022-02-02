@@ -49,7 +49,7 @@ void clearEnv();
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
 Path absPath(Path path,
-    std::optional<Path> dir = {},
+    std::optional<PathView> dir = {},
     bool resolveSymlinks = false);
 
 /* Canonicalise a path by removing all `.' or `..' components and
@@ -62,7 +62,7 @@ Path canonPath(PathView path, bool resolveSymlinks = false);
    everything before the final `/'.  If the path is the root or an
    immediate child thereof (e.g., `/foo'), this means `/'
    is returned.*/
-Path dirOf(const Path & path);
+Path dirOf(const PathView path);
 
 /* Return the base name of the given canonical path, i.e., everything
    following the final `/' (trailing slashes are removed). */
@@ -148,6 +148,9 @@ Path getDataDir();
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
+inline Paths createDirs(PathView path) {
+    return createDirs(Path(path));
+}
 
 /* Create a symlink. */
 void createSymlink(const Path & target, const Path & link,
@@ -187,6 +190,7 @@ public:
     void cancel();
     void reset(const Path & p, bool recursive = true);
     operator Path() const { return path; }
+    operator PathView() const { return path; }
 };
 
 
@@ -491,7 +495,7 @@ std::string toLower(const std::string & s);
 
 
 /* Escape a string as a shell word. */
-std::string shellEscape(const std::string & s);
+std::string shellEscape(const std::string_view s);
 
 
 /* Exception handling in destructors: print an error message, then

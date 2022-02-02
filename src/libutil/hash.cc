@@ -259,7 +259,7 @@ Hash::Hash(std::string_view rest, HashType type, bool isSRI)
         throw BadHash("hash '%s' has wrong length for hash type '%s'", rest, printHashType(this->type));
 }
 
-Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
+Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashType> ht)
 {
     if (hashStr.empty()) {
         if (!ht)

@@ -463,7 +463,7 @@ bool NixRepl::processLine(string line)
         if (v.type() == nPath || v.type() == nString) {
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
-            pos.file = state->symbols.create(filename);
+            pos.file = state->symbols.create(*filename);
         } else if (v.isLambda()) {
             pos = v.lambda.fun->pos;
         } else {

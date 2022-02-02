@@ -1,6 +1,7 @@
 #pragma once
 
 #include "attr-set.hh"
+#include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
@@ -201,8 +202,8 @@ public:
     void resetFileCache();
 
     /* Look up a file in the search path. */
-    Path findFile(const string & path);
-    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
+    Path findFile(const std::string_view path);
+    Path findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
@@ -236,9 +237,9 @@ public:
     inline void forceList(Value & v);
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
-    string forceString(Value & v, const Pos & pos = noPos);
-    string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
-    string forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    std::string_view forceString(Value & v, const Pos & pos = noPos);
+    std::string_view forceString(Value & v, PathSet & context, const Pos & pos = noPos);
+    std::string_view forceStringNoCtx(Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
@@ -251,7 +252,7 @@ public:
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
-    string coerceToString(const Pos & pos, Value & v, PathSet & context,
+    BackedStringView coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
@@ -309,8 +310,8 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(char * text, size_t length, FileOrigin origin, const Path & path,
-        const Path & basePath, StaticEnv & staticEnv);
+    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
+        const PathView basePath, StaticEnv & staticEnv);
 
 public:
 

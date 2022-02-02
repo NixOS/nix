@@ -250,10 +250,12 @@ static Flake getFlake(
         for (auto & setting : *nixConfig->value->attrs) {
             forceTrivialValue(state, *setting.value, *setting.pos);
             if (setting.value->type() == nString)
-                flake.config.settings.insert({setting.name, state.forceStringNoCtx(*setting.value, *setting.pos)});
+                flake.config.settings.insert({setting.name, string(state.forceStringNoCtx(*setting.value, *setting.pos))});
             else if (setting.value->type() == nPath) {
                 PathSet emptyContext = {};
-                flake.config.settings.insert({setting.name, state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true)});
+                flake.config.settings.emplace(
+                    setting.name,
+                    state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true) .toOwned());
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos)});
@@ -265,7 +267,7 @@ static Flake getFlake(
                     if (elem->type() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             setting.name, showType(*setting.value));
-                    ss.push_back(state.forceStringNoCtx(*elem, *setting.pos));
+                    ss.emplace_back(state.forceStringNoCtx(*elem, *setting.pos));
                 }
                 flake.config.settings.insert({setting.name, ss});
             }
@@ -726,7 +728,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.requireExperimentalFeatureOnEvaluation(Xp::Flakes, "builtins.getFlake", pos);
 
-    auto flakeRefS = state.forceStringNoCtx(*args[0], pos);
+    string flakeRefS(state.forceStringNoCtx(*args[0], pos));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input.isImmutable())
         throw Error("cannot call 'getFlake' on mutable flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);
