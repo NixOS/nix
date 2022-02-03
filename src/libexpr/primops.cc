@@ -210,7 +210,7 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         if (!vScope)
             state.evalFile(path, v);
         else {
-            state.forceAttrs(*vScope);
+            state.forceAttrs(*vScope, pos);
 
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
@@ -2502,7 +2502,7 @@ static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args
     for (unsigned int n = 0; n < listSize; ++n) {
         Value * vElem = listElems[n];
         try {
-            state.forceAttrs(*vElem);
+            state.forceAttrs(*vElem, noPos);
             for (auto & attr : *vElem->attrs)
                 attrsSeen[attr.name].first++;
         } catch (TypeError & e) {

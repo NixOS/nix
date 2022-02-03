@@ -107,7 +107,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
                 string name(state->forceStringNoCtx(*elem, *i->pos));
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value);
+                state->forceAttrs(*out->value, *i->pos);
 
                 /* And evaluate its ‘outPath’ attribute. */
                 Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
@@ -172,7 +172,7 @@ StringSet DrvInfo::queryMetaNames()
 
 bool DrvInfo::checkMeta(Value & v)
 {
-    state->forceValue(v);
+    state->forceValue(v, v.determinePos(noPos));
     if (v.type() == nList) {
         for (auto elem : v.listItems())
             if (!checkMeta(*elem)) return false;
@@ -278,7 +278,7 @@ static bool getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v);
+        state.forceValue(v, v.determinePos(noPos));
         if (!state.isDerivation(v)) return true;
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =

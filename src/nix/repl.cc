@@ -342,7 +342,7 @@ StringSet NixRepl::completePrefix(string prefix)
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v);
+            state->forceAttrs(v, noPos);
 
             for (auto & i : *v.attrs) {
                 string name = i.name;
@@ -673,7 +673,7 @@ void NixRepl::reloadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs);
+    state->forceAttrs(attrs, attrs.determinePos(noPos));
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
@@ -712,7 +712,7 @@ void NixRepl::evalString(string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v);
+    state->forceValue(v, v.determinePos(noPos));
 }
 
 
@@ -742,7 +742,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v);
+    state->forceValue(v, v.determinePos(noPos));
 
     switch (v.type()) {
 

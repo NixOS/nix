@@ -28,12 +28,12 @@ string resolveMirrorUrl(EvalState & state, string url)
     Value vMirrors;
     // FIXME: use nixpkgs flake
     state.eval(state.parseExprFromString("import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>", "."), vMirrors);
-    state.forceAttrs(vMirrors);
+    state.forceAttrs(vMirrors, noPos);
 
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
         throw Error("unknown mirror name '%s'", mirrorName);
-    state.forceList(*mirrorList->value);
+    state.forceList(*mirrorList->value, noPos);
 
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
@@ -196,11 +196,11 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             Value vRoot;
             state->evalFile(path, vRoot);
             Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
-            state->forceAttrs(v);
+            state->forceAttrs(v, noPos);
 
             /* Extract the URL. */
             auto & attr = v.attrs->need(state->symbols.create("urls"));
-            state->forceList(*attr.value);
+            state->forceList(*attr.value, noPos);
             if (attr.value->listSize() < 1)
                 throw Error("'urls' list is empty");
             url = state->forceString(*attr.value->listElems()[0]);

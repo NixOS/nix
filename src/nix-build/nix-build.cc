@@ -318,7 +318,7 @@ static void main_nix_build(int argc, char * * argv)
 
         for (auto & i : attrPaths) {
             Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
-            state->forceValue(v);
+            state->forceValue(v, v.determinePos(noPos));
             getDerivations(*state, v, "", *autoArgs, drvs, false);
         }
     }

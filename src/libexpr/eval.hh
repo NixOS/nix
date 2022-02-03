@@ -222,7 +222,7 @@ public:
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
-    inline void forceValue(Value & v, const Pos & pos = noPos);
+    inline void forceValue(Value & v, const Pos & pos);
 
     /* Force a value, then recursively force list elements and
        attributes. */
@@ -232,9 +232,7 @@ public:
     NixInt forceInt(Value & v, const Pos & pos);
     NixFloat forceFloat(Value & v, const Pos & pos);
     bool forceBool(Value & v, const Pos & pos);
-    inline void forceAttrs(Value & v);
     inline void forceAttrs(Value & v, const Pos & pos);
-    inline void forceList(Value & v);
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
     std::string_view forceString(Value & v, const Pos & pos = noPos);

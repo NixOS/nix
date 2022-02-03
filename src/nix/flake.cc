@@ -124,12 +124,13 @@ struct CmdFlakeLock : FlakeCommand
 static void enumerateOutputs(EvalState & state, Value & vFlake,
     std::function<void(const std::string & name, Value & vProvide, const Pos & pos)> callback)
 {
-    state.forceAttrs(vFlake);
+    auto pos = vFlake.determinePos(noPos);
+    state.forceAttrs(vFlake, pos);
 
     auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceAttrs(*aOutputs->value);
+    state.forceAttrs(*aOutputs->value, pos);
 
     auto sHydraJobs = state.symbols.create("hydraJobs");
 
