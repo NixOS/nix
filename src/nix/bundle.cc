@@ -51,7 +51,9 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultApp." + settings.thisSystem.get()};
+        Strings res{
+            "defaultApp." + settings.thisSystem.get()
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;
@@ -59,7 +61,10 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"apps." + settings.thisSystem.get() + "."};
+        Strings res{
+            "apps." + settings.thisSystem.get() + "."
+
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -69,29 +74,24 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto app = installable->toApp(*evalState).resolve(getEvalStore(), store);
+        auto [progFlakeRef, progName] = parseFlakeRefWithFragment(installable->what(), absPath("."));
+        const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
+        auto programInstallable = InstallableFlake(this,
+            evalState, std::move(progFlakeRef),
+            Strings{progName == "" ? "defaultApp" : progName},
+            Strings(this->getDefaultFlakeAttrPathPrefixes()),
+            lockFlagsProg);
+        auto val = programInstallable.toValue(*evalState).first;
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         auto bundler = InstallableFlake(this,
             evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
-            Strings({"bundlers."}), lockFlags);
-
-        auto attrs = evalState->buildBindings(2);
-
-        PathSet context;
-        for (auto & i : app.context)
-            context.insert("=" + store->printStorePath(i.path));
-        attrs.alloc("program").mkString(app.program, context);
-
-        attrs.alloc("system").mkString(settings.thisSystem.get());
+            Strings{bundlerName == "" ? "defaultBundler." + settings.thisSystem.get() : settings.thisSystem.get() + "." + bundlerName, bundlerName},
+            Strings({"","bundlers."}), lockFlags);
 
         auto vRes = evalState->allocValue();
-        evalState->callFunction(
-            *bundler.toValue(*evalState).first,
-            evalState->allocValue()->mkAttrs(attrs),
-            *vRes, noPos);
+        evalState->callFunction(*bundler.toValue(*evalState).first, *val, *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
@@ -113,9 +113,12 @@ struct CmdBundle : InstallableCommand
 
         auto outPathS = store->printStorePath(outPath);
 
-        if (!outLink)
-            outLink = baseNameOf(app.program);
+        if (!outLink) {
+            auto &attr = vRes->attrs->need(evalState->sName);
+            outLink = evalState->forceStringNoCtx(*attr.value,*attr.pos);
+        }
 
+        // TODO: will crash if not a localFSStore?
         store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink));
     }
 };

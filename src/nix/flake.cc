@@ -475,10 +475,7 @@ struct CmdFlakeCheck : FlakeCommand
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
-                if (!v.lambda.fun->formals ||
-                    !v.lambda.fun->formals->has(state->symbols.create("program")) ||
-                    !v.lambda.fun->formals->has(state->symbols.create("system")))
-                    throw Error("bundler must take formal arguments 'program' and 'system'");
+                // TODO: check types of inputs/outputs?
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 reportError(e);
@@ -609,14 +606,27 @@ struct CmdFlakeCheck : FlakeCommand
                                     *attr.value, *attr.pos);
                         }
 
-                        else if (name == "defaultBundler")
-                            checkBundler(name, vOutput, pos);
+                        else if (name == "defaultBundler") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkBundler(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                            }
+                        }
 
                         else if (name == "bundlers") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                checkBundler(fmt("%s.%s", name, attr.name),
-                                    *attr.value, *attr.pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs) {
+                                    checkBundler(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                                }
+                            }
                         }
 
                         else
