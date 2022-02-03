@@ -115,6 +115,7 @@ public:
     RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
+    bool debugStop;
     std::list<DebugTrace> debugTraces;
 
 private:

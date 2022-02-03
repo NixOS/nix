@@ -439,7 +439,11 @@ bool NixRepl::processLine(string line)
              << "  :d <cmd>      Debug mode commands\n"
              << "  :d stack      Show call stack\n"
              << "  :d env        Show env stack\n"
-             << "  :d error      Show current error\n";
+             << "  :d error      Show current error\n"
+             << "  :d go         Go until end of program, exception, or builtins.break().\n"
+             << "  :d step       Go one step\n"
+             ;
+
     }
 
     else if (command == ":d" || command == ":debug") {
@@ -475,6 +479,16 @@ bool NixRepl::processLine(string line)
             {
                 notice("error information not available");
             }
+        }
+        else if (arg == "step") {
+            // set flag and exit repl.
+            state->debugStop = true;
+            return false;
+        }
+        else if (arg == "go") {
+            // set flag and exit repl.
+            state->debugStop = false;
+            return false;
         }
     }
 

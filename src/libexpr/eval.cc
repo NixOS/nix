@@ -417,6 +417,7 @@ EvalState::EvalState(
     , repair(NoRepair)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
+    , debugStop(true)
     , regexCache(makeRegexCache())
     , baseEnv(allocEnv(128))
     , staticBaseEnv(new StaticEnv(false, 0))
@@ -930,7 +931,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState &evalState, DebugTrace t)
 :evalState(evalState), trace(t)
 {
     evalState.debugTraces.push_front(t);
-    if (debuggerHook)
+    if (evalState.debugStop && debuggerHook)
         debuggerHook(0, t.env, t.expr);
 }
 
