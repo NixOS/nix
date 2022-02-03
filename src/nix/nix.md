@@ -76,7 +76,7 @@ the Nix store. Here are the recognised types of installables:
     
     Note that the search will only include files indexed by git. In particular, files
     which are matched by `.gitignore` or have never been `git add`-ed will not be
-    available in the flake. If this is undesireable, specify `path:<directory>` explicitly;
+    available in the flake. If this is undesirable, specify `path:<directory>` explicitly;
     
     For example, if `/foo/bar` is a git repository with the following structure:
     ```

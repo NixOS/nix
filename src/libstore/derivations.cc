@@ -699,10 +699,10 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 }
 
 
-std::string hashPlaceholder(const std::string & outputName)
+std::string hashPlaceholder(const std::string_view outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
+    return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(Base32, false);
 }
 
 std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName)

@@ -121,7 +121,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
     std::string filename(pos, 0, colon);
     unsigned int lineno;
     try {
-        lineno = std::stoi(std::string(pos, colon + 1));
+        lineno = std::stoi(std::string(pos, colon + 1, string::npos));
     } catch (std::invalid_argument & e) {
         throw ParseError("cannot parse line number '%s'", pos);
     }

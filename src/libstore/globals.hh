@@ -970,7 +970,7 @@ public:
     Setting<std::string> commitLockFileSummary{
         this, "", "commit-lockfile-summary",
         R"(
-          The commit summary to use when commiting changed flake lock files. If
+          The commit summary to use when committing changed flake lock files. If
           empty, the summary is generated based on the action performed.
         )"};
 };

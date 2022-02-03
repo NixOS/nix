@@ -107,7 +107,7 @@ public:
 };
 
 /* Helper that defaults empty hashes to the 0 hash. */
-Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
+Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashType> ht);
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
 string printHash16or32(const Hash & hash);
