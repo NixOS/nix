@@ -497,7 +497,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceValue(*aOutputs->value, aOutputs->value->determinePos(noPos));
+    state.forceValue(*aOutputs->value, [&]() { return aOutputs->value->determinePos(noPos); });
 
     return aOutputs->value;
 }

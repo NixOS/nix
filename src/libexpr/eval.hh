@@ -224,6 +224,9 @@ public:
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const Pos & pos);
 
+    template <typename Callable>
+    inline void forceValue(Value & v, Callable getPos);
+
     /* Force a value, then recursively force list elements and
        attributes. */
     void forceValueDeep(Value & v);
@@ -232,7 +235,12 @@ public:
     NixInt forceInt(Value & v, const Pos & pos);
     NixFloat forceFloat(Value & v, const Pos & pos);
     bool forceBool(Value & v, const Pos & pos);
-    inline void forceAttrs(Value & v, const Pos & pos);
+
+    void forceAttrs(Value & v, const Pos & pos);
+
+    template <typename Callable>
+    inline void forceAttrs(Value & v, Callable getPos);
+
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
     std::string_view forceString(Value & v, const Pos & pos = noPos);

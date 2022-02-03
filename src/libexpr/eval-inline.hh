@@ -15,12 +15,6 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
-{
-    throw TypeError(s, showType(v));
-}
-
-
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
 {
     throw TypeError({
@@ -31,6 +25,13 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 
 
 void EvalState::forceValue(Value & v, const Pos & pos)
+{
+    forceValue(v, [&]() { return pos; });
+}
+
+
+template<typename Callable>
+void EvalState::forceValue(Value & v, Callable getPos)
 {
     if (v.isThunk()) {
         Env * env = v.thunk.env;
@@ -47,15 +48,22 @@ void EvalState::forceValue(Value & v, const Pos & pos)
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
-        throwEvalError(pos, "infinite recursion encountered");
+        throwEvalError(getPos(), "infinite recursion encountered");
 }
 
 
 inline void EvalState::forceAttrs(Value & v, const Pos & pos)
 {
-    forceValue(v, pos);
+    forceAttrs(v, [&]() { return pos; });
+}
+
+
+template <typename Callable>
+inline void EvalState::forceAttrs(Value & v, Callable getPos)
+{
+    forceValue(v, getPos);
     if (v.type() != nAttrs)
-        throwTypeError(pos, "value is %1% while a set was expected", v);
+        throwTypeError(getPos(), "value is %1% while a set was expected", v);
 }
 
 

@@ -673,7 +673,7 @@ void NixRepl::reloadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs, attrs.determinePos(noPos));
+    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
@@ -712,7 +712,7 @@ void NixRepl::evalString(string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v, v.determinePos(noPos));
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
 }
 
 
@@ -742,7 +742,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v, v.determinePos(noPos));
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
 
     switch (v.type()) {
 
