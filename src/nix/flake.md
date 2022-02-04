@@ -137,15 +137,6 @@ Currently the `type` attribute can be one of the following:
   *path* must be a directory in the file system containing a file
   named `flake.nix`.
 
-  If the directory or any of its parents is a Git repository, then
-  this is essentially equivalent to `git+file://<path>` (see below),
-  except that the `dir` parameter is derived automatically. For
-  example, if `/foo/bar` is a Git repository, then the flake reference
-  `/foo/bar/flake` is equivalent to `/foo/bar?dir=flake`.
-
-  If the directory is not inside a Git repository, then the flake
-  contents is the entire contents of *path*.
-
   *path* generally must be an absolute path. However, on the command
   line, it can be a relative path (e.g. `.` or `./foo`) which is
   interpreted as relative to the current directory. In this case, it
@@ -300,6 +291,12 @@ The following attributes are supported in `flake.nix`:
   `nix` subcommands require specific attributes to have a specific
   value (e.g. `packages.x86_64-linux` must be an attribute set of
   derivations built for the `x86_64-linux` platform).
+
+* `nixConfig`: a set of `nix.conf` options to be set when evaluating any
+  part of a flake. In the interests of security, only a small set of
+  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
+  and `flake-registry`) are allowed to be set without confirmation so long as
+  `accept-flake-config` is not set in the global configuration.
 
 ## Flake inputs
 

@@ -64,29 +64,32 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-// FIXME: optimize
-static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
+// we make use of the fact that the parser receives a private copy of the input
+// string and can munge around in it.
+static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 {
-    string t;
-    t.reserve(length);
+    char * result = s;
+    char * t = s;
     char c;
+    // the input string is terminated with *two* NULs, so we can safely take
+    // *one* character after the one being checked against.
     while ((c = *s++)) {
         if (c == '\\') {
-            assert(*s);
             c = *s++;
-            if (c == 'n') t += '\n';
-            else if (c == 'r') t += '\r';
-            else if (c == 't') t += '\t';
-            else t += c;
+            if (c == 'n') *t = '\n';
+            else if (c == 'r') *t = '\r';
+            else if (c == 't') *t = '\t';
+            else *t = c;
         }
         else if (c == '\r') {
             /* Normalise CR and CR/LF into LF. */
-            t += '\n';
+            *t = '\n';
             if (*s == '\n') s++; /* cr/lf */
         }
-        else t += c;
+        else *t = c;
+        t++;
     }
-    return new ExprString(symbols.create(t));
+    return {result, size_t(t - result)};
 }
 
 
@@ -139,7 +142,7 @@ or          { return OR_KW; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
 
-{ID}        { yylval->id = strdup(yytext); return ID; }
+{ID}        { yylval->id = {yytext, (size_t) yyleng}; return ID; }
 {INT}       { errno = 0;
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
@@ -173,7 +176,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->e = unescapeStr(data->symbols, yytext, yyleng);
+                yylval->str = unescapeStr(data->symbols, yytext, yyleng);
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -188,26 +191,26 @@ or          { return OR_KW; }
 
 \'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
-                   yylval->e = new ExprIndStr(yytext);
+                   yylval->str = {yytext, (size_t) yyleng, true};
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ |
 <IND_STRING>\$   {
-                   yylval->e = new ExprIndStr("$");
+                   yylval->str = {"$", 1};
                    return IND_STR;
                  }
 <IND_STRING>\'\'\' {
-                   yylval->e = new ExprIndStr("''");
+                   yylval->str = {"''", 2};
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
+                   yylval->str = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { POP_STATE(); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
-                   yylval->e = new ExprIndStr("'");
+                   yylval->str = {"'", 1};
                    return IND_STR;
                  }
 
@@ -221,14 +224,14 @@ or          { return OR_KW; }
 <PATH_START>{PATH_SEG} {
   POP_STATE();
   PUSH_STATE(INPATH_SLASH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return PATH;
 }
 
 <PATH_START>{HPATH_START} {
   POP_STATE();
   PUSH_STATE(INPATH_SLASH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return HPATH;
 }
 
@@ -237,7 +240,7 @@ or          { return OR_KW; }
     PUSH_STATE(INPATH_SLASH);
   else
     PUSH_STATE(INPATH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return PATH;
 }
 {HPATH} {
@@ -245,7 +248,7 @@ or          { return OR_KW; }
     PUSH_STATE(INPATH_SLASH);
   else
     PUSH_STATE(INPATH);
-  yylval->path = strdup(yytext);
+  yylval->path = {yytext, (size_t) yyleng};
   return HPATH;
 }
 
@@ -261,7 +264,7 @@ or          { return OR_KW; }
       PUSH_STATE(INPATH_SLASH);
   else
       PUSH_STATE(INPATH);
-  yylval->e = new ExprString(data->symbols.create(string(yytext)));
+  yylval->str = {yytext, (size_t) yyleng};
   return STR;
 }
 <INPATH>{ANY} |
@@ -280,8 +283,8 @@ or          { return OR_KW; }
   throw ParseError("path has a trailing slash");
 }
 
-{SPATH}     { yylval->path = strdup(yytext); return SPATH; }
-{URI}       { yylval->uri = strdup(yytext); return URI; }
+{SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }
+{URI}       { yylval->uri = {yytext, (size_t) yyleng}; return URI; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */

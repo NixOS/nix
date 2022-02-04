@@ -107,7 +107,7 @@ Path resolveSymlink(const Path & path)
     auto target = readLink(path);
     return hasPrefix(target, "/")
         ? target
-        : dirOf(path) + "/" + target;
+        : concatStrings(dirOf(path), "/", target);
 }
 
 std::set<string> resolveTree(const Path & path, PathSet & deps)

@@ -172,7 +172,7 @@ void RemoteStore::initConnection(Connection & conn)
                it. */
             conn.closeWrite();
             auto msg = conn.from.drain();
-            throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
+            throw Error("protocol mismatch, got '%s'", chomp(saved.s + msg));
         }
 
         conn.from >> conn.daemonVersion;
@@ -188,7 +188,12 @@ void RemoteStore::initConnection(Connection & conn)
         }
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
-            conn.to << false;
+            conn.to << false; // obsolete reserveSpace
+
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
+            conn.to.flush();
+            conn.daemonNixVersion = readString(conn.from);
+        }
 
         auto ex = conn.processStderr();
         if (ex) std::rethrow_exception(ex);
@@ -905,6 +910,25 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
  fallback:
     return Store::queryMissing(targets, willBuild, willSubstitute,
         unknown, downloadSize, narSize);
+}
+
+
+void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    auto conn(getConnection());
+    conn->to << wopAddBuildLog << drvPath.to_string();
+    StringSource source(log);
+    conn.withFramedSink([&](Sink & sink) {
+        source.drainInto(sink);
+    });
+    readInt(conn->from);
+}
+
+
+std::optional<std::string> RemoteStore::getVersion()
+{
+    auto conn(getConnection());
+    return conn->daemonNixVersion;
 }
 
 

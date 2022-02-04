@@ -101,7 +101,8 @@ The following common options are supported:
 
   - `NIX_BUILD_SHELL`\
     Shell used to start the interactive environment. Defaults to the
-    `bash` found in `PATH`.
+    `bash` found in `<nixpkgs>`, falling back to the `bash` found in
+    `PATH` if not found.
 
 # Examples
 

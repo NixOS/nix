@@ -258,13 +258,10 @@ static void main_nix_build(int argc, char * * argv)
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     if (runEnv) {
-        auto newArgs = state->allocBindings(autoArgs->size() + 1);
-        auto tru = state->allocValue();
-        mkBool(*tru, true);
-        newArgs->push_back(Attr(state->symbols.create("inNixShell"), tru));
-        for (auto & i : *autoArgs) newArgs->push_back(i);
-        newArgs->sort();
-        autoArgs = newArgs;
+        auto newArgs = state->buildBindings(autoArgs->size() + 1);
+        newArgs.alloc("inNixShell").mkBool(true);
+        for (auto & i : *autoArgs) newArgs.insert(i);
+        autoArgs = newArgs.finish();
     }
 
     if (packages) {
@@ -295,7 +292,7 @@ static void main_nix_build(int argc, char * * argv)
     else
         for (auto i : left) {
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(i, absPath(".")));
+                exprs.push_back(state->parseExprFromString(std::move(i), absPath(".")));
             else {
                 auto absolute = i;
                 try {
@@ -321,7 +318,7 @@ static void main_nix_build(int argc, char * * argv)
 
         for (auto & i : attrPaths) {
             Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
-            state->forceValue(v);
+            state->forceValue(v, [&]() { return v.determinePos(noPos); });
             getDerivations(*state, v, "", *autoArgs, drvs, false);
         }
     }
@@ -486,7 +483,7 @@ static void main_nix_build(int argc, char * * argv)
            lose the current $PATH directories. */
         auto rcfile = (Path) tmpDir + "/rc";
         std::string rc = fmt(
-                R"(_nix_shell_clean_tmpdir() { rm -rf %1%; }; )"s +
+                R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; }; )"s +
                 (keepTmp ?
                     "trap _nix_shell_clean_tmpdir EXIT; "
                     "exitHooks+=(_nix_shell_clean_tmpdir); "

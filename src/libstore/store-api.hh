@@ -724,8 +724,11 @@ public:
 
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
-    virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
-    { return nullptr; }
+    virtual std::optional<std::string> getBuildLog(const StorePath & path)
+    { return std::nullopt; }
+
+    virtual void addBuildLog(const StorePath & path, std::string_view log)
+    { unsupported("addBuildLog"); }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
@@ -762,6 +765,9 @@ public:
      * (a no-op when there’s no daemon)
      */
     virtual void setOptions() { }
+
+    virtual std::optional<std::string> getVersion() { return {}; }
+
 protected:
 
     Stats stats;
@@ -808,6 +814,13 @@ std::map<StorePath, StorePath> copyPaths(
 void copyClosure(
     Store & srcStore, Store & dstStore,
     const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);

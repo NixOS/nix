@@ -1,6 +1,9 @@
 # Release X.Y (202?-??-??)
 
-* The TOML parser used by `builtins.fromTOML` has been replaced by [a
-  more compliant one](https://github.com/ToruNiina/toml11).
-* Added `:st`/`:show-trace` commands to nix repl, which are used to
-  set or toggle display of error traces.
+* `nix bundle` breaking API change now supports bundlers of the form
+  `bundler.<system>.<name>= derivation: another-derivation;`. This supports
+  additional functionality to inspect evaluation information during bundling. A
+  new [repository](https://github.com/NixOS/bundlers) has various bundlers
+  implemented.
+
+* `nix store ping` now reports the version of the remote Nix daemon.

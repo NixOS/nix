@@ -31,6 +31,7 @@ struct CmdWhyDepends : SourceExprCommand
 {
     std::string _package, _dependency;
     bool all = false;
+    bool precise = false;
 
     CmdWhyDepends()
     {
@@ -55,6 +56,12 @@ struct CmdWhyDepends : SourceExprCommand
             .shortName = 'a',
             .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
             .handler = {&all, true},
+        });
+
+        addFlag({
+            .longName = "precise",
+            .description = "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
+            .handler = {&precise, true},
         });
     }
 
@@ -158,11 +165,19 @@ struct CmdWhyDepends : SourceExprCommand
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
-            logger->cout("%s%s%s%s" ANSI_NORMAL,
-                firstPad,
-                node.visited ? "\e[38;5;244m" : "",
-                firstPad != "" ? "→ " : "",
-                pathS);
+            if (precise) {
+                logger->cout("%s%s%s%s" ANSI_NORMAL,
+                    firstPad,
+                    node.visited ? "\e[38;5;244m" : "",
+                    firstPad != "" ? "→ " : "",
+                    pathS);
+            } else {
+                logger->cout("%s%s%s%s" ANSI_NORMAL,
+                    firstPad,
+                    node.visited ? "\e[38;5;244m" : "",
+                    firstPad != "" ? treeLast : "",
+                    pathS);
+            }
 
             if (node.path == dependencyPath && !all
                 && packagePath != dependencyPath)
@@ -237,9 +252,8 @@ struct CmdWhyDepends : SourceExprCommand
 
             // FIXME: should use scanForReferences().
 
-            visitPath(pathS);
+            if (precise) visitPath(pathS);
 
-            RunPager pager;
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
 
@@ -259,6 +273,7 @@ struct CmdWhyDepends : SourceExprCommand
             }
         };
 
+        RunPager pager;
         try {
             printNode(graph.at(packagePath), "", "");
         } catch (BailOut & ) { }

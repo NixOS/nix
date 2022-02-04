@@ -50,6 +50,6 @@ with import ./config.nix;
 
   fetchurl = import <nix/fetchurl.nix> {
     url = "file://" + toString ./lang/eval-okay-xml.exp.xml;
-    sha256 = "0kg4sla7ihm8ijr8cb3117fhl99zrc2bwy1jrngsfmkh8bav4m0v";
+    sha256 = "sha256-behBlX+DQK/Pjvkuc8Tx68Jwi4E5v86wDq+ZLaHyhQE=";
   };
 }

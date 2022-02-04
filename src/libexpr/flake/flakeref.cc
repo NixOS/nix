@@ -122,6 +122,28 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
             if (isFlake) {
 
+                if (!allowMissing && !pathExists(path + "/flake.nix")){
+                    notice("path '%s' does not contain a 'flake.nix', searching up",path);
+
+                    // Save device to detect filesystem boundary
+                    dev_t device = lstat(path).st_dev;
+                    bool found = false;
+                    while (path != "/") {
+                        if (pathExists(path + "/flake.nix")) {
+                            found = true;
+                            break;
+                        } else if (pathExists(path + "/.git"))
+                            throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
+                        else {
+                            if (lstat(path).st_dev != device)
+                                throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                        }
+                        path = dirOf(path);
+                    }
+                    if (!found)
+                        throw BadURL("could not find a flake.nix file");
+                }
+
                 if (!S_ISDIR(lstat(path).st_mode))
                     throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
 

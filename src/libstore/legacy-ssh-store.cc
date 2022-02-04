@@ -94,7 +94,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 conn->sshConn->in.close();
                 auto msg = conn->from.drain();
                 throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-                    host, chomp(*saved.s + msg));
+                    host, chomp(saved.s + msg));
             }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)

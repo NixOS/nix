@@ -104,10 +104,10 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
             /* For each output... */
             for (auto elem : i->value->listItems()) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*elem, *i->pos);
+                string name(state->forceStringNoCtx(*elem, *i->pos));
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value);
+                state->forceAttrs(*out->value, *i->pos);
 
                 /* And evaluate its ‘outPath’ attribute. */
                 Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
@@ -172,7 +172,7 @@ StringSet DrvInfo::queryMetaNames()
 
 bool DrvInfo::checkMeta(Value & v)
 {
-    state->forceValue(v);
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
     if (v.type() == nList) {
         for (auto elem : v.listItems())
             if (!checkMeta(*elem)) return false;
@@ -254,15 +254,14 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
 void DrvInfo::setMeta(const string & name, Value * v)
 {
     getMeta();
-    Bindings * old = meta;
-    meta = state->allocBindings(1 + (old ? old->size() : 0));
+    auto attrs = state->buildBindings(1 + (meta ? meta->size() : 0));
     Symbol sym = state->symbols.create(name);
-    if (old)
-        for (auto i : *old)
+    if (meta)
+        for (auto i : *meta)
             if (i.name != sym)
-                meta->push_back(i);
-    if (v) meta->push_back(Attr(sym, v));
-    meta->sort();
+                attrs.insert(i);
+    if (v) attrs.insert(sym, v);
+    meta = attrs.finish();
 }
 
 
@@ -279,7 +278,7 @@ static bool getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v);
+        state.forceValue(v, [&]() { return v.determinePos(noPos); });
         if (!state.isDerivation(v)) return true;
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =

@@ -54,6 +54,36 @@ void StoreCommand::run()
     run(getStore());
 }
 
+CopyCommand::CopyCommand()
+{
+    addFlag({
+        .longName = "from",
+        .description = "URL of the source Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&srcUri},
+    });
+
+    addFlag({
+        .longName = "to",
+        .description = "URL of the destination Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&dstUri},
+    });
+}
+
+ref<Store> CopyCommand::createStore()
+{
+    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+}
+
+ref<Store> CopyCommand::getDstStore()
+{
+    if (srcUri.empty() && dstUri.empty())
+        throw UsageError("you must pass '--from' and/or '--to'");
+
+    return dstUri.empty() ? openStore() : openStore(dstUri);
+}
+
 EvalCommand::EvalCommand()
 {
     addFlag({
@@ -65,16 +95,33 @@ EvalCommand::EvalCommand()
 
 extern std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
 
+
+
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
+}
+
+ref<Store> EvalCommand::getEvalStore()
+{
+    if (!evalStore)
+        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
+    return ref<Store>(evalStore);
+}
+
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
         evalState =
-#if HAVE_BOEHMGC
+            #if HAVE_BOEHMGC
             std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-#else
+                searchPath, getEvalStore(), getStore())
+            #else
             std::make_shared<EvalState>(
-#endif
-                searchPath, getEvalStore(), getStore());
+                searchPath, getEvalStore(), getStore())
+            #endif
+            ;
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
                 // clear the screen.
@@ -111,19 +158,6 @@ ref<EvalState> EvalCommand::getEvalState()
             };
     }
     return ref<EvalState>(evalState);
-}
-
-EvalCommand::~EvalCommand()
-{
-    if (evalState)
-        evalState->printStats();
-}
-
-ref<Store> EvalCommand::getEvalStore()
-{
-    if (!evalStore)
-        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
-    return ref<Store>(evalStore);
 }
 
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)

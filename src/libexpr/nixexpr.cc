@@ -190,7 +190,7 @@ void ExprConcatStrings::show(std::ostream & str) const
     str << "(";
     for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << i.second;
+        str << *i.second;
     }
     str << ")";
 }
@@ -527,7 +527,7 @@ string ExprLambda::showNamePos() const
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    for (auto & i : symbols)
+    for (auto & i : store)
         n += i.size();
     return n;
 }

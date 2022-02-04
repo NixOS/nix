@@ -59,7 +59,6 @@ struct HelpRequested { };
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
     bool showVersion = false;
@@ -187,14 +186,11 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
             , "/"),
         *vUtils);
 
-    auto vArgs = state.allocValue();
-    state.mkAttrs(*vArgs, 16);
-    auto vJson = state.allocAttr(*vArgs, state.symbols.create("command"));
-    mkString(*vJson, toplevel.toJSON().dump());
-    vArgs->attrs->sort();
+    auto attrs = state.buildBindings(16);
+    attrs.alloc("command").mkString(toplevel.toJSON().dump());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, *vArgs, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -273,11 +269,15 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = lvlNotice;
-    settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
     setLogFormat("bar");
+    settings.verboseBuild = false;
+    if (isatty(STDERR_FILENO)) {
+        verbosity = lvlNotice;
+    } else {
+        verbosity = lvlInfo;
+    }
 
     Finally f([] { logger->stop(); });
 

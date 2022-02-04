@@ -9,6 +9,7 @@
 #include "callback.hh"
 #include "topo-sort.hh"
 #include "finally.hh"
+#include "compression.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -1307,7 +1308,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             canonicalisePathMetaData(realPath, -1);
 
-            optimisePath(realPath); // FIXME: combine with hashPath()
+            optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
             registerValidPath(info);
         }
@@ -1419,7 +1420,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
             canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
 
-            optimisePath(realPath);
+            optimisePath(realPath, repair);
 
             ValidPathInfo info { dstPath, narHash.first };
             info.narSize = narHash.second;
@@ -1461,12 +1462,12 @@ StorePath LocalStore::addTextToStore(const string & name, const string & s,
 
             StringSink sink;
             dumpString(s, sink);
-            auto narHash = hashString(htSHA256, *sink.s);
+            auto narHash = hashString(htSHA256, sink.s);
 
-            optimisePath(realPath);
+            optimisePath(realPath, repair);
 
             ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s->size();
+            info.narSize = sink.s.size();
             info.references = references;
             info.ca = TextHash { .hash = hash };
             registerValidPath(info);
@@ -1897,5 +1898,31 @@ FixedOutputHash LocalStore::hashCAPath(
         .hash = hash,
     };
 }
+
+void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    assert(drvPath.isDerivation());
+
+    auto baseName = drvPath.to_string();
+
+    auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+
+    if (pathExists(logPath)) return;
+
+    createDirs(dirOf(logPath));
+
+    auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
+
+    writeFile(tmpFile, compress("bzip2", log));
+
+    if (rename(tmpFile.c_str(), logPath.c_str()) != 0)
+        throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
+}
+
+std::optional<std::string> LocalStore::getVersion()
+{
+    return nixVersion;
+}
+
 
 }  // namespace nix

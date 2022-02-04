@@ -78,7 +78,7 @@ struct CmdCatNar : StoreCommand, MixCat
 
     void run(ref<Store> store) override
     {
-        cat(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
+        cat(makeNarAccessor(readFile(narPath)));
     }
 };
 

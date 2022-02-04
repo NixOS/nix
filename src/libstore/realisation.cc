@@ -78,7 +78,7 @@ Realisation Realisation::fromJSON(
         auto fieldIterator = json.find(fieldName);
         if (fieldIterator == json.end())
             return std::nullopt;
-        return *fieldIterator;
+        return {*fieldIterator};
     };
     auto getField = [&](std::string fieldName) -> std::string {
         if (auto field = getOptionalField(fieldName))

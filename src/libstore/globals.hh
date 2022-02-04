@@ -966,6 +966,13 @@ public:
 
     Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
         "Whether to accept nix configuration from a flake without prompting."};
+
+    Setting<std::string> commitLockFileSummary{
+        this, "", "commit-lockfile-summary",
+        R"(
+          The commit summary to use when committing changed flake lock files. If
+          empty, the summary is generated based on the action performed.
+        )"};
 };
 
 

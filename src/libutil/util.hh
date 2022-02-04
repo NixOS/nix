@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include <boost/lexical_cast.hpp>
+
 #include <atomic>
 #include <functional>
 #include <map>
@@ -47,30 +49,32 @@ void clearEnv();
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
 Path absPath(Path path,
-    std::optional<Path> dir = {},
+    std::optional<PathView> dir = {},
     bool resolveSymlinks = false);
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink
    components such that each component of the resulting path is *not*
    a symbolic link. */
-Path canonPath(const Path & path, bool resolveSymlinks = false);
+Path canonPath(PathView path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
    immediate child thereof (e.g., `/foo'), this means `/'
    is returned.*/
-Path dirOf(const Path & path);
+Path dirOf(const PathView path);
 
 /* Return the base name of the given canonical path, i.e., everything
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
-/* Check whether 'path' is a descendant of 'dir'. */
-bool isInDir(const Path & path, const Path & dir);
+/* Check whether 'path' is a descendant of 'dir'. Both paths must be
+   canonicalized. */
+bool isInDir(std::string_view path, std::string_view dir);
 
-/* Check whether 'path' is equal to 'dir' or a descendant of 'dir'. */
-bool isDirOrInDir(const Path & path, const Path & dir);
+/* Check whether 'path' is equal to 'dir' or a descendant of
+   'dir'. Both paths must be canonicalized. */
+bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /* Get status of `path'. */
 struct stat lstat(const Path & path);
@@ -144,6 +148,9 @@ Path getDataDir();
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
+inline Paths createDirs(PathView path) {
+    return createDirs(Path(path));
+}
 
 /* Create a symlink. */
 void createSymlink(const Path & target, const Path & link,
@@ -183,6 +190,7 @@ public:
     void cancel();
     void reset(const Path & p, bool recursive = true);
     operator Path() const { return path; }
+    operator PathView() const { return path; }
 };
 
 
@@ -364,20 +372,32 @@ MakeError(FormatError, Error);
 
 
 /* String tokenizer. */
-template<class C> C tokenizeString(std::string_view s, const string & separators = " \t\n\r");
+template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 
 /* Concatenate the given strings with a separator between the
    elements. */
 template<class C>
-string concatStringsSep(const string & sep, const C & ss)
+string concatStringsSep(const std::string_view sep, const C & ss)
 {
+    size_t size = 0;
+    // need a cast to string_view since this is also called with Symbols
+    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
     string s;
+    s.reserve(size);
     for (auto & i : ss) {
         if (s.size() != 0) s += sep;
         s += i;
     }
     return s;
+}
+
+template<class ... Parts>
+auto concatStrings(Parts && ... parts)
+    -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), string>
+{
+    std::string_view views[sizeof...(parts)] = { parts... };
+    return concatStringsSep({}, views);
 }
 
 
@@ -417,21 +437,21 @@ bool statusOk(int status);
 
 /* Parse a string into an integer. */
 template<class N>
-std::optional<N> string2Int(const std::string & s)
+std::optional<N> string2Int(const std::string_view s)
 {
     if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
         return std::nullopt;
-    std::istringstream str(s);
-    N n;
-    str >> n;
-    if (str && str.get() == EOF) return n;
-    return std::nullopt;
+    try {
+        return boost::lexical_cast<N>(s.data(), s.size());
+    } catch (const boost::bad_lexical_cast &) {
+        return std::nullopt;
+    }
 }
 
 /* Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
    'T' denoting a binary unit prefix. */
 template<class N>
-N string2IntWithUnitPrefix(std::string s)
+N string2IntWithUnitPrefix(std::string_view s)
 {
     N multiplier = 1;
     if (!s.empty()) {
@@ -442,7 +462,7 @@ N string2IntWithUnitPrefix(std::string s)
             else if (u == 'G') multiplier = 1ULL << 30;
             else if (u == 'T') multiplier = 1ULL << 40;
             else throw UsageError("invalid unit specifier '%1%'", u);
-            s.resize(s.size() - 1);
+            s.remove_suffix(1);
         }
     }
     if (auto n = string2Int<N>(s))
@@ -452,13 +472,13 @@ N string2IntWithUnitPrefix(std::string s)
 
 /* Parse a string into a float. */
 template<class N>
-std::optional<N> string2Float(const string & s)
+std::optional<N> string2Float(const std::string_view s)
 {
-    std::istringstream str(s);
-    N n;
-    str >> n;
-    if (str && str.get() == EOF) return n;
-    return std::nullopt;
+    try {
+        return boost::lexical_cast<N>(s.data(), s.size());
+    } catch (const boost::bad_lexical_cast &) {
+        return std::nullopt;
+    }
 }
 
 
@@ -475,7 +495,7 @@ std::string toLower(const std::string & s);
 
 
 /* Escape a string as a shell word. */
-std::string shellEscape(const std::string & s);
+std::string shellEscape(const std::string_view s);
 
 
 /* Exception handling in destructors: print an error message, then

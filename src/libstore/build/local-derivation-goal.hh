@@ -27,9 +27,10 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Pipe for synchronising updates to the builder namespaces. */
     Pipe userNamespaceSync;
 
-    /* The mount namespace of the builder, used to add additional
+    /* The mount namespace and user namespace of the builder, used to add additional
        paths to the sandbox as a result of recursive Nix calls. */
     AutoCloseFD sandboxMountNamespace;
+    AutoCloseFD sandboxUserNamespace;
 
     /* On Linux, whether we're doing the build in its own user
        namespace. */

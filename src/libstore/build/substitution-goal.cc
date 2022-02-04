@@ -138,8 +138,8 @@ void PathSubstitutionGoal::tryNext()
        only after we've downloaded the path. */
     if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
     {
-        warn("substituter '%s' does not have a valid signature for path '%s'",
-            sub->getUri(), worker.store.printStorePath(storePath));
+        warn("the substitute for '%s' from '%s' is not signed by any of the keys in 'trusted-public-keys'",
+            worker.store.printStorePath(storePath), sub->getUri());
         tryNext();
         return;
     }

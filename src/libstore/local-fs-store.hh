@@ -45,7 +45,8 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLog(const StorePath & path) override;
+
 };
 
 }

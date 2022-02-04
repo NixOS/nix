@@ -347,7 +347,7 @@ StringSet NixRepl::completePrefix(string prefix)
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v);
+            state->forceAttrs(v, noPos);
 
             for (auto & i : *v.attrs) {
                 string name = i.name;
@@ -521,7 +521,7 @@ bool NixRepl::processLine(string line)
         if (v.type() == nPath || v.type() == nString) {
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
-            pos.file = state->symbols.create(filename);
+            pos.file = state->symbols.create(*filename);
         } else if (v.isLambda()) {
             pos = v.lambda.fun->pos;
         } else {
@@ -737,7 +737,7 @@ void NixRepl::loadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs);
+    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
@@ -766,7 +766,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 
 Expr * NixRepl::parseString(string s)
 {
-    Expr * e = state->parseExprFromString(s, curDir, staticEnv);
+    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
     return e;
 }
 
@@ -775,7 +775,7 @@ void NixRepl::evalString(string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v);
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
 }
 
 
@@ -805,7 +805,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v);
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
 
     switch (v.type()) {
 

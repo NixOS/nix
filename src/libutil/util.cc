@@ -81,7 +81,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
+Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -95,27 +95,27 @@ Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
             if (!getcwd(buf, sizeof(buf)))
 #endif
                 throw SysError("cannot get cwd");
-            dir = buf;
+            path = concatStrings(buf, "/", path);
 #ifdef __GNU__
             free(buf);
 #endif
-        }
-        path = *dir + "/" + path;
+        } else
+            path = concatStrings(*dir, "/", path);
     }
     return canonPath(path, resolveSymlinks);
 }
 
 
-Path canonPath(const Path & path, bool resolveSymlinks)
+Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
     string s;
+    s.reserve(256);
 
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);
 
-    string::const_iterator i = path.begin(), end = path.end();
     string temp;
 
     /* Count the number of times we follow a symlink and stop at some
@@ -125,33 +125,37 @@ Path canonPath(const Path & path, bool resolveSymlinks)
     while (1) {
 
         /* Skip slashes. */
-        while (i != end && *i == '/') i++;
-        if (i == end) break;
+        while (!path.empty() && path[0] == '/') path.remove_prefix(1);
+        if (path.empty()) break;
 
         /* Ignore `.'. */
-        if (*i == '.' && (i + 1 == end || i[1] == '/'))
-            i++;
+        if (path == "." || path.substr(0, 2) == "./")
+            path.remove_prefix(1);
 
         /* If `..', delete the last component. */
-        else if (*i == '.' && i + 1 < end && i[1] == '.' &&
-            (i + 2 == end || i[2] == '/'))
+        else if (path == ".." || path.substr(0, 3) == "../")
         {
             if (!s.empty()) s.erase(s.rfind('/'));
-            i += 2;
+            path.remove_prefix(2);
         }
 
         /* Normal component; copy it. */
         else {
             s += '/';
-            while (i != end && *i != '/') s += *i++;
+            if (const auto slash = path.find('/'); slash == string::npos) {
+                s += path;
+                path = {};
+            } else {
+                s += path.substr(0, slash);
+                path = path.substr(slash);
+            }
 
             /* If s points to a symlink, resolve it and continue from there */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = readLink(s) + string(i, end);
-                i = temp.begin();
-                end = temp.end();
+                temp = concatStrings(readLink(s), path);
+                path = temp;
                 if (!temp.empty() && temp[0] == '/') {
                     s.clear();  /* restart for symlinks pointing to absolute path */
                 } else {
@@ -164,11 +168,11 @@ Path canonPath(const Path & path, bool resolveSymlinks)
         }
     }
 
-    return s.empty() ? "/" : s;
+    return s.empty() ? "/" : std::move(s);
 }
 
 
-Path dirOf(const Path & path)
+Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
@@ -196,16 +200,16 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
-bool isInDir(const Path & path, const Path & dir)
+bool isInDir(std::string_view path, std::string_view dir)
 {
-    return path[0] == '/'
-        && string(path, 0, dir.size()) == dir
+    return path.substr(0, 1) == "/"
+        && path.substr(0, dir.size()) == dir
         && path.size() >= dir.size() + 2
         && path[dir.size()] == '/';
 }
 
 
-bool isDirOrInDir(const Path & path, const Path & dir)
+bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
 }
@@ -668,9 +672,11 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 
 string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink(reserveSize);
+    // the parser needs two extra bytes to append terminating characters, other users will
+    // not care very much about the extra memory.
+    StringSink sink(reserveSize + 2);
     drainFD(fd, sink, block);
-    return std::move(*sink.s);
+    return std::move(sink.s);
 }
 
 
@@ -1055,7 +1061,7 @@ std::pair<int, std::string> runProgram(RunOptions && options)
         status = e.status;
     }
 
-    return {status, std::move(*sink.s)};
+    return {status, std::move(sink.s)};
 }
 
 void runProgram2(const RunOptions & options)
@@ -1229,23 +1235,22 @@ void _interrupted()
 //////////////////////////////////////////////////////////////////////
 
 
-template<class C> C tokenizeString(std::string_view s, const string & separators)
+template<class C> C tokenizeString(std::string_view s, std::string_view separators)
 {
     C result;
     string::size_type pos = s.find_first_not_of(separators, 0);
     while (pos != string::npos) {
         string::size_type end = s.find_first_of(separators, pos + 1);
         if (end == string::npos) end = s.size();
-        string token(s, pos, end - pos);
-        result.insert(result.end(), token);
+        result.insert(result.end(), string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
     return result;
 }
 
-template Strings tokenizeString(std::string_view s, const string & separators);
-template StringSet tokenizeString(std::string_view s, const string & separators);
-template vector<string> tokenizeString(std::string_view s, const string & separators);
+template Strings tokenizeString(std::string_view s, std::string_view separators);
+template StringSet tokenizeString(std::string_view s, std::string_view separators);
+template vector<string> tokenizeString(std::string_view s, std::string_view separators);
 
 
 string chomp(std::string_view s)
@@ -1339,9 +1344,11 @@ std::string toLower(const std::string & s)
 }
 
 
-std::string shellEscape(const std::string & s)
+std::string shellEscape(const std::string_view s)
 {
-    std::string r = "'";
+    std::string r;
+    r.reserve(s.size() + 2);
+    r += "'";
     for (auto & i : s)
         if (i == '\'') r += "'\\''"; else r += i;
     r += '\'';
@@ -1746,7 +1753,7 @@ void bind(int fd, const std::string & path)
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pid pid = startProcess([&]() {
-            auto dir = dirOf(path);
+            Path dir = dirOf(path);
             if (chdir(dir.c_str()) == -1)
                 throw SysError("chdir to '%s' failed", dir);
             std::string base(baseNameOf(path));
@@ -1775,7 +1782,7 @@ void connect(int fd, const std::string & path)
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pid pid = startProcess([&]() {
-            auto dir = dirOf(path);
+            Path dir = dirOf(path);
             if (chdir(dir.c_str()) == -1)
                 throw SysError("chdir to '%s' failed", dir);
             std::string base(baseNameOf(path));

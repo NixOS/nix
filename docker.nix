@@ -20,6 +20,8 @@ let
     man
     cacert.out
     findutils
+    iana-etc
+    git
   ];
 
   users = {
@@ -199,6 +201,8 @@ let
 
       mkdir $out/tmp
 
+      mkdir -p $out/var/tmp
+
       mkdir -p $out/etc/nix
       cat $nixConfContentsPath > $out/etc/nix/nix.conf
 
@@ -234,6 +238,7 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
   '';
   fakeRootCommands = ''
     chmod 1777 tmp
+    chmod 1777 var/tmp
   '';
 
   config = {

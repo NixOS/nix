@@ -98,7 +98,7 @@ struct ExprInt : Expr
 {
     NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env);
     Pos* getPos() { return 0; }
     COMMON_METHODS
@@ -108,7 +108,7 @@ struct ExprFloat : Expr
 {
     NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
+    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env);
     Pos* getPos() { return 0; }
     COMMON_METHODS
@@ -116,20 +116,12 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    Symbol s;
+    string s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
+    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env);
     Pos* getPos() { return 0; }
     COMMON_METHODS
-};
-
-/* Temporary class used during parsing of indented strings. */
-struct ExprIndStr : Expr
-{
-    string s;
-    ExprIndStr(const string & s) : s(s) { };
-    Pos* getPos() { return 0; }
 };
 
 struct ExprPath : Expr
@@ -237,10 +229,25 @@ struct Formal
 
 struct Formals
 {
-    typedef std::list<Formal> Formals_;
+    typedef std::vector<Formal> Formals_;
     Formals_ formals;
-    std::set<Symbol> argNames; // used during parsing
     bool ellipsis;
+
+    bool has(Symbol arg) const {
+        auto it = std::lower_bound(formals.begin(), formals.end(), arg,
+            [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+
+    std::vector<Formal> lexicographicOrder() const
+    {
+        std::vector<Formal> result(formals.begin(), formals.end());
+        std::sort(result.begin(), result.end(),
+            [] (const Formal & a, const Formal & b) {
+                return std::string_view(a.name) < std::string_view(b.name);
+            });
+        return result;
+    }
 };
 
 struct ExprLambda : Expr
@@ -253,11 +260,6 @@ struct ExprLambda : Expr
     ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
-        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError({
-                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
-                .errPos = pos
-            });
     };
     void setName(Symbol & name);
     string showNamePos() const;

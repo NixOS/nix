@@ -172,8 +172,9 @@ public:
 
     void optimiseStore() override;
 
-    /* Optimise a single store path. */
-    void optimisePath(const Path & path);
+    /* Optimise a single store path. Optionally, test the encountered
+       symlinks for corruption. */
+    void optimisePath(const Path & path, RepairFlag repair);
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -209,6 +210,8 @@ public:
     std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+
+    std::optional<std::string> getVersion() override;
 
 private:
 
@@ -253,7 +256,7 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
+    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
@@ -278,6 +281,8 @@ private:
         const Path & path,
         const std::string_view pathHash
     );
+
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;

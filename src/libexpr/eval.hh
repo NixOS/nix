@@ -1,6 +1,7 @@
 #pragma once
 
 #include "attr-set.hh"
+#include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
@@ -49,8 +50,6 @@ struct Env
 
 valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env);
 
-Value & mkString(Value & v, std::string_view s, const PathSet & context = PathSet());
-
 void copyContext(const Value & v, PathSet & context);
 
 
@@ -93,7 +92,8 @@ public:
         sContentAddressed,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
-        sDescription, sSelf, sEpsilon;
+        sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
+        sPrefix;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -104,7 +104,7 @@ public:
        mode. */
     std::optional<PathSet> allowedPaths;
 
-    Value vEmptySet;
+    Bindings emptyBindings;
 
     /* Store used to materialise .drv files. */
     const ref<Store> store;
@@ -148,7 +148,7 @@ private:
     std::shared_ptr<RegexCache> regexCache;
 
     /* Allocation cache for GC'd Value objects. */
-    void * valueAllocCache = nullptr;
+    std::shared_ptr<void *> valueAllocCache;
 
 public:
 
@@ -195,8 +195,8 @@ public:
     Expr * parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string_view s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
-    Expr * parseExprFromString(std::string_view s, const Path & basePath);
+    Expr * parseExprFromString(std::string s, const Path & basePath, , std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parseExprFromString(std::string s, const Path & basePath);
 
     Expr * parseStdin();
 
@@ -216,8 +216,8 @@ public:
     void resetFileCache();
 
     /* Look up a file in the search path. */
-    Path findFile(const string & path);
-    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
+    Path findFile(const std::string_view path);
+    Path findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
@@ -236,7 +236,10 @@ public:
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
-    inline void forceValue(Value & v, const Pos & pos = noPos);
+    inline void forceValue(Value & v, const Pos & pos);
+
+    template <typename Callable>
+    inline void forceValue(Value & v, Callable getPos);
 
     /* Force a value, then recursively force list elements and
        attributes. */
@@ -246,14 +249,17 @@ public:
     NixInt forceInt(Value & v, const Pos & pos);
     NixFloat forceFloat(Value & v, const Pos & pos);
     bool forceBool(Value & v, const Pos & pos);
-    inline void forceAttrs(Value & v);
-    inline void forceAttrs(Value & v, const Pos & pos);
-    inline void forceList(Value & v);
+
+    void forceAttrs(Value & v, const Pos & pos);
+
+    template <typename Callable>
+    inline void forceAttrs(Value & v, Callable getPos);
+
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
-    string forceString(Value & v, const Pos & pos = noPos);
-    string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
-    string forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    std::string_view forceString(Value & v, const Pos & pos = noPos);
+    std::string_view forceString(Value & v, PathSet & context, const Pos & pos = noPos);
+    std::string_view forceStringNoCtx(Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
@@ -266,7 +272,7 @@ public:
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
-    string coerceToString(const Pos & pos, Value & v, PathSet & context,
+    BackedStringView coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
@@ -324,7 +330,7 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(const char * text, FileOrigin origin, const Path & path,
+    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
         const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
@@ -353,12 +359,16 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
-    Value * allocAttr(Value & vAttrs, const std::string & name);
+    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
 
+    BindingsBuilder buildBindings(size_t capacity)
+    {
+        return BindingsBuilder(*this, allocBindings(capacity));
+    }
+
     void mkList(Value & v, size_t length);
-    void mkAttrs(Value & v, size_t capacity);
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, ptr<Pos> pos);
 
@@ -411,6 +421,9 @@ private:
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+    friend struct Value;
 };
 
 class DebugTraceStacker {
