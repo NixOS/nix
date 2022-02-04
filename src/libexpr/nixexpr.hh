@@ -364,15 +364,19 @@ struct StaticEnv
 
     void sort()
     {
-        std::sort(vars.begin(), vars.end(),
+        std::stable_sort(vars.begin(), vars.end(),
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
     }
 
     void deduplicate()
     {
-        const auto last = std::unique(vars.begin(), vars.end(),
-            [] (const Vars::value_type & a, const Vars::value_type & b) { return a.first == b.first; });
-        vars.erase(last, vars.end());
+        auto it = vars.begin(), jt = it, end = vars.end();
+        while (jt != end) {
+            *it = *jt++;
+            while (jt != end && it->first == jt->first) *it = *jt++;
+            it++;
+        }
+        vars.erase(it, end);
     }
 
     Vars::const_iterator find(const Symbol & name) const
