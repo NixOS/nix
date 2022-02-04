@@ -40,3 +40,26 @@ testRepl () {
 testRepl
 # Same thing (kind-of), but with a remote store.
 testRepl --store "$TEST_ROOT/store?real=$NIX_STORE_DIR"
+
+testReplResponse () {
+    local response="$(nix repl <<< "$1")"
+    echo "$response" | grep -qs "$2" \
+      || fail "repl command set:
+
+$1
+
+does not respond with:
+
+$2
+
+but with:
+
+$response"
+}
+
+# :a uses the newest version of a symbol
+testReplResponse '
+:a { a = "1"; }
+:a { a = "2"; }
+"result: ${a}"
+' "result: 2"
