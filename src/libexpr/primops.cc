@@ -712,12 +712,13 @@ static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
 
 static RegisterPrimOp primop_break({
     .name = "break",
-    .args = {},
+    .args = {"v"},
     .doc = R"(
       In debug mode, pause Nix expression evaluation and enter the repl.
     )",
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
+        std::cout << "primop_break, value: " << *args[0] << std::endl;
         // PathSet context;
         // string s = state.coerceToString(pos, *args[0], context);
         if (debuggerHook && !state.debugTraces.empty())
@@ -728,6 +729,9 @@ static RegisterPrimOp primop_break({
           // const Env &env;
           // hintformat hint;
           debuggerHook(nullptr, dt.env, dt.expr);
+
+          // returning the value we were passed.
+          v = *args[0];
         }
     }
 });

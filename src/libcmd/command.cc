@@ -77,7 +77,8 @@ ref<EvalState> EvalCommand::getEvalState()
                 searchPath, getEvalStore(), getStore());
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
-                std::cout << "\033[2J\033[1;1H";
+                // clear the screen.
+                // std::cout << "\033[2J\033[1;1H";
               
                 if (error)
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
