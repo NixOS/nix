@@ -97,7 +97,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath(".")));
+                parseFlakeRef(flakeRef, absPath("."), true));
         }}
     });
 
