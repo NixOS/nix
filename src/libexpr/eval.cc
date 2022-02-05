@@ -860,18 +860,18 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const string &s2, Env & env, Expr *expr))
-{
-    auto error = TypeError({
-        .msg = hintfmt(s, s2),
-        .errPos = pos
-    });
+// LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const string &s2, Env & env, Expr *expr))
+// {
+//     auto error = TypeError({
+//         .msg = hintfmt(s, s2),
+//         .errPos = pos
+//     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+//     if (debuggerHook && expr)
+//         debuggerHook(&error, env, *expr);
 
-    throw error;
-}
+//     throw error;
+// }
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env, Expr *expr))
 {
@@ -1243,7 +1243,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError("value is %1% while a Boolean was expected", v);
+        throwTypeError(noPos, "value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -1262,7 +1262,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError("value is %1% while a set was expected", v);
+        throwTypeError(noPos, "value is %1% while a set was expected", v);
 }
 
 

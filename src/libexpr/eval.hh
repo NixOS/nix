@@ -195,7 +195,7 @@ public:
     Expr * parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string s, const Path & basePath, , std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string s, const Path & basePath);
 
     Expr * parseStdin();
@@ -331,7 +331,7 @@ private:
     friend struct ExprLet;
 
     Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
-        const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
+        const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
 
