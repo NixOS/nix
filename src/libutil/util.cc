@@ -147,7 +147,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
                 path = {};
             } else {
                 s += path.substr(0, slash);
-                path = path.substr(slash + 1);
+                path = path.substr(slash);
             }
 
             /* If s points to a symlink, resolve it and continue from there */
