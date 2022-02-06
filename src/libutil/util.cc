@@ -1561,7 +1561,22 @@ std::pair<unsigned short, unsigned short> getWindowSize()
 }
 
 
-static Sync<std::list<std::function<void()>>> _interruptCallbacks;
+/* We keep track of interrupt callbacks using integer tokens, so we can iterate
+   safely without having to lock the data structure while executing arbitrary
+   functions.
+ */
+struct InterruptCallbacks {
+    typedef int64_t Token;
+
+    /* We use unique tokens so that we can't accidentally delete the wrong
+       handler because of an erroneous double delete. */
+    Token nextToken = 0;
+
+    /* Used as a list, see InterruptCallbacks comment. */
+    std::map<Token, std::function<void()>> callbacks;
+};
+
+static Sync<InterruptCallbacks> _interruptCallbacks;
 
 static void signalHandlerThread(sigset_t set)
 {
@@ -1583,14 +1598,29 @@ void triggerInterrupt()
     _isInterrupted = true;
 
     {
-        auto interruptCallbacks(_interruptCallbacks.lock());
-        for (auto & callback : *interruptCallbacks) {
-            try {
-                callback();
-            } catch (...) {
-                ignoreException();
+        InterruptCallbacks::Token i = 0;
+        std::function<void()> callback;
+        do {
+            {
+                auto interruptCallbacks(_interruptCallbacks.lock());
+                auto lb = interruptCallbacks->callbacks.lower_bound(i);
+                if (lb != interruptCallbacks->callbacks.end()) {
+                    callback = lb->second;
+                    i = lb->first + 1;
+                } else {
+                    callback = nullptr;
+                }
+            }
+
+            if (callback) {
+                try {
+                    callback();
+                } catch (...) {
+                    ignoreException();
+                }
             }
         }
+        while (callback);
     }
 }
 
@@ -1694,21 +1724,22 @@ void restoreProcessContext(bool restoreMounts)
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
-    std::list<std::function<void()>>::iterator it;
+    InterruptCallbacks::Token token;
     ~InterruptCallbackImpl() override
     {
-        _interruptCallbacks.lock()->erase(it);
+        auto interruptCallbacks(_interruptCallbacks.lock());
+        interruptCallbacks->callbacks.erase(token);
     }
 };
 
 std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback)
 {
     auto interruptCallbacks(_interruptCallbacks.lock());
-    interruptCallbacks->push_back(callback);
+    auto token = interruptCallbacks->nextToken++;
+    interruptCallbacks->callbacks.emplace(token, callback);
 
     auto res = std::make_unique<InterruptCallbackImpl>();
-    res->it = interruptCallbacks->end();
-    res->it--;
+    res->token = token;
 
     return std::unique_ptr<InterruptCallback>(res.release());
 }
