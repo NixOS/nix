@@ -500,6 +500,7 @@ static void main_nix_build(int argc, char * * argv)
                 "%3%"
                 "PATH=%4%:\"$PATH\"; "
                 "SHELL=%5%; "
+                "BASH=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
