@@ -9,9 +9,7 @@ static std::atomic<size_t> nextNumber{0};
 
 InputAccessor::InputAccessor()
     : number(++nextNumber)
-{
-    printError("CREATE %d", number);
-}
+{ }
 
 // FIXME: merge with archive.cc.
 const std::string narVersionMagic1 = "nix-archive-1";
@@ -133,7 +131,17 @@ struct FSInputAccessor : InputAccessor
         auto absPath = makeAbsPath(path);
         printError("READDIR %s", absPath);
         checkAllowed(absPath);
-        abort();
+        DirEntries res;
+        for (auto & entry : nix::readDirectory(absPath)) {
+            std::optional<Type> type;
+            switch (entry.type) {
+            case DT_REG: type = Type::tRegular; break;
+            case DT_LNK: type = Type::tSymlink; break;
+            case DT_DIR: type = Type::tDirectory; break;
+            }
+            res.emplace(entry.name, type);
+        }
+        return res;
     }
 
     std::string readLink(PathView path) override
