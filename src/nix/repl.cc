@@ -624,7 +624,7 @@ void NixRepl::loadFile(const Path & path)
 void NixRepl::loadFlake(const std::string & flakeRefS)
 {
     if (flakeRefS.empty())
-        throw Error("cannot use `:load-flake` without a path specified. (Use . for the current working directory.)");
+        throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
     auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
     if (evalSettings.pureEval && !flakeRef.input.isImmutable())
