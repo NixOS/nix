@@ -1358,11 +1358,15 @@ std::string shellEscape(const std::string_view s)
 
 void ignoreException()
 {
+    /* Make sure no exceptions leave this function.
+       printError() also throws when remote is closed. */
     try {
-        throw;
-    } catch (std::exception & e) {
-        printError("error (ignored): %1%", e.what());
-    }
+        try {
+            throw;
+        } catch (std::exception & e) {
+            printError("error (ignored): %1%", e.what());
+        }
+    } catch (...) { }
 }
 
 bool shouldANSI()
