@@ -165,8 +165,6 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
 {
     auto path = realisePath(state, pos, vPath);
 
-    state.evalFile(path, v);
-
 #if 0
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
@@ -207,7 +205,9 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         state.forceAttrs(v, pos);
     }
 
-    else {
+    else
+#endif
+    {
         if (!vScope)
             state.evalFile(path, v);
         else {
@@ -233,7 +233,6 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
             e->eval(state, *env, v);
         }
     }
-#endif
 }
 
 static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
