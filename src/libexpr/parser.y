@@ -788,7 +788,7 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     }
 
     if (hasPrefix(path, "nix/"))
-        return concatStrings(corepkgsPrefix, path.substr(4));
+        return packPath(SourcePath {corepkgsFS, (std::string) path.substr(3)});
 
     throw ThrownError({
         .msg = hintfmt(evalSettings.pureEval

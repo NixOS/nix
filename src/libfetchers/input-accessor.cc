@@ -23,7 +23,7 @@ void InputAccessor::dumpPath(
     Sink & sink,
     PathFilter & filter)
 {
-    auto dumpContents = [&](std::string_view path)
+    auto dumpContents = [&](PathView path)
     {
         // FIXME: pipe
         auto s = readFile(path);
@@ -97,7 +97,7 @@ struct FSInputAccessor : InputAccessor
         : root(root)
     { }
 
-    std::string readFile(std::string_view path) override
+    std::string readFile(PathView path) override
     {
         auto absPath = makeAbsPath(path);
         printError("READ %s", absPath);
@@ -105,14 +105,14 @@ struct FSInputAccessor : InputAccessor
         return nix::readFile(absPath);
     }
 
-    bool pathExists(std::string_view path) override
+    bool pathExists(PathView path) override
     {
         auto absPath = makeAbsPath(path);
         printError("EXISTS %s", absPath);
         return isAllowed(absPath) && nix::pathExists(absPath);
     }
 
-    Stat lstat(std::string_view path) override
+    Stat lstat(PathView path) override
     {
         auto absPath = makeAbsPath(path);
         printError("LSTAT %s", absPath);
@@ -128,7 +128,7 @@ struct FSInputAccessor : InputAccessor
         };
     }
 
-    DirEntries readDirectory(std::string_view path) override
+    DirEntries readDirectory(PathView path) override
     {
         auto absPath = makeAbsPath(path);
         printError("READDIR %s", absPath);
@@ -136,7 +136,7 @@ struct FSInputAccessor : InputAccessor
         abort();
     }
 
-    std::string readLink(std::string_view path) override
+    std::string readLink(PathView path) override
     {
         auto absPath = makeAbsPath(path);
         printError("READLINK %s", absPath);
@@ -144,19 +144,19 @@ struct FSInputAccessor : InputAccessor
         return nix::readLink(absPath);
     }
 
-    Path makeAbsPath(std::string_view path)
+    Path makeAbsPath(PathView path)
     {
         assert(hasPrefix(path, "/"));
         return canonPath(root + std::string(path));
     }
 
-    void checkAllowed(std::string_view absPath)
+    void checkAllowed(PathView absPath)
     {
         if (!isAllowed(absPath))
             throw Error("access to path '%s' is not allowed", absPath);
     }
 
-    bool isAllowed(std::string_view absPath)
+    bool isAllowed(PathView absPath)
     {
         if (!isDirOrInDir(absPath, root))
             return false;
@@ -173,6 +173,50 @@ std::ostream & operator << (std::ostream & str, const SourcePath & path)
 {
     str << path.path; // FIXME
     return str;
+}
+
+struct MemoryInputAccessorImpl : MemoryInputAccessor
+{
+    std::map<Path, std::string> files;
+
+    std::string readFile(PathView path) override
+    {
+        auto i = files.find((Path) path);
+        if (i == files.end())
+            throw Error("file '%s' does not exist", path);
+        return i->second;
+    }
+
+    bool pathExists(PathView path) override
+    {
+        auto i = files.find((Path) path);
+        return i != files.end();
+    }
+
+    Stat lstat(PathView path) override
+    {
+        throw UnimplementedError("MemoryInputAccessor::lstat");
+    }
+
+    DirEntries readDirectory(PathView path) override
+    {
+        return {};
+    }
+
+    std::string readLink(PathView path) override
+    {
+        throw UnimplementedError("MemoryInputAccessor::readLink");
+    }
+
+    void addFile(PathView path, std::string && contents) override
+    {
+        files.emplace(path, std::move(contents));
+    }
+};
+
+ref<MemoryInputAccessor> makeMemoryInputAccessor()
+{
+    return make_ref<MemoryInputAccessorImpl>();
 }
 
 }

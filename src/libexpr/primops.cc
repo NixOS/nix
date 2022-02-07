@@ -165,15 +165,6 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
 {
     auto path = realisePath(state, pos, vPath);
 
-    #if 0
-    // FIXME: use InputAccessor
-    if (path == corepkgsPrefix + "fetchurl.nix") {
-        state.eval(state.parseExprFromString(
-            #include "fetchurl.nix.gen.hh"
-            , "/"), v);
-    }
-    #endif
-
     state.evalFile(path, v);
 
 #if 0
@@ -214,13 +205,6 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
         state.forceFunction(**state.vImportedDrvToDerivation, pos);
         v.mkApp(*state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos);
-    }
-
-    // FIXME: use InputAccessor
-    else if (path == corepkgsPrefix + "fetchurl.nix") {
-        state.eval(state.parseExprFromString(
-            #include "fetchurl.nix.gen.hh"
-            , "/"), v);
     }
 
     else {
@@ -1502,7 +1486,6 @@ static RegisterPrimOp primop_readFile({
    which are desugared to 'findFile __nixPath "x"'. */
 static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    #if 0
     state.forceList(*args[0], pos);
 
     SearchPath searchPath;
@@ -1523,7 +1506,18 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             pos
         );
 
-        auto path = realisePath(state, pos, *i->value, { .requireAbsolutePath = false });
+        PathSet context;
+        auto path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
+
+        try {
+            auto rewrites = state.realiseContext(context);
+            path = rewriteStrings(path, rewrites);
+        } catch (InvalidPathError & e) {
+            throw EvalError({
+                .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
+                .errPos = pos
+            });
+        }
 
         searchPath.emplace_back(prefix, path);
     }
@@ -1532,9 +1526,6 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     // FIXME: checkSourcePath?
     v.mkPath(state.findFile(searchPath, path, pos));
-    #endif
-
-    throw UnimplementedError("findFile");
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {

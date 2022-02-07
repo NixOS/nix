@@ -7,6 +7,7 @@ static constexpr std::string_view marker = "/__virtual/";
 
 Path EvalState::packPath(const SourcePath & path)
 {
+    // FIXME: canonPath(path) ?
     printError("PACK %s", path.path);
     assert(hasPrefix(path.path, "/"));
     inputAccessors.emplace(path.accessor->number, path.accessor);

@@ -15,9 +15,9 @@ struct InputAccessor
     virtual ~InputAccessor()
     { }
 
-    virtual std::string readFile(std::string_view path) = 0;
+    virtual std::string readFile(PathView path) = 0;
 
-    virtual bool pathExists(std::string_view path) = 0;
+    virtual bool pathExists(PathView path) = 0;
 
     enum Type { tRegular, tSymlink, tDirectory, tMisc };
 
@@ -28,15 +28,15 @@ struct InputAccessor
         bool isExecutable = false; // regular files only
     };
 
-    virtual Stat lstat(std::string_view path) = 0;
+    virtual Stat lstat(PathView path) = 0;
 
     typedef std::optional<Type> DirEntry;
 
     typedef std::map<std::string, DirEntry> DirEntries;
 
-    virtual DirEntries readDirectory(std::string_view path) = 0;
+    virtual DirEntries readDirectory(PathView path) = 0;
 
-    virtual std::string readLink(std::string_view path) = 0;
+    virtual std::string readLink(PathView path) = 0;
 
     virtual void dumpPath(
         const Path & path,
@@ -45,6 +45,13 @@ struct InputAccessor
 };
 
 ref<InputAccessor> makeFSInputAccessor(const Path & root);
+
+struct MemoryInputAccessor : InputAccessor
+{
+    virtual void addFile(PathView path, std::string && contents) = 0;
+};
+
+ref<MemoryInputAccessor> makeMemoryInputAccessor();
 
 struct SourcePath
 {
