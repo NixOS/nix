@@ -220,11 +220,17 @@ struct GitInputScheme : InputScheme
         if (!input.getRef() && !input.getRev() && isLocal) {
             bool clean = false;
 
+            auto env = getEnv();
+            // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
+            // that way unknown errors can lead to a failure instead of continuing through the wrong code path
+            env["LC_ALL"] = "C";
+
             /* Check whether HEAD points to something that looks like a commit,
                since that is the refrence we want to use later on. */
             auto result = runProgram(RunOptions {
                 .program = "git",
                 .args = { "-C", actualUrl, "--git-dir=.git", "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+                .environment = env,
                 .mergeStderrToStdout = true
             });
             auto exitCode = WEXITSTATUS(result.first);
