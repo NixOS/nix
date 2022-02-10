@@ -7,20 +7,34 @@
 
 namespace nix {
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, EvalState &evalState))
 {
-    throw EvalError({
+    auto error = EvalError({
         .msg = hintfmt(s),
         .errPos = pos
     });
+
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
+
+    throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, EvalState &evalState))
 {
-    throw TypeError({
+    auto error = TypeError({
         .msg = hintfmt(s, showType(v)),
         .errPos = pos
     });
+
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
+
+    throw error;
 }
 
 
@@ -48,7 +62,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
-        throwEvalError(getPos(), "infinite recursion encountered");
+        throwEvalError(getPos(), "infinite recursion encountered", *this);
 }
 
 
@@ -63,7 +77,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos)
 {
     forceValue(v, getPos);
     if (v.type() != nAttrs)
-        throwTypeError(getPos(), "value is %1% while a set was expected", v);
+        throwTypeError(getPos(), "value is %1% while a set was expected", v, *this);
 }
 
 
@@ -71,7 +85,7 @@ inline void EvalState::forceList(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (!v.isList())
-        throwTypeError(pos, "value is %1% while a list was expected", v);
+        throwTypeError(pos, "value is %1% while a list was expected", v, *this);
 }
 
 /* Note: Various places expect the allocated memory to be zeroed. */

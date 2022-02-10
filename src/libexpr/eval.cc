@@ -787,6 +787,19 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, Eva
     throw error;
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, Env & env, Expr *expr))
+{
+    auto error = EvalError({
+        .msg = hintfmt(s),
+        .errPos = pos
+    });
+
+    if (debuggerHook && expr)
+        debuggerHook(&error, env, *expr);
+
+    throw error;
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, EvalState &evalState))
 {
     auto error = EvalError({
@@ -875,17 +888,15 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, EvalS
 }
 
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, EvalState &evalState))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, Env & env, Expr *expr))
 {
     auto error = TypeError({
         .msg = hintfmt(s, v),
         .errPos = pos
     });
 
-    if (debuggerHook && !evalState.debugTraces.empty()) {
-        DebugTrace &last = evalState.debugTraces.front();
-        debuggerHook(&error, last.env, last.expr);
-    }
+    if (debuggerHook && expr)
+        debuggerHook(&error, env, *expr);
 
     throw error;
 }
@@ -1253,7 +1264,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(noPos, "value is %1% while a Boolean was expected", v);
+        throwTypeError(noPos, "value is %1% while a Boolean was expected", v, env, e);
     return v.boolean;
 }
 
@@ -1263,7 +1274,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v, env, e);
     return v.boolean;
 }
 
@@ -1272,7 +1283,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError(noPos, "value is %1% while a set was expected", v);
+        throwTypeError(noPos, "value is %1% while a set was expected", v, env, e);
 }
 
 
@@ -1377,8 +1388,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos,
-                env, this);
+            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos, env, this);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1697,7 +1707,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else
-            throwTypeError(pos, "attempt to call something which is not a function but %1%", vCur);
+            throwTypeError(pos, "attempt to call something which is not a function but %1%", vCur, *this);
     }
 
     vRes = vCur;
@@ -2005,7 +2015,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
-            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
+            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path", env, this);
         v.mkPath(canonPath(str()));
     } else
         v.mkStringMove(c_str(), context);
@@ -2256,9 +2266,7 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
 string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
-        throwEvalError("file names are not allowed to end in '%1%'",
-            drvExtension,
-            *this);
+        throwEvalError("file names are not allowed to end in '%1%'", drvExtension, *this);
 
     Path dstPath;
     auto i = srcToStore.find(path);
@@ -2283,8 +2291,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false).toOwned();
     if (path == "" || path[0] != '/')
-        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path,
-            *this);
+        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path, *this);
     return path;
 }
 
