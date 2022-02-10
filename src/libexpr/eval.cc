@@ -775,12 +775,30 @@ valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, EvalState &evalState))
 {
     auto error = EvalError(s, s2);
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
+
+    throw error;
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, EvalState &evalState))
+{
+    auto error = EvalError({
+        .msg = hintfmt(s, s2),
+        .errPos = pos
+    });
+
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
+
     throw error;
 }
 
@@ -797,25 +815,32 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, Env & env, Expr *expr))
-{
-    auto error = EvalError(s, s2, s3);
-
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
-
-    throw error;
-}
-
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, const string & s3, EvalState &evalState))
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2, s3),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
+
+    throw error;
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, EvalState &evalState))
+{
+    auto error = EvalError({
+        .msg = hintfmt(s, s2, s3),
+        .errPos = noPos
+    });
+
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
 
     throw error;
 }
@@ -834,44 +859,36 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, EvalState &evalState))
 {
     auto error = TypeError({
         .msg = hintfmt(s),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, Env & env, Expr *expr))
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, EvalState &evalState))
 {
     auto error = TypeError({
         .msg = hintfmt(s, v),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook && !evalState.debugTraces.empty()) {
+        DebugTrace &last = evalState.debugTraces.front();
+        debuggerHook(&error, last.env, last.expr);
+    }
 
     throw error;
 }
-
-// LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const string &s2, Env & env, Expr *expr))
-// {
-//     auto error = TypeError({
-//         .msg = hintfmt(s, s2),
-//         .errPos = pos
-//     });
-
-//     if (debuggerHook && expr)
-//         debuggerHook(&error, env, *expr);
-
-//     throw error;
-// }
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env, Expr *expr))
 {
@@ -885,13 +902,6 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 
     throw error;
 }
-
-// LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, Env & env, Expr *expr))
-// {
-//     auto error = TypeError({ 
-//           .msg = hintfmt(s, showType(v))
-//           .errPos = e ;
-// }
 
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
 {
@@ -2053,8 +2063,8 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nInt)
-        throwTypeError(pos, "value is %1% while an integer was expected", v,
-            fakeEnv(1), 0);
+        throwTypeError(pos, "value is %1% while an integer was expected", v, *this);
+
     return v.integer;
 }
 
@@ -2066,7 +2076,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
         return v.integer;
     else if (v.type() != nFloat)
         throwTypeError(pos, "value is %1% while a float was expected", v,
-            fakeEnv(1), 0);
+            *this);
     return v.fpoint;
 }
 
@@ -2076,7 +2086,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nBool)
         throwTypeError(pos, "value is %1% while a Boolean was expected", v,
-            fakeEnv(1), 0);
+            *this);
     return v.boolean;
 }
 
@@ -2092,7 +2102,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nFunction && !isFunctor(v))
         throwTypeError(pos, "value is %1% while a function was expected", v,
-            fakeEnv(1), 0);
+            *this);
 }
 
 
@@ -2101,7 +2111,7 @@ std::string_view EvalState::forceString(Value & v, const Pos & pos)
     forceValue(v, pos);
     if (v.type() != nString) {
         throwTypeError(pos, "value is %1% while a string was expected", v,
-            fakeEnv(1), 0);
+            *this);
     }
     return v.string.s;
 }
@@ -2152,10 +2162,10 @@ std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], fakeEnv(1), 0);
+                v.string.s, v.string.context[0], *this);
         else
             throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
-                v.string.s, v.string.context[0], fakeEnv(1), 0);
+                v.string.s, v.string.context[0], *this);
     }
     return s;
 }
@@ -2210,8 +2220,7 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
-            throwTypeError(pos, "cannot coerce a set to a string",
-                fakeEnv(1), 0);
+            throwTypeError(pos, "cannot coerce a set to a string", *this);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -2240,8 +2249,7 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
         }
     }
 
-    throwTypeError(pos, "cannot coerce %1% to a string", v,
-        fakeEnv(1), 0);
+    throwTypeError(pos, "cannot coerce %1% to a string", v, *this);
 }
 
 
@@ -2250,7 +2258,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in '%1%'",
             drvExtension,
-            fakeEnv(1), 0);
+            *this);
 
     Path dstPath;
     auto i = srcToStore.find(path);
@@ -2276,7 +2284,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
     string path = coerceToString(pos, v, context, false, false).toOwned();
     if (path == "" || path[0] != '/')
         throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path,
-            fakeEnv(1), 0);
+            *this);
     return path;
 }
 
@@ -2358,7 +2366,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             throwEvalError("cannot compare %1% with %2%",
                 showType(v1),
                 showType(v2),
-                fakeEnv(1), 0);
+                *this);
     }
 }
 
