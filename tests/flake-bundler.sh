@@ -10,26 +10,28 @@ cd $TEST_HOME
 cat <<EOF > flake.nix
 {
     outputs = {self}: {
-       bundlers.$system.simple = drv:
+      bundlers.$system = rec {
+        simple = drv:
           if drv?type && drv.type == "derivation"
           then drv
-          else self.defaultPackage.$system;
-       defaultBundler.$system = self.bundlers.$system.simple;
-       defaultPackage.$system = import ./simple.nix;
-       defaultApp.$system = {
-         type = "app";
-         program = "\${import ./simple.nix}/hello";
-       };
+          else self.packages.$system.default;
+        default = simple;
+      };
+      packages.$system.default = import ./simple.nix;
+      apps.$system.default = {
+        type = "app";
+        program = "\${import ./simple.nix}/hello";
+      };
     };
 }
 EOF
 nix build .#
 nix bundle --bundler .# .#
-nix bundle --bundler .#defaultBundler.$system  .#defaultPackage.$system
-nix bundle --bundler .#bundlers.$system.simple .#defaultPackage.$system
+nix bundle --bundler .#bundlers.$system.default .#packages.$system.default
+nix bundle --bundler .#bundlers.$system.simple  .#packages.$system.default
 
-nix bundle --bundler .#defaultBundler.$system  .#defaultApp.$system
-nix bundle --bundler .#bundlers.$system.simple .#defaultApp.$system
+nix bundle --bundler .#bundlers.$system.default .#apps.$system.default
+nix bundle --bundler .#bundlers.$system.simple  .#apps.$system.default
 
 clearStore
 

@@ -49,9 +49,11 @@ struct CmdBundle : InstallableCommand
 
     Category category() override { return catSecondary; }
 
+    // FIXME: cut&paste from CmdRun.
     Strings getDefaultFlakeAttrPaths() override
     {
         Strings res{
+            "apps." + settings.thisSystem.get() + ".default",
             "defaultApp." + settings.thisSystem.get()
         };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
@@ -61,10 +63,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{
-            "apps." + settings.thisSystem.get() + "."
-
-        };
+        Strings res{"apps." + settings.thisSystem.get() + "."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -80,7 +79,9 @@ struct CmdBundle : InstallableCommand
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
             evalState, std::move(bundlerFlakeRef), bundlerName,
-            {"defaultBundler." + settings.thisSystem.get()},
+            {"bundlers." + settings.thisSystem.get() + ".default",
+             "defaultBundler." + settings.thisSystem.get()
+            },
             {"bundlers." + settings.thisSystem.get() + "."},
             lockFlags
         };

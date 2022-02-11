@@ -158,7 +158,10 @@ SourceExprCommand::SourceExprCommand()
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
 {
-    return {"defaultPackage." + settings.thisSystem.get()};
+    return {
+        "packages." + settings.thisSystem.get() + ".default",
+        "defaultPackage." + settings.thisSystem.get()
+    };
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
