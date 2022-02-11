@@ -709,7 +709,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         getEvalState(),
                         std::move(flakeRef),
                         fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                        getDefaultFlakeAttrPathPrefixes(),
+                        fragment == "" ? Strings{} : getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;
             } catch (...) {
