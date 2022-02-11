@@ -648,11 +648,10 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
         };
       }) crossSystems)) // (builtins.listToAttrs (map (stdenvName:
-      nixpkgsFor.${system}.lib.nameValuePair
-        "nix-${stdenvName}"
-        nixpkgsFor.${system}."${stdenvName}Packages".nix
-      ) stdenvs))
-      );
+        nixpkgsFor.${system}.lib.nameValuePair
+          "nix-${stdenvName}"
+          nixpkgsFor.${system}."${stdenvName}Packages".nix
+      ) stdenvs)));
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
 
