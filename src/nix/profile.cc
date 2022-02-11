@@ -295,7 +295,11 @@ public:
         expectArgs("elements", &_matchers);
     }
 
-    typedef std::variant<size_t, Path, std::regex> Matcher;
+    struct RegexPattern {
+        std::string pattern;
+        std::regex  reg;
+    };
+    typedef std::variant<size_t, Path, RegexPattern> Matcher;
 
     std::vector<Matcher> getMatchers(ref<Store> store)
     {
@@ -307,7 +311,7 @@ public:
             else if (store->isStorePath(s))
                 res.push_back(s);
             else
-                res.push_back(std::regex(s, std::regex::extended | std::regex::icase));
+                res.push_back(RegexPattern{s,std::regex(s, std::regex::extended | std::regex::icase)});
         }
 
         return res;
@@ -320,9 +324,9 @@ public:
                 if (*n == pos) return true;
             } else if (auto path = std::get_if<Path>(&matcher)) {
                 if (element.storePaths.count(store.parseStorePath(*path))) return true;
-            } else if (auto regex = std::get_if<std::regex>(&matcher)) {
+            } else if (auto regex = std::get_if<RegexPattern>(&matcher)) {
                 if (element.source
-                    && std::regex_match(element.source->attrPath, *regex))
+                    && std::regex_match(element.source->attrPath, regex->reg))
                     return true;
             }
         }
@@ -355,16 +359,30 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
             auto & element(oldManifest.elements[i]);
-            if (!matches(*store, element, i, matchers))
+            if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
+            } else {
+                notice("removing '%s'", element.describe());
+            }
         }
 
-        // FIXME: warn about unused matchers?
-
+        auto removedCount = oldManifest.elements.size() - newManifest.elements.size();
         printInfo("removed %d packages, kept %d packages",
-            oldManifest.elements.size() - newManifest.elements.size(),
+            removedCount,
             newManifest.elements.size());
 
+        if (removedCount == 0) {
+            for (auto matcher: matchers) {
+                if (const size_t* index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index in profile", *index);
+                } else if (const Path* path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths in profile", *path);
+                } else if (const RegexPattern* regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages in profile", regex->pattern);
+                }
+            }
+            warn ("Try `nix profile list` to see the current profile.");
+        }
         updateProfile(newManifest.build(store));
     }
 };
