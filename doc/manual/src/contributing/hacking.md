@@ -57,18 +57,17 @@ $ nix develop .#clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
-[nix-shell]$ make -j $NIX_BUILD_CORES
+./bootstrap.sh
+./configure $configureFlags --prefix=$(pwd)/outputs/out
+make -j $NIX_BUILD_CORES
 ```
 
 To install it in `$(pwd)/outputs` and test it:
 
 ```console
-[nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
-[nix-shell]$ ./outputs/out/bin/nix --version
-nix (Nix) 3.0
+make install
+make installcheck -j $NIX_BUILD_CORES
+./outputs/out/bin/nix --version
 ```
 
 To run a functional test:
