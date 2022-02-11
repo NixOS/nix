@@ -437,7 +437,7 @@ EvalState::EvalState(
     , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
-    , debugStop(true)
+    , debugStop(false)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
@@ -785,6 +785,17 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, Eva
     }
 
     throw error;
+}
+
+void EvalState::debug_throw(Error e) {
+    // call this in the situation where Expr and Env are inaccessible.  The debugger will start in the last context
+    // that's in the DebugTrace stack.
+
+    if (debuggerHook && !debugTraces.empty()) {
+        DebugTrace &last = debugTraces.front();
+        debuggerHook(&e, last.env, last.expr);
+    }
+    throw e;
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, Env & env, Expr *expr))

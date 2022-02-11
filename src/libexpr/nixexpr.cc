@@ -305,7 +305,7 @@ void ExprVar::bindVars(const std::shared_ptr<const StaticEnv> &env)
     if (withLevel == -1) 
     {
         throw UndefinedVarError({
-            .msg = hintfmt("undefined variable (ExprVar bindvars) '%1%'", name),
+            .msg = hintfmt("undefined variable '%1%'", name),
             .errPos = pos
         });
     }
