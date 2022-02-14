@@ -649,12 +649,14 @@ struct CmdFlakeCheck : FlakeCommand
     }
 };
 
+static Strings defaultTemplateAttrPathsPrefixes{"templates."};
+static Strings defaultTemplateAttrPaths = {"defaultTemplate"};
+
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
     Path destDir;
 
-    const Strings attrsPathPrefixes{"templates."};
     const LockFlags lockFlags{ .writeLockFile = false };
 
     CmdFlakeInitCommon()
@@ -669,8 +671,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 completeFlakeRefWithFragment(
                     getEvalState(),
                     lockFlags,
-                    attrsPathPrefixes,
-                    {"defaultTemplate"},
+                    defaultTemplateAttrPathsPrefixes,
+                    defaultTemplateAttrPaths,
                     prefix);
             }}
         });
@@ -685,9 +687,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef),
-            Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings(attrsPathPrefixes), lockFlags);
+            evalState, std::move(templateFlakeRef), templateName,
+            defaultTemplateAttrPaths,
+            defaultTemplateAttrPathsPrefixes,
+            lockFlags);
 
         auto [cursor, attrPath] = installable.getCursor(*evalState);
 

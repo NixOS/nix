@@ -74,21 +74,16 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto [progFlakeRef, progName] = parseFlakeRefWithFragment(installable->what(), absPath("."));
-        const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
-        auto programInstallable = InstallableFlake(this,
-            evalState, std::move(progFlakeRef),
-            Strings{progName == "" ? "defaultApp" : progName},
-            Strings(this->getDefaultFlakeAttrPathPrefixes()),
-            lockFlagsProg);
-        auto val = programInstallable.toValue(*evalState).first;
+        auto val = installable->toValue(*evalState).first;
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
-        auto bundler = InstallableFlake(this,
-            evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? "defaultBundler." + settings.thisSystem.get() : settings.thisSystem.get() + "." + bundlerName, bundlerName},
-            Strings({"","bundlers."}), lockFlags);
+        InstallableFlake bundler{this,
+            evalState, std::move(bundlerFlakeRef), bundlerName,
+            {"defaultBundler." + settings.thisSystem.get()},
+            {"bundlers." + settings.thisSystem.get() + "."},
+            lockFlags
+        };
 
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *val, *vRes, noPos);

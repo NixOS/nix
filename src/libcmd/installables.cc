@@ -545,13 +545,14 @@ InstallableFlake::InstallableFlake(
     SourceExprCommand * cmd,
     ref<EvalState> state,
     FlakeRef && flakeRef,
-    Strings && attrPaths,
-    Strings && prefixes,
+    std::string_view fragment,
+    Strings attrPaths,
+    Strings prefixes,
     const flake::LockFlags & lockFlags)
     : InstallableValue(state),
       flakeRef(flakeRef),
-      attrPaths(attrPaths),
-      prefixes(prefixes),
+      attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
+      prefixes(fragment == "" ? Strings{} : prefixes),
       lockFlags(lockFlags)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
@@ -566,6 +567,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
+        debug("trying flake output attribute '%s'", attrPath);
+
         auto attr = root->findAlongAttrPath(
             parseAttrPath(*state, attrPath),
             true
@@ -708,8 +711,9 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
-                        fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
-                        fragment == "" ? Strings{} : getDefaultFlakeAttrPathPrefixes(),
+                        fragment,
+                        getDefaultFlakeAttrPaths(),
+                        getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;
             } catch (...) {
