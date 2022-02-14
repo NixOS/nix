@@ -102,8 +102,9 @@ struct InstallableFlake : InstallableValue
         SourceExprCommand * cmd,
         ref<EvalState> state,
         FlakeRef && flakeRef,
-        Strings && attrPaths,
-        Strings && prefixes,
+        std::string_view fragment,
+        Strings attrPaths,
+        Strings prefixes,
         const flake::LockFlags & lockFlags);
 
     std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
