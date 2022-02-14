@@ -699,6 +699,7 @@ static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
     .fun = prim_genericClosure,
 });
 
+
 static RegisterPrimOp primop_break({
     .name = "break",
     .args = {"v"},
@@ -707,17 +708,15 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
-        std::cout << "primop_break, value: " << *args[0] << std::endl;
-        // PathSet context;
-        // string s = state.coerceToString(pos, *args[0], context);
+        auto error = Error(ErrorInfo{
+            .level = lvlInfo,
+            .msg = hintfmt("breakpoint reached; value was %1%", *args[0]),
+            .errPos = pos,
+        });
         if (debuggerHook && !state.debugTraces.empty())
         {
           auto &dt = state.debugTraces.front();
-          // std::optional<ErrPos> pos;
-          // const Expr &expr;
-          // const Env &env;
-          // hintformat hint;
-          debuggerHook(nullptr, dt.env, dt.expr);
+          debuggerHook(&error, dt.env, dt.expr);
 
           // returning the value we were passed.
           v = *args[0];

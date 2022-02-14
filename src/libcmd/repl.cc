@@ -931,23 +931,9 @@ void runRepl(
 {
     auto repl = std::make_unique<NixRepl>(evalState);
 
-    // repl->debugError = debugError;
+    repl->debugError = debugError;
 
     repl->initEnv();
-
-    // auto dts = debugError ? 
-    //     std::unique_ptr<DebugTraceStacker>(
-    //         // tack on a final DebugTrace for the error position.
-    //         new DebugTraceStacker(
-    //               *evalState,
-    //               DebugTrace
-    //                     {.pos = debugError->info().errPos,
-    //                      .expr = expr,
-    //                      .env = *repl->env,
-    //                      .hint = debugError->info().msg
-    //                     })
-    //         )
-    //     : nullptr;
 
     // add 'extra' vars.
     std::set<std::string> names;
