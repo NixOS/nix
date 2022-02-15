@@ -14,7 +14,7 @@ InputAccessor::InputAccessor()
 // FIXME: merge with archive.cc.
 const std::string narVersionMagic1 = "nix-archive-1";
 
-static string caseHackSuffix = "~nix~case~hack~";
+static std::string caseHackSuffix = "~nix~case~hack~";
 
 void InputAccessor::dumpPath(
     const Path & path,
@@ -51,12 +51,12 @@ void InputAccessor::dumpPath(
 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
-            std::map<string, string> unhacked;
+            std::map<std::string, std::string> unhacked;
             for (auto & i : readDirectory(path))
                 if (/* archiveSettings.useCaseHack */ false) { // FIXME
-                    string name(i.first);
+                    std::string name(i.first);
                     size_t pos = i.first.find(caseHackSuffix);
-                    if (pos != string::npos) {
+                    if (pos != std::string::npos) {
                         debug(format("removing case hack suffix from '%s'") % (path + "/" + i.first));
                         name.erase(pos);
                     }
@@ -225,6 +225,12 @@ struct MemoryInputAccessorImpl : MemoryInputAccessor
 ref<MemoryInputAccessor> makeMemoryInputAccessor()
 {
     return make_ref<MemoryInputAccessorImpl>();
+}
+
+std::string_view SourcePath::baseName() const
+{
+    // FIXME
+    return path == "" || path == "/" ? "source" : baseNameOf(path);
 }
 
 }

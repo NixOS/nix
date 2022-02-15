@@ -63,7 +63,6 @@ struct Flake
     FlakeRef lockedRef; // the specific local store result of invoking the fetcher
     bool forceDirty = false; // pretend that 'lockedRef' is dirty
     std::optional<std::string> description;
-    std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
     ConfigFile config; // 'nixConfig' attribute
     ~Flake();
@@ -139,7 +138,7 @@ void callFlake(
 
 void emitTreeAttrs(
     EvalState & state,
-    const fetchers::Tree & tree,
+    const SourcePath & path,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback = false,

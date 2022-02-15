@@ -13,25 +13,32 @@ namespace nix {
 
 void emitTreeAttrs(
     EvalState & state,
-    const fetchers::Tree & tree,
+    const SourcePath & path,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isLocked());
+    // FIXME?
+    //assert(input.isLocked());
 
     auto attrs = state.buildBindings(8);
 
+    #if 0
     auto storePath = state.store->printStorePath(tree.storePath);
 
     attrs.alloc(state.sOutPath).mkString(storePath, {storePath});
+    #endif
+
+    attrs.alloc(state.sOutPath).mkPath(state.packPath(path));
 
     // FIXME: support arbitrary input attributes.
 
+    #if 0
     auto narHash = input.getNarHash();
     assert(narHash);
     attrs.alloc("narHash").mkString(narHash->to_string(SRI, true));
+    #endif
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -169,11 +176,17 @@ static void fetchTree(
     if (evalSettings.pureEval && !input.isLocked())
         throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
 
-    auto [tree, input2] = input.fetch(state.store);
+    auto [accessor, input2] = input.lazyFetch(state.store);
 
-    state.allowPath(tree.storePath);
+    //state.allowPath(tree.storePath);
 
-    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(
+        state,
+        {accessor, "/"},
+        input2,
+        v,
+        params.emptyRevFallback,
+        false);
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)

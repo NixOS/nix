@@ -182,7 +182,9 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
+            #if 0
             j["path"] = store->printStorePath(flake.sourceInfo->storePath);
+            #endif
             j["locks"] = lockedFlake.lockFile.toJSON();
             logger->cout("%s", j.dump());
         } else {
@@ -196,9 +198,11 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
                     *flake.description);
+            #if 0
             logger->cout(
                 ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
                 store->printStorePath(flake.sourceInfo->storePath));
+            #endif
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
@@ -881,6 +885,8 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
+        throw UnimplementedError("flake archive");
+        #if 0
         sources.insert(flake.flake.sourceInfo->storePath);
         if (jsonRoot)
             jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
@@ -911,6 +917,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
             copyPaths(*store, *dstStore, sources);
         }
+        #endif
     }
 };
 

@@ -16,15 +16,14 @@ Path EvalState::packPath(const SourcePath & path)
 
 SourcePath EvalState::unpackPath(const Path & path)
 {
+    printError("UNPACK %s", path);
     if (hasPrefix(path, marker)) {
         auto s = path.substr(marker.size());
         auto slash = s.find('/');
-        assert(slash != s.npos);
         auto n = std::stoi(s.substr(0, slash));
-        printError("GOT %d", n);
         auto i = inputAccessors.find(n);
         assert(i != inputAccessors.end());
-        return {i->second, s.substr(slash)};
+        return {i->second, slash != std::string::npos ? s.substr(slash) : "/"};
     } else {
         printError("FIXME: %s", path);
         return rootPath(path);

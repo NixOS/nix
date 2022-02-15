@@ -73,6 +73,11 @@ public:
        the Nix store and the locked input. */
     std::pair<Tree, Input> fetch(ref<Store> store) const;
 
+    /* Return an InputAccessor that allows access to files in the
+       input without copying it to the store. Also return a possibly
+       unlocked input. */
+    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store) const;
+
     Input applyOverrides(
         std::optional<std::string> ref,
         std::optional<Hash> rev) const;
@@ -131,6 +136,8 @@ struct InputScheme
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
     virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
+
+    virtual std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input);
 
     virtual ref<InputAccessor> getAccessor()
     {

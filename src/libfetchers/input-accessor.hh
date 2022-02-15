@@ -57,6 +57,8 @@ struct SourcePath
 {
     ref<InputAccessor> accessor;
     Path path;
+
+    std::string_view baseName() const;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);

@@ -2070,14 +2070,14 @@ std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
         auto path2 = unpackPath(path);
         #if 0
         auto p = settings.readOnlyMode
-            ? store->computeStorePathForPath(std::string(baseNameOf(path)), canonPath(path)).first
-            : store->addToStore(std::string(baseNameOf(path)), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+            ? store->computeStorePathForPath(path2.baseName(), canonPath(path)).first
+            : store->addToStore(path2.baseName(), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         #endif
         auto source = sinkToSource([&](Sink & sink) {
             path2.accessor->dumpPath(path2.path, sink);
         });
         // FIXME: readOnlyMode
-        auto p = store->addToStoreFromDump(*source, std::string(baseNameOf(path)), FileIngestionMethod::Recursive, htSHA256, repair);
+        auto p = store->addToStoreFromDump(*source, path2.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
         dstPath = store->printStorePath(p);
         allowPath(p);
         srcToStore.insert_or_assign(path, std::move(p));

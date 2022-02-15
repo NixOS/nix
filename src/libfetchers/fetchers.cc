@@ -172,6 +172,19 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     return {std::move(tree), input};
 }
 
+std::pair<ref<InputAccessor>, Input> Input::lazyFetch(ref<Store> store) const
+{
+    if (!scheme)
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
+
+    try {
+        return scheme->lazyFetch(store, *this);
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
+}
+
 Input Input::applyOverrides(
     std::optional<std::string> ref,
     std::optional<Hash> rev) const
@@ -287,6 +300,13 @@ void InputScheme::markChangedFile(const Input & input, std::string_view file, st
 void InputScheme::clone(const Input & input, const Path & destDir)
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::pair<ref<InputAccessor>, Input> InputScheme::lazyFetch(ref<Store> store, const Input & input)
+{
+    auto [storePath, input2] = fetch(store, input);
+
+    return {makeFSInputAccessor(store->toRealPath(storePath)), input2};
 }
 
 }
