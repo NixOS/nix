@@ -438,6 +438,7 @@ EvalState::EvalState(
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugStop(false)
+    , debugQuit(false)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))

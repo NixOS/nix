@@ -89,6 +89,7 @@ string removeWhitespace(string s)
     s = chomp(s);
     size_t n = s.find_first_not_of(" \n\r\t");
     if (n != string::npos) s = string(s, n);
+
     return s;
 }
 
@@ -231,8 +232,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          "))
+        {
+            // ctrl-D should exit the debugger.
+            state->debugStop = false;
+            state->debugQuit = true;
             break;
-
+        }
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
@@ -464,12 +469,12 @@ bool NixRepl::processLine(string line)
                           std::cout << "\n";
                       }
                   }
-              }                   
+              }
         } else if (arg == "env") {
             auto iter = this->state->debugTraces.begin();
             if (iter != this->state->debugTraces.end()) {
                printStaticEnvBindings(iter->expr);
-            }                   
+            }
         }
         else if (arg == "error") {
             if (this->debugError) {
@@ -481,12 +486,12 @@ bool NixRepl::processLine(string line)
             }
         }
         else if (arg == "step") {
-            // set flag and exit repl.
+            // set flag to stop at next DebugTrace; exit repl.
             state->debugStop = true;
             return false;
         }
         else if (arg == "go") {
-            // set flag and exit repl.
+            // set flag to run to next breakpoint or end of program; exit repl.
             state->debugStop = false;
             return false;
         }
@@ -605,8 +610,11 @@ bool NixRepl::processLine(string line)
         printValue(std::cout, v, 1000000000) << std::endl;
     }
 
-    else if (command == ":q" || command == ":quit")
+    else if (command == ":q" || command == ":quit") {
+        state->debugStop = false;
+        state->debugQuit = true;
         return false;
+    }
 
     else if (command == ":doc") {
         Value v;
@@ -944,7 +952,7 @@ void runRepl(
     }
 
     printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
-    
+
     repl->mainLoop({});
 }
 

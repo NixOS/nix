@@ -718,6 +718,15 @@ static RegisterPrimOp primop_break({
           auto &dt = state.debugTraces.front();
           debuggerHook(&error, dt.env, dt.expr);
 
+          if (state.debugQuit) {
+              // if the user elects to quit the repl, throw an exception.
+              throw Error(ErrorInfo{
+                  .level = lvlInfo,
+                  .msg = hintfmt("quit from debugger"),
+                  .errPos = pos,
+              });
+          }
+
           // returning the value we were passed.
           v = *args[0];
         }

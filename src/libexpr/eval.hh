@@ -116,6 +116,7 @@ public:
     RootValue vImportedDrvToDerivation = nullptr;
 
     bool debugStop;
+    bool debugQuit;
     std::list<DebugTrace> debugTraces;
 
     void debug_throw(Error e);
