@@ -124,15 +124,13 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            auto actualPath = store->toRealPath(storePath);
-
-            return {fetchers::Tree(std::move(actualPath), std::move(storePath)), *this};
+            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
 
-    auto [tree, input] = [&]() -> std::pair<Tree, Input> {
+    auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
             return scheme->fetch(store, *this);
         } catch (Error & e) {
@@ -141,8 +139,10 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }();
 
-    if (tree.actualPath == "")
-        tree.actualPath = store->toRealPath(tree.storePath);
+    Tree tree {
+        .actualPath = store->toRealPath(storePath),
+        .storePath = storePath,
+    };
 
     auto narHash = store->queryPathInfo(tree.storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));

@@ -143,7 +143,7 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -193,10 +193,7 @@ struct MercurialInputScheme : InputScheme
 
                 auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
 
-                return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
-                    input
-                };
+                return {std::move(storePath), input};
             }
         }
 
@@ -212,15 +209,12 @@ struct MercurialInputScheme : InputScheme
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<Tree, Input>
+            -> std::pair<StorePath, Input>
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-            return {
-                Tree(store->toRealPath(storePath), std::move(storePath)),
-                input
-            };
+            return {std::move(storePath), input};
         };
 
         if (input.getRev()) {

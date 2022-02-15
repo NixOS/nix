@@ -180,7 +180,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -199,10 +199,7 @@ struct GitArchiveInputScheme : InputScheme
 
         if (auto res = getCache()->lookup(store, immutableAttrs)) {
             input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
-            return {
-                Tree(store->toRealPath(res->second), std::move(res->second)),
-                input
-            };
+            return {std::move(res->second), input};
         }
 
         auto url = getDownloadUrl(input);
@@ -221,7 +218,7 @@ struct GitArchiveInputScheme : InputScheme
             tree.storePath,
             true);
 
-        return {std::move(tree), input};
+        return {std::move(tree.storePath), input};
     }
 };
 

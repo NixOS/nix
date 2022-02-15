@@ -16,7 +16,6 @@ struct Tree
 {
     Path actualPath;
     StorePath storePath;
-    Tree(Path && actualPath, StorePath && storePath) : actualPath(actualPath), storePath(std::move(storePath)) {}
 };
 
 struct InputScheme;
@@ -131,7 +130,7 @@ struct InputScheme
 
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
-    virtual std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) = 0;
+    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

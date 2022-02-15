@@ -172,7 +172,7 @@ struct GitInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -197,17 +197,14 @@ struct GitInputScheme : InputScheme
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<Tree, Input>
+            -> std::pair<StorePath, Input>
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-            return {
-                Tree(store->toRealPath(storePath), std::move(storePath)),
-                input
-            };
+            return {std::move(storePath), input};
         };
 
         if (input.getRev()) {
@@ -285,10 +282,7 @@ struct GitInputScheme : InputScheme
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
-                    input
-                };
+                return {std::move(storePath), input};
             }
         }
 
