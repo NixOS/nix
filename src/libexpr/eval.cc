@@ -799,15 +799,15 @@ void EvalState::debug_throw(Error e) {
     throw e;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, Env & env, Expr &expr))
 {
     auto error = EvalError({
         .msg = hintfmt(s),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
@@ -827,15 +827,15 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const string & s2, Env & env, Expr &expr))
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
@@ -870,7 +870,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2, Env & env, Expr &expr))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     auto error = EvalError({
@@ -878,8 +878,8 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
         .errPos = p1
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
@@ -900,68 +900,67 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, EvalS
 }
 
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, Env & env, Expr &expr))
 {
     auto error = TypeError({
         .msg = hintfmt(s, v),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env, Expr &expr))
 {
     auto error = TypeError({
         .msg = hintfmt(s, fun.showNamePos(), s2),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1, Env & env, Expr &expr))
 {
     auto error = AssertionError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr &expr))
 {
     auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
 
-    if (debuggerHook && expr) {
-        debuggerHook(&error, env, *expr);
-    }
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, Env & env, Expr *expr))
+LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const string & s1, Env & env, Expr &expr))
 {
     auto error = MissingArgumentError({
         .msg = hintfmt(s, s1),
         .errPos = pos
     });
 
-    if (debuggerHook && expr)
-        debuggerHook(&error, env, *expr);
+    if (debuggerHook)
+        debuggerHook(&error, env, expr);
 
     throw error;
 }
@@ -1055,7 +1054,8 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith) {
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, (Expr*)&var);
+            // TODO deal with const_cast
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, *const_cast<ExprVar*>(&var));
         }
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
@@ -1276,7 +1276,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(noPos, "value is %1% while a Boolean was expected", v, env, e);
+        throwTypeError(noPos, "value is %1% while a Boolean was expected", v, env, *e);
     return v.boolean;
 }
 
@@ -1286,7 +1286,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v, env, e);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v, env, *e);
     return v.boolean;
 }
 
@@ -1295,7 +1295,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError(noPos, "value is %1% while a set was expected", v, env, e);
+        throwTypeError(noPos, "value is %1% while a set was expected", v, env, *e);
 }
 
 
@@ -1400,7 +1400,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos, env, this);
+            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos, env, *this);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1498,7 +1498,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name, env, this);
+                    throwEvalError(pos, "attribute '%1%' missing", name, env, *this);
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1599,7 +1599,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     auto j = args[0]->attrs->get(i.name);
                     if (!j) {
                         if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
-                            lambda, i.name, *fun.lambda.env, &lambda);
+                            lambda, i.name, *fun.lambda.env, lambda);
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
                     } else {
                         attrsUsed++;
@@ -1615,7 +1615,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     for (auto & i : *args[0]->attrs)
                         if (!lambda.formals->has(i.name))
                             throwTypeError(pos, "%1% called with unexpected argument '%2%'",
-                                lambda, i.name, *fun.lambda.env, &lambda);
+                                lambda, i.name, *fun.lambda.env, lambda);
                     abort(); // can't happen
                 }
             }
@@ -1790,7 +1790,7 @@ this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/#ss-functions.)",
                 i.name,
-                *fun.lambda.env, fun.lambda.fun);
+                *fun.lambda.env, *fun.lambda.fun);
             }
         }
     }
@@ -1822,7 +1822,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError(pos, "assertion '%1%' failed", out.str(), env, this);
+        throwAssertionError(pos, "assertion '%1%' failed", out.str(), env, *this);
     }
     body->eval(state, env, v);
 }
@@ -1999,7 +1999,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else {
-                throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp), env, this);
+                throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp), env, *this);
             }
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
@@ -2007,7 +2007,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp), env, this);
+                throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp), env, *this);
         } else {
             if (s.empty()) s.reserve(es->size());
             /* skip canonization of first path, which would only be not
@@ -2027,7 +2027,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
-            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path", env, this);
+            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path", env, *this);
         v.mkPath(canonPath(str()));
     } else
         v.mkStringMove(c_str(), context);
