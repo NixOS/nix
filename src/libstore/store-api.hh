@@ -499,7 +499,7 @@ public:
        false).
        `dump` may be drained */
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
+    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
         const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }

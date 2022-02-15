@@ -1208,7 +1208,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         return path;
     }
 
-    StorePath addToStoreFromDump(Source & dump, const string & name,
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
         const StorePathSet & references = StorePathSet()) override
     {

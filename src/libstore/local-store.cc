@@ -1318,7 +1318,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
+StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     /* For computing the store path. */

@@ -307,7 +307,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     }});
 }
 
-StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & name,
+StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)

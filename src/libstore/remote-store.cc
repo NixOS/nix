@@ -500,7 +500,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
-    const string & name,
+    std::string_view name,
     ContentAddressMethod caMethod,
     const StorePathSet & references,
     RepairFlag repair)
@@ -582,7 +582,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
+StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
       FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
 {
     return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
