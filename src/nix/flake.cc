@@ -728,6 +728,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 else
                     throw Error("file '%s' has unsupported type", from2);
                 files.push_back(to2);
+                notice("wrote: %s", to2);
             }
         };
 
@@ -737,6 +738,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : files) args.push_back(s);
             runProgram("git", true, args);
+        }
+        auto welcomeText = cursor->maybeGetAttr("welcomeText");
+        if (welcomeText) {
+            notice("\n----------\n");
+            notice(welcomeText->getString());
         }
     }
 };
