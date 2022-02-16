@@ -315,7 +315,7 @@ std::string LockFile::diff(const LockFile & oldLocks, const LockFile & newLocks)
                 printInputPath(j->first), j->second);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
-            res += fmt("• " ANSI_RED "Removed input '%s'" ANSI_NORMAL "\n", printInputPath(i->first));
+            res += fmt("• " ANSI_YELLOW "Removed input '%s'" ANSI_NORMAL "\n", printInputPath(i->first));
             ++i;
         } else {
             if (!equals(i->second, j->second)) {
