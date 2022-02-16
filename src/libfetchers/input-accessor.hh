@@ -44,7 +44,9 @@ struct InputAccessor
         PathFilter & filter = defaultPathFilter);
 };
 
-ref<InputAccessor> makeFSInputAccessor(const Path & root);
+ref<InputAccessor> makeFSInputAccessor(
+    const Path & root,
+    std::optional<PathSet> && allowedPaths = {});
 
 struct MemoryInputAccessor : InputAccessor
 {

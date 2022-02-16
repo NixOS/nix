@@ -90,10 +90,19 @@ void InputAccessor::dumpPath(
 struct FSInputAccessor : InputAccessor
 {
     Path root;
+    std::optional<PathSet> allowedPaths;
 
-    FSInputAccessor(const Path & root)
+    FSInputAccessor(const Path & root, std::optional<PathSet> && allowedPaths)
         : root(root)
-    { }
+        , allowedPaths(allowedPaths)
+    {
+        if (allowedPaths) {
+            for (auto & p : *allowedPaths) {
+                assert(!hasPrefix(p, "/"));
+                assert(!hasSuffix(p, "/"));
+            }
+        }
+    }
 
     std::string readFile(PathView path) override
     {
@@ -139,7 +148,8 @@ struct FSInputAccessor : InputAccessor
             case DT_LNK: type = Type::tSymlink; break;
             case DT_DIR: type = Type::tDirectory; break;
             }
-            res.emplace(entry.name, type);
+            if (isAllowed(absPath + "/" + entry.name))
+                res.emplace(entry.name, type);
         }
         return res;
     }
@@ -161,6 +171,8 @@ struct FSInputAccessor : InputAccessor
     void checkAllowed(PathView absPath)
     {
         if (!isAllowed(absPath))
+            // FIXME: for Git trees, show a custom error message like
+            // "file is not under version control or does not exist"
             throw Error("access to path '%s' is not allowed", absPath);
     }
 
@@ -168,13 +180,30 @@ struct FSInputAccessor : InputAccessor
     {
         if (!isDirOrInDir(absPath, root))
             return false;
+
+        if (allowedPaths) {
+            // FIXME: make isDirOrInDir return subPath
+            auto subPath = absPath.substr(root.size());
+            if (hasPrefix(subPath, "/"))
+                subPath = subPath.substr(1);
+
+            if (subPath != "") {
+                auto lb = allowedPaths->lower_bound((std::string) subPath);
+                if (lb == allowedPaths->end()
+                    || !isDirOrInDir("/" + *lb, "/" + (std::string) subPath))
+                    return false;
+            }
+        }
+
         return true;
     }
 };
 
-ref<InputAccessor> makeFSInputAccessor(const Path & root)
+ref<InputAccessor> makeFSInputAccessor(
+    const Path & root,
+    std::optional<PathSet> && allowedPaths)
 {
-    return make_ref<FSInputAccessor>(root);
+    return make_ref<FSInputAccessor>(root, std::move(allowedPaths));
 }
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
