@@ -163,12 +163,15 @@ fi
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Checks for libarchive
+# Look for libarchive.
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
 if test "$shared" != yes; then
     LIBARCHIVE_LIBS+=' -lz'
 fi
+
+# Look for libzip.
+PKG_CHECK_MODULES([LIBZIP], [libzip])
 
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])

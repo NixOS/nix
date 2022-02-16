@@ -183,10 +183,8 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> downloadArchive(ref<Store> store, Input input)
     {
-        Input input(_input);
-
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
         auto rev = input.getRev();
@@ -196,32 +194,46 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("rev", rev->gitRev());
 
         Attrs lockedAttrs({
-            {"type", "git-tarball"},
+            {"type", "git-zipball"},
             {"rev", rev->gitRev()},
         });
 
         if (auto res = getCache()->lookup(store, lockedAttrs)) {
-            input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
+            // FIXME
+            //input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
             return {std::move(res->second), input};
         }
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, input.getName(), true, url.headers);
+        auto res = downloadFile(store, url.url, input.getName(), true, url.headers);
 
-        input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
+        //input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
         getCache()->add(
             store,
             lockedAttrs,
             {
                 {"rev", rev->gitRev()},
-                {"lastModified", uint64_t(lastModified)}
+                // FIXME: get lastModified
+                //{"lastModified", uint64_t(lastModified)}
             },
-            tree.storePath,
+            res.storePath,
             true);
 
-        return {std::move(tree.storePath), input};
+        return {res.storePath, input};
+    }
+
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    {
+        throw UnimplementedError("GitArchive::fetch()");
+    }
+
+    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input) override
+    {
+        auto [storePath, input2] = downloadArchive(store, input);
+
+        return {makeZipInputAccessor(store->toRealPath(storePath)), input2};
     }
 };
 
@@ -262,7 +274,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
+        auto url = fmt("https://api.%s/repos/%s/%s/zipball/%s", // FIXME: check if this is correct for self hosted instances
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
@@ -329,7 +341,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // is 10 reqs/sec/ip-addr.  See
         // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.zip?sha=%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 

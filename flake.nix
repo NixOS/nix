@@ -111,6 +111,7 @@
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
+            libzip
             boost
             lowdown-nix
             gtest

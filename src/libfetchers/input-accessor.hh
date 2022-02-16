@@ -55,6 +55,8 @@ struct MemoryInputAccessor : InputAccessor
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();
 
+ref<InputAccessor> makeZipInputAccessor(PathView path);
+
 struct SourcePath
 {
     ref<InputAccessor> accessor;
