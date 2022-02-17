@@ -13,6 +13,7 @@
 #include "registry.hh"
 #include "json.hh"
 #include "eval-cache.hh"
+#include "markdown.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -741,8 +742,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         }
         auto welcomeText = cursor->maybeGetAttr("welcomeText");
         if (welcomeText) {
-            notice("\n----------\n");
-            notice(welcomeText->getString());
+            notice("\n");
+            notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
     }
 };

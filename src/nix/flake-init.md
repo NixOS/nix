@@ -37,8 +37,8 @@ A flake can declare templates through its `templates` and
 
 * `path`: The path of the directory to be copied.
 
-* `welcomeText`: A block of text to display when a user initializes a new flake
-  based on this template.
+* `welcomeText`: A block of markdown text to display when a user initializes a
+  new flake based on this template.
 
 
 Here is an example:
@@ -50,8 +50,14 @@ outputs = { self }: {
     path = ./rust;
     description = "A simple Rust/Cargo project";
     welcomeText = ''
-      You've created a simple Rust/Cargo template.
-      Visit https://www.rust-lang.org/ for more info.
+      # Simple Rust/Cargo Template
+      ## Intended usage
+      The intended usage of this flake is...
+
+      ## More info
+      - [Rust language](https://www.rust-lang.org/)
+      - [Rust on the NixOS Wiki](https://nixos.wiki/wiki/Rust)
+      - ...
     '';
   };
 
