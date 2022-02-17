@@ -48,6 +48,7 @@ nix_tests = \
   flakes.sh \
   flake-local-settings.sh \
   flake-searching.sh \
+  flake-bundler.sh \
   build.sh \
   repl.sh ca/repl.sh \
   ca/build.sh \
@@ -62,6 +63,8 @@ nix_tests = \
   ca/nix-copy.sh \
   eval-store.sh \
   readfile-context.sh \
+  store-ping.sh \
+  nix_path.sh \
   why-depends.sh
   # parallel.sh
 

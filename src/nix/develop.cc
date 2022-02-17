@@ -472,9 +472,11 @@ struct CmdDevelop : Common, MixEnvironment
         else {
             script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n" + script;
             if (developSettings.bashPrompt != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", shellEscape(developSettings.bashPrompt));
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
+                    shellEscape(developSettings.bashPrompt.get()));
             if (developSettings.bashPromptSuffix != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", shellEscape(developSettings.bashPromptSuffix));
+                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
+                    shellEscape(developSettings.bashPromptSuffix.get()));
         }
 
         writeFull(rcFileFd.get(), script);
@@ -496,7 +498,8 @@ struct CmdDevelop : Common, MixEnvironment
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
-                Strings{"bashInteractive"},
+                "bashInteractive",
+                Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 

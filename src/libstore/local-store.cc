@@ -1318,7 +1318,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
+StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name,
     FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     /* For computing the store path. */
@@ -1918,5 +1918,11 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
     if (rename(tmpFile.c_str(), logPath.c_str()) != 0)
         throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
 }
+
+std::optional<std::string> LocalStore::getVersion()
+{
+    return nixVersion;
+}
+
 
 }  // namespace nix

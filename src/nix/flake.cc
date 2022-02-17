@@ -124,12 +124,13 @@ struct CmdFlakeLock : FlakeCommand
 static void enumerateOutputs(EvalState & state, Value & vFlake,
     std::function<void(const std::string & name, Value & vProvide, const Pos & pos)> callback)
 {
-    state.forceAttrs(vFlake);
+    auto pos = vFlake.determinePos(noPos);
+    state.forceAttrs(vFlake, pos);
 
     auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceAttrs(*aOutputs->value);
+    state.forceAttrs(*aOutputs->value, pos);
 
     auto sHydraJobs = state.symbols.create("hydraJobs");
 
@@ -475,10 +476,7 @@ struct CmdFlakeCheck : FlakeCommand
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
-                if (!v.lambda.fun->formals ||
-                    !v.lambda.fun->formals->argNames.count(state->symbols.create("program")) ||
-                    !v.lambda.fun->formals->argNames.count(state->symbols.create("system")))
-                    throw Error("bundler must take formal arguments 'program' and 'system'");
+                // TODO: check types of inputs/outputs?
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 reportError(e);
@@ -609,14 +607,27 @@ struct CmdFlakeCheck : FlakeCommand
                                     *attr.value, *attr.pos);
                         }
 
-                        else if (name == "defaultBundler")
-                            checkBundler(name, vOutput, pos);
+                        else if (name == "defaultBundler") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkBundler(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                            }
+                        }
 
                         else if (name == "bundlers") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                checkBundler(fmt("%s.%s", name, attr.name),
-                                    *attr.value, *attr.pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs) {
+                                    checkBundler(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                                }
+                            }
                         }
 
                         else
@@ -638,12 +649,14 @@ struct CmdFlakeCheck : FlakeCommand
     }
 };
 
+static Strings defaultTemplateAttrPathsPrefixes{"templates."};
+static Strings defaultTemplateAttrPaths = {"defaultTemplate"};
+
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
     Path destDir;
 
-    const Strings attrsPathPrefixes{"templates."};
     const LockFlags lockFlags{ .writeLockFile = false };
 
     CmdFlakeInitCommon()
@@ -658,8 +671,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 completeFlakeRefWithFragment(
                     getEvalState(),
                     lockFlags,
-                    attrsPathPrefixes,
-                    {"defaultTemplate"},
+                    defaultTemplateAttrPathsPrefixes,
+                    defaultTemplateAttrPaths,
                     prefix);
             }}
         });
@@ -674,9 +687,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef),
-            Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings(attrsPathPrefixes), lockFlags);
+            evalState, std::move(templateFlakeRef), templateName,
+            defaultTemplateAttrPaths,
+            defaultTemplateAttrPathsPrefixes,
+            lockFlags);
 
         auto [cursor, attrPath] = installable.getCursor(*evalState);
 

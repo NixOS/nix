@@ -55,7 +55,7 @@ R""(
   # nix develop /tmp/my-build-env
   ```
 
-* Replace all occurences of the store path corresponding to
+* Replace all occurrences of the store path corresponding to
   `glibc.dev` with a writable directory:
 
   ```console

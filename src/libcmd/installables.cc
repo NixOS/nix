@@ -97,7 +97,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath(".")));
+                parseFlakeRef(flakeRef, absPath("."), true));
         }}
     });
 
@@ -198,8 +198,9 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             prefix_ = "";
         }
 
-        Value &v1(*findAlongAttrPath(*state, prefix_, *autoArgs, root).first);
-        state->forceValue(v1);
+        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+        Value &v1(*v);
+        state->forceValue(v1, pos);
         Value v2;
         state->autoCallFunction(*autoArgs, v1, v2);
 
@@ -446,7 +447,7 @@ struct InstallableAttrPath : InstallableValue
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
-        state.forceValue(*vRes);
+        state.forceValue(*vRes, pos);
         return {vRes, pos};
     }
 
@@ -496,7 +497,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceValue(*aOutputs->value);
+    state.forceValue(*aOutputs->value, [&]() { return aOutputs->value->determinePos(noPos); });
 
     return aOutputs->value;
 }
@@ -521,7 +522,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake);
+            state.forceAttrs(*vFlake, noPos);
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);
@@ -544,13 +545,14 @@ InstallableFlake::InstallableFlake(
     SourceExprCommand * cmd,
     ref<EvalState> state,
     FlakeRef && flakeRef,
-    Strings && attrPaths,
-    Strings && prefixes,
+    std::string_view fragment,
+    Strings attrPaths,
+    Strings prefixes,
     const flake::LockFlags & lockFlags)
     : InstallableValue(state),
       flakeRef(flakeRef),
-      attrPaths(attrPaths),
-      prefixes(prefixes),
+      attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
+      prefixes(fragment == "" ? Strings{} : prefixes),
       lockFlags(lockFlags)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
@@ -565,6 +567,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
+        debug("trying flake output attribute '%s'", attrPath);
+
         auto attr = root->findAlongAttrPath(
             parseAttrPath(*state, attrPath),
             true
@@ -608,7 +612,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
     for (auto & attrPath : getActualAttrPaths()) {
         try {
             auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
-            state.forceValue(*v);
+            state.forceValue(*v, pos);
             return {v, pos};
         } catch (AttrPathNotFound & e) {
         }
@@ -707,7 +711,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
-                        fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
+                        fragment,
+                        getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;

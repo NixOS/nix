@@ -133,6 +133,7 @@
                 ./boehmgc-coroutine-sp-fallback.diff
               ];
             }))
+            nlohmann_json
           ];
 
         perlDeps =
@@ -446,19 +447,7 @@
         installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
 
         # docker image with Nix inside
-        dockerImage = nixpkgs.lib.genAttrs linux64BitSystems (system:
-          let
-            pkgs = nixpkgsFor.${system};
-            image = import ./docker.nix { inherit pkgs; tag = version; };
-          in pkgs.runCommand "docker-image-tarball-${version}"
-            { meta.description = "Docker image with Nix for ${system}";
-            }
-            ''
-              mkdir -p $out/nix-support
-              image=$out/image.tar.gz
-              ln -s ${image} $image
-              echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
-            '');
+        dockerImage = nixpkgs.lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
         # Line coverage analysis.
         coverage =
@@ -605,6 +594,20 @@
 
           hardeningDisable = [ "pie" ];
         };
+        dockerImage =
+          let
+            pkgs = nixpkgsFor.${system};
+            image = import ./docker.nix { inherit pkgs; tag = version; };
+          in
+          pkgs.runCommand
+            "docker-image-tarball-${version}"
+            { meta.description = "Docker image with Nix for ${system}"; }
+            ''
+              mkdir -p $out/nix-support
+              image=$out/image.tar.gz
+              ln -s ${image} $image
+              echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
+            '';
       } // builtins.listToAttrs (map (crossSystem: {
         name = "nix-${crossSystem}";
         value = let
@@ -645,11 +648,10 @@
           installCheckFlags = "sysconfdir=$(out)/etc";
         };
       }) crossSystems)) // (builtins.listToAttrs (map (stdenvName:
-      nixpkgsFor.${system}.lib.nameValuePair
-        "nix-${stdenvName}"
-        nixpkgsFor.${system}."${stdenvName}Packages".nix
-      ) stdenvs))
-      );
+        nixpkgsFor.${system}.lib.nameValuePair
+          "nix-${stdenvName}"
+          nixpkgsFor.${system}."${stdenvName}Packages".nix
+      ) stdenvs)));
 
       defaultPackage = forAllSystems (system: self.packages.${system}.nix);
 

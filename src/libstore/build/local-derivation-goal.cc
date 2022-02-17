@@ -912,9 +912,12 @@ void LocalDerivationGoal::startBuilder()
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
-        sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
-        if (sandboxUserNamespace.get() == -1)
-            throw SysError("getting sandbox user namespace");
+
+        if (usingUserNamespace) {
+            sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
+            if (sandboxUserNamespace.get() == -1)
+                throw SysError("getting sandbox user namespace");
+        }
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -1205,7 +1208,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         return path;
     }
 
-    StorePath addToStoreFromDump(Source & dump, const string & name,
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
         const StorePathSet & references = StorePathSet()) override
     {

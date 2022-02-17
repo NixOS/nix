@@ -730,6 +730,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
     description = "Flake B";
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
+        goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
             inputs.foobar.follows = "foobar";
@@ -744,6 +745,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
     description = "Flake C";
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
+        goodoo.follows = "foobar";
     };
     outputs = { ... }: {};
 }
@@ -759,7 +761,7 @@ EOF
 
 cat > $flakeFollowsE/flake.nix <<EOF
 {
-    description = "Flake D";
+    description = "Flake E";
     inputs = {};
     outputs = { ... }: {};
 }
@@ -767,6 +769,8 @@ EOF
 
 git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
   flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
+
+nix flake metadata $flakeFollowsA
 
 nix flake update $flakeFollowsA
 

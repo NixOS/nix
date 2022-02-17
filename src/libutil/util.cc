@@ -81,7 +81,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
+Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -95,12 +95,12 @@ Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
             if (!getcwd(buf, sizeof(buf)))
 #endif
                 throw SysError("cannot get cwd");
-            dir = buf;
+            path = concatStrings(buf, "/", path);
 #ifdef __GNU__
             free(buf);
 #endif
-        }
-        path = *dir + "/" + path;
+        } else
+            path = concatStrings(*dir, "/", path);
     }
     return canonPath(path, resolveSymlinks);
 }
@@ -147,7 +147,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
                 path = {};
             } else {
                 s += path.substr(0, slash);
-                path = path.substr(slash + 1);
+                path = path.substr(slash);
             }
 
             /* If s points to a symlink, resolve it and continue from there */
@@ -172,7 +172,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 }
 
 
-Path dirOf(const Path & path)
+Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
@@ -1344,9 +1344,11 @@ std::string toLower(const std::string & s)
 }
 
 
-std::string shellEscape(const std::string & s)
+std::string shellEscape(const std::string_view s)
 {
-    std::string r = "'";
+    std::string r;
+    r.reserve(s.size() + 2);
+    r += "'";
     for (auto & i : s)
         if (i == '\'') r += "'\\''"; else r += i;
     r += '\'';
@@ -1356,11 +1358,15 @@ std::string shellEscape(const std::string & s)
 
 void ignoreException()
 {
+    /* Make sure no exceptions leave this function.
+       printError() also throws when remote is closed. */
     try {
-        throw;
-    } catch (std::exception & e) {
-        printError("error (ignored): %1%", e.what());
-    }
+        try {
+            throw;
+        } catch (std::exception & e) {
+            printError("error (ignored): %1%", e.what());
+        }
+    } catch (...) { }
 }
 
 bool shouldANSI()
@@ -1751,7 +1757,7 @@ void bind(int fd, const std::string & path)
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pid pid = startProcess([&]() {
-            auto dir = dirOf(path);
+            Path dir = dirOf(path);
             if (chdir(dir.c_str()) == -1)
                 throw SysError("chdir to '%s' failed", dir);
             std::string base(baseNameOf(path));
@@ -1780,7 +1786,7 @@ void connect(int fd, const std::string & path)
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pid pid = startProcess([&]() {
-            auto dir = dirOf(path);
+            Path dir = dirOf(path);
             if (chdir(dir.c_str()) == -1)
                 throw SysError("chdir to '%s' failed", dir);
             std::string base(baseNameOf(path));

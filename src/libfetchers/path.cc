@@ -80,7 +80,7 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
         std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
@@ -115,10 +115,7 @@ struct PathInputScheme : InputScheme
             // FIXME: try to substitute storePath.
             storePath = store->addToStore("source", absPath);
 
-        return {
-            Tree(store->toRealPath(*storePath), std::move(*storePath)),
-            input
-        };
+        return {std::move(*storePath), input};
     }
 };
 

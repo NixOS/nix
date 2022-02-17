@@ -110,18 +110,11 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    Symbol s;
+    string s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { v.mkString(s); };
+    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
-};
-
-/* Temporary class used during parsing of indented strings. */
-struct ExprIndStr : Expr
-{
-    string s;
-    ExprIndStr(const string & s) : s(s) { };
 };
 
 struct ExprPath : Expr
@@ -223,10 +216,25 @@ struct Formal
 
 struct Formals
 {
-    typedef std::list<Formal> Formals_;
+    typedef std::vector<Formal> Formals_;
     Formals_ formals;
-    std::set<Symbol> argNames; // used during parsing
     bool ellipsis;
+
+    bool has(Symbol arg) const {
+        auto it = std::lower_bound(formals.begin(), formals.end(), arg,
+            [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+
+    std::vector<Formal> lexicographicOrder() const
+    {
+        std::vector<Formal> result(formals.begin(), formals.end());
+        std::sort(result.begin(), result.end(),
+            [] (const Formal & a, const Formal & b) {
+                return std::string_view(a.name) < std::string_view(b.name);
+            });
+        return result;
+    }
 };
 
 struct ExprLambda : Expr
@@ -239,11 +247,6 @@ struct ExprLambda : Expr
     ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
-        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError({
-                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
-                .errPos = pos
-            });
     };
     void setName(Symbol & name);
     string showNamePos() const;
@@ -364,15 +367,19 @@ struct StaticEnv
 
     void sort()
     {
-        std::sort(vars.begin(), vars.end(),
+        std::stable_sort(vars.begin(), vars.end(),
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
     }
 
     void deduplicate()
     {
-        const auto last = std::unique(vars.begin(), vars.end(),
-            [] (const Vars::value_type & a, const Vars::value_type & b) { return a.first == b.first; });
-        vars.erase(last, vars.end());
+        auto it = vars.begin(), jt = it, end = vars.end();
+        while (jt != end) {
+            *it = *jt++;
+            while (jt != end && it->first == jt->first) *it = *jt++;
+            it++;
+        }
+        vars.erase(it, end);
     }
 
     Vars::const_iterator find(const Symbol & name) const

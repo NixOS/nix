@@ -1,5 +1,6 @@
 #include "eval.hh"
 #include "hash.hh"
+#include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
 #include "derivations.hh"
@@ -218,7 +219,7 @@ string showType(const Value & v)
     }
 }
 
-Pos Value::determinePos(const Pos &pos) const
+Pos Value::determinePos(const Pos & pos) const
 {
     switch (internalType) {
         case tAttrs: return *attrs->pos;
@@ -753,6 +754,11 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
+{
+    throw TypeError(s, showType(v));
+}
+
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const string & s1))
 {
     throw AssertionError({
@@ -1137,7 +1143,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            Hence we need __overrides.) */
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
-            state.forceAttrs(*vOverrides);
+            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); });
             Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
@@ -1285,7 +1291,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     for (auto & i : attrPath) {
-        state.forceValue(*vAttrs);
+        state.forceValue(*vAttrs, noPos);
         Bindings::iterator j;
         Symbol name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
@@ -1373,7 +1379,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (!lambda.formals->argNames.count(i.name))
+                        if (!lambda.formals->has(i.name))
                             throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
                     abort(); // can't happen
                 }
@@ -1499,14 +1505,16 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 
 void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
-    forceValue(fun);
+    auto pos = fun.determinePos(noPos);
+
+    forceValue(fun, pos);
 
     if (fun.type() == nAttrs) {
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
             Value * v = allocValue();
-            callFunction(*found->value, fun, *v, noPos);
-            forceValue(*v);
+            callFunction(*found->value, fun, *v, pos);
+            forceValue(*v, pos);
             return autoCallFunction(args, *v, res);
         }
     }
@@ -1694,7 +1702,7 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     PathSet context;
-    std::vector<std::string> s;
+    std::vector<BackedStringView> s;
     size_t sSize = 0;
     NixInt n = 0;
     NixFloat nf = 0;
@@ -1705,7 +1713,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     const auto str = [&] {
         std::string result;
         result.reserve(sSize);
-        for (const auto & part : s) result += part;
+        for (const auto & part : s) result += *part;
         return result;
     };
     /* c_str() is not str().c_str() because we want to create a string
@@ -1715,15 +1723,18 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         char * result = allocString(sSize + 1);
         char * tmp = result;
         for (const auto & part : s) {
-            memcpy(tmp, part.c_str(), part.size());
-            tmp += part.size();
+            memcpy(tmp, part->data(), part->size());
+            tmp += part->size();
         }
         *tmp = 0;
         return result;
     };
 
+    Value values[es->size()];
+    Value * vTmpP = values;
+
     for (auto & [i_pos, i] : *es) {
-        Value vTmp;
+        Value & vTmp = *vTmpP++;
         i->eval(state, env, vTmp);
 
         /* If the first element is a path, then the result will also
@@ -1756,9 +1767,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
-            s.emplace_back(
-                state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first));
-            sSize += s.back().size();
+            auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
+            sSize += part->size();
+            s.emplace_back(std::move(part));
         }
 
         first = false;
@@ -1792,7 +1803,7 @@ void EvalState::forceValueDeep(Value & v)
     recurse = [&](Value & v) {
         if (!seen.insert(&v).second) return;
 
-        forceValue(v);
+        forceValue(v, [&]() { return v.determinePos(noPos); });
 
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
@@ -1857,7 +1868,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 }
 
 
-string EvalState::forceString(Value & v, const Pos & pos)
+std::string_view EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nString) {
@@ -1866,7 +1877,7 @@ string EvalState::forceString(Value & v, const Pos & pos)
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
-    return string(v.string.s);
+    return v.string.s;
 }
 
 
@@ -1901,17 +1912,17 @@ std::vector<std::pair<Path, std::string>> Value::getContext()
 }
 
 
-string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
+std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {
-    string s = forceString(v, pos);
+    auto s = forceString(v, pos);
     copyContext(v, context);
     return s;
 }
 
 
-string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
+std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
-    string s = forceString(v, pos);
+    auto s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
             throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
@@ -1929,7 +1940,7 @@ bool EvalState::isDerivation(Value & v)
     if (v.type() != nAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
     if (i == v.attrs->end()) return false;
-    forceValue(*i->value);
+    forceValue(*i->value, *i->pos);
     if (i->value->type() != nString) return false;
     return strcmp(i->value->string.s, "derivation") == 0;
 }
@@ -1942,34 +1953,35 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
     if (i != v.attrs->end()) {
         Value v1;
         callFunction(*i->value, v, v1, pos);
-        return coerceToString(pos, v1, context, coerceMore, copyToStore);
+        return coerceToString(pos, v1, context, coerceMore, copyToStore).toOwned();
     }
 
     return {};
 }
 
-string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
+BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore, bool canonicalizePath)
 {
     forceValue(v, pos);
 
-    string s;
-
     if (v.type() == nString) {
         copyContext(v, context);
-        return v.string.s;
+        return std::string_view(v.string.s);
     }
 
     if (v.type() == nPath) {
-        Path path(canonicalizePath ? canonPath(v.path) : v.path);
-        return copyToStore ? copyPathToStore(context, path) : path;
+        BackedStringView path(PathView(v.path));
+        if (canonicalizePath)
+            path = canonPath(*path);
+        if (copyToStore)
+            path = copyPathToStore(context, std::move(path).toOwned());
+        return path;
     }
 
     if (v.type() == nAttrs) {
         auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
-        if (maybeString) {
-            return *maybeString;
-        }
+        if (maybeString)
+            return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
@@ -1991,14 +2003,13 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         if (v.isList()) {
             string result;
             for (auto [n, v2] : enumerate(v.listItems())) {
-                result += coerceToString(pos, *v2,
-                    context, coerceMore, copyToStore);
+                result += *coerceToString(pos, *v2, context, coerceMore, copyToStore);
                 if (n < v.listSize() - 1
                     /* !!! not quite correct */
                     && (!v2->isList() || v2->listSize() != 0))
                     result += " ";
             }
-            return result;
+            return std::move(result);
         }
     }
 
@@ -2032,7 +2043,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
 
 Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
-    string path = coerceToString(pos, v, context, false, false);
+    string path = coerceToString(pos, v, context, false, false).toOwned();
     if (path == "" || path[0] != '/')
         throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
     return path;
@@ -2041,8 +2052,8 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 
 bool EvalState::eqValues(Value & v1, Value & v2)
 {
-    forceValue(v1);
-    forceValue(v2);
+    forceValue(v1, noPos);
+    forceValue(v2, noPos);
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls
