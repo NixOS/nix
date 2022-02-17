@@ -536,7 +536,7 @@ create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
 
     _sudo "to make the basic directory structure of Nix (part 1)" \
-          mkdir -pv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
+          mkdir -pv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool,/daemon-socket} /nix/var/nix/{gcroots,profiles}/per-user
 
     _sudo "to make the basic directory structure of Nix (part 2)" \
           mkdir -pv -m 1775 /nix/store
