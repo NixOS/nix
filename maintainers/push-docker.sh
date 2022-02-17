@@ -2,7 +2,7 @@
 
 # TODO: parse from .version
 MAINTENANCE_VERSION="2.6"
-VERSION="$MAINTENANCE_VERSION.0"
+VERSION="$MAINTENANCE_VERSION.1"
 
 # Should be override `latest` tag, default true
 PUSH_AS_LATEST=1
@@ -55,9 +55,11 @@ do
 done
 
 echo "=> Creating $VERSION multi platform docker manifest for the following platforms: $PLATFORMS ..."
+docker manifest rm nixos/nix:$VERSION $DOCKER_MANIFEST
 docker manifest create nixos/nix:$VERSION $DOCKER_MANIFEST
 if [ $PUSH_AS_LATEST -eq 1 ]; then
   echo "=> Creating latest multi platform docker manifest for the following platforms: $PLATFORMS ..."
+  docker manifest rm nixos/nix:latest $DOCKER_MANIFEST_LATEST
   docker manifest create nixos/nix:latest $DOCKER_MANIFEST_LATEST
 fi
 
