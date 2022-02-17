@@ -2066,7 +2066,6 @@ std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
         dstPath = store->printStorePath(i->second);
     else {
         // FIXME: use SourcePath
-        printError("COPY %s", path);
         auto path2 = unpackPath(path);
         #if 0
         auto p = settings.readOnlyMode

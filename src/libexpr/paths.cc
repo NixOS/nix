@@ -8,7 +8,6 @@ static constexpr std::string_view marker = "/__virtual/";
 Path EvalState::packPath(const SourcePath & path)
 {
     // FIXME: canonPath(path) ?
-    printError("PACK %s", path.path);
     assert(hasPrefix(path.path, "/"));
     inputAccessors.emplace(path.accessor->number, path.accessor);
     return std::string(marker) + std::to_string(path.accessor->number) + path.path;
@@ -16,7 +15,6 @@ Path EvalState::packPath(const SourcePath & path)
 
 SourcePath EvalState::unpackPath(const Path & path)
 {
-    printError("UNPACK %s", path);
     if (hasPrefix(path, marker)) {
         auto s = path.substr(marker.size());
         auto slash = s.find('/');
@@ -32,7 +30,6 @@ SourcePath EvalState::unpackPath(const Path & path)
 
 SourcePath EvalState::rootPath(const Path & path)
 {
-    printError("ROOT %s", path);
     return {rootFS, path};
 }
 

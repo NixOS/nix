@@ -107,7 +107,6 @@ struct FSInputAccessor : InputAccessor
     std::string readFile(PathView path) override
     {
         auto absPath = makeAbsPath(path);
-        printError("READ %s", absPath);
         checkAllowed(absPath);
         return nix::readFile(absPath);
     }
@@ -115,14 +114,12 @@ struct FSInputAccessor : InputAccessor
     bool pathExists(PathView path) override
     {
         auto absPath = makeAbsPath(path);
-        printError("EXISTS %s", absPath);
         return isAllowed(absPath) && nix::pathExists(absPath);
     }
 
     Stat lstat(PathView path) override
     {
         auto absPath = makeAbsPath(path);
-        printError("LSTAT %s", absPath);
         checkAllowed(absPath);
         auto st = nix::lstat(absPath);
         return Stat {
@@ -138,7 +135,6 @@ struct FSInputAccessor : InputAccessor
     DirEntries readDirectory(PathView path) override
     {
         auto absPath = makeAbsPath(path);
-        printError("READDIR %s", absPath);
         checkAllowed(absPath);
         DirEntries res;
         for (auto & entry : nix::readDirectory(absPath)) {
@@ -157,7 +153,6 @@ struct FSInputAccessor : InputAccessor
     std::string readLink(PathView path) override
     {
         auto absPath = makeAbsPath(path);
-        printError("READLINK %s", absPath);
         checkAllowed(absPath);
         return nix::readLink(absPath);
     }
