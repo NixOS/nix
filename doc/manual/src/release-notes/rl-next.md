@@ -7,3 +7,9 @@
   implemented.
 
 * `nix store ping` now reports the version of the remote Nix daemon.
+
+* `nix flake {init,new}` now display information about which files have been
+  created.
+
+* Templates can now define a `welcomeText` attribute, which is printed out by
+  `nix flake {init,new} --template <template>`.
