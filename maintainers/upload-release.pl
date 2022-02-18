@@ -55,6 +55,11 @@ my $releaseDir = "nix/$releaseName";
 my $tmpDir = "$TMPDIR/nix-release/$releaseName";
 File::Path::make_path($tmpDir);
 
+my $narCache = "$TMPDIR/nar-cache";
+File::Path::make_path($narCache);
+
+my $binaryCache = "https://cache.nixos.org/?local-nar-cache=$narCache";
+
 # S3 setup.
 my $aws_access_key_id = $ENV{'AWS_ACCESS_KEY_ID'} or die "No AWS_ACCESS_KEY_ID given.";
 my $aws_secret_access_key = $ENV{'AWS_SECRET_ACCESS_KEY'} or die "No AWS_SECRET_ACCESS_KEY given.";
@@ -80,6 +85,7 @@ sub downloadFile {
     my ($jobName, $productNr, $dstName) = @_;
 
     my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+    #print STDERR "$jobName: ", Dumper($buildInfo), "\n";
 
     my $srcFile = $buildInfo->{buildproducts}->{$productNr}->{path} or die "job '$jobName' lacks product $productNr\n";
     $dstName //= basename($srcFile);
@@ -87,19 +93,27 @@ sub downloadFile {
 
     if (!-e $tmpFile) {
         print STDERR "downloading $srcFile to $tmpFile...\n";
-        system("NIX_REMOTE=https://cache.nixos.org/ nix store cat '$srcFile' > '$tmpFile'") == 0
+
+        my $fileInfo = decode_json(`NIX_REMOTE=$binaryCache nix store ls --json '$srcFile'`);
+
+        $srcFile = $fileInfo->{target} if $fileInfo->{type} eq 'symlink';
+
+        #print STDERR $srcFile, " ", Dumper($fileInfo), "\n";
+
+        system("NIX_REMOTE=$binaryCache nix store cat '$srcFile' > '$tmpFile'.tmp") == 0
             or die "unable to fetch $srcFile\n";
+        rename("$tmpFile.tmp", $tmpFile) or die;
     }
 
-    my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
+    my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash};
     my $sha256_actual = `nix hash file --base16 --type sha256 '$tmpFile'`;
     chomp $sha256_actual;
-    if ($sha256_expected ne $sha256_actual) {
+    if (defined($sha256_expected) && $sha256_expected ne $sha256_actual) {
         print STDERR "file $tmpFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
         exit 1;
     }
 
-    write_file("$tmpFile.sha256", $sha256_expected);
+    write_file("$tmpFile.sha256", $sha256_actual);
 
     if (! -e "$tmpFile.asc") {
         system("gpg2 --detach-sign --armor $tmpFile") == 0 or die "unable to sign $tmpFile\n";
@@ -117,6 +131,60 @@ downloadFile("binaryTarballCross.x86_64-linux.armv6l-linux", "1");
 downloadFile("binaryTarballCross.x86_64-linux.armv7l-linux", "1");
 downloadFile("installerScript", "1");
 
+# Upload docker images to dockerhub.
+my $dockerManifest = "";
+my $dockerManifestLatest = "";
+
+for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
+    my $system = $platforms->[0];
+    my $dockerPlatform = $platforms->[1];
+    my $fn = "nix-$version-docker-image-$dockerPlatform.tar.gz";
+    downloadFile("dockerImage.$system", "1", $fn);
+
+    print STDERR "loading docker image for $dockerPlatform...\n";
+    system("docker load -i $tmpDir/$fn") == 0 or die;
+
+    my $tag = "nixos/nix:$version-$dockerPlatform";
+    my $latestTag = "nixos/nix:latest-$dockerPlatform";
+
+    print STDERR "tagging $version docker image for $dockerPlatform...\n";
+    system("docker tag nix:$version $tag") == 0 or die;
+
+    if ($isLatest) {
+        print STDERR "tagging latest docker image for $dockerPlatform...\n";
+        system("docker tag nix:$version $latestTag") == 0 or die;
+    }
+
+    print STDERR "pushing $version docker image for $dockerPlatform...\n";
+    system("docker push -q $tag") == 0 or die;
+
+    if ($isLatest) {
+        print STDERR "pushing latest docker image for $dockerPlatform...\n";
+        system("docker push -q $latestTag") == 0 or die;
+    }
+
+    $dockerManifest .= " --amend $tag";
+    $dockerManifestLatest .= " --amend $latestTag"
+}
+
+print STDERR "creating multi-platform docker manifest...\n";
+system("docker manifest rm nixos/nix:$version");
+system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
+if ($isLatest) {
+    print STDERR "creating latest multi-platform docker manifest...\n";
+    system("docker manifest rm nixos/nix:latest");
+    system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
+}
+
+print STDERR "pushing multi-platform docker manifest...\n";
+system("docker manifest push nixos/nix:$version") == 0 or die;
+
+if ($isLatest) {
+    print STDERR "pushing latest multi-platform docker manifest...\n";
+    system("docker manifest push nixos/nix:latest") == 0 or die;
+}
+
+# Upload release files to S3.
 for my $fn (glob "$tmpDir/*") {
     my $name = basename($fn);
     my $dstKey = "$releaseDir/" . $name;
