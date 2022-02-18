@@ -22,6 +22,7 @@ extern "C" {
 #include "ansicolor.hh"
 #include "shared.hh"
 #include "eval.hh"
+#include "eval-cache.hh"
 #include "eval-inline.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
@@ -42,16 +43,20 @@ extern "C" {
 
 namespace nix {
 
+typedef std::vector<std::shared_ptr<Installable>> Installables;
+
 struct NixRepl
     #if HAVE_BOEHMGC
     : gc
     #endif
 {
     std::string curDir;
-    std::unique_ptr<EvalState> state;
+    ref<EvalState> state;
     Bindings * autoArgs;
 
     Strings loadedFiles;
+    typedef std::vector<std::pair<Value*,std::string>> AnnotatedValues;
+    std::function<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
     StaticEnv staticEnv;
@@ -61,13 +66,16 @@ struct NixRepl
 
     const Path historyFile;
 
-    NixRepl(const Strings & searchPath, nix::ref<Store> store);
+    NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
+            std::function<AnnotatedValues()> getValues);
     ~NixRepl();
-    void mainLoop(const std::vector<std::string> & files);
+    void mainLoop();
     StringSet completePrefix(const std::string & prefix);
     bool getLine(std::string & input, const std::string &prompt);
     StorePath getDerivationPath(Value & v);
     bool processLine(std::string line);
+
+    void loadInstallable(Installable & installable);
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
@@ -92,8 +100,10 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
-    : state(std::make_unique<EvalState>(searchPath, store))
+NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
+            std::function<NixRepl::AnnotatedValues()> getValues)
+    : state(state)
+    , getValues(getValues)
     , staticEnv(false, &state->staticBaseEnv)
     , historyFile(getDataDir() + "/nix/repl-history")
 {
@@ -198,16 +208,12 @@ namespace {
     }
 }
 
-void NixRepl::mainLoop(const std::vector<std::string> & files)
+void NixRepl::mainLoop()
 {
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
-    for (auto & i : files)
-        loadedFiles.push_back(i);
-
     reloadFiles();
-    if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
@@ -630,6 +636,11 @@ bool NixRepl::processLine(std::string line)
     return true;
 }
 
+void NixRepl::loadInstallable(Installable & installable)
+{
+    auto [val, pos] = installable.toValue(*state);
+    addAttrsToScope(*val);
+}
 
 void NixRepl::loadFile(const Path & path)
 {
@@ -646,11 +657,11 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(flakeRefS, absPath("."), true);
+    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
-    auto v = state->allocValue();
+    Value v;
 
     flake::callFlake(*state,
         flake::lockFlake(*state, flakeRef,
@@ -659,17 +670,8 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
                 .useRegistries = !evalSettings.pureEval,
                 .allowMutable  = !evalSettings.pureEval,
             }),
-        *v);
-
-    auto f = v->attrs->get(state->symbols.create(fragment));
-
-    if (f == 0) {
-        warn("no attribute %s, nothing loaded", fragment);
-        return;
-    };
-
-    fragment != "" ? addAttrsToScope(*f->value) : addAttrsToScope(*v);
-
+        v);
+    addAttrsToScope(v);
 }
 
 
@@ -693,15 +695,14 @@ void NixRepl::reloadFiles()
     Strings old = loadedFiles;
     loadedFiles.clear();
 
-    bool first = true;
     for (auto & i : old) {
-        if (!first) notice("");
-        first = false;
         notice("Loading '%1%'...", i);
+        loadFile(i);
+    }
 
-        settings.isExperimentalFeatureEnabled(Xp::Flakes)
-        ? loadFlake(i)
-        : loadFile(i);
+    for (auto & [i,what] : getValues()) {
+        notice("Loading Installable '%1%'...", what);
+        addAttrsToScope(*i);
     }
 }
 
@@ -898,17 +899,20 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
-struct CmdRepl : StoreCommand, MixEvalArgs
+struct CmdRepl : InstallableCommand
 {
     std::vector<std::string> files;
+    Strings getDefaultFlakeAttrPathPrefixes()
+    override {
+        return {};
+    }
+    Strings getDefaultFlakeAttrPaths()
+    override {
+        return {""};
+    }
 
     CmdRepl()
     {
-        expectArgs({
-            .label = "files",
-            .handler = {&files},
-            .completer = completePath
-        });
     }
 
     std::string description() override
@@ -925,10 +929,19 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
+
         evalSettings.pureEval = false;
-        auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+        auto state = getEvalState();
+        auto repl = std::make_unique<NixRepl>(searchPath, openStore(),state
+                ,[&]()->NixRepl::AnnotatedValues{
+                   auto installable = load();
+                   auto [val, pos] = installable->toValue(*state);
+                   auto what = installable->what();
+                   return { {val,what} };
+                }
+            );
         repl->autoArgs = getAutoArgs(*repl->state);
-        repl->mainLoop(files);
+        repl->mainLoop();
     }
 };
 
