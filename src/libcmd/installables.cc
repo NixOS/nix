@@ -905,10 +905,10 @@ std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
 {
     if (_installables.empty()) {
         if (useDefaultInstallables())
-            return parseFlakeRef(".", absPath("."));
+            return parseFlakeRefWithFragment(".", absPath(".")).first;
         return {};
     }
-    return parseFlakeRef(_installables.front(), absPath("."));
+    return parseFlakeRefWithFragment(_installables.front(), absPath(".")).first;
 }
 
 InstallableCommand::InstallableCommand()
