@@ -97,7 +97,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
             for (auto & storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);
-                auto storePathS = store->printStorePath(storePath);
+                auto storePathS = store->printStorePath(info->path);
 
                 std::cout << storePathS;
 
