@@ -127,11 +127,11 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
-            if (flag.completer)
-                if (auto prefix = needsCompletion(*pos)) {
-                    anyCompleted = true;
+            if (auto prefix = needsCompletion(*pos)) {
+                anyCompleted = true;
+                if (flag.completer)
                     flag.completer(n, *prefix);
-                }
+            }
             args.push_back(*pos++);
         }
         if (!anyCompleted)
@@ -146,6 +146,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                     && hasPrefix(name, std::string(*prefix, 2)))
                     completions->add("--" + name, flag->description);
             }
+            return false;
         }
         auto i = longFlags.find(std::string(*pos, 2));
         if (i == longFlags.end()) return false;
@@ -187,10 +188,12 @@ bool Args::processArgs(const Strings & args, bool finish)
     {
         std::vector<std::string> ss;
         for (const auto &[n, s] : enumerate(args)) {
-            ss.push_back(s);
-            if (exp.completer)
-                if (auto prefix = needsCompletion(s))
+            if (auto prefix = needsCompletion(s)) {
+                ss.push_back(*prefix);
+                if (exp.completer)
                     exp.completer(n, *prefix);
+            } else
+                ss.push_back(s);
         }
         exp.handler.fun(ss);
         expectedArgs.pop_front();
@@ -322,16 +325,16 @@ MultiCommand::MultiCommand(const Commands & commands_)
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
-            if (auto prefix = needsCompletion(s)) {
-                for (auto & [name, command] : commands)
-                    if (hasPrefix(name, *prefix))
-                        completions->add(name);
-            }
             auto i = commands.find(s);
             if (i == commands.end())
                 throw UsageError("'%s' is not a recognised command", s);
             command = {s, i->second()};
             command->second->parent = this;
+        }},
+        .completer = {[&](size_t, std::string_view prefix) {
+            for (auto & [name, command] : commands)
+                if (hasPrefix(name, prefix))
+                    completions->add(name);
         }}
     });
 
