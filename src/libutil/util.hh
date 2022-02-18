@@ -77,6 +77,7 @@ bool isInDir(std::string_view path, std::string_view dir);
 bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /* Get status of `path'. */
+struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
 
 /* Return true iff the given path exists. */

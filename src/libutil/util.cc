@@ -215,6 +215,15 @@ bool isDirOrInDir(std::string_view path, std::string_view dir)
 }
 
 
+struct stat stat(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError("getting status of '%1%'", path);
+    return st;
+}
+
+
 struct stat lstat(const Path & path)
 {
     struct stat st;

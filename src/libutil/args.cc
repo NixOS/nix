@@ -290,7 +290,7 @@ static void _completePath(std::string_view prefix, bool onlyDirs)
     if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
         for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
             if (onlyDirs) {
-                auto st = lstat(globbuf.gl_pathv[i]);
+                auto st = stat(globbuf.gl_pathv[i]);
                 if (!S_ISDIR(st.st_mode)) continue;
             }
             completions->add(globbuf.gl_pathv[i]);
