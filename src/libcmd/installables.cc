@@ -98,6 +98,14 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
                 parseFlakeRef(flakeRef, absPath("."), true));
+        }},
+        .completer = {[&](size_t n, std::string_view prefix) {
+            if (n == 0) {
+                if (auto flakeRef = getFlakeRefForCompletion())
+                    completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
+            } else if (n == 1) {
+                completeFlakeRef(getEvalState()->store, prefix);
+            }
         }}
     });
 
