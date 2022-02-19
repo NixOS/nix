@@ -68,6 +68,9 @@ Path dirOf(const PathView path);
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
+/* Perform tilde expansion on a path. */
+std::string expandTilde(std::string_view path);
+
 /* Check whether 'path' is a descendant of 'dir'. Both paths must be
    canonicalized. */
 bool isInDir(std::string_view path, std::string_view dir);

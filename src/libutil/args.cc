@@ -282,12 +282,13 @@ static void _completePath(std::string_view prefix, bool onlyDirs)
 {
     completionType = ctFilenames;
     glob_t globbuf;
-    int flags = GLOB_NOESCAPE | GLOB_TILDE;
+    int flags = GLOB_NOESCAPE;
     #ifdef GLOB_ONLYDIR
     if (onlyDirs)
         flags |= GLOB_ONLYDIR;
     #endif
-    if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
+    // using expandTilde here instead of GLOB_TILDE(_CHECK) so that ~<Tab> expands to /home/user/
+    if (glob((expandTilde(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
         for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
             if (onlyDirs) {
                 auto st = stat(globbuf.gl_pathv[i]);
@@ -295,8 +296,8 @@ static void _completePath(std::string_view prefix, bool onlyDirs)
             }
             completions->add(globbuf.gl_pathv[i]);
         }
-        globfree(&globbuf);
     }
+    globfree(&globbuf);
 }
 
 void completePath(size_t, std::string_view prefix)
