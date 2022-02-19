@@ -1207,12 +1207,14 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
-                auto s = handleJSONLogMessage(currentHookLine, worker.act, hook->activities, true);
-                if (s && !isWrittenToLog && logSink) {
-                    auto json = nlohmann::json::parse(std::string(currentHookLine, 5));
-                    if (json["type"] == resBuildLogLine) {
-                        auto f = json["fields"];
-                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                auto json = parseJSONMessage(currentHookLine);
+                if (json) {
+                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
+                    if (s && !isWrittenToLog && logSink) {
+                        if ((*json)["type"] == resBuildLogLine) {
+                            auto f = (*json)["fields"];
+                            (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                        }
                     }
                 }
                 currentHookLine.clear();
