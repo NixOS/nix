@@ -78,10 +78,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         RepairFlag repair = NoRepair) override
     { unsupported("addToStore"); }
 
-private:
-
-    void putBuildSettings(Connection & conn);
-
 public:
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,

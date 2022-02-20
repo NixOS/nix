@@ -10,6 +10,7 @@
 
 #include "serve-protocol.hh"
 #include "length-prefixed-protocol-helper.hh"
+#include "store-api.hh"
 
 namespace nix {
 
@@ -55,5 +56,58 @@ struct ServeProto::Serialise
 };
 
 /* protocol-specific templates */
+
+struct ServeProto::BasicClientConnection
+{
+    FdSink to;
+    FdSource from;
+    ServeProto::Version remoteVersion;
+
+    /**
+     * Coercion to `ServeProto::ReadConn`. This makes it easy to use the
+     * factored out serve protocol serializers with a
+     * `LegacySSHStore::Connection`.
+     *
+     * The serve protocol connection types are unidirectional, unlike
+     * this type.
+     */
+    operator ServeProto::ReadConn ()
+    {
+        return ServeProto::ReadConn {
+            .from = from,
+            .version = remoteVersion,
+        };
+    }
+
+    /**
+     * Coercion to `ServeProto::WriteConn`. This makes it easy to use the
+     * factored out serve protocol serializers with a
+     * `LegacySSHStore::Connection`.
+     *
+     * The serve protocol connection types are unidirectional, unlike
+     * this type.
+     */
+    operator ServeProto::WriteConn ()
+    {
+        return ServeProto::WriteConn {
+            .to = to,
+            .version = remoteVersion,
+        };
+    }
+
+    StorePathSet queryValidPaths(
+        const Store & remoteStore,
+        bool lock, const StorePathSet & paths,
+        SubstituteFlag maybeSubstitute);
+
+    /**
+     * Just the request half, because Hydra may do other things between
+     * issuing the request and reading the `BuildResult` response.
+     */
+    void putBuildDerivationRequest(
+        const Store & store,
+        const StorePath & drvPath, const BasicDerivation & drv,
+        const ServeProto::BuildOptions & options);
+};
 
 }
