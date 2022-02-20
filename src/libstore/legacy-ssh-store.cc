@@ -64,15 +64,8 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     StringSink saved;
     TeeSource tee(conn->from, saved);
     try {
-        conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
-        conn->to.flush();
-
-        unsigned int magic = readInt(conn->from);
-        if (magic != SERVE_MAGIC_2)
-            throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
-        conn->remoteVersion = readInt(conn->from);
-        if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
-            throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
+        conn->remoteVersion = ServeProto::BasicClientConnection::handshake(
+            conn->to, tee, SERVE_PROTOCOL_VERSION, host);
     } catch (SerialisationError & e) {
         // in.close(): Don't let the remote block on us not writing.
         conn->sshConn->in.close();

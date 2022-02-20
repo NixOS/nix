@@ -64,6 +64,28 @@ struct ServeProto::BasicClientConnection
     ServeProto::Version remoteVersion;
 
     /**
+     * Establishes connection, negotiating version.
+     *
+     * @return the version provided by the other side of the
+     * connection.
+     *
+     * @param to Taken by reference to allow for various error handling
+     * mechanisms.
+     *
+     * @param from Taken by reference to allow for various error
+     * handling mechanisms.
+     *
+     * @param localVersion Our version which is sent over
+     *
+     * @param host Just used to add context to thrown exceptions.
+     */
+    static ServeProto::Version handshake(
+        BufferedSink & to,
+        Source & from,
+        ServeProto::Version localVersion,
+        std::string_view host);
+
+    /**
      * Coercion to `ServeProto::ReadConn`. This makes it easy to use the
      * factored out serve protocol serializers with a
      * `LegacySSHStore::Connection`.

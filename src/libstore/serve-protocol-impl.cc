@@ -4,6 +4,25 @@
 
 namespace nix {
 
+ServeProto::Version ServeProto::BasicClientConnection::handshake(
+    BufferedSink & to,
+    Source & from,
+    ServeProto::Version localVersion,
+    std::string_view host)
+{
+    to << SERVE_MAGIC_1 << localVersion;
+    to.flush();
+
+    unsigned int magic = readInt(from);
+    if (magic != SERVE_MAGIC_2)
+        throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
+    auto remoteVersion = readInt(from);
+    if (GET_PROTOCOL_MAJOR(remoteVersion) != 0x200)
+        throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
+    return remoteVersion;
+}
+
+
 StorePathSet ServeProto::BasicClientConnection::queryValidPaths(
     const Store & store,
     bool lock, const StorePathSet & paths,
