@@ -1177,6 +1177,7 @@ bool DerivationGoal::isReadDesc(int fd)
 
 void DerivationGoal::handleChildOutput(int fd, std::string_view data)
 {
+    // local & `ssh://`-builds are dealt with here.
     auto isWrittenToLog = isReadDesc(fd);
     if (isWrittenToLog)
     {
@@ -1210,11 +1211,11 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
                 auto json = parseJSONMessage(currentHookLine);
                 if (json) {
                     auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
-                    if (s && !isWrittenToLog && logSink) {
-                        if ((*json)["type"] == resBuildLogLine) {
-                            auto f = (*json)["fields"];
-                            (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
-                        }
+                    // ensure that logs from a builder using `ssh-ng://` as protocol
+                    // are also available to `nix log`.
+                    if (s && !isWrittenToLog && logSink && (*json)["type"] == resBuildLogLine) {
+                        auto f = (*json)["fields"];
+                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
                     }
                 }
                 currentHookLine.clear();
