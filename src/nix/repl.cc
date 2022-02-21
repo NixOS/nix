@@ -75,7 +75,7 @@ struct NixRepl
     Expr * parseString(string s);
     void evalString(string s, Value & v);
 
-    typedef set<Value *> ValuesSeen;
+    typedef std::set<Value *> ValuesSeen;
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };

@@ -654,7 +654,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     // `doneKeys' doesn't need to be a GC root, because its values are
     // reachable from res.
     auto cmp = CompareValues(state);
-    set<Value *, decltype(cmp)> doneKeys(cmp);
+    std::set<Value *, decltype(cmp)> doneKeys(cmp);
     while (!workSet.empty()) {
         Value * e = *(workSet.begin());
         workSet.pop_front();

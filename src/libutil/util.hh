@@ -343,7 +343,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
 /* Close all file descriptors except those listed in the given set.
    Good practice in child processes. */
-void closeMostFDs(const set<int> & exceptions);
+void closeMostFDs(const std::set<int> & exceptions);
 
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);

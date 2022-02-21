@@ -1174,7 +1174,7 @@ void runProgram2(const RunOptions & options)
 }
 
 
-void closeMostFDs(const set<int> & exceptions)
+void closeMostFDs(const std::set<int> & exceptions)
 {
 #if __linux__
     try {
