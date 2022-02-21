@@ -1599,28 +1599,24 @@ void triggerInterrupt()
 
     {
         InterruptCallbacks::Token i = 0;
-        std::function<void()> callback;
-        do {
+        while (true) {
+            std::function<void()> callback;
             {
                 auto interruptCallbacks(_interruptCallbacks.lock());
                 auto lb = interruptCallbacks->callbacks.lower_bound(i);
-                if (lb != interruptCallbacks->callbacks.end()) {
-                    callback = lb->second;
-                    i = lb->first + 1;
-                } else {
-                    callback = nullptr;
-                }
+                if (lb == interruptCallbacks->callbacks.end())
+                    break;
+
+                callback = lb->second;
+                i = lb->first + 1;
             }
 
-            if (callback) {
-                try {
-                    callback();
-                } catch (...) {
-                    ignoreException();
-                }
+            try {
+                callback();
+            } catch (...) {
+                ignoreException();
             }
         }
-        while (callback);
     }
 }
 
