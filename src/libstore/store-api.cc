@@ -761,11 +761,11 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
 
     for (auto & storePath : storePaths) {
         auto jsonPath = jsonList.object();
-        jsonPath.attr("path", printStorePath(storePath));
 
         try {
             auto info = queryPathInfo(storePath);
 
+            jsonPath.attr("path", printStorePath(info->path));
             jsonPath
                 .attr("narHash", info->narHash.to_string(hashBase, true))
                 .attr("narSize", info->narSize);
@@ -819,6 +819,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             }
 
         } catch (InvalidPath &) {
+            jsonPath.attr("path", printStorePath(storePath));
             jsonPath.attr("valid", false);
         }
     }
