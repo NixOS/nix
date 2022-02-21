@@ -10,9 +10,9 @@ struct Regex;
 
 struct DrvName
 {
-    string fullName;
-    string name;
-    string version;
+    std::string fullName;
+    std::string name;
+    std::string version;
     unsigned int hits;
 
     DrvName();
@@ -25,7 +25,7 @@ private:
     std::unique_ptr<Regex> regex;
 };
 
-typedef list<DrvName> DrvNames;
+typedef std::list<DrvName> DrvNames;
 
 std::string_view nextComponent(std::string_view::const_iterator & p,
     const std::string_view::const_iterator end);

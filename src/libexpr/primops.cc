@@ -574,9 +574,9 @@ struct CompareValues
 
 
 #if HAVE_BOEHMGC
-typedef list<Value *, gc_allocator<Value *> > ValueList;
+typedef std::list<Value *, gc_allocator<Value *> > ValueList;
 #else
-typedef list<Value *> ValueList;
+typedef std::list<Value *> ValueList;
 #endif
 
 
@@ -654,7 +654,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     // `doneKeys' doesn't need to be a GC root, because its values are
     // reachable from res.
     auto cmp = CompareValues(state);
-    set<Value *, decltype(cmp)> doneKeys(cmp);
+    std::set<Value *, decltype(cmp)> doneKeys(cmp);
     while (!workSet.empty()) {
         Value * e = *(workSet.begin());
         workSet.pop_front();
@@ -3649,12 +3649,12 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
             .errPos = pos
         });
 
-    vector<string> from;
+    std::vector<string> from;
     from.reserve(args[0]->listSize());
     for (auto elem : args[0]->listItems())
         from.emplace_back(state.forceString(*elem, pos));
 
-    vector<std::pair<string, PathSet>> to;
+    std::vector<std::pair<string, PathSet>> to;
     to.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         PathSet ctx;

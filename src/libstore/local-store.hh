@@ -292,7 +292,7 @@ private:
 
 
 typedef std::pair<dev_t, ino_t> Inode;
-typedef set<Inode> InodesSeen;
+typedef std::set<Inode> InodesSeen;
 
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path

@@ -20,7 +20,7 @@ class PathLocks
 {
 private:
     typedef std::pair<int, Path> FDPair;
-    list<FDPair> fds;
+    std::list<FDPair> fds;
     bool deletePaths;
 
 public:

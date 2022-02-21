@@ -99,7 +99,7 @@ struct DirEntry
         : name(name), ino(ino), type(type) { }
 };
 
-typedef vector<DirEntry> DirEntries;
+typedef std::vector<DirEntry> DirEntries;
 
 DirEntries readDirectory(const Path & path);
 
@@ -343,7 +343,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
 /* Close all file descriptors except those listed in the given set.
    Good practice in child processes. */
-void closeMostFDs(const set<int> & exceptions);
+void closeMostFDs(const std::set<int> & exceptions);
 
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);

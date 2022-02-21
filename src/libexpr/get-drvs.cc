@@ -266,7 +266,7 @@ void DrvInfo::setMeta(const string & name, Value * v)
 
 
 /* Cache for already considered attrsets. */
-typedef set<Bindings *> Done;
+typedef std::set<Bindings *> Done;
 
 
 /* Evaluate value `v'.  If it evaluates to a set of type `derivation',

@@ -1091,7 +1091,7 @@ HookReply DerivationGoal::tryBuildHook()
     /* Create the log file and pipe. */
     Path logFile = openLogFile();
 
-    set<int> fds;
+    std::set<int> fds;
     fds.insert(hook->fromHook.readSide.get());
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);

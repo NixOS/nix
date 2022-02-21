@@ -840,7 +840,7 @@ void printTable(Table & table)
 {
     auto nrColumns = table.size() > 0 ? table.front().size() : 0;
 
-    vector<size_t> widths;
+    std::vector<size_t> widths;
     widths.resize(nrColumns);
 
     for (auto & i : table) {
@@ -907,7 +907,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
+static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
 {
     JSONObject topObj(cout, true);
     for (auto & i : elems) {
@@ -1020,7 +1020,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Sort them by name. */
     /* !!! */
-    vector<DrvInfo> elems;
+    std::vector<DrvInfo> elems;
     for (auto & i : elems_) elems.push_back(i);
     sort(elems.begin(), elems.end(), cmpElemByName);
 

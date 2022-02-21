@@ -90,7 +90,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
         if (hash != string::npos)
             line = string(line, 0, hash);
 
-        vector<string> tokens = tokenizeString<vector<string> >(line);
+        auto tokens = tokenizeString<std::vector<string>>(line);
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
@@ -122,7 +122,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
 
         string name = tokens[0];
 
-        vector<string>::iterator i = tokens.begin();
+        auto i = tokens.begin();
         advance(i, 2);
 
         set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow

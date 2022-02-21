@@ -1174,7 +1174,7 @@ void runProgram2(const RunOptions & options)
 }
 
 
-void closeMostFDs(const set<int> & exceptions)
+void closeMostFDs(const std::set<int> & exceptions)
 {
 #if __linux__
     try {
@@ -1250,7 +1250,7 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 
 template Strings tokenizeString(std::string_view s, std::string_view separators);
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
-template vector<string> tokenizeString(std::string_view s, std::string_view separators);
+template std::vector<string> tokenizeString(std::string_view s, std::string_view separators);
 
 
 string chomp(std::string_view s)
