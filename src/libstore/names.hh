@@ -10,9 +10,9 @@ struct Regex;
 
 struct DrvName
 {
-    string fullName;
-    string name;
-    string version;
+    std::string fullName;
+    std::string name;
+    std::string version;
     unsigned int hits;
 
     DrvName();

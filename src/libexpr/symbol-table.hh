@@ -17,8 +17,8 @@ namespace nix {
 class Symbol
 {
 private:
-    const string * s; // pointer into SymbolTable
-    Symbol(const string * s) : s(s) { };
+    const std::string * s; // pointer into SymbolTable
+    Symbol(const std::string * s) : s(s) { };
     friend class SymbolTable;
 
 public:
@@ -72,7 +72,7 @@ class SymbolTable
 {
 private:
     std::unordered_map<std::string_view, Symbol> symbols;
-    std::list<string> store;
+    std::list<std::string> store;
 
 public:
     Symbol create(std::string_view s)
@@ -84,7 +84,7 @@ public:
         auto it = symbols.find(s);
         if (it != symbols.end()) return it->second;
 
-        const string & rawSym = store.emplace_back(s);
+        auto & rawSym = store.emplace_back(s);
         return symbols.emplace(rawSym, Symbol(&rawSym)).first->second;
     }
 

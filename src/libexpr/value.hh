@@ -77,20 +77,20 @@ class ExternalValueBase
 
     public:
     /* Return a simple string describing the type */
-    virtual string showType() const = 0;
+    virtual std::string showType() const = 0;
 
     /* Return a string to be used in builtins.typeOf */
-    virtual string typeOf() const = 0;
+    virtual std::string typeOf() const = 0;
 
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
-     * error
+     * error.
      */
-    virtual string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
 
     /* Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
-    virtual bool operator==(const ExternalValueBase & b) const;
+    virtual bool operator ==(const ExternalValueBase & b) const;
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
     virtual void printValueAsJSON(EvalState & state, bool strict,
