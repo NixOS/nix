@@ -453,7 +453,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         }
 
         if (upgradedCount == 0) {
-            for (auto matcher: matchers) {
+            for (auto & matcher : matchers) {
                 if (const size_t* index = std::get_if<size_t>(&matcher)){
                     warn("'%d' is not a valid index in profile", *index);
                 } else if (const Path* path = std::get_if<Path>(&matcher)){
@@ -462,7 +462,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     warn("'%s' does not match any packages in profile", regex->pattern);
                 }
             }
-            warn ("Try `nix profile list` to see the current profile.");
+            warn ("Use 'nix profile list' to see the current profile.");
         }
 
         store->buildPaths(pathsToBuild);
