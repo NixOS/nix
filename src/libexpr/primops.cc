@@ -3649,12 +3649,12 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
             .errPos = pos
         });
 
-    vector<string> from;
+    std::vector<string> from;
     from.reserve(args[0]->listSize());
     for (auto elem : args[0]->listItems())
         from.emplace_back(state.forceString(*elem, pos));
 
-    vector<std::pair<string, PathSet>> to;
+    std::vector<std::pair<string, PathSet>> to;
     to.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         PathSet ctx;

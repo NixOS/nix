@@ -99,7 +99,7 @@ struct DirEntry
         : name(name), ino(ino), type(type) { }
 };
 
-typedef vector<DirEntry> DirEntries;
+typedef std::vector<DirEntry> DirEntries;
 
 DirEntries readDirectory(const Path & path);
 

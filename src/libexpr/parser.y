@@ -193,7 +193,7 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
 
 
 static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
-    vector<std::pair<Pos, std::variant<Expr *, StringToken> > > & es)
+    std::vector<std::pair<Pos, std::variant<Expr *, StringToken> > > & es)
 {
     if (es.empty()) return new ExprString("");
 
@@ -233,7 +233,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
     }
 
     /* Strip spaces from each line. */
-    vector<std::pair<Pos, Expr *> > * es2 = new vector<std::pair<Pos, Expr *> >;
+    std::vector<std::pair<Pos, Expr *> > * es2 = new std::vector<std::pair<Pos, Expr *> >;
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -415,7 +415,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new vector<std::pair<Pos, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
+    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<Pos, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
   | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
   | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
@@ -503,9 +503,9 @@ string_parts_interpolated
   : string_parts_interpolated STR
   { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$ = new vector<std::pair<Pos, Expr *> >;
+      $$ = new std::vector<std::pair<Pos, Expr *> >;
       $$->emplace_back(makeCurPos(@1, data), new ExprString(string($1)));
       $$->emplace_back(makeCurPos(@2, data), $3);
     }
@@ -528,7 +528,7 @@ path_start
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | { $$ = new vector<std::pair<Pos, std::variant<Expr *, StringToken> > >; }
+  | { $$ = new std::vector<std::pair<Pos, std::variant<Expr *, StringToken> > >; }
   ;
 
 binds
@@ -582,9 +582,9 @@ attrpath
       } else
           $$->push_back(AttrName($3));
     }
-  | attr { $$ = new vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
+  | attr { $$ = new std::vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
   | string_attr
-    { $$ = new vector<AttrName>;
+    { $$ = new std::vector<AttrName>;
       ExprString *str = dynamic_cast<ExprString *>($1);
       if (str) {
           $$->push_back(AttrName(data->symbols.create(str->s)));

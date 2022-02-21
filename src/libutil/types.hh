@@ -11,7 +11,6 @@
 
 namespace nix {
 
-using std::vector;
 using std::string;
 
 typedef std::list<string> Strings;
@@ -25,7 +24,7 @@ typedef std::string_view PathView;
 typedef std::list<Path> Paths;
 typedef std::set<Path> PathSet;
 
-typedef vector<std::pair<string, string>> Headers;
+typedef std::vector<std::pair<string, string>> Headers;
 
 /* Helper class to run code at startup. */
 template<typename T>
