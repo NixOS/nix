@@ -70,9 +70,9 @@ public:
 
 
 #if HAVE_BOEHMGC
-typedef list<DrvInfo, traceable_allocator<DrvInfo> > DrvInfos;
+typedef std::list<DrvInfo, traceable_allocator<DrvInfo> > DrvInfos;
 #else
-typedef list<DrvInfo> DrvInfos;
+typedef std::list<DrvInfo> DrvInfos;
 #endif
 
 

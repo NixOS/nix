@@ -574,9 +574,9 @@ struct CompareValues
 
 
 #if HAVE_BOEHMGC
-typedef list<Value *, gc_allocator<Value *> > ValueList;
+typedef std::list<Value *, gc_allocator<Value *> > ValueList;
 #else
-typedef list<Value *> ValueList;
+typedef std::list<Value *> ValueList;
 #endif
 
 

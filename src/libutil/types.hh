@@ -11,12 +11,11 @@
 
 namespace nix {
 
-using std::list;
 using std::set;
 using std::vector;
 using std::string;
 
-typedef list<string> Strings;
+typedef std::list<string> Strings;
 typedef set<string> StringSet;
 typedef std::map<string, string> StringMap;
 
@@ -24,7 +23,7 @@ typedef std::map<string, string> StringMap;
 
 typedef string Path;
 typedef std::string_view PathView;
-typedef list<Path> Paths;
+typedef std::list<Path> Paths;
 typedef set<Path> PathSet;
 
 typedef vector<std::pair<string, string>> Headers;
