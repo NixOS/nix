@@ -246,7 +246,8 @@ get_volume_pass() {
 verify_volume_pass() {
     local volume_special="$1" # (i.e., disk1s7)
     local volume_uuid="$2"
-    /usr/sbin/diskutil apfs unlockVolume "$volume_special" -verify -stdinpassphrase -user "$volume_uuid"
+    _sudo "to confirm the password actually unlocks the volume" \
+        /usr/sbin/diskutil apfs unlockVolume "$volume_special" -verify -stdinpassphrase -user "$volume_uuid"
 }
 
 volume_pass_works() {
