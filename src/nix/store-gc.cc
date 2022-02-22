@@ -37,6 +37,10 @@ struct CmdStoreGC : StoreCommand, MixDryRun
         GCResults results;
         PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
         store->collectGarbage(options, results);
+        if (dryRun)
+          for (auto & i : results.paths)
+            std::cout << i << std::endl;
+
     }
 };
 
