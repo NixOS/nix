@@ -97,11 +97,9 @@ the Nix store. Here are the recognised types of installables:
     For example, if `/foo/bar/flake.nix` exists, then `/foo/bar/baz/` will resolve to
    `path:/foo/bar`
 
-
-
   If *attrpath* is omitted, Nix tries some default values; for most
-  subcommands, the default is `defaultPackage.`*system*
-  (e.g. `defaultPackage.x86_64-linux`), but some subcommands have
+  subcommands, the default is `packages.`*system*`.default`
+  (e.g. `packages.x86_64-linux.default`), but some subcommands have
   other defaults. If *attrpath* *is* specified, *attrpath* is
   interpreted as relative to one or more prefixes; for most
   subcommands, these are `packages.`*system*,
