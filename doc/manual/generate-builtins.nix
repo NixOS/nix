@@ -6,9 +6,9 @@ builtins:
 concatStrings (map
   (name:
     let builtin = builtins.${name}; in
-    "<dt><code>${name} "
+    "<dt id=\"${name}\"><a href=\"#${name}\"><code>${name} "
     + concatStringsSep " " (map (s: "<var>${s}</var>") builtin.args)
-    + "</code></dt>"
+    + "</code></a></dt>"
     + "<dd>\n\n"
     + builtin.doc
     + "\n\n</dd>"
