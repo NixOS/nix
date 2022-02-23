@@ -501,6 +501,12 @@
           inherit (self) overlay;
         });
 
+        tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          inherit (self) overlay;
+        });
+
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
           (system:
