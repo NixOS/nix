@@ -57,6 +57,10 @@ ref<MemoryInputAccessor> makeMemoryInputAccessor();
 
 ref<InputAccessor> makeZipInputAccessor(PathView path);
 
+ref<InputAccessor> makePatchingInputAccessor(
+    ref<InputAccessor> next,
+    const std::vector<std::string> & patches);
+
 struct SourcePath
 {
     ref<InputAccessor> accessor;

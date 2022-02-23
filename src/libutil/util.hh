@@ -537,6 +537,12 @@ std::string base64Decode(std::string_view s);
 std::string stripIndentation(std::string_view s);
 
 
+/* Get the prefix of 's' up to and excluding the next line break (LF
+   optionally preceded by CR), and the remainder following the line
+   break. */
+std::pair<std::string_view, std::string_view> getLine(std::string_view s);
+
+
 /* Get a value for the specified key from an associate container. */
 template <class T>
 std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)

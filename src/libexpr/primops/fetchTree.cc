@@ -105,6 +105,7 @@ static void fetchTree(
 ) {
     fetchers::Input input;
     PathSet context;
+    std::vector<std::string> patches;
 
     state.forceValue(*args[0], pos);
 
@@ -130,7 +131,22 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
+
+            if (attr.name == "patches") {
+                state.forceList(*attr.value, *attr.pos);
+
+                for (auto elem : attr.value->listItems()) {
+                    // FIXME: use realisePath
+                    PathSet context;
+                    auto patchFile = state.unpackPath(state.coerceToPath(pos, *elem, context));
+                    patches.push_back(patchFile.accessor->readFile(patchFile.path));
+                }
+
+                continue;
+            }
+
             state.forceValue(*attr.value, *attr.pos);
+
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false).toOwned();
                 attrs.emplace(attr.name,
@@ -177,6 +193,9 @@ static void fetchTree(
         throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
 
     auto [accessor, input2] = input.lazyFetch(state.store);
+
+    if (!patches.empty())
+        accessor = makePatchingInputAccessor(accessor, patches);
 
     //state.allowPath(tree.storePath);
 
