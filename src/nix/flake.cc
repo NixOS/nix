@@ -501,6 +501,17 @@ struct CmdFlakeCheck : FlakeCommand
 
                         state->forceValue(vOutput, pos);
 
+                        std::string_view replacement =
+                            name == "defaultPackage" ? "packages.<system>.default" :
+                            name == "defaultApps" ? "apps.<system>.default" :
+                            name == "defaultTemplate" ? "templates.default" :
+                            name == "defaultBundler" ? "bundlers.<system>.default" :
+                            name == "overlay" ? "overlays.default" :
+                            name == "devShell" ? "devShells.<system>.default" :
+                            "";
+                        if (replacement != "")
+                            warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
+
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
@@ -651,7 +662,7 @@ struct CmdFlakeCheck : FlakeCommand
 };
 
 static Strings defaultTemplateAttrPathsPrefixes{"templates."};
-static Strings defaultTemplateAttrPaths = {"defaultTemplate"};
+static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
 
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {

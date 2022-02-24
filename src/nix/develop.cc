@@ -325,8 +325,15 @@ struct Common : InstallableCommand, MixProfile
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+        Strings paths{
+            "devShells." + settings.thisSystem.get() + ".default",
+            "devShell." + settings.thisSystem.get(),
+        };
+        for (auto & p : SourceExprCommand::getDefaultFlakeAttrPaths())
+            paths.push_back(p);
+        return paths;
     }
+
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
         auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();

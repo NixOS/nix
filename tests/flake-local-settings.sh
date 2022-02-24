@@ -21,7 +21,7 @@ cat <<EOF > flake.nix
     nixConfig.allow-dirty = false; # See #5621
 
     outputs = a: {
-       defaultPackage.$system = import ./simple.nix;
+       packages.$system.default = import ./simple.nix;
     };
 }
 EOF

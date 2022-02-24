@@ -158,7 +158,10 @@ struct CmdRun : InstallableCommand
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultApp." + settings.thisSystem.get()};
+        Strings res{
+            "apps." + settings.thisSystem.get() + ".default",
+            "defaultApp." + settings.thisSystem.get(),
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;

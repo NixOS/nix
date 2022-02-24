@@ -42,24 +42,26 @@ homepage](https://github.com/NixOS/bundlers) for more details.
 If no flake output attribute is given, `nix bundle` tries the following
 flake output attributes:
 
-* `defaultBundler.<system>`
+* `bundlers.<system>.default`
 
 If an attribute *name* is given, `nix run` tries the following flake
 output attributes:
 
-* `bundler.<system>.<name>`
+* `bundlers.<system>.<name>`
 
 # Bundlers
 
 A bundler is specified by a flake output attribute named
-`bundlers.<system>.<name>` or `defaultBundler.<system>`. It looks like this:
+`bundlers.<system>.<name>`. It looks like this:
 
 ```nix
-bundlers.x86_64-linux.identity = drv: drv;
+bundlers.x86_64-linux = rec {
+  identity = drv: drv;
 
-bundlers.x86_64-linux.blender_2_79 = drv: self.packages.x86_64-linux.blender_2_79;
+  blender_2_79 = drv: self.packages.x86_64-linux.blender_2_79;
 
-defaultBundler.x86_64-linux = drv: drv;
+  default = identity;
+};
 ```
 
 A bundler must be a function that accepts an arbitrary value (typically a

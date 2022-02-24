@@ -58,9 +58,9 @@ For instance, if `name` is set to `hello-1.10`, `nix run` will run
 If no flake output attribute is given, `nix run` tries the following
 flake output attributes:
 
-* `defaultApp.<system>`
+* `apps.<system>.default`
 
-* `defaultPackage.<system>`
+* `packages.<system>.default`
 
 If an attribute *name* is given, `nix run` tries the following flake
 output attributes:
@@ -74,7 +74,7 @@ output attributes:
 # Apps
 
 An app is specified by a flake output attribute named
-`apps.<system>.<name>` or `defaultApp.<system>`. It looks like this:
+`apps.<system>.<name>`. It looks like this:
 
 ```nix
 apps.x86_64-linux.blender_2_79 = {
