@@ -89,12 +89,19 @@ static void expectType(EvalState & state, ValueType type,
 }
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
-    EvalState & state, Value * value, const Pos & pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath);
+    EvalState & state,
+    Value * value,
+    const Pos & pos,
+    const std::optional<Path> & baseDir,
+    const InputPath & lockRootPath);
 
-static FlakeInput parseFlakeInput(EvalState & state,
-    const std::string & inputName, Value * value, const Pos & pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath)
+static FlakeInput parseFlakeInput(
+    EvalState & state,
+    const std::string & inputName,
+    Value * value,
+    const Pos & pos,
+    const std::optional<Path> & baseDir,
+    const InputPath & lockRootPath)
 {
     expectType(state, nAttrs, *value, pos);
 
@@ -168,8 +175,11 @@ static FlakeInput parseFlakeInput(EvalState & state,
 }
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
-    EvalState & state, Value * value, const Pos & pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath)
+    EvalState & state,
+    Value * value,
+    const Pos & pos,
+    const std::optional<Path> & baseDir,
+    const InputPath & lockRootPath)
 {
     std::map<FlakeId, FlakeInput> inputs;
 
@@ -188,38 +198,31 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     return inputs;
 }
 
-static Flake getFlake(
+static Flake readFlake(
     EvalState & state,
-    const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache,
-    InputPath lockRootPath)
+    const FlakeRef & lockedRef,
+    nix::ref<InputAccessor> accessor,
+    const InputPath & lockRootPath)
 {
-    auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-        state, originalRef, allowLookup, flakeCache);
+    auto flakeDir = canonPath("/" + lockedRef.subdir);
+    SourcePath flakePath{accessor, canonPath(flakeDir + "/flake.nix")};
 
-    // Guard against symlink attacks.
-    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir, true);
-    auto flakeFile = canonPath(flakeDir + "/flake.nix", true);
-    if (!isInDir(flakeFile, sourceInfo.actualPath))
-        throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
-            lockedRef, state.store->printStorePath(sourceInfo.storePath));
-
-    Flake flake {
-        .originalRef = originalRef,
-        .resolvedRef = resolvedRef,
-        .lockedRef = lockedRef,
-        //.sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
-    };
-
-    if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
+    if (!flakePath.pathExists())
+        throw Error("source tree referenced by '%s' does not contain a file named '%s'", lockedRef, flakePath.path);
 
     Value vInfo;
-    // FIXME: use accessor
-    state.evalFile(state.rootPath(flakeFile), vInfo, true); // FIXME: symlink attack
+    state.evalFile(flakePath, vInfo, true);
 
-    expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(flakeFile), 0, 0));
+    expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(state.packPath(flakePath)), 0, 0));
+
+    Flake flake {
+        // FIXME
+        .originalRef = lockedRef,
+        .resolvedRef = lockedRef,
+        .lockedRef = lockedRef,
+        .accessor = accessor,
+        .flakePath = dirOf(flakePath.path),
+    };
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, *description->pos);
@@ -295,6 +298,19 @@ static Flake getFlake(
     return flake;
 }
 
+static Flake getFlake(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    bool allowLookup,
+    FlakeCache & flakeCache,
+    const InputPath & lockRootPath)
+{
+    // FIXME: resolve
+    auto [accessor, input] = originalRef.input.lazyFetch(state.store);
+
+    return readFlake(state, originalRef, accessor, lockRootPath);
+}
+
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
 {
     return getFlake(state, originalRef, allowLookup, flakeCache, {});
@@ -304,6 +320,14 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 {
     FlakeCache flakeCache;
     return getFlake(state, originalRef, allowLookup, flakeCache);
+}
+
+static LockFile readLockFile(const Flake & flake)
+{
+    SourcePath lockFilePath{flake.accessor, canonPath(flake.flakePath + "/flake.lock")};
+    return lockFilePath.pathExists()
+        ? LockFile(lockFilePath.readFile(), fmt("%s", lockFilePath))
+        : LockFile();
 }
 
 /* Compute an in-memory lock file for the specified top-level flake,
@@ -319,19 +343,16 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache);
+    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply();
         state.store->setOptions();
     }
 
-    #if 0
     try {
 
-        // FIXME: symlink attack
-        auto oldLockFile = LockFile::read(
-            flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock");
+        auto oldLockFile = readLockFile(flake);
 
         debug("old lock file: %s", oldLockFile);
 
@@ -545,8 +566,7 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : LockFile::read(
-                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
+                                : readLockFile(inputFlake).root,
                                 oldLock ? lockRootPath : inputPath, localPath, false);
                         }
 
@@ -565,12 +585,9 @@ LockedFlake lockFlake(
             }
         };
 
-        // Bring in the current ref for relative path resolution if we have it
-        auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
-
         computeLocks(
             flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, parentPath, false);
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, flake.flakePath, false);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
@@ -670,9 +687,6 @@ LockedFlake lockFlake(
         e.addTrace({}, "while updating the lock file of flake '%s'", flake.lockedRef.to_string());
         throw;
     }
-    #endif
-
-    throw UnimplementedError("lockFlake");
 }
 
 void callFlake(EvalState & state,
@@ -687,17 +701,13 @@ void callFlake(EvalState & state,
 
     vLocks->mkString(lockedFlake.lockFile.to_string());
 
-    #if 0
     emitTreeAttrs(
         state,
-        //*lockedFlake.flake.sourceInfo,
+        {lockedFlake.flake.accessor, lockedFlake.flake.flakePath},
         lockedFlake.flake.lockedRef.input,
         *vRootSrc,
         false,
         lockedFlake.flake.forceDirty);
-    #endif
-
-    throw UnimplementedError("callFlake");
 
     vRootSubdir->mkString(lockedFlake.flake.lockedRef.subdir);
 

@@ -716,7 +716,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticEnv)
 {
     auto packed = packPath(path);
-    auto buffer = path.accessor->readFile(path.path);
+    auto buffer = path.readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     return parse(buffer.data(), buffer.size(), foFile, packed, dirOf(packed), staticEnv);

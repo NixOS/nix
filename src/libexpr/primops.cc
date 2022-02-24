@@ -1394,7 +1394,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
 
     try {
-        v.mkBool(path.accessor->pathExists(path.path));
+        v.mkBool(path.pathExists());
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1459,7 +1459,7 @@ static RegisterPrimOp primop_dirOf({
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0]);
-    auto s = path.accessor->readFile(path.path);
+    auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     auto refs =
@@ -1547,7 +1547,7 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     auto path = realisePath(state, pos, *args[1]);
 
     // FIXME: state.toRealPath(path, context)
-    v.mkString(hashString(*ht, path.accessor->readFile(path.path)).to_string(Base16, false));
+    v.mkString(hashString(*ht, path.readFile()).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({

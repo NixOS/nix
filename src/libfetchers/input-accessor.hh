@@ -67,6 +67,12 @@ struct SourcePath
     Path path;
 
     std::string_view baseName() const;
+
+    std::string readFile() const
+    { return accessor->readFile(path); }
+
+    bool pathExists() const
+    { return accessor->pathExists(path); }
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);

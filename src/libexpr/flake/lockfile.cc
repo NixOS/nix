@@ -66,7 +66,7 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     return pos;
 }
 
-LockFile::LockFile(const nlohmann::json & json, const Path & path)
+LockFile::LockFile(const nlohmann::json & json, std::string_view path)
 {
     auto version = json.value("version", 0);
     if (version < 5 || version > 7)
@@ -114,6 +114,11 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
     // between inputs are only possible using 'follows' indirections.
     // Once we drop support for version <= 6, we can simplify the code
     // a bit since we don't need to worry about cycles.
+}
+
+LockFile::LockFile(std::string_view contents, std::string_view path)
+    : LockFile(nlohmann::json::parse(contents), path)
+{
 }
 
 nlohmann::json LockFile::toJSON() const
@@ -181,12 +186,6 @@ nlohmann::json LockFile::toJSON() const
 std::string LockFile::to_string() const
 {
     return toJSON().dump(2);
-}
-
-LockFile LockFile::read(const Path & path)
-{
-    if (!pathExists(path)) return LockFile();
-    return LockFile(nlohmann::json::parse(readFile(path)), path);
 }
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
