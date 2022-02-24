@@ -91,9 +91,9 @@ startDaemon() {
     # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_DAEMON_SOCKET_PATH
     PATH=$DAEMON_PATH nix daemon &
-    for ((i = 0; i < 30; i++)); do
+    for ((i = 0; i < 300; i++)); do
         if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then break; fi
-        sleep 1
+        sleep 0.1
     done
     pidDaemon=$!
     trap "killDaemon" EXIT
@@ -102,9 +102,9 @@ startDaemon() {
 
 killDaemon() {
     kill $pidDaemon
-    for i in {0.10}; do
+    for i in {0..100}; do
         kill -0 $pidDaemon || break
-        sleep 1
+        sleep 0.1
     done
     kill -9 $pidDaemon || true
     wait $pidDaemon || true
