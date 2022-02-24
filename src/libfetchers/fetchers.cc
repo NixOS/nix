@@ -24,11 +24,11 @@ static void fixupInput(Input & input)
     input.getType();
     input.getRef();
     if (input.getRev())
-        input.immutable = true;
+        input.locked = true;
     input.getRevCount();
     input.getLastModified();
     if (input.getNarHash())
-        input.immutable = true;
+        input.locked = true;
 }
 
 Input Input::fromURL(const ParsedURL & url)
@@ -165,7 +165,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
                 input.to_string(), *prevRevCount);
     }
 
-    input.immutable = true;
+    input.locked = true;
 
     assert(input.hasAllInfo());
 
@@ -209,7 +209,7 @@ StorePath Input::computeStorePath(Store & store) const
 {
     auto narHash = getNarHash();
     if (!narHash)
-        throw Error("cannot compute store path for mutable input '%s'", to_string());
+        throw Error("cannot compute store path for unlocked input '%s'", to_string());
     return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, getName());
 }
 

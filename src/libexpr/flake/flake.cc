@@ -501,7 +501,7 @@ LockedFlake lockFlake(
                            this input. */
                         debug("creating new input '%s'", inputPathS);
 
-                        if (!lockFlags.allowMutable && !input.ref->input.isImmutable())
+                        if (!lockFlags.allowMutable && !input.ref->input.isLocked())
                             throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                         if (input.isFlake) {
@@ -650,7 +650,7 @@ LockedFlake lockFlake(
                            now. Corner case: we could have reverted from a
                            dirty to a clean tree! */
                         if (flake.lockedRef.input == prevLockedRef.input
-                            && !flake.lockedRef.input.isImmutable())
+                            && !flake.lockedRef.input.isLocked())
                             throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake.originalRef);
                     }
                 } else
@@ -709,8 +709,8 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 
     string flakeRefS(state.forceStringNoCtx(*args[0], pos));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
-    if (evalSettings.pureEval && !flakeRef.input.isImmutable())
-        throw Error("cannot call 'getFlake' on mutable flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);
+    if (evalSettings.pureEval && !flakeRef.input.isLocked())
+        throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);
 
     callFlake(state,
         lockFlake(state, flakeRef,

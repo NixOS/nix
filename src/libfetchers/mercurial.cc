@@ -199,7 +199,7 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
 
-        auto getImmutableAttrs = [&]()
+        auto getLockedAttrs = [&]()
         {
             return Attrs({
                 {"type", "hg"},
@@ -218,20 +218,20 @@ struct MercurialInputScheme : InputScheme
         };
 
         if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+            if (auto res = getCache()->lookup(store, getLockedAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
 
         auto revOrRef = input.getRev() ? input.getRev()->gitRev() : *input.getRef();
 
-        Attrs mutableAttrs({
+        Attrs unlockedAttrs({
             {"type", "hg"},
             {"name", name},
             {"url", actualUrl},
             {"ref", *input.getRef()},
         });
 
-        if (auto res = getCache()->lookup(store, mutableAttrs)) {
+        if (auto res = getCache()->lookup(store, unlockedAttrs)) {
             auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
             if (!input.getRev() || input.getRev() == rev2) {
                 input.attrs.insert_or_assign("rev", rev2.gitRev());
@@ -277,7 +277,7 @@ struct MercurialInputScheme : InputScheme
         auto revCount = std::stoull(tokens[1]);
         input.attrs.insert_or_assign("ref", tokens[2]);
 
-        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+        if (auto res = getCache()->lookup(store, getLockedAttrs()))
             return makeResult(res->first, std::move(res->second));
 
         Path tmpDir = createTempDir();
@@ -297,14 +297,14 @@ struct MercurialInputScheme : InputScheme
         if (!_input.getRev())
             getCache()->add(
                 store,
-                mutableAttrs,
+                unlockedAttrs,
                 infoAttrs,
                 storePath,
                 false);
 
         getCache()->add(
             store,
-            getImmutableAttrs(),
+            getLockedAttrs(),
             infoAttrs,
             storePath,
             true);

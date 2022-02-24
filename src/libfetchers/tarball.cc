@@ -13,7 +13,7 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers)
 {
     // FIXME: check store
@@ -88,7 +88,7 @@ DownloadFileResult downloadFile(
         inAttrs,
         infoAttrs,
         *storePath,
-        immutable);
+        locked);
 
     if (url != res.effectiveUri)
         getCache()->add(
@@ -100,7 +100,7 @@ DownloadFileResult downloadFile(
             },
             infoAttrs,
             *storePath,
-            immutable);
+            locked);
 
     return {
         .storePath = std::move(*storePath),
@@ -113,7 +113,7 @@ std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers)
 {
     Attrs inAttrs({
@@ -130,7 +130,7 @@ std::pair<Tree, time_t> downloadTarball(
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
-    auto res = downloadFile(store, url, name, immutable, headers);
+    auto res = downloadFile(store, url, name, locked, headers);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -160,7 +160,7 @@ std::pair<Tree, time_t> downloadTarball(
         inAttrs,
         infoAttrs,
         *unpackedStorePath,
-        immutable);
+        locked);
 
     return {
         Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
@@ -202,7 +202,7 @@ struct TarballInputScheme : InputScheme
 
         Input input;
         input.attrs = attrs;
-        //input.immutable = (bool) maybeGetStrAttr(input.attrs, "hash");
+        //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
         return input;
     }
 

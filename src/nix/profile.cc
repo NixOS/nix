@@ -415,7 +415,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             if (element.source
-                && !element.source->originalRef.input.isImmutable()
+                && !element.source->originalRef.input.isLocked()
                 && matches(*store, element, i, matchers))
             {
                 upgradedCount++;
