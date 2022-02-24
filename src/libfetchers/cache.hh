@@ -13,7 +13,7 @@ struct Cache
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
         const StorePath & storePath,
-        bool immutable) = 0;
+        bool locked) = 0;
 
     virtual std::optional<std::pair<Attrs, StorePath>> lookup(
         ref<Store> store,

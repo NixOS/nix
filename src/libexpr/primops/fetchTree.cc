@@ -19,7 +19,7 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isImmutable());
+    assert(input.isLocked());
 
     auto attrs = state.buildBindings(8);
 
@@ -166,8 +166,8 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect())
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isImmutable())
-        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
+    if (evalSettings.pureEval && !input.isLocked())
+        throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
 
     auto [tree, input2] = input.fetch(state.store);
 
