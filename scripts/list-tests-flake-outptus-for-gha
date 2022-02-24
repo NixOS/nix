@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+set -x
+
+nix build --inputs-from . nixpkgs#jq -o jq
+
+TEST_NAMES=$(nix flake show . --json | ./jq-bin/bin/jq -c ".checks[\"$(nix eval --raw --impure --expr builtins.currentSystem)\"] | keys")
+
+
+echo "::set-output name=json::$TEST_NAMES"

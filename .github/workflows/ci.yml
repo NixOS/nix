@@ -6,13 +6,15 @@ on:
 
 jobs:
 
-  tests:
+  build:
     needs: [check_cachix]
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    outputs:
+      flake-outputs-json: ${{ steps.list-outputs.outputs.json }}
     steps:
     - uses: actions/checkout@v2.4.0
       with:
@@ -25,7 +27,32 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: nix --experimental-features 'nix-command flakes' flake check -L
+    - run: nix --experimental-features 'nix-command flakes' build -L
+    - name: List all the tests to run
+      id: list-outputs
+      run: scripts/list-tests-flake-outptus-for-gha
+
+  test:
+    needs: [build, check_cachix]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        outputName: ${{ fromJson(needs.build.outputs.flake-outputs-json) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2.4.0
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v16
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - uses: cachix/cachix-action@v10
+      if: needs.check_cachix.outputs.secret == 'true'
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: nix --experimental-features 'nix-command flakes' build .#checks.$(nix eval --raw --impure --expr builtins.currentSystem).${{ matrix.outputName }}  -L
+
 
   check_cachix:
     name: Cachix secret present for installer tests
@@ -40,7 +67,7 @@ jobs:
         run: echo "::set-output name=secret::${{ env._CACHIX_SECRETS != '' }}"
 
   installer:
-    needs: [tests, check_cachix]
+    needs: [test, check_cachix]
     if: github.event_name == 'push' && needs.check_cachix.outputs.secret == 'true'
     runs-on: ubuntu-latest
     outputs:
@@ -76,7 +103,7 @@ jobs:
     - run: nix-instantiate -E 'builtins.currentTime' --eval
 
   docker_push_image:
-    needs: [check_cachix, tests]
+    needs: [check_cachix, build]
     if: >-
       github.event_name == 'push' &&
       github.ref_name == 'master' &&
