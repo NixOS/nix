@@ -131,8 +131,6 @@ and `/etc/zshrc` which you may remove.
    ```console
    sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
    sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
-   sudo launchctl unload /Library/LaunchDaemons/org.nixos.activate-system.plist
-   sudo rm /Library/LaunchDaemons/org.nixos.activate-system.plist
    ```
 
    This stops the Nix daemon and prevents it from being started next time you
