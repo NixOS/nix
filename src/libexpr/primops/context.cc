@@ -37,7 +37,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
 
     PathSet context2;
     for (auto & p : context)
-        context2.insert(p.at(0) == '=' ? string(p, 1) : p);
+        context2.insert(p.at(0) == '=' ? std::string(p, 1) : p);
 
     v.mkString(*s, context2);
 }
@@ -76,13 +76,13 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
     auto contextInfos = std::map<Path, ContextInfo>();
     for (const auto & p : context) {
         Path drv;
-        string output;
+        std::string output;
         const Path * path = &p;
         if (p.at(0) == '=') {
-            drv = string(p, 1);
+            drv = std::string(p, 1);
             path = &drv;
         } else if (p.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(p);
+            std::pair<std::string, std::string> ctx = decodeContext(p);
             drv = ctx.first;
             output = ctx.second;
             path = &drv;
@@ -166,7 +166,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                         .errPos = *i.pos
                     });
                 }
-                context.insert("=" + string(i.name));
+                context.insert("=" + std::string(i.name));
             }
         }
 

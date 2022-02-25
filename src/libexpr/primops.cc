@@ -141,7 +141,7 @@ static void mkOutputString(
     BindingsBuilder & attrs,
     const StorePath & drvPath,
     const BasicDerivation & drv,
-    const std::pair<string, DerivationOutput> & o)
+    const std::pair<std::string, DerivationOutput> & o)
 {
     auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
     attrs.alloc(o.first).mkString(
@@ -314,7 +314,7 @@ void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value
 {
     auto path = realisePath(state, pos, *args[0]);
 
-    string sym(state.forceStringNoCtx(*args[1], pos));
+    std::string sym(state.forceStringNoCtx(*args[1], pos));
 
     void *handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (!handle)
@@ -386,7 +386,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
 static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    string t;
+    std::string t;
     switch (args[0]->type()) {
         case nInt: t = "int"; break;
         case nBool: t = "bool"; break;
@@ -707,7 +707,7 @@ static RegisterPrimOp primop_abort({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         PathSet context;
-        string s = state.coerceToString(pos, *args[0], context).toOwned();
+        auto s = state.coerceToString(pos, *args[0], context).toOwned();
         throw Abort("evaluation aborted with the following error message: '%1%'", s);
     }
 });
@@ -725,7 +725,7 @@ static RegisterPrimOp primop_throw({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
       PathSet context;
-      string s = state.coerceToString(pos, *args[0], context).toOwned();
+      auto s = state.coerceToString(pos, *args[0], context).toOwned();
       throw ThrownError(s);
     }
 });
@@ -826,7 +826,7 @@ static RegisterPrimOp primop_tryEval({
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name(state.forceStringNoCtx(*args[0], pos));
+    std::string name(state.forceStringNoCtx(*args[0], pos));
     v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
@@ -935,7 +935,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         pos
     );
 
-    string drvName;
+    std::string drvName;
     Pos & posDrvName(*attr->pos);
     try {
         drvName = state.forceStringNoCtx(*attr->value, pos);
@@ -973,7 +973,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     for (auto & i : args[0]->attrs->lexicographicOrder()) {
         if (i->name == state.sIgnoreNulls) continue;
-        const string & key = i->name;
+        const std::string & key = i->name;
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string_view s) {
@@ -1031,7 +1031,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (auto elem : i->value->listItems()) {
-                    string s = state.coerceToString(posDrvName, *elem, context, true).toOwned();
+                    auto s = state.coerceToString(posDrvName, *elem, context, true).toOwned();
                     drv.args.push_back(s);
                 }
             }
@@ -1118,7 +1118,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(path);
+            auto ctx = decodeContext(path);
             drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(ctx.second);
         }
 
@@ -1440,8 +1440,8 @@ static RegisterPrimOp primop_dirOf({
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0]);
-    string s = readFile(path);
-    if (s.find((char) 0) != string::npos)
+    auto s = readFile(path);
+    if (s.find((char) 0) != std::string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     StorePathSet refs;
     if (state.store->isInStore(path)) {
@@ -1474,7 +1474,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     for (auto v2 : args[0]->listItems()) {
         state.forceAttrs(*v2, pos);
 
-        string prefix;
+        std::string prefix;
         Bindings::iterator i = v2->attrs->find(state.sPrefix);
         if (i != v2->attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
@@ -1488,7 +1488,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         );
 
         PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
+        auto path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
 
         try {
             auto rewrites = state.realiseContext(context);
@@ -1754,8 +1754,8 @@ static RegisterPrimOp primop_fromJSON({
 static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string name(state.forceStringNoCtx(*args[0], pos));
-    string contents(state.forceString(*args[1], context, pos));
+    std::string name(state.forceStringNoCtx(*args[0], pos));
+    std::string contents(state.forceString(*args[1], context, pos));
 
     StorePathSet refs;
 
@@ -1863,7 +1863,7 @@ static RegisterPrimOp primop_toFile({
 static void addPath(
     EvalState & state,
     const Pos & pos,
-    const string & name,
+    const std::string & name,
     Path path,
     Value * filterFun,
     FileIngestionMethod method,
@@ -2016,14 +2016,14 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     state.forceAttrs(*args[0], pos);
     Path path;
-    string name;
+    std::string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
     PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
-        const string & n(attr.name);
+        auto & n(attr.name);
         if (n == "path")
             path = state.coerceToPath(*attr.pos, *attr.value, context);
         else if (attr.name == state.sName)
@@ -3616,7 +3616,7 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
     auto sep = state.forceString(*args[0], context, pos);
     state.forceList(*args[1], pos);
 
-    string res;
+    std::string res;
     res.reserve((args[1]->listSize() + 32) * sep.size());
     bool first = true;
 
@@ -3649,12 +3649,12 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
             .errPos = pos
         });
 
-    std::vector<string> from;
+    std::vector<std::string> from;
     from.reserve(args[0]->listSize());
     for (auto elem : args[0]->listItems())
         from.emplace_back(state.forceString(*elem, pos));
 
-    std::vector<std::pair<string, PathSet>> to;
+    std::vector<std::pair<std::string, PathSet>> to;
     to.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         PathSet ctx;
@@ -3665,7 +3665,7 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     PathSet context;
     auto s = state.forceString(*args[2], context, pos);
 
-    string res;
+    std::string res;
     // Loops one past last character to handle the case where 'from' contains an empty string.
     for (size_t p = 0; p <= s.size(); ) {
         bool found = false;

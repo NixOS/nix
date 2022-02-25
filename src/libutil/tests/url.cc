@@ -5,9 +5,9 @@ namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
 
-    string print_map(std::map<string, string> m) {
-        std::map<string, string>::iterator it;
-        string s = "{ ";
+    std::string print_map(std::map<std::string, std::string> m) {
+        std::map<std::string, std::string>::iterator it;
+        std::string s = "{ ";
         for (it = m.begin(); it != m.end(); ++it) {
             s += "{ ";
             s += it->first;
@@ -262,21 +262,21 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(percentDecode, decodesUrlEncodedString) {
-        string s = "==@==";
-        string d = percentDecode("%3D%3D%40%3D%3D");
+        std::string s = "==@==";
+        std::string d = percentDecode("%3D%3D%40%3D%3D");
         ASSERT_EQ(d, s);
     }
 
     TEST(percentDecode, multipleDecodesAreIdempotent) {
-        string once = percentDecode("%3D%3D%40%3D%3D");
-        string twice = percentDecode(once);
+        std::string once = percentDecode("%3D%3D%40%3D%3D");
+        std::string twice = percentDecode(once);
 
         ASSERT_EQ(once, twice);
     }
 
     TEST(percentDecode, trailingPercent) {
-        string s = "==@==%";
-        string d = percentDecode("%3D%3D%40%3D%3D%25");
+        std::string s = "==@==%";
+        std::string d = percentDecode("%3D%3D%40%3D%3D%25");
 
         ASSERT_EQ(d, s);
     }

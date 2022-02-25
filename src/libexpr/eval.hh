@@ -150,7 +150,7 @@ public:
         const Pos & pos
     );
 
-    void addToSearchPath(const string & s);
+    void addToSearchPath(const std::string & s);
 
     SearchPath getSearchPath() { return searchPath; }
 
@@ -251,7 +251,7 @@ public:
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);
 
-    std::optional<string> tryAttrsToString(const Pos & pos, Value & v,
+    std::optional<std::string> tryAttrsToString(const Pos & pos, Value & v,
         PathSet & context, bool coerceMore = false, bool copyToStore = true);
 
     /* String coercion.  Converts strings, paths and derivations to a
@@ -262,7 +262,7 @@ public:
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
-    string copyPathToStore(PathSet & context, const Path & path);
+    std::string copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
@@ -284,18 +284,18 @@ private:
 
     void createBaseEnv();
 
-    Value * addConstant(const string & name, Value & v);
+    Value * addConstant(const std::string & name, Value & v);
 
-    void addConstant(const string & name, Value * v);
+    void addConstant(const std::string & name, Value * v);
 
-    Value * addPrimOp(const string & name,
+    Value * addPrimOp(const std::string & name,
         size_t arity, PrimOpFun primOp);
 
     Value * addPrimOp(PrimOp && primOp);
 
 public:
 
-    Value & getBuiltin(const string & name);
+    Value & getBuiltin(const std::string & name);
 
     struct Doc
     {
@@ -414,12 +414,12 @@ private:
 
 
 /* Return a string representing the type of the value `v'. */
-string showType(ValueType type);
-string showType(const Value & v);
+std::string_view showType(ValueType type);
+std::string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<string, string> decodeContext(std::string_view s);
+std::pair<std::string, std::string> decodeContext(std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);

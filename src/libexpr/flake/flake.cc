@@ -254,7 +254,7 @@ static Flake getFlake(
         for (auto & setting : *nixConfig->value->attrs) {
             forceTrivialValue(state, *setting.value, *setting.pos);
             if (setting.value->type() == nString)
-                flake.config.settings.insert({setting.name, string(state.forceStringNoCtx(*setting.value, *setting.pos))});
+                flake.config.settings.insert({setting.name, std::string(state.forceStringNoCtx(*setting.value, *setting.pos))});
             else if (setting.value->type() == nPath) {
                 PathSet emptyContext = {};
                 flake.config.settings.emplace(
@@ -707,7 +707,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.requireExperimentalFeatureOnEvaluation(Xp::Flakes, "builtins.getFlake", pos);
 
-    string flakeRefS(state.forceStringNoCtx(*args[0], pos));
+    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);

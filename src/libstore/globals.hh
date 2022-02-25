@@ -988,6 +988,6 @@ void loadConfFile();
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const string nixVersion;
+extern const std::string nixVersion;
 
 }

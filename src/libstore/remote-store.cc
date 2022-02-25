@@ -661,8 +661,11 @@ void RemoteStore::addMultipleToStore(
 }
 
 
-StorePath RemoteStore::addTextToStore(const string & name, const string & s,
-    const StorePathSet & references, RepairFlag repair)
+StorePath RemoteStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     StringSource source(s);
     return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
@@ -1000,7 +1003,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         auto msg = readNum<uint64_t>(from);
 
         if (msg == STDERR_WRITE) {
-            string s = readString(from);
+            auto s = readString(from);
             if (!sink) throw Error("no sink");
             (*sink)(s);
         }
@@ -1017,7 +1020,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
             if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
                 return std::make_exception_ptr(readError(from));
             } else {
-                string error = readString(from);
+                auto error = readString(from);
                 unsigned int status = readInt(from);
                 return std::make_exception_ptr(Error(status, error));
             }

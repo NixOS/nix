@@ -26,18 +26,21 @@ struct Pos
     FileOrigin origin;
     Symbol file;
     unsigned int line, column;
-    Pos() : origin(foString), line(0), column(0) { };
+
+    Pos() : origin(foString), line(0), column(0) { }
     Pos(FileOrigin origin, const Symbol & file, unsigned int line, unsigned int column)
-        : origin(origin), file(file), line(line), column(column) { };
+        : origin(origin), file(file), line(line), column(column) { }
+
     operator bool() const
     {
         return line != 0;
     }
+
     bool operator < (const Pos & p2) const
     {
         if (!line) return p2.line;
         if (!p2.line) return false;
-        int d = ((string) file).compare((string) p2.file);
+        int d = ((const std::string &) file).compare((const std::string &) p2.file);
         if (d < 0) return true;
         if (d > 0) return false;
         if (line < p2.line) return true;
@@ -68,7 +71,7 @@ struct AttrName
 
 typedef std::vector<AttrName> AttrPath;
 
-string showAttrPath(const AttrPath & attrPath);
+std::string showAttrPath(const AttrPath & attrPath);
 
 
 /* Abstract syntax of Nix expressions. */
@@ -110,7 +113,7 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    string s;
+    std::string s;
     Value v;
     ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     COMMON_METHODS
@@ -119,9 +122,9 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
-    string s;
+    std::string s;
     Value v;
-    ExprPath(const string & s) : s(s) { v.mkPath(this->s.c_str()); };
+    ExprPath(std::string s) : s(std::move(s)) { v.mkPath(this->s.c_str()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -249,7 +252,7 @@ struct ExprLambda : Expr
     {
     };
     void setName(Symbol & name);
-    string showNamePos() const;
+    std::string showNamePos() const;
     inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };

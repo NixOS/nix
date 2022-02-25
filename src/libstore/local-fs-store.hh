@@ -27,7 +27,7 @@ class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store
 {
 public:
 
-    const static string drvsLogDir;
+    const static std::string drvsLogDir;
 
     LocalFSStore(const Params & params);
 

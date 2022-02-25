@@ -51,7 +51,7 @@ public:
 
     void timedOut(Error && ex) override { abort(); };
 
-    string key() override;
+    std::string key() override;
 
     void work() override;
     void handleEOF(int fd) override;

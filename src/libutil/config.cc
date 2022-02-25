@@ -81,16 +81,16 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
-        string line;
+        std::string line;
         while (pos < contents.size() && contents[pos] != '\n')
             line += contents[pos++];
         pos++;
 
-        string::size_type hash = line.find('#');
-        if (hash != string::npos)
-            line = string(line, 0, hash);
+        auto hash = line.find('#');
+        if (hash != std::string::npos)
+            line = std::string(line, 0, hash);
 
-        auto tokens = tokenizeString<std::vector<string>>(line);
+        auto tokens = tokenizeString<std::vector<std::string>>(line);
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
@@ -120,7 +120,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
         if (tokens[1] != "=")
             throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
 
-        string name = tokens[0];
+        std::string name = tokens[0];
 
         auto i = tokens.begin();
         advance(i, 2);
@@ -132,7 +132,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
 void AbstractConfig::applyConfigFile(const Path & path)
 {
     try {
-        string contents = readFile(path);
+        std::string contents = readFile(path);
         applyConfig(contents, path);
     } catch (SysError &) { }
 }

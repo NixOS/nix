@@ -186,7 +186,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
-    const string & who, bool unpack, std::string name)
+    const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
@@ -198,7 +198,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            std::string n(attr.name);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")

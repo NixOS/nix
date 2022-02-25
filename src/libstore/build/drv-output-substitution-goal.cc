@@ -137,7 +137,7 @@ void DrvOutputSubstitutionGoal::finished()
     amDone(ecSuccess);
 }
 
-string DrvOutputSubstitutionGoal::key()
+std::string DrvOutputSubstitutionGoal::key()
 {
     /* "a$" ensures substitution goals happen before derivation
        goals. */

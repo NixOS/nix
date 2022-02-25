@@ -481,12 +481,12 @@ void LocalDerivationGoal::startBuilder()
            temporary build directory.  The text files have the format used
            by `nix-store --register-validity'.  However, the deriver
            fields are left empty. */
-        string s = get(drv->env, "exportReferencesGraph").value_or("");
+        auto s = get(drv->env, "exportReferencesGraph").value_or("");
         Strings ss = tokenizeString<Strings>(s);
         if (ss.size() % 2 != 0)
             throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
         for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-            string fileName = *i++;
+            auto fileName = *i++;
             static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
             if (!std::regex_match(fileName, regex))
                 throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
@@ -517,10 +517,10 @@ void LocalDerivationGoal::startBuilder()
                 i.pop_back();
             }
             size_t p = i.find('=');
-            if (p == string::npos)
+            if (p == std::string::npos)
                 dirsInChroot[i] = {i, optional};
             else
-                dirsInChroot[string(i, 0, p)] = {string(i, p + 1), optional};
+                dirsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
         }
         dirsInChroot[tmpDirInSandbox] = tmpDir;
 
@@ -671,9 +671,10 @@ void LocalDerivationGoal::startBuilder()
         auto state = stBegin;
         auto lines = runProgram(settings.preBuildHook, false, args);
         auto lastPos = std::string::size_type{0};
-        for (auto nlPos = lines.find('\n'); nlPos != string::npos;
-                nlPos = lines.find('\n', lastPos)) {
-            auto line = std::string{lines, lastPos, nlPos - lastPos};
+        for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
+                nlPos = lines.find('\n', lastPos))
+        {
+            auto line = lines.substr(lastPos, nlPos - lastPos);
             lastPos = nlPos + 1;
             if (state == stBegin) {
                 if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
@@ -686,10 +687,10 @@ void LocalDerivationGoal::startBuilder()
                     state = stBegin;
                 } else {
                     auto p = line.find('=');
-                    if (p == string::npos)
+                    if (p == std::string::npos)
                         dirsInChroot[line] = line;
                     else
-                        dirsInChroot[string(line, 0, p)] = string(line, p + 1);
+                        dirsInChroot[line.substr(0, p)] = line.substr(p + 1);
                 }
             }
         }
@@ -941,7 +942,7 @@ void LocalDerivationGoal::startBuilder()
     /* Check if setting up the build environment failed. */
     std::vector<std::string> msgs;
     while (true) {
-        string msg = [&]() {
+        std::string msg = [&]() {
             try {
                 return readLine(builderOut.readSide.get());
             } catch (Error & e) {
@@ -953,8 +954,8 @@ void LocalDerivationGoal::startBuilder()
                 throw;
             }
         }();
-        if (string(msg, 0, 1) == "\2") break;
-        if (string(msg, 0, 1) == "\1") {
+        if (msg.substr(0, 1) == "\2") break;
+        if (msg.substr(0, 1) == "\1") {
             FdSource source(builderOut.readSide.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
@@ -990,7 +991,7 @@ void LocalDerivationGoal::initTmpDir() {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(htSHA256, i.first);
-                string fn = ".attr-" + hash.to_string(Base32, false);
+                std::string fn = ".attr-" + hash.to_string(Base32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -1081,7 +1082,7 @@ void LocalDerivationGoal::writeStructuredAttrs()
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
                cases where we know or don't know the output path ahead of time. */
-            rewritten[i] = rewriteStrings(v, inputRewrites);
+            rewritten[i] = rewriteStrings((std::string) v, inputRewrites);
         }
 
         json["outputs"] = rewritten;
@@ -1187,10 +1188,14 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet()) override
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1200,17 +1205,24 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         goal.addDependency(info.path);
     }
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair = NoRepair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair = NoRepair) override
     {
         auto path = next->addTextToStore(name, s, references, repair);
         goal.addDependency(path);
         return path;
     }
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet()) override
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        RepairFlag repair,
+        const StorePathSet & references) override
     {
         auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
         goal.addDependency(path);
@@ -1992,7 +2004,7 @@ void LocalDerivationGoal::runChild()
             args.push_back(rewriteStrings(i, inputRewrites));
 
         /* Indicate that we managed to set up the build environment. */
-        writeFull(STDERR_FILENO, string("\2\n"));
+        writeFull(STDERR_FILENO, std::string("\2\n"));
 
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
@@ -2010,7 +2022,7 @@ void LocalDerivationGoal::runChild()
                 else if (drv->builder == "builtin:unpack-channel")
                     builtinUnpackChannel(drv2);
                 else
-                    throw Error("unsupported builtin builder '%1%'", string(drv->builder, 8));
+                    throw Error("unsupported builtin builder '%1%'", drv->builder.substr(8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
@@ -2694,7 +2706,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & out
                     }
 
                 if (!badPaths.empty()) {
-                    string badPathsStr;
+                    std::string badPathsStr;
                     for (auto & i : badPaths) {
                         badPathsStr += "\n  ";
                         badPathsStr += worker.store.printStorePath(i);

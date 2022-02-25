@@ -101,12 +101,20 @@ public:
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair, const StorePathSet & references) override;
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 

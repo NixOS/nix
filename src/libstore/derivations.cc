@@ -82,7 +82,7 @@ bool derivationIsImpure(DerivationType dt) {
 
 bool BasicDerivation::isBuiltin() const
 {
-    return string(builder, 0, 8) == "builtin:";
+    return builder.substr(0, 8) == "builtin:";
 }
 
 
@@ -104,19 +104,19 @@ StorePath writeDerivation(Store & store,
 
 
 /* Read string `s' from stream `str'. */
-static void expect(std::istream & str, const string & s)
+static void expect(std::istream & str, std::string_view s)
 {
     char s2[s.size()];
     str.read(s2, s.size());
-    if (string(s2, s.size()) != s)
+    if (std::string(s2, s.size()) != s)
         throw FormatError("expected string '%1%'", s);
 }
 
 
 /* Read a C-style string from stream `str'. */
-static string parseString(std::istream & str)
+static std::string parseString(std::istream & str)
 {
-    string res;
+    std::string res;
     expect(str, "\"");
     int c;
     while ((c = str.get()) != '"')
@@ -172,7 +172,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
 {
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
-        if (string(hashAlgo, 0, 2) == "r:") {
+        if (hashAlgo.substr(0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = hashAlgo.substr(2);
         }
@@ -260,8 +260,8 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
     /* Parse the environment variables. */
     expect(str, ",[");
     while (!endOfList(str)) {
-        expect(str, "("); string name = parseString(str);
-        expect(str, ","); string value = parseString(str);
+        expect(str, "("); auto name = parseString(str);
+        expect(str, ","); auto value = parseString(str);
         expect(str, ")");
         drv.env[name] = value;
     }
@@ -271,7 +271,7 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 }
 
 
-static void printString(string & res, std::string_view s)
+static void printString(std::string & res, std::string_view s)
 {
     boost::container::small_vector<char, 64 * 1024> buffer;
     buffer.reserve(s.size() * 2 + 2);
@@ -289,7 +289,7 @@ static void printString(string & res, std::string_view s)
 }
 
 
-static void printUnquotedString(string & res, std::string_view s)
+static void printUnquotedString(std::string & res, std::string_view s)
 {
     res += '"';
     res.append(s);
@@ -298,7 +298,7 @@ static void printUnquotedString(string & res, std::string_view s)
 
 
 template<class ForwardIterator>
-static void printStrings(string & res, ForwardIterator i, ForwardIterator j)
+static void printStrings(std::string & res, ForwardIterator i, ForwardIterator j)
 {
     res += '[';
     bool first = true;
@@ -311,7 +311,7 @@ static void printStrings(string & res, ForwardIterator i, ForwardIterator j)
 
 
 template<class ForwardIterator>
-static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterator j)
+static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIterator j)
 {
     res += '[';
     bool first = true;
@@ -323,10 +323,10 @@ static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterato
 }
 
 
-string Derivation::unparse(const Store & store, bool maskOutputs,
+std::string Derivation::unparse(const Store & store, bool maskOutputs,
     std::map<std::string, StringSet> * actualInputs) const
 {
-    string s;
+    std::string s;
     s.reserve(65536);
     s += "Derive([";
 
@@ -401,7 +401,7 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
 
 
 // FIXME: remove
-bool isDerivation(const string & fileName)
+bool isDerivation(const std::string & fileName)
 {
     return hasSuffix(fileName, drvExtension);
 }
@@ -593,7 +593,7 @@ std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation &
 }
 
 
-bool wantOutput(const string & output, const std::set<string> & wanted)
+bool wantOutput(const std::string & output, const std::set<std::string> & wanted)
 {
     return wanted.empty() || wanted.find(output) != wanted.end();
 }

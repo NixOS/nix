@@ -147,8 +147,11 @@ public:
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -204,7 +207,11 @@ public:
        derivation 'deriver'. */
     void registerDrvOutput(const Realisation & info) override;
     void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
-    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
+    void cacheDrvOutputMapping(
+        State & state,
+        const uint64_t deriver,
+        const std::string & outputName,
+        const StorePath & output);
 
     std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
     std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);

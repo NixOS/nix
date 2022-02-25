@@ -14,6 +14,7 @@ namespace nix {
 typedef std::list<std::string> Strings;
 typedef std::set<std::string> StringSet;
 typedef std::map<std::string, std::string> StringMap;
+typedef std::map<std::string, std::string> StringPairs;
 
 /* Paths are just strings. */
 typedef std::string Path;

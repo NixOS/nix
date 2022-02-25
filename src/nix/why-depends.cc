@@ -157,11 +157,11 @@ struct CmdWhyDepends : SourceExprCommand
            closure (i.e., that have a non-infinite distance to
            'dependency'). Print every edge on a path between `package`
            and `dependency`. */
-        std::function<void(Node &, const string &, const string &)> printNode;
+        std::function<void(Node &, const std::string &, const std::string &)> printNode;
 
         struct BailOut { };
 
-        printNode = [&](Node & node, const string & firstPad, const string & tailPad) {
+        printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);

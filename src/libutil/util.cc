@@ -110,13 +110,13 @@ Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
-    string s;
+    std::string s;
     s.reserve(256);
 
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);
 
-    string temp;
+    std::string temp;
 
     /* Count the number of times we follow a symlink and stop at some
        arbitrary (but high) limit to prevent infinite loops. */
@@ -142,7 +142,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
         /* Normal component; copy it. */
         else {
             s += '/';
-            if (const auto slash = path.find('/'); slash == string::npos) {
+            if (const auto slash = path.find('/'); slash == std::string::npos) {
                 s += path;
                 path = {};
             } else {
@@ -175,7 +175,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
-    if (pos == string::npos)
+    if (pos == std::string::npos)
         return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
@@ -191,7 +191,7 @@ std::string_view baseNameOf(std::string_view path)
         last -= 1;
 
     auto pos = path.rfind('/', last);
-    if (pos == string::npos)
+    if (pos == std::string::npos)
         pos = 0;
     else
         pos += 1;
@@ -249,7 +249,7 @@ Path readLink(const Path & path)
             else
                 throw SysError("reading symbolic link '%1%'", path);
         else if (rlSize < bufSize)
-            return string(buf.data(), rlSize);
+            return std::string(buf.data(), rlSize);
     }
 }
 
@@ -269,7 +269,7 @@ DirEntries readDirectory(DIR *dir, const Path & path)
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         entries.emplace_back(name, dirent->d_ino,
 #ifdef HAVE_STRUCT_DIRENT_D_TYPE
@@ -303,7 +303,7 @@ unsigned char getFileType(const Path & path)
 }
 
 
-string readFile(int fd)
+std::string readFile(int fd)
 {
     struct stat st;
     if (fstat(fd, &st) == -1)
@@ -313,7 +313,7 @@ string readFile(int fd)
 }
 
 
-string readFile(const Path & path)
+std::string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
@@ -366,9 +366,9 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-string readLine(int fd)
+std::string readLine(int fd)
 {
-    string s;
+    std::string s;
     while (1) {
         checkInterrupt();
         char ch;
@@ -387,7 +387,7 @@ string readLine(int fd)
 }
 
 
-void writeLine(int fd, string s)
+void writeLine(int fd, std::string s)
 {
     s += '\n';
     writeFull(fd, s);
@@ -398,7 +398,7 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
     checkInterrupt();
 
-    string name(baseNameOf(path));
+    std::string name(baseNameOf(path));
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
@@ -566,8 +566,8 @@ Path getConfigDir()
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
-    std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
+    auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
+    std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
     result.insert(result.begin(), configHome);
     return result;
 }
@@ -670,7 +670,7 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block, const size_t reserveSize)
+std::string drainFD(int fd, bool block, const size_t reserveSize)
 {
     // the parser needs two extra bytes to append terminating characters, other users will
     // not care very much about the extra memory.
@@ -719,7 +719,7 @@ void drainFD(int fd, Sink & sink, bool block)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
+AutoDelete::AutoDelete(const std::string & p, bool recursive) : path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -1036,7 +1036,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-string runProgram(Path program, bool searchPath, const Strings & args,
+std::string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
@@ -1238,11 +1238,11 @@ void _interrupted()
 template<class C> C tokenizeString(std::string_view s, std::string_view separators)
 {
     C result;
-    string::size_type pos = s.find_first_not_of(separators, 0);
-    while (pos != string::npos) {
-        string::size_type end = s.find_first_of(separators, pos + 1);
-        if (end == string::npos) end = s.size();
-        result.insert(result.end(), string(s, pos, end - pos));
+    auto pos = s.find_first_not_of(separators, 0);
+    while (pos != std::string::npos) {
+        auto end = s.find_first_of(separators, pos + 1);
+        if (end == std::string::npos) end = s.size();
+        result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
     return result;
@@ -1250,29 +1250,30 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 
 template Strings tokenizeString(std::string_view s, std::string_view separators);
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
-template std::vector<string> tokenizeString(std::string_view s, std::string_view separators);
+template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 
-string chomp(std::string_view s)
+std::string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
-    return i == string::npos ? "" : string(s, 0, i + 1);
+    return i == std::string_view::npos ? "" : std::string(s, 0, i + 1);
 }
 
 
-string trim(const string & s, const string & whitespace)
+std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == string::npos) return "";
+    if (i == std::string_view::npos) return "";
     auto j = s.find_last_not_of(whitespace);
-    return string(s, i, j == string::npos ? j : j - i + 1);
+    return std::string(s, i, j == std::string::npos ? j : j - i + 1);
 }
 
 
-string replaceStrings(std::string_view s,
-    const std::string & from, const std::string & to)
+std::string replaceStrings(
+    std::string res,
+    std::string_view from,
+    std::string_view to)
 {
-    string res(s);
     if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
@@ -1283,20 +1284,19 @@ string replaceStrings(std::string_view s,
 }
 
 
-std::string rewriteStrings(const std::string & _s, const StringMap & rewrites)
+std::string rewriteStrings(std::string s, const StringMap & rewrites)
 {
-    auto s = _s;
     for (auto & i : rewrites) {
         if (i.first == i.second) continue;
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos)
+        while ((j = s.find(i.first, j)) != std::string::npos)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
 }
 
 
-string statusToString(int status)
+std::string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
@@ -1448,9 +1448,9 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
 constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-string base64Encode(std::string_view s)
+std::string base64Encode(std::string_view s)
 {
-    string res;
+    std::string res;
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1469,7 +1469,7 @@ string base64Encode(std::string_view s)
 }
 
 
-string base64Decode(std::string_view s)
+std::string base64Decode(std::string_view s)
 {
     constexpr char npos = -1;
     constexpr std::array<char, 256> base64DecodeChars = [&]() {
@@ -1481,7 +1481,7 @@ string base64Decode(std::string_view s)
         return result;
     }();
 
-    string res;
+    std::string res;
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
@@ -1835,7 +1835,7 @@ void connect(int fd, const std::string & path)
 }
 
 
-string showBytes(uint64_t bytes)
+std::string showBytes(uint64_t bytes)
 {
     return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
@@ -1846,7 +1846,7 @@ void commonChildInit(Pipe & logPipe)
 {
     logger = makeSimpleLogger();
 
-    const static string pathNullDevice = "/dev/null";
+    const static std::string pathNullDevice = "/dev/null";
     restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate

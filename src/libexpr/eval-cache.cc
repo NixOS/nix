@@ -596,7 +596,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     for (auto & attr : *getValue().attrs)
         attrs.push_back(attr.name);
     std::sort(attrs.begin(), attrs.end(), [](const Symbol & a, const Symbol & b) {
-        return (const string &) a < (const string &) b;
+        return (const std::string &) a < (const std::string &) b;
     });
 
     if (root->db)

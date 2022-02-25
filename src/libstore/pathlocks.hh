@@ -26,9 +26,9 @@ private:
 public:
     PathLocks();
     PathLocks(const PathSet & paths,
-        const string & waitMsg = "");
+        const std::string & waitMsg = "");
     bool lockPaths(const PathSet & _paths,
-        const string & waitMsg = "",
+        const std::string & waitMsg = "",
         bool wait = true);
     ~PathLocks();
     void unlock();

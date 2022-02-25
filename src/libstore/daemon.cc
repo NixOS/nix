@@ -479,8 +479,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddTextToStore: {
-        string suffix = readString(from);
-        string s = readString(from);
+        std::string suffix = readString(from);
+        std::string s = readString(from);
         auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto path = store->addTextToStore(suffix, s, refs, NoRepair);
@@ -698,8 +698,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
-                string name = readString(from);
-                string value = readString(from);
+                auto name = readString(from);
+                auto value = readString(from);
                 clientSettings.overrides.emplace(name, value);
             }
         }

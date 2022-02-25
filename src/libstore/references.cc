@@ -68,7 +68,7 @@ void RefScanSink::operator () (std::string_view data)
 
 
 std::pair<StorePathSet, HashResult> scanForReferences(
-    const string & path,
+    const std::string & path,
     const StorePathSet & refs)
 {
     HashSink hashSink { htSHA256 };
@@ -121,7 +121,7 @@ void RewritingSink::operator () (std::string_view data)
     s.append(data);
 
     size_t j = 0;
-    while ((j = s.find(from, j)) != string::npos) {
+    while ((j = s.find(from, j)) != std::string::npos) {
         matches.push_back(pos + j);
         s.replace(j, from.size(), to);
     }

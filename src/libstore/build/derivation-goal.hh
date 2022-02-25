@@ -145,7 +145,7 @@ struct DerivationGoal : public Goal
 
     void timedOut(Error && ex) override;
 
-    string key() override;
+    std::string key() override;
 
     void work() override;
 
@@ -200,7 +200,7 @@ struct DerivationGoal : public Goal
     virtual bool isReadDesc(int fd);
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data) override;
+    void handleChildOutput(int fd, std::string_view data) override;
     void handleEOF(int fd) override;
     void flushLine();
 

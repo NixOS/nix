@@ -26,7 +26,7 @@ static RunOptions hgOptions(const Strings & args)
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.
-static string runHg(const Strings & args, const std::optional<std::string> & input = {})
+static std::string runHg(const Strings & args, const std::optional<std::string> & input = {})
 {
     RunOptions opts = hgOptions(args);
     opts.input = input;
@@ -254,7 +254,7 @@ struct MercurialInputScheme : InputScheme
                     runHg({ "pull", "-R", cacheDir, "--", actualUrl });
                 }
                 catch (ExecError & e) {
-                    string transJournal = cacheDir + "/.hg/store/journal";
+                    auto transJournal = cacheDir + "/.hg/store/journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
                         runHg({ "recover", "-R", cacheDir });

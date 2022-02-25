@@ -70,7 +70,7 @@ int getSchema(Path schemaPath)
 {
     int curSchema = 0;
     if (pathExists(schemaPath)) {
-        string s = readFile(schemaPath);
+        auto s = readFile(schemaPath);
         auto n = string2Int<int>(s);
         if (!n)
             throw Error("'%1%' is corrupt", schemaPath);
@@ -239,7 +239,7 @@ LocalStore::LocalStore(const Params & params)
             res = posix_fallocate(fd.get(), 0, settings.reservedSize);
 #endif
             if (res == -1) {
-                writeFull(fd.get(), string(settings.reservedSize, 'X'));
+                writeFull(fd.get(), std::string(settings.reservedSize, 'X'));
                 [[gnu::unused]] auto res2 = ftruncate(fd.get(), settings.reservedSize);
             }
         }
@@ -450,7 +450,7 @@ void LocalStore::openDB(State & state, bool create)
         throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
-    string dbPath = dbDir + "/db.sqlite";
+    std::string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
     state.db = SQLite(dbPath, create);
 
@@ -471,19 +471,19 @@ void LocalStore::openDB(State & state, bool create)
        should be safe enough.  If the user asks for it, don't sync at
        all.  This can cause database corruption if the system
        crashes. */
-    string syncMode = settings.fsyncMetadata ? "normal" : "off";
+    std::string syncMode = settings.fsyncMetadata ? "normal" : "off";
     db.exec("pragma synchronous = " + syncMode);
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
        default. */
-    string mode = settings.useSQLiteWAL ? "wal" : "truncate";
-    string prevMode;
+    std::string mode = settings.useSQLiteWAL ? "wal" : "truncate";
+    std::string prevMode;
     {
         SQLiteStmt stmt;
         stmt.create(db, "pragma main.journal_mode;");
         if (sqlite3_step(stmt) != SQLITE_ROW)
             throwSQLiteError(db, "querying journal mode");
-        prevMode = string((const char *) sqlite3_column_text(stmt, 0));
+        prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
     }
     if (prevMode != mode &&
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
@@ -679,7 +679,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 {
     assert(drvPath.isDerivation());
     std::string drvName(drvPath.name());
-    drvName = string(drvName, 0, drvName.size() - drvExtension.size());
+    drvName = drvName.substr(0, drvName.size() - drvExtension.size());
 
     auto envHasRightPath = [&](const StorePath & actual, const std::string & varName)
     {
@@ -786,7 +786,11 @@ void LocalStore::registerDrvOutput(const Realisation & info)
     });
 }
 
-void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output)
+void LocalStore::cacheDrvOutputMapping(
+    State & state,
+    const uint64_t deriver,
+    const std::string & outputName,
+    const StorePath & output)
 {
     retrySQLite<void>([&]() {
         state.stmts->AddDerivationOutput.use()
@@ -795,7 +799,6 @@ void LocalStore::cacheDrvOutputMapping(State & state, const uint64_t deriver, co
             (printStorePath(output))
             .exec();
     });
-
 }
 
 
@@ -1436,7 +1439,9 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 }
 
 
-StorePath LocalStore::addTextToStore(const string & name, const string & s,
+StorePath LocalStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
     const StorePathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
@@ -1548,7 +1553,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
+            std::string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);

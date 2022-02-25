@@ -272,7 +272,7 @@ void PathSubstitutionGoal::finished()
 }
 
 
-void PathSubstitutionGoal::handleChildOutput(int fd, const string & data)
+void PathSubstitutionGoal::handleChildOutput(int fd, std::string_view data)
 {
 }
 

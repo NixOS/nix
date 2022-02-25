@@ -32,11 +32,11 @@ extern char * * environ __attribute__((weak));
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
-std::vector<string> shellwords(const string & s)
+static std::vector<std::string> shellwords(const std::string & s)
 {
     std::regex whitespace("^(\\s+).*");
     auto begin = s.cbegin();
-    std::vector<string> res;
+    std::vector<std::string> res;
     std::string cur;
     enum state {
         sBegin,
@@ -96,14 +96,14 @@ static void main_nix_build(int argc, char * * argv)
 
     auto inShebang = false;
     std::string script;
-    std::vector<string> savedArgs;
+    std::vector<std::string> savedArgs;
 
     AutoDelete tmpDir(createTempDir("", myName));
 
     std::string outLink = "./result";
 
     // List of environment variables kept for --pure
-    std::set<string> keepVars{
+    std::set<std::string> keepVars{
         "HOME", "XDG_RUNTIME_DIR", "USER", "LOGNAME", "DISPLAY",
         "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "PATH", "TERM", "IN_NIX_SHELL",
         "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",
@@ -384,7 +384,9 @@ static void main_nix_build(int argc, char * * argv)
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
-                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+                    [&](const std::string & exclude) {
+                        return !std::regex_search(store->printStorePath(input.first), std::regex(exclude));
+                    }))
             {
                 pathsToBuild.push_back({input.first, input.second});
                 pathsToCopy.insert(input.first);
@@ -437,7 +439,7 @@ static void main_nix_build(int argc, char * * argv)
         for (auto & var : drv.env)
             if (passAsFile.count(var.first)) {
                 keepTmp = true;
-                string fn = ".attr-" + std::to_string(fileNr++);
+                auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (Path) tmpDir + "/" + fn;
                 writeFile(p, var.second);
                 env[var.first + "Path"] = p;
@@ -514,7 +516,7 @@ static void main_nix_build(int argc, char * * argv)
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 shellEscape(dirOf(*shell)),
                 shellEscape(*shell),
-                (getenv("TZ") ? (string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
+                (getenv("TZ") ? (std::string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
                 envCommand);
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);

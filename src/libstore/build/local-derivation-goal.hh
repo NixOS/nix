@@ -58,7 +58,7 @@ struct LocalDerivationGoal : public DerivationGoal
     typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
 
-    typedef map<string, string> Environment;
+    typedef map<std::string, std::string> Environment;
     Environment env;
 
 #if __APPLE__

@@ -16,7 +16,7 @@ using namespace nix;
 
 /* If ‘url’ starts with ‘mirror://’, then resolve it using the list of
    mirrors defined in Nixpkgs. */
-string resolveMirrorUrl(EvalState & state, string url)
+std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 {
     if (url.substr(0, 9) != "mirror://") return url;
 
@@ -38,8 +38,8 @@ string resolveMirrorUrl(EvalState & state, string url)
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
 
-    string mirror(state.forceString(*mirrorList->value->listElems()[0]));
-    return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
+    std::string mirror(state.forceString(*mirrorList->value->listElems()[0]));
+    return mirror + (hasSuffix(mirror, "/") ? "" : "/") + s.substr(p + 1);
 }
 
 std::tuple<StorePath, Hash> prefetchFile(
@@ -128,10 +128,10 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 {
     {
         HashType ht = htSHA256;
-        std::vector<string> args;
+        std::vector<std::string> args;
         bool printPath = getEnv("PRINT_PATH") == "1";
         bool fromExpr = false;
-        string attrPath;
+        std::string attrPath;
         bool unpack = false;
         bool executable = false;
         std::optional<std::string> name;
@@ -147,7 +147,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             else if (*arg == "--version")
                 printVersion("nix-prefetch-url");
             else if (*arg == "--type") {
-                string s = getArg(*arg, arg, end);
+                auto s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
             }
             else if (*arg == "--print-path")
@@ -186,7 +186,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
         /* If -A is given, get the URL from the specified Nix
            expression. */
-        string url;
+        std::string url;
         if (!fromExpr) {
             if (args.empty())
                 throw UsageError("you must specify a URL");

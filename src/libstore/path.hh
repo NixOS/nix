@@ -62,7 +62,7 @@ public:
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
-typedef std::map<string, StorePath> OutputPathMap;
+typedef std::map<std::string, StorePath> OutputPathMap;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 

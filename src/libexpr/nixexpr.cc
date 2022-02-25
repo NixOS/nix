@@ -16,10 +16,10 @@ std::ostream & operator << (std::ostream & str, const Expr & e)
     return str;
 }
 
-static void showString(std::ostream & str, const string & s)
+static void showString(std::ostream & str, std::string_view s)
 {
     str << '"';
-    for (auto c : (string) s)
+    for (auto c : s)
         if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
         else if (c == '\n') str << "\\n";
         else if (c == '\r') str << "\\r";
@@ -28,7 +28,7 @@ static void showString(std::ostream & str, const string & s)
     str << '"';
 }
 
-static void showId(std::ostream & str, const string & s)
+static void showId(std::ostream & str, std::string_view s)
 {
     if (s.empty())
         str << "\"\"";
@@ -218,7 +218,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
         auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
         switch (pos.origin) {
             case foFile:
-                f % (string) pos.file;
+                f % (const std::string &) pos.file;
                 break;
             case foStdin:
             case foString:
@@ -234,7 +234,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 }
 
 
-string showAttrPath(const AttrPath & attrPath)
+std::string showAttrPath(const AttrPath & attrPath)
 {
     std::ostringstream out;
     bool first = true;
@@ -468,9 +468,9 @@ void ExprLambda::setName(Symbol & name)
 }
 
 
-string ExprLambda::showNamePos() const
+std::string ExprLambda::showNamePos() const
 {
-    return (format("%1% at %2%") % (name.set() ? "'" + (string) name + "'" : "anonymous function") % pos).str();
+    return fmt("%1% at %2%", name.set() ? "'" + (std::string) name + "'" : "anonymous function", pos);
 }
 
 

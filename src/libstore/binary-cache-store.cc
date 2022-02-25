@@ -385,8 +385,14 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
         }});
 }
 
-StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, const StorePathSet & references)
+StorePath BinaryCacheStore::addToStore(
+    std::string_view name,
+    const Path & srcPath,
+    FileIngestionMethod method,
+    HashType hashAlgo,
+    PathFilter & filter,
+    RepairFlag repair,
+    const StorePathSet & references)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
@@ -418,8 +424,11 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     })->path;
 }
 
-StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
-    const StorePathSet & references, RepairFlag repair)
+StorePath BinaryCacheStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
     auto path = makeTextPath(name, textHash, references);

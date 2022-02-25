@@ -158,7 +158,7 @@ public:
     }
 
     /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest, bool optional = false)
+    void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
         expectArgs({
             .label = label,

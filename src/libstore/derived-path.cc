@@ -75,9 +75,9 @@ DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_vi
     assert(n != s.npos);
     auto drvPath = store.parseStorePath(s.substr(0, n));
     auto outputsS = s.substr(n + 1);
-    std::set<string> outputs;
+    std::set<std::string> outputs;
     if (outputsS != "*")
-        outputs = tokenizeString<std::set<string>>(outputsS, ",");
+        outputs = tokenizeString<std::set<std::string>>(outputsS, ",");
     return {drvPath, outputs};
 }
 

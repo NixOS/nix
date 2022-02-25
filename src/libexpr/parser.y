@@ -244,7 +244,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
         es2->emplace_back(i->first, e);
     };
     const auto trimString = [&] (const StringToken & t) {
-        string s2;
+        std::string s2;
         for (size_t j = 0; j < t.l; ++j) {
             if (atStartOfLine) {
                 if (t.p[j] == ' ') {
@@ -268,9 +268,9 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
         /* Remove the last line if it is empty and consists only of
            spaces. */
         if (n == 1) {
-            string::size_type p = s2.find_last_of('\n');
-            if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
-                s2 = string(s2, 0, p + 1);
+            std::string::size_type p = s2.find_last_of('\n');
+            if (p != std::string::npos && s2.find_first_not_of(' ', p + 1) == std::string::npos)
+                s2 = std::string(s2, 0, p + 1);
         }
 
         es2->emplace_back(i->first, new ExprString(s2));
@@ -466,7 +466,7 @@ expr_simple
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
-      string path($1.p + 1, $1.l - 2);
+      std::string path($1.p + 1, $1.l - 2);
       $$ = new ExprCall(CUR_POS,
           new ExprVar(data->symbols.create("__findFile")),
           {new ExprVar(data->symbols.create("__nixPath")),
@@ -479,7 +479,7 @@ expr_simple
               .msg = hintfmt("URL literals are disabled"),
               .errPos = CUR_POS
           });
-      $$ = new ExprString(string($1));
+      $$ = new ExprString(std::string($1));
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -494,19 +494,19 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = new ExprString(string($1)); }
+  : STR { $$ = new ExprString(std::string($1)); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
   | { $$ = new ExprString(""); }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(string($2))); }
+  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(std::string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
   | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new std::vector<std::pair<Pos, Expr *> >;
-      $$->emplace_back(makeCurPos(@1, data), new ExprString(string($1)));
+      $$->emplace_back(makeCurPos(@1, data), new ExprString(std::string($1)));
       $$->emplace_back(makeCurPos(@2, data), $3);
     }
   ;
@@ -520,7 +520,7 @@ path_start
     $$ = new ExprPath(path);
   }
   | HPATH {
-    Path path(getHome() + string($1.p + 1, $1.l - 1));
+    Path path(getHome() + std::string($1.p + 1, $1.l - 1));
     $$ = new ExprPath(path);
   }
   ;
@@ -738,16 +738,16 @@ Expr * EvalState::parseStdin()
 }
 
 
-void EvalState::addToSearchPath(const string & s)
+void EvalState::addToSearchPath(const std::string & s)
 {
     size_t pos = s.find('=');
-    string prefix;
+    std::string prefix;
     Path path;
-    if (pos == string::npos) {
+    if (pos == std::string::npos) {
         path = s;
     } else {
-        prefix = string(s, 0, pos);
-        path = string(s, pos + 1);
+        prefix = std::string(s, 0, pos);
+        path = std::string(s, pos + 1);
     }
 
     searchPath.emplace_back(prefix, path);

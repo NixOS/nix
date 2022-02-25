@@ -100,7 +100,7 @@ std::vector<Path> getUserConfigFiles()
     // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
     auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
     if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<string>>(nixConfFiles.value(), ":");
+        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
     }
 
     // Use the paths specified by the XDG spec
@@ -181,7 +181,7 @@ bool Settings::isWSL1()
     return hasSuffix(utsbuf.release, "-Microsoft");
 }
 
-const string nixVersion = PACKAGE_VERSION;
+const std::string nixVersion = PACKAGE_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smEnabled, true},

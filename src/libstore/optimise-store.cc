@@ -77,7 +77,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
             continue;
         }
 
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         names.push_back(name);
     }
