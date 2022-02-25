@@ -81,12 +81,17 @@ struct ZipInputAccessor : InputAccessor
     bool pathExists(PathView _path) override
     {
         auto path = canonPath(_path);
-        return members.find(((std::string) path).c_str()) != members.end();
+        return
+            members.find(((std::string) path).c_str()) != members.end()
+            || members.find(((std::string) path + "/").c_str()) != members.end();
     }
 
     Stat lstat(PathView _path) override
     {
         auto path = canonPath(_path);
+
+        if (path == "/")
+            return Stat { .type = tDirectory };
 
         Type type = tRegular;
         bool isExecutable = false;
@@ -126,7 +131,8 @@ struct ZipInputAccessor : InputAccessor
 
     DirEntries readDirectory(PathView _path) override
     {
-        auto path = canonPath(_path) + "/";
+        auto path = canonPath(_path);
+        if (path != "/") path += "/";
 
         auto i = members.find(((std::string) path).c_str());
         if (i == members.end())
