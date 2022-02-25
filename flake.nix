@@ -533,26 +533,28 @@
           nixpkgs = nixpkgs-regression;
         };
 
-        installTests = forAllSystems (system:
+        installTestsAgainstSelf = forAllSystems (system:
           let pkgs = nixpkgsFor.${system}; in
-          pkgs.runCommand "install-tests" {
-            againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
-            againstCurrentUnstable =
-              # FIXME: temporarily disable this on macOS because of #3605.
-              if system == "x86_64-linux"
-              then testNixVersions pkgs pkgs.nix pkgs.nixUnstable
-              else null;
-            # Disabled because the latest stable version doesn't handle
-            # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
-            # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
-          } "touch $out");
+          testNixVersions pkgs pkgs.nix pkgs.pkgs.nix
+        );
+        installTestsAgainstCurrentUnstable = forAllSystems (system:
+          let pkgs = nixpkgsFor.${system}; in
+          # FIXME: temporarily disable this on macOS because of #3605.
+          if system == "x86_64-linux"
+          then testNixVersions pkgs pkgs.nix pkgs.nixUnstable
+          else pkgs.writeText "dummy" "dummy"
+        );
+        # Disabled because the latest stable version doesn't handle
+        # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
+        # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
 
       };
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
-        installTests = self.hydraJobs.installTests.${system};
+        installTestsAgainstCurrentUnstable = self.hydraJobs.installTestsAgainstCurrentUnstable.${system};
+        installTestsAgainstSelf = self.hydraJobs.installTestsAgainstSelf.${system};
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
