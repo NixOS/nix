@@ -175,8 +175,16 @@ and `/etc/zshrc` which you may remove.
    This will remove the Nix Store volume and everything that was added to the
    store.
 
-The change to `/etc/synthetic.conf` will only take effect after a reboot but
-you shouldn't have any traces of Nix left on your system.
+> **Note**
+> 
+> After you complete the steps here, you will still have an empty `/nix`
+> directory. This is an expected sign of a successful uninstall. The empty
+> `/nix` directory will disappear the next time you reboot.
+>
+> You do not have to reboot to finish uninstalling Nix. The uninstall is
+> complete. macOS (Catalina+) directly controls root directories and its
+> read-only root will prevent you from manually deleting the empty `/nix`
+> mountpoint.
 
 # macOS Installation <a name="sect-macos-installation-change-store-prefix"></a><a name="sect-macos-installation-encrypted-volume"></a><a name="sect-macos-installation-symlink"></a><a name="sect-macos-installation-recommended-notes"></a>
 <!-- Note: anchors above to catch permalinks to old explanations -->
