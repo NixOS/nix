@@ -103,11 +103,18 @@ void ExprAttrs::show(std::ostream & str) const
 {
     if (recursive) str << "rec ";
     str << "{ ";
-    for (auto & i : attrs)
-        if (i.second.inherited)
-            str << "inherit " << i.first << " " << "; ";
+    typedef const decltype(attrs)::value_type * Attr;
+    std::vector<Attr> sorted;
+    for (auto & i : attrs) sorted.push_back(&i);
+        std::sort(sorted.begin(), sorted.end(), [](Attr a, Attr b) {
+            return (const std::string &) a->first < (const std::string &) b->first;
+        });
+    for (auto & i : sorted) {
+        if (i->second.inherited)
+            str << "inherit " << i->first << " " << "; ";
         else
-            str << i.first << " = " << *i.second.e << "; ";
+            str << i->first << " = " << *i->second.e << "; ";
+    }
     for (auto & i : dynamicAttrs)
         str << "\"${" << *i.nameExpr << "}\" = " << *i.valueExpr << "; ";
     str << "}";
