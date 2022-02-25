@@ -833,7 +833,7 @@ static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
 }
 
 
-typedef list<Strings> Table;
+typedef std::list<Strings> Table;
 
 
 void printTable(Table & table)
