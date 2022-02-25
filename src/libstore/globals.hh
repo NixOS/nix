@@ -113,7 +113,7 @@ public:
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
-        "If `verbose-build` is false, the number of lines of the tail of "
+        "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
