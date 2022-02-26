@@ -842,7 +842,14 @@ void Value::mkStringMove(const char * s, const PathSet & context)
 
 void Value::mkPath(std::string_view s)
 {
-    mkPath(dupStringWithLen(s.data(), s.size()));
+    if (s.size() == 0) {
+        // Pathological, but better than crashing in dupStringWithLen, as
+        // s.data() may be null.
+        mkPath("");
+    }
+    else {
+        mkPath(dupStringWithLen(s.data(), s.size()));
+    }
 }
 
 
