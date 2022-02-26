@@ -805,7 +805,13 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 
 void Value::mkString(std::string_view s)
 {
-    mkString(dupStringWithLen(s.data(), s.size()));
+    if (s.size() == 0) {
+        // s.data() may not be valid and we don't need to allocate.
+        mkString("");
+    }
+    else {
+        mkString(dupStringWithLen(s.data(), s.size()));
+    }
 }
 
 
