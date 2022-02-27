@@ -282,7 +282,7 @@ struct Common : InstallableCommand, MixProfile
 
         out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
 
-        out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
+        out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)/\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
 
