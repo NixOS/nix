@@ -63,9 +63,15 @@ static char * dupString(const char * s)
 }
 
 
-static char * dupStringWithLen(const char * s, size_t size)
+// When there's no need to write to the string, we can optimize away empty
+// string allocations.
+// This function handles makeImmutableStringWithLen(null, 0) by returning the
+// empty string.
+static const char * makeImmutableStringWithLen(const char * s, size_t size)
 {
     char * t;
+    if (size == 0)
+        return "";
 #if HAVE_BOEHMGC
     t = GC_STRNDUP(s, size);
 #else
@@ -73,6 +79,10 @@ static char * dupStringWithLen(const char * s, size_t size)
 #endif
     if (!t) throw std::bad_alloc();
     return t;
+}
+
+static inline const char * makeImmutableString(std::string_view s) {
+    return makeImmutableStringWithLen(s.data(), s.size());
 }
 
 
@@ -805,13 +815,7 @@ LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, con
 
 void Value::mkString(std::string_view s)
 {
-    if (s.size() == 0) {
-        // s.data() may not be valid and we don't need to allocate.
-        mkString("");
-    }
-    else {
-        mkString(dupStringWithLen(s.data(), s.size()));
-    }
+    mkString(makeImmutableString(s));
 }
 
 
@@ -842,14 +846,7 @@ void Value::mkStringMove(const char * s, const PathSet & context)
 
 void Value::mkPath(std::string_view s)
 {
-    if (s.size() == 0) {
-        // Pathological, but better than crashing in dupStringWithLen, as
-        // s.data() may be null.
-        mkPath("");
-    }
-    else {
-        mkPath(dupStringWithLen(s.data(), s.size()));
-    }
+    mkPath(makeImmutableString(s));
 }
 
 
