@@ -131,6 +131,7 @@ sources = [config_priv_h] + files(
   'hilite.cc',
   'json-utils.cc',
   'logging.cc',
+  'logging-diffs.cc',
   'memory-source-accessor.cc',
   'mounted-source-accessor.cc',
   'position.cc',
