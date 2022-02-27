@@ -517,6 +517,14 @@ void EvalState::allowPath(const StorePath & storePath)
         allowedPaths->insert(store->toRealPath(storePath));
 }
 
+void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value &v)
+{
+    allowPath(storePath);
+
+    auto path = store->printStorePath(storePath);
+    v.mkString(path, PathSet({path}));
+}
+
 Path EvalState::checkSourcePath(const Path & path_)
 {
     if (!allowedPaths) return path_;

@@ -185,13 +185,6 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 // FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
-static void setStorePath(EvalState &state, const StorePath &storePath, Value &v) {
-    state.allowPath(storePath);
-
-    auto path = state.store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
-}
-
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     const std::string & who, bool unpack, std::string name)
 {
@@ -248,7 +241,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
         auto validPaths = state.store->queryValidPaths({expectedPath}, NoSubstitute);
         if (!validPaths.empty()) {
-            setStorePath(state, expectedPath, v);
+            state.allowAndSetStorePathString(expectedPath, v);
             return;
         }
     }
@@ -267,7 +260,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
-    setStorePath(state, storePath, v);
+    state.allowAndSetStorePathString(storePath, v);
 }
 
 static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
