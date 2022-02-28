@@ -171,12 +171,6 @@ struct CmdWhyDepends : SourceExprCommand
                     node.visited ? "\e[38;5;244m" : "",
                     firstPad != "" ? "→ " : "",
                     pathS);
-            } else {
-                logger->cout("%s%s%s%s" ANSI_NORMAL,
-                    firstPad,
-                    node.visited ? "\e[38;5;244m" : "",
-                    firstPad != "" ? treeLast : "",
-                    pathS);
             }
 
             if (node.path == dependencyPath && !all
@@ -184,7 +178,7 @@ struct CmdWhyDepends : SourceExprCommand
                 throw BailOut();
 
             if (node.visited) return;
-            node.visited = true;
+            if (precise) node.visited = true;
 
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
@@ -267,6 +261,16 @@ struct CmdWhyDepends : SourceExprCommand
                     if (!all) break;
                 }
 
+                if (!precise) {
+                    auto pathS = store->printStorePath(ref.second->path);
+                    logger->cout("%s%s%s%s" ANSI_NORMAL,
+                        firstPad,
+                        ref.second->visited ? "\e[38;5;244m" : "",
+                        last ? treeLast : treeConn,
+                        pathS);
+                    node.visited = true;
+                }
+
                 printNode(*ref.second,
                     tailPad + (last ? treeNull : treeLine),
                     tailPad + (last ? treeNull : treeLine));
@@ -275,6 +279,9 @@ struct CmdWhyDepends : SourceExprCommand
 
         RunPager pager;
         try {
+            if (!precise) {
+                logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
+            }
             printNode(graph.at(packagePath), "", "");
         } catch (BailOut & ) { }
     }
