@@ -1460,11 +1460,10 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
+    // FIXME: only do queryPathInfo if path.accessor is the store accessor
     auto refs =
-        #if 0
-        state.store->isInStore(path) ?
-        state.store->queryPathInfo(state.store->toStorePath(path).first)->references :
-        #endif
+        state.store->isInStore(path.path) ?
+        state.store->queryPathInfo(state.store->toStorePath(path.path).first)->references :
         StorePathSet{};
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
