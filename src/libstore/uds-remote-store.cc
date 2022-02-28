@@ -56,14 +56,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     auto conn = make_ref<Connection>();
 
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0);
-    if (!conn->fd)
-        throw SysError("cannot create Unix domain socket");
-    closeOnExec(conn->fd.get());
+    conn->fd = createUnixDomainSocket();
 
     nix::connect(conn->fd.get(), path ? *path : settings.nixDaemonSocketFile);
 

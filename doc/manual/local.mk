@@ -12,11 +12,13 @@ man-pages := $(foreach n, \
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 # Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
+# Set cores to 0 because otherwise nix show-config resolves the cores based on the current machine
 dummy-env = env -i \
 	HOME=/dummy \
 	NIX_CONF_DIR=/dummy \
 	NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt \
-	NIX_STATE_DIR=/dummy
+	NIX_STATE_DIR=/dummy \
+	NIX_CONFIG='cores = 0'
 
 nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
 
@@ -70,6 +72,7 @@ $(d)/builtins.json: $(bindir)/nix
 	@mv $@.tmp $@
 
 # Generate the HTML manual.
+html: $(docdir)/manual/index.html
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.

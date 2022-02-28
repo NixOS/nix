@@ -96,7 +96,7 @@ has the following fields:
   user specified, but the one resulting from applying the default
   attribute paths and prefixes; for instance, `hello` might resolve to
   `packages.x86_64-linux.hello` and the empty string to
-  `defaultPackage.x86_64-linux`.
+  `packages.x86_64-linux.default`.
 
 * `storePath`: The paths in the Nix store containing the package.
 

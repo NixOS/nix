@@ -55,7 +55,7 @@ R""(
   # nix develop /tmp/my-build-env
   ```
 
-* Replace all occurences of the store path corresponding to
+* Replace all occurrences of the store path corresponding to
   `glibc.dev` with a writable directory:
 
   ```console
@@ -88,9 +88,9 @@ the flake's `nixConfig` attribute.
 If no flake output attribute is given, `nix develop` tries the following
 flake output attributes:
 
-* `devShell.<system>`
+* `devShells.<system>.default`
 
-* `defaultPackage.<system>`
+* `packages.<system>.default`
 
 If a flake output *name* is given, `nix develop` tries the following flake
 output attributes:

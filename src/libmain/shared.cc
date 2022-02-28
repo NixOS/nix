@@ -15,9 +15,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#ifdef __linux__
+#include <features.h>
+#endif
+#ifdef __GLIBC__
+#include <gnu/lib-names.h>
+#include <nss.h>
+#include <dlfcn.h>
+#endif
 
 #include <openssl/crypto.h>
 
@@ -89,7 +94,7 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
 }
 
 
-string getArg(const string & opt,
+std::string getArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
@@ -121,21 +126,30 @@ static void preloadNSS() {
        been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
        load its lookup libraries in the parent before any child gets a chance to. */
     std::call_once(dns_resolve_flag, []() {
-        struct addrinfo *res = NULL;
-
-        /* nss will only force the "local" (not through nscd) dns resolution if its on the LOCALDOMAIN.
-           We need the resolution to be done locally, as nscd socket will not be accessible in the
-           sandbox. */
-        char * previous_env = getenv("LOCALDOMAIN");
-        setenv("LOCALDOMAIN", "invalid", 1);
-        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) == 0) {
-            if (res) freeaddrinfo(res);
-        }
-        if (previous_env) {
-             setenv("LOCALDOMAIN", previous_env, 1);
-        } else {
-             unsetenv("LOCALDOMAIN");
-        }
+#ifdef __GLIBC__
+        /* On linux, glibc will run every lookup through the nss layer.
+         * That means every lookup goes, by default, through nscd, which acts as a local
+         * cache.
+         * Because we run builds in a sandbox, we also remove access to nscd otherwise
+         * lookups would leak into the sandbox.
+         *
+         * But now we have a new problem, we need to make sure the nss_dns backend that
+         * does the dns lookups when nscd is not available is loaded or available.
+         *
+         * We can't make it available without leaking nix's environment, so instead we'll
+         * load the backend, and configure nss so it does not try to run dns lookups
+         * through nscd.
+         *
+         * This is technically only used for builtins:fetch* functions so we only care
+         * about dns.
+         *
+         * All other platforms are unaffected.
+         */
+        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
+            warn("unable to load nss_dns backend");
+        // FIXME: get hosts entry from nsswitch.conf.
+        __nss_configure_lookup("hosts", "files dns");
+#endif
     });
 }
 
@@ -213,6 +227,8 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
+    printError("FOO %s", programName);
+    
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',
@@ -308,14 +324,14 @@ void parseCmdLine(int argc, char * * argv,
 }
 
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(const std::string & programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 
-void printVersion(const string & programName)
+void printVersion(const std::string & programName)
 {
     std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
     if (verbosity > lvlInfo) {
@@ -338,7 +354,7 @@ void printVersion(const string & programName)
 }
 
 
-void showManPage(const string & name)
+void showManPage(const std::string & name)
 {
     restoreProcessContext();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
@@ -347,13 +363,13 @@ void showManPage(const string & name)
 }
 
 
-int handleExceptions(const string & programName, std::function<void()> fun)
+int handleExceptions(const std::string & programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
     ErrorInfo::programName = baseNameOf(programName);
 
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
             fun();
@@ -393,7 +409,7 @@ RunPager::RunPager()
     if (!isatty(STDOUT_FILENO)) return;
     char * pager = getenv("NIX_PAGER");
     if (!pager) pager = getenv("PAGER");
-    if (pager && ((string) pager == "" || (string) pager == "cat")) return;
+    if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
 
     Pipe toPager;
     toPager.create();
@@ -413,7 +429,7 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-
+    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
 }
@@ -424,7 +440,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            close(STDOUT_FILENO);
+            dup2(stdout, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {

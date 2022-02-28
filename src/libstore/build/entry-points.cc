@@ -1,4 +1,3 @@
-#include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "derivation-goal.hh"
@@ -74,7 +73,7 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
                     outputId,
                     Realisation{ outputId, *staticOutput.second}
                     );
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !derivationHasKnownOutputPaths(drv.type())) {
             auto realisation = this->queryRealisation(outputId);
             if (realisation)
                 result.builtOutputs.insert_or_assign(

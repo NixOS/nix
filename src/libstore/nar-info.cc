@@ -11,7 +11,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         return Error("NAR info file '%1%' is corrupt", whence);
     };
 
-    auto parseHashField = [&](const string & s) {
+    auto parseHashField = [&](const std::string & s) {
         try {
             return Hash::parseAnyPrefixed(s);
         } catch (BadHash &) {

@@ -28,7 +28,7 @@ struct NarMember
 
 struct NarAccessor : public FSAccessor
 {
-    std::shared_ptr<const std::string> nar;
+    std::optional<const std::string> nar;
 
     GetNarBytes getNarBytes;
 
@@ -90,7 +90,7 @@ struct NarAccessor : public FSAccessor
         void receiveContents(std::string_view data) override
         { }
 
-        void createSymlink(const Path & path, const string & target) override
+        void createSymlink(const Path & path, const std::string & target) override
         {
             createMember(path,
                 NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
@@ -104,7 +104,7 @@ struct NarAccessor : public FSAccessor
         }
     };
 
-    NarAccessor(ref<const std::string> nar) : nar(nar)
+    NarAccessor(std::string && _nar) : nar(_nar)
     {
         StringSource source(*nar);
         NarIndexer indexer(*this, source);
@@ -224,9 +224,9 @@ struct NarAccessor : public FSAccessor
     }
 };
 
-ref<FSAccessor> makeNarAccessor(ref<const std::string> nar)
+ref<FSAccessor> makeNarAccessor(std::string && nar)
 {
-    return make_ref<NarAccessor>(nar);
+    return make_ref<NarAccessor>(std::move(nar));
 }
 
 ref<FSAccessor> makeNarAccessor(Source & source)

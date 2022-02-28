@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -20,7 +21,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<unsigned int>(def, name, description, aliases)
+        : BaseSetting<unsigned int>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
@@ -37,21 +38,12 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Paths>(def, name, description, aliases)
+        : BaseSetting<Paths>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
 
     void set(const std::string & str, bool append = false) override;
-};
-
-class MissingExperimentalFeature: public Error
-{
-public:
-    std::string missingFeature;
-
-    MissingExperimentalFeature(std::string feature);
-    virtual const char* sname() const override { return "MissingExperimentalFeature"; }
 };
 
 class Settings : public Config {
@@ -121,7 +113,7 @@ public:
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
-        "If `verbose-build` is false, the number of lines of the tail of "
+        "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
@@ -138,7 +130,9 @@ public:
         {"build-max-jobs"}};
 
     Setting<unsigned int> buildCores{
-        this, getDefaultCores(), "cores",
+        this,
+        getDefaultCores(),
+        "cores",
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the
           invocation of builders. Builders can use this variable at their
@@ -149,7 +143,7 @@ public:
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
         )",
-        {"build-cores"}};
+        {"build-cores"}, false};
 
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
@@ -591,10 +585,11 @@ public:
           platform and generate incompatible code, so you may wish to
           cross-check the results of using this option against proper
           natively-built versions of your derivations.
-        )"};
+        )", {}, false};
 
     Setting<StringSet> systemFeatures{
-        this, getDefaultSystemFeatures(),
+        this,
+        getDefaultSystemFeatures(),
         "system-features",
         R"(
           A set of system “features” supported by this machine, e.g. `kvm`.
@@ -610,7 +605,7 @@ public:
           This setting by default includes `kvm` if `/dev/kvm` is accessible,
           and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
           that are used in Nixpkgs to route builds to specific machines.
-        )"};
+        )", {}, false};
 
     Setting<Strings> substituters{
         this,
@@ -805,6 +800,15 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+
+    Setting<StringSet> ignoredAcls{
+        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        R"(
+          A list of ACLs that should be ignored, normally Nix attempts to
+          remove all ACLs from files and directories in the Nix store, but
+          some ACLs like `security.selinux` or `system.nfs4_acl` can't be
+          removed even by root. Therefore it's best to just ignore them.
+        )"};
 #endif
 
     Setting<Strings> hashedMirrors{
@@ -925,12 +929,12 @@ public:
           value.
           )"};
 
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
-    void requireExperimentalFeature(const std::string & name);
+    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<bool> allowDirty{this, true, "allow-dirty",
         "Whether to allow dirty Git/Mercurial trees."};
@@ -959,6 +963,16 @@ public:
 
     Setting<bool> useRegistries{this, true, "use-registries",
         "Whether to use flake registries to resolve flake references."};
+
+    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
+        "Whether to accept nix configuration from a flake without prompting."};
+
+    Setting<std::string> commitLockFileSummary{
+        this, "", "commit-lockfile-summary",
+        R"(
+          The commit summary to use when committing changed flake lock files. If
+          empty, the summary is generated based on the action performed.
+        )"};
 };
 
 
@@ -974,6 +988,6 @@ void loadConfFile();
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const string nixVersion;
+extern const std::string nixVersion;
 
 }

@@ -26,7 +26,7 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    MakeReadOnly(const PathView path) : path(path) { }
     ~MakeReadOnly()
     {
         try {
@@ -77,7 +77,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
             continue;
         }
 
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         names.push_back(name);
     }
@@ -88,7 +88,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
 
 void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
-    const Path & path, InodeHash & inodeHash)
+    const Path & path, InodeHash & inodeHash, RepairFlag repair)
 {
     checkInterrupt();
 
@@ -110,7 +110,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(act, stats, path + "/" + i, inodeHash);
+            optimisePath_(act, stats, path + "/" + i, inodeHash, repair);
         return;
     }
 
@@ -151,7 +151,20 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Check if this is a known hash. */
     Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
 
- retry:
+    /* Maybe delete the link, if it has been corrupted. */
+    if (pathExists(linkPath)) {
+        auto stLink = lstat(linkPath);
+        if (st.st_size != stLink.st_size
+            || (repair && hash != hashPath(htSHA256, linkPath).first))
+        {
+            // XXX: Consider overwriting linkPath with our valid version.
+            warn("removing corrupted link '%s'", linkPath);
+            warn("There may be more corrupted paths."
+                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
+            unlink(linkPath.c_str());
+        }
+    }
+
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
@@ -187,23 +200,18 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         return;
     }
 
-    if (st.st_size != stLink.st_size) {
-        warn("removing corrupted link '%s'", linkPath);
-        unlink(linkPath.c_str());
-        goto retry;
-    }
-
     printMsg(lvlTalkative, format("linking '%1%' to '%2%'") % path % linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    bool mustToggle = dirOf(path) != realStoreDir.get();
-    if (mustToggle) makeWritable(dirOf(path));
+    const Path dirOfPath(dirOf(path));
+    bool mustToggle = dirOfPath != realStoreDir.get();
+    if (mustToggle) makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % realStoreDir % getpid() % random()).str();
@@ -260,7 +268,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash);
+            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());
@@ -278,12 +286,12 @@ void LocalStore::optimiseStore()
         stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const Path & path)
+void LocalStore::optimisePath(const Path & path, RepairFlag repair)
 {
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash);
+    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash, repair);
 }
 
 

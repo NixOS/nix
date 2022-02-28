@@ -154,12 +154,13 @@ private:
 /* A sink that writes data to a string. */
 struct StringSink : Sink
 {
-    ref<std::string> s;
-    StringSink() : s(make_ref<std::string>()) { };
-    explicit StringSink(const size_t reservedSize) : s(make_ref<std::string>()) {
-      s->reserve(reservedSize);
+    std::string s;
+    StringSink() { }
+    explicit StringSink(const size_t reservedSize)
+    {
+      s.reserve(reservedSize);
     };
-    StringSink(ref<std::string> s) : s(s) { };
+    StringSink(std::string && s) : s(std::move(s)) { };
     void operator () (std::string_view data) override;
 };
 
@@ -167,9 +168,9 @@ struct StringSink : Sink
 /* A source that reads data from a string. */
 struct StringSource : Source
 {
-    const string & s;
+    std::string_view s;
     size_t pos;
-    StringSource(const string & _s) : s(_s), pos(0) { }
+    StringSource(std::string_view s) : s(s), pos(0) { }
     size_t read(char * data, size_t len) override;
 };
 
@@ -317,10 +318,10 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     return sink;
 }
 
-Sink & operator << (Sink & sink, const string & s);
+Sink & operator << (Sink & in, const Error & ex);
+Sink & operator << (Sink & sink, std::string_view s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);
-Sink & operator << (Sink & in, const Error & ex);
 
 
 MakeError(SerialisationError, Error);
@@ -363,10 +364,10 @@ inline uint64_t readLongLong(Source & source)
 
 void readPadding(size_t len, Source & source);
 size_t readString(char * buf, size_t max, Source & source);
-string readString(Source & source, size_t max = std::numeric_limits<size_t>::max());
+std::string readString(Source & source, size_t max = std::numeric_limits<size_t>::max());
 template<class T> T readStrings(Source & source);
 
-Source & operator >> (Source & in, string & s);
+Source & operator >> (Source & in, std::string & s);
 
 template<typename T>
 Source & operator >> (Source & in, T & n)

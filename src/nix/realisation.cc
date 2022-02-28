@@ -46,7 +46,7 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
     void run(ref<Store> store, BuiltPaths && paths) override
     {
-        settings.requireExperimentalFeature("ca-derivations");
+        settings.requireExperimentalFeature(Xp::CaDerivations);
         RealisedPath::Set realisations;
 
         for (auto & builtPath : paths) {

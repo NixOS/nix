@@ -16,7 +16,6 @@ struct Tree
 {
     Path actualPath;
     StorePath storePath;
-    Tree(Path && actualPath, StorePath && storePath) : actualPath(actualPath), storePath(std::move(storePath)) {}
 };
 
 struct InputScheme;
@@ -35,7 +34,7 @@ struct Input
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
-    bool immutable = false;
+    bool locked = false;
     bool direct = true;
 
     /* path of the parent of this input, used for relative path resolution */
@@ -60,9 +59,9 @@ public:
        one that goes through a registry. */
     bool isDirect() const { return direct; }
 
-    /* Check whether this is an "immutable" input, that is,
+    /* Check whether this is a "locked" input, that is,
        one that contains a commit hash or content hash. */
-    bool isImmutable() const { return immutable; }
+    bool isLocked() const { return locked; }
 
     bool hasAllInfo() const;
 
@@ -70,6 +69,8 @@ public:
 
     bool contains(const Input & other) const;
 
+    /* Fetch the input into the Nix store, returning the location in
+       the Nix store and the locked input. */
     std::pair<Tree, Input> fetch(ref<Store> store) const;
 
     Input applyOverrides(
@@ -131,7 +132,7 @@ struct InputScheme
 
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
-    virtual std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) = 0;
+    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
@@ -147,14 +148,14 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers = {});
 
 std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers = {});
 
 }

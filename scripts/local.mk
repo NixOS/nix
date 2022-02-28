@@ -1,7 +1,5 @@
 nix_noinst_scripts := \
-  $(d)/nix-http-export.cgi \
-  $(d)/nix-profile.sh \
-  $(d)/nix-reduce-build
+  $(d)/nix-profile.sh
 
 noinst-scripts += $(nix_noinst_scripts)
 

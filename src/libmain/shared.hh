@@ -22,7 +22,7 @@ public:
     virtual ~Exit();
 };
 
-int handleExceptions(const string & programName, std::function<void()> fun);
+int handleExceptions(const std::string & programName, std::function<void()> fun);
 
 /* Don't forget to call initPlugins() after settings are initialized! */
 void initNix();
@@ -30,10 +30,10 @@ void initNix();
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(const std::string & programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
-void printVersion(const string & programName);
+void printVersion(const std::string & programName);
 
 /* Ugh.  No better place to put this. */
 void printGCWarning();
@@ -50,10 +50,10 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
     const StorePathSet & willSubstitute, const StorePathSet & unknown,
     uint64_t downloadSize, uint64_t narSize, Verbosity lvl = lvlInfo);
 
-string getArg(const string & opt,
+std::string getArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end);
 
-template<class N> N getIntArg(const string & opt,
+template<class N> N getIntArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end, bool allowUnit)
 {
     ++i;
@@ -76,7 +76,7 @@ struct LegacyArgs : public MixCommonArgs
 
 
 /* Show the manual page for the specified program. */
-void showManPage(const string & name);
+void showManPage(const std::string & name);
 
 /* The constructor of this class starts a pager if stdout is a
    terminal and $PAGER is set. Stdout is redirected to the pager. */
@@ -88,6 +88,7 @@ public:
 
 private:
     Pid pid;
+    int stdout;
 };
 
 extern volatile ::sig_atomic_t blockInt;
@@ -95,7 +96,7 @@ extern volatile ::sig_atomic_t blockInt;
 
 /* GC helpers. */
 
-string showBytes(uint64_t bytes);
+std::string showBytes(uint64_t bytes);
 
 struct GCResults;
 

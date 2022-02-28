@@ -11,7 +11,7 @@
 
 using namespace nix;
 
-typedef std::map<string,string> Channels;
+typedef std::map<std::string, std::string> Channels;
 
 static Channels channels;
 static Path channelsList;
@@ -22,11 +22,11 @@ static void readChannels()
     if (!pathExists(channelsList)) return;
     auto channelsFile = readFile(channelsList);
 
-    for (const auto & line : tokenizeString<std::vector<string>>(channelsFile, "\n")) {
+    for (const auto & line : tokenizeString<std::vector<std::string>>(channelsFile, "\n")) {
         chomp(line);
         if (std::regex_search(line, std::regex("^\\s*\\#")))
             continue;
-        auto split = tokenizeString<std::vector<string>>(line, " ");
+        auto split = tokenizeString<std::vector<std::string>>(line, " ");
         auto url = std::regex_replace(split[0], std::regex("/*$"), "");
         auto name = split.size() > 1 ? split[1] : std::string(baseNameOf(url));
         channels[name] = url;
@@ -44,7 +44,7 @@ static void writeChannels()
 }
 
 // Adds a channel.
-static void addChannel(const string & url, const string & name)
+static void addChannel(const std::string & url, const std::string & name)
 {
     if (!regex_search(url, std::regex("^(file|http|https)://")))
         throw Error("invalid channel URL '%1%'", url);
@@ -58,7 +58,7 @@ static void addChannel(const string & url, const string & name)
 static Path profile;
 
 // Remove a channel.
-static void removeChannel(const string & name)
+static void removeChannel(const std::string & name)
 {
     readChannels();
     channels.erase(name);
@@ -88,15 +88,6 @@ static void update(const StringSet & channelNames)
     for (const auto & channel : channels) {
         auto name = channel.first;
         auto url = channel.second;
-        if (!(channelNames.empty() || channelNames.count(name)))
-            continue;
-
-        // We want to download the url to a file to see if it's a tarball while also checking if we
-        // got redirected in the process, so that we can grab the various parts of a nix channel
-        // definition from a consistent location if the redirect changes mid-download.
-        auto result = fetchers::downloadFile(store, url, std::string(baseNameOf(url)), false);
-        auto filename = store->toRealPath(result.storePath);
-        url = result.effectiveUrl;
 
         // If the URL contains a version number, append it to the name
         // attribute (so that "nix-env -q" on the channels profile
@@ -105,34 +96,47 @@ static void update(const StringSet & channelNames)
         std::smatch match;
         auto urlBase = std::string(baseNameOf(url));
         if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$")))
-            cname = cname + (string) match[1];
+            cname = cname + (std::string) match[1];
 
         std::string extraAttrs;
 
-        bool unpacked = false;
-        if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-            runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
-                        "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
-            unpacked = true;
-        }
+        if (!(channelNames.empty() || channelNames.count(name))) {
+            // no need to update this channel, reuse the existing store path
+            Path symlink = profile + "/" + name;
+            Path storepath = dirOf(readLink(symlink));
+            exprs.push_back("f: rec { name = \"" + cname + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \"" + storepath + "\"; out = { inherit outPath; };}");
+        } else {
+            // We want to download the url to a file to see if it's a tarball while also checking if we
+            // got redirected in the process, so that we can grab the various parts of a nix channel
+            // definition from a consistent location if the redirect changes mid-download.
+            auto result = fetchers::downloadFile(store, url, std::string(baseNameOf(url)), false);
+            auto filename = store->toRealPath(result.storePath);
+            url = result.effectiveUrl;
 
-        if (!unpacked) {
-            // Download the channel tarball.
-            try {
-                filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
-            } catch (FileTransferError & e) {
-                filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
+            bool unpacked = false;
+            if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
+                runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
+                            "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
+                unpacked = true;
             }
-        }
 
-        // Regardless of where it came from, add the expression representing this channel to accumulated expression
-        exprs.push_back("f: f { name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; " + extraAttrs + " }");
+            if (!unpacked) {
+                // Download the channel tarball.
+                try {
+                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
+                } catch (FileTransferError & e) {
+                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
+                }
+            }
+            // Regardless of where it came from, add the expression representing this channel to accumulated expression
+            exprs.push_back("f: f { name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; " + extraAttrs + " }");
+        }
     }
 
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
     std::cerr << "unpacking channels...\n";
-    Strings envArgs{ "--profile", profile, "--file", unpackChannelPath, "--install", "--from-expression" };
+    Strings envArgs{ "--profile", profile, "--file", unpackChannelPath, "--install", "--remove-all", "--from-expression" };
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));
     envArgs.push_back("--quiet");
@@ -172,7 +176,7 @@ static int main_nix_channel(int argc, char ** argv)
             cUpdate,
             cRollback
         } cmd = cNone;
-        std::vector<string> args;
+        std::vector<std::string> args;
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help") {
                 showManPage("nix-channel");
