@@ -2,12 +2,15 @@
 
 set -u
 
+TESTS_TIMER_LOG=${TESTS_TIMER_LOG:-/dev/null}
+
+start_time=$(date -u +%s)
+echo "$(date -u +%s) $1 start" >> "$TESTS_TIMER_LOG"
+
 red=""
 green=""
 yellow=""
 normal=""
-
-TESTS_TIMER_LOG=${TESTS_TIMER_LOG:-/dev/null}
 
 post_run_msg="ran test $1..."
 if [ -t 1 ]; then
@@ -18,11 +21,8 @@ if [ -t 1 ]; then
 fi
 (cd tests && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
 
-start_time=$(date -u +%s)
-echo "$(date -u +%s) $1 start" >> "$TESTS_TIMER_LOG"
 log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)"
 status=$?
-echo "$(date -u +%s) $1 stop" >> "$TESTS_TIMER_LOG"
 stop_time=$(date -u +%s)
 elapsed_time=$(($stop_time-$start_time))
 
@@ -35,3 +35,4 @@ else
   echo "$log" | sed 's/^/    /'
   exit "$status"
 fi
+echo "$(date -u +%s) $1 stop" >> "$TESTS_TIMER_LOG"
