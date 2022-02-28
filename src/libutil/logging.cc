@@ -113,7 +113,7 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
     }
 }
 
-void writeToStderr(const string & s)
+void writeToStderr(std::string_view s)
 {
     try {
         writeFull(STDERR_FILENO, s, false);

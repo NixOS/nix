@@ -125,7 +125,7 @@ Special exit codes:
 
   - `104`\
     Not deterministic, the build succeeded in check mode but the
-    resulting output is not binary reproducable.
+    resulting output is not binary reproducible.
 
 With the `--keep-going` flag it's possible for multiple failures to
 occur, in this case the 1xx status codes are or combined using binary
@@ -321,8 +321,8 @@ symlink.
     This query has one option:
 
       - `--include-outputs`
-        Also include the output path of store derivations, and their
-        closures.
+        Also include the existing output paths of store derivations,
+        and their closures.
 
     This query can be used to implement various kinds of deployment. A
     *source deployment* is obtained by distributing the closure of a

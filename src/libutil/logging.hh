@@ -40,7 +40,7 @@ struct LoggerSettings : Config
     Setting<bool> showTrace{
         this, false, "show-trace",
         R"(
-          Where Nix should print out a stack trace in case of Nix
+          Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
 };
@@ -189,13 +189,14 @@ extern Verbosity verbosity; /* suppress msgs > this */
 /* Print a string message if the current log level is at least the specified
    level. Note that this has to be implemented as a macro to ensure that the
    arguments are evaluated lazily. */
-#define printMsg(level, args...) \
+#define printMsgUsing(loggerParam, level, args...) \
     do { \
         auto __lvl = level; \
         if (__lvl <= nix::verbosity) { \
-            logger->log(__lvl, fmt(args)); \
+            loggerParam->log(__lvl, fmt(args)); \
         } \
     } while (0)
+#define printMsg(level, args...) printMsgUsing(logger, level, args)
 
 #define printError(args...) printMsg(lvlError, args)
 #define notice(args...) printMsg(lvlNotice, args)
@@ -215,6 +216,6 @@ inline void warn(const std::string & fs, const Args & ... args)
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
-void writeToStderr(const string & s);
+void writeToStderr(std::string_view s);
 
 }

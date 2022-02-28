@@ -2,7 +2,7 @@ R""(
 
 # Description
 
-`nix flake` provides subcommands for managing *flake
+`nix registry` provides subcommands for managing *flake
 registries*. Flake registries are a convenience feature that allows
 you to refer to flakes using symbolic identifiers such as `nixpkgs`,
 rather than full URLs such as `git://github.com/NixOS/nixpkgs`. You

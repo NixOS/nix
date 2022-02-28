@@ -377,6 +377,11 @@ cure_artifacts() {
 }
 
 validate_starting_assumptions() {
+    task "Checking for artifacts of previous installs"
+    cat <<EOF
+Before I try to install, I'll check for signs Nix already is or has
+been installed on this system.
+EOF
     if type nix-env 2> /dev/null >&2; then
         warning <<EOF
 Nix already appears to be installed. This installer may run into issues.
@@ -386,20 +391,34 @@ $(uninstall_directions)
 EOF
     fi
 
+    # TODO: I think it would be good for this step to accumulate more
+    #       knowledge of older obsolete artifacts, if there are any.
+    #       We could issue a "reminder" here that the user might want
+    #       to clean them up?
+
     for profile_target in "${PROFILE_TARGETS[@]}"; do
+        # TODO: I think it would be good to accumulate a list of all
+        #       of the copies so that people don't hit this 2 or 3x in
+        #       a row for different files.
         if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+            # this backup process first released in Nix 2.1
             failure <<EOF
-When this script runs, it backs up the current $profile_target to
-$profile_target$PROFILE_BACKUP_SUFFIX. This backup file already exists, though.
+I back up shell profile/rc scripts before I add Nix to them.
+I need to back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX,
+but the latter already exists.
 
-Please follow these instructions to clean up the old backup file:
+Here's how to clean up the old backup file:
 
-1. Copy $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX to another place, just
-in case.
+1. Back up (copy) $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX
+   to another location, just in case.
 
-2. Take care to make sure that $profile_target$PROFILE_BACKUP_SUFFIX doesn't look like
-it has anything nix-related in it. If it does, something is probably
-quite wrong. Please open an issue or get in touch immediately.
+2. Ensure $profile_target$PROFILE_BACKUP_SUFFIX does not have anything
+   Nix-related in it. If it does, something is probably quite
+   wrong. Please open an issue or get in touch immediately.
+
+3. Once you confirm $profile_target is backed up and
+   $profile_target$PROFILE_BACKUP_SUFFIX doesn't mention Nix, run:
+   mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 EOF
         fi
     done
@@ -557,21 +576,40 @@ create_directories() {
         # since this bit is cross-platform:
         # - first try with `command -vp` to try and find
         #   chown in the usual places
+        #   * to work around some sort of deficiency in
+        #     `command -p` in macOS bash 3.2, we also add
+        #     PATH="$(getconf PATH 2>/dev/null)". As long as
+        #     getconf is found, this should set a sane PATH
+        #     which `command -p` in bash 3.2 appears to use.
+        #     A bash with a properly-working `command -p`
+        #     should ignore this hard-set PATH in favor of
+        #     whatever it obtains internally. See
+        #     github.com/NixOS/nix/issues/5768
         # - fall back on `command -v` which would find
         #   any chown on path
         # if we don't find one, the command is already
         # hiding behind || true, and the general state
         # should be one the user can repair once they
         # figure out where chown is...
-        local get_chr_own="$(command -vp chown)"
+        local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
         if [[ -z "$get_chr_own" ]]; then
             get_chr_own="$(command -v chown)"
         fi
-        _sudo "to take root ownership of existing Nix store files" \
-              "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+
+        if [[ -z "$get_chr_own" ]]; then
+            reminder <<EOF
+I wanted to take root ownership of existing Nix store files,
+but I couldn't locate 'chown'. (You may need to fix your PATH.)
+To manually change file ownership, you can run:
+    sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT'
+EOF
+        else
+            _sudo "to take root ownership of existing Nix store files" \
+                  "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+        fi
     fi
     _sudo "to make the basic directory structure of Nix (part 1)" \
-          install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
+          install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool,/daemon-socket} /nix/var/nix/{gcroots,profiles}/per-user
 
     _sudo "to make the basic directory structure of Nix (part 2)" \
           install -dv -g "$NIX_BUILD_GROUP_NAME" -m 1775 /nix/store
@@ -599,7 +637,7 @@ manager. This will happen in a few stages:
 1. Make sure your computer doesn't already have Nix. If it does, I
    will show you instructions on how to clean up your old install.
 
-2. Show you what we are going to install and where. Then we will ask
+2. Show you what I am going to install and where. Then I will ask
    if you are ready to continue.
 
 3. Create the system users and groups that the Nix daemon uses to run
@@ -614,14 +652,14 @@ manager. This will happen in a few stages:
 
 EOF
 
-    if ui_confirm "Would you like to see a more detailed list of what we will do?"; then
+    if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
         cat <<EOF
 
-We will:
+I will:
 
  - make sure your computer doesn't already have Nix files
    (if it does, I will tell you how to clean them up.)
- - create local users (see the list above for the users we'll make)
+ - create local users (see the list above for the users I'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT
  - create a configuration file in /etc/nix
@@ -656,7 +694,7 @@ run in a headless fashion, like this:
 
   $ curl -L https://nixos.org/nix/install | sh
 
-or maybe in a CI pipeline. Because of that, we're going to skip the
+or maybe in a CI pipeline. Because of that, I'm going to skip the
 verbose output in the interest of brevity.
 
 If you would like to
@@ -670,7 +708,7 @@ EOF
     fi
 
     cat <<EOF
-This script is going to call sudo a lot. Every time we do, it'll
+This script is going to call sudo a lot. Every time I do, it'll
 output exactly what it'll do, and why.
 
 Just like this:
@@ -682,15 +720,15 @@ EOF
     cat <<EOF
 
 This might look scary, but everything can be undone by running just a
-few commands. We used to ask you to confirm each time sudo ran, but it
+few commands. I used to ask you to confirm each time sudo ran, but it
 was too many times. Instead, I'll just ask you this one time:
 
 EOF
-    if ui_confirm "Can we use sudo?"; then
+    if ui_confirm "Can I use sudo?"; then
         ok "Yay! Thanks! Let's get going!"
     else
         failure <<EOF
-That is okay, but we can't install.
+That is okay, but I can't install.
 EOF
     fi
 }
@@ -809,10 +847,10 @@ main() {
     # can fail faster in this case. Sourcing install-darwin... now runs
     # `touch /` to detect Read-only root, but it could update times on
     # pre-Catalina macOS if run as root user.
-    if [ $EUID -eq 0 ]; then
+    if [ "$EUID" -eq 0 ]; then
         failure <<EOF
-Please do not run this script with root privileges. We will call sudo
-when we need to.
+Please do not run this script with root privileges. I will call sudo
+when I need to.
 EOF
     fi
 

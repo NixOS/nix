@@ -79,7 +79,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         size_t pathLen = 0;
         for (auto & storePath : storePaths)
@@ -97,7 +97,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
             for (auto & storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);
-                auto storePathS = store->printStorePath(storePath);
+                auto storePathS = store->printStorePath(info->path);
 
                 std::cout << storePathS;
 

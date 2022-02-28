@@ -129,7 +129,7 @@ struct CgroupUserLock : UserLock
 
     static std::unique_ptr<UserLock> acquire()
     {
-        settings.requireExperimentalFeature("auto-allocate-uids");
+        settings.requireExperimentalFeature(Xp::AutoAllocateUids);
         assert(settings.startId > 0);
         assert(settings.startId % settings.idsPerBuild == 0);
         assert(settings.uidCount % settings.idsPerBuild == 0);

@@ -40,7 +40,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
-        state.forceValue(v);
+        state.forceValue(v, [&]() { return v.determinePos(noPos); });
 
         PathSet context;
         if (evalOnly) {
@@ -50,9 +50,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okXML)
-                printValueAsXML(state, strict, location, vRes, std::cout, context);
+                printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON)
-                printValueAsJSON(state, strict, vRes, std::cout, context);
+                printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
             else {
                 if (strict) state.forceValueDeep(vRes);
                 std::cout << vRes << std::endl;
@@ -64,7 +64,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 Path drvPath = i.queryDrvPath();
 
                 /* What output do we want? */
-                string outputName = i.queryOutputName();
+                std::string outputName = i.queryOutputName();
                 if (outputName == "")
                     throw Error("derivation '%1%' lacks an 'outputName' attribute ", drvPath);
 

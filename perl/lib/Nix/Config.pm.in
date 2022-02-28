@@ -1,6 +1,7 @@
 package Nix::Config;
 
 use MIME::Base64;
+use Nix::Store;
 
 $version = "@PACKAGE_VERSION@";
 

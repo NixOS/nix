@@ -57,8 +57,8 @@ public:
     {
         // FIXME: do this lazily?
         if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            priority.setDefault(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
@@ -126,7 +126,7 @@ protected:
         const std::string & mimeType) override
     {
         auto req = makeRequest(path);
-        req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
+        req.data = StreamToSourceAdapter(istream).drain();
         req.mimeType = mimeType;
         try {
             getFileTransfer()->upload(req);
@@ -159,7 +159,7 @@ protected:
     }
 
     void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) noexcept override
+        Callback<std::optional<std::string>> callback) noexcept override
     {
         checkEnabled();
 
@@ -170,10 +170,10 @@ protected:
         getFileTransfer()->enqueueFileTransfer(request,
             {[callbackPtr, this](std::future<FileTransferResult> result) {
                 try {
-                    (*callbackPtr)(result.get().data);
+                    (*callbackPtr)(std::move(result.get().data));
                 } catch (FileTransferError & e) {
                     if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                        return (*callbackPtr)(std::shared_ptr<std::string>());
+                        return (*callbackPtr)({});
                     maybeDisable();
                     callbackPtr->rethrow();
                 } catch (...) {

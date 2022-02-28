@@ -21,7 +21,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         , Store(params)
     { }
 
-    string getUri() override
+    std::string getUri() override
     {
         return *uriSchemes().begin();
     }
@@ -43,15 +43,19 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         RepairFlag repair, CheckSigsFlag checkSigs) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
-    { unsupported("queryRealisation"); }
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    { callback(nullptr); }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;

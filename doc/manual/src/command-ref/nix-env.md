@@ -238,13 +238,25 @@ a number of possible ways:
 
 ## Examples
 
-To install a specific version of `gcc` from the active Nix expression:
+To install a package using a specific attribute path from the active Nix expression:
+
+```console
+$ nix-env -iA gcc40mips
+installing `gcc-4.0.2'
+$ nix-env -iA xorg.xorgserver
+installing `xorg-server-1.2.0'
+```
+
+To install a specific version of `gcc` using the derivation name:
 
 ```console
 $ nix-env --install gcc-3.3.2
 installing `gcc-3.3.2'
 uninstalling `gcc-3.1'
 ```
+
+Using attribute path for selecting a package is preferred,
+as it is much faster and there will not be multiple matches.
 
 Note the previously installed version is removed, since
 `--preserve-installed` was not specified.
@@ -254,13 +266,6 @@ To install an arbitrary version:
 ```console
 $ nix-env --install gcc
 installing `gcc-3.3.2'
-```
-
-To install using a specific attribute:
-
-```console
-$ nix-env -i -A gcc40mips
-$ nix-env -i -A xorg.xorgserver
 ```
 
 To install all derivations in the Nix expression `foo.nix`:
@@ -374,22 +379,29 @@ For the other flags, see `--install`.
 ## Examples
 
 ```console
-$ nix-env --upgrade gcc
+$ nix-env --upgrade -A nixpkgs.gcc
 upgrading `gcc-3.3.1' to `gcc-3.4'
 ```
 
+When there are no updates available, nothing will happen:
+
 ```console
-$ nix-env -u gcc-3.3.2 --always (switch to a specific version)
+$ nix-env --upgrade -A nixpkgs.pan
+```
+
+Using `-A` is preferred when possible, as it is faster and unambiguous but
+it is also possible to upgrade to a specific version by matching the derivation name:
+
+```console
+$ nix-env -u gcc-3.3.2 --always
 upgrading `gcc-3.4' to `gcc-3.3.2'
 ```
 
-```console
-$ nix-env --upgrade pan
-(no upgrades available, so nothing happens)
-```
+To try to upgrade everything
+(matching packages based on the part of the derivation name without version):
 
 ```console
-$ nix-env -u (try to upgrade everything)
+$ nix-env -u
 upgrading `hello-2.1.2' to `hello-2.1.3'
 upgrading `mozilla-1.2' to `mozilla-1.4'
 ```
@@ -401,7 +413,7 @@ of a derivation `x` by looking at their respective `name` attributes.
 The names (e.g., `gcc-3.3.1` are split into two parts: the package name
 (`gcc`), and the version (`3.3.1`). The version part starts after the
 first dash not followed by a letter. `x` is considered an upgrade of `y`
-if their package names match, and the version of `y` is higher that that
+if their package names match, and the version of `y` is higher than that
 of `x`.
 
 The versions are compared by splitting them into contiguous components

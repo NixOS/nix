@@ -37,10 +37,10 @@ class JSONSax : nlohmann::json_sax<json> {
         ValueMap attrs;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            Value & v = parent->value(state);
-            state.mkAttrs(v, attrs.size());
+            auto attrs2 = state.buildBindings(attrs.size());
             for (auto & i : attrs)
-                v.attrs->push_back(Attr(i.first, i.second));
+                attrs2.insert(i.first, i.second);
+            parent->value(state).mkAttrs(attrs2.alreadySorted());
             return std::move(parent);
         }
         void add() override { v = nullptr; }
@@ -76,45 +76,51 @@ class JSONSax : nlohmann::json_sax<json> {
     EvalState & state;
     std::unique_ptr<JSONState> rs;
 
-    template<typename T, typename... Args> inline bool handle_value(T f, Args... args)
-    {
-        f(rs->value(state), args...);
-        rs->add();
-        return true;
-    }
-
 public:
     JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
 
     bool null()
     {
-        return handle_value(mkNull);
+        rs->value(state).mkNull();
+        rs->add();
+        return true;
     }
 
     bool boolean(bool val)
     {
-        return handle_value(mkBool, val);
+        rs->value(state).mkBool(val);
+        rs->add();
+        return true;
     }
 
     bool number_integer(number_integer_t val)
     {
-        return handle_value(mkInt, val);
+        rs->value(state).mkInt(val);
+        rs->add();
+        return true;
     }
 
     bool number_unsigned(number_unsigned_t val)
     {
-        return handle_value(mkInt, val);
+        rs->value(state).mkInt(val);
+        rs->add();
+        return true;
     }
 
     bool number_float(number_float_t val, const string_t & s)
     {
-        return handle_value(mkFloat, val);
+        rs->value(state).mkFloat(val);
+        rs->add();
+        return true;
     }
 
     bool string(string_t & val)
     {
-        return handle_value<void(Value&, const char*)>(mkString, val.c_str());
+        rs->value(state).mkString(val);
+        rs->add();
+        return true;
     }
+
 #if NLOHMANN_JSON_VERSION_MAJOR >= 3 && NLOHMANN_JSON_VERSION_MINOR >= 8
     bool binary(binary_t&)
     {
@@ -157,7 +163,7 @@ public:
     }
 };
 
-void parseJSON(EvalState & state, const string & s_, Value & v)
+void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
 {
     JSONSax parser(state, v);
     bool res = json::sax_parse(s_, &parser);

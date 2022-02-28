@@ -208,8 +208,8 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 
     Strings::iterator i = opArgs.begin();
     HashType hashAlgo = parseHashType(*i++);
-    string hash = *i++;
-    string name = *i++;
+    std::string hash = *i++;
+    std::string name = *i++;
 
     cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash::parseAny(hash, hashAlgo), name)));
 }
@@ -238,7 +238,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
    graph.  Topological sorting is used to keep the tree relatively
    flat. */
 static void printTree(const StorePath & path,
-    const string & firstPad, const string & tailPad, StorePathSet & done)
+    const std::string & firstPad, const std::string & tailPad, StorePathSet & done)
 {
     if (!done.insert(path).second) {
         cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
@@ -277,7 +277,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
-    string bindingName;
+    std::string bindingName;
 
     for (auto & i : opFlags) {
         QueryType prev = query;
@@ -637,7 +637,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
     FdSink sink(STDOUT_FILENO);
-    string path = *opArgs.begin();
+    std::string path = *opArgs.begin();
     dumpPath(path, sink);
     sink.flush();
 }
@@ -800,6 +800,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             settings.buildRepeat = readInt(in);
             settings.enforceDeterminism = readInt(in);
             settings.runDiffHook = true;
+        }
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
+            settings.keepFailed = (bool) readInt(in);
         }
         settings.printRepeatedBuilds = false;
     };
@@ -972,9 +975,9 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 
     if (opArgs.size() != 3) throw UsageError("three arguments expected");
     auto i = opArgs.begin();
-    string keyName = *i++;
-    string secretKeyFile = *i++;
-    string publicKeyFile = *i++;
+    std::string keyName = *i++;
+    std::string secretKeyFile = *i++;
+    std::string publicKeyFile = *i++;
 
     auto secretKey = SecretKey::generate(keyName);
 

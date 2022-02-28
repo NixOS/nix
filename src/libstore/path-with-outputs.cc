@@ -31,14 +31,14 @@ std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs> 
 std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromDerivedPath(const DerivedPath & p)
 {
     return std::visit(overloaded {
-        [&](DerivedPath::Opaque bo) -> std::variant<StorePathWithOutputs, StorePath> {
+        [&](const DerivedPath::Opaque & bo) -> std::variant<StorePathWithOutputs, StorePath> {
             if (bo.path.isDerivation()) {
                 // drv path gets interpreted as "build", not "get drv file itself"
                 return bo.path;
             }
             return StorePathWithOutputs { bo.path };
         },
-        [&](DerivedPath::Built bfd) -> std::variant<StorePathWithOutputs, StorePath> {
+        [&](const DerivedPath::Built & bfd) -> std::variant<StorePathWithOutputs, StorePath> {
             return StorePathWithOutputs { bfd.drvPath, bfd.outputs };
         },
     }, p.raw());
@@ -49,9 +49,9 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 {
     size_t n = s.find("!");
     return n == s.npos
-        ? std::make_pair(s, std::set<string>())
+        ? std::make_pair(s, std::set<std::string>())
         : std::make_pair(((std::string_view) s).substr(0, n),
-            tokenizeString<std::set<string>>(((std::string_view) s).substr(n + 1), ","));
+            tokenizeString<std::set<std::string>>(((std::string_view) s).substr(n + 1), ","));
 }
 
 

@@ -4,24 +4,25 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
+#include <boost/container/small_vector.hpp>
 
 namespace nix {
 
 std::optional<StorePath> DerivationOutput::path(const Store & store, std::string_view drvName, std::string_view outputName) const
 {
     return std::visit(overloaded {
-        [](DerivationOutputInputAddressed doi) -> std::optional<StorePath> {
+        [](const DerivationOutputInputAddressed & doi) -> std::optional<StorePath> {
             return { doi.path };
         },
-        [&](DerivationOutputCAFixed dof) -> std::optional<StorePath> {
+        [&](const DerivationOutputCAFixed & dof) -> std::optional<StorePath> {
             return {
                 dof.path(store, drvName, outputName)
             };
         },
-        [](DerivationOutputCAFloating dof) -> std::optional<StorePath> {
+        [](const DerivationOutputCAFloating & dof) -> std::optional<StorePath> {
             return std::nullopt;
         },
-        [](DerivationOutputDeferred) -> std::optional<StorePath> {
+        [](const DerivationOutputDeferred &) -> std::optional<StorePath> {
             return std::nullopt;
         },
     }, output);
@@ -81,7 +82,7 @@ bool derivationIsImpure(DerivationType dt) {
 
 bool BasicDerivation::isBuiltin() const
 {
-    return string(builder, 0, 8) == "builtin:";
+    return builder.substr(0, 8) == "builtin:";
 }
 
 
@@ -103,19 +104,19 @@ StorePath writeDerivation(Store & store,
 
 
 /* Read string `s' from stream `str'. */
-static void expect(std::istream & str, const string & s)
+static void expect(std::istream & str, std::string_view s)
 {
     char s2[s.size()];
     str.read(s2, s.size());
-    if (string(s2, s.size()) != s)
+    if (std::string(s2, s.size()) != s)
         throw FormatError("expected string '%1%'", s);
 }
 
 
 /* Read a C-style string from stream `str'. */
-static string parseString(std::istream & str)
+static std::string parseString(std::istream & str)
 {
-    string res;
+    std::string res;
     expect(str, "\"");
     int c;
     while ((c = str.get()) != '"')
@@ -171,7 +172,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
 {
     if (hashAlgo != "") {
         auto method = FileIngestionMethod::Flat;
-        if (string(hashAlgo, 0, 2) == "r:") {
+        if (hashAlgo.substr(0, 2) == "r:") {
             method = FileIngestionMethod::Recursive;
             hashAlgo = hashAlgo.substr(2);
         }
@@ -187,7 +188,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
                 },
             };
         } else {
-            settings.requireExperimentalFeature("ca-derivations");
+            settings.requireExperimentalFeature(Xp::CaDerivations);
             assert(pathS == "");
             return DerivationOutput {
                 .output = DerivationOutputCAFloating {
@@ -259,8 +260,8 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
     /* Parse the environment variables. */
     expect(str, ",[");
     while (!endOfList(str)) {
-        expect(str, "("); string name = parseString(str);
-        expect(str, ","); string value = parseString(str);
+        expect(str, "("); auto name = parseString(str);
+        expect(str, ","); auto value = parseString(str);
         expect(str, ")");
         drv.env[name] = value;
     }
@@ -270,9 +271,11 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 }
 
 
-static void printString(string & res, std::string_view s)
+static void printString(std::string & res, std::string_view s)
 {
-    char buf[s.size() * 2 + 2];
+    boost::container::small_vector<char, 64 * 1024> buffer;
+    buffer.reserve(s.size() * 2 + 2);
+    char * buf = buffer.data();
     char * p = buf;
     *p++ = '"';
     for (auto c : s)
@@ -286,7 +289,7 @@ static void printString(string & res, std::string_view s)
 }
 
 
-static void printUnquotedString(string & res, std::string_view s)
+static void printUnquotedString(std::string & res, std::string_view s)
 {
     res += '"';
     res.append(s);
@@ -295,7 +298,7 @@ static void printUnquotedString(string & res, std::string_view s)
 
 
 template<class ForwardIterator>
-static void printStrings(string & res, ForwardIterator i, ForwardIterator j)
+static void printStrings(std::string & res, ForwardIterator i, ForwardIterator j)
 {
     res += '[';
     bool first = true;
@@ -308,7 +311,7 @@ static void printStrings(string & res, ForwardIterator i, ForwardIterator j)
 
 
 template<class ForwardIterator>
-static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterator j)
+static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIterator j)
 {
     res += '[';
     bool first = true;
@@ -320,10 +323,10 @@ static void printUnquotedStrings(string & res, ForwardIterator i, ForwardIterato
 }
 
 
-string Derivation::unparse(const Store & store, bool maskOutputs,
+std::string Derivation::unparse(const Store & store, bool maskOutputs,
     std::map<std::string, StringSet> * actualInputs) const
 {
-    string s;
+    std::string s;
     s.reserve(65536);
     s += "Derive([";
 
@@ -332,22 +335,22 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
         if (first) first = false; else s += ',';
         s += '('; printUnquotedString(s, i.first);
         std::visit(overloaded {
-            [&](DerivationOutputInputAddressed doi) {
+            [&](const DerivationOutputInputAddressed & doi) {
                 s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(doi.path));
                 s += ','; printUnquotedString(s, "");
                 s += ','; printUnquotedString(s, "");
             },
-            [&](DerivationOutputCAFixed dof) {
+            [&](const DerivationOutputCAFixed & dof) {
                 s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(dof.path(store, name, i.first)));
                 s += ','; printUnquotedString(s, dof.hash.printMethodAlgo());
                 s += ','; printUnquotedString(s, dof.hash.hash.to_string(Base16, false));
             },
-            [&](DerivationOutputCAFloating dof) {
+            [&](const DerivationOutputCAFloating & dof) {
                 s += ','; printUnquotedString(s, "");
                 s += ','; printUnquotedString(s, makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                 s += ','; printUnquotedString(s, "");
             },
-            [&](DerivationOutputDeferred) {
+            [&](const DerivationOutputDeferred &) {
                 s += ','; printUnquotedString(s, "");
                 s += ','; printUnquotedString(s, "");
                 s += ','; printUnquotedString(s, "");
@@ -398,7 +401,7 @@ string Derivation::unparse(const Store & store, bool maskOutputs,
 
 
 // FIXME: remove
-bool isDerivation(const string & fileName)
+bool isDerivation(const std::string & fileName)
 {
     return hasSuffix(fileName, drvExtension);
 }
@@ -420,13 +423,13 @@ DerivationType BasicDerivation::type() const
     std::optional<HashType> floatingHashType;
     for (auto & i : outputs) {
         std::visit(overloaded {
-            [&](DerivationOutputInputAddressed _) {
+            [&](const DerivationOutputInputAddressed &) {
                inputAddressedOutputs.insert(i.first);
             },
-            [&](DerivationOutputCAFixed _) {
+            [&](const DerivationOutputCAFixed &) {
                 fixedCAOutputs.insert(i.first);
             },
-            [&](DerivationOutputCAFloating dof) {
+            [&](const DerivationOutputCAFloating & dof) {
                 floatingCAOutputs.insert(i.first);
                 if (!floatingHashType) {
                     floatingHashType = dof.hashType;
@@ -435,7 +438,7 @@ DerivationType BasicDerivation::type() const
                         throw Error("All floating outputs must use the same hash type");
                 }
             },
-            [&](DerivationOutputDeferred _) {
+            [&](const DerivationOutputDeferred &) {
                deferredIAOutputs.insert(i.first);
             },
         }, i.second.output);
@@ -538,15 +541,15 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         const auto & res = pathDerivationModulo(store, i.first);
         std::visit(overloaded {
             // Regular non-CA derivation, replace derivation
-            [&](Hash drvHash) {
+            [&](const Hash & drvHash) {
                 inputs2.insert_or_assign(drvHash.to_string(Base16, false), i.second);
             },
-            [&](DeferredHash deferredHash) {
+            [&](const DeferredHash & deferredHash) {
                 isDeferred = true;
                 inputs2.insert_or_assign(deferredHash.hash.to_string(Base16, false), i.second);
             },
             // CA derivation's output hashes
-            [&](CaOutputHashes outputHashes) {
+            [&](const CaOutputHashes & outputHashes) {
                 std::set<std::string> justOut = { "out" };
                 for (auto & output : i.second) {
                     /* Put each one in with a single "out" output.. */
@@ -572,17 +575,17 @@ std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation &
 {
     std::map<std::string, Hash> res;
     std::visit(overloaded {
-        [&](Hash drvHash) {
+        [&](const Hash & drvHash) {
             for (auto & outputName : drv.outputNames()) {
                 res.insert({outputName, drvHash});
             }
         },
-        [&](DeferredHash deferredHash) {
+        [&](const DeferredHash & deferredHash) {
             for (auto & outputName : drv.outputNames()) {
                 res.insert({outputName, deferredHash.hash});
             }
         },
-        [&](CaOutputHashes outputHashes) {
+        [&](const CaOutputHashes & outputHashes) {
             res = outputHashes;
         },
     }, hashDerivationModulo(store, drv, true));
@@ -590,7 +593,7 @@ std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation &
 }
 
 
-bool wantOutput(const string & output, const std::set<string> & wanted)
+bool wantOutput(const std::string & output, const std::set<std::string> & wanted)
 {
     return wanted.empty() || wanted.find(output) != wanted.end();
 }
@@ -666,22 +669,22 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
     for (auto & i : drv.outputs) {
         out << i.first;
         std::visit(overloaded {
-            [&](DerivationOutputInputAddressed doi) {
+            [&](const DerivationOutputInputAddressed & doi) {
                 out << store.printStorePath(doi.path)
                     << ""
                     << "";
             },
-            [&](DerivationOutputCAFixed dof) {
+            [&](const DerivationOutputCAFixed & dof) {
                 out << store.printStorePath(dof.path(store, drv.name, i.first))
                     << dof.hash.printMethodAlgo()
                     << dof.hash.hash.to_string(Base16, false);
             },
-            [&](DerivationOutputCAFloating dof) {
+            [&](const DerivationOutputCAFloating & dof) {
                 out << ""
                     << (makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType))
                     << "";
             },
-            [&](DerivationOutputDeferred) {
+            [&](const DerivationOutputDeferred &) {
                 out << ""
                     << ""
                     << "";
@@ -696,10 +699,10 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 }
 
 
-std::string hashPlaceholder(const std::string & outputName)
+std::string hashPlaceholder(const std::string_view outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
+    return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(Base32, false);
 }
 
 std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName)

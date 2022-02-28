@@ -54,6 +54,36 @@ void StoreCommand::run()
     run(getStore());
 }
 
+CopyCommand::CopyCommand()
+{
+    addFlag({
+        .longName = "from",
+        .description = "URL of the source Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&srcUri},
+    });
+
+    addFlag({
+        .longName = "to",
+        .description = "URL of the destination Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&dstUri},
+    });
+}
+
+ref<Store> CopyCommand::createStore()
+{
+    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+}
+
+ref<Store> CopyCommand::getDstStore()
+{
+    if (srcUri.empty() && dstUri.empty())
+        throw UsageError("you must pass '--from' and/or '--to'");
+
+    return dstUri.empty() ? openStore() : openStore(dstUri);
+}
+
 EvalCommand::EvalCommand()
 {
 }
@@ -74,7 +104,15 @@ ref<Store> EvalCommand::getEvalStore()
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getEvalStore(), getStore());
+        evalState =
+            #if HAVE_BOEHMGC
+            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+                searchPath, getEvalStore(), getStore())
+            #else
+            std::make_shared<EvalState>(
+                searchPath, getEvalStore(), getStore())
+            #endif
+            ;
     return ref<EvalState>(evalState);
 }
 
@@ -120,7 +158,7 @@ void BuiltPathsCommand::run(ref<Store> store)
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
             StorePathSet pathsRoots, pathsClosure;
-            for (auto & root: paths) {
+            for (auto & root : paths) {
                 auto rootFromThis = root.outPaths();
                 pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
             }
@@ -138,17 +176,20 @@ StorePathsCommand::StorePathsCommand(bool recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, BuiltPaths paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
 {
-    StorePaths storePaths;
-    for (auto& builtPath : paths)
-        for (auto& p : builtPath.outPaths())
-            storePaths.push_back(p);
+    StorePathSet storePaths;
+    for (auto & builtPath : paths)
+        for (auto & p : builtPath.outPaths())
+            storePaths.insert(p);
 
-    run(store, std::move(storePaths));
+    auto sorted = store->topoSortPaths(storePaths);
+    std::reverse(sorted.begin(), sorted.end());
+
+    run(store, std::move(sorted));
 }
 
-void StorePathCommand::run(ref<Store> store, std::vector<StorePath> storePaths)
+void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
 {
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
@@ -200,10 +241,10 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuiltPath::Opaque bo) {
+            [&](const BuiltPath::Opaque & bo) {
                 result.push_back(bo.path);
             },
-            [&](BuiltPath::Built bfd) {
+            [&](const BuiltPath::Built & bfd) {
                 for (auto & output : bfd.outputs) {
                     result.push_back(output.second);
                 }

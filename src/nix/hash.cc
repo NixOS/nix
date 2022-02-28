@@ -177,7 +177,7 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--base32") base32 = true;
         else if (*arg == "--truncate") truncate = true;
         else if (*arg == "--type") {
-            string s = getArg(*arg, arg, end);
+            std::string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
         }
         else if (*arg == "--to-base16") op = opTo16;

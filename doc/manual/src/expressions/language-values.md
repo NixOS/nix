@@ -64,7 +64,7 @@ Nix has the following basic data types:
     the start of each line. To be precise, it strips from each line a
     number of spaces equal to the minimal indentation of the string as a
     whole (disregarding the indentation of empty lines). For instance,
-    the first and second line are indented two space, while the third
+    the first and second line are indented two spaces, while the third
     line is indented four spaces. Thus, two spaces are stripped from
     each line, so the resulting string is
     

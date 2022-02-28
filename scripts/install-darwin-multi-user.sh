@@ -13,11 +13,22 @@ NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 read_only_root() {
     # this touch command ~should~ always produce an error
     # as of this change I confirmed /usr/bin/touch emits:
+    # "touch: /: Operation not permitted" Monterey
     # "touch: /: Read-only file system" Catalina+ and Big Sur
     # "touch: /: Permission denied" Mojave
     # (not matching prefix for compat w/ coreutils touch in case using
     # an explicit path causes problems; its prefix differs)
-    [[ "$(/usr/bin/touch / 2>&1)" = *"Read-only file system" ]]
+    case "$(/usr/bin/touch / 2>&1)" in
+        *"Read-only file system") # Catalina, Big Sur
+            return 0
+            ;;
+        *"Operation not permitted") # Monterey
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 
     # Avoiding the slow semantic way to get this information (~330ms vs ~8ms)
     # unless using touch causes problems. Just in case, that approach is:
@@ -67,7 +78,7 @@ poly_service_installed_check() {
 poly_service_uninstall_directions() {
     echo "$1. Remove macOS-specific components:"
     if should_create_volume && test_nix_volume_mountd_installed; then
-        darwin_volume_uninstall_directions
+        nix_volume_mountd_uninstall_directions
     fi
     if test_nix_daemon_installed; then
         nix_daemon_uninstall_directions
@@ -207,7 +218,7 @@ EOF
         setup_darwin_volume
     fi
 
-    if [ "$(diskutil info -plist /nix | xmllint --xpath "(/plist/dict/key[text()='GlobalPermissionsEnabled'])/following-sibling::*[1]" -)" = "<false/>" ]; then
-        failure "This script needs a /nix volume with global permissions! This may require running sudo diskutil enableOwnership /nix."
+    if [ "$(/usr/sbin/diskutil info -plist /nix | xmllint --xpath "(/plist/dict/key[text()='GlobalPermissionsEnabled'])/following-sibling::*[1]" -)" = "<false/>" ]; then
+        failure "This script needs a /nix volume with global permissions! This may require running sudo /usr/sbin/diskutil enableOwnership /nix."
     fi
 }

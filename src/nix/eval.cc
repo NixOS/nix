@@ -81,7 +81,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
             recurse = [&](Value & v, const Pos & pos, const Path & path)
             {
-                state->forceValue(v);
+                state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path, v.string.s);
@@ -107,12 +107,12 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else if (raw) {
             stopProgressBar();
-            std::cout << state->coerceToString(noPos, *v, context);
+            std::cout << *state->coerceToString(noPos, *v, context);
         }
 
         else if (json) {
             JSONPlaceholder jsonOut(std::cout);
-            printValueAsJSON(*state, true, *v, jsonOut, context);
+            printValueAsJSON(*state, true, *v, pos, jsonOut, context);
         }
 
         else {

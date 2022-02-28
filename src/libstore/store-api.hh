@@ -151,8 +151,32 @@ struct BuildResult
         DependencyFailed,
         LogLimitExceeded,
         NotDeterministic,
+        ResolvesToAlreadyValid,
     } status = MiscFailure;
     std::string errorMsg;
+
+    std::string toString() const {
+        auto strStatus = [&]() {
+            switch (status) {
+                case Built: return "Built";
+                case Substituted: return "Substituted";
+                case AlreadyValid: return "AlreadyValid";
+                case PermanentFailure: return "PermanentFailure";
+                case InputRejected: return "InputRejected";
+                case OutputRejected: return "OutputRejected";
+                case TransientFailure: return "TransientFailure";
+                case CachedFailure: return "CachedFailure";
+                case TimedOut: return "TimedOut";
+                case MiscFailure: return "MiscFailure";
+                case DependencyFailed: return "DependencyFailed";
+                case LogLimitExceeded: return "LogLimitExceeded";
+                case NotDeterministic: return "NotDeterministic";
+                case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
+                default: return "Unknown";
+            };
+        }();
+        return strStatus + ((errorMsg == "") ? "" : " : " + errorMsg);
+    }
 
     /* How many times this build was performed. */
     unsigned int timesBuilt = 0;
@@ -170,7 +194,7 @@ struct BuildResult
     time_t startTime = 0, stopTime = 0;
 
     bool success() {
-        return status == Built || status == Substituted || status == AlreadyValid;
+        return status == Built || status == Substituted || status == AlreadyValid || status == ResolvesToAlreadyValid;
     }
 };
 
@@ -232,7 +256,6 @@ protected:
 
     struct State
     {
-        // FIXME: fix key
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
@@ -329,7 +352,9 @@ public:
        simply yield a different store path, so other users wouldn't be
        affected), but it has some backwards compatibility issues (the
        hashing scheme changes), so I'm not doing that for now. */
-    StorePath computeStorePathForText(const string & name, const string & s,
+    StorePath computeStorePathForText(
+        std::string_view name,
+        std::string_view s,
         const StorePathSet & references) const;
 
     /* Check whether a path is valid. */
@@ -370,6 +395,14 @@ public:
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
+    /* Query the information about a realisation. */
+    std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
+
+    /* Asynchronous version of queryRealisation(). */
+    void queryRealisation(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept;
+
+
     /* Check whether the given valid path info is sufficiently attested, by
        either being signed by a trusted public key or content-addressed, in
        order to be included in the given store.
@@ -394,10 +427,10 @@ protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+    virtual void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
 
 public:
-
-    virtual std::optional<const Realisation> queryRealisation(const DrvOutput &) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -451,9 +484,14 @@ public:
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
-    virtual StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
+    virtual StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        HashType hashAlgo = htSHA256,
+        PathFilter & filter = defaultPathFilter,
+        RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet());
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -468,14 +506,18 @@ public:
        false).
        `dump` may be drained */
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
-    virtual StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
+    virtual StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair = NoRepair) = 0;
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path
@@ -561,26 +603,6 @@ public:
     virtual void addIndirectRoot(const Path & path)
     { unsupported("addIndirectRoot"); }
 
-    /* Acquire the global GC lock, then immediately release it.  This
-       function must be called after registering a new permanent root,
-       but before exiting.  Otherwise, it is possible that a running
-       garbage collector doesn't see the new root and deletes the
-       stuff we've just built.  By acquiring the lock briefly, we
-       ensure that either:
-
-       - The collector is already running, and so we block until the
-         collector is finished.  The collector will know about our
-         *temporary* locks, which should include whatever it is we
-         want to register as a permanent lock.
-
-       - The collector isn't running, or it's just started but hasn't
-         acquired the GC lock yet.  In that case we get and release
-         the lock right away, then exit.  The collector scans the
-         permanent root and sees ours.
-
-       In either case the permanent root is seen by the collector. */
-    virtual void syncWithGC() { };
-
     /* Find the roots of the garbage collector.  Each root is a pair
        (link, storepath) where `link' is the path of the symlink
        outside of the Nix store that point to `storePath'. If
@@ -596,7 +618,7 @@ public:
     /* Return a string representing information about the path that
        can be loaded into the database using `nix-store --load-db' or
        `nix-store --register-validity'. */
-    string makeValidityRegistration(const StorePathSet & paths,
+    std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
 
     /* Write a JSON representation of store path metadata, such as the
@@ -712,8 +734,11 @@ public:
 
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
-    virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
-    { return nullptr; }
+    virtual std::optional<std::string> getBuildLog(const StorePath & path)
+    { return std::nullopt; }
+
+    virtual void addBuildLog(const StorePath & path, std::string_view log)
+    { unsupported("addBuildLog"); }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
@@ -744,6 +769,14 @@ public:
 
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
+
+    /*
+     * Synchronises the options of the client with those of the daemon
+     * (a no-op when there’s no daemon)
+     */
+    virtual void setOptions() { }
+
+    virtual std::optional<std::string> getVersion() { return {}; }
 
 protected:
 
@@ -791,6 +824,13 @@ std::map<StorePath, StorePath> copyPaths(
 void copyClosure(
     Store & srcStore, Store & dstStore,
     const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -880,7 +920,7 @@ struct RegisterStoreImplementation
 
 /* Display a set of paths in human-readable form (i.e., between quotes
    and separated by commas). */
-string showPaths(const PathSet & paths);
+std::string showPaths(const PathSet & paths);
 
 
 std::optional<ValidPathInfo> decodeValidPathInfo(

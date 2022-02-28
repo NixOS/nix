@@ -98,10 +98,8 @@ struct ProfileManifest
 
         else if (pathExists(profile + "/manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            if (state.allowedPaths) {
-                state.allowedPaths->insert(state.store->followLinksToStore(profile));
-                state.allowedPaths->insert(state.store->followLinksToStore(profile + "/manifest.nix"));
-            }
+            state.allowPath(state.store->followLinksToStore(profile));
+            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
             auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 
@@ -159,17 +157,17 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, sink.s);
 
         ValidPathInfo info {
             store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
             narHash,
         };
         info.references = std::move(references);
-        info.narSize = sink.s->size();
+        info.narSize = sink.s.size();
         info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
-        auto source = StringSource { *sink.s };
+        StringSource source(sink.s);
         store->addToStore(info, source);
 
         return std::move(info.path);
@@ -260,11 +258,11 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     ProfileElement element;
 
                     std::visit(overloaded {
-                        [&](BuiltPath::Opaque bo) {
+                        [&](const BuiltPath::Opaque & bo) {
                             pathsToBuild.push_back(bo);
                             element.storePaths.insert(bo.path);
                         },
-                        [&](BuiltPath::Built bfd) {
+                        [&](const BuiltPath::Built & bfd) {
                             // TODO: Why are we querying if we know the output
                             // names already? Is it just to figure out what the
                             // default one is?
@@ -297,7 +295,11 @@ public:
         expectArgs("elements", &_matchers);
     }
 
-    typedef std::variant<size_t, Path, std::regex> Matcher;
+    struct RegexPattern {
+        std::string pattern;
+        std::regex  reg;
+    };
+    typedef std::variant<size_t, Path, RegexPattern> Matcher;
 
     std::vector<Matcher> getMatchers(ref<Store> store)
     {
@@ -309,7 +311,7 @@ public:
             else if (store->isStorePath(s))
                 res.push_back(s);
             else
-                res.push_back(std::regex(s, std::regex::extended | std::regex::icase));
+                res.push_back(RegexPattern{s,std::regex(s, std::regex::extended | std::regex::icase)});
         }
 
         return res;
@@ -322,9 +324,9 @@ public:
                 if (*n == pos) return true;
             } else if (auto path = std::get_if<Path>(&matcher)) {
                 if (element.storePaths.count(store.parseStorePath(*path))) return true;
-            } else if (auto regex = std::get_if<std::regex>(&matcher)) {
+            } else if (auto regex = std::get_if<RegexPattern>(&matcher)) {
                 if (element.source
-                    && std::regex_match(element.source->attrPath, *regex))
+                    && std::regex_match(element.source->attrPath, regex->reg))
                     return true;
             }
         }
@@ -357,16 +359,30 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
             auto & element(oldManifest.elements[i]);
-            if (!matches(*store, element, i, matchers))
+            if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
+            } else {
+                notice("removing '%s'", element.describe());
+            }
         }
 
-        // FIXME: warn about unused matchers?
-
+        auto removedCount = oldManifest.elements.size() - newManifest.elements.size();
         printInfo("removed %d packages, kept %d packages",
-            oldManifest.elements.size() - newManifest.elements.size(),
+            removedCount,
             newManifest.elements.size());
 
+        if (removedCount == 0) {
+            for (auto matcher: matchers) {
+                if (const size_t* index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index in profile", *index);
+                } else if (const Path* path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths in profile", *path);
+                } else if (const RegexPattern* regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages in profile", regex->pattern);
+                }
+            }
+            warn ("Try `nix profile list` to see the current profile.");
+        }
         updateProfile(newManifest.build(store));
     }
 };
@@ -394,12 +410,16 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         // FIXME: code duplication
         std::vector<DerivedPath> pathsToBuild;
 
+        auto upgradedCount = 0;
+
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             if (element.source
-                && !element.source->originalRef.input.isImmutable()
+                && !element.source->originalRef.input.isLocked()
                 && matches(*store, element, i, matchers))
             {
+                upgradedCount++;
+
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
@@ -407,6 +427,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     this,
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
+                    "",
                     {element.source->attrPath},
                     {},
                     lockFlags);
@@ -429,6 +450,19 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
                 pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {drv.outputName}});
             }
+        }
+
+        if (upgradedCount == 0) {
+            for (auto & matcher : matchers) {
+                if (const size_t* index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index in profile", *index);
+                } else if (const Path* path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths in profile", *path);
+                } else if (const RegexPattern* regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages in profile", regex->pattern);
+                }
+            }
+            warn ("Use 'nix profile list' to see the current profile.");
         }
 
         store->buildPaths(pathsToBuild);
