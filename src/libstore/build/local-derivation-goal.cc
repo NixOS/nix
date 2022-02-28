@@ -2383,14 +2383,10 @@ void LocalDerivationGoal::registerOutputs()
             [&](DerivationOutputCAFloating dof) {
                 return newInfoFromCA(dof);
             },
-                [&](DerivationOutputDeferred) {
+            [&](DerivationOutputDeferred) -> ValidPathInfo {
                 // No derivation should reach that point without having been
                 // rewritten first
                 assert(false);
-                // Ugly, but the compiler insists on having this return a value
-                // of type `ValidPathInfo` despite the `assert(false)`, so
-                // let's provide it
-                return *(ValidPathInfo*)0;
             },
         }, output.output);
 
