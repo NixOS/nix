@@ -189,6 +189,8 @@
 
         src = self;
 
+        TESTS_TIMER_LOG="${placeholder "out"}/testTime";
+
         VERSION_SUFFIX = versionSuffix;
 
         nativeBuildInputs = nativeBuildDeps;
