@@ -4,7 +4,7 @@
 #include "error.hh"
 #include "config.hh"
 
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
