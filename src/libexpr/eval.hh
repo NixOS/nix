@@ -91,13 +91,9 @@ public:
        already exist there. */
     RepairFlag repair;
 
-    /* The allowed filesystem paths in restricted or pure evaluation
-       mode. */
-    std::optional<PathSet> allowedPaths;
-
     Bindings emptyBindings;
 
-    ref<InputAccessor> rootFS;
+    ref<FSInputAccessor> rootFS;
     ref<MemoryInputAccessor> corepkgsFS;
 
     std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;

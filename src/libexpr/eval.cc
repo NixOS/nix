@@ -450,7 +450,10 @@ EvalState::EvalState(
     , sPrefix(symbols.create("prefix"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , rootFS(makeFSInputAccessor(""))
+    , rootFS(makeFSInputAccessor("",
+            evalSettings.restrictEval || evalSettings.pureEval
+            ? std::optional<PathSet>(PathSet())
+            : std::nullopt))
     , corepkgsFS(makeMemoryInputAccessor())
     , store(store)
     , buildStore(buildStore ? buildStore : store)
@@ -477,9 +480,7 @@ EvalState::EvalState(
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
 
-    if (evalSettings.restrictEval || evalSettings.pureEval) {
-        allowedPaths = PathSet();
-
+    if (rootFS->hasAccessControl()) {
         for (auto & i : searchPath) {
             auto r = resolveSearchPathElem(i);
             if (!r.first) continue;
@@ -516,14 +517,12 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    if (allowedPaths)
-        allowedPaths->insert(path);
+    rootFS->allowPath(path);
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    if (allowedPaths)
-        allowedPaths->insert(store->toRealPath(storePath));
+    rootFS->allowPath(store->toRealPath(storePath));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value & v)
@@ -602,14 +601,12 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        // FIXME: use rootPath
-        //checkSourcePath(uri);
+        rootFS->checkAllowed(uri);
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        // FIXME: use rootPath
-        //checkSourcePath(std::string(uri, 7));
+        rootFS->checkAllowed(uri.substr(7));
         return;
     }
 

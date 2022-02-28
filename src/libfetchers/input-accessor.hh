@@ -44,7 +44,16 @@ struct InputAccessor
         PathFilter & filter = defaultPathFilter);
 };
 
-ref<InputAccessor> makeFSInputAccessor(
+struct FSInputAccessor : InputAccessor
+{
+    virtual void checkAllowed(PathView absPath) = 0;
+
+    virtual void allowPath(Path path) = 0;
+
+    virtual bool hasAccessControl() = 0;
+};
+
+ref<FSInputAccessor> makeFSInputAccessor(
     const Path & root,
     std::optional<PathSet> && allowedPaths = {});
 

@@ -87,18 +87,18 @@ void InputAccessor::dumpPath(
     dump(path);
 }
 
-struct FSInputAccessor : InputAccessor
+struct FSInputAccessorImpl : FSInputAccessor
 {
     Path root;
     std::optional<PathSet> allowedPaths;
 
-    FSInputAccessor(const Path & root, std::optional<PathSet> && allowedPaths)
+    FSInputAccessorImpl(const Path & root, std::optional<PathSet> && allowedPaths)
         : root(root)
         , allowedPaths(allowedPaths)
     {
         if (allowedPaths) {
             for (auto & p : *allowedPaths) {
-                assert(!hasPrefix(p, "/"));
+                assert(hasPrefix(p, "/"));
                 assert(!hasSuffix(p, "/"));
             }
         }
@@ -159,16 +159,22 @@ struct FSInputAccessor : InputAccessor
 
     Path makeAbsPath(PathView path)
     {
+        // FIXME: resolve symlinks in 'path' and check that any
+        // intermediate path is allowed.
         assert(hasPrefix(path, "/"));
-        return canonPath(root + std::string(path));
+        try {
+            return canonPath(root + std::string(path), true);
+        } catch (Error &) {
+            return canonPath(root + std::string(path));
+        }
     }
 
-    void checkAllowed(PathView absPath)
+    void checkAllowed(PathView absPath) override
     {
         if (!isAllowed(absPath))
             // FIXME: for Git trees, show a custom error message like
             // "file is not under version control or does not exist"
-            throw Error("access to path '%s' is not allowed", absPath);
+            throw Error("access to path '%s' is forbidden", absPath);
     }
 
     bool isAllowed(PathView absPath)
@@ -177,28 +183,37 @@ struct FSInputAccessor : InputAccessor
             return false;
 
         if (allowedPaths) {
-            // FIXME: make isDirOrInDir return subPath
-            auto subPath = absPath.substr(root.size());
-            if (hasPrefix(subPath, "/"))
-                subPath = subPath.substr(1);
-
-            if (subPath != "") {
-                auto lb = allowedPaths->lower_bound((std::string) subPath);
-                if (lb == allowedPaths->end()
-                    || !isDirOrInDir("/" + *lb, "/" + (std::string) subPath))
+            // FIXME: this can be done more efficiently.
+            Path p(absPath);
+            while (true) {
+                if (allowedPaths->find((std::string) p) != allowedPaths->end())
+                    break;
+                if (p == "/")
                     return false;
+                p = dirOf(p);
             }
         }
 
         return true;
     }
+
+    void allowPath(Path path) override
+    {
+        if (allowedPaths)
+            allowedPaths->insert(std::move(path));
+    }
+
+    bool hasAccessControl() override
+    {
+        return (bool) allowedPaths;
+    }
 };
 
-ref<InputAccessor> makeFSInputAccessor(
+ref<FSInputAccessor> makeFSInputAccessor(
     const Path & root,
     std::optional<PathSet> && allowedPaths)
 {
-    return make_ref<FSInputAccessor>(root, std::move(allowedPaths));
+    return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths));
 }
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path)

@@ -82,7 +82,7 @@ StringMap EvalState::realiseContext(const PathSet & context)
 
     /* Add the output of this derivations to the allowed
        paths. */
-    if (allowedPaths) {
+    if (rootFS->hasAccessControl()) {
         for (auto & [_placeholder, outputPath] : res) {
             allowPath(store->toRealPath(outputPath));
         }
@@ -91,6 +91,7 @@ StringMap EvalState::realiseContext(const PathSet & context)
     return res;
 }
 
+// FIXME: remove?
 struct RealisePathFlags {
     // Whether to check that the path is allowed in pure eval mode
     bool checkForPureEval = true;
@@ -110,22 +111,19 @@ static SourcePath realisePath(EvalState & state, const Pos & pos, Value & v, con
         }
     }();
 
-    return path;
-
-    #if 0
     try {
-        StringMap rewrites = state.realiseContext(context);
-
-        auto realPath = state.toRealPath(rewriteStrings(path, rewrites), context);
-
-        return flags.checkForPureEval
-            ? state.checkSourcePath(realPath)
-            : realPath;
+        if (!context.empty()) {
+            auto rewrites = state.realiseContext(context);
+            // FIXME: check that path.accessor == rootFS?
+            auto realPath = state.toRealPath(rewriteStrings(path.path, rewrites), context);
+            // FIXME: return store accessor
+            return state.rootPath(realPath);
+        } else
+            return path;
     } catch (Error & e) {
         e.addTrace(pos, "while realising the context of path '%s'", path);
         throw;
     }
-    #endif
 }
 
 /* Add and attribute to the given attribute map from the output name to
