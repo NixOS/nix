@@ -62,7 +62,7 @@ struct LocalDerivationGoal : public DerivationGoal
     Environment env;
 
 #if __APPLE__
-    typedef string SandboxProfile;
+    typedef std::string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
 #endif
 

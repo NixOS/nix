@@ -1933,7 +1933,7 @@ void LocalDerivationGoal::runChild()
                             "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
                             i.first, i.second.source);
 
-                    string path = i.first;
+                    std::string path = i.first;
                     struct stat st;
                     if (lstat(path.c_str(), &st)) {
                         if (i.second.optional && errno == ENOENT)
@@ -1985,7 +1985,7 @@ void LocalDerivationGoal::runChild()
                 args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
                 if (allowLocalNetworking) {
                     args.push_back("-D");
-                    args.push_back(string("_ALLOW_LOCAL_NETWORKING=1"));
+                    args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
                 }
                 args.push_back(drv->builder);
             } else {
@@ -2383,14 +2383,10 @@ void LocalDerivationGoal::registerOutputs()
             [&](DerivationOutputCAFloating dof) {
                 return newInfoFromCA(dof);
             },
-                [&](DerivationOutputDeferred) {
+            [&](DerivationOutputDeferred) -> ValidPathInfo {
                 // No derivation should reach that point without having been
                 // rewritten first
                 assert(false);
-                // Ugly, but the compiler insists on having this return a value
-                // of type `ValidPathInfo` despite the `assert(false)`, so
-                // let's provide it
-                return *(ValidPathInfo*)0;
             },
         }, output.output);
 
