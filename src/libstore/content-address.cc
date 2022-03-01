@@ -31,10 +31,10 @@ std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
 std::string renderContentAddress(ContentAddress ca)
 {
     return std::visit(overloaded {
-        [](TextHash th) {
+        [](TextHash & th) {
             return "text:" + th.hash.to_string(Base32, true);
         },
-        [](FixedOutputHash fsh) {
+        [](FixedOutputHash & fsh) {
             return makeFixedOutputCA(fsh.method, fsh.hash);
         }
     }, ca);
@@ -43,10 +43,10 @@ std::string renderContentAddress(ContentAddress ca)
 std::string renderContentAddressMethod(ContentAddressMethod cam)
 {
     return std::visit(overloaded {
-        [](TextHashMethod &th) {
+        [](TextHashMethod & th) {
             return std::string{"text:"} + printHashType(htSHA256);
         },
-        [](FixedOutputHashMethod &fshm) {
+        [](FixedOutputHashMethod & fshm) {
             return "fixed:" + makeFileIngestionPrefix(fshm.fileIngestionMethod) + printHashType(fshm.hashType);
         }
     }, cam);
@@ -104,12 +104,12 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
 
     return std::visit(
         overloaded {
-            [&](TextHashMethod thm) {
+            [&](TextHashMethod & thm) {
                 return ContentAddress(TextHash {
                     .hash = Hash::parseNonSRIUnprefixed(rest, htSHA256)
                 });
             },
-            [&](FixedOutputHashMethod fohMethod) {
+            [&](FixedOutputHashMethod & fohMethod) {
                 return ContentAddress(FixedOutputHash {
                     .method = fohMethod.fileIngestionMethod,
                     .hash = Hash::parseNonSRIUnprefixed(rest, std::move(fohMethod.hashType)),
@@ -120,8 +120,10 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
 
 ContentAddressMethod parseContentAddressMethod(std::string_view caMethod)
 {
-    std::string_view asPrefix {std::string{caMethod} + ":"};
-    return parseContentAddressMethodPrefix(asPrefix);
+    std::string asPrefix = std::string{caMethod} + ":";
+    // parseContentAddressMethodPrefix takes its argument by reference
+    std::string_view asPrefixView = asPrefix;
+    return parseContentAddressMethodPrefix(asPrefixView);
 }
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt)
@@ -137,10 +139,10 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 Hash getContentAddressHash(const ContentAddress & ca)
 {
     return std::visit(overloaded {
-        [](TextHash th) {
+        [](const TextHash & th) {
             return th.hash;
         },
-        [](FixedOutputHash fsh) {
+        [](const FixedOutputHash & fsh) {
             return fsh.hash;
         }
     }, ca);

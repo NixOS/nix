@@ -74,6 +74,10 @@ let pkgs = rec {
   '';
 
   bash = shell;
+  bashInteractive = runCommand "bash" {} ''
+    mkdir -p $out/bin
+    ln -s ${shell} $out/bin/bash
+  '';
 
   # ruby "interpreter" that outputs "$@"
   ruby = runCommand "ruby" {} ''

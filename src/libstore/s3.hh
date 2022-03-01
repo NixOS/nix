@@ -4,6 +4,8 @@
 
 #include "ref.hh"
 
+#include <optional>
+
 namespace Aws { namespace Client { class ClientConfiguration; } }
 namespace Aws { namespace S3 { class S3Client; } }
 
@@ -20,7 +22,7 @@ struct S3Helper
 
     struct FileTransferResult
     {
-        std::shared_ptr<std::string> data;
+        std::optional<std::string> data;
         unsigned int durationMs;
     };
 

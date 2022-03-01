@@ -31,38 +31,38 @@ at the first error.
 The following flake output attributes must be derivations:
 
 * `checks.`*system*`.`*name*
-* `defaultPackage.`*system*`
-* `devShell.`*system*`
-* `devShells.`*system*`.`*name*`
-* `nixosConfigurations.`*name*`.config.system.build.toplevel
+* `defaultPackage.`*system*
+* `devShell.`*system*
+* `devShells.`*system*`.`*name*
+* `nixosConfigurations.`*name*`.config.system.build.toplevel`
 * `packages.`*system*`.`*name*
 
 The following flake output attributes must be [app
 definitions](./nix3-run.md):
 
 * `apps.`*system*`.`*name*
-* `defaultApp.`*system*`
+* `defaultApp.`*system*
 
 The following flake output attributes must be [template
 definitions](./nix3-flake-init.md):
 
 * `defaultTemplate`
-* `templates`.`*name*
+* `templates.`*name*
 
 The following flake output attributes must be *Nixpkgs overlays*:
 
 * `overlay`
-* `overlays`.`*name*
+* `overlays.`*name*
 
 The following flake output attributes must be *NixOS modules*:
 
 * `nixosModule`
-* `nixosModules`.`*name*
+* `nixosModules.`*name*
 
 The following flake output attributes must be
 [bundlers](./nix3-bundle.md):
 
-* `bundlers`.`*name*
+* `bundlers.`*name*
 * `defaultBundler`
 
 In addition, the `hydraJobs` output is evaluated in the same way as

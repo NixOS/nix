@@ -9,7 +9,7 @@ namespace nix {
 static Strings parseAttrPath(std::string_view s)
 {
     Strings res;
-    string cur;
+    std::string cur;
     auto i = s.begin();
     while (i != s.end()) {
         if (*i == '.') {
@@ -41,7 +41,7 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
+std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
@@ -58,7 +58,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v);
+        state.forceValue(*v, noPos);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
@@ -121,7 +121,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
     std::string filename(pos, 0, colon);
     unsigned int lineno;
     try {
-        lineno = std::stoi(std::string(pos, colon + 1));
+        lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
     } catch (std::invalid_argument & e) {
         throw ParseError("cannot parse line number '%s'", pos);
     }

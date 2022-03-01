@@ -13,6 +13,7 @@
 #include "registry.hh"
 #include "json.hh"
 #include "eval-cache.hh"
+#include "markdown.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -124,15 +125,26 @@ struct CmdFlakeLock : FlakeCommand
 static void enumerateOutputs(EvalState & state, Value & vFlake,
     std::function<void(const std::string & name, Value & vProvide, const Pos & pos)> callback)
 {
-    state.forceAttrs(vFlake);
+    auto pos = vFlake.determinePos(noPos);
+    state.forceAttrs(vFlake, pos);
 
     auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceAttrs(*aOutputs->value);
+    state.forceAttrs(*aOutputs->value, pos);
 
-    for (auto & attr : *aOutputs->value->attrs)
-        callback(attr.name, *attr.value, *attr.pos);
+    auto sHydraJobs = state.symbols.create("hydraJobs");
+
+    /* Hack: ensure that hydraJobs is evaluated before anything
+       else. This way we can disable IFD for hydraJobs and then enable
+       it for other outputs. */
+    if (auto attr = aOutputs->value->attrs->get(sHydraJobs))
+        callback(attr->name, *attr->value, *attr->pos);
+
+    for (auto & attr : *aOutputs->value->attrs) {
+        if (attr.name != sHydraJobs)
+            callback(attr.name, *attr.value, *attr.pos);
+    }
 }
 
 struct CmdFlakeMetadata : FlakeCommand, MixJSON
@@ -242,6 +254,14 @@ struct CmdFlakeInfo : CmdFlakeMetadata
     }
 };
 
+static bool argHasName(std::string_view arg, std::string_view expected)
+{
+    return
+        arg == expected
+        || arg == "_"
+        || (hasPrefix(arg, "_") && arg.substr(1) == expected);
+}
+
 struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
@@ -269,7 +289,10 @@ struct CmdFlakeCheck : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        settings.readOnlyMode = !build;
+        if (!build) {
+            settings.readOnlyMode = true;
+            evalSettings.enableImportFromDerivation.setDefault(false);
+        }
 
         auto state = getEvalState();
 
@@ -333,10 +356,14 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
                 state->forceValue(v, pos);
-                if (!v.isLambda() || v.lambda.fun->matchAttrs || std::string(v.lambda.fun->arg) != "final")
+                if (!v.isLambda()
+                    || v.lambda.fun->hasFormals()
+                    || !argHasName(v.lambda.fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
-                if (!body || body->matchAttrs || std::string(body->arg) != "prev")
+                if (!body
+                    || body->hasFormals()
+                    || !argHasName(body->arg, "prev"))
                     throw Error("overlay does not take an argument named 'prev'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
@@ -350,7 +377,7 @@ struct CmdFlakeCheck : FlakeCommand
             try {
                 state->forceValue(v, pos);
                 if (v.isLambda()) {
-                    if (!v.lambda.fun->matchAttrs || !v.lambda.fun->formals->ellipsis)
+                    if (!v.lambda.fun->hasFormals() || !v.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
                 } else if (v.type() == nAttrs) {
                     for (auto & attr : *v.attrs)
@@ -381,9 +408,13 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     state->forceAttrs(*attr.value, *attr.pos);
-                    if (!state->isDerivation(*attr.value))
-                        checkHydraJobs(attrPath + "." + (std::string) attr.name,
-                            *attr.value, *attr.pos);
+                    auto attrPath2 = attrPath + "." + (std::string) attr.name;
+                    if (state->isDerivation(*attr.value)) {
+                        Activity act(*logger, lvlChatty, actUnknown,
+                            fmt("checking Hydra job '%s'", attrPath2));
+                        checkDerivation(attrPath2, *attr.value, *attr.pos);
+                    } else
+                        checkHydraJobs(attrPath2, *attr.value, *attr.pos);
                 }
 
             } catch (Error & e) {
@@ -446,10 +477,7 @@ struct CmdFlakeCheck : FlakeCommand
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
-                if (!v.lambda.fun->formals ||
-                    v.lambda.fun->formals->argNames.find(state->symbols.create("program")) == v.lambda.fun->formals->argNames.end() ||
-                    v.lambda.fun->formals->argNames.find(state->symbols.create("system")) == v.lambda.fun->formals->argNames.end())
-                    throw Error("bundler must take formal arguments 'program' and 'system'");
+                // TODO: check types of inputs/outputs?
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 reportError(e);
@@ -469,7 +497,20 @@ struct CmdFlakeCheck : FlakeCommand
                         fmt("checking flake output '%s'", name));
 
                     try {
+                        evalSettings.enableImportFromDerivation.setDefault(name != "hydraJobs");
+
                         state->forceValue(vOutput, pos);
+
+                        std::string_view replacement =
+                            name == "defaultPackage" ? "packages.<system>.default" :
+                            name == "defaultApps" ? "apps.<system>.default" :
+                            name == "defaultTemplate" ? "templates.default" :
+                            name == "defaultBundler" ? "bundlers.<system>.default" :
+                            name == "overlay" ? "overlays.default" :
+                            name == "devShell" ? "devShells.<system>.default" :
+                            "";
+                        if (replacement != "")
+                            warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
 
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos);
@@ -578,14 +619,27 @@ struct CmdFlakeCheck : FlakeCommand
                                     *attr.value, *attr.pos);
                         }
 
-                        else if (name == "defaultBundler")
-                            checkBundler(name, vOutput, pos);
+                        else if (name == "defaultBundler") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkBundler(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                            }
+                        }
 
                         else if (name == "bundlers") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                checkBundler(fmt("%s.%s", name, attr.name),
-                                    *attr.value, *attr.pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs) {
+                                    checkBundler(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                                }
+                            }
                         }
 
                         else
@@ -603,16 +657,18 @@ struct CmdFlakeCheck : FlakeCommand
             store->buildPaths(drvPaths);
         }
         if (hasErrors)
-            throw Error("Some errors were encountered during the evaluation");
+            throw Error("some errors were encountered during the evaluation");
     }
 };
+
+static Strings defaultTemplateAttrPathsPrefixes{"templates."};
+static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
 
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
     Path destDir;
 
-    const Strings attrsPathPrefixes{"templates."};
     const LockFlags lockFlags{ .writeLockFile = false };
 
     CmdFlakeInitCommon()
@@ -627,8 +683,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 completeFlakeRefWithFragment(
                     getEvalState(),
                     lockFlags,
-                    attrsPathPrefixes,
-                    {"defaultTemplate"},
+                    defaultTemplateAttrPathsPrefixes,
+                    defaultTemplateAttrPaths,
                     prefix);
             }}
         });
@@ -643,9 +699,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef),
-            Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings(attrsPathPrefixes), lockFlags);
+            evalState, std::move(templateFlakeRef), templateName,
+            defaultTemplateAttrPaths,
+            defaultTemplateAttrPathsPrefixes,
+            lockFlags);
 
         auto [cursor, attrPath] = installable.getCursor(*evalState);
 
@@ -686,6 +743,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 else
                     throw Error("file '%s' has unsupported type", from2);
                 files.push_back(to2);
+                notice("wrote: %s", to2);
             }
         };
 
@@ -695,6 +753,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : files) args.push_back(s);
             runProgram("git", true, args);
+        }
+        auto welcomeText = cursor->maybeGetAttr("welcomeText");
+        if (welcomeText) {
+            notice("\n");
+            notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
     }
 };
@@ -873,6 +936,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
+        evalSettings.enableImportFromDerivation.setDefault(false);
+
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
 
@@ -1019,7 +1084,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         (attrPath.size() == 1 && attrPath[0] == "overlay")
                         || (attrPath.size() == 2 && attrPath[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
                         attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
-                        attrPath.size() == 2 && attrPath[0] == "nixosModules" ? std::make_pair("nixos-module", "NixOS module") :
+                        (attrPath.size() == 1 && attrPath[0] == "nixosModule")
+                        || (attrPath.size() == 2 && attrPath[0] == "nixosModules") ? std::make_pair("nixos-module", "NixOS module") :
                         std::make_pair("unknown", "unknown");
                     if (json) {
                         j.emplace("type", type);
@@ -1117,7 +1183,7 @@ struct CmdFlake : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix flake' requires a sub-command.");
-        settings.requireExperimentalFeature("flakes");
+        settings.requireExperimentalFeature(Xp::Flakes);
         command->second->prepare();
         command->second->run();
     }

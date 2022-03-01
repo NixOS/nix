@@ -1,4 +1,3 @@
-#include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "derivation-goal.hh"
@@ -11,12 +10,12 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (auto & br : reqs) {
+    for (const auto & br : reqs) {
         std::visit(overloaded {
-            [&](DerivedPath::Built bfd) {
+            [&](const DerivedPath::Built & bfd) {
                 goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
             },
-            [&](DerivedPath::Opaque bo) {
+            [&](const DerivedPath::Opaque & bo) {
                 goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
             },
         }, br.raw());
@@ -74,7 +73,7 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
                     outputId,
                     Realisation{ outputId, *staticOutput.second}
                     );
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !derivationHasKnownOutputPaths(drv.type())) {
             auto realisation = this->queryRealisation(outputId);
             if (realisation)
                 result.builtOutputs.insert_or_assign(
