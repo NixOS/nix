@@ -1,4 +1,5 @@
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
@@ -80,10 +81,11 @@ static int main_nix_collect_garbage(int argc, char * * argv)
         // Run the actual garbage collector.
         if (!dryRun) {
             auto store = openStore();
+            auto & gcStore = requireGcStore(*store);
             options.action = GCOptions::gcDeleteDead;
             GCResults results;
             PrintFreed freed(true, results);
-            store->collectGarbage(options, results);
+            gcStore.collectGarbage(options, results);
         }
 
         return 0;
