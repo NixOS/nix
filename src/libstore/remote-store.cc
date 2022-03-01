@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "path-with-outputs.hh"
 #include "remote-fs-accessor.hh"
+#include "build-result.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"

@@ -2,6 +2,7 @@
 #include "derivations.hh"
 #include "dotgraph.hh"
 #include "globals.hh"
+#include "build-result.hh"
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
