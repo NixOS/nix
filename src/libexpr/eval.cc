@@ -517,7 +517,7 @@ void EvalState::allowPath(const StorePath & storePath)
         allowedPaths->insert(store->toRealPath(storePath));
 }
 
-void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value &v)
+void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value & v)
 {
     allowPath(storePath);
 

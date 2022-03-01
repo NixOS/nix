@@ -203,8 +203,6 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
-            else if (n == "narHash")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
