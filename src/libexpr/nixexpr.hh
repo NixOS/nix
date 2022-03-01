@@ -121,9 +121,13 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
-    std::string s;
+    std::string s; // FIXME: remove
     Value v;
-    ExprPath(std::string s) : s(std::move(s)) { v.mkPath(this->s.c_str()); };
+    ExprPath(InputAccessor & accessor, std::string s)
+        : s(std::move(s))
+    {
+        v.mkPath({accessor, this->s});
+    }
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

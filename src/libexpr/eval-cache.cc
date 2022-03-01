@@ -396,8 +396,11 @@ Value & AttrCursor::forceValue()
         if (v.type() == nString)
             cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
                            string_t{v.string.s, {}}};
-        else if (v.type() == nPath)
-            cachedValue = {root->db->setString(getKey(), v.path), string_t{v.path, {}}};
+        else if (v.type() == nPath) {
+            // FIXME: take accessor into account?
+            auto path = v.path().path;
+            cachedValue = {root->db->setString(getKey(), path), string_t{path, {}}};
+        }
         else if (v.type() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
         else if (v.type() == nAttrs)
@@ -537,7 +540,7 @@ std::string AttrCursor::getString()
     if (v.type() != nString && v.type() != nPath)
         throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
 
-    return v.type() == nString ? v.string.s : v.path;
+    return v.type() == nString ? v.string.s : v.path().to_string();
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -568,7 +571,7 @@ string_t AttrCursor::getStringWithContext()
     if (v.type() == nString)
         return {v.string.s, v.getContext(*root->state.store)};
     else if (v.type() == nPath)
-        return {v.path, {}};
+        return {v.path().to_string(), {}};
     else
         throw TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
 }

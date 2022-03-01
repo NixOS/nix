@@ -104,7 +104,7 @@ static SourcePath realisePath(EvalState & state, const Pos & pos, Value & v, con
     auto path = [&]()
     {
         try {
-            return state.unpackPath(state.coerceToPath(pos, v, context));
+            return state.coerceToPath(pos, v, context);
         } catch (Error & e) {
             e.addTrace(pos, "while realising the context of a path");
             throw;
@@ -557,7 +557,8 @@ struct CompareValues
             case nString:
                 return strcmp(v1->string.s, v2->string.s) < 0;
             case nPath:
-                return strcmp(v1->path, v2->path) < 0;
+                // FIXME: handle accessor?
+                return strcmp(v1->_path.path, v2->_path.path) < 0;
             case nList:
                 // Lexicographic comparison
                 for (size_t i = 0;; i++) {
@@ -1315,8 +1316,8 @@ static RegisterPrimOp primop_placeholder({
 static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
-    v.mkString(canonPath(path), context);
+    auto path = state.coerceToPath(pos, *args[0], context);
+    v.mkString(canonPath(path.path), context);
 }
 
 static RegisterPrimOp primop_toPath({
@@ -1347,7 +1348,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
 
     PathSet context;
     // FIXME: check rootPath
-    Path path = state.coerceToPath(pos, *args[0], context);
+    auto path = state.coerceToPath(pos, *args[0], context).path;
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -1439,7 +1440,10 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
     PathSet context;
     auto path = state.coerceToString(pos, *args[0], context, false, false);
     auto dir = dirOf(*path);
+    abort();
+    #if 0
     if (args[0]->type() == nPath) v.mkPath(dir); else v.mkString(dir, context);
+    #endif
 }
 
 static RegisterPrimOp primop_dirOf({
@@ -1520,8 +1524,11 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     auto path = state.forceStringNoCtx(*args[1], pos);
 
+    #if 0
     // FIXME: checkSourcePath?
     v.mkPath(state.findFile(searchPath, path, pos));
+    #endif
+    abort();
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
@@ -1563,7 +1570,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
 {
     auto path = realisePath(state, pos, *args[0]);
 
-    auto entries = path.accessor->readDirectory(path.path);
+    auto entries = path.readDirectory();
     auto attrs = state.buildBindings(entries.size());
 
     for (auto & [name, type] : entries) {
@@ -1881,7 +1888,7 @@ static RegisterPrimOp primop_toFile({
 static void addPath(
     EvalState & state,
     const Pos & pos,
-    const std::string & name,
+    std::string_view name,
     Path path,
     Value * filterFun,
     FileIngestionMethod method,
@@ -1959,7 +1966,7 @@ static void addPath(
 static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
+    auto path = state.coerceToPath(pos, *args[1], context);
 
     state.forceValue(*args[0], pos);
     if (args[0]->type() != nFunction)
@@ -1970,7 +1977,8 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    // FIXME: use SourcePath
+    addPath(state, pos, path.baseName(), path.path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2031,7 +2039,7 @@ static RegisterPrimOp primop_filterSource({
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
-    Path path;
+    std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
@@ -2041,7 +2049,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     for (auto & attr : *args[0]->attrs) {
         auto & n(attr.name);
         if (n == "path")
-            path = state.coerceToPath(*attr.pos, *attr.value, context);
+            path.emplace(state.coerceToPath(*attr.pos, *attr.value, context));
         else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
@@ -2057,15 +2065,16 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
                 .errPos = *attr.pos
             });
     }
-    if (path.empty())
+    if (!path)
         throw EvalError({
             .msg = hintfmt("'path' required"),
             .errPos = pos
         });
     if (name.empty())
-        name = baseNameOf(path);
+        name = path->baseName();
 
-    addPath(state, pos, name, path, filterFun, method, expectedHash, v, context);
+    // FIXME: use SourcePath
+    addPath(state, pos, name, path->path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({

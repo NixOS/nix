@@ -30,7 +30,7 @@ void emitTreeAttrs(
     attrs.alloc(state.sOutPath).mkString(storePath, {storePath});
     #endif
 
-    attrs.alloc(state.sOutPath).mkPath(state.packPath(path));
+    attrs.alloc(state.sOutPath).mkPath(path);
 
     // FIXME: support arbitrary input attributes.
 
@@ -138,8 +138,8 @@ static void fetchTree(
                 for (auto elem : attr.value->listItems()) {
                     // FIXME: use realisePath
                     PathSet context;
-                    auto patchFile = state.unpackPath(state.coerceToPath(pos, *elem, context));
-                    patches.push_back(patchFile.accessor->readFile(patchFile.path));
+                    auto patchFile = state.coerceToPath(pos, *elem, context);
+                    patches.push_back(patchFile.readFile());
                 }
 
                 continue;
@@ -201,7 +201,7 @@ static void fetchTree(
 
     emitTreeAttrs(
         state,
-        {accessor, "/"},
+        {state.registerAccessor(accessor), "/"},
         input2,
         v,
         params.emptyRevFallback,

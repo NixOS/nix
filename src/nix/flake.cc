@@ -452,9 +452,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (auto attr = v.attrs->get(state->symbols.create("path"))) {
                     if (attr->name == state->symbols.create("path")) {
                         PathSet context;
-                        auto path = state->coerceToPath(*attr->pos, *attr->value, context);
-                        if (!store->isInStore(path))
-                            throw Error("template '%s' has a bad 'path' attribute");
+                        state->coerceToStorePath(*attr->pos, *attr->value, context);
                         // TODO: recursively check the flake in 'path'.
                     }
                 } else

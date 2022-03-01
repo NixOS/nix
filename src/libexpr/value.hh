@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include "symbol-table.hh"
+#include "input-accessor.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -170,7 +171,11 @@ public:
             const char * * context; // must be in sorted order
         } string;
 
-        const char * path;
+        struct {
+            InputAccessor * accessor;
+            const char * path;
+        } _path;
+
         Bindings * attrs;
         struct {
             size_t size;
@@ -255,14 +260,7 @@ public:
         mkString(((const std::string &) s).c_str());
     }
 
-    inline void mkPath(const char * s)
-    {
-        clearValue();
-        internalType = tPath;
-        path = s;
-    }
-
-    void mkPath(std::string_view s);
+    void mkPath(const SourcePath & path);
 
     inline void mkNull()
     {
@@ -403,6 +401,12 @@ public:
         assert(isList());
         auto begin = listElems();
         return ConstListIterable { begin, begin + listSize() };
+    }
+
+    SourcePath path() const
+    {
+        assert(internalType == tPath);
+        return SourcePath { .accessor = *_path.accessor, .path = _path.path };
     }
 };
 

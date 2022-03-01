@@ -96,7 +96,7 @@ public:
     ref<FSInputAccessor> rootFS;
     ref<MemoryInputAccessor> corepkgsFS;
 
-    std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;
+    std::unordered_map<InputAccessor *, ref<InputAccessor>> inputAccessors;
 
     /* Store used to materialise .drv files. */
     const ref<Store> store;
@@ -156,11 +156,9 @@ public:
 
     SearchPath getSearchPath() { return searchPath; }
 
-    Path packPath(const SourcePath & path);
+    SourcePath rootPath(Path path);
 
-    SourcePath unpackPath(const Path & path);
-
-    SourcePath rootPath(const Path & path);
+    InputAccessor & registerAccessor(ref<InputAccessor> accessor);
 
     /* Allow access to a path. */
     void allowPath(const Path & path);
@@ -274,8 +272,7 @@ public:
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    // FIXME: return SourcePath
-    Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
+    SourcePath coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
     /* Like coerceToPath, but the result must be a store path. */
     StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context);

@@ -72,16 +72,26 @@ ref<InputAccessor> makePatchingInputAccessor(
 
 struct SourcePath
 {
-    ref<InputAccessor> accessor;
+    InputAccessor & accessor;
     Path path;
 
     std::string_view baseName() const;
 
     std::string readFile() const
-    { return accessor->readFile(path); }
+    { return accessor.readFile(path); }
 
     bool pathExists() const
-    { return accessor->pathExists(path); }
+    { return accessor.pathExists(path); }
+
+    InputAccessor::DirEntries readDirectory() const
+    {  return accessor.readDirectory(path); }
+
+    void dumpPath(
+        Sink & sink,
+        PathFilter & filter = defaultPathFilter) const
+    { return accessor.dumpPath(path, sink, filter); }
+
+    std::string to_string() const;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);

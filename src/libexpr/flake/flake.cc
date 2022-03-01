@@ -201,7 +201,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 static Flake readFlake(
     EvalState & state,
     const FlakeRef & lockedRef,
-    nix::ref<InputAccessor> accessor,
+    InputAccessor & accessor,
     const InputPath & lockRootPath)
 {
     auto flakeDir = canonPath("/" + lockedRef.subdir);
@@ -213,14 +213,14 @@ static Flake readFlake(
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
 
-    expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(state.packPath(flakePath)), 0, 0));
+    expectType(state, nAttrs, vInfo, Pos(foFile, state.symbols.create(flakePath.to_string()), 0, 0));
 
     Flake flake {
         // FIXME
         .originalRef = lockedRef,
         .resolvedRef = lockedRef,
         .lockedRef = lockedRef,
-        .accessor = accessor,
+        .accessor = ptr(&accessor),
         .flakePath = dirOf(flakePath.path),
     };
 
@@ -308,7 +308,7 @@ static Flake getFlake(
     // FIXME: resolve
     auto [accessor, input] = originalRef.input.lazyFetch(state.store);
 
-    return readFlake(state, originalRef, accessor, lockRootPath);
+    return readFlake(state, originalRef, state.registerAccessor(accessor), lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
@@ -324,7 +324,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 
 static LockFile readLockFile(const Flake & flake)
 {
-    SourcePath lockFilePath{flake.accessor, canonPath(flake.flakePath + "/flake.lock")};
+    SourcePath lockFilePath{*flake.accessor, canonPath(flake.flakePath + "/flake.lock")};
     return lockFilePath.pathExists()
         ? LockFile(lockFilePath.readFile(), fmt("%s", lockFilePath))
         : LockFile();
@@ -703,7 +703,7 @@ void callFlake(EvalState & state,
 
     emitTreeAttrs(
         state,
-        {lockedFlake.flake.accessor, lockedFlake.flake.flakePath},
+        {*lockedFlake.flake.accessor, lockedFlake.flake.flakePath},
         lockedFlake.flake.lockedRef.input,
         *vRootSrc,
         false,

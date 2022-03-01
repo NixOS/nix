@@ -119,7 +119,7 @@ void Value::print(std::ostream & str, std::set<const void *> * seen) const
         str << "\"";
         break;
     case tPath:
-        str << path; // !!! escaping?
+        str << path().to_string(); // !!! escaping?
         break;
     case tNull:
         str << "null";
@@ -721,11 +721,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2))
-{
-    throw EvalError(s, s2);
-}
-
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
 {
     throw EvalError(ErrorInfo {
@@ -862,9 +857,12 @@ void Value::mkStringMove(const char * s, const PathSet & context)
 }
 
 
-void Value::mkPath(std::string_view s)
+void Value::mkPath(const SourcePath & path)
 {
-    mkPath(makeImmutableString(s));
+    clearValue();
+    internalType = tPath;
+    _path.accessor = &path.accessor;
+    _path.path = makeImmutableString(path.path);
 }
 
 
@@ -978,24 +976,19 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial)
+void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    #if 0
-    auto path = checkSourcePath(path_);
-    #endif
-
-    auto path = packPath(path_);
-
     // FIXME: use SourcePath as cache key
+    auto pathKey = path.to_string();
     FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
+    if ((i = fileEvalCache.find(pathKey)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
-    auto resolvedPath_ = resolveExprPath(path_);
-    auto resolvedPath = packPath(resolvedPath_);
-    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
+    auto resolvedPath = resolveExprPath(path);
+    auto resolvedPathKey = resolvedPath.to_string();
+    if ((i = fileEvalCache.find(resolvedPathKey)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
@@ -1003,17 +996,17 @@ void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial
     printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    auto j = fileParseCache.find(resolvedPath);
+    auto j = fileParseCache.find(resolvedPathKey);
     if (j != fileParseCache.end())
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(resolvedPath_);
+        e = parseExprFromFile(resolvedPath);
         #if 0
         e = parseExprFromFile(checkSourcePath(resolvedPath));
         #endif
 
-    cacheFile(path, resolvedPath, e, v, mustBeTrivial);
+    cacheFile(pathKey, resolvedPathKey, e, v, mustBeTrivial);
 }
 
 
@@ -1790,9 +1783,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
         } else {
             if (s.empty()) s.reserve(es->size());
-            /* skip canonization of first path, which would only be not
-            canonized in the first place if it's coming from a ./${foo} type
-            path */
+            /* Skip canonization of first path, which would only be
+               non-canonical in the first place if it's coming from a
+               ./${foo} type path. */
             auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
             sSize += part->size();
             s.emplace_back(std::move(part));
@@ -1808,7 +1801,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
-        v.mkPath(canonPath(str()));
+        v.mkPath({.accessor = *values[0]._path.accessor, .path = canonPath(str())});
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2005,11 +1998,12 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
     }
 
     if (v.type() == nPath) {
-        BackedStringView path(PathView(v.path));
+        auto path = v.path().to_string();
         if (canonicalizePath)
-            path = canonPath(*path);
+            // FIXME: unnecessary?
+            path = canonPath(path);
         if (copyToStore)
-            path = copyPathToStore(context, std::move(path).toOwned());
+            path = copyPathToStore(context, path);
         return path;
     }
 
@@ -2054,6 +2048,7 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
 
 std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
+    #if 0
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
@@ -2070,7 +2065,7 @@ std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
             : store->addToStore(path2.baseName(), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
         #endif
         auto source = sinkToSource([&](Sink & sink) {
-            path2.accessor->dumpPath(path2.path, sink);
+            path2.dumpPath(sink);
         });
         // FIXME: readOnlyMode
         auto p = store->addToStoreFromDump(*source, path2.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
@@ -2082,15 +2077,18 @@ std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
 
     context.insert(dstPath);
     return dstPath;
+    #endif
+    abort();
 }
 
 
-Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
+SourcePath EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     auto path = coerceToString(pos, v, context, false, false).toOwned();
     if (path == "" || path[0] != '/')
         throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
-    return path;
+    // FIXME
+    return rootPath(path);
 }
 
 
@@ -2137,7 +2135,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return strcmp(v1.string.s, v2.string.s) == 0;
 
         case nPath:
-            return strcmp(v1.path, v2.path) == 0;
+            return
+                v1._path.accessor == v2._path.accessor
+                && strcmp(v1._path.path, v2._path.path) == 0;
 
         case nNull:
             return true;

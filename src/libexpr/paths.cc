@@ -3,34 +3,15 @@
 
 namespace nix {
 
-static constexpr std::string_view marker = "/__virtual/";
-
-Path EvalState::packPath(const SourcePath & path)
+SourcePath EvalState::rootPath(Path path)
 {
-    // FIXME: canonPath(path) ?
-    assert(hasPrefix(path.path, "/"));
-    inputAccessors.emplace(path.accessor->number, path.accessor);
-    return std::string(marker) + std::to_string(path.accessor->number) + path.path;
+    return {*rootFS, std::move(path)};
 }
 
-SourcePath EvalState::unpackPath(const Path & path)
+InputAccessor & EvalState::registerAccessor(ref<InputAccessor> accessor)
 {
-    if (hasPrefix(path, marker)) {
-        auto s = path.substr(marker.size());
-        auto slash = s.find('/');
-        auto n = std::stoi(s.substr(0, slash));
-        auto i = inputAccessors.find(n);
-        assert(i != inputAccessors.end());
-        return {i->second, slash != std::string::npos ? s.substr(slash) : "/"};
-    } else {
-        printError("FIXME: %s", path);
-        return rootPath(path);
-    }
-}
-
-SourcePath EvalState::rootPath(const Path & path)
-{
-    return {rootFS, path};
+    inputAccessors.emplace(&*accessor, accessor);
+    return *accessor;
 }
 
 }

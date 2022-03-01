@@ -178,6 +178,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
         #include "generate-manpage.nix.gen.hh"
         , "/"), *vGenerateManpage);
 
+    // FIXME: use MemoryAccessor
     auto vUtils = state.allocValue();
     state.cacheFile(
         "/utils.nix", "/utils.nix",

@@ -216,9 +216,14 @@ ref<FSInputAccessor> makeFSInputAccessor(
     return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths));
 }
 
+std::string SourcePath::to_string() const
+{
+    return path; // FIXME
+}
+
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
 {
-    str << path.path; // FIXME
+    str << path.to_string();
     return str;
 }
 

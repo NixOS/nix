@@ -517,11 +517,11 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(path);
+    $$ = new ExprPath(*data->state.rootFS, path);
   }
   | HPATH {
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(path);
+    $$ = new ExprPath(*data->state.rootFS, path);
   }
   ;
 
@@ -700,7 +700,7 @@ SourcePath resolveExprPath(const SourcePath & path)
 
     // FIXME
     auto path2 = path.path + "/default.nix";
-    if (path.accessor->pathExists(path2))
+    if (path.pathExists())
         return {path.accessor, path2};
 
     return path;
@@ -715,11 +715,11 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 
 Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticEnv)
 {
-    auto packed = packPath(path);
     auto buffer = path.readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foFile, packed, dirOf(packed), staticEnv);
+    // FIXME: pass SourcePaths
+    return parse(buffer.data(), buffer.size(), foFile, path.path, dirOf(path.path), staticEnv);
 }
 
 
@@ -788,7 +788,8 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     }
 
     if (hasPrefix(path, "nix/"))
-        return packPath(SourcePath {corepkgsFS, (std::string) path.substr(3)});
+        abort();
+        //return packPath(SourcePath {corepkgsFS, (std::string) path.substr(3)});
 
     throw ThrownError({
         .msg = hintfmt(evalSettings.pureEval
