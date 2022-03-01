@@ -239,13 +239,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
             : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
 
-        auto validPaths = state.store->queryValidPaths({expectedPath}, NoSubstitute);
-        if (!validPaths.empty()) {
+        if (state.store->isValidPath(expectedPath)) {
             state.allowAndSetStorePathString(expectedPath, v);
             return;
         }
     }
 
+    // TODO: fetching may fail, yet the path may be substitutable.
+    //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
