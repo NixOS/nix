@@ -1,5 +1,6 @@
 #include "flake.hh"
 #include "globals.hh"
+#include "fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -53,7 +54,7 @@ void ConfigFile::apply()
             auto trustedList = readTrustedList();
 
             bool trusted = false;
-            if (nix::settings.acceptFlakeConfig){
+            if (nix::fetchSettings.acceptFlakeConfig){
                 trusted = true;
             } else if (auto saved = get(get(trustedList, name).value_or(std::map<std::string, bool>()), valueS)) {
                 trusted = *saved;
