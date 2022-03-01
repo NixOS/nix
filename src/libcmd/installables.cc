@@ -201,7 +201,7 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             prefix_ = "";
         }
 
-        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root, false);
         Value &v1(*v);
         state->forceValue(v1, pos);
         Value v2;
@@ -449,7 +449,7 @@ struct InstallableAttrPath : InstallableValue
 
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
-        auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
+        auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v, false);
         state.forceValue(*vRes, pos);
         return {vRes, pos};
     }
@@ -614,7 +614,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 
     for (auto & attrPath : getActualAttrPaths()) {
         try {
-            auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
+            auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs, false);
             state.forceValue(*v, pos);
             return {v, pos};
         } catch (AttrPathNotFound & e) {

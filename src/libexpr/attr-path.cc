@@ -42,7 +42,7 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 
 
 std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string & attrPath,
-    Bindings & autoArgs, Value & vIn)
+    Bindings & autoArgs, Value & vIn, bool callFunctors)
 {
     Strings tokens = parseAttrPath(attrPath);
 
@@ -56,7 +56,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
 
         /* Evaluate the expression. */
         Value * vNew = state.allocValue();
-        state.autoCallFunction(autoArgs, *v, *vNew);
+        state.autoCallFunction(autoArgs, *v, *vNew, callFunctors);
         v = vNew;
         state.forceValue(*v, noPos);
 

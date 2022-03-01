@@ -1503,13 +1503,13 @@ void EvalState::incrFunctionCall(ExprLambda * fun)
 }
 
 
-void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
+void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res, bool callFunctors)
 {
     auto pos = fun.determinePos(noPos);
 
     forceValue(fun, pos);
 
-    if (fun.type() == nAttrs) {
+    if (callFunctors && (fun.type() == nAttrs)) {
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
             Value * v = allocValue();

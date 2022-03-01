@@ -14,7 +14,8 @@ std::pair<Value *, Pos> findAlongAttrPath(
     EvalState & state,
     const std::string & attrPath,
     Bindings & autoArgs,
-    Value & vIn);
+    Value & vIn,
+    bool callFunctors = true);
 
 /* Heuristic to find the filename and lineno or a nix value. */
 Pos findPackageFilename(EvalState & state, Value & v, std::string what);
