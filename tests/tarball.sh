@@ -26,10 +26,14 @@ test_tarball() {
     nix-build -o $TEST_ROOT/result '<foo>' -I foo=file://$tarball
 
     nix-build -o $TEST_ROOT/result -E "import (fetchTarball file://$tarball)"
+    # Do not re-fetch paths already present
+    nix-build  -o $TEST_ROOT/result -E "import (fetchTarball { url = file:///does-not-exist/must-remain-unused/$tarball; sha256 = \"$hash\"; })"
 
     nix-build  -o $TEST_ROOT/result -E "import (fetchTree file://$tarball)"
     nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; })"
     nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })"
+    # Do not re-fetch paths already present
+    nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file:///does-not-exist/must-remain-unused/$tarball; narHash = \"$hash\"; })"
     nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"sha256-xdKv2pq/IiwLSnBBJXW8hNowI4MrdZfW+SYqDQs7Tzc=\"; })" 2>&1 | grep 'NAR hash mismatch in input'
 
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" >&2

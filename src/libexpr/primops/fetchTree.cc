@@ -203,6 +203,8 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            else if (n == "narHash")
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
@@ -230,6 +232,20 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
+    // early exit if pinned and already in the store
+    if (expectedHash && expectedHash->type == htSHA256) {
+        auto expectedPath =
+            unpack
+            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
+            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+
+        auto validPaths = state.store->queryValidPaths({expectedPath}, NoSubstitute);
+        if (!validPaths.empty()) {
+            state.allowAndSetStorePathString(expectedPath, v);
+            return;
+        }
+    }
+
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
@@ -244,10 +260,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
-    state.allowPath(storePath);
-
-    auto path = state.store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
+    state.allowAndSetStorePathString(storePath, v);
 }
 
 static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)

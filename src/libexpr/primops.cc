@@ -1919,20 +1919,15 @@ static void addPath(
         if (expectedHash)
             expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
 
-        Path dstPath;
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            dstPath = state.store->printStorePath(settings.readOnlyMode
+            StorePath dstPath = settings.readOnlyMode
                 ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs));
-            if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
+                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs);
+            if (expectedHash && expectedStorePath != dstPath)
                 throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
+            state.allowAndSetStorePathString(dstPath, v);
         } else
-            dstPath = state.store->printStorePath(*expectedStorePath);
-
-        v.mkString(dstPath, {dstPath});
-
-        state.allowPath(dstPath);
-
+            state.allowAndSetStorePathString(*expectedStorePath, v);
     } catch (Error & e) {
         e.addTrace(pos, "while adding path '%s'", path);
         throw;

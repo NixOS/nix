@@ -161,6 +161,9 @@ public:
        the real store path if `store` is a chroot store. */
     void allowPath(const StorePath & storePath);
 
+    /* Allow access to a store path and return it as a string. */
+    void allowAndSetStorePathString(const StorePath & storePath, Value &v);
+
     /* Check whether access to a path is allowed and throw an error if
        not. Otherwise return the canonicalised path. */
     Path checkSourcePath(const Path & path);
