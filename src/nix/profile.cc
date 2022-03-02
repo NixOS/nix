@@ -61,6 +61,27 @@ struct ProfileElement
     {
         return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
     }
+
+    void updateStorePaths(ref<Store> evalStore, ref<Store> store, Installable & installable)
+    {
+        // FIXME: respect meta.outputsToInstall
+        storePaths.clear();
+        for (auto & buildable : getBuiltPaths(evalStore, store, installable.toDerivedPaths())) {
+            std::visit(overloaded {
+                [&](const BuiltPath::Opaque & bo) {
+                    storePaths.insert(bo.path);
+                },
+                [&](const BuiltPath::Built & bfd) {
+                    // TODO: Why are we querying if we know the output
+                    // names already? Is it just to figure out what the
+                    // default one is?
+                    for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
+                        storePaths.insert(output.second);
+                    }
+                },
+            }, buildable.raw());
+        }
+    }
 };
 
 struct ProfileManifest
@@ -232,53 +253,25 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        std::vector<DerivedPath> pathsToBuild;
+        auto builtPaths = Installable::build(getEvalStore(), store, Realise::Outputs, installables, bmNormal);
 
         for (auto & installable : installables) {
-            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
-                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+            ProfileElement element;
 
-                ProfileElement element;
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
+            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
+                // FIXME: make build() return this?
+                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
                 element.source = ProfileElementSource{
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
                 };
-
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, StringSet{drv.outputName}});
-
-                manifest.elements.emplace_back(std::move(element));
-            } else {
-                auto buildables = build(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal);
-
-                for (auto & buildable : buildables) {
-                    ProfileElement element;
-
-                    std::visit(overloaded {
-                        [&](const BuiltPath::Opaque & bo) {
-                            pathsToBuild.push_back(bo);
-                            element.storePaths.insert(bo.path);
-                        },
-                        [&](const BuiltPath::Built & bfd) {
-                            // TODO: Why are we querying if we know the output
-                            // names already? Is it just to figure out what the
-                            // default one is?
-                            for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
-                                pathsToBuild.push_back(DerivedPath::Built{bfd.drvPath, {output.first}});
-                                element.storePaths.insert(output.second);
-                            }
-                        },
-                    }, buildable.raw());
-
-                    manifest.elements.emplace_back(std::move(element));
-                }
             }
-        }
 
-        store->buildPaths(pathsToBuild);
+            element.updateStorePaths(getEvalStore(), store, *installable);
+
+            manifest.elements.push_back(std::move(element));
+        }
 
         updateProfile(manifest.build(store));
     }
@@ -407,8 +400,8 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         auto matchers = getMatchers(store);
 
-        // FIXME: code duplication
-        std::vector<DerivedPath> pathsToBuild;
+        std::vector<std::shared_ptr<Installable>> installables;
+        std::vector<size_t> indices;
 
         auto upgradedCount = 0;
 
@@ -423,32 +416,30 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                InstallableFlake installable(
+                auto installable = std::make_shared<InstallableFlake>(
                     this,
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
                     "",
-                    {element.source->attrPath},
-                    {},
+                    Strings{element.source->attrPath},
+                    Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv] = installable.toDerivation();
+                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
 
                 if (element.source->resolvedRef == resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
-                    installable.flakeRef,
+                    installable->flakeRef,
                     resolvedRef,
                     attrPath,
                 };
 
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {drv.outputName}});
+                installables.push_back(installable);
+                indices.push_back(i);
             }
         }
 
@@ -465,7 +456,13 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
             warn ("Use 'nix profile list' to see the current profile.");
         }
 
-        store->buildPaths(pathsToBuild);
+        auto builtPaths = Installable::build(getEvalStore(), store, Realise::Outputs, installables, bmNormal);
+
+        for (size_t i = 0; i < installables.size(); ++i) {
+            auto & installable = installables.at(i);
+            auto & element = manifest.elements[indices.at(i)];
+            element.updateStorePaths(getEvalStore(), store, *installable);
+        }
 
         updateProfile(manifest.build(store));
     }
