@@ -30,7 +30,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#clang11Stdenv
+$ nix develop .#native-clang11StdenvPackages
 ```
 
 > **Note**
@@ -77,12 +77,12 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell -A devShells.x86_64-linux.clang11Stdenv
+$ nix-shell -A devShells.x86_64-linux.native-clang11StdenvPackages
 ```
 
 > **Note**
 >
-> You can use `ccacheStdenv` to drastically improve rebuild time.
+> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
 > By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
 
 To build Nix itself in this shell:
