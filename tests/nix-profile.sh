@@ -13,7 +13,7 @@ cat > $flake1Dir/flake.nix <<EOF
 
   outputs = { self }: with import ./config.nix; rec {
     packages.$system.default = mkDerivation {
-      name = "simple-\${builtins.readFile ./version}";
+      name = "profile-test-\${builtins.readFile ./version}";
       builder = builtins.toFile "builder.sh"
         ''
           mkdir -p \$out/bin
@@ -67,6 +67,13 @@ nix profile remove 0
 (! [ -e $TEST_HOME/.nix-profile/bin/foo ])
 nix profile history | grep 'foo: 1.0 -> ∅'
 nix profile diff-closures | grep 'Version 3 -> 4'
+
+# Test installing a non-flake package.
+nix profile install --file ./simple.nix ''
+[[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
+nix profile remove 1
+nix profile install $(nix-build --no-out-link ./simple.nix)
+[[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
 
 # Test wipe-history.
 nix profile wipe-history
