@@ -470,7 +470,6 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
     for (auto & drvInfo : drvInfos) {
         res.push_back({
             state->store->parseStorePath(drvInfo.queryDrvPath()),
-            state->store->maybeParseStorePath(drvInfo.queryOutPath()),
             drvInfo.queryOutputName()
         });
     }
@@ -584,9 +583,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
         auto drvPath = attr->forceDerivation();
 
-        auto drvInfo = DerivationInfo{
+        auto drvInfo = DerivationInfo {
             std::move(drvPath),
-            state->store->maybeParseStorePath(attr->getAttr(state->sOutPath)->getString()),
             attr->getAttr(state->sOutputName)->getString()
         };
 

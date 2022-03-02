@@ -22,7 +22,11 @@ cat > $flake1Dir/flake.nix <<EOF
           echo Hello \${builtins.readFile ./who}
           EOF
           chmod +x \$out/bin/hello
+          echo DONE
         '';
+      __contentAddressed = import ./ca.nix;
+      outputHashMode = "recursive";
+      outputHashAlgo = "sha256";
     };
   };
 }
@@ -30,6 +34,7 @@ EOF
 
 printf World > $flake1Dir/who
 printf 1.0 > $flake1Dir/version
+printf false > $flake1Dir/ca.nix
 
 cp ./config.nix $flake1Dir/
 
@@ -66,3 +71,17 @@ nix profile diff-closures | grep 'Version 3 -> 4'
 # Test wipe-history.
 nix profile wipe-history
 [[ $(nix profile history | grep Version | wc -l) -eq 1 ]]
+
+# Test upgrade to CA package.
+printf true > $flake1Dir/ca.nix
+printf 3.0 > $flake1Dir/version
+nix profile upgrade --extra-experimental-features ca-derivations 0
+nix profile history | grep "packages.$system.default: 1.0 -> 3.0"
+
+# Test new install of CA package.
+nix profile remove 0
+printf 4.0 > $flake1Dir/version
+printf Utrecht > $flake1Dir/who
+nix profile install --extra-experimental-features ca-derivations $flake1Dir
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Utrecht" ]]
+[[ $(nix path-info --json $(realpath $TEST_HOME/.nix-profile/bin/hello) | jq -r .[].ca) =~ fixed:r:sha256: ]]

@@ -134,7 +134,6 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        std::optional<StorePath> outPath;
         std::string outputName;
     };
 
