@@ -14,6 +14,7 @@
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "serialise.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"

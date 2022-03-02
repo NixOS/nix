@@ -2,6 +2,7 @@
 
 #include "parsed-derivations.hh"
 #include "lock.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
 #include "goal.hh"
