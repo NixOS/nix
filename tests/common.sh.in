@@ -173,8 +173,13 @@ needLocalStore() {
 }
 
 # Just to make it easy to find which tests should be fixed
-buggyNeedLocalStore () {
+buggyNeedLocalStore() {
   needLocalStore
+}
+
+enableFeatures() {
+    local features="$1"
+    sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
 }
 
 set -x

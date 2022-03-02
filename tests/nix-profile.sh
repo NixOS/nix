@@ -3,6 +3,8 @@ source common.sh
 clearStore
 clearProfiles
 
+enableFeatures "ca-derivations ca-references"
+
 # Make a flake.
 flake1Dir=$TEST_ROOT/flake1
 mkdir -p $flake1Dir
@@ -82,13 +84,13 @@ nix profile wipe-history
 # Test upgrade to CA package.
 printf true > $flake1Dir/ca.nix
 printf 3.0 > $flake1Dir/version
-nix profile upgrade --extra-experimental-features ca-derivations 0
+nix profile upgrade 0
 nix profile history | grep "packages.$system.default: 1.0 -> 3.0"
 
 # Test new install of CA package.
 nix profile remove 0
 printf 4.0 > $flake1Dir/version
 printf Utrecht > $flake1Dir/who
-nix profile install --extra-experimental-features ca-derivations $flake1Dir
+nix profile install $flake1Dir
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Utrecht" ]]
 [[ $(nix path-info --json $(realpath $TEST_HOME/.nix-profile/bin/hello) | jq -r .[].ca) =~ fixed:r:sha256: ]]
