@@ -89,7 +89,7 @@ nix_tests = \
   build.sh \
   ca/nix-run.sh \
   db-migration.sh \
-  nix-profile.sh \
+  bash-profile.sh \
   pass-as-file.sh \
   describe-stores.sh \
   store-ping.sh
