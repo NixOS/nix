@@ -9,7 +9,6 @@ clearProfiles
 # Query installed: should be empty.
 test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 0
 
-mkdir -p $TEST_HOME
 nix-env --switch-profile $profiles/test
 
 # Query available: should contain several.
