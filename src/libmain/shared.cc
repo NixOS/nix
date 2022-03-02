@@ -227,8 +227,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
-    printError("FOO %s", programName);
-    
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',
