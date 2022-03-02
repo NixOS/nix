@@ -373,15 +373,15 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         if (removedCount == 0) {
             for (auto matcher: matchers) {
-                if (const size_t* index = std::get_if<size_t>(&matcher)){
-                    warn("'%d' is not a valid index in profile", *index);
-                } else if (const Path* path = std::get_if<Path>(&matcher)){
-                    warn("'%s' does not match any paths in profile", *path);
-                } else if (const RegexPattern* regex = std::get_if<RegexPattern>(&matcher)){
-                    warn("'%s' does not match any packages in profile", regex->pattern);
+                if (const size_t * index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index", *index);
+                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths", *path);
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages", regex->pattern);
                 }
             }
-            warn ("Try `nix profile list` to see the current profile.");
+            warn ("Use 'nix profile list' to see the current profile.");
         }
         updateProfile(newManifest.build(store));
     }
@@ -454,12 +454,12 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         if (upgradedCount == 0) {
             for (auto & matcher : matchers) {
-                if (const size_t* index = std::get_if<size_t>(&matcher)){
-                    warn("'%d' is not a valid index in profile", *index);
-                } else if (const Path* path = std::get_if<Path>(&matcher)){
-                    warn("'%s' does not match any paths in profile", *path);
-                } else if (const RegexPattern* regex = std::get_if<RegexPattern>(&matcher)){
-                    warn("'%s' does not match any packages in profile", regex->pattern);
+                if (const size_t * index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index", *index);
+                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths", *path);
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages", regex->pattern);
                 }
             }
             warn ("Use 'nix profile list' to see the current profile.");
