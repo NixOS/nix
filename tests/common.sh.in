@@ -109,10 +109,10 @@ startDaemon() {
 killDaemon() {
     kill $pidDaemon
     for i in {0..100}; do
-        kill -0 $pidDaemon || break
+        kill -0 $pidDaemon 2> /dev/null || break
         sleep 0.1
     done
-    kill -9 $pidDaemon || true
+    kill -9 $pidDaemon 2> /dev/null || true
     wait $pidDaemon || true
     trap "" EXIT
 }
