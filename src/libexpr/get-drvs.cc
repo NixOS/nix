@@ -22,7 +22,7 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
 {
     auto [drvPath, selectedOutputs] = parsePathWithOutputs(*store, drvPathWithOutputs);
 
-    this->drvPath = store->printStorePath(drvPath);
+    this->drvPath = drvPath;
 
     auto drv = store->derivationFromPath(drvPath);
 
@@ -41,9 +41,7 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
         throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
     auto & [outputName, output] = *i;
 
-    auto optStorePath = output.path(*store, drv.name, outputName);
-    if (optStorePath)
-        outPath = store->printStorePath(*optStorePath);
+    outPath = {output.path(*store, drv.name, outputName)};
 }
 
 
@@ -68,24 +66,35 @@ std::string DrvInfo::querySystem() const
 }
 
 
-std::string DrvInfo::queryDrvPath() const
+std::optional<StorePath> DrvInfo::queryDrvPath() const
 {
-    if (drvPath == "" && attrs) {
+    if (!drvPath && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
         PathSet context;
-        drvPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
+        if (i == attrs->end())
+            drvPath = {std::nullopt};
+        else
+            drvPath = {state->coerceToStorePath(*i->pos, *i->value, context)};
     }
-    return drvPath;
+    return drvPath.value_or(std::nullopt);
 }
 
 
-std::string DrvInfo::queryOutPath() const
+StorePath DrvInfo::requireDrvPath() const
+{
+    if (auto drvPath = queryDrvPath())
+        return *drvPath;
+    throw Error("derivation does not contain a 'drvPath' attribute");
+}
+
+
+StorePath DrvInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
         if (i != attrs->end())
-            outPath = state->coerceToPath(*i->pos, *i->value, context);
+            outPath = state->coerceToStorePath(*i->pos, *i->value, context);
     }
     if (!outPath)
         throw UnimplementedError("CA derivations are not yet supported");
@@ -113,10 +122,10 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
                 Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                 if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
                 PathSet context;
-                outputs[name] = state->coerceToPath(*outPath->pos, *outPath->value, context);
+                outputs.emplace(name, state->coerceToStorePath(*outPath->pos, *outPath->value, context));
             }
         } else
-            outputs["out"] = queryOutPath();
+            outputs.emplace("out", queryOutPath());
     }
     if (!onlyOutputsToInstall || !attrs)
         return outputs;

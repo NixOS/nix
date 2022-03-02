@@ -211,7 +211,7 @@ static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
 // at a time.
 static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 {
-    auto path = state.store->parseStorePath(elem.queryOutPath());
+    auto path = elem.queryOutPath();
     if (state.store->isValidPath(path)) return true;
     return state.store->querySubstitutablePaths({path}).count(path);
 }
@@ -429,14 +429,15 @@ static void queryInstSources(EvalState & state,
                 elem.setName(name);
 
                 if (path.isDerivation()) {
-                    elem.setDrvPath(state.store->printStorePath(path));
+                    elem.setDrvPath(path);
                     auto outputs = state.store->queryDerivationOutputMap(path);
-                    elem.setOutPath(state.store->printStorePath(outputs.at("out")));
+                    elem.setOutPath(outputs.at("out"));
                     if (name.size() >= drvExtension.size() &&
                         std::string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = name.substr(0, name.size() - drvExtension.size());
                 }
-                else elem.setOutPath(state.store->printStorePath(path));
+                else
+                    elem.setOutPath(path);
 
                 elems.push_back(elem);
             }
@@ -470,13 +471,11 @@ static void queryInstSources(EvalState & state,
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
     std::vector<DerivedPath> targets;
-    for (auto & i : elems) {
-        Path drvPath = i.queryDrvPath();
-        if (drvPath != "")
-            targets.push_back(DerivedPath::Built{state.store->parseStorePath(drvPath)});
+    for (auto & i : elems)
+        if (auto drvPath = i.queryDrvPath())
+            targets.push_back(DerivedPath::Built{*drvPath});
         else
-            targets.push_back(DerivedPath::Opaque{state.store->parseStorePath(i.queryOutPath())});
-    }
+            targets.push_back(DerivedPath::Opaque{i.queryOutPath()});
 
     printMissing(state.store, targets);
 }
@@ -744,14 +743,11 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     if (globals.forceName != "")
         drv.setName(globals.forceName);
 
+    auto drvPath = drv.queryDrvPath();
     std::vector<DerivedPath> paths {
-        (drv.queryDrvPath() != "")
-        ? (DerivedPath) (DerivedPath::Built {
-                globals.state->store->parseStorePath(drv.queryDrvPath())
-            })
-        : (DerivedPath) (DerivedPath::Opaque {
-                globals.state->store->parseStorePath(drv.queryOutPath())
-            }),
+        drvPath
+        ? (DerivedPath) (DerivedPath::Built { *drvPath })
+        : (DerivedPath) (DerivedPath::Opaque { drv.queryOutPath() }),
     };
     printMissing(globals.state->store, paths);
     if (globals.dryRun) return;
@@ -759,8 +755,9 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 
     debug(format("switching to new user environment"));
     Path generation = createGeneration(
-        ref<LocalFSStore>(store2), globals.profile,
-        store2->parseStorePath(drv.queryOutPath()));
+        ref<LocalFSStore>(store2),
+        globals.profile,
+        drv.queryOutPath());
     switchLink(globals.profile, generation);
 }
 
@@ -780,7 +777,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 split = std::partition(
                     workingElems.begin(), workingElems.end(),
                     [&selectorStorePath, globals](auto &elem) {
-                        return selectorStorePath != globals.state->store->parseStorePath(elem.queryOutPath());
+                        return selectorStorePath != elem.queryOutPath();
                     }
                 );
             } else {
@@ -925,9 +922,8 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
             if (printOutPath) {
                 DrvInfo::Outputs outputs = i.queryOutputs();
                 JSONObject outputObj = pkgObj.object("outputs");
-                for (auto & j : outputs) {
-                    outputObj.attr(j.first, j.second);
-                }
+                for (auto & j : outputs)
+                    outputObj.attr(j.first, globals.state->store->printStorePath(j.second));
             }
 
             if (printMeta) {
@@ -957,6 +953,8 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
 
 static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 {
+    auto & store(*globals.state->store);
+
     Strings remaining;
     std::string attrPath;
 
@@ -1027,12 +1025,11 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */
-    PathSet installed; /* installed paths */
+    StorePathSet installed; /* installed paths */
 
-    if (printStatus) {
+    if (printStatus)
         for (auto & i : installedElems)
             installed.insert(i.queryOutPath());
-    }
 
 
     /* Query which paths have substitutes. */
@@ -1042,13 +1039,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         StorePathSet paths;
         for (auto & i : elems)
             try {
-                paths.insert(globals.state->store->parseStorePath(i.queryOutPath()));
+                paths.insert(i.queryOutPath());
             } catch (AssertionError & e) {
                 printMsg(lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
                 i.setFailed();
             }
-        validPaths = globals.state->store->queryValidPaths(paths);
-        substitutablePaths = globals.state->store->querySubstitutablePaths(paths);
+        validPaths = store.queryValidPaths(paths);
+        substitutablePaths = store.querySubstitutablePaths(paths);
     }
 
 
@@ -1073,8 +1070,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
 
             if (globals.prebuiltOnly &&
-                !validPaths.count(globals.state->store->parseStorePath(i.queryOutPath())) &&
-                !substitutablePaths.count(globals.state->store->parseStorePath(i.queryOutPath())))
+                !validPaths.count(i.queryOutPath()) &&
+                !substitutablePaths.count(i.queryOutPath()))
                 continue;
 
             /* For table output. */
@@ -1084,10 +1081,10 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             XMLAttrs attrs;
 
             if (printStatus) {
-                Path outPath = i.queryOutPath();
-                bool hasSubs = substitutablePaths.count(globals.state->store->parseStorePath(outPath));
-                bool isInstalled = installed.find(outPath) != installed.end();
-                bool isValid = validPaths.count(globals.state->store->parseStorePath(outPath));
+                auto outPath = i.queryOutPath();
+                bool hasSubs = substitutablePaths.count(outPath);
+                bool isInstalled = installed.count(outPath);
+                bool isValid = validPaths.count(outPath);
                 if (xmlOutput) {
                     attrs["installed"] = isInstalled ? "1" : "0";
                     attrs["valid"] = isValid ? "1" : "0";
@@ -1152,9 +1149,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             if (printDrvPath) {
                 auto drvPath = i.queryDrvPath();
                 if (xmlOutput) {
-                    if (drvPath != "") attrs["drvPath"] = drvPath;
+                    if (drvPath) attrs["drvPath"] = store.printStorePath(*drvPath);
                 } else
-                    columns.push_back(drvPath == "" ? "-" : drvPath);
+                    columns.push_back(drvPath ? store.printStorePath(*drvPath) : "-");
             }
 
             if (printOutPath && !xmlOutput) {
@@ -1163,7 +1160,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 for (auto & j : outputs) {
                     if (!s.empty()) s += ';';
                     if (j.first != "out") { s += j.first; s += "="; }
-                    s += j.second;
+                    s += store.printStorePath(j.second);
                 }
                 columns.push_back(s);
             }
@@ -1184,7 +1181,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                         for (auto & j : outputs) {
                             XMLAttrs attrs2;
                             attrs2["name"] = j.first;
-                            attrs2["path"] = j.second;
+                            attrs2["path"] = store.printStorePath(j.second);
                             xml.writeEmptyElement("output", attrs2);
                         }
                     }

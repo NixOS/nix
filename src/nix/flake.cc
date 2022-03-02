@@ -327,7 +327,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!drvInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return std::make_optional(store->parseStorePath(drvInfo->queryDrvPath()));
+                return drvInfo->queryDrvPath();
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the derivation '%s'", attrPath));
                 reportError(e);

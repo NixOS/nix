@@ -468,10 +468,10 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
 
     std::vector<DerivationInfo> res;
     for (auto & drvInfo : drvInfos) {
-        res.push_back({
-            state->store->parseStorePath(drvInfo.queryDrvPath()),
-            drvInfo.queryOutputName()
-        });
+        auto drvPath = drvInfo.queryDrvPath();
+        if (!drvPath)
+            throw Error("'%s' is not a derivation", what());
+        res.push_back({ *drvPath, drvInfo.queryOutputName() });
     }
 
     return res;
