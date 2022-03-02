@@ -4,6 +4,7 @@ clearStore
 clearProfiles
 
 enableFeatures "ca-derivations ca-references"
+restartDaemon
 
 # Make a flake.
 flake1Dir=$TEST_ROOT/flake1
