@@ -87,8 +87,7 @@ startDaemon() {
     if [[ "$NIX_REMOTE" == daemon ]]; then
       return
     fi
-    # Start the daemon, wait for the socket to appear.  !!!
-    # ‘nix-daemon’ should have an option to fork into the background.
+    # Start the daemon, wait for the socket to appear.
     rm -f $NIX_DAEMON_SOCKET_PATH
     PATH=$DAEMON_PATH nix-daemon&
     pidDaemon=$!
