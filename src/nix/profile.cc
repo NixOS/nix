@@ -252,7 +252,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
                 manifest.elements.emplace_back(std::move(element));
             } else {
-                auto buildables = build(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal);
+                auto buildables = Installable::build(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal);
 
                 for (auto & buildable : buildables) {
                     ProfileElement element;
