@@ -1412,7 +1412,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             }
         }
 
-        else if (*i == '\r')
+        else if (*i == '\r' || *i == '\a')
             // do nothing for now
             i++;
 
