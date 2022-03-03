@@ -272,6 +272,9 @@ public:
        path.  Nothing is copied to the store. */
     Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
+    /* Like coerceToPath, but the result must be a store path. */
+    StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context);
+
 public:
 
     /* The base environment, containing the builtin functions and

@@ -97,13 +97,13 @@ struct CmdBundle : InstallableCommand
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         PathSet context2;
-        StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*attr1->pos, *attr1->value, context2));
+        auto drvPath = evalState->coerceToStorePath(*attr1->pos, *attr1->value, context2);
 
         auto attr2 = vRes->attrs->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
+        auto outPath = evalState->coerceToStorePath(*attr2->pos, *attr2->value, context2);
 
         store->buildPaths({ DerivedPath::Built { drvPath } });
 

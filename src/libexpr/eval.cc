@@ -2058,6 +2058,18 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 }
 
 
+StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & context)
+{
+    auto path = coerceToString(pos, v, context, false, false).toOwned();
+    if (auto storePath = store->maybeParseStorePath(path))
+        return *storePath;
+    throw EvalError({
+        .msg = hintfmt("path '%1%' is not in the Nix store", path),
+        .errPos = pos
+    });
+}
+
+
 bool EvalState::eqValues(Value & v1, Value & v2)
 {
     forceValue(v1, noPos);

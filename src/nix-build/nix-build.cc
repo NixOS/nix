@@ -346,7 +346,7 @@ static void main_nix_build(int argc, char * * argv)
             throw UsageError("nix-shell requires a single derivation");
 
         auto & drvInfo = drvs.front();
-        auto drv = evalStore->derivationFromPath(evalStore->parseStorePath(drvInfo.queryDrvPath()));
+        auto drv = evalStore->derivationFromPath(drvInfo.requireDrvPath());
 
         std::vector<StorePathWithOutputs> pathsToBuild;
         RealisedPath::Set pathsToCopy;
@@ -369,7 +369,7 @@ static void main_nix_build(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                auto bashDrv = store->parseStorePath(drv->queryDrvPath());
+                auto bashDrv = drv->requireDrvPath();
                 pathsToBuild.push_back({bashDrv});
                 pathsToCopy.insert(bashDrv);
                 shellDrv = bashDrv;
@@ -458,10 +458,7 @@ static void main_nix_build(int argc, char * * argv)
                 }
             }
 
-            ParsedDerivation parsedDrv(
-                StorePath(store->parseStorePath(drvInfo.queryDrvPath())),
-                drv
-            );
+            ParsedDerivation parsedDrv(drvInfo.requireDrvPath(), drv);
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();
@@ -553,7 +550,7 @@ static void main_nix_build(int argc, char * * argv)
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
         for (auto & drvInfo : drvs) {
-            auto drvPath = store->parseStorePath(drvInfo.queryDrvPath());
+            auto drvPath = drvInfo.requireDrvPath();
 
             auto outputName = drvInfo.queryOutputName();
             if (outputName == "")

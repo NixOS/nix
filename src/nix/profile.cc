@@ -126,7 +126,7 @@ struct ProfileManifest
 
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
-                element.storePaths = {state.store->parseStorePath(drvInfo.queryOutPath())};
+                element.storePaths = {drvInfo.queryOutPath()};
                 elements.emplace_back(std::move(element));
             }
         }
