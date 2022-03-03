@@ -114,8 +114,8 @@ struct Value
 private:
     InternalType internalType;
 
-friend std::string showType(const Value & v);
-friend void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v);
+    friend std::string showType(const Value & v);
+    friend void printValue(std::ostream & str, std::set<const Value *> & seen, const Value & v);
 
 public:
 

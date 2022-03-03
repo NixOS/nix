@@ -86,14 +86,9 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
+void printValue(std::ostream & str, std::set<const Value *> & seen, const Value & v)
 {
     checkInterrupt();
-
-    if (!active.insert(&v).second) {
-        str << "<CYCLE>";
-        return;
-    }
 
     switch (v.internalType) {
     case tInt:
@@ -120,10 +115,14 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << "null";
         break;
     case tAttrs: {
+        seen.insert(&v);
         str << "{ ";
         for (auto & i : v.attrs->lexicographicOrder()) {
             str << i->name << " = ";
-            printValue(str, active, *i->value);
+            if (seen.count(i->value))
+                str << "<REPEAT>";
+            else
+                printValue(str, seen, *i->value);
             str << "; ";
         }
         str << "}";
@@ -132,9 +131,13 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
     case tList1:
     case tList2:
     case tListN:
+        seen.insert(&v);
         str << "[ ";
         for (auto v2 : v.listItems()) {
-            printValue(str, active, *v2);
+            if (seen.count(v2))
+                str << "<REPEAT>";
+            else
+                printValue(str, seen, *v2);
             str << " ";
         }
         str << "]";
@@ -161,15 +164,13 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
     default:
         abort();
     }
-
-    active.erase(&v);
 }
 
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
-    std::set<const Value *> active;
-    printValue(str, active, v);
+    std::set<const Value *> seen;
+    printValue(str, seen, v);
     return str;
 }
 
