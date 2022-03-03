@@ -953,7 +953,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
 
 static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 {
-    auto & store(*globals.state->store);
+    auto & store { *globals.state->store };
 
     Strings remaining;
     std::string attrPath;
