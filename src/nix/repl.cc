@@ -800,7 +800,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (seen.find(i.second) != seen.end())
+                if (seen.count(i.second))
                     str << "«repeated»";
                 else
                     try {
