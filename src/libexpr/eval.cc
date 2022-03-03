@@ -86,7 +86,7 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void printValue(std::ostream & str, std::set<const Value *> & seen, const Value & v)
+void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v)
 {
     checkInterrupt();
 
@@ -115,32 +115,32 @@ void printValue(std::ostream & str, std::set<const Value *> & seen, const Value 
         str << "null";
         break;
     case tAttrs: {
-        seen.insert(&v);
-        str << "{ ";
-        for (auto & i : v.attrs->lexicographicOrder()) {
-            str << i->name << " = ";
-            if (seen.count(i->value))
-                str << "<REPEAT>";
-            else
+        if (!v.attrs->empty() && !seen.insert(v.attrs).second)
+            str << "<REPEAT>";
+        else {
+            str << "{ ";
+            for (auto & i : v.attrs->lexicographicOrder()) {
+                str << i->name << " = ";
                 printValue(str, seen, *i->value);
-            str << "; ";
+                str << "; ";
+            }
+            str << "}";
         }
-        str << "}";
         break;
     }
     case tList1:
     case tList2:
     case tListN:
-        seen.insert(&v);
-        str << "[ ";
-        for (auto v2 : v.listItems()) {
-            if (seen.count(v2))
-                str << "<REPEAT>";
-            else
+        if (v.listSize() && !seen.insert(v.listElems()).second)
+            str << "<REPEAT>";
+        else {
+            str << "[ ";
+            for (auto v2 : v.listItems()) {
                 printValue(str, seen, *v2);
-            str << " ";
+                str << " ";
+            }
+            str << "]";
         }
-        str << "]";
         break;
     case tThunk:
     case tApp:
@@ -169,7 +169,7 @@ void printValue(std::ostream & str, std::set<const Value *> & seen, const Value 
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
-    std::set<const Value *> seen;
+    std::set<const void *> seen;
     printValue(str, seen, v);
     return str;
 }

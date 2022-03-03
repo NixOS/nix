@@ -115,7 +115,7 @@ private:
     InternalType internalType;
 
     friend std::string showType(const Value & v);
-    friend void printValue(std::ostream & str, std::set<const Value *> & seen, const Value & v);
+    friend void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v);
 
 public:
 
