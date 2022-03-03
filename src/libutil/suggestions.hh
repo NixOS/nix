@@ -6,6 +6,8 @@
 
 namespace nix {
 
+int levenshteinDistance(std::string_view first, std::string_view second);
+
 /**
  * A potential suggestion for the cli interface.
  */

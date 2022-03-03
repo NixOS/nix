@@ -5,15 +5,8 @@
 
 namespace nix {
 
-/**
- * Return `some(distance)` where distance is an integer representing some
- * notion of distance between both arguments.
- *
- * If the distance is too big, return none
- */
-int distanceBetween(std::string_view first, std::string_view second)
+int levenshteinDistance(std::string_view first, std::string_view second)
 {
-    // Levenshtein distance.
     // Implementation borrowed from
     // https://en.wikipedia.org/wiki/Levenshtein_distance#Iterative_with_two_matrix_rows
 
@@ -49,7 +42,7 @@ Suggestions Suggestions::bestMatches (
     std::set<Suggestion> res;
     for (const auto & possibleMatch : allMatches) {
         res.insert(Suggestion {
-            .distance = distanceBetween(query, possibleMatch),
+            .distance = levenshteinDistance(query, possibleMatch),
             .suggestion = possibleMatch,
         });
     }
@@ -63,7 +56,7 @@ Suggestions Suggestions::trim(int limit, int maxDistance) const
     int count = 0;
 
     for (auto & elt : suggestions) {
-        if (count >= limit || elt.distance >= maxDistance)
+        if (count >= limit || elt.distance > maxDistance)
             break;
         count++;
         res.insert(elt);
