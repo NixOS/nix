@@ -610,17 +610,24 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 
     auto emptyArgs = state.allocBindings(0);
 
+    Suggestions suggestions;
+
     for (auto & attrPath : getActualAttrPaths()) {
         try {
             auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
             state.forceValue(*v, pos);
             return {v, pos};
         } catch (AttrPathNotFound & e) {
+            suggestions += e.info().suggestions;
         }
     }
 
-    throw Error("flake '%s' does not provide attribute %s",
-        flakeRef, showAttrPaths(getActualAttrPaths()));
+    throw Error(
+        suggestions,
+        "flake '%s' does not provide attribute %s",
+        flakeRef,
+        showAttrPaths(getActualAttrPaths())
+    );
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>

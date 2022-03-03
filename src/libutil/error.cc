@@ -282,6 +282,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         }
     }
 
+    auto suggestions = einfo.suggestions.trim();
+    if (! suggestions.suggestions.empty()){
+        oss << "Did you mean " <<
+            suggestions.trim().pretty_print() <<
+            "?" << std::endl;
+    }
+
     // traces
     if (showTrace && !einfo.traces.empty()) {
         for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {

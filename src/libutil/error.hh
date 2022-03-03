@@ -1,5 +1,6 @@
 #pragma once
 
+#include "suggestions.hh"
 #include "ref.hh"
 #include "types.hh"
 #include "fmt.hh"
@@ -112,6 +113,8 @@ struct ErrorInfo {
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
 
+    Suggestions suggestions;
+
     static std::optional<std::string> programName;
 };
 
@@ -139,6 +142,11 @@ public:
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args & ... args)
         : err { .level = lvlError, .msg = hintfmt(fs, args...) }
+    { }
+
+    template<typename... Args>
+    BaseError(const Suggestions & sug, const Args & ... args)
+        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
     { }
 
     BaseError(hintformat hint)
