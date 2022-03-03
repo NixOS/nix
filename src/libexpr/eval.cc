@@ -850,7 +850,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         if (env->type == Env::HasWithExpr) {
             if (noEval) return 0;
             Value * v = allocValue();
-            evalAttrs(*env->up, (Expr *) env->values[0], *v);
+            evalAttrs(*env->up, (Expr *) env->values[0], *v, noPos, "<borked>");
             env->values[0] = v;
             env->type = Env::HasWithAttrs;
         }
@@ -1055,31 +1055,21 @@ void EvalState::eval(Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e)
+inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std::string & location)
 {
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError("value is %1% while a Boolean was expected", v);
+        throwTypeError(pos, (location + ": value is %1% while a Boolean was expected").c_str(), v);
     return v.boolean;
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
-{
-    Value v;
-    e->eval(*this, env, v);
-    if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
-    return v.boolean;
-}
-
-
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
+inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string & location)
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError("value is %1% while a set was expected", v);
+        throwTypeError(pos, (location + ": value is %1% while a set was expected").c_str(), v);
 }
 
 
@@ -1577,13 +1567,13 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond, pos) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, pos, "In the condition of the if operator") ? then : else_)->eval(state, env, v);
 }
 
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos)) {
+    if (!state.evalBool(env, cond, pos, "In the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(out);
         throwAssertionError(pos, "assertion '%1%' failed", out.str());
@@ -1594,7 +1584,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e));
+    v.mkBool(!state.evalBool(env, e, noPos, "In the argument of the not operator")); // XXX: FIXME: !
 }
 
 
@@ -1616,27 +1606,27 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
+    v.mkBool(state.evalBool(env, e1, pos, "In the left operand of the AND (&&) operator") && state.evalBool(env, e2, pos, "In the right operand of the AND (&&) operator"));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.mkBool(state.evalBool(env, e1, pos, "In the left operand of the OR (||) operator") || state.evalBool(env, e2, pos, "In the right operand of the OR (||) operator"));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.mkBool(!state.evalBool(env, e1, pos, "In the left operand of the IMPL (->) operator") || state.evalBool(env, e2, pos, "In the right operand of the IMPL (->) operator"));
 }
 
 
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1, v2;
-    state.evalAttrs(env, e1, v1);
-    state.evalAttrs(env, e2, v2);
+    state.evalAttrs(env, e1, v1, pos, "In the left operand of the update (//) operator");
+    state.evalAttrs(env, e2, v2, pos, "In the right operand of the update (//) operator");
 
     state.nrOpUpdates++;
 
