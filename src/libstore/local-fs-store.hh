@@ -1,6 +1,7 @@
 #pragma once
 
 #include "store-api.hh"
+#include "gc-store.hh"
 
 namespace nix {
 
@@ -23,7 +24,7 @@ struct LocalFSStoreConfig : virtual StoreConfig
         "physical path to the Nix store"};
 };
 
-class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store
+class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store, virtual GcStore
 {
 public:
 

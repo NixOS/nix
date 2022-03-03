@@ -22,9 +22,9 @@ DerivedPath StorePathWithOutputs::toDerivedPath() const
 
 std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs> ss)
 {
-	std::vector<DerivedPath> reqs;
-	for (auto & s : ss) reqs.push_back(s.toDerivedPath());
-	return reqs;
+    std::vector<DerivedPath> reqs;
+    for (auto & s : ss) reqs.push_back(s.toDerivedPath());
+    return reqs;
 }
 
 

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "store-api.hh"
+#include "gc-store.hh"
 
 
 namespace nix {
@@ -29,7 +30,7 @@ struct RemoteStoreConfig : virtual StoreConfig
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual RemoteStoreConfig, public virtual Store
+class RemoteStore : public virtual RemoteStoreConfig, public virtual Store, public virtual GcStore
 {
 public:
 
