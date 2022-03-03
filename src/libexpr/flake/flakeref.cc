@@ -98,7 +98,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     if (std::regex_match(url, match, flakeRegex)) {
         auto parsedURL = ParsedURL{
             .url = url,
-            .base = "flake:" + std::string(match[1]),
+            .base = "flake:" + match.str(1),
             .scheme = "flake",
             .authority = "",
             .path = match[1],
@@ -106,12 +106,12 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
         return std::make_pair(
             FlakeRef(Input::fromURL(parsedURL), ""),
-            percentDecode(std::string(match[6])));
+            percentDecode(match.str(6)));
     }
 
     else if (std::regex_match(url, match, pathUrlRegex)) {
         std::string path = match[1];
-        std::string fragment = percentDecode(std::string(match[3]));
+        std::string fragment = percentDecode(match.str(3));
 
         if (baseDir) {
             /* Check if 'url' is a path (either absolute or relative
