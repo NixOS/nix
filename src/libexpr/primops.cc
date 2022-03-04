@@ -683,12 +683,12 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
-        Value call;
-        call.mkApp(op->value, e);
-        state.forceList(call, pos, "While evaluating the return value of the `operator` passed to builtins.genericClosure");
+        Value res;
+        state.callFunction(*op->value, 1, &e, res, *op->pos);
+        state.forceList(res, pos, "While evaluating the return value of the `operator` passed to builtins.genericClosure");
 
         /* Add the values returned by the operator to the work set. */
-        for (auto elem : call.listItems()) {
+        for (auto elem : res.listItems()) {
             state.forceValue(*elem, pos);
             workSet.push_back(elem);
         }
@@ -2033,7 +2033,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos, "while evaluating the `name` attribute passed to builtins.path");
         else if (n == "filter")
-            state.forceFunction(filterFun = *attr.value, *attr.pos, "While evaluating the `filter` parameter passed to builtins.path");
+            state.forceFunction(*(filterFun = attr.value), *attr.pos, "While evaluating the `filter` parameter passed to builtins.path");
         else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos, "While evaluating the `recursive` attribute passed to builtins.path") };
         else if (n == "sha256")

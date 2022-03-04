@@ -747,14 +747,6 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
-{
-    throw TypeError({
-        .msg = hintfmt(s),
-        .errPos = pos
-    });
-}
-
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
 {
     throw TypeError({
@@ -762,11 +754,6 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 }
-
-//LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
-//{
-//    throw TypeError(s, showType(v));
-//}
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
 {
@@ -1371,7 +1358,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 for (auto & i : lambda.formals->formals) {
                     auto j = args[0]->attrs->get(i.name);
                     if (!j) {
-                        if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
+                        if (!i.def) throwTypeError(pos, "Function %1% called without required argument '%2%'",
                             lambda, i.name);
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
                     } else {
@@ -1387,7 +1374,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                        user. */
                     for (auto & i : *args[0]->attrs)
                         if (!lambda.formals->has(i.name))
-                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                            throwTypeError(pos, "Function %1% called with unexpected argument '%2%'", lambda, i.name);
                     abort(); // can't happen
                 }
             }
@@ -2059,7 +2046,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context, cons
 
 StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & context, const std::string & errorCtx)
 {
-    auto path = coerceToString(pos, v, context, false, false, errorCtx).toOwned();
+    auto path = coerceToString(pos, v, context, false, false, true, errorCtx).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
         return *storePath;
     throw EvalError({
