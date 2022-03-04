@@ -1050,21 +1050,21 @@ void EvalState::eval(Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std::string & location)
+inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std::string & errorCtx)
 {
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(pos, "%2%: value is %1% while a Boolean was expected", v, location);
+        throwTypeError(pos, "%2%: value is %1% while a Boolean was expected", v, errorCtx);
     return v.boolean;
 }
 
 
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string & location)
+inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string & errorCtx)
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError(pos, "%2%: value is %1% while a set was expected", v, location);
+        throwTypeError(pos, "%2%: value is %1% while a set was expected", v, errorCtx);
 }
 
 
