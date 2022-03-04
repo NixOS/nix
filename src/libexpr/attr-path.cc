@@ -106,7 +106,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
 }
 
 
-Pos findPackageFilename(EvalState & state, Value & v, std::string what)
+std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -132,9 +132,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
         throw ParseError("cannot parse line number '%s'", pos);
     }
 
-    Symbol file = state.symbols.create(filename);
-
-    return { foFile, file, lineno, 0 };
+    return { std::move(filename), lineno };
 }
 
 

@@ -461,21 +461,21 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        Pos pos;
-
-        if (v.type() == nPath || v.type() == nString) {
-            PathSet context;
-            auto filename = state->coerceToString(noPos, v, context);
-            pos.file = state->symbols.create(*filename);
-        } else if (v.isLambda()) {
-            pos = v.lambda.fun->pos;
-        } else {
-            // assume it's a derivation
-            pos = findPackageFilename(*state, v, arg);
-        }
+        const auto [file, line] = [&] () -> std::pair<std::string, uint32_t> {
+            if (v.type() == nPath || v.type() == nString) {
+                PathSet context;
+                auto filename = state->coerceToString(noPos, v, context);
+                return {state->symbols.create(*filename), 0};
+            } else if (v.isLambda()) {
+                return {v.lambda.fun->pos.file, v.lambda.fun->pos.line};
+            } else {
+                // assume it's a derivation
+                return findPackageFilename(*state, v, arg);
+            }
+        }();
 
         // Open in EDITOR
-        auto args = editorFor(pos);
+        auto args = editorFor(file, line);
         auto editor = args.front();
         args.pop_front();
 

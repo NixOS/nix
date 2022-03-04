@@ -30,17 +30,17 @@ struct CmdEdit : InstallableCommand
 
         auto [v, pos] = installable->toValue(*state);
 
-        try {
-            pos = findPackageFilename(*state, *v, installable->what());
-        } catch (NoPositionInfo &) {
-        }
-
-        if (pos == noPos)
-            throw Error("cannot find position information for '%s", installable->what());
+        const auto [file, line] = [&] {
+            try {
+                return findPackageFilename(*state, *v, installable->what());
+            } catch (NoPositionInfo &) {
+                throw Error("cannot find position information for '%s", installable->what());
+            }
+        }();
 
         stopProgressBar();
 
-        auto args = editorFor(pos);
+        auto args = editorFor(file, line);
 
         restoreProcessContext();
 
