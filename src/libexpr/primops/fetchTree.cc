@@ -102,7 +102,7 @@ static void fetchTree(
     state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos);
+        state.forceAttrs(*args[0], pos, "While evaluating the argument passed to builtins.fetchTree");
 
         fetchers::Attrs attrs;
 
@@ -112,7 +112,7 @@ static void fetchTree(
                     .msg = hintfmt("unexpected attribute 'type'"),
                     .errPos = pos
                 });
-            type = state.forceStringNoCtx(*aType->value, *aType->pos);
+            type = state.forceStringNoCtx(*aType->value, *aType->pos, "While evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
             throw Error({
                 .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
@@ -195,16 +195,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     if (args[0]->type() == nAttrs) {
 
-        state.forceAttrs(*args[0], pos);
-
         for (auto & attr : *args[0]->attrs) {
             std::string n(attr.name);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                url = state.forceStringNoCtx(*attr.value, *attr.pos, "While evaluating the url we should fetch");
             else if (n == "sha256")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos, "While evaluating the sha256 of the content we should fetch"), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.value, *attr.pos, "While evaluating the name of the content we should fetch");
             else
                 throw EvalError({
                     .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
@@ -218,7 +216,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 .errPos = pos
             });
     } else
-        url = state.forceStringNoCtx(*args[0], pos);
+        url = state.forceStringNoCtx(*args[0], pos, "While evaluating the url we should fetch");
 
     url = resolveUri(*url);
 

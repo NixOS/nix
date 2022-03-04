@@ -234,20 +234,20 @@ public:
     void forceValueDeep(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
-    NixInt forceInt(Value & v, const Pos & pos);
-    NixFloat forceFloat(Value & v, const Pos & pos);
-    bool forceBool(Value & v, const Pos & pos);
+    NixInt forceInt(Value & v, const Pos & pos, const std::string & errorCtx);
+    NixFloat forceFloat(Value & v, const Pos & pos, const std::string & errorCtx);
+    bool forceBool(Value & v, const Pos & pos, const std::string & errorCtx);
 
-    void forceAttrs(Value & v, const Pos & pos);
+    void forceAttrs(Value & v, const Pos & pos, const std::string & errorCtx);
 
     template <typename Callable>
-    inline void forceAttrs(Value & v, Callable getPos);
+    inline void forceAttrs(Value & v, Callable getPos, const std::string & errorCtx);
 
-    inline void forceList(Value & v, const Pos & pos);
-    void forceFunction(Value & v, const Pos & pos); // either lambda or primop
-    std::string_view forceString(Value & v, const Pos & pos = noPos);
-    std::string_view forceString(Value & v, PathSet & context, const Pos & pos = noPos);
-    std::string_view forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    inline void forceList(Value & v, const Pos & pos, const std::string & errorCtx);
+    void forceFunction(Value & v, const Pos & pos, const std::string & errorCtx); // either lambda or primop
+    std::string_view forceString(Value & v, const Pos & pos, const std::string & errorCtx);
+    std::string_view forceString(Value & v, PathSet & context, const Pos & pos, const std::string & errorCtx);
+    std::string_view forceStringNoCtx(Value & v, const Pos & pos, const std::string & errorCtx);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
@@ -363,7 +363,7 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, ptr<Pos> pos);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
+    void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos, const std::string & errorCtx);
 
     /* Print statistics. */
     void printStats();

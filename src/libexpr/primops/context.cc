@@ -17,7 +17,7 @@ static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringCo
 static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    state.forceString(*args[0], context, pos);
+    state.forceString(*args[0], context, pos, "While evaluating the argument passed to builtins.hasContext");
     v.mkBool(!context.empty());
 }
 
@@ -72,7 +72,7 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
         Strings outputs;
     };
     PathSet context;
-    state.forceString(*args[0], context, pos);
+    state.forceString(*args[0], context, pos, "While evaluating the argument passed to builtins.getContext");
     auto contextInfos = std::map<Path, ContextInfo>();
     for (const auto & p : context) {
         Path drv;
@@ -136,9 +136,9 @@ static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
 static void prim_appendContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto orig = state.forceString(*args[0], context, pos);
+    auto orig = state.forceString(*args[0], context, pos, "while evaluating the first argument passed to builtins.appendContext");
 
-    state.forceAttrs(*args[1], pos);
+    state.forceAttrs(*args[1], pos, "While evaluating the second argument passed to builtins.appendContext");
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
@@ -150,16 +150,16 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             });
         if (!settings.readOnlyMode)
             state.store->ensurePath(state.store->parseStorePath(i.name));
-        state.forceAttrs(*i.value, *i.pos);
+        state.forceAttrs(*i.value, *i.pos, "While evaluating the value of a string context");
         auto iter = i.value->attrs->find(sPath);
         if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, *iter->pos))
+            if (state.forceBool(*iter->value, *iter->pos, "While evaluating the `path` attribute of a string context"))
                 context.insert(i.name);
         }
 
         iter = i.value->attrs->find(sAllOutputs);
         if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, *iter->pos)) {
+            if (state.forceBool(*iter->value, *iter->pos, "While evaluating the `allOutputs` attribute of a string context")) {
                 if (!isDerivation(i.name)) {
                     throw EvalError({
                         .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
@@ -172,7 +172,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
 
         iter = i.value->attrs->find(state.sOutputs);
         if (iter != i.value->attrs->end()) {
-            state.forceList(*iter->value, *iter->pos);
+            state.forceList(*iter->value, *iter->pos, "While evaluating the `outputs` attribute of a string context");
             if (iter->value->listSize() && !isDerivation(i.name)) {
                 throw EvalError({
                     .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
@@ -180,7 +180,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                 });
             }
             for (auto elem : iter->value->listItems()) {
-                auto name = state.forceStringNoCtx(*elem, *iter->pos);
+                auto name = state.forceStringNoCtx(*elem, *iter->pos, "While evaluating an output name within a string context");
                 context.insert(concatStrings("!", name, "!", i.name));
             }
         }

@@ -524,7 +524,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake, noPos);
+            state.forceAttrs(*vFlake, noPos, "While evaluating a cached flake");
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);

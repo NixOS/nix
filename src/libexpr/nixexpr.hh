@@ -4,7 +4,6 @@
 #include "symbol-table.hh"
 #include "error.hh"
 
-
 namespace nix {
 
 

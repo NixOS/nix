@@ -112,7 +112,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
 
     // FIXME: is it possible to extract the Pos object instead of doing this
     //        toString + parsing?
-    auto pos = state.forceString(*v2);
+    auto pos = state.forceString(*v2, noPos, "While evaluating the meta.position attribute of a derivation");
 
     auto colon = pos.rfind(':');
     if (colon == std::string::npos)

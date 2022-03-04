@@ -111,7 +111,7 @@ struct CmdBundle : InstallableCommand
 
         if (!outLink) {
             auto &attr = vRes->attrs->need(evalState->sName);
-            outLink = evalState->forceStringNoCtx(*attr.value,*attr.pos);
+            outLink = evalState->forceStringNoCtx(*attr.value, *attr.pos, "");
         }
 
         // TODO: will crash if not a localFSStore?

@@ -342,7 +342,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v, noPos);
+            state->forceAttrs(v, noPos, "nevermind, it is ignored anyway");
 
             for (auto & i : *v.attrs) {
                 std::string name = i.name;
@@ -675,7 +675,7 @@ void NixRepl::reloadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
+    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); }, "While evaluating an attribute set to be merged in the global scope");
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 

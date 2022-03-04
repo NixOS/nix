@@ -336,7 +336,7 @@ Value & AttrCursor::getValue()
     if (!_value) {
         if (parent) {
             auto & vParent = parent->first->getValue();
-            root->state.forceAttrs(vParent, noPos);
+            root->state.forceAttrs(vParent, noPos, "While evaluating the parent attr set");
             auto attr = vParent.attrs->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());

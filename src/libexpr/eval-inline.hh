@@ -15,10 +15,10 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, const std::string & s2))
 {
     throw TypeError({
-        .msg = hintfmt(s, showType(v)),
+        .msg = hintfmt(s, showType(v), s2),
         .errPos = pos
     });
 }
@@ -52,26 +52,26 @@ void EvalState::forceValue(Value & v, Callable getPos)
 }
 
 
-inline void EvalState::forceAttrs(Value & v, const Pos & pos)
+inline void EvalState::forceAttrs(Value & v, const Pos & pos, const std::string & errorCtx)
 {
-    forceAttrs(v, [&]() { return pos; });
+    forceAttrs(v, [&]() { return pos; }, errorCtx);
 }
 
 
 template <typename Callable>
-inline void EvalState::forceAttrs(Value & v, Callable getPos)
+inline void EvalState::forceAttrs(Value & v, Callable getPos, const std::string & errorCtx)
 {
     forceValue(v, getPos);
     if (v.type() != nAttrs)
-        throwTypeError(getPos(), "value is %1% while a set was expected", v);
+        throwTypeError(getPos(), "%2%: value is %1% while a set was expected", v, errorCtx);
 }
 
 
-inline void EvalState::forceList(Value & v, const Pos & pos)
+inline void EvalState::forceList(Value & v, const Pos & pos, const std::string & errorCtx)
 {
     forceValue(v, pos);
     if (!v.isList())
-        throwTypeError(pos, "value is %1% while a list was expected", v);
+        throwTypeError(pos, "%2%: value is %1% while a list was expected", v, errorCtx);
 }
 
 /* Note: Various places expect the allocated memory to be zeroed. */

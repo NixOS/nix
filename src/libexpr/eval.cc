@@ -297,7 +297,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue);
+        state.forceStringNoCtx(nameValue, noPos, "While evaluating an attribute name");
         return state.symbols.create(nameValue.string.s);
     }
 }
@@ -763,9 +763,17 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
+//LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
+//{
+//    throw TypeError(s, showType(v));
+//}
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
 {
-    throw TypeError(s, showType(v));
+    throw AssertionError({
+        .msg = hintfmt(s, showType(v)),
+        .errPos = pos
+    });
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const std::string & s1))
@@ -1060,7 +1068,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std:
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(pos, (location + ": value is %1% while a Boolean was expected").c_str(), v);
+        throwTypeError(pos, "%2%: value is %1% while a Boolean was expected", v, location);
     return v.boolean;
 }
 
@@ -1069,7 +1077,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError(pos, (location + ": value is %1% while a set was expected").c_str(), v);
+        throwTypeError(pos, "%2%: value is %1% while a set was expected", v, location);
 }
 
 
@@ -1142,7 +1150,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            Hence we need __overrides.) */
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
-            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); });
+            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); }, "While evaluating the `__overrides` attribute");
             Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
@@ -1170,7 +1178,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(nameVal, i.pos);
         if (nameVal.type() == nNull)
             continue;
-        state.forceStringNoCtx(nameVal);
+        state.forceStringNoCtx(nameVal, i.pos, "While evaluating the name of a dynamic attribute");
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
@@ -1260,7 +1268,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     return;
                 }
             } else {
-                state.forceAttrs(*vAttrs, pos);
+                state.forceAttrs(*vAttrs, pos, "While selecting an attribute");
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                     throwEvalError(pos, "attribute '%1%' missing", name);
             }
@@ -1351,7 +1359,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 env2.values[displ++] = args[0];
 
             else {
-                forceAttrs(*args[0], pos);
+                forceAttrs(*args[0], pos, "While evaluating the value passed as argument to a function expecting an attribute set");
 
                 if (!lambda.arg.empty())
                     env2.values[displ++] = args[0];
@@ -1567,7 +1575,8 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond, pos, "In the condition of the if operator") ? then : else_)->eval(state, env, v);
+    // We cheat in the parser, an pass the position of the condition as the position of the if itself.
+    (state.evalBool(env, cond, pos, "") ? then : else_)->eval(state, env, v);
 }
 
 
@@ -1665,18 +1674,18 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists, pos);
+    state.concatLists(v, 2, lists, pos, "While evaluating one of the elements to concatenate");
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos, const std::string & errorCtx)
 {
     nrListConcats++;
 
     Value * nonEmpty = 0;
     size_t len = 0;
     for (size_t n = 0; n < nrLists; ++n) {
-        forceList(*lists[n], pos);
+        forceList(*lists[n], pos, errorCtx);
         auto l = lists[n]->listSize();
         len += l;
         if (l) nonEmpty = lists[n];
@@ -1824,31 +1833,31 @@ void EvalState::forceValueDeep(Value & v)
 }
 
 
-NixInt EvalState::forceInt(Value & v, const Pos & pos)
+NixInt EvalState::forceInt(Value & v, const Pos & pos, const std::string & errorCtx)
 {
     forceValue(v, pos);
     if (v.type() != nInt)
-        throwTypeError(pos, "value is %1% while an integer was expected", v);
+        throwTypeError(pos, "%2%: value is %1% while an integer was expected", v, errorCtx);
     return v.integer;
 }
 
 
-NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
+NixFloat EvalState::forceFloat(Value & v, const Pos & pos, const std::string & errorCtx)
 {
     forceValue(v, pos);
     if (v.type() == nInt)
         return v.integer;
     else if (v.type() != nFloat)
-        throwTypeError(pos, "value is %1% while a float was expected", v);
+        throwTypeError(pos, "%2%: value is %1% while a float was expected", v, errorCtx);
     return v.fpoint;
 }
 
 
-bool EvalState::forceBool(Value & v, const Pos & pos)
+bool EvalState::forceBool(Value & v, const Pos & pos, const std::string & errorCtx)
 {
     forceValue(v, pos);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
+        throwTypeError(pos, "%2%: value is %1% while a Boolean was expected", v, errorCtx);
     return v.boolean;
 }
 
@@ -1859,22 +1868,19 @@ bool EvalState::isFunctor(Value & fun)
 }
 
 
-void EvalState::forceFunction(Value & v, const Pos & pos)
+void EvalState::forceFunction(Value & v, const Pos & pos, const std::string & errorCtx)
 {
     forceValue(v, pos);
     if (v.type() != nFunction && !isFunctor(v))
-        throwTypeError(pos, "value is %1% while a function was expected", v);
+        throwTypeError(pos, "%2%: value is %1% while a function was expected", v, errorCtx);
 }
 
 
-std::string_view EvalState::forceString(Value & v, const Pos & pos)
+std::string_view EvalState::forceString(Value & v, const Pos & pos, const std::string & errorCtx)
 {
     forceValue(v, pos);
     if (v.type() != nString) {
-        if (pos)
-            throwTypeError(pos, "value is %1% while a string was expected", v);
-        else
-            throwTypeError("value is %1% while a string was expected", v);
+        throwTypeError(pos, "%2%: value is %1% while a string was expected", v, errorCtx);
     }
     return v.string.s;
 }
@@ -1911,23 +1917,23 @@ std::vector<std::pair<Path, std::string>> Value::getContext()
 }
 
 
-std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
+std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos & pos, const std::string & errorCtx)
 {
-    auto s = forceString(v, pos);
+    auto s = forceString(v, pos, errorCtx);
     copyContext(v, context);
     return s;
 }
 
 
-std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos)
+std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos, const std::string & errorCtx)
 {
-    auto s = forceString(v, pos);
+    auto s = forceString(v, pos, errorCtx);
     if (v.string.context) {
         if (pos)
-            throwEvalError(pos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
+            throwEvalError(pos, (errorCtx + ": the string '%1%' is not allowed to refer to a store path (such as '%2%')").c_str(),
                 v.string.s, v.string.context[0]);
         else
-            throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
+            throwEvalError((errorCtx + ": the string '%1%' is not allowed to refer to a store path (such as '%2%')").c_str(),
                 v.string.s, v.string.context[0]);
     }
     return s;
