@@ -272,9 +272,9 @@ void completeFlakeRefWithFragment(
                 auto attr = root->findAlongAttrPath(attrPath);
                 if (!attr) continue;
 
-                for (auto & attr2 : attr->getAttrs()) {
+                for (auto & attr2 : (*attr)->getAttrs()) {
                     if (hasPrefix(attr2, lastAttr)) {
-                        auto attrPath2 = attr->getAttrPath(attr2);
+                        auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
                         completions->add(flakeRefS + "#" + concatStringsSep(".", attrPath2));
@@ -568,15 +568,22 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto cache = openEvalCache(*state, lockedFlake);
     auto root = cache->getRoot();
 
+    Suggestions suggestions;
+
     for (auto & attrPath : getActualAttrPaths()) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attr = root->findAlongAttrPath(
+        auto attrOrSuggestions = root->findAlongAttrPath(
             parseAttrPath(*state, attrPath),
             true
         );
 
-        if (!attr) continue;
+        if (!attrOrSuggestions) {
+            suggestions += attrOrSuggestions.getSuggestions();
+            continue;
+        }
+
+        auto attr = *attrOrSuggestions;
 
         if (!attr->isDerivation())
             throw Error("flake output attribute '%s' is not a derivation", attrPath);
@@ -591,7 +598,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
         return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
     }
 
-    throw Error("flake '%s' does not provide attribute %s",
+    throw Error(suggestions, "flake '%s' does not provide attribute %s",
         flakeRef, showAttrPaths(getActualAttrPaths()));
 }
 
@@ -642,7 +649,7 @@ InstallableFlake::getCursors(EvalState & state)
 
     for (auto & attrPath : getActualAttrPaths()) {
         auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
-        if (attr) res.push_back({attr, attrPath});
+        if (attr) res.push_back({*attr, attrPath});
     }
 
     return res;
