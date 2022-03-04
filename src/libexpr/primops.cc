@@ -103,7 +103,7 @@ static Path realisePath(EvalState & state, const Pos & pos, Value & v, const Rea
     auto path = [&]()
     {
         try {
-            return state.coerceToPath(pos, v, context);
+            return state.coerceToPath(pos, v, context, "While realising the context of a path");
         } catch (Error & e) {
             e.addTrace(pos, "while realising the context of a path");
             throw;
@@ -350,10 +350,12 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
         });
     }
     PathSet context;
-    auto program = state.coerceToString(pos, *elems[0], context, false, false).toOwned();
+    auto program = state.coerceToString(pos, *elems[0], context, false, false,
+           "While evaluating the first element of the argument passed to builtins.exec").toOwned();
     Strings commandArgs;
     for (unsigned int i = 1; i < args[0]->listSize(); ++i) {
-        commandArgs.push_back(state.coerceToString(pos, *elems[i], context, false, false).toOwned());
+        commandArgs.push_back(state.coerceToString(pos, *elems[i], context, false, false,
+                    "While evaluating an element of the argument passed to builtins.exec").toOwned());
     }
     try {
         auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
@@ -714,7 +716,8 @@ static RegisterPrimOp primop_abort({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         PathSet context;
-        auto s = state.coerceToString(pos, *args[0], context).toOwned();
+        auto s = state.coerceToString(pos, *args[0], context,
+                "While evaluating the error message passed to builtins.abort").toOwned();
         throw Abort("evaluation aborted with the following error message: '%1%'", s);
     }
 });
@@ -732,7 +735,8 @@ static RegisterPrimOp primop_throw({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
       PathSet context;
-      auto s = state.coerceToString(pos, *args[0], context).toOwned();
+      auto s = state.coerceToString(pos, *args[0], context,
+              "While evaluating the error message passed to builtin.throw").toOwned();
       throw ThrownError(s);
     }
 });
@@ -744,7 +748,8 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context).toOwned());
+        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context,
+                    "While evaluating the error message passed to builtins.addErrorContext").toOwned());
         throw;
     }
 }
@@ -757,7 +762,8 @@ static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
 
 static void prim_ceil(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos), "While evaluating the first argument passed to builtins.ceil");
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos),
+            "While evaluating the first argument passed to builtins.ceil");
     v.mkInt(ceil(value));
 }
 
@@ -1028,7 +1034,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
             if (i->name == state.sContentAddressed) {
-                contentAddressed = state.forceBool(*i->value, pos, "While evaluating the `__contentAddressed` attribute passed to builtins.derivationStrict");
+                contentAddressed = state.forceBool(*i->value, pos,
+                        "While evaluating the `__contentAddressed` attribute passed to builtins.derivationStrict");
                 if (contentAddressed)
                     settings.requireExperimentalFeature(Xp::CaDerivations);
             }
@@ -1036,9 +1043,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
-                state.forceList(*i->value, pos, "While evaluating the `args` attribute passed to builtins.derivationStrict");
+                state.forceList(*i->value, pos,
+                        "While evaluating the `args` attribute passed to builtins.derivationStrict");
                 for (auto elem : i->value->listItems()) {
-                    auto s = state.coerceToString(posDrvName, *elem, context, true).toOwned();
+                    auto s = state.coerceToString(posDrvName, *elem, context, true,
+                            "While evaluating an element of the `args` argument passed to builtins.derivationStrict").toOwned();
                     drv.args.push_back(s);
                 }
             }
@@ -1074,7 +1083,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     }
 
                 } else {
-                    auto s = state.coerceToString(*i->pos, *i->value, context, true).toOwned();
+                    auto s = state.coerceToString(*i->pos, *i->value, context, true, "While evaluating an attribute passed to builtins.derivationStrict").toOwned();
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
@@ -1306,7 +1315,7 @@ static RegisterPrimOp primop_placeholder({
 static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path = state.coerceToPath(pos, *args[0], context, "While evaluating the first argument passed to builtins.toPath");
     v.mkString(canonPath(path), context);
 }
 
@@ -1337,7 +1346,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
         });
 
     PathSet context;
-    Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
+    Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "While evaluating the first argument passed to builtins.storePath"));
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -1407,7 +1416,7 @@ static RegisterPrimOp primop_pathExists({
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context, false, false)), context);
+    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context, false, false, "While evaluating the first argument passed to builtins.baseNameOf")), context);
 }
 
 static RegisterPrimOp primop_baseNameOf({
@@ -1427,7 +1436,7 @@ static RegisterPrimOp primop_baseNameOf({
 static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto path = state.coerceToString(pos, *args[0], context, false, false);
+    auto path = state.coerceToString(pos, *args[0], context, false, false, "While evaluating the first argument passed to builtins.dirOf");
     auto dir = dirOf(*path);
     if (args[0]->type() == nPath) v.mkPath(dir); else v.mkString(dir, context);
 }
@@ -1484,7 +1493,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         std::string prefix;
         Bindings::iterator i = v2->attrs->find(state.sPrefix);
         if (i != v2->attrs->end())
-            prefix = state.forceStringNoCtx(*i->value, pos, "While evaluating the `prefix` attribute passed to an element of the list passed to builtins.findFile");
+            prefix = state.forceStringNoCtx(*i->value, pos, "While evaluating the `prefix` attribute of an element of the list passed to builtins.findFile");
 
         i = getAttr(
             state,
@@ -1495,7 +1504,8 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         );
 
         PathSet context;
-        auto path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
+        auto path = state.coerceToString(pos, *i->value, context, false, false,
+                "While evaluating the `path` attribute of an element of the list passed to builtins.findFile").toOwned();
 
         try {
             auto rewrites = state.realiseContext(context);
@@ -1945,7 +1955,7 @@ static void addPath(
 static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
+    Path path = state.coerceToPath(pos, *args[1], context, "While evaluating the second argument (the path to filter) passed to builtins.filterSource");
 
     state.forceValue(*args[0], pos);
     if (args[0]->type() != nFunction)
@@ -2027,7 +2037,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     for (auto & attr : *args[0]->attrs) {
         auto & n(attr.name);
         if (n == "path")
-            path = state.coerceToPath(*attr.pos, *attr.value, context);
+            path = state.coerceToPath(*attr.pos, *attr.value, context, "While evaluating the `path` attribute passed to builtins.path");
         else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos, "while evaluating the `name` attribute passed to builtins.path");
         else if (n == "filter") {
@@ -2045,7 +2055,7 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     }
     if (path.empty())
         throw EvalError({
-            .msg = hintfmt("'path' required"),
+            .msg = hintfmt("Missing required 'path' attribute in the first argument to builtins.path"),
             .errPos = pos
         });
     if (name.empty())
@@ -3318,7 +3328,7 @@ static RegisterPrimOp primop_lessThan({
 static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto s = state.coerceToString(pos, *args[0], context, true, false);
+    auto s = state.coerceToString(pos, *args[0], context, true, false, "While evaluating the first argument passed to builtins.toString");
     v.mkString(*s, context);
 }
 
@@ -3352,10 +3362,10 @@ static RegisterPrimOp primop_toString({
    non-negative. */
 static void prim_substring(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    int start = state.forceInt(*args[0], pos, "While evaluating the first argument passed to builtins.substring");
-    int len = state.forceInt(*args[1], pos, "While evaluating the second argument passed to builtins.substring");
+    int start = state.forceInt(*args[0], pos, "While evaluating the first argument (the start offset) passed to builtins.substring");
+    int len = state.forceInt(*args[1], pos, "While evaluating the second argument (the substring length) passed to builtins.substring");
     PathSet context;
-    auto s = state.coerceToString(pos, *args[2], context);
+    auto s = state.coerceToString(pos, *args[2], context, "While evaluating the third argument (the string) passed to builtins.substring");
 
     if (start < 0)
         throw EvalError({
@@ -3389,7 +3399,7 @@ static RegisterPrimOp primop_substring({
 static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto s = state.coerceToString(pos, *args[0], context);
+    auto s = state.coerceToString(pos, *args[0], context, "While evaluating the argument passed to builtins.stringLength");
     v.mkInt(s->size());
 }
 
@@ -3641,8 +3651,8 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
 {
     PathSet context;
 
-    auto sep = state.forceString(*args[0], context, pos, "While evaluating the first argument passed to builtins.concatStringsSep");
-    state.forceList(*args[1], pos, "While evaluating the second argument passed to builtins.concatStringsSep");
+    auto sep = state.forceString(*args[0], context, pos, "While evaluating the first argument (the separator string) passed to builtins.concatStringsSep");
+    state.forceList(*args[1], pos, "While evaluating the second argument (the list of strings to concat) passed to builtins.concatStringsSep");
 
     std::string res;
     res.reserve((args[1]->listSize() + 32) * sep.size());
@@ -3650,7 +3660,7 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
 
     for (auto elem : args[1]->listItems()) {
         if (first) first = false; else res += sep;
-        res += *state.coerceToString(pos, *elem, context);
+        res += *state.coerceToString(pos, *elem, context, "While evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
     }
 
     v.mkString(res, context);

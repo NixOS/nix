@@ -262,17 +262,18 @@ public:
        referenced paths are copied to the Nix store as a side effect. */
     BackedStringView coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true,
-        bool canonicalizePath = true);
+        bool canonicalizePath = true,
+        const std::string & errorCtx = "");
 
     std::string copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
+    Path coerceToPath(const Pos & pos, Value & v, PathSet & context, const std::string & errorCtx);
 
     /* Like coerceToPath, but the result must be a store path. */
-    StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context);
+    StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context, const std::string & errorCtx);
 
 public:
 

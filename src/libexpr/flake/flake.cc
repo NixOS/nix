@@ -260,7 +260,7 @@ static Flake getFlake(
                 PathSet emptyContext = {};
                 flake.config.settings.emplace(
                     setting.name,
-                    state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true) .toOwned());
+                    state.coerceToString(*setting.pos, *setting.value, emptyContext, false, true, true, "") .toOwned());
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.insert({setting.name, state.forceInt(*setting.value, *setting.pos, "")});
