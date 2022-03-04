@@ -110,8 +110,10 @@ struct CmdBundle : InstallableCommand
         auto outPathS = store->printStorePath(outPath);
 
         if (!outLink) {
-            auto &attr = vRes->attrs->need(evalState->sName);
-            outLink = evalState->forceStringNoCtx(*attr.value,*attr.pos);
+            auto * attr = vRes->attrs->get(evalState->sName);
+            if (!attr)
+                throw Error("attribute 'name' missing");
+            outLink = evalState->forceStringNoCtx(*attr->value, *attr->pos);
         }
 
         // TODO: will crash if not a localFSStore?
