@@ -41,13 +41,13 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string & attrPath,
+std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
 
     Value * v = &vIn;
-    Pos pos = noPos;
+    PosIdx pos = noPos;
 
     for (auto & attr : tokens) {
 
@@ -83,7 +83,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
                 throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             }
             v = &*a->value;
-            pos = *a->pos;
+            pos = a->pos;
         }
 
         else {

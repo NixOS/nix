@@ -5,7 +5,7 @@
 
 namespace nix {
 
-static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
@@ -17,38 +17,38 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
     for (auto & attr : *args[0]->attrs) {
         if (attr.name == "fromPath") {
             PathSet context;
-            fromPath = state.coerceToStorePath(*attr.pos, *attr.value, context);
+            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context);
         }
 
         else if (attr.name == "toPath") {
-            state.forceValue(*attr.value, *attr.pos);
+            state.forceValue(*attr.value, attr.pos);
             toCA = true;
             if (attr.value->type() != nString || attr.value->string.s != std::string("")) {
                 PathSet context;
-                toPath = state.coerceToStorePath(*attr.pos, *attr.value, context);
+                toPath = state.coerceToStorePath(attr.pos, *attr.value, context);
             }
         }
 
         else if (attr.name == "fromStore")
-            fromStoreUrl = state.forceStringNoCtx(*attr.value, *attr.pos);
+            fromStoreUrl = state.forceStringNoCtx(*attr.value, attr.pos);
 
         else
             throw Error({
                 .msg = hintfmt("attribute '%s' isn't supported in call to 'fetchClosure'", attr.name),
-                .errPos = pos
+                .errPos = state.positions[pos]
             });
     }
 
     if (!fromPath)
         throw Error({
             .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
-            .errPos = pos
+            .errPos = state.positions[pos]
         });
 
     if (!fromStoreUrl)
         throw Error({
             .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
-            .errPos = pos
+            .errPos = state.positions[pos]
         });
 
     auto parsedURL = parseURL(*fromStoreUrl);
@@ -58,13 +58,13 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
         !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))
         throw Error({
             .msg = hintfmt("'fetchClosure' only supports http:// and https:// stores"),
-            .errPos = pos
+            .errPos = state.positions[pos]
         });
 
     if (!parsedURL.query.empty())
         throw Error({
             .msg = hintfmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
-            .errPos = pos
+            .errPos = state.positions[pos]
         });
 
     auto fromStore = openStore(parsedURL.to_string());
@@ -80,7 +80,7 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
                         state.store->printStorePath(*fromPath),
                         state.store->printStorePath(i->second),
                         state.store->printStorePath(*toPath)),
-                    .errPos = pos
+                    .errPos = state.positions[pos]
                 });
             if (!toPath)
                 throw Error({
@@ -89,7 +89,7 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
                         "please set this in the 'toPath' attribute passed to 'fetchClosure'",
                         state.store->printStorePath(*fromPath),
                         state.store->printStorePath(i->second)),
-                    .errPos = pos
+                    .errPos = state.positions[pos]
                 });
         }
     } else {
@@ -105,7 +105,7 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
             throw Error({
                 .msg = hintfmt("in pure mode, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
                     state.store->printStorePath(*toPath)),
-                .errPos = pos
+                .errPos = state.positions[pos]
             });
     }
 

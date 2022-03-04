@@ -28,9 +28,9 @@ struct CmdEdit : InstallableCommand
     {
         auto state = getEvalState();
 
-        auto [v, pos] = installable->toValue(*state);
-
         const auto [file, line] = [&] {
+            auto [v, pos] = installable->toValue(*state);
+
             try {
                 return findPackageFilename(*state, *v, installable->what());
             } catch (NoPositionInfo &) {

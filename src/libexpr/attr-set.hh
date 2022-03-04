@@ -17,10 +17,10 @@ struct Attr
 {
     Symbol name;
     Value * value;
-    ptr<Pos> pos;
-    Attr(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
+    PosIdx pos;
+    Attr(Symbol name, Value * value, PosIdx pos = noPos)
         : name(name), value(value), pos(pos) { };
-    Attr() : pos(&noPos) { };
+    Attr() { };
     bool operator < (const Attr & a) const
     {
         return name < a.name;
@@ -35,13 +35,13 @@ class Bindings
 {
 public:
     typedef uint32_t size_t;
-    ptr<Pos> pos;
+    PosIdx pos;
 
 private:
     size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : pos(&noPos), size_(0), capacity_(capacity) { }
+    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
     Bindings(const Bindings & bindings) = delete;
 
 public:
@@ -118,7 +118,7 @@ public:
         : bindings(bindings), state(state)
     { }
 
-    void insert(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
+    void insert(Symbol name, Value * value, PosIdx pos = noPos)
     {
         insert(Attr(name, value, pos));
     }
@@ -133,9 +133,9 @@ public:
         bindings->push_back(attr);
     }
 
-    Value & alloc(const Symbol & name, ptr<Pos> pos = ptr(&noPos));
+    Value & alloc(const Symbol & name, PosIdx pos = noPos);
 
-    Value & alloc(std::string_view name, ptr<Pos> pos = ptr(&noPos));
+    Value & alloc(std::string_view name, PosIdx pos = noPos);
 
     Bindings * finish()
     {

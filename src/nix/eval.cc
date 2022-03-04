@@ -77,9 +77,9 @@ struct CmdEval : MixJSON, InstallableCommand
             if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", *writeTo);
 
-            std::function<void(Value & v, const Pos & pos, const Path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const Path & path)> recurse;
 
-            recurse = [&](Value & v, const Pos & pos, const Path & path)
+            recurse = [&](Value & v, const PosIdx pos, const Path & path)
             {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
@@ -92,14 +92,16 @@ struct CmdEval : MixJSON, InstallableCommand
                         try {
                             if (attr.name == "." || attr.name == "..")
                                 throw Error("invalid file name '%s'", attr.name);
-                            recurse(*attr.value, *attr.pos, path + "/" + std::string(attr.name));
+                            recurse(*attr.value, attr.pos, path + "/" + std::string(attr.name));
                         } catch (Error & e) {
-                            e.addTrace(*attr.pos, hintfmt("while evaluating the attribute '%s'", attr.name));
+                            e.addTrace(
+                                state->positions[attr.pos],
+                                hintfmt("while evaluating the attribute '%s'", attr.name));
                             throw;
                         }
                 }
                 else
-                    throw TypeError("value at '%s' is not a string or an attribute set", pos);
+                    throw TypeError("value at '%s' is not a string or an attribute set", state->positions[pos]);
             };
 
             recurse(*v, pos, *writeTo);

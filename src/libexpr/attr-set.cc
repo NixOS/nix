@@ -40,7 +40,7 @@ Value * EvalState::allocAttr(Value & vAttrs, std::string_view name)
 }
 
 
-Value & BindingsBuilder::alloc(const Symbol & name, ptr<Pos> pos)
+Value & BindingsBuilder::alloc(const Symbol & name, PosIdx pos)
 {
     auto value = state.allocValue();
     bindings->push_back(Attr(name, value, pos));
@@ -48,7 +48,7 @@ Value & BindingsBuilder::alloc(const Symbol & name, ptr<Pos> pos)
 }
 
 
-Value & BindingsBuilder::alloc(std::string_view name, ptr<Pos> pos)
+Value & BindingsBuilder::alloc(std::string_view name, PosIdx pos)
 {
     return alloc(state.symbols.create(name), pos);
 }

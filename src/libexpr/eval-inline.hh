@@ -80,7 +80,7 @@ Env & EvalState::allocEnv(size_t size)
 
 
 [[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const Pos & pos)
+void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     forceValue(v, [&]() { return pos; });
 }
@@ -109,7 +109,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const Pos & pos)
+inline void EvalState::forceAttrs(Value & v, const PosIdx pos)
 {
     forceAttrs(v, [&]() { return pos; });
 }
@@ -126,7 +126,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos)
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const Pos & pos)
+inline void EvalState::forceList(Value & v, const PosIdx pos)
 {
     forceValue(v, pos);
     if (!v.isList())

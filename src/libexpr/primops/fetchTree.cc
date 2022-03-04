@@ -90,7 +90,7 @@ struct FetchTreeParams {
 
 static void fetchTree(
     EvalState & state,
-    const Pos & pos,
+    const PosIdx pos,
     Value * * args,
     Value & v,
     std::optional<std::string> type,
@@ -110,22 +110,22 @@ static void fetchTree(
             if (type)
                 throw Error({
                     .msg = hintfmt("unexpected attribute 'type'"),
-                    .errPos = pos
+                    .errPos = state.positions[pos]
                 });
-            type = state.forceStringNoCtx(*aType->value, *aType->pos);
+            type = state.forceStringNoCtx(*aType->value, aType->pos);
         } else if (!type)
             throw Error({
                 .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = pos
+                .errPos = state.positions[pos]
             });
 
         attrs.emplace("type", type.value());
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
-            state.forceValue(*attr.value, *attr.pos);
+            state.forceValue(*attr.value, attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
-                auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false).toOwned();
+                auto s = state.coerceToString(attr.pos, *attr.value, context, false, false).toOwned();
                 attrs.emplace(attr.name,
                     attr.name == "url"
                     ? type == "git"
@@ -146,7 +146,7 @@ static void fetchTree(
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 throw Error({
                     .msg = hintfmt("attribute 'name' isn't supported in call to 'fetchTree'"),
-                    .errPos = pos
+                    .errPos = state.positions[pos]
                 });
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
@@ -167,7 +167,7 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
-        throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
+        throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]);
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -176,7 +176,7 @@ static void fetchTree(
     emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
 
-static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     settings.requireExperimentalFeature(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
@@ -185,7 +185,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 // FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
-static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
+static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
     const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
@@ -200,22 +200,22 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         for (auto & attr : *args[0]->attrs) {
             std::string n(attr.name);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                url = state.forceStringNoCtx(*attr.value, attr.pos);
             else if (n == "sha256")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.value, attr.pos);
             else
                 throw EvalError({
                     .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
-                    .errPos = *attr.pos
+                    .errPos = state.positions[attr.pos]
                 });
             }
 
         if (!url)
             throw EvalError({
                 .msg = hintfmt("'url' argument required"),
-                .errPos = pos
+                .errPos = state.positions[pos]
             });
     } else
         url = state.forceStringNoCtx(*args[0], pos);
@@ -262,7 +262,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     state.allowAndSetStorePathString(storePath, v);
 }
 
-static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     fetch(state, pos, args, v, "fetchurl", false, "");
 }
@@ -278,7 +278,7 @@ static RegisterPrimOp primop_fetchurl({
     .fun = prim_fetchurl,
 });
 
-static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     fetch(state, pos, args, v, "fetchTarball", true, "source");
 }
@@ -329,7 +329,7 @@ static RegisterPrimOp primop_fetchTarball({
     .fun = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }

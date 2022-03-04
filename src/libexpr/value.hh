@@ -56,6 +56,7 @@ struct Expr;
 struct ExprLambda;
 struct PrimOp;
 class Symbol;
+class PosIdx;
 struct Pos;
 class StorePath;
 class Store;
@@ -103,7 +104,7 @@ class ExternalValueBase
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
         XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
-        const Pos & pos) const;
+        const PosIdx pos) const;
 
     virtual ~ExternalValueBase()
     {
@@ -368,7 +369,7 @@ public:
         return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
     }
 
-    Pos determinePos(const Pos & pos) const;
+    PosIdx determinePos(const PosIdx pos) const;
 
     /* Check whether forcing this value requires a trivial amount of
        computation. In particular, function applications are

@@ -61,7 +61,7 @@ std::string DrvInfo::querySystem() const
 {
     if (system == "" && attrs) {
         auto i = attrs->find(state->sSystem);
-        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos);
+        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, i->pos);
     }
     return system;
 }
@@ -75,7 +75,7 @@ std::optional<StorePath> DrvInfo::queryDrvPath() const
         if (i == attrs->end())
             drvPath = {std::nullopt};
         else
-            drvPath = {state->coerceToStorePath(*i->pos, *i->value, context)};
+            drvPath = {state->coerceToStorePath(i->pos, *i->value, context)};
     }
     return drvPath.value_or(std::nullopt);
 }
@@ -95,7 +95,7 @@ StorePath DrvInfo::queryOutPath() const
         Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
         if (i != attrs->end())
-            outPath = state->coerceToStorePath(*i->pos, *i->value, context);
+            outPath = state->coerceToStorePath(i->pos, *i->value, context);
     }
     if (!outPath)
         throw UnimplementedError("CA derivations are not yet supported");
@@ -109,23 +109,23 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
         /* Get the ‘outputs’ list. */
         Bindings::iterator i;
         if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
-            state->forceList(*i->value, *i->pos);
+            state->forceList(*i->value, i->pos);
 
             /* For each output... */
             for (auto elem : i->value->listItems()) {
-                std::string output(state->forceStringNoCtx(*elem, *i->pos));
+                std::string output(state->forceStringNoCtx(*elem, i->pos));
 
                 if (withPaths) {
                     /* Evaluate the corresponding set. */
                     Bindings::iterator out = attrs->find(state->symbols.create(output));
                     if (out == attrs->end()) continue; // FIXME: throw error?
-                    state->forceAttrs(*out->value, *i->pos);
+                    state->forceAttrs(*out->value, i->pos);
 
                     /* And evaluate its ‘outPath’ attribute. */
                     Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                     if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
                     PathSet context;
-                    outputs.emplace(output, state->coerceToStorePath(*outPath->pos, *outPath->value, context));
+                    outputs.emplace(output, state->coerceToStorePath(outPath->pos, *outPath->value, context));
                 } else
                     outputs.emplace(output, std::nullopt);
             }
@@ -168,7 +168,7 @@ Bindings * DrvInfo::getMeta()
     if (!attrs) return 0;
     Bindings::iterator a = attrs->find(state->sMeta);
     if (a == attrs->end()) return 0;
-    state->forceAttrs(*a->value, *a->pos);
+    state->forceAttrs(*a->value, a->pos);
     meta = a->value->attrs;
     return meta;
 }
@@ -369,7 +369,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                    `recurseForDerivations = true' attribute. */
                 if (i->value->type() == nAttrs) {
                     Bindings::iterator j = i->value->attrs->find(state.sRecurseForDerivations);
-                    if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos))
+                    if (j != i->value->attrs->end() && state.forceBool(*j->value, j->pos))
                         getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }

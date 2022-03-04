@@ -249,33 +249,31 @@ std::string showAttrPath(const AttrPath & attrPath)
 }
 
 
-Pos noPos;
-
 
 /* Computing levels/displacements for variables. */
 
-void Expr::bindVars(const StaticEnv & env)
+void Expr::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     abort();
 }
 
-void ExprInt::bindVars(const StaticEnv & env)
+void ExprInt::bindVars(const PosTable & pt, const StaticEnv & env)
 {
 }
 
-void ExprFloat::bindVars(const StaticEnv & env)
+void ExprFloat::bindVars(const PosTable & pt, const StaticEnv & env)
 {
 }
 
-void ExprString::bindVars(const StaticEnv & env)
+void ExprString::bindVars(const PosTable & pt, const StaticEnv & env)
 {
 }
 
-void ExprPath::bindVars(const StaticEnv & env)
+void ExprPath::bindVars(const PosTable & pt, const StaticEnv & env)
 {
 }
 
-void ExprVar::bindVars(const StaticEnv & env)
+void ExprVar::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
@@ -302,30 +300,30 @@ void ExprVar::bindVars(const StaticEnv & env)
     if (withLevel == -1)
         throw UndefinedVarError({
             .msg = hintfmt("undefined variable '%1%'", name),
-            .errPos = pos
+            .errPos = pt[pos]
         });
     fromWith = true;
     this->level = withLevel;
 }
 
-void ExprSelect::bindVars(const StaticEnv & env)
+void ExprSelect::bindVars(const PosTable & pt, const StaticEnv & env)
 {
-    e->bindVars(env);
-    if (def) def->bindVars(env);
+    e->bindVars(pt, env);
+    if (def) def->bindVars(pt, env);
     for (auto & i : attrPath)
         if (!i.symbol.set())
-            i.expr->bindVars(env);
+            i.expr->bindVars(pt, env);
 }
 
-void ExprOpHasAttr::bindVars(const StaticEnv & env)
+void ExprOpHasAttr::bindVars(const PosTable & pt, const StaticEnv & env)
 {
-    e->bindVars(env);
+    e->bindVars(pt, env);
     for (auto & i : attrPath)
         if (!i.symbol.set())
-            i.expr->bindVars(env);
+            i.expr->bindVars(pt, env);
 }
 
-void ExprAttrs::bindVars(const StaticEnv & env)
+void ExprAttrs::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     const StaticEnv * dynamicEnv = &env;
     StaticEnv newEnv(false, &env, recursive ? attrs.size() : 0);
@@ -340,26 +338,26 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
-            i.second.e->bindVars(i.second.inherited ? env : newEnv);
+            i.second.e->bindVars(pt, i.second.inherited ? env : newEnv);
     }
 
     else
         for (auto & i : attrs)
-            i.second.e->bindVars(env);
+            i.second.e->bindVars(pt, env);
 
     for (auto & i : dynamicAttrs) {
-        i.nameExpr->bindVars(*dynamicEnv);
-        i.valueExpr->bindVars(*dynamicEnv);
+        i.nameExpr->bindVars(pt, *dynamicEnv);
+        i.valueExpr->bindVars(pt, *dynamicEnv);
     }
 }
 
-void ExprList::bindVars(const StaticEnv & env)
+void ExprList::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     for (auto & i : elems)
-        i->bindVars(env);
+        i->bindVars(pt, env);
 }
 
-void ExprLambda::bindVars(const StaticEnv & env)
+void ExprLambda::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     StaticEnv newEnv(
         false, &env,
@@ -377,20 +375,20 @@ void ExprLambda::bindVars(const StaticEnv & env)
         newEnv.sort();
 
         for (auto & i : formals->formals)
-            if (i.def) i.def->bindVars(newEnv);
+            if (i.def) i.def->bindVars(pt, newEnv);
     }
 
-    body->bindVars(newEnv);
+    body->bindVars(pt, newEnv);
 }
 
-void ExprCall::bindVars(const StaticEnv & env)
+void ExprCall::bindVars(const PosTable & pt, const StaticEnv & env)
 {
-    fun->bindVars(env);
+    fun->bindVars(pt, env);
     for (auto e : args)
-        e->bindVars(env);
+        e->bindVars(pt, env);
 }
 
-void ExprLet::bindVars(const StaticEnv & env)
+void ExprLet::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     StaticEnv newEnv(false, &env, attrs->attrs.size());
 
@@ -401,12 +399,12 @@ void ExprLet::bindVars(const StaticEnv & env)
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
-        i.second.e->bindVars(i.second.inherited ? env : newEnv);
+        i.second.e->bindVars(pt, i.second.inherited ? env : newEnv);
 
-    body->bindVars(newEnv);
+    body->bindVars(pt, newEnv);
 }
 
-void ExprWith::bindVars(const StaticEnv & env)
+void ExprWith::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
@@ -420,36 +418,36 @@ void ExprWith::bindVars(const StaticEnv & env)
             break;
         }
 
-    attrs->bindVars(env);
+    attrs->bindVars(pt, env);
     StaticEnv newEnv(true, &env);
-    body->bindVars(newEnv);
+    body->bindVars(pt, newEnv);
 }
 
-void ExprIf::bindVars(const StaticEnv & env)
+void ExprIf::bindVars(const PosTable & pt, const StaticEnv & env)
 {
-    cond->bindVars(env);
-    then->bindVars(env);
-    else_->bindVars(env);
+    cond->bindVars(pt, env);
+    then->bindVars(pt, env);
+    else_->bindVars(pt, env);
 }
 
-void ExprAssert::bindVars(const StaticEnv & env)
+void ExprAssert::bindVars(const PosTable & pt, const StaticEnv & env)
 {
-    cond->bindVars(env);
-    body->bindVars(env);
+    cond->bindVars(pt, env);
+    body->bindVars(pt, env);
 }
 
-void ExprOpNot::bindVars(const StaticEnv & env)
+void ExprOpNot::bindVars(const PosTable & pt, const StaticEnv & env)
 {
-    e->bindVars(env);
+    e->bindVars(pt, env);
 }
 
-void ExprConcatStrings::bindVars(const StaticEnv & env)
+void ExprConcatStrings::bindVars(const PosTable & pt, const StaticEnv & env)
 {
     for (auto & i : *es)
-        i.second->bindVars(env);
+        i.second->bindVars(pt, env);
 }
 
-void ExprPos::bindVars(const StaticEnv & env)
+void ExprPos::bindVars(const PosTable & pt, const StaticEnv & env)
 {
 }
 
@@ -468,9 +466,9 @@ void ExprLambda::setName(Symbol & name)
 }
 
 
-std::string ExprLambda::showNamePos() const
+std::string ExprLambda::showNamePos(const PosTable & pt) const
 {
-    return fmt("%1% at %2%", name.set() ? "'" + (std::string) name + "'" : "anonymous function", pos);
+    return fmt("%1% at %2%", name.set() ? "'" + (std::string) name + "'" : "anonymous function", pt[pos]);
 }
 
 

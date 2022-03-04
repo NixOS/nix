@@ -467,7 +467,8 @@ bool NixRepl::processLine(std::string line)
                 auto filename = state->coerceToString(noPos, v, context);
                 return {state->symbols.create(*filename), 0};
             } else if (v.isLambda()) {
-                return {v.lambda.fun->pos.file, v.lambda.fun->pos.line};
+                auto pos = state->positions[v.lambda.fun->pos];
+                return {pos.file, pos.line};
             } else {
                 // assume it's a derivation
                 return findPackageFilename(*state, v, arg);
@@ -498,7 +499,7 @@ bool NixRepl::processLine(std::string line)
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
-        state->callFunction(f, v, result, Pos());
+        state->callFunction(f, v, result, PosIdx());
 
         StorePath drvPath = getDerivationPath(result);
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
@@ -799,7 +800,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
             if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(*i->pos, *i->value, context));
+                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context));
             else
                 str << "???";
             str << "»";
@@ -861,7 +862,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case nFunction:
         if (v.isLambda()) {
             std::ostringstream s;
-            s << v.lambda.fun->pos;
+            s << state->positions[v.lambda.fun->pos];
             str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
         } else if (v.isPrimOp()) {
             str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;

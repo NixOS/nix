@@ -473,7 +473,7 @@ struct InstallableAttrPath : InstallableValue
 
     std::string what() const override { return attrPath; }
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override
+    std::pair<Value *, PosIdx> toValue(EvalState & state) override
     {
         auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
         state.forceValue(*vRes, pos);
@@ -613,7 +613,7 @@ std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
     return res;
 }
 
-std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
+std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 {
     return {&getCursor(state)->forceValue(), noPos};
 }
