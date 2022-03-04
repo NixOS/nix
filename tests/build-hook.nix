@@ -15,7 +15,7 @@ let
   input1 = mkDerivation {
     shell = busybox;
     name = "build-remote-input-1";
-    buildCommand = "echo hi; echo FOO > $out";
+    buildCommand = "echo hi-input1; echo FOO > $out";
     requiredSystemFeatures = ["foo"];
   };
 
@@ -30,7 +30,7 @@ let
     shell = busybox;
     name = "build-remote-input-3";
     buildCommand = ''
-      echo hi
+      echo hi-input3
       read x < ${input2}
       echo $x BAZ > $out
     '';
