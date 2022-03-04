@@ -1957,15 +1957,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context, "While evaluating the second argument (the path to filter) passed to builtins.filterSource");
 
-    state.forceValue(*args[0], pos);
-    if (args[0]->type() != nFunction)
-        throw TypeError({
-            .msg = hintfmt(
-                "first argument in call to 'filterSource' is not a function but %1%",
-                showType(*args[0])),
-            .errPos = pos
-        });
-
+    state.forceFunction(*args[0], pos, "While evaluating the first argument to builtins.filterSource");
     addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
@@ -2040,10 +2032,9 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             path = state.coerceToPath(*attr.pos, *attr.value, context, "While evaluating the `path` attribute passed to builtins.path");
         else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos, "while evaluating the `name` attribute passed to builtins.path");
-        else if (n == "filter") {
-            state.forceValue(*attr.value, pos);
-            filterFun = attr.value;
-        } else if (n == "recursive")
+        else if (n == "filter")
+            state.forceFunction(filterFun = *attr.value, *attr.pos, "While evaluating the `filter` parameter passed to builtins.path");
+        else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, *attr.pos, "While evaluating the `recursive` attribute passed to builtins.path") };
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos, "While evaluating the `sha256` attribute passed to builtins.path"), htSHA256);
