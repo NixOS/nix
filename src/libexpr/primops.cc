@@ -3906,7 +3906,7 @@ void EvalState::createBaseEnv()
                 addPrimOp({
                     .fun = primOp.fun,
                     .arity = std::max(primOp.args.size(), primOp.arity),
-                    .name = symbols.create(primOp.name),
+                    .name = primOp.name,
                     .args = primOp.args,
                     .doc = primOp.doc,
                 });

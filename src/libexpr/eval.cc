@@ -645,14 +645,14 @@ Value * EvalState::addPrimOp(const std::string & name,
        the primop to a dummy value. */
     if (arity == 0) {
         auto vPrimOp = allocValue();
-        vPrimOp->mkPrimOp(new PrimOp { .fun = primOp, .arity = 1, .name = sym });
+        vPrimOp->mkPrimOp(new PrimOp { .fun = primOp, .arity = 1, .name = name2 });
         Value v;
         v.mkApp(vPrimOp, vPrimOp);
         return addConstant(name, v);
     }
 
     Value * v = allocValue();
-    v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
+    v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = name2 });
     staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
@@ -667,21 +667,21 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     if (primOp.arity == 0) {
         primOp.arity = 1;
         auto vPrimOp = allocValue();
-        vPrimOp->mkPrimOp(new PrimOp(std::move(primOp)));
+        vPrimOp->mkPrimOp(new PrimOp(primOp));
         Value v;
         v.mkApp(vPrimOp, vPrimOp);
         return addConstant(primOp.name, v);
     }
 
-    Symbol envName = primOp.name;
+    Symbol envName = symbols.create(primOp.name);
     if (hasPrefix(primOp.name, "__"))
-        primOp.name = symbols.create(std::string(primOp.name, 2));
+        primOp.name = primOp.name.substr(2);
 
     Value * v = allocValue();
-    v->mkPrimOp(new PrimOp(std::move(primOp)));
+    v->mkPrimOp(new PrimOp(primOp));
     staticBaseEnv.vars.emplace_back(envName, baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(primOp.name), v));
     return v;
 }
 

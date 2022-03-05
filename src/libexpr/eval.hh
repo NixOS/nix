@@ -30,7 +30,7 @@ struct PrimOp
 {
     PrimOpFun fun;
     size_t arity;
-    Symbol name;
+    std::string name;
     std::vector<std::string> args;
     const char * doc = nullptr;
 };
@@ -305,7 +305,7 @@ public:
     struct Doc
     {
         Pos pos;
-        std::optional<Symbol> name;
+        std::optional<std::string> name;
         size_t arity;
         std::vector<std::string> args;
         const char * doc;
@@ -391,7 +391,7 @@ private:
 
     bool countCalls;
 
-    typedef std::map<Symbol, size_t> PrimOpCalls;
+    typedef std::map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
     typedef std::map<ExprLambda *, size_t> FunctionCalls;
