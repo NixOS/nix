@@ -684,7 +684,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         /* Call the `operator' function with `e' as argument. */
         Value res;
-        state.callFunction(*op->value, 1, &e, res, *op->pos);
+        state.callFunction(*op->value, 1, &e, res, pos);
         state.forceList(res, pos, "While evaluating the return value of the `operator` passed to builtins.genericClosure");
 
         /* Add the values returned by the operator to the work set. */
