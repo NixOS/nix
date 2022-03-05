@@ -26,7 +26,7 @@ MakeError(RestrictedPathError, Error);
 
 struct Pos
 {
-    Symbol file;
+    std::string file;
     FileOrigin origin;
     uint32_t line;
     uint32_t column;
@@ -64,10 +64,10 @@ public:
         explicit Origin(uint32_t idx): idx(idx), file{}, origin{} {}
 
     public:
-        const Symbol file;
+        const std::string file;
         const FileOrigin origin;
 
-        Origin(Symbol file, FileOrigin origin): file(file), origin(origin) {}
+        Origin(std::string file, FileOrigin origin): file(std::move(file)), origin(origin) {}
     };
 
     struct Offset {

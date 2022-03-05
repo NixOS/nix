@@ -75,6 +75,8 @@ public:
     SymbolTable symbols;
     PosTable positions;
 
+    static inline std::string derivationNixPath = "//builtin/derivation.nix";
+
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,

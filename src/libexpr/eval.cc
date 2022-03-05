@@ -934,7 +934,7 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, PosIdx p)
 {
     auto pos = positions[p];
-    if (pos.file.set()) {
+    if (!pos.file.empty()) {
         auto attrs = buildBindings(3);
         attrs.alloc(sFile).mkString(pos.file);
         attrs.alloc(sLine).mkInt(pos.line);
@@ -1296,7 +1296,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     } catch (Error & e) {
         auto pos2r = state.positions[pos2];
-        if (pos2 && pos2r.file != state.sDerivationNix)
+        if (pos2 && pos2r.file != state.derivationNixPath)
             state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath));
         throw;

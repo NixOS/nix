@@ -3915,7 +3915,7 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    sDerivationNix = symbols.create("//builtin/derivation.nix");
+    sDerivationNix = symbols.create(derivationNixPath);
     auto vDerivation = allocValue();
     addConstant("derivation", vDerivation);
 
