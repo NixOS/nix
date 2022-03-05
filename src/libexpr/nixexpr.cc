@@ -144,9 +144,9 @@ void ExprLambda::show(std::ostream & str) const
             str << "...";
         }
         str << " }";
-        if (!arg.empty()) str << " @ ";
+        if (arg.set()) str << " @ ";
     }
-    if (!arg.empty()) str << arg;
+    if (arg.set()) str << arg;
     str << ": " << *body << ")";
 }
 
@@ -364,11 +364,11 @@ void ExprLambda::bindVars(const StaticEnv & env)
     StaticEnv newEnv(
         false, &env,
         (hasFormals() ? formals->formals.size() : 0) +
-        (arg.empty() ? 0 : 1));
+        (!arg.set() ? 0 : 1));
 
     Displacement displ = 0;
 
-    if (!arg.empty()) newEnv.vars.emplace_back(arg, displ++);
+    if (arg.set()) newEnv.vars.emplace_back(arg, displ++);
 
     if (hasFormals()) {
         for (auto & i : formals->formals)

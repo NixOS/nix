@@ -1342,7 +1342,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             ExprLambda & lambda(*vCur.lambda.fun);
 
             auto size =
-                (lambda.arg.empty() ? 0 : 1) +
+                (!lambda.arg.set() ? 0 : 1) +
                 (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
             Env & env2(allocEnv(size));
             env2.up = vCur.lambda.env;
@@ -1355,7 +1355,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             else {
                 forceAttrs(*args[0], pos);
 
-                if (!lambda.arg.empty())
+                if (lambda.arg.set())
                     env2.values[displ++] = args[0];
 
                 /* For each formal argument, get the actual argument.  If

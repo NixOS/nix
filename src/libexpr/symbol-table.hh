@@ -60,11 +60,6 @@ public:
         return s;
     }
 
-    bool empty() const
-    {
-        return s->empty();
-    }
-
     friend std::ostream & operator << (std::ostream & str, const Symbol & sym);
 };
 

@@ -139,7 +139,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
             if (v.lambda.fun->hasFormals()) {
                 XMLAttrs attrs;
-                if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
+                if (v.lambda.fun->arg.set()) attrs["name"] = v.lambda.fun->arg;
                 if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
                 for (auto & i : v.lambda.fun->formals->lexicographicOrder())

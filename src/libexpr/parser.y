@@ -369,7 +369,7 @@ expr_function
   : ID ':' expr_function
     { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), toFormals(*data, $2), $5); }
+    { $$ = new ExprLambda(CUR_POS, {}, toFormals(*data, $2), $5); }
   | '{' formals '}' '@' ID ':' expr_function
     {
       Symbol arg = data->symbols.create($5);
