@@ -636,25 +636,7 @@ void EvalState::addConstant(const std::string & name, Value * v)
 Value * EvalState::addPrimOp(const std::string & name,
     size_t arity, PrimOpFun primOp)
 {
-    auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
-    Symbol sym = symbols.create(name2);
-
-    /* Hack to make constants lazy: turn them into a application of
-       the primop to a dummy value. */
-    if (arity == 0) {
-        auto vPrimOp = allocValue();
-        vPrimOp->mkPrimOp(new PrimOp { .fun = primOp, .arity = 1, .name = sym });
-        Value v;
-        v.mkApp(vPrimOp, vPrimOp);
-        return addConstant(name, v);
-    }
-
-    Value * v = allocValue();
-    v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
-    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
-    return v;
+    return addPrimOp(PrimOp { .fun = primOp, .arity = arity, .name = symbols.create(name) });
 }
 
 
