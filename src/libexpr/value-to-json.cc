@@ -50,7 +50,7 @@ void printValueAsJSON(EvalState & state, bool strict,
                 auto obj(out.object());
                 StringSet names;
                 for (auto & j : *v.attrs)
-                    names.insert(j.name);
+                    names.emplace(state.symbols[j.name]);
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
                     auto placeholder(obj.placeholder(j));

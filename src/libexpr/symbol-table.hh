@@ -16,46 +16,25 @@ namespace nix {
 
 class Symbol
 {
-private:
-    const std::string * s; // pointer into SymbolTable
-    Symbol(const std::string * s) : s(s) { };
     friend class SymbolTable;
+private:
+    std::string s;
 
 public:
-    Symbol() : s(0) { };
-
-    bool operator == (const Symbol & s2) const
-    {
-        return s == s2.s;
-    }
+    Symbol(std::string_view s) : s(s) { }
 
     // FIXME: remove
     bool operator == (std::string_view s2) const
     {
-        return s->compare(s2) == 0;
-    }
-
-    bool operator != (const Symbol & s2) const
-    {
-        return s != s2.s;
-    }
-
-    bool operator < (const Symbol & s2) const
-    {
-        return s < s2.s;
+        return s == s2;
     }
 
     operator const std::string & () const
     {
-        return *s;
+        return s;
     }
 
     operator const std::string_view () const
-    {
-        return *s;
-    }
-
-    bool set() const
     {
         return s;
     }
@@ -63,38 +42,64 @@ public:
     friend std::ostream & operator << (std::ostream & str, const Symbol & sym);
 };
 
+class SymbolIdx
+{
+    friend class SymbolTable;
+
+private:
+    uint32_t id;
+
+    explicit SymbolIdx(uint32_t id): id(id) {}
+
+public:
+    SymbolIdx() : id(0) {}
+
+    explicit operator bool() const { return id > 0; }
+
+    bool operator<(const SymbolIdx other) const { return id < other.id; }
+    bool operator==(const SymbolIdx other) const { return id == other.id; }
+    bool operator!=(const SymbolIdx other) const { return id != other.id; }
+};
+
 class SymbolTable
 {
 private:
-    std::unordered_map<std::string_view, Symbol> symbols;
-    std::list<std::string> store;
+    std::unordered_map<std::string_view, std::pair<const Symbol *, uint32_t>> symbols;
+    ChunkedVector<Symbol, 8192> store{16};
 
 public:
-    Symbol create(std::string_view s)
+    SymbolIdx create(std::string_view s)
     {
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // TODO: could probably be done more efficiently with transparent Hash and Equals
         // on the original implementation using unordered_set
         auto it = symbols.find(s);
-        if (it != symbols.end()) return it->second;
+        if (it != symbols.end()) return SymbolIdx(it->second.second + 1);
 
-        auto & rawSym = store.emplace_back(s);
-        return symbols.emplace(rawSym, Symbol(&rawSym)).first->second;
+        const auto & [rawSym, idx] = store.add(s);
+        symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
+        return SymbolIdx(idx + 1);
+    }
+
+    const Symbol & operator[](SymbolIdx s) const
+    {
+        if (s.id == 0 || s.id > store.size())
+            abort();
+        return store[s.id - 1];
     }
 
     size_t size() const
     {
-        return symbols.size();
+        return store.size();
     }
 
     size_t totalSize() const;
 
     template<typename T>
-    void dump(T callback)
+    void dump(T callback) const
     {
-        for (auto & s : store)
-            callback(s);
+        store.forEach(callback);
     }
 };
 

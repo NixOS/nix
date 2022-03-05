@@ -403,7 +403,7 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value * * args, Val
         case nFloat: t = "float"; break;
         case nThunk: abort();
     }
-    v.mkString(state.symbols.create(t));
+    v.mkString(t);
 }
 
 static RegisterPrimOp primop_typeOf({
@@ -584,7 +584,7 @@ typedef std::list<Value *> ValueList;
 static Bindings::iterator getAttr(
     EvalState & state,
     std::string_view funcName,
-    Symbol attrSym,
+    SymbolIdx attrSym,
     Bindings * attrSet,
     const PosIdx pos)
 {
@@ -592,7 +592,7 @@ static Bindings::iterator getAttr(
     if (value == attrSet->end()) {
         hintformat errorMsg = hintfmt(
             "attribute '%s' missing for call to '%s'",
-            attrSym,
+            state.symbols[attrSym],
             funcName
         );
 
@@ -919,7 +919,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
     if (args[0]->type() == nString)
         printError("trace: %1%", args[0]->string.s);
     else
-        printError("trace: %1%", *args[0]);
+        printError("trace: %1%", printValue(state, *args[0]));
     state.forceValue(*args[1], pos);
     v = *args[1];
 }
@@ -998,9 +998,9 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     StringSet outputs;
     outputs.insert("out");
 
-    for (auto & i : args[0]->attrs->lexicographicOrder()) {
+    for (auto & i : args[0]->attrs->lexicographicOrder(state.symbols)) {
         if (i->name == state.sIgnoreNulls) continue;
-        const std::string & key = i->name;
+        const std::string & key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string_view s) {
@@ -2046,7 +2046,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
-        auto & n(attr.name);
+        auto & n(state.symbols[attr.name]);
         if (n == "path")
             path = state.coerceToPath(attr.pos, *attr.value, context);
         else if (attr.name == state.sName)
@@ -2060,7 +2060,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos), htSHA256);
         else
             throw EvalError({
-                .msg = hintfmt("unsupported argument '%1%' to 'addPath'", attr.name),
+                .msg = hintfmt("unsupported argument '%1%' to 'addPath'", state.symbols[attr.name]),
                 .errPos = state.positions[attr.pos]
             });
     }
@@ -2126,7 +2126,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
 
     size_t n = 0;
     for (auto & i : *args[0]->attrs)
-        (v.listElems()[n++] = state.allocValue())->mkString(i.name);
+        (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
               [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
@@ -2156,8 +2156,9 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value * * args,
         v.listElems()[n++] = (Value *) &i;
 
     std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) {
-            std::string_view s1 = ((Attr *) v1)->name, s2 = ((Attr *) v2)->name;
+        [&](Value * v1, Value * v2) {
+            std::string_view s1 = state.symbols[((Attr *) v1)->name],
+                s2 = state.symbols[((Attr *) v2)->name];
             return s1 < s2;
         });
 
@@ -2312,7 +2313,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
     auto attrs = state.buildBindings(args[0]->listSize());
 
-    std::set<Symbol> seen;
+    std::set<SymbolIdx> seen;
 
     for (auto v2 : args[0]->listItems()) {
         state.forceAttrs(*v2, pos);
@@ -2327,7 +2328,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
         auto name = state.forceStringNoCtx(*j->value, j->pos);
 
-        Symbol sym = state.symbols.create(name);
+        auto sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
             Bindings::iterator j2 = getAttr(
                 state,
@@ -2396,7 +2397,7 @@ static RegisterPrimOp primop_intersectAttrs({
 
 static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
+    auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
     state.forceList(*args[1], pos);
 
     Value * res[args[1]->listSize()];
@@ -2483,7 +2484,7 @@ static void prim_mapAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     for (auto & i : *args[1]->attrs) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
-        vName->mkString(i.name);
+        vName->mkString(state.symbols[i.name]);
         vFun2->mkApp(args[0], vName);
         attrs.alloc(i.name).mkApp(vFun2, i.value);
     }
@@ -2515,7 +2516,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
     // attribute with the merge function application. this way we need not
     // use (slightly slower) temporary storage the GC does not know about.
 
-    std::map<Symbol, std::pair<size_t, Value * *>> attrsSeen;
+    std::map<SymbolIdx, std::pair<size_t, Value * *>> attrsSeen;
 
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
@@ -2550,7 +2551,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
 
     for (auto & attr : *v.attrs) {
         auto name = state.allocValue();
-        name->mkString(attr.name);
+        name->mkString(state.symbols[attr.name]);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
         auto call2 = state.allocValue();
@@ -3058,7 +3059,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value * * args, Va
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
         auto name = state.forceStringNoCtx(res, pos);
-        Symbol sym = state.symbols.create(name);
+        auto sym = state.symbols.create(name);
         auto vector = attrs.try_emplace(sym, ValueVector()).first;
         vector->second.push_back(vElem);
     }
@@ -3932,7 +3933,7 @@ void EvalState::createBaseEnv()
         // the parser needs two NUL bytes as terminators; one of them
         // is implied by being a C string.
         "\0";
-    eval(parse(code, sizeof(code), foFile, sDerivationNix, "/", staticBaseEnv), *vDerivation);
+    eval(parse(code, sizeof(code), foFile, derivationNixPath, "/", staticBaseEnv), *vDerivation);
 }
 
 

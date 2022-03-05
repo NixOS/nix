@@ -73,7 +73,7 @@ struct NixRepl
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
-    void addVarToScope(const Symbol & name, Value & v);
+    void addVarToScope(const SymbolIdx name, Value & v);
     Expr * parseString(std::string s);
     void evalString(std::string s, Value & v);
 
@@ -347,9 +347,9 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             state->forceAttrs(v, noPos);
 
             for (auto & i : *v.attrs) {
-                std::string name = i.name;
+                std::string_view name = state->symbols[i.name];
                 if (name.substr(0, cur2.size()) != cur2) continue;
-                completions.insert(prev + expr + "." + name);
+                completions.insert(concatStrings(prev, expr, ".", name));
             }
 
         } catch (ParseError & e) {
@@ -464,8 +464,9 @@ bool NixRepl::processLine(std::string line)
         const auto [file, line] = [&] () -> std::pair<std::string, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 PathSet context;
-                auto filename = state->coerceToString(noPos, v, context);
-                return {state->symbols.create(*filename), 0};
+                auto filename = state->coerceToString(noPos, v, context).toOwned();
+                state->symbols.create(filename);
+                return {filename, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
                 return {pos.file, pos.line};
@@ -672,7 +673,7 @@ void NixRepl::initEnv()
 
     varNames.clear();
     for (auto & i : state->staticBaseEnv.vars)
-        varNames.insert(i.first);
+        varNames.emplace(state->symbols[i.first]);
 }
 
 
@@ -702,7 +703,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     for (auto & i : *attrs.attrs) {
         staticEnv.vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
-        varNames.insert((std::string) i.name);
+        varNames.emplace(state->symbols[i.name]);
     }
     staticEnv.sort();
     staticEnv.deduplicate();
@@ -710,7 +711,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
 }
 
 
-void NixRepl::addVarToScope(const Symbol & name, Value & v)
+void NixRepl::addVarToScope(const SymbolIdx name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
@@ -719,7 +720,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
     staticEnv.vars.emplace_back(name, displ);
     staticEnv.sort();
     env->values[displ++] = &v;
-    varNames.insert((std::string) name);
+    varNames.emplace(state->symbols[name]);
 }
 
 
@@ -812,7 +813,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             typedef std::map<std::string, Value *> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
-                sorted[i.name] = i.value;
+                sorted.emplace(state->symbols[i.name], i.value);
 
             for (auto & i : sorted) {
                 if (isVarName(i.first))

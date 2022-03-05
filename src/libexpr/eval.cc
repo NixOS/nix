@@ -96,7 +96,8 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void Value::print(std::ostream & str, std::set<const void *> * seen) const
+void Value::print(const SymbolTable & symbols, std::ostream & str,
+    std::set<const void *> * seen) const
 {
     checkInterrupt();
 
@@ -129,9 +130,9 @@ void Value::print(std::ostream & str, std::set<const void *> * seen) const
             str << "«repeated»";
         else {
             str << "{ ";
-            for (auto & i : attrs->lexicographicOrder()) {
-                str << i->name << " = ";
-                i->value->print(str, seen);
+            for (auto & i : attrs->lexicographicOrder(symbols)) {
+                str << symbols[i->name] << " = ";
+                i->value->print(symbols, str, seen);
                 str << "; ";
             }
             str << "}";
@@ -146,7 +147,7 @@ void Value::print(std::ostream & str, std::set<const void *> * seen) const
         else {
             str << "[ ";
             for (auto v2 : listItems()) {
-                v2->print(str, seen);
+                v2->print(symbols, str, seen);
                 str << " ";
             }
             str << "]";
@@ -177,17 +178,18 @@ void Value::print(std::ostream & str, std::set<const void *> * seen) const
 }
 
 
-void Value::print(std::ostream & str, bool showRepeated) const
+void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepeated) const
 {
     std::set<const void *> seen;
-    print(str, showRepeated ? nullptr : &seen);
+    print(symbols, str, showRepeated ? nullptr : &seen);
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+std::string printValue(const EvalState & state, const Value & v)
 {
-    v.print(str, false);
-    return str;
+    std::ostringstream out;
+    v.print(state.symbols, out);
+    return out.str();
 }
 
 
@@ -306,9 +308,9 @@ static BoehmGCStackAllocator boehmGCStackAllocator;
 #endif
 
 
-static Symbol getName(const AttrName & name, EvalState & state, Env & env)
+static SymbolIdx getName(const AttrName & name, EvalState & state, Env & env)
 {
-    if (name.symbol.set()) {
+    if (name.symbol) {
         return name.symbol;
     } else {
         Value nameValue;
@@ -639,7 +641,7 @@ Value * EvalState::addPrimOp(const std::string & name,
     size_t arity, PrimOpFun primOp)
 {
     auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
-    Symbol sym = symbols.create(name2);
+    auto sym = symbols.create(name2);
 
     /* Hack to make constants lazy: turn them into a application of
        the primop to a dummy value. */
@@ -673,7 +675,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         return addConstant(primOp.name, v);
     }
 
-    Symbol envName = symbols.create(primOp.name);
+    auto envName = symbols.create(primOp.name);
     if (hasPrefix(primOp.name, "__"))
         primOp.name = primOp.name.substr(2);
 
@@ -767,11 +769,11 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     });
 }
 
-void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol & sym, const PosIdx p2) const
+void EvalState::throwEvalError(const PosIdx p1, const char * s, const SymbolIdx sym, const PosIdx p2) const
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
-        .msg = hintfmt(s, sym, positions[p2]),
+        .msg = hintfmt(s, symbols[sym], positions[p2]),
         .errPos = positions[p1]
     });
 }
@@ -785,19 +787,19 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s) const
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun,
-    const Symbol & s2) const
+    const SymbolIdx s2) const
 {
     throw TypeError({
-        .msg = hintfmt(s, fun.showNamePos(positions), s2),
+        .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
         .errPos = positions[pos]
     });
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const ExprLambda & fun, const Symbol & s2) const
+    const ExprLambda & fun, const SymbolIdx s2) const
 {
     throw TypeError(ErrorInfo {
-        .msg = hintfmt(s, fun.showNamePos(positions), s2),
+        .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
         .errPos = positions[pos],
         .suggestions = suggestions,
     });
@@ -901,7 +903,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", symbols[var.name]);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -1187,7 +1189,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (nameVal.type() == nNull)
             continue;
         state.forceStringNoCtx(nameVal);
-        Symbol nameSym = state.symbols.create(nameVal.string.s);
+        auto nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
             state.throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, j->pos);
@@ -1243,10 +1245,12 @@ static std::string showAttrPath(EvalState & state, Env & env, const AttrPath & a
     for (auto & i : attrPath) {
         if (!first) out << '.'; else first = false;
         try {
-            out << getName(i, state, env);
+            out << state.symbols[getName(i, state, env)];
         } catch (Error & e) {
-            assert(!i.symbol.set());
-            out << "\"${" << *i.expr << "}\"";
+            assert(!i.symbol);
+            out << "\"${";
+            i.expr->show(state.symbols, out);
+            out << "}\"";
         }
     }
     return out.str();
@@ -1266,7 +1270,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         for (auto & i : attrPath) {
             state.nrLookups++;
             Bindings::iterator j;
-            Symbol name = getName(i, state, env);
+            auto name = getName(i, state, env);
             if (def) {
                 state.forceValue(*vAttrs, pos);
                 if (vAttrs->type() != nAttrs ||
@@ -1280,11 +1284,11 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs)
-                        allAttrNames.insert(attr.name);
+                        allAttrNames.insert(state.symbols[attr.name]);
                     state.throwEvalError(
                         pos,
-                        Suggestions::bestMatches(allAttrNames, name),
-                        "attribute '%1%' missing", name);
+                        Suggestions::bestMatches(allAttrNames, state.symbols[name]),
+                        "attribute '%1%' missing", state.symbols[name]);
                 }
             }
             vAttrs = j->value;
@@ -1316,7 +1320,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrPath) {
         state.forceValue(*vAttrs, noPos);
         Bindings::iterator j;
-        Symbol name = getName(i, state, env);
+        auto name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
             (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
@@ -1366,7 +1370,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             ExprLambda & lambda(*vCur.lambda.fun);
 
             auto size =
-                (!lambda.arg.set() ? 0 : 1) +
+                (!lambda.arg ? 0 : 1) +
                 (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
             Env & env2(allocEnv(size));
             env2.up = vCur.lambda.env;
@@ -1379,7 +1383,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             else {
                 forceAttrs(*args[0], pos);
 
-                if (lambda.arg.set())
+                if (lambda.arg)
                     env2.values[displ++] = args[0];
 
                 /* For each formal argument, get the actual argument.  If
@@ -1407,10 +1411,10 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         if (!lambda.formals->has(i.name)) {
                             std::set<std::string> formalNames;
                             for (auto & formal : lambda.formals->formals)
-                                formalNames.insert(formal.name);
+                                formalNames.insert(symbols[formal.name]);
                             throwTypeError(
                                 pos,
-                                Suggestions::bestMatches(formalNames, i.name),
+                                Suggestions::bestMatches(formalNames, symbols[i.name]),
                                 "%1% called with unexpected argument '%2%'",
                                 lambda,
                                 i.name);
@@ -1428,8 +1432,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
                     addErrorTrace(e, lambda.pos, "while evaluating %s",
-                        (lambda.name.set()
-                            ? "'" + (const std::string &) lambda.name + "'"
+                        (lambda.name
+                            ? concatStrings("'", symbols[lambda.name], "'")
                             : "anonymous lambda"));
                     addErrorTrace(e, pos, "from call site%s", "");
                 }
@@ -1578,7 +1582,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", i.name);
+https://nixos.org/manual/nix/stable/#ss-functions.)", symbols[i.name]);
 
             }
         }
@@ -1610,7 +1614,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
-        cond->show(out);
+        cond->show(state.symbols, out);
         state.throwAssertionError(pos, "assertion '%1%' failed", out.str());
     }
     body->eval(state, env, v);
@@ -1844,7 +1848,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", i.name);
+                    addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
                     throw;
                 }
         }
@@ -2267,7 +2271,7 @@ void EvalState::printStats()
                 auto list = topObj.list("functions");
                 for (auto & i : functionCalls) {
                     auto obj = list.object();
-                    if (i.first->name.set())
+                    if (i.first->name)
                         obj.attr("name", (const std::string &) i.first->name);
                     else
                         obj.attr("name", nullptr);

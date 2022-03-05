@@ -22,7 +22,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            std::string_view n(attr.name);
+            std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.coerceToString(attr.pos, *attr.value, context, false, false).toOwned();
             else if (n == "rev") {
@@ -38,7 +38,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
                 name = state.forceStringNoCtx(*attr.value, attr.pos);
             else
                 throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", attr.name),
+                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
                     .errPos = state.positions[attr.pos]
                 });
         }

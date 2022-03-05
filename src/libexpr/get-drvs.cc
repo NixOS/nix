@@ -179,7 +179,7 @@ StringSet DrvInfo::queryMetaNames()
     StringSet res;
     if (!getMeta()) return res;
     for (auto & i : *meta)
-        res.insert(i.name);
+        res.emplace(state->symbols[i.name]);
     return res;
 }
 
@@ -269,7 +269,7 @@ void DrvInfo::setMeta(const std::string & name, Value * v)
 {
     getMeta();
     auto attrs = state->buildBindings(1 + (meta ? meta->size() : 0));
-    Symbol sym = state->symbols.create(name);
+    auto sym = state->symbols.create(name);
     if (meta)
         for (auto i : *meta)
             if (i.name != sym)
@@ -356,11 +356,11 @@ static void getDerivations(EvalState & state, Value & vIn,
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        for (auto & i : v.attrs->lexicographicOrder()) {
-            debug("evaluating attribute '%1%'", i->name);
-            if (!std::regex_match(std::string(i->name), attrRegex))
+        for (auto & i : v.attrs->lexicographicOrder(state.symbols)) {
+            debug("evaluating attribute '%1%'", state.symbols[i->name]);
+            if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
                 continue;
-            std::string pathPrefix2 = addToPath(pathPrefix, i->name);
+            std::string pathPrefix2 = addToPath(pathPrefix, state.symbols[i->name]);
             if (combineChannels)
                 getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
             else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {

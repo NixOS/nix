@@ -144,45 +144,46 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
     for (auto & i : *args[1]->attrs) {
-        if (!state.store->isStorePath(i.name))
+        const auto & name = state.symbols[i.name];
+        if (!state.store->isStorePath(name))
             throw EvalError({
-                .msg = hintfmt("Context key '%s' is not a store path", i.name),
+                .msg = hintfmt("Context key '%s' is not a store path", name),
                 .errPos = state.positions[i.pos]
             });
         if (!settings.readOnlyMode)
-            state.store->ensurePath(state.store->parseStorePath(i.name));
+            state.store->ensurePath(state.store->parseStorePath(name));
         state.forceAttrs(*i.value, i.pos);
         auto iter = i.value->attrs->find(sPath);
         if (iter != i.value->attrs->end()) {
             if (state.forceBool(*iter->value, iter->pos))
-                context.insert(i.name);
+                context.emplace(name);
         }
 
         iter = i.value->attrs->find(sAllOutputs);
         if (iter != i.value->attrs->end()) {
             if (state.forceBool(*iter->value, iter->pos)) {
-                if (!isDerivation(i.name)) {
+                if (!isDerivation(name)) {
                     throw EvalError({
-                        .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
+                        .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", name),
                         .errPos = state.positions[i.pos]
                     });
                 }
-                context.insert("=" + std::string(i.name));
+                context.insert(concatStrings("=", name));
             }
         }
 
         iter = i.value->attrs->find(state.sOutputs);
         if (iter != i.value->attrs->end()) {
             state.forceList(*iter->value, iter->pos);
-            if (iter->value->listSize() && !isDerivation(i.name)) {
+            if (iter->value->listSize() && !isDerivation(name)) {
                 throw EvalError({
-                    .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
+                    .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", name),
                     .errPos = state.positions[i.pos]
                 });
             }
             for (auto elem : iter->value->listItems()) {
-                auto name = state.forceStringNoCtx(*elem, iter->pos);
-                context.insert(concatStrings("!", name, "!", i.name));
+                auto outputName = state.forceStringNoCtx(*elem, iter->pos);
+                context.insert(concatStrings("!", outputName, "!", name));
             }
         }
     }

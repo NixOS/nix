@@ -15,12 +15,14 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     std::optional<StorePath> toPath;
 
     for (auto & attr : *args[0]->attrs) {
-        if (attr.name == "fromPath") {
+        const auto & attrName = state.symbols[attr.name];
+
+        if (attrName == "fromPath") {
             PathSet context;
             fromPath = state.coerceToStorePath(attr.pos, *attr.value, context);
         }
 
-        else if (attr.name == "toPath") {
+        else if (attrName == "toPath") {
             state.forceValue(*attr.value, attr.pos);
             toCA = true;
             if (attr.value->type() != nString || attr.value->string.s != std::string("")) {
@@ -29,12 +31,12 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             }
         }
 
-        else if (attr.name == "fromStore")
+        else if (attrName == "fromStore")
             fromStoreUrl = state.forceStringNoCtx(*attr.value, attr.pos);
 
         else
             throw Error({
-                .msg = hintfmt("attribute '%s' isn't supported in call to 'fetchClosure'", attr.name),
+                .msg = hintfmt("attribute '%s' isn't supported in call to 'fetchClosure'", attrName),
                 .errPos = state.positions[pos]
             });
     }

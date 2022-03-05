@@ -15,10 +15,10 @@ struct Value;
 /* Map one attribute name to its value. */
 struct Attr
 {
-    Symbol name;
+    SymbolIdx name;
     Value * value;
     PosIdx pos;
-    Attr(Symbol name, Value * value, PosIdx pos = noPos)
+    Attr(SymbolIdx name, Value * value, PosIdx pos = noPos)
         : name(name), value(value), pos(pos) { };
     Attr() { };
     bool operator < (const Attr & a) const
@@ -57,7 +57,7 @@ public:
         attrs[size_++] = attr;
     }
 
-    iterator find(const Symbol & name)
+    iterator find(const SymbolIdx & name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
@@ -65,7 +65,7 @@ public:
         return end();
     }
 
-    Attr * get(const Symbol & name)
+    Attr * get(const SymbolIdx & name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
@@ -86,14 +86,15 @@ public:
     size_t capacity() { return capacity_; }
 
     /* Returns the attributes in lexicographically sorted order. */
-    std::vector<const Attr *> lexicographicOrder() const
+    std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
     {
         std::vector<const Attr *> res;
         res.reserve(size_);
         for (size_t n = 0; n < size_; n++)
             res.emplace_back(&attrs[n]);
-        std::sort(res.begin(), res.end(), [](const Attr * a, const Attr * b) {
-            return (const std::string &) a->name < (const std::string &) b->name;
+        std::sort(res.begin(), res.end(), [&](const Attr * a, const Attr * b) {
+            std::string_view sa = symbols[a->name], sb = symbols[b->name];
+            return sa < sb;
         });
         return res;
     }
@@ -118,7 +119,7 @@ public:
         : bindings(bindings), state(state)
     { }
 
-    void insert(Symbol name, Value * value, PosIdx pos = noPos)
+    void insert(SymbolIdx name, Value * value, PosIdx pos = noPos)
     {
         insert(Attr(name, value, pos));
     }
@@ -133,7 +134,7 @@ public:
         bindings->push_back(attr);
     }
 
-    Value & alloc(const Symbol & name, PosIdx pos = noPos);
+    Value & alloc(const SymbolIdx & name, PosIdx pos = noPos);
 
     Value & alloc(std::string_view name, PosIdx pos = noPos);
 

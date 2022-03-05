@@ -106,7 +106,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        the store; we need it for future modifications of the
        environment. */
     std::ostringstream str;
-    manifest.print(str, true);
+    manifest.print(state.symbols, str, true);
     auto manifestFile = state.store->addTextToStore("env-manifest.nix",
         str.str(), references);
 

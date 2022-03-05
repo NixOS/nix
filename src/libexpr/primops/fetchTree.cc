@@ -126,20 +126,20 @@ static void fetchTree(
             state.forceValue(*attr.value, attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, false, false).toOwned();
-                attrs.emplace(attr.name,
-                    attr.name == "url"
+                attrs.emplace(state.symbols[attr.name],
+                    state.symbols[attr.name] == "url"
                     ? type == "git"
                       ? fixURIForGit(s, state)
                       : fixURI(s, state)
                     : s);
             }
             else if (attr.value->type() == nBool)
-                attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
+                attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
-                attrs.emplace(attr.name, uint64_t(attr.value->integer));
+                attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer));
             else
                 throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    attr.name, showType(*attr.value));
+                    state.symbols[attr.name], showType(*attr.value));
         }
 
         if (!params.allowNameArgument)
@@ -198,7 +198,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            std::string n(attr.name);
+            std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, attr.pos);
             else if (n == "sha256")
@@ -207,7 +207,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                 name = state.forceStringNoCtx(*attr.value, attr.pos);
             else
                 throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                    .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
                     .errPos = state.positions[attr.pos]
                 });
             }

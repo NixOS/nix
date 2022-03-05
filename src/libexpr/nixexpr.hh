@@ -125,15 +125,15 @@ struct StaticEnv;
 /* An attribute path is a sequence of attribute names. */
 struct AttrName
 {
-    Symbol symbol;
+    SymbolIdx symbol;
     Expr * expr;
-    AttrName(const Symbol & s) : symbol(s) {};
+    AttrName(const SymbolIdx & s) : symbol(s) {};
     AttrName(Expr * e) : expr(e) {};
 };
 
 typedef std::vector<AttrName> AttrPath;
 
-std::string showAttrPath(const AttrPath & attrPath);
+std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
 
 
 /* Abstract syntax of Nix expressions. */
@@ -141,19 +141,17 @@ std::string showAttrPath(const AttrPath & attrPath);
 struct Expr
 {
     virtual ~Expr() { };
-    virtual void show(std::ostream & str) const;
-    virtual void bindVars(const PosTable & pt, const StaticEnv & env);
+    virtual void show(const SymbolTable & symbols, std::ostream & str) const;
+    virtual void bindVars(const EvalState & es, const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
-    virtual void setName(Symbol & name);
+    virtual void setName(SymbolIdx name);
 };
 
-std::ostream & operator << (std::ostream & str, const Expr & e);
-
 #define COMMON_METHODS \
-    void show(std::ostream & str) const; \
+    void show(const SymbolTable & symbols, std::ostream & str) const;    \
     void eval(EvalState & state, Env & env, Value & v); \
-    void bindVars(const PosTable & pt, const StaticEnv & env);
+    void bindVars(const EvalState & es, const StaticEnv & env);
 
 struct ExprInt : Expr
 {
@@ -197,7 +195,7 @@ typedef uint32_t Displacement;
 struct ExprVar : Expr
 {
     PosIdx pos;
-    Symbol name;
+    SymbolIdx name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
        or function argument) or from a "with". */
@@ -212,8 +210,8 @@ struct ExprVar : Expr
     Level level;
     Displacement displ;
 
-    ExprVar(const Symbol & name) : name(name) { };
-    ExprVar(const PosIdx & pos, const Symbol & name) : pos(pos), name(name) { };
+    ExprVar(const SymbolIdx & name) : name(name) { };
+    ExprVar(const PosIdx & pos, const SymbolIdx & name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -224,7 +222,7 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(const PosIdx & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const PosIdx & pos, Expr * e, const SymbolIdx & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
 };
 
@@ -249,7 +247,7 @@ struct ExprAttrs : Expr
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
-    typedef std::map<Symbol, AttrDef> AttrDefs;
+    typedef std::map<SymbolIdx, AttrDef> AttrDefs;
     AttrDefs attrs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
@@ -274,9 +272,8 @@ struct ExprList : Expr
 struct Formal
 {
     PosIdx pos;
-    Symbol name;
+    SymbolIdx name;
     Expr * def;
-    Formal(const PosIdx & pos, const Symbol & name, Expr * def) : pos(pos), name(name), def(def) { };
 };
 
 struct Formals
@@ -285,18 +282,19 @@ struct Formals
     Formals_ formals;
     bool ellipsis;
 
-    bool has(Symbol arg) const {
+    bool has(SymbolIdx arg) const {
         auto it = std::lower_bound(formals.begin(), formals.end(), arg,
-            [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
+            [] (const Formal & f, const SymbolIdx & sym) { return f.name < sym; });
         return it != formals.end() && it->name == arg;
     }
 
-    std::vector<Formal> lexicographicOrder() const
+    std::vector<Formal> lexicographicOrder(const SymbolTable & symbols) const
     {
         std::vector<Formal> result(formals.begin(), formals.end());
         std::sort(result.begin(), result.end(),
-            [] (const Formal & a, const Formal & b) {
-                return std::string_view(a.name) < std::string_view(b.name);
+            [&] (const Formal & a, const Formal & b) {
+                std::string_view sa = symbols[a.name], sb = symbols[b.name];
+                return sa < sb;
             });
         return result;
     }
@@ -305,16 +303,20 @@ struct Formals
 struct ExprLambda : Expr
 {
     PosIdx pos;
-    Symbol name;
-    Symbol arg;
+    SymbolIdx name;
+    SymbolIdx arg;
     Formals * formals;
     Expr * body;
-    ExprLambda(const PosIdx & pos, const Symbol & arg, Formals * formals, Expr * body)
+    ExprLambda(PosIdx pos, SymbolIdx arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
     };
-    void setName(Symbol & name);
-    std::string showNamePos(const PosTable & pt) const;
+    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
+        : pos(pos), formals(formals), body(body)
+    {
+    }
+    void setName(SymbolIdx name);
+    std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };
@@ -377,13 +379,13 @@ struct ExprOpNot : Expr
         Expr * e1, * e2; \
         name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
         name(const PosIdx & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
-        void show(std::ostream & str) const \
+        void show(const SymbolTable & symbols, std::ostream & str) const \
         { \
-            str << "(" << *e1 << " " s " " << *e2 << ")";   \
+            str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
         } \
-        void bindVars(const PosTable & pt, const StaticEnv & env)    \
+        void bindVars(const EvalState & es, const StaticEnv & env)    \
         { \
-            e1->bindVars(pt, env); e2->bindVars(pt, env);    \
+            e1->bindVars(es, env); e2->bindVars(es, env);    \
         } \
         void eval(EvalState & state, Env & env, Value & v); \
     };
@@ -423,7 +425,7 @@ struct StaticEnv
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
-    typedef std::vector<std::pair<Symbol, Displacement>> Vars;
+    typedef std::vector<std::pair<SymbolIdx, Displacement>> Vars;
     Vars vars;
 
     StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
@@ -447,7 +449,7 @@ struct StaticEnv
         vars.erase(it, end);
     }
 
-    Vars::const_iterator find(const Symbol & name) const
+    Vars::const_iterator find(const SymbolIdx & name) const
     {
         Vars::value_type key(name, 0);
         auto i = std::lower_bound(vars.begin(), vars.end(), key);

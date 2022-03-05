@@ -77,26 +77,26 @@ using namespace nix;
 namespace nix {
 
 
-static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
+static void dupAttr(const EvalState & state, const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
          .msg = hintfmt("attribute '%1%' already defined at %2%",
-             showAttrPath(attrPath), prevPos),
-         .errPos = pos
+             showAttrPath(state.symbols, attrPath), state.positions[prevPos]),
+         .errPos = state.positions[pos]
     });
 }
 
-static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
+static void dupAttr(const EvalState & state, SymbolIdx attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-        .msg = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
-        .errPos = pos
+        .msg = hintfmt("attribute '%1%' already defined at %2%", state.symbols[attr], state.positions[prevPos]),
+        .errPos = state.positions[pos]
     });
 }
 
 
 static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
-    Expr * e, const PosIdx pos, const nix::PosTable & pt)
+    Expr * e, const PosIdx pos, const nix::EvalState & state)
 {
     AttrPath::iterator i;
     // All attrpaths have at least one attr
@@ -104,15 +104,15 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     // Checking attrPath validity.
     // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
-        if (i->symbol.set()) {
+        if (i->symbol) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
                 if (!j->second.inherited) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                    if (!attrs2) dupAttr(attrPath, pt[pos], pt[j->second.pos]);
+                    if (!attrs2) dupAttr(state, attrPath, pos, j->second.pos);
                     attrs = attrs2;
                 } else
-                    dupAttr(attrPath, pt[pos], pt[j->second.pos]);
+                    dupAttr(state, attrPath, pos, j->second.pos);
             } else {
                 ExprAttrs * nested = new ExprAttrs;
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
@@ -126,7 +126,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     }
     // Expr insertion.
     // ==========================
-    if (i->symbol.set()) {
+    if (i->symbol) {
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
             // This attr path is already defined. However, if both
@@ -139,11 +139,11 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                 for (auto & ad : ae->attrs) {
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
-                        dupAttr(ad.first, pt[j2->second.pos], pt[ad.second.pos]);
+                        dupAttr(state, ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
                 }
             } else {
-                dupAttr(attrPath, pt[pos], pt[j->second.pos]);
+                dupAttr(state, attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
@@ -157,14 +157,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 
 
 static Formals * toFormals(ParseData & data, ParserFormals * formals,
-    PosIdx pos = noPos, Symbol arg = {})
+    PosIdx pos = noPos, SymbolIdx arg = {})
 {
     std::sort(formals->formals.begin(), formals->formals.end(),
         [] (const auto & a, const auto & b) {
             return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
         });
 
-    std::optional<std::pair<Symbol, PosIdx>> duplicate;
+    std::optional<std::pair<SymbolIdx, PosIdx>> duplicate;
     for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
         if (formals->formals[i].name != formals->formals[i + 1].name)
             continue;
@@ -173,7 +173,7 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
     }
     if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", duplicate->first),
+            .msg = hintfmt("duplicate formal function argument '%1%'", data.symbols[duplicate->first]),
             .errPos = data.state.positions[duplicate->second]
         });
 
@@ -181,9 +181,9 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
     result.ellipsis = formals->ellipsis;
     result.formals = std::move(formals->formals);
 
-    if (arg.set() && result.has(arg))
+    if (arg && result.has(arg))
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", arg),
+            .msg = hintfmt("duplicate formal function argument '%1%'", data.symbols[arg]),
             .errPos = data.state.positions[pos]
         });
 
@@ -369,15 +369,15 @@ expr_function
   : ID ':' expr_function
     { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, {}, toFormals(*data, $2), $5); }
+    { $$ = new ExprLambda(CUR_POS, toFormals(*data, $2), $5); }
   | '{' formals '}' '@' ID ':' expr_function
     {
-      Symbol arg = data->symbols.create($5);
+      auto arg = data->symbols.create($5);
       $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $2, CUR_POS, arg), $7);
     }
   | ID '@' '{' formals '}' ':' expr_function
     {
-      Symbol arg = data->symbols.create($1);
+      auto arg = data->symbols.create($1);
       $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $4, CUR_POS, arg), $7);
     }
   | ASSERT expr ';' expr_function
@@ -532,13 +532,12 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data), data->state.positions); }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data), data->state); }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              dupAttr(i.symbol, data->state.positions[makeCurPos(@3, data)],
-                  data->state.positions[$$->attrs[i.symbol].pos]);
+              dupAttr(data->state, i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
           auto pos = makeCurPos(@3, data);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
@@ -548,8 +547,7 @@ binds
       /* !!! Should ensure sharing of the expression in $4. */
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              dupAttr(i.symbol, data->state.positions[makeCurPos(@6, data)],
-                  data->state.positions[$$->attrs[i.symbol].pos]);
+              dupAttr(data->state, i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
     }
@@ -623,8 +621,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal(CUR_POS, data->symbols.create($1), 0); }
-  | ID '?' expr { $$ = new Formal(CUR_POS, data->symbols.create($1), $3); }
+  : ID { $$ = new Formal{CUR_POS, data->symbols.create($1), 0}; }
+  | ID '?' expr { $$ = new Formal{CUR_POS, data->symbols.create($1), $3}; }
   ;
 
 %%
@@ -670,7 +668,7 @@ Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
 
     if (res) throw ParseError(data.error.value());
 
-    data.result->bindVars(positions, staticEnv);
+    data.result->bindVars(*this, staticEnv);
 
     return data.result;
 }

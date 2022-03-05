@@ -152,6 +152,14 @@ public:
     {
         return chunks[idx / ChunkSize][idx % ChunkSize];
     }
+
+    template<typename Fn>
+    void forEach(Fn fn) const
+    {
+        for (const auto & c : chunks)
+            for (const auto & e : c)
+                fn(e);
+    }
 };
 
 }

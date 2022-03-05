@@ -139,11 +139,11 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
        else. This way we can disable IFD for hydraJobs and then enable
        it for other outputs. */
     if (auto attr = aOutputs->value->attrs->get(sHydraJobs))
-        callback(attr->name, *attr->value, attr->pos);
+        callback(state.symbols[attr->name], *attr->value, attr->pos);
 
     for (auto & attr : *aOutputs->value->attrs) {
         if (attr.name != sHydraJobs)
-            callback(attr.name, *attr.value, attr.pos);
+            callback(state.symbols[attr.name], *attr.value, attr.pos);
     }
 }
 
@@ -254,14 +254,6 @@ struct CmdFlakeInfo : CmdFlakeMetadata
     }
 };
 
-static bool argHasName(std::string_view arg, std::string_view expected)
-{
-    return
-        arg == expected
-        || arg == "_"
-        || (hasPrefix(arg, "_") && arg.substr(1) == expected);
-}
-
 struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
@@ -317,6 +309,14 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto resolve = [&] (PosIdx p) {
             return state->positions[p];
+        };
+
+        auto argHasName = [&] (SymbolIdx arg, std::string_view expected) {
+            std::string_view name = state->symbols[arg];
+            return
+                name == expected
+                || name == "_"
+                || (hasPrefix(name, "_") && name.substr(1) == expected);
         };
 
         auto checkSystemName = [&](const std::string & system, const PosIdx pos) {
@@ -390,7 +390,7 @@ struct CmdFlakeCheck : FlakeCommand
                         } catch (Error & e) {
                             e.addTrace(
                                 state->positions[attr.pos],
-                                hintfmt("while evaluating the option '%s'", attr.name));
+                                hintfmt("while evaluating the option '%s'", state->symbols[attr.name]));
                             throw;
                         }
                 } else
@@ -414,7 +414,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     state->forceAttrs(*attr.value, attr.pos);
-                    auto attrPath2 = attrPath + "." + (std::string) attr.name;
+                    auto attrPath2 = concatStrings(attrPath, ".", state->symbols[attr.name]);
                     if (state->isDerivation(*attr.value)) {
                         Activity act(*logger, lvlChatty, actUnknown,
                             fmt("checking Hydra job '%s'", attrPath2));
@@ -468,7 +468,7 @@ struct CmdFlakeCheck : FlakeCommand
                     throw Error("template '%s' lacks attribute 'description'", attrPath);
 
                 for (auto & attr : *v.attrs) {
-                    std::string name(attr.name);
+                    std::string_view name(state->symbols[attr.name]);
                     if (name != "path" && name != "description" && name != "welcomeText")
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
@@ -522,13 +522,14 @@ struct CmdFlakeCheck : FlakeCommand
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 state->forceAttrs(*attr.value, attr.pos);
                                 for (auto & attr2 : *attr.value->attrs) {
                                     auto drvPath = checkDerivation(
-                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
-                                    if (drvPath && (std::string) attr.name == settings.thisSystem.get())
+                                    if (drvPath && attr_name == settings.thisSystem.get())
                                         drvPaths.push_back(DerivedPath::Built{*drvPath});
                                 }
                             }
@@ -537,9 +538,10 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "formatter") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 checkApp(
-                                    fmt("%s.%s", name, attr.name),
+                                    fmt("%s.%s", name, attr_name),
                                     *attr.value, attr.pos);
                             }
                         }
@@ -547,11 +549,12 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "packages" || name == "devShells") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 state->forceAttrs(*attr.value, attr.pos);
                                 for (auto & attr2 : *attr.value->attrs)
                                     checkDerivation(
-                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
                             }
                         }
@@ -559,11 +562,12 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "apps") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 state->forceAttrs(*attr.value, attr.pos);
                                 for (auto & attr2 : *attr.value->attrs)
                                     checkApp(
-                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
                             }
                         }
@@ -571,9 +575,10 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "defaultPackage" || name == "devShell") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 checkDerivation(
-                                    fmt("%s.%s", name, attr.name),
+                                    fmt("%s.%s", name, attr_name),
                                     *attr.value, attr.pos);
                             }
                         }
@@ -581,9 +586,10 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "defaultApp") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 checkApp(
-                                    fmt("%s.%s", name, attr.name),
+                                    fmt("%s.%s", name, attr_name),
                                     *attr.value, attr.pos);
                             }
                         }
@@ -591,7 +597,7 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "legacyPackages") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                checkSystemName(state->symbols[attr.name], attr.pos);
                                 // FIXME: do getDerivations?
                             }
                         }
@@ -602,7 +608,7 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "overlays") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkOverlay(fmt("%s.%s", name, attr.name),
+                                checkOverlay(fmt("%s.%s", name, state->symbols[attr.name]),
                                     *attr.value, attr.pos);
                         }
 
@@ -612,14 +618,14 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "nixosModules") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkModule(fmt("%s.%s", name, attr.name),
+                                checkModule(fmt("%s.%s", name, state->symbols[attr.name]),
                                     *attr.value, attr.pos);
                         }
 
                         else if (name == "nixosConfigurations") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkNixOSConfiguration(fmt("%s.%s", name, attr.name),
+                                checkNixOSConfiguration(fmt("%s.%s", name, state->symbols[attr.name]),
                                     *attr.value, attr.pos);
                         }
 
@@ -632,16 +638,17 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "templates") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs)
-                                checkTemplate(fmt("%s.%s", name, attr.name),
+                                checkTemplate(fmt("%s.%s", name, state->symbols[attr.name]),
                                     *attr.value, attr.pos);
                         }
 
                         else if (name == "defaultBundler") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 checkBundler(
-                                    fmt("%s.%s", name, attr.name),
+                                    fmt("%s.%s", name, attr_name),
                                     *attr.value, attr.pos);
                             }
                         }
@@ -649,11 +656,12 @@ struct CmdFlakeCheck : FlakeCommand
                         else if (name == "bundlers") {
                             state->forceAttrs(vOutput, pos);
                             for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(attr.name, attr.pos);
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
                                 state->forceAttrs(*attr.value, attr.pos);
                                 for (auto & attr2 : *attr.value->attrs) {
                                     checkBundler(
-                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
                                 }
                             }
@@ -1000,7 +1008,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 auto showDerivation = [&]()
                 {
-                    auto name = visitor.getAttr(state->sName)->getString();
+                    auto name = visitor.getAttr("name")->getString();
                     if (json) {
                         std::optional<std::string> description;
                         if (auto aMeta = visitor.maybeGetAttr("meta")) {

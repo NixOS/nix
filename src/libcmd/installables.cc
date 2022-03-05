@@ -235,7 +235,7 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
 
         if (v2.type() == nAttrs) {
             for (auto & i : *v2.attrs) {
-                std::string name = i.name;
+                std::string name = state->symbols[i.name];
                 if (name.find(searchWord) == 0) {
                     if (prefix_ == "")
                         completions->add(name);
@@ -600,7 +600,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
     auto drvInfo = DerivationInfo {
         std::move(drvPath),
-        attr->getAttr(state->sOutputName)->getString()
+        attr->getAttr("outputName")->getString()
     };
 
     return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
