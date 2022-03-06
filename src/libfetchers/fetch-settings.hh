@@ -29,7 +29,7 @@ struct FetchSettings : public Config
 
           * Github: the token value is the OAUTH-TOKEN string obtained
             as the Personal Access Token from the Github server (see
-            https://docs.github.com/en/developers/apps/authorizing-oath-apps).
+            https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps).
 
           * Gitlab: the token value is either the OAuth2 token or the
             Personal Access Token (these are different types tokens
