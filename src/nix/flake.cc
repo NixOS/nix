@@ -709,12 +709,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto templateDirAttr = cursor->getAttr("path");
         auto templateDir = templateDirAttr->getString();
 
-        if (!store->isInStore(templateDir)) {
+        if (!store->isInStore(templateDir))
             throw TypeError(
-                std::string("'%s' was not found in the Nix store\n") +
+                "'%s' was not found in the Nix store\n"
                 "If you've set '%s' to a string, try using a path instead.",
                 templateDir, templateDirAttr->getAttrPathStr());
-        }
 
         std::vector<Path> files;
 
