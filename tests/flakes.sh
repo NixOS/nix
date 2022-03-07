@@ -27,8 +27,11 @@ flakeFollowsB=$TEST_ROOT/follows/flakeA/flakeB
 flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
 flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
 flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
+flakeHierMain=$TEST_ROOT/hier/flakeMain
+flakeHierSub=$TEST_ROOT/hier/flakeSub
+flakeHierSubSub=$TEST_ROOT/hier/flakeSubSub
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA $flakeHierMain $flakeHierSub $flakeHierSubSub; do
     rm -rf $repo $repo.tmp
     mkdir -p $repo
     git -C $repo init
@@ -834,3 +837,75 @@ nix store delete $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
+
+# Test flake honors intermediate lock files
+
+# 1. Creates and locks a "main" flake referencing a trivial empty
+#    "sub" flake via a specific commit hash;
+
+cat > $flakeHierSub/flake.nix <<EOF
+{
+  outputs = { self }: { };
+}
+EOF
+
+git -C $flakeHierSub add flake.nix
+git -C $flakeHierSub commit -m 'Trivial sub-flake'
+
+hashSub="$(git -C $flakeHierSub rev-parse HEAD)"
+
+cat > $flakeHierMain/flake.nix <<EOF
+{
+  inputs.sub.url = "git+file://$flakeHierSub?rev=$hashSub";
+  outputs = { self }: { };
+}
+EOF
+
+git -C $flakeHierMain add flake.nix
+
+nix flake update $flakeHierMain
+
+git -C $flakeHierMain add flake.lock
+git -C $flakeHierMain commit -m 'Reference sub-flake by commit'
+
+# 2. Adds a "sub-sub" flake, references it *mutably* from the "sub"
+#    flake, and locks the "sub" flake via `nix flake update`;
+
+cat > $flakeHierSubSub/flake.nix <<EOF
+{
+  outputs = { self }: { };
+}
+EOF
+
+git -C $flakeHierSubSub add flake.nix
+git -C $flakeHierSubSub commit -m 'Trivial sub-sub-flake'
+
+hashSubSub=$(git -C $flakeHierSubSub rev-parse HEAD)
+
+sed -i $flakeHierSub/flake.nix \
+    -e '2i inputs.subSub.url = "git+file://'$flakeHierSubSub'";'
+
+nix flake update $flakeHierSub
+
+git -C $flakeHierSub add flake.lock
+git -C $flakeHierSub commit -a -m 'Reference trivial sub-sub-flake mutably'
+
+# 3. Adds a new commit to the "sub-sub" flake;
+
+git -C $flakeHierSubSub commit --allow-empty -m 'New sub-sub commit'
+
+# 4. Updates the "main" flake to reference the "sub" flake mutably, but
+#    does *not* lock it (yet).
+
+sed -i $flakeHierMain/flake.nix \
+    -e 's/?rev=[a-f0-9]*//'
+
+git -C $flakeHierMain commit -a -m 'Reference sub-flake mutably'
+
+# Here, both `metadata` and `update` rewrite the lock file in "main",
+# but the former fetches the last commit from "sub-sub," whereas the
+# latter honors the contents of the lock file in "sub."
+
+nix flake metadata $flakeHierMain
+
+[[ $(jq -r .nodes.subSub.locked.rev $flakeHierMain/flake.lock) = $hashSubSub ]]
