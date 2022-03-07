@@ -249,6 +249,45 @@ public:
     std::string_view forceString(Value & v, PathSet & context, const Pos & pos = noPos);
     std::string_view forceStringNoCtx(Value & v, const Pos & pos = noPos);
 
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const Pos & pos, const char * s) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const Pos & pos, const char * s, const Value & v) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const char * s, const std::string & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s,
+        const std::string & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const Pos & pos, const char * s, const std::string & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const Pos & pos, const char * s, const std::string & s2, const std::string & s3) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const Pos & pos, const char * s) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s,
+        const ExprLambda & fun, const Symbol & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const char * s, const Value & v) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwAssertionError(const Pos & pos, const char * s, const std::string & s1) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwUndefinedVarError(const Pos & pos, const char * s, const std::string & s1) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwMissingArgumentError(const Pos & pos, const char * s, const std::string & s1) const;
+
+    [[gnu::noinline]]
+    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    [[gnu::noinline]]
+    void addErrorTrace(Error & e, const Pos & pos, const char * s, const std::string & s2) const;
+
+public:
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);

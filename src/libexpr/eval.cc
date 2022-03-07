@@ -714,12 +714,30 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2))
+void EvalState::throwEvalError(const Pos & pos, const char * s) const
+{
+    throw EvalError({
+        .msg = hintfmt(s),
+        .errPos = pos
+    });
+}
+
+void EvalState::throwTypeError(const Pos & pos, const char * s, const Value & v) const
+{
+    throw TypeError({
+        .msg = hintfmt(s, showType(v)),
+        .errPos = pos
+    });
+
+}
+
+void EvalState::throwEvalError(const char * s, const std::string & s2) const
 {
     throw EvalError(s, s2);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
+void EvalState::throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s,
+    const std::string & s2) const
 {
     throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
@@ -728,7 +746,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & s
     });
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
+void EvalState::throwEvalError(const Pos & pos, const char * s, const std::string & s2) const
 {
     throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
@@ -736,12 +754,13 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     });
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2, const std::string & s3))
+void EvalState::throwEvalError(const char * s, const std::string & s2, const std::string & s3) const
 {
     throw EvalError(s, s2, s3);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2, const std::string & s3))
+void EvalState::throwEvalError(const Pos & pos, const char * s, const std::string & s2,
+    const std::string & s3) const
 {
     throw EvalError({
         .msg = hintfmt(s, s2, s3),
@@ -749,7 +768,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
     });
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
+void EvalState::throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2) const
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
@@ -758,7 +777,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
+void EvalState::throwTypeError(const Pos & pos, const char * s) const
 {
     throw TypeError({
         .msg = hintfmt(s),
@@ -766,7 +785,8 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
+void EvalState::throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun,
+    const Symbol & s2) const
 {
     throw TypeError({
         .msg = hintfmt(s, fun.showNamePos(), s2),
@@ -774,7 +794,8 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol & s2))
+void EvalState::throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s,
+    const ExprLambda & fun, const Symbol & s2) const
 {
     throw TypeError(ErrorInfo {
         .msg = hintfmt(s, fun.showNamePos(), s2),
@@ -784,12 +805,12 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & s
 }
 
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
+void EvalState::throwTypeError(const char * s, const Value & v) const
 {
     throw TypeError(s, showType(v));
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, const std::string & s1))
+void EvalState::throwAssertionError(const Pos & pos, const char * s, const std::string & s1) const
 {
     throw AssertionError({
         .msg = hintfmt(s, s1),
@@ -797,7 +818,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
     });
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const std::string & s1))
+void EvalState::throwUndefinedVarError(const Pos & pos, const char * s, const std::string & s1) const
 {
     throw UndefinedVarError({
         .msg = hintfmt(s, s1),
@@ -805,7 +826,7 @@ LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * 
     });
 }
 
-LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char * s, const std::string & s1))
+void EvalState::throwMissingArgumentError(const Pos & pos, const char * s, const std::string & s1) const
 {
     throw MissingArgumentError({
         .msg = hintfmt(s, s1),
@@ -813,12 +834,12 @@ LocalNoInlineNoReturn(void throwMissingArgumentError(const Pos & pos, const char
     });
 }
 
-LocalNoInline(void addErrorTrace(Error & e, const char * s, const std::string & s2))
+void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
 {
     e.addTrace(std::nullopt, s, s2);
 }
 
-LocalNoInline(void addErrorTrace(Error & e, const Pos & pos, const char * s, const std::string & s2))
+void EvalState::addErrorTrace(Error & e, const Pos & pos, const char * s, const std::string & s2) const
 {
     e.addTrace(pos, s, s2);
 }
@@ -1169,7 +1190,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos);
+            state.throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, *j->pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1260,7 +1281,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs)
                         allAttrNames.insert(attr.name);
-                    throwEvalError(
+                    state.throwEvalError(
                         pos,
                         Suggestions::bestMatches(allAttrNames, name),
                         "attribute '%1%' missing", name);
@@ -1275,7 +1296,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     } catch (Error & e) {
         if (*pos2 != noPos && pos2->file != state.sDerivationNix)
-            addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
+            state.addErrorTrace(e, *pos2, "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath));
         throw;
     }
@@ -1587,7 +1608,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(out);
-        throwAssertionError(pos, "assertion '%1%' failed", out.str());
+        state.throwAssertionError(pos, "assertion '%1%' failed", out.str());
     }
     body->eval(state, env, v);
 }
@@ -1764,14 +1785,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp));
+                state.throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp));
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
+                state.throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
         } else {
             if (s.empty()) s.reserve(es->size());
             /* skip canonization of first path, which would only be not
@@ -1791,7 +1812,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
-            throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
+            state.throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
         v.mkPath(canonPath(str()));
     } else
         v.mkStringMove(c_str(), context);

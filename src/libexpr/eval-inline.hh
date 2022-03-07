@@ -2,26 +2,7 @@
 
 #include "eval.hh"
 
-#define LocalNoInline(f) static f __attribute__((noinline)); f
-#define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
-
 namespace nix {
-
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
-{
-    throw EvalError({
-        .msg = hintfmt(s),
-        .errPos = pos
-    });
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
-{
-    throw TypeError({
-        .msg = hintfmt(s, showType(v)),
-        .errPos = pos
-    });
-}
 
 
 /* Note: Various places expect the allocated memory to be zeroed. */
