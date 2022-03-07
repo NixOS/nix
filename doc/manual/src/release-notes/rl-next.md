@@ -27,3 +27,6 @@
 
 * Templates can now define a `welcomeText` attribute, which is printed out by
   `nix flake {init,new} --template <template>`.
+
+* Nix will now helpfully suggest some valid inputs when the user mistypes
+  something on the command-line
