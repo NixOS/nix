@@ -1,5 +1,9 @@
 # Release X.Y (202?-??-??)
 
+* Nix will now make some helpful suggestions when you mistype
+  something on the command line. For instance, if you type `nix build
+  nixpkgs#thunderbrd`, it will suggest `thunderbird`.
+
 * A number of "default" flake output attributes have been
   renamed. These are:
 
@@ -27,6 +31,3 @@
 
 * Templates can now define a `welcomeText` attribute, which is printed out by
   `nix flake {init,new} --template <template>`.
-
-* Nix will now helpfully suggest some valid inputs when the user mistypes
-  something on the command-line
