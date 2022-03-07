@@ -55,6 +55,7 @@ nix path-info --store $TEST_ROOT/machine3 --all \
   | grep builder-build-remote-input-3.sh
 
 
+# Temporarily disabled because of https://github.com/NixOS/nix/issues/6209
 if [[ -z "$CONTENT_ADDRESSED" ]]; then
   for i in input1 input3; do
     nix log --store $TEST_ROOT/machine0 --file "$file" --arg busybox $busybox passthru."$i" | grep hi-$i
