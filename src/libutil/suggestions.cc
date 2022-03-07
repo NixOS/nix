@@ -65,27 +65,27 @@ Suggestions Suggestions::trim(int limit, int maxDistance) const
     return Suggestions{res};
 }
 
-std::string Suggestion::pretty_print() const
+std::string Suggestion::to_string() const
 {
     return ANSI_WARNING + filterANSIEscapes(suggestion) + ANSI_NORMAL;
 }
 
-std::string Suggestions::pretty_print() const
+std::string Suggestions::to_string() const
 {
     switch (suggestions.size()) {
         case 0:
             return "";
         case 1:
-            return suggestions.begin()->pretty_print();
+            return suggestions.begin()->to_string();
         default: {
             std::string res = "one of ";
             auto iter = suggestions.begin();
-            res += iter->pretty_print(); // Iter can’t be end() because the container isn’t null
+            res += iter->to_string(); // Iter can’t be end() because the container isn’t null
             iter++;
             auto last = suggestions.end(); last--;
             for ( ; iter != suggestions.end() ; iter++) {
                 res += (iter == last) ? " or " : ", ";
-                res += iter->pretty_print();
+                res += iter->to_string();
             }
             return res;
         }
@@ -99,6 +99,16 @@ Suggestions & Suggestions::operator+=(const Suggestions & other)
             other.suggestions.end()
     );
     return *this;
+}
+
+std::ostream & operator<<(std::ostream & str, const Suggestion & suggestion)
+{
+    return str << suggestion.to_string();
+}
+
+std::ostream & operator<<(std::ostream & str, const Suggestions & suggestions)
+{
+    return str << suggestions.to_string();
 }
 
 }

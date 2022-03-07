@@ -16,7 +16,7 @@ public:
     int distance; // The smaller the better
     std::string suggestion;
 
-    std::string pretty_print() const;
+    std::string to_string() const;
 
     GENERATE_CMP(Suggestion, me->distance, me->suggestion)
 };
@@ -25,7 +25,7 @@ class Suggestions {
 public:
     std::set<Suggestion> suggestions;
 
-    std::string pretty_print() const;
+    std::string to_string() const;
 
     Suggestions trim(
         int limit = 5,
@@ -39,4 +39,7 @@ public:
 
     Suggestions& operator+=(const Suggestions & other);
 };
+
+std::ostream & operator<<(std::ostream & str, const Suggestion &);
+std::ostream & operator<<(std::ostream & str, const Suggestions &);
 }

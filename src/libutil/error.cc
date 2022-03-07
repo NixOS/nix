@@ -285,7 +285,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     auto suggestions = einfo.suggestions.trim();
     if (! suggestions.suggestions.empty()){
         oss << "Did you mean " <<
-            suggestions.trim().pretty_print() <<
+            suggestions.trim() <<
             "?" << std::endl;
     }
 
