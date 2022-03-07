@@ -63,7 +63,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, const std::string 
 {
     forceValue(v, getPos);
     if (v.type() != nAttrs)
-        throwTypeError(getPos(), "%2%: value is %1% while a set was expected", v, errorCtx);
+        throwTypeError(getPos(), "%2%value is %1% while a set was expected", v, errorCtx);
 }
 
 
@@ -71,7 +71,7 @@ inline void EvalState::forceList(Value & v, const Pos & pos, const std::string &
 {
     forceValue(v, pos);
     if (!v.isList())
-        throwTypeError(pos, "%2%: value is %1% while a list was expected", v, errorCtx);
+        throwTypeError(pos, "%2%value is %1% while a list was expected", v, errorCtx);
 }
 
 /* Note: Various places expect the allocated memory to be zeroed. */

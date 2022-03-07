@@ -28,17 +28,17 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
     Value vMirrors;
     // FIXME: use nixpkgs flake
     state.eval(state.parseExprFromString("import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>", "."), vMirrors);
-    state.forceAttrs(vMirrors, noPos, "While evaluating the set of all mirrors");
+    state.forceAttrs(vMirrors, noPos, "While evaluating the set of all mirrors: ");
 
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
         throw Error("unknown mirror name '%s'", mirrorName);
-    state.forceList(*mirrorList->value, noPos, "While evaluating this mirror configuration");
+    state.forceList(*mirrorList->value, noPos, "While evaluating this mirror configuration: ");
 
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
 
-    std::string mirror(state.forceString(*mirrorList->value->listElems()[0], noPos, "While evaluating the first available mirror"));
+    std::string mirror(state.forceString(*mirrorList->value->listElems()[0], noPos, "While evaluating the first available mirror: "));
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + s.substr(p + 1);
 }
 
@@ -196,27 +196,27 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             Value vRoot;
             state->evalFile(path, vRoot);
             Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
-            state->forceAttrs(v, noPos, "While evaluating the source attribute to prefetch");
+            state->forceAttrs(v, noPos, "While evaluating the source attribute to prefetch: ");
 
             /* Extract the URL. */
             auto & attr = v.attrs->need(state->symbols.create("urls"));
-            state->forceList(*attr.value, noPos, "While evaluating the urls to prefetch");
+            state->forceList(*attr.value, noPos, "While evaluating the urls to prefetch: ");
             if (attr.value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            url = state->forceString(*attr.value->listElems()[0], noPos, "While evaluating the first url from the urls list");
+            url = state->forceString(*attr.value->listElems()[0], noPos, "While evaluating the first url from the urls list: ");
 
             /* Extract the hash mode. */
             auto attr2 = v.attrs->get(state->symbols.create("outputHashMode"));
             if (!attr2)
                 printInfo("warning: this does not look like a fetchurl call");
             else
-                unpack = state->forceString(*attr2->value, noPos, "While evaluating the outputHashMode of the source to prefetch") == "recursive";
+                unpack = state->forceString(*attr2->value, noPos, "While evaluating the outputHashMode of the source to prefetch: ") == "recursive";
 
             /* Extract the name. */
             if (!name) {
                 auto attr3 = v.attrs->get(state->symbols.create("name"));
                 if (!attr3)
-                    name = state->forceString(*attr3->value, noPos, "While evaluating the name of the source to prefetch");
+                    name = state->forceString(*attr3->value, noPos, "While evaluating the name of the source to prefetch: ");
             }
         }
 

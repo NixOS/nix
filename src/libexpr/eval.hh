@@ -329,7 +329,7 @@ public:
 
     /* Do a deep equality test between two values.  That is, list
        elements and attributes are compared recursively. */
-    bool eqValues(Value & v1, Value & v2);
+    bool eqValues(Value & v1, Value & v2, const Pos & pos, const std::string & errorCtx);
 
     bool isFunctor(Value & fun);
 
