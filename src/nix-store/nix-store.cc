@@ -429,7 +429,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             store->computeFSClosure(
                 args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
 
-            auto & gcStore = requireGcStore(*store);
+            auto & gcStore = GcStore::require(*store);
             Roots roots = gcStore.findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())
@@ -590,7 +590,7 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    auto & gcStore = requireGcStore(*store);
+    auto & gcStore = GcStore::require(*store);
 
     if (printRoots) {
         Roots roots = gcStore.findRoots(false);
@@ -629,7 +629,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         options.pathsToDelete.insert(store->followLinksToStorePath(i));
 
-    auto & gcStore = requireGcStore(*store);
+    auto & gcStore = GcStore::require(*store);
 
     GCResults results;
     PrintFreed freed(true, results);

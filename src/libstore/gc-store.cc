@@ -2,7 +2,7 @@
 
 namespace nix {
 
-GcStore & requireGcStore(Store & store)
+GcStore & GcStore::require(Store & store)
 {
     auto * gcStore = dynamic_cast<GcStore *>(&store);
     if (!gcStore)

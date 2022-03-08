@@ -33,7 +33,7 @@ struct CmdStoreDelete : StorePathsCommand
 
     void run(ref<Store> store, std::vector<StorePath> && storePaths) override
     {
-        auto & gcStore = requireGcStore(*store);
+        auto & gcStore = GcStore::require(*store);
 
         for (auto & path : storePaths)
             options.pathsToDelete.insert(path);

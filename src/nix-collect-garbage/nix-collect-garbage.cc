@@ -81,7 +81,7 @@ static int main_nix_collect_garbage(int argc, char * * argv)
         // Run the actual garbage collector.
         if (!dryRun) {
             auto store = openStore();
-            auto & gcStore = requireGcStore(*store);
+            auto & gcStore = GcStore::require(*store);
             options.action = GCOptions::gcDeleteDead;
             GCResults results;
             PrintFreed freed(true, results);

@@ -34,7 +34,7 @@ struct CmdStoreGC : StoreCommand, MixDryRun
 
     void run(ref<Store> store) override
     {
-        auto & gcStore = requireGcStore(*store);
+        auto & gcStore = GcStore::require(*store);
 
         options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
         GCResults results;

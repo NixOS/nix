@@ -77,8 +77,8 @@ struct GcStore : public virtual Store
 
     /* Perform a garbage collection. */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
-};
 
-GcStore & requireGcStore(Store & store);
+    static GcStore & require(Store & store);
+};
 
 }
