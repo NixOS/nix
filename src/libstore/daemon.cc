@@ -423,7 +423,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             }();
             logger->stopWork();
 
-            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
+            worker_proto::write(*store, wconn, *pathInfo);
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -817,7 +817,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
+            worker_proto::write(*store, wconn, *info, false);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;

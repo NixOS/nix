@@ -75,6 +75,7 @@ struct Source;
 
 // items being serialized
 struct BuildResult;
+struct PathInfo;
 
 
 namespace worker_proto {
@@ -102,6 +103,13 @@ MAKE_PROTO(template<typename T>, std::set<T>);
 MAKE_PROTO(X_, Y_);
 #undef X_
 #undef Y_
+
+/* These are a non-standard form for historical reasons. */
+
+ValidPathInfo readValidPathInfo(const Store & store, ReadConn conn);
+ValidPathInfo readValidPathInfo(const Store & store, ReadConn conn, StorePath && path);
+
+void write(const Store & store, WriteConn conn, const ValidPathInfo & pathInfo, bool includePath = true);
 
 }
 

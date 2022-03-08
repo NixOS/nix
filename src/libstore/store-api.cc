@@ -11,6 +11,8 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
+// FIXME this should not be here
+#include "worker-protocol.hh"
 
 #include <regex>
 
@@ -266,7 +268,11 @@ void Store::addMultipleToStore(
 {
     auto expected = readNum<uint64_t>(source);
     for (uint64_t i = 0; i < expected; ++i) {
-        auto info = ValidPathInfo::read(source, *this, 16);
+        auto info = worker_proto::readValidPathInfo(*this,
+            worker_proto::ReadConn {
+                { .from = source },
+                .version = 16,
+            });
         info.ultimate = false;
         addToStore(info, source, repair, checkSigs);
     }
@@ -978,6 +984,7 @@ std::map<StorePath, StorePath> copyPaths(
     return pathsMap;
 }
 
+
 std::map<StorePath, StorePath> copyPaths(
     Store & srcStore,
     Store & dstStore,
@@ -1013,7 +1020,12 @@ std::map<StorePath, StorePath> copyPaths(
             PushActivity pact(act.id);
 
             auto info = srcStore.queryPathInfo(storePath);
-            info->write(sink, srcStore, 16);
+            worker_proto::write(srcStore,
+                worker_proto::WriteConn {
+                    { .to = sink },
+                    .version = 16,
+                },
+                *info);
             srcStore.narFromPath(storePath, sink);
         }
     });
