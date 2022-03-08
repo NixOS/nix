@@ -1,6 +1,5 @@
 #pragma once
 
-#include "store-api.hh"
 #include "serialise.hh"
 
 namespace nix {
@@ -73,6 +72,12 @@ typedef enum {
 
 class Store;
 struct Source;
+
+// items being serialized
+struct DerivedPath;
+struct DrvOutput;
+struct Realisation;
+
 
 /* To guide overloading */
 template<typename T>
