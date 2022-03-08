@@ -9,6 +9,7 @@
 #include "archive.hh"
 #include "compression.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "local-store.hh" // TODO remove, along with remaining downcasts

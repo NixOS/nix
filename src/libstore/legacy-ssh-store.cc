@@ -7,6 +7,7 @@
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "ssh.hh"
 #include "derivations.hh"
 #include "callback.hh"

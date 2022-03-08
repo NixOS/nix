@@ -1,6 +1,7 @@
 #include "daemon.hh"
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "build-result.hh"
 #include "store-api.hh"
 #include "store-cast.hh"

@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "build-result.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "archive.hh"
 #include "derivations.hh"
 

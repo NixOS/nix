@@ -4,6 +4,9 @@
  *
  * Template implementations (as opposed to mere declarations).
  *
+ * This file is an exmample of the "impl.hh" pattern. See the
+ * contributing guide.
+ *
  * One only needs to include this when one is declaring a
  * `BaseClass<CustomType>` setting, or as derived class of such an
  * instantiation.
