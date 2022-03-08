@@ -78,6 +78,7 @@ struct Source;
 struct DerivedPath;
 struct DrvOutput;
 struct Realisation;
+struct BuildResult;
 
 
 namespace worker_proto {
