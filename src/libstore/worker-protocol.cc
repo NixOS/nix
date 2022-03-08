@@ -6,7 +6,7 @@
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
 #include "archive.hh"
-#include "derivations.hh"
+#include "path-info.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -141,5 +141,48 @@ void WorkerProto::Serialise<BuildResult>::write(const Store & store, WorkerProto
     }
 }
 
+
+ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, ReadConn conn)
+{
+    auto path = WorkerProto::Serialise<StorePath>::read(store, conn);
+    return WorkerProto::Serialise<ValidPathInfo>::read(store, conn, std::move(path));
+}
+
+ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, ReadConn conn, StorePath && path)
+{
+    auto deriver = readString(conn.from);
+    auto narHash = Hash::parseAny(readString(conn.from), htSHA256);
+    ValidPathInfo info(path, narHash);
+    if (deriver != "") info.deriver = store.parseStorePath(deriver);
+    info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
+    conn.from >> info.registrationTime >> info.narSize;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
+        conn.from >> info.ultimate;
+        info.sigs = readStrings<StringSet>(conn.from);
+        info.ca = ContentAddress::parseOpt(readString(conn.from));
+    }
+    return info;
+}
+
+void WorkerProto::Serialise<ValidPathInfo>::write(
+    const Store & store,
+    WriteConn conn,
+    const ValidPathInfo & pathInfo,
+    bool includePath)
+{
+    if (includePath)
+        conn.to << store.printStorePath(pathInfo.path);
+    conn.to
+        << (pathInfo.deriver ? store.printStorePath(*pathInfo.deriver) : "")
+        << pathInfo.narHash.to_string(HashFormat::Base16, false);
+    WorkerProto::write(store, conn, pathInfo.references);
+    conn.to << pathInfo.registrationTime << pathInfo.narSize;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
+        conn.to
+            << pathInfo.ultimate
+            << pathInfo.sigs
+            << renderContentAddress(pathInfo.ca);
+    }
+}
 
 }

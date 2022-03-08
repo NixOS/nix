@@ -1,6 +1,4 @@
 #include "path-info.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
 #include "store-api.hh"
 
 namespace nix {
@@ -99,7 +97,6 @@ Strings ValidPathInfo::shortRefs() const
     return refs;
 }
 
-
 ValidPathInfo::ValidPathInfo(
     const Store & store,
     std::string_view name,
@@ -126,57 +123,6 @@ ValidPathInfo::ValidPathInfo(
             };
         },
     }, std::move(ca).raw);
-}
-
-
-ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned int format)
-{
-    return read(source, store, format, store.parseStorePath(readString(source)));
-}
-
-ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned int format, StorePath && path)
-{
-    auto deriver = readString(source);
-    auto narHash = Hash::parseAny(readString(source), htSHA256);
-    ValidPathInfo info(path, narHash);
-    if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    info.references = WorkerProto::Serialise<StorePathSet>::read(store,
-        WorkerProto::ReadConn {
-            .from = source,
-            .version = format,
-        });
-    source >> info.registrationTime >> info.narSize;
-    if (format >= 16) {
-        source >> info.ultimate;
-        info.sigs = readStrings<StringSet>(source);
-        info.ca = ContentAddress::parseOpt(readString(source));
-    }
-    return info;
-}
-
-
-void ValidPathInfo::write(
-    Sink & sink,
-    const Store & store,
-    unsigned int format,
-    bool includePath) const
-{
-    if (includePath)
-        sink << store.printStorePath(path);
-    sink << (deriver ? store.printStorePath(*deriver) : "")
-         << narHash.to_string(HashFormat::Base16, false);
-    WorkerProto::write(store,
-        WorkerProto::WriteConn {
-            .to = sink,
-            .version = format,
-        },
-        references);
-    sink << registrationTime << narSize;
-    if (format >= 16) {
-        sink << ultimate
-             << sigs
-             << renderContentAddress(ca);
-    }
 }
 
 }

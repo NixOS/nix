@@ -121,11 +121,6 @@ struct ValidPathInfo
         std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
-
-    static ValidPathInfo read(Source & source, const Store & store, unsigned int format);
-    static ValidPathInfo read(Source & source, const Store & store, unsigned int format, StorePath && path);
-
-    void write(Sink & sink, const Store & store, unsigned int format, bool includePath = true) const;
 };
 
 typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;

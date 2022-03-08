@@ -11,6 +11,9 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
+// FIXME this should not be here, see TODO below on
+// `addMultipleToStore`.
+#include "worker-protocol.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -357,7 +360,13 @@ void Store::addMultipleToStore(
 {
     auto expected = readNum<uint64_t>(source);
     for (uint64_t i = 0; i < expected; ++i) {
-        auto info = ValidPathInfo::read(source, *this, 16);
+        // FIXME we should not be using the worker protocol here, let
+        // alone the worker protocol with a hard-coded version!
+        auto info = WorkerProto::Serialise<ValidPathInfo>::read(*this,
+            WorkerProto::ReadConn {
+                .from = source,
+                .version = 16,
+            });
         info.ultimate = false;
         addToStore(info, source, repair, checkSigs);
     }

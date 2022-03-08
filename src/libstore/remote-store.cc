@@ -332,7 +332,7 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
             info = std::make_shared<ValidPathInfo>(
-                ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion), StorePath{path}));
+                WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn, StorePath{path}));
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -445,7 +445,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         }
 
         return make_ref<ValidPathInfo>(
-            ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion)));
+            WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
     }
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -570,7 +570,12 @@ void RemoteStore::addMultipleToStore(
     auto source = sinkToSource([&](Sink & sink) {
         sink << pathsToCopy.size();
         for (auto & [pathInfo, pathSource] : pathsToCopy) {
-            pathInfo.write(sink, *this, 16);
+            WorkerProto::Serialise<ValidPathInfo>::write(*this,
+                 WorkerProto::WriteConn {
+                     .to = sink,
+                     .version = 16,
+                 },
+                 pathInfo);
             pathSource->drainInto(sink);
         }
     });
