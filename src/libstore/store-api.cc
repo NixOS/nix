@@ -1300,6 +1300,34 @@ Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool req
     }
 }
 
+std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
+{
+
+    if (!path.isDerivation()) {
+        try {
+            auto info = queryPathInfo(path);
+            if (!info->deriver) return std::nullopt;
+            return *info->deriver;
+        } catch (InvalidPath &) {
+            return std::nullopt;
+        }
+    }
+
+    if (!settings.isExperimentalFeatureEnabled(Xp::CaDerivations) || !isValidPath(path))
+        return path;
+
+    auto drv = readDerivation(path);
+    if (!derivationHasKnownOutputPaths(drv.type())) {
+        // The build log is actually attached to the corresponding
+        // resolved derivation, so we need to get it first
+        auto resolvedDrv = drv.tryResolve(*this);
+        if (resolvedDrv)
+            return writeDerivation(*this, *resolvedDrv, NoRepair, true);
+    }
+
+    return path;
+}
+
 Derivation Store::readDerivation(const StorePath & drvPath)
 { return readDerivationCommon(*this, drvPath, true); }
 
