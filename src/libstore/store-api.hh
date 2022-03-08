@@ -595,6 +595,13 @@ public:
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
 
+    /**
+     * Given a store path, return the realisation actually used in the realisation of this path:
+     * - If the path is a content-addressed derivation, try to resolve it
+     * - Otherwise, find one of its derivers
+     */
+    std::optional<StorePath> getBuildDerivationPath(const StorePath &);
+
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
     virtual std::optional<std::string> getBuildLog(const StorePath & path)

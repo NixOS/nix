@@ -89,17 +89,10 @@ const std::string LocalFSStore::drvsLogDir = "drvs";
 
 std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
 {
-    auto path = path_;
-
-    if (!path.isDerivation()) {
-        try {
-            auto info = queryPathInfo(path);
-            if (!info->deriver) return std::nullopt;
-            path = *info->deriver;
-        } catch (InvalidPath &) {
-            return std::nullopt;
-        }
-    }
+    auto maybePath = getBuildDerivationPath(path_);
+    if (!maybePath)
+        return std::nullopt;
+    auto path = maybePath.value();
 
     auto baseName = path.to_string();
 

@@ -501,18 +501,10 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
 std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
-    auto drvPath = path;
-
-    if (!path.isDerivation()) {
-        try {
-            auto info = queryPathInfo(path);
-            // FIXME: add a "Log" field to .narinfo
-            if (!info->deriver) return std::nullopt;
-            drvPath = *info->deriver;
-        } catch (InvalidPath &) {
-            return std::nullopt;
-        }
-    }
+    auto maybePath = getBuildDerivationPath(path);
+    if (!maybePath)
+        return std::nullopt;
+    auto drvPath = maybePath.value();
 
     auto logPath = "log/" + std::string(baseNameOf(printStorePath(drvPath)));
 
