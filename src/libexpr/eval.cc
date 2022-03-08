@@ -782,6 +782,16 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
     });
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol & s2))
+{
+    throw TypeError(ErrorInfo {
+        .msg = hintfmt(s, fun.showNamePos(), s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
+
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
     throw TypeError(s, showType(v));
@@ -1414,8 +1424,17 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (!lambda.formals->has(i.name))
-                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                        if (!lambda.formals->has(i.name)) {
+                            std::set<std::string> formalNames;
+                            for (auto & formal : lambda.formals->formals)
+                                formalNames.insert(formal.name);
+                            throwTypeError(
+                                pos,
+                                Suggestions::bestMatches(formalNames, i.name),
+                                "%1% called with unexpected argument '%2%'",
+                                lambda,
+                                i.name);
+                        }
                     abort(); // can't happen
                 }
             }
