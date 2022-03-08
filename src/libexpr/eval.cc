@@ -729,7 +729,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
         .errPos = pos,
         .suggestions = suggestions,
@@ -738,7 +738,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & s
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
         .errPos = pos
     });
