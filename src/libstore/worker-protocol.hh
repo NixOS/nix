@@ -1,6 +1,7 @@
 #pragma once
 
 #include "serialise.hh"
+#include "phantom.hh"
 
 namespace nix {
 
@@ -77,11 +78,6 @@ struct Source;
 struct DerivedPath;
 struct DrvOutput;
 struct Realisation;
-
-
-/* To guide overloading */
-template<typename T>
-struct Phantom {};
 
 
 namespace worker_proto {
