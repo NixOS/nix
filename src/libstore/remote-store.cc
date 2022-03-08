@@ -91,6 +91,37 @@ void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
 }
 
 
+BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+{
+    BuildResult res;
+    res.status = (BuildResult::Status) readInt(from);
+    from
+        >> res.errorMsg
+        >> res.timesBuilt
+        >> res.isNonDeterministic
+        >> res.startTime
+        >> res.stopTime;
+    res.drvPath = worker_proto::read(store, from, Phantom<std::optional<StorePath>> {});
+    res.builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
+    res.outPath = worker_proto::read(store, from, Phantom<std::optional<StorePath>> {});
+    return res;
+}
+
+void write(const Store & store, Sink & to, const BuildResult & res)
+{
+    to
+        << res.status
+        << res.errorMsg
+        << res.timesBuilt
+        << res.isNonDeterministic
+        << res.startTime
+        << res.stopTime;
+    worker_proto::write(store, to, res.drvPath);
+    worker_proto::write(store, to, res.builtOutputs);
+    worker_proto::write(store, to, res.outPath);
+}
+
+
 std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
 {
     auto s = readString(from);
@@ -747,17 +778,24 @@ static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, cons
     }
 }
 
-void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
+void RemoteStore::copyDrvsFromEvalStore(
+    const std::vector<DerivedPath> & paths,
+    std::shared_ptr<Store> evalStore)
 {
     if (evalStore && evalStore.get() != this) {
         /* The remote doesn't have a way to access evalStore, so copy
            the .drvs. */
         RealisedPath::Set drvPaths2;
-        for (auto & i : drvPaths)
+        for (auto & i : paths)
             if (auto p = std::get_if<DerivedPath::Built>(&i))
                 drvPaths2.insert(p->drvPath);
         copyClosure(*evalStore, *this, drvPaths2);
     }
+}
+
+void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
+{
+    copyDrvsFromEvalStore(drvPaths, evalStore);
 
     auto conn(getConnection());
     conn->to << wopBuildPaths;
@@ -772,6 +810,90 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
             throw Error("repairing or checking is not supported when building through the Nix daemon");
     conn.processStderr();
     readInt(conn->from);
+}
+
+std::vector<BuildResult> RemoteStore::buildPathsWithResults(
+    const std::vector<DerivedPath> & paths,
+    BuildMode buildMode,
+    std::shared_ptr<Store> evalStore)
+{
+    copyDrvsFromEvalStore(paths, evalStore);
+
+    std::optional<ConnectionHandle> conn_(getConnection());
+    auto & conn = *conn_;
+
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
+        conn->to << wopBuildPathsWithResults;
+        writeDerivedPaths(*this, conn, paths);
+        conn->to << buildMode;
+        conn.processStderr();
+        return worker_proto::read(*this, conn->from, Phantom<std::vector<BuildResult>> {});
+    } else {
+        // Avoid deadlock.
+        conn_.reset();
+
+        // Note: this throws an exception if a build/substitution
+        // fails, but meh.
+        buildPaths(paths, buildMode, evalStore);
+
+        std::vector<BuildResult> results;
+
+        for (auto & path : paths) {
+            std::visit(
+                overloaded {
+                    [&](const DerivedPath::Opaque & bo) {
+                        BuildResult res;
+                        res.status = BuildResult::Substituted;
+                        res.outPath = bo.path;
+                        results.push_back(res);
+                    },
+                    [&](const DerivedPath::Built & bfd) {
+                        BuildResult res;
+                        res.status = BuildResult::Built;
+                        res.drvPath = bfd.drvPath;
+
+                        OutputPathMap outputs;
+                        auto drv = evalStore->readDerivation(bfd.drvPath);
+                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
+                        auto drvOutputs = drv.outputsAndOptPaths(*this);
+                        for (auto & output : bfd.outputs) {
+                            if (!outputHashes.count(output))
+                                throw Error(
+                                    "the derivation '%s' doesn't have an output named '%s'",
+                                    printStorePath(bfd.drvPath), output);
+                            auto outputId =
+                                DrvOutput{outputHashes.at(output), output};
+                            if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+                                auto realisation =
+                                    queryRealisation(outputId);
+                                if (!realisation)
+                                    throw Error(
+                                        "cannot operate on an output of unbuilt "
+                                        "content-addressed derivation '%s'",
+                                        outputId.to_string());
+                                res.builtOutputs.emplace(realisation->id, *realisation);
+                            } else {
+                                // If ca-derivations isn't enabled, assume that
+                                // the output path is statically known.
+                                assert(drvOutputs.count(output));
+                                assert(drvOutputs.at(output).second);
+                                res.builtOutputs.emplace(
+                                    outputId,
+                                    Realisation {
+                                        .id = outputId,
+                                        .outPath = *drvOutputs.at(output).second
+                                    });
+                            }
+                        }
+
+                        results.push_back(res);
+                    }
+                },
+                path.raw());
+        }
+
+        return results;
+    }
 }
 
 

@@ -32,7 +32,7 @@ void DrvOutputSubstitutionGoal::init()
 
 void DrvOutputSubstitutionGoal::tryNext()
 {
-    trace("Trying next substituter");
+    trace("trying next substituter");
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
@@ -119,7 +119,7 @@ void DrvOutputSubstitutionGoal::realisationFetched()
 void DrvOutputSubstitutionGoal::outPathValid()
 {
     assert(outputInfo);
-    trace("Output path substituted");
+    trace("output path substituted");
 
     if (nrFailed > 0) {
         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());

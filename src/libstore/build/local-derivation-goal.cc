@@ -194,7 +194,7 @@ void LocalDerivationGoal::tryLocalBuild() {
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, e);
+        done(BuildResult::InputRejected, {}, e);
         return;
     }
 
@@ -756,7 +756,7 @@ void LocalDerivationGoal::startBuilder()
     if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
         throw SysError("putting pseudoterminal into raw mode");
 
-    result.startTime = time(0);
+    buildResult.startTime = time(0);
 
     /* Fork a child to build the package. */
 
@@ -1261,6 +1261,16 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
+        for (auto & result : buildPathsWithResults(paths, buildMode, evalStore))
+            if (!result.success())
+                result.rethrow();
+    }
+
+    std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr) override
+    {
         assert(!evalStore);
 
         if (buildMode != bmNormal) throw Error("unsupported build mode");
@@ -1273,26 +1283,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", req.to_string(*next));
         }
 
-        next->buildPaths(paths, buildMode);
+        auto results = next->buildPathsWithResults(paths, buildMode);
 
-        for (auto & path : paths) {
-            auto p =  std::get_if<DerivedPath::Built>(&path);
-            if (!p) continue;
-            auto & bfd = *p;
-            auto drv = readDerivation(bfd.drvPath);
-            auto drvHashes = staticOutputHashes(*this, drv);
-            auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
-            for (auto & [outputName, outputPath] : outputs)
-                if (wantOutput(outputName, bfd.outputs)) {
-                    newPaths.insert(outputPath);
-                    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
-                        auto thisRealisation = next->queryRealisation(
-                            DrvOutput{drvHashes.at(outputName), outputName}
-                        );
-                        assert(thisRealisation);
-                        newRealisations.insert(*thisRealisation);
-                    }
-                }
+        for (auto & result : results) {
+            for (auto & [outputName, output] : result.builtOutputs) {
+                newPaths.insert(output.outPath);
+                newRealisations.insert(output);
+            }
         }
 
         StorePathSet closure;
@@ -1301,6 +1298,8 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             goal.addDependency(path);
         for (auto & real : Realisation::closure(*next, newRealisations))
             goal.addedDrvOutputs.insert(real.id);
+
+        return results;
     }
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
@@ -2069,7 +2068,7 @@ void LocalDerivationGoal::runChild()
 }
 
 
-void LocalDerivationGoal::registerOutputs()
+DrvOutputs LocalDerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -2078,10 +2077,8 @@ void LocalDerivationGoal::registerOutputs()
        We can only early return when the outputs are known a priori. For
        floating content-addressed derivations this isn't the case.
      */
-    if (hook) {
-        DerivationGoal::registerOutputs();
-        return;
-    }
+    if (hook)
+        return DerivationGoal::registerOutputs();
 
     std::map<std::string, ValidPathInfo> infos;
 
@@ -2203,6 +2200,8 @@ void LocalDerivationGoal::registerOutputs()
         }});
 
     std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
+
+    OutputPathMap finalOutputs;
 
     for (auto & outputName : sortedOutputNames) {
         auto output = drv->outputs.at(outputName);
@@ -2340,6 +2339,7 @@ void LocalDerivationGoal::registerOutputs()
         };
 
         ValidPathInfo newInfo = std::visit(overloaded {
+
             [&](const DerivationOutputInputAddressed & output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
@@ -2359,6 +2359,7 @@ void LocalDerivationGoal::registerOutputs()
                     newInfo0.references.insert(newInfo0.path);
                 return newInfo0;
             },
+
             [&](const DerivationOutputCAFixed & dof) {
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
                     .method = dof.hash.method,
@@ -2381,14 +2382,17 @@ void LocalDerivationGoal::registerOutputs()
                 }
                 return newInfo0;
             },
-            [&](DerivationOutputCAFloating dof) {
+
+            [&](DerivationOutputCAFloating & dof) {
                 return newInfoFromCA(dof);
             },
+
             [&](DerivationOutputDeferred) -> ValidPathInfo {
                 // No derivation should reach that point without having been
                 // rewritten first
                 assert(false);
             },
+
         }, output.output);
 
         /* FIXME: set proper permissions in restorePath() so
@@ -2499,11 +2503,12 @@ void LocalDerivationGoal::registerOutputs()
     }
 
     if (buildMode == bmCheck) {
-        // In case of FOD mismatches on `--check` an error must be thrown as this is also
-        // a source for non-determinism.
+        /* In case of fixed-output derivations, if there are
+           mismatches on `--check` an error must be thrown as this is
+           also a source for non-determinism. */
         if (delayedException)
             std::rethrow_exception(delayedException);
-        return;
+        return assertPathValidity();
     }
 
     /* Apply output checks. */
@@ -2515,7 +2520,7 @@ void LocalDerivationGoal::registerOutputs()
         assert(prevInfos.size() == infos.size());
         for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
             if (!(*i == *j)) {
-                result.isNonDeterministic = true;
+                buildResult.isNonDeterministic = true;
                 Path prev = worker.store.printStorePath(i->second.path) + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
                 hintformat hint = prevExists
@@ -2553,7 +2558,7 @@ void LocalDerivationGoal::registerOutputs()
 
     if (curRound < nrRounds) {
         prevInfos = std::move(infos);
-        return;
+        return {};
     }
 
     /* Remove the .check directories if we're done. FIXME: keep them
@@ -2588,17 +2593,24 @@ void LocalDerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
+    DrvOutputs builtOutputs;
 
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
-        for (auto& [outputName, newInfo] : infos) {
-            auto thisRealisation = Realisation{
-                .id = DrvOutput{initialOutputs.at(outputName).outputHash,
-                                outputName},
-                .outPath = newInfo.path};
+    for (auto & [outputName, newInfo] : infos) {
+        auto thisRealisation = Realisation {
+            .id = DrvOutput {
+                initialOutputs.at(outputName).outputHash,
+                outputName
+            },
+            .outPath = newInfo.path
+        };
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
+        builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
+
+    return builtOutputs;
 }
 
 void LocalDerivationGoal::signRealisation(Realisation & realisation)
@@ -2607,7 +2619,7 @@ void LocalDerivationGoal::signRealisation(Realisation & realisation)
 }
 
 
-void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
+void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo> & outputs)
 {
     std::map<Path, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
@@ -2679,8 +2691,8 @@ void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & out
                 for (auto & i : *value) {
                     if (worker.store.isStorePath(i))
                         spec.insert(worker.store.parseStorePath(i));
-                    else if (finalOutputs.count(i))
-                        spec.insert(finalOutputs.at(i));
+                    else if (outputs.count(i))
+                        spec.insert(outputs.at(i).path);
                     else throw BuildError("derivation contains an illegal reference specifier '%s'", i);
                 }
 

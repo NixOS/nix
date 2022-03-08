@@ -12,6 +12,7 @@
 #include "eval-cache.hh"
 #include "url.hh"
 #include "registry.hh"
+#include "build-result.hh"
 
 #include <regex>
 #include <queue>
@@ -769,8 +770,7 @@ BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPa
                             throw Error(
                                 "the derivation '%s' doesn't have an output named '%s'",
                                 store->printStorePath(bfd.drvPath), output);
-                        if (settings.isExperimentalFeatureEnabled(
-                                Xp::CaDerivations)) {
+                        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
                             auto outputId =
                                 DrvOutput{outputHashes.at(output), output};
                             auto realisation =
@@ -816,12 +816,31 @@ BuiltPaths Installable::build(
         pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
     }
 
-    if (mode == Realise::Nothing || mode == Realise::Derivation)
+    switch (mode) {
+    case Realise::Nothing:
+    case Realise::Derivation:
         printMissing(store, pathsToBuild, lvlError);
-    else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild, bMode, evalStore);
-
-    return getBuiltPaths(evalStore, store, pathsToBuild);
+        return getBuiltPaths(evalStore, store, pathsToBuild);
+    case Realise::Outputs: {
+        BuiltPaths res;
+        for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
+            if (!buildResult.success())
+                buildResult.rethrow();
+            if (buildResult.drvPath) {
+                std::map<std::string, StorePath> outputs;
+                for (auto & path : buildResult.builtOutputs)
+                    outputs.emplace(path.first.outputName, path.second.outPath);
+                res.push_back(BuiltPath::Built{*buildResult.drvPath, outputs});
+            } else if (buildResult.outPath) {
+                res.push_back(BuiltPath::Opaque{*buildResult.outPath});
+            } else
+                abort();
+        }
+        return res;
+    }
+    default:
+        assert(false);
+    }
 }
 
 BuiltPaths Installable::toBuiltPaths(

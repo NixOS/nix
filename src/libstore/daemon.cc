@@ -532,6 +532,25 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopBuildPathsWithResults: {
+        auto drvs = readDerivedPaths(*store, clientVersion, from);
+        BuildMode mode = bmNormal;
+        mode = (BuildMode) readInt(from);
+
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients.  */
+        if (mode == bmRepair && !trusted)
+            throw Error("repairing is not allowed because you are not in 'trusted-users'");
+
+        logger->startWork();
+        auto results = store->buildPathsWithResults(drvs, mode);
+        logger->stopWork();
+
+        worker_proto::write(*store, to, results);
+
+        break;
+    }
+
     case wopBuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;

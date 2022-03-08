@@ -24,6 +24,14 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
+void PathSubstitutionGoal::done(ExitCode result, BuildResult::Status status)
+{
+    buildResult.outPath = storePath;
+    buildResult.status = status;
+    amDone(result);
+}
+
+
 void PathSubstitutionGoal::work()
 {
     (this->*state)();
@@ -38,7 +46,7 @@ void PathSubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        amDone(ecSuccess);
+        done(ecSuccess, BuildResult::AlreadyValid);
         return;
     }
 
@@ -65,7 +73,7 @@ void PathSubstitutionGoal::tryNext()
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
-        amDone(substituterFailed ? ecFailed : ecNoSubstituters);
+        done(substituterFailed ? ecFailed : ecNoSubstituters, BuildResult::NoSubstituters);
 
         if (substituterFailed) {
             worker.failedSubstitutions++;
@@ -163,7 +171,9 @@ void PathSubstitutionGoal::referencesValid()
 
     if (nrFailed > 0) {
         debug("some references of path '%s' could not be realised", worker.store.printStorePath(storePath));
-        amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
+        done(
+            nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
+            BuildResult::DependencyFailed);
         return;
     }
 
@@ -268,7 +278,7 @@ void PathSubstitutionGoal::finished()
 
     worker.updateProgress();
 
-    amDone(ecSuccess);
+    done(ecSuccess, BuildResult::Substituted);
 }
 
 
