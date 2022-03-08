@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "util.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
 

@@ -12,6 +12,7 @@
 #include "shared.hh"
 #include "util.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"

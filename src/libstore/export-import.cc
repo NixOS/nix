@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 
 #include <algorithm>
 
