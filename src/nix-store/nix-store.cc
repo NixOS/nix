@@ -4,6 +4,7 @@
 #include "globals.hh"
 #include "build-result.hh"
 #include "gc-store.hh"
+#include "log-store.hh"
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
@@ -474,13 +475,15 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    auto & logStore = LogStore::require(*store);
+
     RunPager pager;
 
     for (auto & i : opArgs) {
-        auto path = store->followLinksToStorePath(i);
-        auto log = store->getBuildLog(path);
+        auto path = logStore.followLinksToStorePath(i);
+        auto log = logStore.getBuildLog(path);
         if (!log)
-            throw Error("build log of derivation '%s' is not available", store->printStorePath(path));
+            throw Error("build log of derivation '%s' is not available", logStore.printStorePath(path));
         std::cout << *log;
     }
 }

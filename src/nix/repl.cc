@@ -25,6 +25,7 @@ extern "C" {
 #include "eval-inline.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
+#include "log-store.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
@@ -526,9 +527,16 @@ bool NixRepl::processLine(std::string line)
             bool foundLog = false;
             RunPager pager;
             for (auto & sub : subs) {
-                auto log = sub->getBuildLog(drvPath);
+                auto * logSubP = dynamic_cast<LogStore *>(&*sub);
+                if (!logSubP) {
+                    printInfo("Skipped '%s' which does not support retrieving build logs", sub->getUri());
+                    continue;
+                }
+                auto & logSub = *logSubP;
+
+                auto log = logSub.getBuildLog(drvPath);
                 if (log) {
-                    printInfo("got build log for '%s' from '%s'", drvPathRaw, sub->getUri());
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.getUri());
                     logger->writeToStdout(*log);
                     foundLog = true;
                     break;

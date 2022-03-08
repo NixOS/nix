@@ -4,6 +4,7 @@
 #include "build-result.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
+#include "log-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
 #include "archive.hh"
@@ -953,11 +954,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!trusted)
             throw Error("you are not privileged to add logs");
+        auto & logStore = LogStore::require(*store);
         {
             FramedSource source(from);
             StringSink sink;
             source.drainInto(sink);
-            store->addBuildLog(path, sink.s);
+            logStore.addBuildLog(path, sink.s);
         }
         logger->stopWork();
         to << 1;
