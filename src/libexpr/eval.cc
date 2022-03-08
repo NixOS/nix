@@ -727,6 +727,15 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
     throw EvalError(s, s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
+{
+    throw EvalError({
+        .msg = hintfmt(s, s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
 {
     throw EvalError({
@@ -1281,8 +1290,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    std::set<std::string> allAttrNames;
+                    for (auto & attr : *vAttrs->attrs)
+                        allAttrNames.insert(attr.name);
+                    throwEvalError(
+                        pos,
+                        Suggestions::bestMatches(allAttrNames, name),
+                        "attribute '%1%' missing", name);
+                }
             }
             vAttrs = j->value;
             pos2 = j->pos;
