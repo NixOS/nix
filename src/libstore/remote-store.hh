@@ -97,6 +97,11 @@ public:
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
+    std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode,
+        std::shared_ptr<Store> evalStore) override;
+
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
@@ -171,6 +176,9 @@ private:
 
     std::atomic_bool failed{false};
 
+    void copyDrvsFromEvalStore(
+        const std::vector<DerivedPath> & paths,
+        std::shared_ptr<Store> evalStore);
 };
 
 

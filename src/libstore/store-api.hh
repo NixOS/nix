@@ -432,6 +432,16 @@ public:
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr);
 
+    /* Like `buildPaths()`, but return a vector of `BuildResult`s
+       corresponding to each element in `paths`. Note that in case of
+       a build/substitution error, this function won't throw an
+       exception, but return a `BuildResult` containing an error
+       message. */
+    virtual std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
+
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).
 
