@@ -82,17 +82,16 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
     Worker worker(*this, *this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
-    BuildResult result;
-
     try {
         worker.run(Goals{goal});
-        result = goal->buildResult;
+        return goal->buildResult;
     } catch (Error & e) {
-        result.status = BuildResult::MiscFailure;
-        result.errorMsg = e.msg();
-    }
-
-    return result;
+        return BuildResult {
+            .status = BuildResult::MiscFailure,
+            .errorMsg = e.msg(),
+            .path = DerivedPath::Built { .drvPath = drvPath },
+        };
+    };
 }
 
 

@@ -66,7 +66,7 @@ namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker)
+    : Goal(worker, DerivedPath::Built { .drvPath = drvPath, .outputs = wantedOutputs })
     , useDerivation(true)
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
@@ -85,7 +85,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
     const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker)
+    : Goal(worker, DerivedPath::Built { .drvPath = drvPath, .outputs = wantedOutputs })
     , useDerivation(false)
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
@@ -509,7 +509,7 @@ void DerivationGoal::inputsRealised()
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
 
-    buildResult = BuildResult();
+    buildResult = BuildResult { .path = buildResult.path };
 }
 
 void DerivationGoal::started()

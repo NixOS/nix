@@ -6,7 +6,7 @@
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+    : Goal(worker, DerivedPath::Opaque { storePath })
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
@@ -26,7 +26,6 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 
 void PathSubstitutionGoal::done(ExitCode result, BuildResult::Status status)
 {
-    buildResult.outPath = storePath;
     buildResult.status = status;
     amDone(result);
 }

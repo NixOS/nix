@@ -62,7 +62,9 @@ struct Goal : public std::enable_shared_from_this<Goal>
     /* Exception containing an error message, if any. */
     std::optional<Error> ex;
 
-    Goal(Worker & worker) : worker(worker)
+    Goal(Worker & worker, DerivedPath path)
+        : worker(worker)
+        , buildResult { .path = std::move(path) }
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
         exitCode = ecBusy;

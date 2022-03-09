@@ -64,12 +64,12 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
+    /* The derivation we built or the store path we substituted. */
+    DerivedPath path;
+
     /* For derivations, the derivation path and the wanted outputs. */
     std::optional<StorePath> drvPath;
     DrvOutputs builtOutputs;
-
-    /* For substitutions, the substituted path. */
-    std::optional<StorePath> outPath;
 
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */

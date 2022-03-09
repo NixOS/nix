@@ -93,7 +93,8 @@ void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
 
 BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
 {
-    BuildResult res;
+    auto path = worker_proto::read(store, from, Phantom<DerivedPath> {});
+    BuildResult res { .path = path };
     res.status = (BuildResult::Status) readInt(from);
     from
         >> res.errorMsg
@@ -101,14 +102,13 @@ BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
         >> res.isNonDeterministic
         >> res.startTime
         >> res.stopTime;
-    res.drvPath = worker_proto::read(store, from, Phantom<std::optional<StorePath>> {});
     res.builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
-    res.outPath = worker_proto::read(store, from, Phantom<std::optional<StorePath>> {});
     return res;
 }
 
 void write(const Store & store, Sink & to, const BuildResult & res)
 {
+    worker_proto::write(store, to, res.path);
     to
         << res.status
         << res.errorMsg
@@ -116,9 +116,7 @@ void write(const Store & store, Sink & to, const BuildResult & res)
         << res.isNonDeterministic
         << res.startTime
         << res.stopTime;
-    worker_proto::write(store, to, res.drvPath);
     worker_proto::write(store, to, res.builtOutputs);
-    worker_proto::write(store, to, res.outPath);
 }
 
 
@@ -842,15 +840,16 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
             std::visit(
                 overloaded {
                     [&](const DerivedPath::Opaque & bo) {
-                        BuildResult res;
-                        res.status = BuildResult::Substituted;
-                        res.outPath = bo.path;
-                        results.push_back(res);
+                        results.push_back(BuildResult {
+                            .status = BuildResult::Substituted,
+                            .path = bo,
+                        });
                     },
                     [&](const DerivedPath::Built & bfd) {
-                        BuildResult res;
-                        res.status = BuildResult::Built;
-                        res.drvPath = bfd.drvPath;
+                        BuildResult res {
+                            .status = BuildResult::Built,
+                            .path = bfd,
+                        };
 
                         OutputPathMap outputs;
                         auto drv = evalStore->readDerivation(bfd.drvPath);
@@ -905,7 +904,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res;
+    BuildResult res { .path = DerivedPath::Built { .drvPath = drvPath } };
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {

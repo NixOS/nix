@@ -826,15 +826,17 @@ BuiltPaths Installable::build(
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
                 buildResult.rethrow();
-            if (buildResult.drvPath) {
-                std::map<std::string, StorePath> outputs;
-                for (auto & path : buildResult.builtOutputs)
-                    outputs.emplace(path.first.outputName, path.second.outPath);
-                res.push_back(BuiltPath::Built{*buildResult.drvPath, outputs});
-            } else if (buildResult.outPath) {
-                res.push_back(BuiltPath::Opaque{*buildResult.outPath});
-            } else
-                abort();
+            std::visit(overloaded {
+                [&](const DerivedPath::Built & bfd) {
+                    std::map<std::string, StorePath> outputs;
+                    for (auto & path : buildResult.builtOutputs)
+                        outputs.emplace(path.first.outputName, path.second.outPath);
+                    res.push_back(BuiltPath::Built { bfd.drvPath, outputs });
+                },
+                [&](const DerivedPath::Opaque & bo) {
+                    res.push_back(BuiltPath::Opaque { bo.path });
+                },
+            }, buildResult.path.raw());
         }
         return res;
     }

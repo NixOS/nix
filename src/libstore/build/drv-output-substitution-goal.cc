@@ -6,8 +6,12 @@
 
 namespace nix {
 
-DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
+    const DrvOutput & id,
+    Worker & worker,
+    RepairFlag repair,
+    std::optional<ContentAddress> ca)
+    : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
     , id(id)
 {
     state = &DrvOutputSubstitutionGoal::init;
