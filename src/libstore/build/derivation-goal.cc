@@ -1324,7 +1324,6 @@ void DerivationGoal::done(
     DrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
-    buildResult.drvPath = drvPath;
     buildResult.status = status;
     if (ex)
         // FIXME: strip: "error: "

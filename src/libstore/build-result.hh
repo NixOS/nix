@@ -67,8 +67,8 @@ struct BuildResult
     /* The derivation we built or the store path we substituted. */
     DerivedPath path;
 
-    /* For derivations, the derivation path and the wanted outputs. */
-    std::optional<StorePath> drvPath;
+    /* For derivations, a mapping from the names of the wanted outputs
+       to actual paths. */
     DrvOutputs builtOutputs;
 
     /* The start/stop times of the build (or one of the rounds, if it
