@@ -3,6 +3,7 @@
 #include "dotgraph.hh"
 #include "globals.hh"
 #include "build-result.hh"
+#include "store-cast.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
 #include "local-store.hh"
@@ -430,7 +431,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             store->computeFSClosure(
                 args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
 
-            auto & gcStore = GcStore::require(*store);
+            auto & gcStore = require<GcStore>(*store);
             Roots roots = gcStore.findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())
@@ -475,7 +476,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    auto & logStore = LogStore::require(*store);
+    auto & logStore = require<LogStore>(*store);
 
     RunPager pager;
 
@@ -593,7 +594,7 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    auto & gcStore = GcStore::require(*store);
+    auto & gcStore = require<GcStore>(*store);
 
     if (printRoots) {
         Roots roots = gcStore.findRoots(false);
@@ -632,7 +633,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         options.pathsToDelete.insert(store->followLinksToStorePath(i));
 
-    auto & gcStore = GcStore::require(*store);
+    auto & gcStore = require<GcStore>(*store);
 
     GCResults results;
     PrintFreed freed(true, results);

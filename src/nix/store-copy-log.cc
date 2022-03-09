@@ -1,6 +1,7 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
 #include "log-store.hh"
 #include "sync.hh"
 #include "thread-pool.hh"
@@ -27,10 +28,10 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
 
     void run(ref<Store> srcStore) override
     {
-        auto & srcLogStore = LogStore::require(*srcStore);
+        auto & srcLogStore = require<LogStore>(*srcStore);
 
         auto dstStore = getDstStore();
-        auto & dstLogStore = LogStore::require(*dstStore);
+        auto & dstLogStore = require<LogStore>(*dstStore);
 
         StorePathSet drvPaths;
 
