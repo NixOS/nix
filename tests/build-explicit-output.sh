@@ -9,9 +9,6 @@ nix build "$drv!first" --json | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-a.drv")) and
     (.outputs |
-      .first and
-	  (has("second") | not)))
+      (.first | match(".*multiple-outputs-a-first")) and
+      (has("second") | not)))
 '
-# TODO use
-#      (.first | match(".*multiple-outputs-a-first")) and
-# once we make it put the result paths in the buildables.

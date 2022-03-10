@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "store-api.hh"
+#include "build-result.hh"
 
 namespace nix {
 
@@ -18,8 +19,8 @@ struct CompareGoalPtrs {
 };
 
 /* Set of goals. */
-typedef set<GoalPtr, CompareGoalPtrs> Goals;
-typedef set<WeakGoalPtr, std::owner_less<WeakGoalPtr>> WeakGoals;
+typedef std::set<GoalPtr, CompareGoalPtrs> Goals;
+typedef std::set<WeakGoalPtr, std::owner_less<WeakGoalPtr>> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
 typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
@@ -50,15 +51,20 @@ struct Goal : public std::enable_shared_from_this<Goal>
     unsigned int nrIncompleteClosure;
 
     /* Name of this goal for debugging purposes. */
-    string name;
+    std::string name;
 
     /* Whether the goal is finished. */
     ExitCode exitCode;
 
+    /* Build result. */
+    BuildResult buildResult;
+
     /* Exception containing an error message, if any. */
     std::optional<Error> ex;
 
-    Goal(Worker & worker) : worker(worker)
+    Goal(Worker & worker, DerivedPath path)
+        : worker(worker)
+        , buildResult { .path = std::move(path) }
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
         exitCode = ecBusy;
@@ -75,7 +81,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     virtual void waiteeDone(GoalPtr waitee, ExitCode result);
 
-    virtual void handleChildOutput(int fd, const string & data)
+    virtual void handleChildOutput(int fd, std::string_view data)
     {
         abort();
     }
@@ -87,7 +93,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     void trace(const FormatOrString & fs);
 
-    string getName()
+    std::string getName()
     {
         return name;
     }
@@ -97,7 +103,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
        by the worker (important!), etc. */
     virtual void timedOut(Error && ex) = 0;
 
-    virtual string key() = 0;
+    virtual std::string key() = 0;
 
     void amDone(ExitCode result, std::optional<Error> ex = {});
 

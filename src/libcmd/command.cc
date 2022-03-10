@@ -54,6 +54,36 @@ void StoreCommand::run()
     run(getStore());
 }
 
+CopyCommand::CopyCommand()
+{
+    addFlag({
+        .longName = "from",
+        .description = "URL of the source Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&srcUri},
+    });
+
+    addFlag({
+        .longName = "to",
+        .description = "URL of the destination Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&dstUri},
+    });
+}
+
+ref<Store> CopyCommand::createStore()
+{
+    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+}
+
+ref<Store> CopyCommand::getDstStore()
+{
+    if (srcUri.empty() && dstUri.empty())
+        throw UsageError("you must pass '--from' and/or '--to'");
+
+    return dstUri.empty() ? openStore() : openStore(dstUri);
+}
+
 EvalCommand::EvalCommand()
 {
 }
@@ -74,7 +104,15 @@ ref<Store> EvalCommand::getEvalStore()
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState)
-        evalState = std::make_shared<EvalState>(searchPath, getEvalStore(), getStore());
+        evalState =
+            #if HAVE_BOEHMGC
+            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+                searchPath, getEvalStore(), getStore())
+            #else
+            std::make_shared<EvalState>(
+                searchPath, getEvalStore(), getStore())
+            #endif
+            ;
     return ref<EvalState>(evalState);
 }
 
@@ -115,7 +153,7 @@ void BuiltPathsCommand::run(ref<Store> store)
         for (auto & p : store->queryAllValidPaths())
             paths.push_back(BuiltPath::Opaque{p});
     } else {
-        paths = toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
@@ -203,10 +241,10 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuiltPath::Opaque bo) {
+            [&](const BuiltPath::Opaque & bo) {
                 result.push_back(bo.path);
             },
-            [&](BuiltPath::Built bfd) {
+            [&](const BuiltPath::Built & bfd) {
                 for (auto & output : bfd.outputs) {
                     result.push_back(output.second);
                 }

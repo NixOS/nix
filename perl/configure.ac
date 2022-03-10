@@ -41,7 +41,7 @@ perlarchname=$($perl -e 'use Config; print $Config{archname};')
 AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
 AC_MSG_RESULT($perllibdir)
 
-# Look for libsodium, an optional dependency.
+# Look for libsodium.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Check for the required Perl dependencies (DBI and DBD::SQLite).

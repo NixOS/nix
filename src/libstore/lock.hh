@@ -13,7 +13,7 @@ private:
     AutoCloseFD fdUserLock;
 
     bool isEnabled = false;
-    string user;
+    std::string user;
     uid_t uid = 0;
     gid_t gid = 0;
     std::vector<gid_t> supplementaryGIDs;
@@ -23,7 +23,7 @@ public:
 
     void kill();
 
-    string getUser() { return user; }
+    std::string getUser() { return user; }
     uid_t getUID() { assert(uid); return uid; }
     uid_t getGID() { assert(gid); return gid; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }

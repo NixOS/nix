@@ -1,4 +1,3 @@
-#include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "derivation-goal.hh"
@@ -11,12 +10,12 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (auto & br : reqs) {
+    for (const auto & br : reqs) {
         std::visit(overloaded {
-            [&](DerivedPath::Built bfd) {
+            [&](const DerivedPath::Built & bfd) {
                 goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
             },
-            [&](DerivedPath::Opaque bo) {
+            [&](const DerivedPath::Opaque & bo) {
                 goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
             },
         }, br.raw());
@@ -48,43 +47,51 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     }
 }
 
+std::vector<BuildResult> Store::buildPathsWithResults(
+    const std::vector<DerivedPath> & reqs,
+    BuildMode buildMode,
+    std::shared_ptr<Store> evalStore)
+{
+    Worker worker(*this, evalStore ? *evalStore : *this);
+
+    Goals goals;
+    for (const auto & br : reqs) {
+        std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) {
+                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+            },
+        }, br.raw());
+    }
+
+    worker.run(goals);
+
+    std::vector<BuildResult> results;
+
+    for (auto & i : goals)
+        results.push_back(i->buildResult);
+
+    return results;
+}
+
 BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
     Worker worker(*this, *this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
 
-    BuildResult result;
-
     try {
         worker.run(Goals{goal});
-        result = goal->getResult();
+        return goal->buildResult;
     } catch (Error & e) {
-        result.status = BuildResult::MiscFailure;
-        result.errorMsg = e.msg();
-    }
-    // XXX: Should use `goal->queryPartialDerivationOutputMap()` once it's
-    // extended to return the full realisation for each output
-    auto staticDrvOutputs = drv.outputsAndOptPaths(*this);
-    auto outputHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, staticOutput] : staticDrvOutputs) {
-        auto outputId = DrvOutput{outputHashes.at(outputName), outputName};
-        if (staticOutput.second)
-            result.builtOutputs.insert_or_assign(
-                    outputId,
-                    Realisation{ outputId, *staticOutput.second}
-                    );
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
-            auto realisation = this->queryRealisation(outputId);
-            if (realisation)
-                result.builtOutputs.insert_or_assign(
-                        outputId,
-                        *realisation
-                        );
-        }
-    }
-
-    return result;
+        return BuildResult {
+            .status = BuildResult::MiscFailure,
+            .errorMsg = e.msg(),
+            .path = DerivedPath::Built { .drvPath = drvPath },
+        };
+    };
 }
 
 

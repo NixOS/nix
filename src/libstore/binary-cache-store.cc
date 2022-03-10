@@ -31,7 +31,7 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
 
     StringSink sink;
     sink << narVersionMagic1;
-    narMagic = *sink.s;
+    narMagic = sink.s;
 }
 
 void BinaryCacheStore::init()
@@ -68,7 +68,7 @@ void BinaryCacheStore::upsertFile(const std::string & path,
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
-    Callback<std::shared_ptr<std::string>> callback) noexcept
+    Callback<std::optional<std::string>> callback) noexcept
 {
     try {
         callback(getFile(path));
@@ -77,9 +77,9 @@ void BinaryCacheStore::getFile(const std::string & path,
 
 void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
 {
-    std::promise<std::shared_ptr<std::string>> promise;
+    std::promise<std::optional<std::string>> promise;
     getFile(path,
-        {[&](std::future<std::shared_ptr<std::string>> result) {
+        {[&](std::future<std::optional<std::string>> result) {
             try {
                 promise.set_value(result.get());
             } catch (...) {
@@ -89,15 +89,15 @@ void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
     sink(*promise.get_future().get());
 }
 
-std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
+std::optional<std::string> BinaryCacheStore::getFile(const std::string & path)
 {
     StringSink sink;
     try {
         getFile(path, sink);
     } catch (NoSuchBinaryCacheFile &) {
-        return nullptr;
+        return std::nullopt;
     }
-    return sink.s;
+    return std::move(sink.s);
 }
 
 std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
@@ -111,15 +111,15 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    std::string hashPart(narInfo->path.hashPart());
-
     {
         auto state_(state.lock());
-        state_->pathInfoCache.upsert(hashPart, PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
+        state_->pathInfoCache.upsert(
+            std::string(narInfo->path.to_string()),
+            PathInfoCacheValue { .value = std::shared_ptr<NarInfo>(narInfo) });
     }
 
     if (diskCache)
-        diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
+        diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
 }
 
 AutoCloseFD openFile(const Path & path)
@@ -149,7 +149,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSinkCompressed { fileSink, fileHashSink };
-    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed);
+    auto compressionSink = makeCompressionSink(compression, teeSinkCompressed, parallelCompression, compressionLevel);
     TeeSink teeSinkUncompressed { *compressionSink, narHashSink };
     TeeSource teeSource { narSource, teeSinkUncompressed };
     narAccessor = makeNarAccessor(teeSource);
@@ -307,17 +307,18 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     }});
 }
 
-StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view name,
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name),
+            makeFixedOutputPath(method, nar.first, name, references),
             nar.first,
         };
         info.narSize = nar.second;
+        info.references = references;
         return info;
     })->path;
 }
@@ -366,11 +367,11 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     getFile(narInfoFile,
-        {[=](std::future<std::shared_ptr<std::string>> fut) {
+        {[=](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
 
-                if (!data) return (*callbackPtr)(nullptr);
+                if (!data) return (*callbackPtr)({});
 
                 stats.narInfoRead++;
 
@@ -384,8 +385,14 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
         }});
 }
 
-StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+StorePath BinaryCacheStore::addToStore(
+    std::string_view name,
+    const Path & srcPath,
+    FileIngestionMethod method,
+    HashType hashAlgo,
+    PathFilter & filter,
+    RepairFlag repair,
+    const StorePathSet & references)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
@@ -404,10 +411,11 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name),
+            makeFixedOutputPath(method, h, name, references),
             nar.first,
         };
         info.narSize = nar.second;
+        info.references = references;
         info.ca = FixedOutputHash {
             .method = method,
             .hash = h,
@@ -416,8 +424,11 @@ StorePath BinaryCacheStore::addToStore(const string & name, const Path & srcPath
     })->path;
 }
 
-StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s,
-    const StorePathSet & references, RepairFlag repair)
+StorePath BinaryCacheStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
     auto path = makeTextPath(name, textHash, references);
@@ -427,7 +438,7 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
 
     StringSink sink;
     dumpString(s, sink);
-    auto source = StringSource { *sink.s };
+    StringSource source(sink.s);
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info { path, nar.first };
         info.narSize = nar.second;
@@ -437,40 +448,29 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     })->path;
 }
 
-std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
+void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
-    if (diskCache) {
-        auto [cacheOutcome, maybeCachedRealisation] =
-            diskCache->lookupRealisation(getUri(), id);
-        switch (cacheOutcome) {
-            case NarInfoDiskCache::oValid:
-                debug("Returning a cached realisation for %s", id.to_string());
-                return *maybeCachedRealisation;
-            case NarInfoDiskCache::oInvalid:
-                debug("Returning a cached missing realisation for %s", id.to_string());
-                return {};
-            case NarInfoDiskCache::oUnknown:
-                break;
-        }
-    }
-
     auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
-    auto rawOutputInfo = getFile(outputInfoFilePath);
 
-    if (rawOutputInfo) {
-        auto realisation = Realisation::fromJSON(
-            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath);
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        if (diskCache)
-            diskCache->upsertRealisation(
-                getUri(), realisation);
+    Callback<std::optional<std::string>> newCallback = {
+        [=](std::future<std::optional<std::string>> fut) {
+            try {
+                auto data = fut.get();
+                if (!data) return (*callbackPtr)({});
 
-        return {realisation};
-    } else {
-        if (diskCache)
-            diskCache->upsertAbsentRealisation(getUri(), id);
-        return std::nullopt;
-    }
+                auto realisation = Realisation::fromJSON(
+                    nlohmann::json::parse(*data), outputInfoFilePath);
+                return (*callbackPtr)(std::make_shared<const Realisation>(realisation));
+            } catch (...) {
+                callbackPtr->rethrow();
+            }
+        }
+    };
+
+    getFile(outputInfoFilePath, std::move(newCallback));
 }
 
 void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
@@ -499,7 +499,7 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
     writeNarInfo(narInfo);
 }
 
-std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
+std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
 {
     auto drvPath = path;
 
@@ -507,10 +507,10 @@ std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & pat
         try {
             auto info = queryPathInfo(path);
             // FIXME: add a "Log" field to .narinfo
-            if (!info->deriver) return nullptr;
+            if (!info->deriver) return std::nullopt;
             drvPath = *info->deriver;
         } catch (InvalidPath &) {
-            return nullptr;
+            return std::nullopt;
         }
     }
 
@@ -519,6 +519,16 @@ std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const StorePath & pat
     debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
 
     return getFile(logPath);
+}
+
+void BinaryCacheStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    assert(drvPath.isDerivation());
+
+    upsertFile(
+        "log/" + std::string(drvPath.to_string()),
+        (std::string) log, // FIXME: don't copy
+        "text/plain; charset=utf-8");
 }
 
 }

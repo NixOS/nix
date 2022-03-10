@@ -12,5 +12,5 @@ For instance, `derivation` is also available as `builtins.derivation`.
 <dl>
   <dt><code>derivation <var>attrs</var></code>;
       <code>builtins.derivation <var>attrs</var></code></dt>
-  <dd><p><var>derivation</var> in described in
+  <dd><p><var>derivation</var> is described in
          <a href="derivations.md">its own section</a>.</p></dd>

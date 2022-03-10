@@ -27,9 +27,10 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Pipe for synchronising updates to the builder namespaces. */
     Pipe userNamespaceSync;
 
-    /* The mount namespace of the builder, used to add additional
+    /* The mount namespace and user namespace of the builder, used to add additional
        paths to the sandbox as a result of recursive Nix calls. */
     AutoCloseFD sandboxMountNamespace;
+    AutoCloseFD sandboxUserNamespace;
 
     /* On Linux, whether we're doing the build in its own user
        namespace. */
@@ -57,11 +58,11 @@ struct LocalDerivationGoal : public DerivationGoal
     typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
 
-    typedef map<string, string> Environment;
+    typedef map<std::string, std::string> Environment;
     Environment env;
 
 #if __APPLE__
-    typedef string SandboxProfile;
+    typedef std::string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
 #endif
 
@@ -168,7 +169,7 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    void registerOutputs() override;
+    DrvOutputs registerOutputs() override;
 
     void signRealisation(Realisation &) override;
 

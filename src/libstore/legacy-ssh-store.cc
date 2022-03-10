@@ -2,6 +2,7 @@
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "worker-protocol.hh"
@@ -48,7 +49,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const string & scheme, const string & host, const Params & params)
+    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , LegacySSHStoreConfig(params)
         , Store(params)
@@ -94,7 +95,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 conn->sshConn->in.close();
                 auto msg = conn->from.drain();
                 throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-                    host, chomp(*saved.s + msg));
+                    host, chomp(saved.s + msg));
             }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
@@ -107,7 +108,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         return conn;
     };
 
-    string getUri() override
+    std::string getUri() override
     {
         return *uriSchemes().begin() + "://" + host;
     }
@@ -225,13 +226,21 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
 private:
@@ -248,6 +257,10 @@ private:
             conn.to
                 << settings.buildRepeat
                 << settings.enforceDeterminism;
+
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
+            conn.to << ((int) settings.keepFailed);
+        }
     }
 
 public:
@@ -266,7 +279,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult status;
+        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 
@@ -290,10 +303,10 @@ public:
         for (auto & p : drvPaths) {
             auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
             std::visit(overloaded {
-                [&](StorePathWithOutputs s) {
+                [&](const StorePathWithOutputs & s) {
                     ss.push_back(s.to_string(*this));
                 },
-                [&](StorePath drvPath) {
+                [&](const StorePath & drvPath) {
                     throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
                 },
             }, sOrDrvPath);
@@ -304,7 +317,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult result;
+        BuildResult result { .path = DerivedPath::Opaque { StorePath::dummy } };
         result.status = (BuildResult::Status) readInt(conn->from);
 
         if (!result.success()) {
@@ -363,7 +376,8 @@ public:
         return conn->remoteVersion;
     }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // TODO: Implement
     { unsupported("queryRealisation"); }
 };

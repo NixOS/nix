@@ -43,19 +43,24 @@ program specified by the app definition.
 
 If *installable* evaluates to a derivation, it will try to execute the
 program `<out>/bin/<name>`, where *out* is the primary output store
-path of the derivation and *name* is the `meta.mainProgram` attribute
-of the derivation if it exists, and otherwise the name part of the
-value of the `name` attribute of the derivation (e.g. if `name` is set
-to `hello-1.10`, it will run `$out/bin/hello`).
+path of the derivation, and *name* is the first of the following that
+exists:
+
+* The `meta.mainProgram` attribute of the derivation.
+* The `pname` attribute of the derivation.
+* The name part of the value of the `name` attribute of the derivation.
+
+For instance, if `name` is set to `hello-1.10`, `nix run` will run
+`$out/bin/hello`.
 
 # Flake output attributes
 
 If no flake output attribute is given, `nix run` tries the following
 flake output attributes:
 
-* `defaultApp.<system>`
+* `apps.<system>.default`
 
-* `defaultPackage.<system>`
+* `packages.<system>.default`
 
 If an attribute *name* is given, `nix run` tries the following flake
 output attributes:
@@ -69,7 +74,7 @@ output attributes:
 # Apps
 
 An app is specified by a flake output attribute named
-`apps.<system>.<name>` or `defaultApp.<system>`. It looks like this:
+`apps.<system>.<name>`. It looks like this:
 
 ```nix
 apps.x86_64-linux.blender_2_79 = {

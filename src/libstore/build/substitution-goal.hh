@@ -53,13 +53,15 @@ struct PathSubstitutionGoal : public Goal
     /* Content address for recomputing store path */
     std::optional<ContentAddress> ca;
 
+    void done(ExitCode result, BuildResult::Status status);
+
 public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
 
-    string key() override
+    std::string key() override
     {
         /* "a$" ensures substitution goals happen before derivation
            goals. */
@@ -77,7 +79,7 @@ public:
     void finished();
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data) override;
+    void handleChildOutput(int fd, std::string_view data) override;
     void handleEOF(int fd) override;
 
     void cleanup() override;

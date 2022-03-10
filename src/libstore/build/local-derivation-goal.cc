@@ -1,4 +1,5 @@
 #include "local-derivation-goal.hh"
+#include "gc-store.hh"
 #include "hook-instance.hh"
 #include "worker.hh"
 #include "builtins.hh"
@@ -193,7 +194,7 @@ void LocalDerivationGoal::tryLocalBuild() {
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, e);
+        done(BuildResult::InputRejected, {}, e);
         return;
     }
 
@@ -260,6 +261,7 @@ void LocalDerivationGoal::cleanupHookFinally()
 void LocalDerivationGoal::cleanupPreChildKill()
 {
     sandboxMountNamespace = -1;
+    sandboxUserNamespace = -1;
 }
 
 
@@ -342,7 +344,7 @@ int childEntry(void * arg)
     return 1;
 }
 
-
+#if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
@@ -358,6 +360,7 @@ static void linkOrCopy(const Path & from, const Path & to)
         copyPath(from, to);
     }
 }
+#endif
 
 
 void LocalDerivationGoal::startBuilder()
@@ -479,12 +482,12 @@ void LocalDerivationGoal::startBuilder()
            temporary build directory.  The text files have the format used
            by `nix-store --register-validity'.  However, the deriver
            fields are left empty. */
-        string s = get(drv->env, "exportReferencesGraph").value_or("");
+        auto s = get(drv->env, "exportReferencesGraph").value_or("");
         Strings ss = tokenizeString<Strings>(s);
         if (ss.size() % 2 != 0)
             throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
         for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-            string fileName = *i++;
+            auto fileName = *i++;
             static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
             if (!std::regex_match(fileName, regex))
                 throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
@@ -515,10 +518,10 @@ void LocalDerivationGoal::startBuilder()
                 i.pop_back();
             }
             size_t p = i.find('=');
-            if (p == string::npos)
+            if (p == std::string::npos)
                 dirsInChroot[i] = {i, optional};
             else
-                dirsInChroot[string(i, 0, p)] = {string(i, p + 1), optional};
+                dirsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
         }
         dirsInChroot[tmpDirInSandbox] = tmpDir;
 
@@ -669,9 +672,10 @@ void LocalDerivationGoal::startBuilder()
         auto state = stBegin;
         auto lines = runProgram(settings.preBuildHook, false, args);
         auto lastPos = std::string::size_type{0};
-        for (auto nlPos = lines.find('\n'); nlPos != string::npos;
-                nlPos = lines.find('\n', lastPos)) {
-            auto line = std::string{lines, lastPos, nlPos - lastPos};
+        for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
+                nlPos = lines.find('\n', lastPos))
+        {
+            auto line = lines.substr(lastPos, nlPos - lastPos);
             lastPos = nlPos + 1;
             if (state == stBegin) {
                 if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
@@ -684,10 +688,10 @@ void LocalDerivationGoal::startBuilder()
                     state = stBegin;
                 } else {
                     auto p = line.find('=');
-                    if (p == string::npos)
+                    if (p == std::string::npos)
                         dirsInChroot[line] = line;
                     else
-                        dirsInChroot[string(line, 0, p)] = string(line, p + 1);
+                        dirsInChroot[line.substr(0, p)] = line.substr(p + 1);
                 }
             }
         }
@@ -711,6 +715,7 @@ void LocalDerivationGoal::startBuilder()
     if (!builderOut.readSide)
         throw SysError("opening pseudoterminal master");
 
+    // FIXME: not thread-safe, use ptsname_r
     std::string slaveName(ptsname(builderOut.readSide.get()));
 
     if (buildUser) {
@@ -751,10 +756,9 @@ void LocalDerivationGoal::startBuilder()
     if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
         throw SysError("putting pseudoterminal into raw mode");
 
-    result.startTime = time(0);
+    buildResult.startTime = time(0);
 
     /* Fork a child to build the package. */
-    ProcessOptions options;
 
 #if __linux__
     if (useChroot) {
@@ -796,8 +800,6 @@ void LocalDerivationGoal::startBuilder()
             privateNetwork = true;
 
         userNamespaceSync.create();
-
-        options.allowVfork = false;
 
         Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
         static bool userNamespacesEnabled =
@@ -856,7 +858,7 @@ void LocalDerivationGoal::startBuilder()
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
-        }, options);
+        });
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
@@ -907,11 +909,17 @@ void LocalDerivationGoal::startBuilder()
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
-        /* Save the mount namespace of the child. We have to do this
+        /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
+
+        if (usingUserNamespace) {
+            sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
+            if (sandboxUserNamespace.get() == -1)
+                throw SysError("getting sandbox user namespace");
+        }
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -919,11 +927,12 @@ void LocalDerivationGoal::startBuilder()
     } else
 #endif
     {
+#if __linux__
     fallback:
-        options.allowVfork = !buildUser && !drv->isBuiltin();
+#endif
         pid = startProcess([&]() {
             runChild();
-        }, options);
+        });
     }
 
     /* parent */
@@ -934,7 +943,7 @@ void LocalDerivationGoal::startBuilder()
     /* Check if setting up the build environment failed. */
     std::vector<std::string> msgs;
     while (true) {
-        string msg = [&]() {
+        std::string msg = [&]() {
             try {
                 return readLine(builderOut.readSide.get());
             } catch (Error & e) {
@@ -946,12 +955,12 @@ void LocalDerivationGoal::startBuilder()
                 throw;
             }
         }();
-        if (string(msg, 0, 1) == "\2") break;
-        if (string(msg, 0, 1) == "\1") {
+        if (msg.substr(0, 1) == "\2") break;
+        if (msg.substr(0, 1) == "\1") {
             FdSource source(builderOut.readSide.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
-            throw;
+            throw ex;
         }
         debug("sandbox setup: " + msg);
         msgs.push_back(std::move(msg));
@@ -983,7 +992,7 @@ void LocalDerivationGoal::initTmpDir() {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(htSHA256, i.first);
-                string fn = ".attr-" + hash.to_string(Base32, false);
+                std::string fn = ".attr-" + hash.to_string(Base32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -1074,7 +1083,7 @@ void LocalDerivationGoal::writeStructuredAttrs()
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
                cases where we know or don't know the output path ahead of time. */
-            rewritten[i] = rewriteStrings(v, inputRewrites);
+            rewritten[i] = rewriteStrings((std::string) v, inputRewrites);
         }
 
         json["outputs"] = rewritten;
@@ -1094,10 +1103,10 @@ void LocalDerivationGoal::writeStructuredAttrs()
 static StorePath pathPartOfReq(const DerivedPath & req)
 {
     return std::visit(overloaded {
-        [&](DerivedPath::Opaque bo) {
+        [&](const DerivedPath::Opaque & bo) {
             return bo.path;
         },
-        [&](DerivedPath::Built bfd)  {
+        [&](const DerivedPath::Built & bfd)  {
             return bfd.drvPath;
         },
     }, req.raw());
@@ -1119,7 +1128,7 @@ struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 /* A wrapper around LocalStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual LocalFSStore
+struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual LocalFSStore, public virtual GcStore
 {
     ref<LocalStore> next;
 
@@ -1180,9 +1189,14 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { throw Error("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1192,18 +1206,26 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         goal.addDependency(info.path);
     }
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair = NoRepair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair = NoRepair) override
     {
         auto path = next->addTextToStore(name, s, references, repair);
         goal.addDependency(path);
         return path;
     }
 
-    StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        RepairFlag repair,
+        const StorePathSet & references) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
         goal.addDependency(path);
         return path;
     }
@@ -1227,16 +1249,27 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     // corresponds to an allowed derivation
     { throw Error("registerDrvOutput"); }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
+    void queryRealisationUncached(const DrvOutput & id,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // XXX: This should probably be allowed if the realisation corresponds to
     // an allowed derivation
     {
         if (!goal.isAllowed(id))
-            throw InvalidPath("cannot query an unknown output id '%s' in recursive Nix", id.to_string());
-        return next->queryRealisation(id);
+            callback(nullptr);
+        next->queryRealisation(id, std::move(callback));
     }
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
+    {
+        for (auto & result : buildPathsWithResults(paths, buildMode, evalStore))
+            if (!result.success())
+                result.rethrow();
+    }
+
+    std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr) override
     {
         assert(!evalStore);
 
@@ -1250,26 +1283,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", req.to_string(*next));
         }
 
-        next->buildPaths(paths, buildMode);
+        auto results = next->buildPathsWithResults(paths, buildMode);
 
-        for (auto & path : paths) {
-            auto p =  std::get_if<DerivedPath::Built>(&path);
-            if (!p) continue;
-            auto & bfd = *p;
-            auto drv = readDerivation(bfd.drvPath);
-            auto drvHashes = staticOutputHashes(*this, drv);
-            auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
-            for (auto & [outputName, outputPath] : outputs)
-                if (wantOutput(outputName, bfd.outputs)) {
-                    newPaths.insert(outputPath);
-                    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-                        auto thisRealisation = next->queryRealisation(
-                            DrvOutput{drvHashes.at(outputName), outputName}
-                        );
-                        assert(thisRealisation);
-                        newRealisations.insert(*thisRealisation);
-                    }
-                }
+        for (auto & result : results) {
+            for (auto & [outputName, output] : result.builtOutputs) {
+                newPaths.insert(output.outPath);
+                newRealisations.insert(output);
+            }
         }
 
         StorePathSet closure;
@@ -1278,6 +1298,8 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             goal.addDependency(path);
         for (auto & real : Realisation::closure(*next, newRealisations))
             goal.addedDrvOutputs.insert(real.id);
+
+        return results;
     }
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
@@ -1323,7 +1345,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
 void LocalDerivationGoal::startDaemon()
 {
-    settings.requireExperimentalFeature("recursive-nix");
+    settings.requireExperimentalFeature(Xp::RecursiveNix);
 
     Store::Params params;
     params["path-info-cache-size"] = "0";
@@ -1356,7 +1378,7 @@ void LocalDerivationGoal::startDaemon()
             AutoCloseFD remote = accept(daemonSocket.get(),
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
-                if (errno == EINTR) continue;
+                if (errno == EINTR || errno == EAGAIN) continue;
                 if (errno == EINVAL) break;
                 throw SysError("accepting connection");
             }
@@ -1434,6 +1456,9 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
                    in multithreaded programs. So we do this in a
                    child process.*/
                 Pid child(startProcess([&]() {
+
+                    if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
+                        throw SysError("entering sandbox user namespace");
 
                     if (setns(sandboxMountNamespace.get(), 0) == -1)
                         throw SysError("entering sandbox mount namespace");
@@ -1776,11 +1801,14 @@ void LocalDerivationGoal::runChild()
            i686-linux build on an x86_64-linux machine. */
         struct utsname utsbuf;
         uname(&utsbuf);
-        if (drv->platform == "i686-linux" &&
-            (settings.thisSystem == "x86_64-linux" ||
-             (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
+        if ((drv->platform == "i686-linux"
+                && (settings.thisSystem == "x86_64-linux"
+                    || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
+            || drv->platform == "armv7l-linux"
+            || drv->platform == "armv6l-linux")
+        {
             if (personality(PER_LINUX32) == -1)
-                throw SysError("cannot set i686-linux personality");
+                throw SysError("cannot set 32-bit personality");
         }
 
         /* Impersonate a Linux 2.6 machine to get some determinism in
@@ -1905,7 +1933,7 @@ void LocalDerivationGoal::runChild()
                             "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
                             i.first, i.second.source);
 
-                    string path = i.first;
+                    std::string path = i.first;
                     struct stat st;
                     if (lstat(path.c_str(), &st)) {
                         if (i.second.optional && errno == ENOENT)
@@ -1957,7 +1985,7 @@ void LocalDerivationGoal::runChild()
                 args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
                 if (allowLocalNetworking) {
                     args.push_back("-D");
-                    args.push_back(string("_ALLOW_LOCAL_NETWORKING=1"));
+                    args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
                 }
                 args.push_back(drv->builder);
             } else {
@@ -1976,7 +2004,7 @@ void LocalDerivationGoal::runChild()
             args.push_back(rewriteStrings(i, inputRewrites));
 
         /* Indicate that we managed to set up the build environment. */
-        writeFull(STDERR_FILENO, string("\2\n"));
+        writeFull(STDERR_FILENO, std::string("\2\n"));
 
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
@@ -1994,7 +2022,7 @@ void LocalDerivationGoal::runChild()
                 else if (drv->builder == "builtin:unpack-channel")
                     builtinUnpackChannel(drv2);
                 else
-                    throw Error("unsupported builtin function '%1%'", string(drv->builder, 8));
+                    throw Error("unsupported builtin builder '%1%'", drv->builder.substr(8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
@@ -2040,7 +2068,7 @@ void LocalDerivationGoal::runChild()
 }
 
 
-void LocalDerivationGoal::registerOutputs()
+DrvOutputs LocalDerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -2049,10 +2077,8 @@ void LocalDerivationGoal::registerOutputs()
        We can only early return when the outputs are known a priori. For
        floating content-addressed derivations this isn't the case.
      */
-    if (hook) {
-        DerivationGoal::registerOutputs();
-        return;
-    }
+    if (hook)
+        return DerivationGoal::registerOutputs();
 
     std::map<std::string, ValidPathInfo> infos;
 
@@ -2140,8 +2166,7 @@ void LocalDerivationGoal::registerOutputs()
 
         /* Pass blank Sink as we are not ready to hash data at this stage. */
         NullSink blank;
-        auto references = worker.store.parseStorePathSet(
-            scanForReferences(blank, actualPath, worker.store.printStorePathSet(referenceablePaths)));
+        auto references = scanForReferences(blank, actualPath, referenceablePaths);
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,
@@ -2155,8 +2180,8 @@ void LocalDerivationGoal::registerOutputs()
                 /* Since we'll use the already installed versions of these, we
                    can treat them as leaves and ignore any references they
                    have. */
-                [&](AlreadyRegistered _) { return StringSet {}; },
-                [&](PerhapsNeedToRegister refs) {
+                [&](const AlreadyRegistered &) { return StringSet {}; },
+                [&](const PerhapsNeedToRegister & refs) {
                     StringSet referencedOutputs;
                     /* FIXME build inverted map up front so no quadratic waste here */
                     for (auto & r : refs.refs)
@@ -2176,6 +2201,8 @@ void LocalDerivationGoal::registerOutputs()
 
     std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
 
+    OutputPathMap finalOutputs;
+
     for (auto & outputName : sortedOutputNames) {
         auto output = drv->outputs.at(outputName);
         auto & scratchPath = scratchOutputs.at(outputName);
@@ -2192,11 +2219,11 @@ void LocalDerivationGoal::registerOutputs()
         };
 
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
-            [&](AlreadyRegistered skippedFinalPath) -> std::optional<StorePathSet> {
+            [&](const AlreadyRegistered & skippedFinalPath) -> std::optional<StorePathSet> {
                 finish(skippedFinalPath.path);
                 return std::nullopt;
             },
-            [&](PerhapsNeedToRegister r) -> std::optional<StorePathSet> {
+            [&](const PerhapsNeedToRegister & r) -> std::optional<StorePathSet> {
                 return r.refs;
             },
         }, outputReferencesIfUnregistered.at(outputName));
@@ -2208,14 +2235,14 @@ void LocalDerivationGoal::registerOutputs()
         auto rewriteOutput = [&]() {
             /* Apply hash rewriting if necessary. */
             if (!outputRewrites.empty()) {
-                warn("rewriting hashes in '%1%'; cross fingers", actualPath);
+                debug("rewriting hashes in '%1%'; cross fingers", actualPath);
 
                 /* FIXME: this is in-memory. */
                 StringSink sink;
                 dumpPath(actualPath, sink);
                 deletePath(actualPath);
-                sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
-                StringSource source(*sink.s);
+                sink.s = rewriteStrings(sink.s, outputRewrites);
+                StringSource source(sink.s);
                 restorePath(actualPath, source);
             }
         };
@@ -2283,7 +2310,7 @@ void LocalDerivationGoal::registerOutputs()
                     StringSink sink;
                     dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
-                    rsink2(*sink.s);
+                    rsink2(sink.s);
                     rsink2.flush();
                 });
                 Path tmpPath = actualPath + ".tmp";
@@ -2312,7 +2339,8 @@ void LocalDerivationGoal::registerOutputs()
         };
 
         ValidPathInfo newInfo = std::visit(overloaded {
-            [&](DerivationOutputInputAddressed output) {
+
+            [&](const DerivationOutputInputAddressed & output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
                 /* Preemptively add rewrite rule for final hash, as that is
@@ -2331,14 +2359,15 @@ void LocalDerivationGoal::registerOutputs()
                     newInfo0.references.insert(newInfo0.path);
                 return newInfo0;
             },
-            [&](DerivationOutputCAFixed dof) {
+
+            [&](const DerivationOutputCAFixed & dof) {
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
                     .method = dof.hash.method,
                     .hashType = dof.hash.hash.type,
                 });
 
                 /* Check wanted hash */
-                Hash & wanted = dof.hash.hash;
+                const Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
                 auto got = getContentAddressHash(*newInfo0.ca);
                 if (wanted != got) {
@@ -2353,18 +2382,17 @@ void LocalDerivationGoal::registerOutputs()
                 }
                 return newInfo0;
             },
-            [&](DerivationOutputCAFloating dof) {
+
+            [&](DerivationOutputCAFloating & dof) {
                 return newInfoFromCA(dof);
             },
-                [&](DerivationOutputDeferred) {
+
+            [&](DerivationOutputDeferred) -> ValidPathInfo {
                 // No derivation should reach that point without having been
                 // rewritten first
                 assert(false);
-                // Ugly, but the compiler insists on having this return a value
-                // of type `ValidPathInfo` despite the `assert(false)`, so
-                // let's provide it
-                return *(ValidPathInfo*)0;
             },
+
         }, output.output);
 
         /* FIXME: set proper permissions in restorePath() so
@@ -2455,7 +2483,7 @@ void LocalDerivationGoal::registerOutputs()
         }
 
         if (curRound == nrRounds) {
-            localStore.optimisePath(actualPath); // FIXME: combine with scanForReferences()
+            localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
             worker.markContentsGood(newInfo.path);
         }
 
@@ -2475,11 +2503,12 @@ void LocalDerivationGoal::registerOutputs()
     }
 
     if (buildMode == bmCheck) {
-        // In case of FOD mismatches on `--check` an error must be thrown as this is also
-        // a source for non-determinism.
+        /* In case of fixed-output derivations, if there are
+           mismatches on `--check` an error must be thrown as this is
+           also a source for non-determinism. */
         if (delayedException)
             std::rethrow_exception(delayedException);
-        return;
+        return assertPathValidity();
     }
 
     /* Apply output checks. */
@@ -2491,7 +2520,7 @@ void LocalDerivationGoal::registerOutputs()
         assert(prevInfos.size() == infos.size());
         for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
             if (!(*i == *j)) {
-                result.isNonDeterministic = true;
+                buildResult.isNonDeterministic = true;
                 Path prev = worker.store.printStorePath(i->second.path) + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
                 hintformat hint = prevExists
@@ -2529,7 +2558,7 @@ void LocalDerivationGoal::registerOutputs()
 
     if (curRound < nrRounds) {
         prevInfos = std::move(infos);
-        return;
+        return {};
     }
 
     /* Remove the .check directories if we're done. FIXME: keep them
@@ -2564,17 +2593,24 @@ void LocalDerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
+    DrvOutputs builtOutputs;
 
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        for (auto& [outputName, newInfo] : infos) {
-            auto thisRealisation = Realisation{
-                .id = DrvOutput{initialOutputs.at(outputName).outputHash,
-                                outputName},
-                .outPath = newInfo.path};
+    for (auto & [outputName, newInfo] : infos) {
+        auto thisRealisation = Realisation {
+            .id = DrvOutput {
+                initialOutputs.at(outputName).outputHash,
+                outputName
+            },
+            .outPath = newInfo.path
+        };
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
+        builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
+
+    return builtOutputs;
 }
 
 void LocalDerivationGoal::signRealisation(Realisation & realisation)
@@ -2583,7 +2619,7 @@ void LocalDerivationGoal::signRealisation(Realisation & realisation)
 }
 
 
-void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
+void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo> & outputs)
 {
     std::map<Path, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
@@ -2655,8 +2691,8 @@ void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & out
                 for (auto & i : *value) {
                     if (worker.store.isStorePath(i))
                         spec.insert(worker.store.parseStorePath(i));
-                    else if (finalOutputs.count(i))
-                        spec.insert(finalOutputs.at(i));
+                    else if (outputs.count(i))
+                        spec.insert(outputs.at(i).path);
                     else throw BuildError("derivation contains an illegal reference specifier '%s'", i);
                 }
 
@@ -2679,7 +2715,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & out
                     }
 
                 if (!badPaths.empty()) {
-                    string badPathsStr;
+                    std::string badPathsStr;
                     for (auto & i : badPaths) {
                         badPathsStr += "\n  ";
                         badPathsStr += worker.store.printStorePath(i);

@@ -100,4 +100,5 @@
 
 ; Allow Rosetta 2 to run x86_64 binaries on aarch64-darwin.
 (allow file-read*
-       (subpath "/Library/Apple/usr/libexec/oah"))
+       (subpath "/Library/Apple/usr/libexec/oah")
+       (subpath "/System/Library/Apple/usr/libexec/oah"))
