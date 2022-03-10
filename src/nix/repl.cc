@@ -28,7 +28,6 @@ extern "C" {
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
@@ -46,7 +45,7 @@ struct NixRepl
     : gc
     #endif
 {
-    string curDir;
+    std::string curDir;
     std::unique_ptr<EvalState> state;
     Bindings * autoArgs;
 
@@ -63,30 +62,30 @@ struct NixRepl
     NixRepl(const Strings & searchPath, nix::ref<Store> store);
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
-    StringSet completePrefix(string prefix);
-    bool getLine(string & input, const std::string &prompt);
+    StringSet completePrefix(const std::string & prefix);
+    bool getLine(std::string & input, const std::string &prompt);
     StorePath getDerivationPath(Value & v);
-    bool processLine(string line);
+    bool processLine(std::string line);
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value & v);
-    Expr * parseString(string s);
-    void evalString(string s, Value & v);
+    Expr * parseString(std::string s);
+    void evalString(std::string s, Value & v);
 
-    typedef set<Value *> ValuesSeen;
+    typedef std::set<Value *> ValuesSeen;
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
 
-string removeWhitespace(string s)
+std::string removeWhitespace(std::string s)
 {
     s = chomp(s);
     size_t n = s.find_first_not_of(" \n\r\t");
-    if (n != string::npos) s = string(s, n);
+    if (n != std::string::npos) s = std::string(s, n);
     return s;
 }
 
@@ -105,7 +104,7 @@ NixRepl::~NixRepl()
     write_history(historyFile.c_str());
 }
 
-string runNix(Path program, const Strings & args,
+std::string runNix(Path program, const Strings & args,
     const std::optional<std::string> & input = {})
 {
     auto subprocessEnv = getEnv();
@@ -199,14 +198,14 @@ namespace {
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
+    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
     for (auto & i : files)
         loadedFiles.push_back(i);
 
     reloadFiles();
-    if (!loadedFiles.empty()) std::cout << std::endl;
+    if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
@@ -253,7 +252,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 }
 
 
-bool NixRepl::getLine(string & input, const std::string &prompt)
+bool NixRepl::getLine(std::string & input, const std::string & prompt)
 {
     struct sigaction act, old;
     sigset_t savedSignalMask, set;
@@ -279,6 +278,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     };
 
     setupSignals();
+    Finally resetTerminal([&]() { rl_deprep_terminal(); });
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
     restoreSignals();
@@ -297,7 +297,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
 }
 
 
-StringSet NixRepl::completePrefix(string prefix)
+StringSet NixRepl::completePrefix(const std::string & prefix)
 {
     StringSet completions;
 
@@ -313,7 +313,7 @@ StringSet NixRepl::completePrefix(string prefix)
 
     size_t slash, dot;
 
-    if ((slash = cur.rfind('/')) != string::npos) {
+    if ((slash = cur.rfind('/')) != std::string::npos) {
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
@@ -323,11 +323,11 @@ StringSet NixRepl::completePrefix(string prefix)
             }
         } catch (Error &) {
         }
-    } else if ((dot = cur.rfind('.')) == string::npos) {
+    } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
-            if (string(*i, 0, cur.size()) != cur) break;
+            if (i->substr(0, cur.size()) != cur) break;
             completions.insert(prev + *i);
             i++;
         }
@@ -336,17 +336,17 @@ StringSet NixRepl::completePrefix(string prefix)
             /* This is an expression that should evaluate to an
                attribute set.  Evaluate it to get the names of the
                attributes. */
-            string expr(cur, 0, dot);
-            string cur2 = string(cur, dot + 1);
+            auto expr = cur.substr(0, dot);
+            auto cur2 = cur.substr(dot + 1);
 
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v);
+            state->forceAttrs(v, noPos);
 
             for (auto & i : *v.attrs) {
-                string name = i.name;
-                if (string(name, 0, cur2.size()) != cur2) continue;
+                std::string name = i.name;
+                if (name.substr(0, cur2.size()) != cur2) continue;
                 completions.insert(prev + expr + "." + name);
             }
 
@@ -356,6 +356,8 @@ StringSet NixRepl::completePrefix(string prefix)
             // Quietly ignore evaluation errors.
         } catch (UndefinedVarError & e) {
             // Quietly ignore undefined variable errors.
+        } catch (BadURL & e) {
+            // Quietly ignore BadURL flake-related errors.
         }
     }
 
@@ -363,7 +365,7 @@ StringSet NixRepl::completePrefix(string prefix)
 }
 
 
-bool isVarName(const string & s)
+static bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
     char c = s[0];
@@ -382,26 +384,27 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    Path drvPathRaw = drvInfo->queryDrvPath();
-    if (drvPathRaw == "")
-        throw Error("expression did not evaluate to a valid derivation (no drv path)");
-    StorePath drvPath = state->store->parseStorePath(drvPathRaw);
-    if (!state->store->isValidPath(drvPath))
-        throw Error("expression did not evaluate to a valid derivation (invalid drv path)");
-    return drvPath;
+    auto drvPath = drvInfo->queryDrvPath();
+    if (!drvPath)
+        throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
+    if (!state->store->isValidPath(*drvPath))
+        throw Error("expression evaluated to invalid derivation '%s'", state->store->printStorePath(*drvPath));
+    return *drvPath;
 }
 
 
-bool NixRepl::processLine(string line)
+bool NixRepl::processLine(std::string line)
 {
     if (line == "") return true;
 
-    string command, arg;
+    _isInterrupted = false;
+
+    std::string command, arg;
 
     if (line[0] == ':') {
         size_t p = line.find_first_of(" \n\r\t");
-        command = string(line, 0, p);
-        if (p != string::npos) arg = removeWhitespace(string(line, p));
+        command = line.substr(0, p);
+        if (p != std::string::npos) arg = removeWhitespace(line.substr(p));
     } else {
         arg = line;
     }
@@ -425,7 +428,9 @@ bool NixRepl::processLine(string line)
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
-             << "  :doc <expr>   Show documentation of a builtin function\n";
+             << "  :doc <expr>   Show documentation of a builtin function\n"
+             << "  :log <expr>   Show logs for a derivation\n"
+             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -457,7 +462,7 @@ bool NixRepl::processLine(string line)
         if (v.type() == nPath || v.type() == nString) {
             PathSet context;
             auto filename = state->coerceToString(noPos, v, context);
-            pos.file = state->symbols.create(filename);
+            pos.file = state->symbols.create(*filename);
         } else if (v.isLambda()) {
             pos = v.lambda.fun->pos;
         } else {
@@ -469,7 +474,10 @@ bool NixRepl::processLine(string line)
         auto args = editorFor(pos);
         auto editor = args.front();
         args.pop_front();
-        runProgram(editor, true, args);
+
+        // runProgram redirects stdout to a StringSink,
+        // using runProgram2 to allow editors to display their UI
+        runProgram2(RunOptions { .program = editor, .searchPath = true, .args = args });
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -479,9 +487,10 @@ bool NixRepl::processLine(string line)
     else if (command == ":t") {
         Value v;
         evalString(arg, v);
-        std::cout << showType(v) << std::endl;
+        logger->cout(showType(v));
+    }
 
-    } else if (command == ":u") {
+    else if (command == ":u") {
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
@@ -491,26 +500,41 @@ bool NixRepl::processLine(string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":i" || command == ":s") {
+    else if (command == ":b" || command == ":i" || command == ":s" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b") {
-            /* We could do the build in this process using buildPaths(),
-               but doing it in a child makes it easier to recover from
-               problems / SIGINT. */
-            try {
-                runNix("nix", {"build", "--no-link", drvPathRaw});
-                auto drv = state->store->readDerivation(drvPath);
-                std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                for (auto & i : drv.outputsAndOptPaths(*state->store))
-                    std::cout << fmt("  %s -> %s\n", i.first, state->store->printStorePath(*i.second.second));
-            } catch (ExecError &) {
-            }
+            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            auto drv = state->store->readDerivation(drvPath);
+            logger->cout("\nThis derivation produced the following outputs:");
+            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath))
+                logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
+        } else if (command == ":log") {
+            settings.readOnlyMode = true;
+            Finally roModeReset([&]() {
+                settings.readOnlyMode = false;
+            });
+            auto subs = getDefaultSubstituters();
+
+            subs.push_front(state->store);
+
+            bool foundLog = false;
+            RunPager pager;
+            for (auto & sub : subs) {
+                auto log = sub->getBuildLog(drvPath);
+                if (log) {
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, sub->getUri());
+                    logger->writeToStdout(*log);
+                    foundLog = true;
+                    break;
+                }
+            }
+            if (!foundLog) throw Error("build log of '%s' is not available", drvPathRaw);
         } else {
             runNix("nix-shell", {drvPathRaw});
         }
@@ -541,11 +565,23 @@ bool NixRepl::processLine(string line)
                     + concatStringsSep(" ", args) + "\n\n";
             }
 
-            markdown += trim(stripIndentation(doc->doc));
+            markdown += stripIndentation(doc->doc);
 
-            std::cout << renderMarkdownToTerminal(markdown);
+            logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else
             throw Error("value does not have documentation");
+    }
+
+    else if (command == ":st" || command == ":show-trace") {
+        if (arg == "false" || (arg == "" && loggerSettings.showTrace)) {
+            std::cout << "not showing error traces\n";
+            loggerSettings.showTrace = false;
+        } else if (arg == "true" || (arg == "" && !loggerSettings.showTrace)) {
+            std::cout << "showing error traces\n";
+            loggerSettings.showTrace = true;
+        } else {
+            throw Error("unexpected argument '%s' to %s", arg, command);
+        };
     }
 
     else if (command != "")
@@ -553,13 +589,13 @@ bool NixRepl::processLine(string line)
 
     else {
         size_t p = line.find('=');
-        string name;
-        if (p != string::npos &&
+        std::string name;
+        if (p != std::string::npos &&
             p < line.size() &&
             line[p + 1] != '=' &&
-            isVarName(name = removeWhitespace(string(line, 0, p))))
+            isVarName(name = removeWhitespace(line.substr(0, p))))
         {
-            Expr * e = parseString(string(line, p + 1));
+            Expr * e = parseString(line.substr(p + 1));
             Value & v(*state->allocValue());
             v.mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
@@ -586,9 +622,12 @@ void NixRepl::loadFile(const Path & path)
 
 void NixRepl::loadFlake(const std::string & flakeRefS)
 {
+    if (flakeRefS.empty())
+        throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
+
     auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
-    if (evalSettings.pureEval && !flakeRef.input.isImmutable())
-        throw Error("cannot use ':load-flake' on mutable flake reference '%s' (use --impure to override)", flakeRefS);
+    if (evalSettings.pureEval && !flakeRef.input.isLocked())
+        throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
 
@@ -626,9 +665,9 @@ void NixRepl::reloadFiles()
 
     bool first = true;
     for (auto & i : old) {
-        if (!first) std::cout << std::endl;
+        if (!first) notice("");
         first = false;
-        std::cout << format("Loading '%1%'...") % i << std::endl;
+        notice("Loading '%1%'...", i);
         loadFile(i);
     }
 }
@@ -636,10 +675,18 @@ void NixRepl::reloadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs);
-    for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
-    std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
+    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
+    if (displ + attrs.attrs->size() >= envSize)
+        throw Error("environment full; cannot add more variables");
+
+    for (auto & i : *attrs.attrs) {
+        staticEnv.vars.emplace_back(i.name, displ);
+        env->values[displ++] = i.value;
+        varNames.insert((std::string) i.name);
+    }
+    staticEnv.sort();
+    staticEnv.deduplicate();
+    notice("Added %1% variables.", attrs.attrs->size());
 }
 
 
@@ -647,24 +694,27 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
-    staticEnv.vars[name] = displ;
+    if (auto oldVar = staticEnv.find(name); oldVar != staticEnv.vars.end())
+        staticEnv.vars.erase(oldVar);
+    staticEnv.vars.emplace_back(name, displ);
+    staticEnv.sort();
     env->values[displ++] = &v;
-    varNames.insert((string) name);
+    varNames.insert((std::string) name);
 }
 
 
-Expr * NixRepl::parseString(string s)
+Expr * NixRepl::parseString(std::string s)
 {
-    Expr * e = state->parseExprFromString(s, curDir, staticEnv);
+    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
     return e;
 }
 
 
-void NixRepl::evalString(string s, Value & v)
+void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v);
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
 }
 
 
@@ -694,7 +744,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v);
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
 
     switch (v.type()) {
 
@@ -729,14 +779,17 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
-            str << drvPath << "»";
+            if (i != v.attrs->end())
+                str << state->store->printStorePath(state->coerceToStorePath(*i->pos, *i->value, context));
+            else
+                str << "???";
+            str << "»";
         }
 
         else if (maxDepth > 0) {
             str << "{ ";
 
-            typedef std::map<string, Value *> Sorted;
+            typedef std::map<std::string, Value *> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
                 sorted[i.name] = i.value;
@@ -747,7 +800,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (seen.find(i.second) != seen.end())
+                if (seen.count(i.second))
                     str << "«repeated»";
                 else
                     try {
@@ -770,12 +823,12 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
         str << "[ ";
         if (maxDepth > 0)
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
-                if (seen.find(v.listElems()[n]) != seen.end())
+            for (auto elem : v.listItems()) {
+                if (seen.count(elem))
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *v.listElems()[n], maxDepth - 1, seen);
+                        printValue(str, *elem, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
                     }

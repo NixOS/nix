@@ -7,6 +7,7 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "closure.hh"
+#include "filetransfer.hh"
 
 namespace nix {
 
@@ -99,7 +100,8 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
 
     downloadSize_ = narSize_ = 0;
 
-    ThreadPool pool;
+    // FIXME: make async.
+    ThreadPool pool(fileTransferSettings.httpConnections);
 
     struct State
     {
@@ -238,12 +240,11 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
     return topoSort(paths,
         {[&](const StorePath & path) {
-            StorePathSet references;
             try {
-                references = queryPathInfo(path)->references;
+                return queryPathInfo(path)->references;
             } catch (InvalidPath &) {
+                return StorePathSet();
             }
-            return references;
         }},
         {[&](const StorePath & path, const StorePath & parent) {
             return BuildError(

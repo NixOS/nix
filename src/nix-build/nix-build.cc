@@ -14,7 +14,6 @@
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
@@ -33,11 +32,11 @@ extern char * * environ __attribute__((weak));
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
-std::vector<string> shellwords(const string & s)
+static std::vector<std::string> shellwords(const std::string & s)
 {
     std::regex whitespace("^(\\s+).*");
     auto begin = s.cbegin();
-    std::vector<string> res;
+    std::vector<std::string> res;
     std::string cur;
     enum state {
         sBegin,
@@ -97,15 +96,16 @@ static void main_nix_build(int argc, char * * argv)
 
     auto inShebang = false;
     std::string script;
-    std::vector<string> savedArgs;
+    std::vector<std::string> savedArgs;
 
     AutoDelete tmpDir(createTempDir("", myName));
 
     std::string outLink = "./result";
 
     // List of environment variables kept for --pure
-    std::set<string> keepVars{
-        "HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL",
+    std::set<std::string> keepVars{
+        "HOME", "XDG_RUNTIME_DIR", "USER", "LOGNAME", "DISPLAY",
+        "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "PATH", "TERM", "IN_NIX_SHELL",
         "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",
         "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"
     };
@@ -258,13 +258,10 @@ static void main_nix_build(int argc, char * * argv)
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     if (runEnv) {
-        auto newArgs = state->allocBindings(autoArgs->size() + 1);
-        auto tru = state->allocValue();
-        mkBool(*tru, true);
-        newArgs->push_back(Attr(state->symbols.create("inNixShell"), tru));
-        for (auto & i : *autoArgs) newArgs->push_back(i);
-        newArgs->sort();
-        autoArgs = newArgs;
+        auto newArgs = state->buildBindings(autoArgs->size() + 1);
+        newArgs.alloc("inNixShell").mkBool(true);
+        for (auto & i : *autoArgs) newArgs.insert(i);
+        autoArgs = newArgs.finish();
     }
 
     if (packages) {
@@ -295,7 +292,7 @@ static void main_nix_build(int argc, char * * argv)
     else
         for (auto i : left) {
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(i, absPath(".")));
+                exprs.push_back(state->parseExprFromString(std::move(i), absPath(".")));
             else {
                 auto absolute = i;
                 try {
@@ -321,7 +318,7 @@ static void main_nix_build(int argc, char * * argv)
 
         for (auto & i : attrPaths) {
             Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
-            state->forceValue(v);
+            state->forceValue(v, [&]() { return v.determinePos(noPos); });
             getDerivations(*state, v, "", *autoArgs, drvs, false);
         }
     }
@@ -349,7 +346,7 @@ static void main_nix_build(int argc, char * * argv)
             throw UsageError("nix-shell requires a single derivation");
 
         auto & drvInfo = drvs.front();
-        auto drv = evalStore->derivationFromPath(evalStore->parseStorePath(drvInfo.queryDrvPath()));
+        auto drv = evalStore->derivationFromPath(drvInfo.requireDrvPath());
 
         std::vector<StorePathWithOutputs> pathsToBuild;
         RealisedPath::Set pathsToCopy;
@@ -358,6 +355,7 @@ static void main_nix_build(int argc, char * * argv)
            is not set, then build bashInteractive from
            <nixpkgs>. */
         auto shell = getEnv("NIX_BUILD_SHELL");
+        std::optional<StorePath> shellDrv;
 
         if (!shell) {
 
@@ -371,11 +369,10 @@ static void main_nix_build(int argc, char * * argv)
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
-                auto bashDrv = store->parseStorePath(drv->queryDrvPath());
+                auto bashDrv = drv->requireDrvPath();
                 pathsToBuild.push_back({bashDrv});
                 pathsToCopy.insert(bashDrv);
-
-                shell = drv->queryOutPath() + "/bin/bash";
+                shellDrv = bashDrv;
 
             } catch (Error & e) {
                 logError(e.info());
@@ -387,7 +384,9 @@ static void main_nix_build(int argc, char * * argv)
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
-                    [&](const string & exclude) { return !std::regex_search(store->printStorePath(input.first), std::regex(exclude)); }))
+                    [&](const std::string & exclude) {
+                        return !std::regex_search(store->printStorePath(input.first), std::regex(exclude));
+                    }))
             {
                 pathsToBuild.push_back({input.first, input.second});
                 pathsToCopy.insert(input.first);
@@ -401,7 +400,12 @@ static void main_nix_build(int argc, char * * argv)
 
         if (dryRun) return;
 
-        if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+        if (shellDrv) {
+            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value());
+            shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
+        }
+
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             auto resolvedDrv = drv.tryResolve(*store);
             assert(resolvedDrv && "Successfully resolved the derivation");
             drv = *resolvedDrv;
@@ -435,7 +439,7 @@ static void main_nix_build(int argc, char * * argv)
         for (auto & var : drv.env)
             if (passAsFile.count(var.first)) {
                 keepTmp = true;
-                string fn = ".attr-" + std::to_string(fileNr++);
+                auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (Path) tmpDir + "/" + fn;
                 writeFile(p, var.second);
                 env[var.first + "Path"] = p;
@@ -454,10 +458,7 @@ static void main_nix_build(int argc, char * * argv)
                 }
             }
 
-            ParsedDerivation parsedDrv(
-                StorePath(store->parseStorePath(drvInfo.queryDrvPath())),
-                drv
-            );
+            ParsedDerivation parsedDrv(drvInfo.requireDrvPath(), drv);
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();
@@ -481,7 +482,7 @@ static void main_nix_build(int argc, char * * argv)
            lose the current $PATH directories. */
         auto rcfile = (Path) tmpDir + "/rc";
         std::string rc = fmt(
-                R"(_nix_shell_clean_tmpdir() { rm -rf %1%; }; )"s +
+                R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; }; )"s +
                 (keepTmp ?
                     "trap _nix_shell_clean_tmpdir EXIT; "
                     "exitHooks+=(_nix_shell_clean_tmpdir); "
@@ -498,6 +499,7 @@ static void main_nix_build(int argc, char * * argv)
                 "%3%"
                 "PATH=%4%:\"$PATH\"; "
                 "SHELL=%5%; "
+                "BASH=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
@@ -511,7 +513,7 @@ static void main_nix_build(int argc, char * * argv)
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 shellEscape(dirOf(*shell)),
                 shellEscape(*shell),
-                (getenv("TZ") ? (string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
+                (getenv("TZ") ? (std::string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
                 envCommand);
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);
@@ -548,7 +550,7 @@ static void main_nix_build(int argc, char * * argv)
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
         for (auto & drvInfo : drvs) {
-            auto drvPath = store->parseStorePath(drvInfo.queryDrvPath());
+            auto drvPath = drvInfo.requireDrvPath();
 
             auto outputName = drvInfo.queryOutputName();
             if (outputName == "")

@@ -11,7 +11,7 @@
 
 namespace nix {
 
-static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
+static std::string_view getS(const std::vector<Logger::Field> & fields, size_t n)
 {
     assert(n < fields.size());
     assert(fields[n].type == Logger::Field::tString);
@@ -103,17 +103,19 @@ public:
     ~ProgressBar()
     {
         stop();
-        updateThread.join();
     }
 
     void stop() override
     {
-        auto state(state_.lock());
-        if (!state->active) return;
-        state->active = false;
-        writeToStderr("\r\e[K");
-        updateCV.notify_one();
-        quitCV.notify_one();
+        {
+            auto state(state_.lock());
+            if (!state->active) return;
+            state->active = false;
+            writeToStderr("\r\e[K");
+            updateCV.notify_one();
+            quitCV.notify_one();
+        }
+        updateThread.join();
     }
 
     bool isVerbose() override {

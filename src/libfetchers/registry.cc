@@ -5,6 +5,8 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 
+#include "fetch-settings.hh"
+
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
@@ -150,7 +152,7 @@ void overrideRegistry(
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
-        auto path = settings.flakeRegistry.get();
+        auto path = fetchSettings.flakeRegistry.get();
 
         if (!hasPrefix(path, "/")) {
             auto storePath = downloadFile(store, path, "flake-registry.json", false).storePath;
