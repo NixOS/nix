@@ -92,8 +92,9 @@ nix_tests = \
   bash-profile.sh \
   pass-as-file.sh \
   describe-stores.sh \
-  store-ping.sh \
-  nix-profile.sh
+  nix-profile.sh \
+  suggestions.sh \
+  store-ping.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
