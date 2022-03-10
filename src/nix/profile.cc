@@ -61,6 +61,27 @@ struct ProfileElement
     {
         return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
     }
+
+    void updateStorePaths(ref<Store> evalStore, ref<Store> store, Installable & installable)
+    {
+        // FIXME: respect meta.outputsToInstall
+        storePaths.clear();
+        for (auto & buildable : getBuiltPaths(evalStore, store, installable.toDerivedPaths())) {
+            std::visit(overloaded {
+                [&](const BuiltPath::Opaque & bo) {
+                    storePaths.insert(bo.path);
+                },
+                [&](const BuiltPath::Built & bfd) {
+                    // TODO: Why are we querying if we know the output
+                    // names already? Is it just to figure out what the
+                    // default one is?
+                    for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
+                        storePaths.insert(output.second);
+                    }
+                },
+            }, buildable.raw());
+        }
+    }
 };
 
 struct ProfileManifest
@@ -105,7 +126,7 @@ struct ProfileManifest
 
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
-                element.storePaths = {state.store->parseStorePath(drvInfo.queryOutPath())};
+                element.storePaths = {drvInfo.queryOutPath()};
                 elements.emplace_back(std::move(element));
             }
         }
@@ -157,7 +178,7 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, sink.s);
 
         ValidPathInfo info {
             *store,
@@ -174,9 +195,9 @@ struct ProfileManifest
             narHash,
         };
         info.references = std::move(references);
-        info.narSize = sink.s->size();
+        info.narSize = sink.s.size();
 
-        auto source = StringSource { *sink.s };
+        StringSource source(sink.s);
         store->addToStore(info, source);
 
         return std::move(info.path);
@@ -241,53 +262,25 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        std::vector<DerivedPath> pathsToBuild;
+        auto builtPaths = Installable::build(getEvalStore(), store, Realise::Outputs, installables, bmNormal);
 
         for (auto & installable : installables) {
-            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
-                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+            ProfileElement element;
 
-                ProfileElement element;
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
+            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
+                // FIXME: make build() return this?
+                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
                 element.source = ProfileElementSource{
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
                 };
-
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, StringSet{drv.outputName}});
-
-                manifest.elements.emplace_back(std::move(element));
-            } else {
-                auto buildables = build(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal);
-
-                for (auto & buildable : buildables) {
-                    ProfileElement element;
-
-                    std::visit(overloaded {
-                        [&](const BuiltPath::Opaque & bo) {
-                            pathsToBuild.push_back(bo);
-                            element.storePaths.insert(bo.path);
-                        },
-                        [&](const BuiltPath::Built & bfd) {
-                            // TODO: Why are we querying if we know the output
-                            // names already? Is it just to figure out what the
-                            // default one is?
-                            for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
-                                pathsToBuild.push_back(DerivedPath::Built{bfd.drvPath, {output.first}});
-                                element.storePaths.insert(output.second);
-                            }
-                        },
-                    }, buildable.raw());
-
-                    manifest.elements.emplace_back(std::move(element));
-                }
             }
-        }
 
-        store->buildPaths(pathsToBuild);
+            element.updateStorePaths(getEvalStore(), store, *installable);
+
+            manifest.elements.push_back(std::move(element));
+        }
 
         updateProfile(manifest.build(store));
     }
@@ -304,7 +297,11 @@ public:
         expectArgs("elements", &_matchers);
     }
 
-    typedef std::variant<size_t, Path, std::regex> Matcher;
+    struct RegexPattern {
+        std::string pattern;
+        std::regex  reg;
+    };
+    typedef std::variant<size_t, Path, RegexPattern> Matcher;
 
     std::vector<Matcher> getMatchers(ref<Store> store)
     {
@@ -316,7 +313,7 @@ public:
             else if (store->isStorePath(s))
                 res.push_back(s);
             else
-                res.push_back(std::regex(s, std::regex::extended | std::regex::icase));
+                res.push_back(RegexPattern{s,std::regex(s, std::regex::extended | std::regex::icase)});
         }
 
         return res;
@@ -329,9 +326,9 @@ public:
                 if (*n == pos) return true;
             } else if (auto path = std::get_if<Path>(&matcher)) {
                 if (element.storePaths.count(store.parseStorePath(*path))) return true;
-            } else if (auto regex = std::get_if<std::regex>(&matcher)) {
+            } else if (auto regex = std::get_if<RegexPattern>(&matcher)) {
                 if (element.source
-                    && std::regex_match(element.source->attrPath, *regex))
+                    && std::regex_match(element.source->attrPath, regex->reg))
                     return true;
             }
         }
@@ -364,16 +361,30 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
             auto & element(oldManifest.elements[i]);
-            if (!matches(*store, element, i, matchers))
+            if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
+            } else {
+                notice("removing '%s'", element.describe());
+            }
         }
 
-        // FIXME: warn about unused matchers?
-
+        auto removedCount = oldManifest.elements.size() - newManifest.elements.size();
         printInfo("removed %d packages, kept %d packages",
-            oldManifest.elements.size() - newManifest.elements.size(),
+            removedCount,
             newManifest.elements.size());
 
+        if (removedCount == 0) {
+            for (auto matcher: matchers) {
+                if (const size_t * index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index", *index);
+                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths", *path);
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages", regex->pattern);
+                }
+            }
+            warn ("Use 'nix profile list' to see the current profile.");
+        }
         updateProfile(newManifest.build(store));
     }
 };
@@ -398,47 +409,69 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         auto matchers = getMatchers(store);
 
-        // FIXME: code duplication
-        std::vector<DerivedPath> pathsToBuild;
+        std::vector<std::shared_ptr<Installable>> installables;
+        std::vector<size_t> indices;
+
+        auto upgradedCount = 0;
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             if (element.source
-                && !element.source->originalRef.input.isImmutable()
+                && !element.source->originalRef.input.isLocked()
                 && matches(*store, element, i, matchers))
             {
+                upgradedCount++;
+
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                InstallableFlake installable(
+                auto installable = std::make_shared<InstallableFlake>(
                     this,
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
-                    {element.source->attrPath},
-                    {},
+                    "",
+                    Strings{element.source->attrPath},
+                    Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv] = installable.toDerivation();
+                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
 
                 if (element.source->resolvedRef == resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
                 element.source = ProfileElementSource{
-                    installable.flakeRef,
+                    installable->flakeRef,
                     resolvedRef,
                     attrPath,
                 };
 
-                pathsToBuild.push_back(DerivedPath::Built{drv.drvPath, {drv.outputName}});
+                installables.push_back(installable);
+                indices.push_back(i);
             }
         }
 
-        store->buildPaths(pathsToBuild);
+        if (upgradedCount == 0) {
+            for (auto & matcher : matchers) {
+                if (const size_t * index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index", *index);
+                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths", *path);
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages", regex->pattern);
+                }
+            }
+            warn ("Use 'nix profile list' to see the current profile.");
+        }
+
+        auto builtPaths = Installable::build(getEvalStore(), store, Realise::Outputs, installables, bmNormal);
+
+        for (size_t i = 0; i < installables.size(); ++i) {
+            auto & installable = installables.at(i);
+            auto & element = manifest.elements[indices.at(i)];
+            element.updateStorePaths(getEvalStore(), store, *installable);
+        }
 
         updateProfile(manifest.build(store));
     }

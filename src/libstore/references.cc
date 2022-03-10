@@ -54,12 +54,12 @@ void RefScanSink::operator () (std::string_view data)
        fragment, so search in the concatenation of the tail of the
        previous fragment and the start of the current fragment. */
     auto s = tail;
-    s.append(data.data(), refLength);
+    auto tailLen = std::min(data.size(), refLength);
+    s.append(data.data(), tailLen);
     search(s, hashes, seen);
 
     search(data, hashes, seen);
 
-    auto tailLen = std::min(data.size(), refLength);
     auto rest = refLength - tailLen;
     if (rest < tail.size())
         tail = tail.substr(tail.size() - rest);
@@ -68,7 +68,7 @@ void RefScanSink::operator () (std::string_view data)
 
 
 std::pair<StorePathSet, HashResult> scanForReferences(
-    const string & path,
+    const std::string & path,
     const StorePathSet & refs)
 {
     HashSink hashSink { htSHA256 };
@@ -121,7 +121,7 @@ void RewritingSink::operator () (std::string_view data)
     s.append(data);
 
     size_t j = 0;
-    while ((j = s.find(from, j)) != string::npos) {
+    while ((j = s.find(from, j)) != std::string::npos) {
         matches.push_back(pos + j);
         s.replace(j, from.size(), to);
     }

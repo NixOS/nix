@@ -59,7 +59,6 @@ struct HelpRequested { };
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
     bool showVersion = false;
@@ -187,14 +186,11 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
             , "/"),
         *vUtils);
 
-    auto vArgs = state.allocValue();
-    state.mkAttrs(*vArgs, 16);
-    auto vJson = state.allocAttr(*vArgs, state.symbols.create("command"));
-    mkString(*vJson, toplevel.toJSON().dump());
-    vArgs->attrs->sort();
+    auto attrs = state.buildBindings(16);
+    attrs.alloc("command").mkString(toplevel.toJSON().dump());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, *vArgs, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -255,6 +251,16 @@ void mainWrapped(int argc, char * * argv)
     initNix();
     initGC();
 
+    #if __linux__
+    if (getuid() == 0) {
+        try {
+            saveMountNamespace();
+            if (unshare(CLONE_NEWNS) == -1)
+                throw SysError("setting up a private mount namespace");
+        } catch (Error & e) { }
+    }
+    #endif
+
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
 
@@ -263,11 +269,15 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = lvlNotice;
-    settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
     setLogFormat("bar");
+    settings.verboseBuild = false;
+    if (isatty(STDERR_FILENO)) {
+        verbosity = lvlNotice;
+    } else {
+        verbosity = lvlInfo;
+    }
 
     Finally f([] { logger->stop(); });
 
@@ -300,7 +310,14 @@ void mainWrapped(int argc, char * * argv)
     Finally printCompletions([&]()
     {
         if (completions) {
-            std::cout << (pathCompletions ? "filenames\n" : "no-filenames\n");
+            switch (completionType) {
+            case ctNormal:
+                std::cout << "normal\n"; break;
+            case ctFilenames:
+                std::cout << "filenames\n"; break;
+            case ctAttrs:
+                std::cout << "attrs\n"; break;
+            }
             for (auto & s : *completions)
                 std::cout << s.completion << "\t" << s.description << "\n";
         }
@@ -337,7 +354,7 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->first != "repl"
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
-        settings.requireExperimentalFeature("nix-command");
+        settings.requireExperimentalFeature(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

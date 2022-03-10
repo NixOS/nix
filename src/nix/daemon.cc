@@ -76,7 +76,7 @@ static void setSigChldAction(bool autoReap)
 }
 
 
-bool matchUser(const string & user, const string & group, const Strings & users)
+bool matchUser(const std::string & user, const std::string & group, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
@@ -85,12 +85,12 @@ bool matchUser(const string & user, const string & group, const Strings & users)
         return true;
 
     for (auto & i : users)
-        if (string(i, 0, 1) == "@") {
-            if (group == string(i, 1)) return true;
+        if (i.substr(0, 1) == "@") {
+            if (group == i.substr(1)) return true;
             struct group * gr = getgrnam(i.c_str() + 1);
             if (!gr) continue;
             for (char * * mem = gr->gr_mem; *mem; mem++)
-                if (user == string(*mem)) return true;
+                if (user == std::string(*mem)) return true;
         }
 
     return false;
@@ -198,10 +198,10 @@ static void daemonLoop()
             PeerInfo peer = getPeerInfo(remote.get());
 
             struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
-            string user = pw ? pw->pw_name : std::to_string(peer.uid);
+            std::string user = pw ? pw->pw_name : std::to_string(peer.uid);
 
             struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
-            string group = gr ? gr->gr_name : std::to_string(peer.gid);
+            std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
 
             Strings trustedUsers = settings.trustedUsers;
             Strings allowedUsers = settings.allowedUsers;
@@ -212,7 +212,7 @@ static void daemonLoop()
             if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
                 throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
-            printInfo(format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
+            printInfo(format((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
                 % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
                 % (peer.uidKnown ? user : "<unknown>"));
 
@@ -234,7 +234,7 @@ static void daemonLoop()
 
                 //  For debugging, stuff the pid into argv[1].
                 if (peer.pidKnown && savedArgv[1]) {
-                    string processName = std::to_string(peer.pid);
+                    auto processName = std::to_string(peer.pid);
                     strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
                 }
 

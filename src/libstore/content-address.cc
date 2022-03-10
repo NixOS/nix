@@ -144,8 +144,10 @@ ContentAddress parseContentAddress(std::string_view rawCa) {
 
 std::pair<ContentAddressMethod, HashType> parseContentAddressMethod(std::string_view caMethod)
 {
-    std::string_view asPrefix {std::string{caMethod} + ":"};
-    return parseContentAddressMethodPrefix(asPrefix);
+    std::string asPrefix = std::string{caMethod} + ":";
+    // parseContentAddressMethodPrefix takes its argument by reference
+    std::string_view asPrefixView = asPrefix;
+    return parseContentAddressMethodPrefix(asPrefixView);
 }
 
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt)

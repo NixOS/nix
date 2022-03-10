@@ -1,6 +1,7 @@
 #pragma once
 
 #include "store-api.hh"
+#include "gc-store.hh"
 
 namespace nix {
 
@@ -23,11 +24,11 @@ struct LocalFSStoreConfig : virtual StoreConfig
         "physical path to the Nix store"};
 };
 
-class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store
+class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store, virtual GcStore
 {
 public:
 
-    const static string drvsLogDir;
+    const static std::string drvsLogDir;
 
     LocalFSStore(const Params & params);
 
@@ -45,7 +46,8 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLog(const StorePath & path) override;
+
 };
 
 }

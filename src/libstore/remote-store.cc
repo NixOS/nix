@@ -1,11 +1,12 @@
 #include "serialise.hh"
 #include "util.hh"
 #include "path-with-outputs.hh"
+#include "gc-store.hh"
 #include "remote-fs-accessor.hh"
+#include "build-result.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "derivations.hh"
 #include "pool.hh"
@@ -87,6 +88,35 @@ DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
 void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
 {
     out << drvOutput.to_string();
+}
+
+
+BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+{
+    auto path = worker_proto::read(store, from, Phantom<DerivedPath> {});
+    BuildResult res { .path = path };
+    res.status = (BuildResult::Status) readInt(from);
+    from
+        >> res.errorMsg
+        >> res.timesBuilt
+        >> res.isNonDeterministic
+        >> res.startTime
+        >> res.stopTime;
+    res.builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
+    return res;
+}
+
+void write(const Store & store, Sink & to, const BuildResult & res)
+{
+    worker_proto::write(store, to, res.path);
+    to
+        << res.status
+        << res.errorMsg
+        << res.timesBuilt
+        << res.isNonDeterministic
+        << res.startTime
+        << res.stopTime;
+    worker_proto::write(store, to, res.builtOutputs);
 }
 
 
@@ -173,7 +203,7 @@ void RemoteStore::initConnection(Connection & conn)
                it. */
             conn.closeWrite();
             auto msg = conn.from.drain();
-            throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
+            throw Error("protocol mismatch, got '%s'", chomp(saved.s + msg));
         }
 
         conn.from >> conn.daemonVersion;
@@ -184,15 +214,17 @@ void RemoteStore::initConnection(Connection & conn)
         conn.to << PROTOCOL_VERSION;
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
-            int cpu = sameMachine() && settings.lockCPU ? lockToCurrentCPU() : -1;
-            if (cpu != -1)
-                conn.to << 1 << cpu;
-            else
-                conn.to << 0;
+            // Obsolete CPU affinity.
+            conn.to << 0;
         }
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
-            conn.to << false;
+            conn.to << false; // obsolete reserveSpace
+
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
+            conn.to.flush();
+            conn.daemonNixVersion = readString(conn.from);
+        }
 
         auto ex = conn.processStderr();
         if (ex) std::rethrow_exception(ex);
@@ -290,6 +322,10 @@ ConnectionHandle RemoteStore::getConnection()
     return ConnectionHandle(connections->get());
 }
 
+void RemoteStore::setOptions()
+{
+    setOptions(*(getConnection().handle));
+}
 
 bool RemoteStore::isValidPathUncached(const StorePath & path)
 {
@@ -496,7 +532,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
-    const string & name,
+    std::string_view name,
     ContentAddressMethod caMethod,
     HashType hashType,
     const StorePathSet & references,
@@ -582,10 +618,9 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method, HashType hashType, RepairFlag repair)
+StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
+      FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
 {
-    StorePathSet references;
     return addCAToStore(dump, name, method, hashType, references, repair)->path;
 }
 
@@ -662,8 +697,11 @@ void RemoteStore::addMultipleToStore(
 }
 
 
-StorePath RemoteStore::addTextToStore(const string & name, const string & s,
-    const StorePathSet & references, RepairFlag repair)
+StorePath RemoteStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     StringSource source(s);
     return addCAToStore(source, name, TextHashMethod {}, htSHA256, references, repair)->path;
@@ -682,23 +720,41 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
     conn.processStderr();
 }
 
-std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput & id)
+void RemoteStore::queryRealisationUncached(const DrvOutput & id,
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto conn(getConnection());
+
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+        warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
+        try {
+            callback(nullptr);
+        } catch (...) { return callback.rethrow(); }
+    }
+
     conn->to << wopQueryRealisation;
     conn->to << id.to_string();
     conn.processStderr();
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
-        auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
-        if (outPaths.empty())
-            return std::nullopt;
-        return {Realisation{.id = id, .outPath = *outPaths.begin()}};
-    } else {
-        auto realisations = worker_proto::read(*this, conn->from, Phantom<std::set<Realisation>>{});
-        if (realisations.empty())
-            return std::nullopt;
-        return *realisations.begin();
-    }
+
+    auto real = [&]() -> std::shared_ptr<const Realisation> {
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+            auto outPaths = worker_proto::read(
+                *this, conn->from, Phantom<std::set<StorePath>> {});
+            if (outPaths.empty())
+                return nullptr;
+            return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
+        } else {
+            auto realisations = worker_proto::read(
+                *this, conn->from, Phantom<std::set<Realisation>> {});
+            if (realisations.empty())
+                return nullptr;
+            return std::make_shared<const Realisation>(*realisations.begin());
+        }
+    }();
+
+    try {
+        callback(std::shared_ptr<const Realisation>(real));
+    } catch (...) { return callback.rethrow(); }
 }
 
 static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
@@ -725,17 +781,24 @@ static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, cons
     }
 }
 
-void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
+void RemoteStore::copyDrvsFromEvalStore(
+    const std::vector<DerivedPath> & paths,
+    std::shared_ptr<Store> evalStore)
 {
     if (evalStore && evalStore.get() != this) {
         /* The remote doesn't have a way to access evalStore, so copy
            the .drvs. */
         RealisedPath::Set drvPaths2;
-        for (auto & i : drvPaths)
+        for (auto & i : paths)
             if (auto p = std::get_if<DerivedPath::Built>(&i))
                 drvPaths2.insert(p->drvPath);
         copyClosure(*evalStore, *this, drvPaths2);
     }
+}
+
+void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
+{
+    copyDrvsFromEvalStore(drvPaths, evalStore);
 
     auto conn(getConnection());
     conn->to << wopBuildPaths;
@@ -752,6 +815,91 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
     readInt(conn->from);
 }
 
+std::vector<BuildResult> RemoteStore::buildPathsWithResults(
+    const std::vector<DerivedPath> & paths,
+    BuildMode buildMode,
+    std::shared_ptr<Store> evalStore)
+{
+    copyDrvsFromEvalStore(paths, evalStore);
+
+    std::optional<ConnectionHandle> conn_(getConnection());
+    auto & conn = *conn_;
+
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
+        conn->to << wopBuildPathsWithResults;
+        writeDerivedPaths(*this, conn, paths);
+        conn->to << buildMode;
+        conn.processStderr();
+        return worker_proto::read(*this, conn->from, Phantom<std::vector<BuildResult>> {});
+    } else {
+        // Avoid deadlock.
+        conn_.reset();
+
+        // Note: this throws an exception if a build/substitution
+        // fails, but meh.
+        buildPaths(paths, buildMode, evalStore);
+
+        std::vector<BuildResult> results;
+
+        for (auto & path : paths) {
+            std::visit(
+                overloaded {
+                    [&](const DerivedPath::Opaque & bo) {
+                        results.push_back(BuildResult {
+                            .status = BuildResult::Substituted,
+                            .path = bo,
+                        });
+                    },
+                    [&](const DerivedPath::Built & bfd) {
+                        BuildResult res {
+                            .status = BuildResult::Built,
+                            .path = bfd,
+                        };
+
+                        OutputPathMap outputs;
+                        auto drv = evalStore->readDerivation(bfd.drvPath);
+                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
+                        auto drvOutputs = drv.outputsAndOptPaths(*this);
+                        for (auto & output : bfd.outputs) {
+                            if (!outputHashes.count(output))
+                                throw Error(
+                                    "the derivation '%s' doesn't have an output named '%s'",
+                                    printStorePath(bfd.drvPath), output);
+                            auto outputId =
+                                DrvOutput{outputHashes.at(output), output};
+                            if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+                                auto realisation =
+                                    queryRealisation(outputId);
+                                if (!realisation)
+                                    throw Error(
+                                        "cannot operate on an output of unbuilt "
+                                        "content-addressed derivation '%s'",
+                                        outputId.to_string());
+                                res.builtOutputs.emplace(realisation->id, *realisation);
+                            } else {
+                                // If ca-derivations isn't enabled, assume that
+                                // the output path is statically known.
+                                assert(drvOutputs.count(output));
+                                assert(drvOutputs.at(output).second);
+                                res.builtOutputs.emplace(
+                                    outputId,
+                                    Realisation {
+                                        .id = outputId,
+                                        .outPath = *drvOutputs.at(output).second
+                                    });
+                            }
+                        }
+
+                        results.push_back(res);
+                    }
+                },
+                path.raw());
+        }
+
+        return results;
+    }
+}
+
 
 BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
@@ -761,7 +909,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res;
+    BuildResult res { .path = DerivedPath::Built { .drvPath = drvPath } };
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
@@ -797,15 +945,6 @@ void RemoteStore::addIndirectRoot(const Path & path)
 {
     auto conn(getConnection());
     conn->to << wopAddIndirectRoot << path;
-    conn.processStderr();
-    readInt(conn->from);
-}
-
-
-void RemoteStore::syncWithGC()
-{
-    auto conn(getConnection());
-    conn->to << wopSyncWithGC;
     conn.processStderr();
     readInt(conn->from);
 }
@@ -905,6 +1044,25 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 }
 
 
+void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    auto conn(getConnection());
+    conn->to << wopAddBuildLog << drvPath.to_string();
+    StringSource source(log);
+    conn.withFramedSink([&](Sink & sink) {
+        source.drainInto(sink);
+    });
+    readInt(conn->from);
+}
+
+
+std::optional<std::string> RemoteStore::getVersion()
+{
+    auto conn(getConnection());
+    return conn->daemonNixVersion;
+}
+
+
 void RemoteStore::connect()
 {
     auto conn(getConnection());
@@ -973,7 +1131,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         auto msg = readNum<uint64_t>(from);
 
         if (msg == STDERR_WRITE) {
-            string s = readString(from);
+            auto s = readString(from);
             if (!sink) throw Error("no sink");
             (*sink)(s);
         }
@@ -990,7 +1148,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
             if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
                 return std::make_exception_ptr(readError(from));
             } else {
-                string error = readString(from);
+                auto error = readString(from);
                 unsigned int status = readInt(from);
                 return std::make_exception_ptr(Error(status, error));
             }

@@ -6,7 +6,7 @@ automatically fetching any store paths in Firefox’s closure if they are
 available on the server `avalon`:
 
 ```console
-$ nix-env -i firefox --substituters ssh://alice@avalon
+$ nix-env -iA nixpkgs.firefox --substituters ssh://alice@avalon
 ```
 
 This works similar to the binary cache substituter that Nix usually

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include "symbol-table.hh"
 
 #if HAVE_BOEHMGC
@@ -7,6 +9,8 @@
 #endif
 
 namespace nix {
+
+class BindingsBuilder;
 
 
 typedef enum {
@@ -73,20 +77,20 @@ class ExternalValueBase
 
     public:
     /* Return a simple string describing the type */
-    virtual string showType() const = 0;
+    virtual std::string showType() const = 0;
 
     /* Return a string to be used in builtins.typeOf */
-    virtual string typeOf() const = 0;
+    virtual std::string typeOf() const = 0;
 
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
-     * error
+     * error.
      */
-    virtual string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
 
     /* Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
-    virtual bool operator==(const ExternalValueBase & b) const;
+    virtual bool operator ==(const ExternalValueBase & b) const;
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
     virtual void printValueAsJSON(EvalState & state, bool strict,
@@ -94,7 +98,8 @@ class ExternalValueBase
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
-        XMLWriter & doc, PathSet & context, PathSet & drvsSeen) const;
+        XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+        const Pos & pos) const;
 
     virtual ~ExternalValueBase()
     {
@@ -109,8 +114,8 @@ struct Value
 private:
     InternalType internalType;
 
-friend std::string showType(const Value & v);
-friend void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v);
+    friend std::string showType(const Value & v);
+    friend void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v);
 
 public:
 
@@ -232,12 +237,25 @@ public:
         string.context = context;
     }
 
+    void mkString(std::string_view s);
+
+    void mkString(std::string_view s, const PathSet & context);
+
+    void mkStringMove(const char * s, const PathSet & context);
+
+    inline void mkString(const Symbol & s)
+    {
+        mkString(((const std::string &) s).c_str());
+    }
+
     inline void mkPath(const char * s)
     {
         clearValue();
         internalType = tPath;
         path = s;
     }
+
+    void mkPath(std::string_view s);
 
     inline void mkNull()
     {
@@ -251,6 +269,8 @@ public:
         internalType = tAttrs;
         attrs = a;
     }
+
+    Value & mkAttrs(BindingsBuilder & bindings);
 
     inline void mkList(size_t size)
     {
@@ -341,7 +361,7 @@ public:
         return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
     }
 
-    Pos determinePos(const Pos &pos) const;
+    Pos determinePos(const Pos & pos) const;
 
     /* Check whether forcing this value requires a trivial amount of
        computation. In particular, function applications are
@@ -349,54 +369,45 @@ public:
     bool isTrivial() const;
 
     std::vector<std::pair<Path, std::string>> getContext();
+
+    auto listItems()
+    {
+        struct ListIterable
+        {
+            typedef Value * const * iterator;
+            iterator _begin, _end;
+            iterator begin() const { return _begin; }
+            iterator end() const { return _end; }
+        };
+        assert(isList());
+        auto begin = listElems();
+        return ListIterable { begin, begin + listSize() };
+    }
+
+    auto listItems() const
+    {
+        struct ConstListIterable
+        {
+            typedef const Value * const * iterator;
+            iterator _begin, _end;
+            iterator begin() const { return _begin; }
+            iterator end() const { return _end; }
+        };
+        assert(isList());
+        auto begin = listElems();
+        return ConstListIterable { begin, begin + listSize() };
+    }
 };
-
-
-
-// TODO: Remove these static functions, replace call sites with v.mk* instead
-static inline void mkInt(Value & v, NixInt n)
-{
-    v.mkInt(n);
-}
-
-static inline void mkFloat(Value & v, NixFloat n)
-{
-    v.mkFloat(n);
-}
-
-static inline void mkBool(Value & v, bool b)
-{
-    v.mkBool(b);
-}
-
-static inline void mkNull(Value & v)
-{
-    v.mkNull();
-}
-
-static inline void mkApp(Value & v, Value & left, Value & right)
-{
-    v.mkApp(&left, &right);
-}
-
-static inline void mkString(Value & v, const Symbol & s)
-{
-    v.mkString(((const string &) s).c_str());
-}
-
-
-void mkString(Value & v, const char * s);
-
-
-void mkPath(Value & v, const char * s);
 
 
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
 typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
+typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector> > > ValueVectorMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;
+typedef std::map<Symbol, ValueVector> ValueVectorMap;
 #endif
 
 
