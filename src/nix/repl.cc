@@ -73,7 +73,6 @@ struct NixRepl
     StorePath getDerivationPath(Value & v);
     bool processLine(std::string line);
 
-    void loadInstallable(Installable & installable);
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
@@ -634,12 +633,6 @@ bool NixRepl::processLine(std::string line)
     return true;
 }
 
-void NixRepl::loadInstallable(Installable & installable)
-{
-    auto [val, pos] = installable.toValue(*state);
-    addAttrsToScope(*val);
-}
-
 void NixRepl::loadFile(const Path & path)
 {
     loadedFiles.remove(path);
@@ -899,6 +892,9 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 struct CmdRepl : InstallablesCommand
 {
+    CmdRepl(){
+        evalSettings.pureEval = false;
+    }
     std::vector<std::string> files;
     Strings getDefaultFlakeAttrPaths()
     override {
@@ -906,10 +902,6 @@ struct CmdRepl : InstallablesCommand
     }
     virtual bool useDefaultInstallables() {
         return file.has_value() or expr.has_value();
-    }
-
-    CmdRepl()
-    {
     }
 
     std::string description() override
@@ -926,8 +918,6 @@ struct CmdRepl : InstallablesCommand
 
     void run(ref<Store> store) override
     {
-
-        evalSettings.pureEval = false;
         auto state = getEvalState();
         auto repl = std::make_unique<NixRepl>(searchPath, openStore(),state
                 ,[&]()->NixRepl::AnnotatedValues{

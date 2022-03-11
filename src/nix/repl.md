@@ -48,7 +48,7 @@ R""(
 
   nix-repl> :q
 
-  # nix repl --expr 'import <nixpkgs>{}' --impure
+  # nix repl --expr 'import <nixpkgs>{}'
 
   Loading Installable ''...
   Added 12439 variables.

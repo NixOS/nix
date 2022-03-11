@@ -24,3 +24,8 @@
 
   Selecting derivation outputs using the attribute selection syntax
   (e.g. `nixpkgs#glibc.dev`) no longer works.
+
+* `nix repl` now takes installables on the command line, unifying the usage
+  with other commands that use `--file` and `--expr`. Primary breaking change
+  is for the common usage of `nix repl '<nixpkgs>'` which can be recovered with
+  `nix repl nixpkgs` or `nix repl --expr 'import <nixpkgs>{}'`
