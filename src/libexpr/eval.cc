@@ -449,8 +449,10 @@ EvalState::EvalState(
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #else
     , valueAllocCache(std::make_shared<void *>(nullptr))
+    , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -873,42 +875,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
-}
-
-
-Value * EvalState::allocValue()
-{
-    /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
-       GC_malloc_many returns a linked list of objects of the given size, where the first word
-       of each object is also the pointer to the next object in the list. This also means that we
-       have to explicitly clear the first word of every object we take. */
-    if (!*valueAllocCache) {
-        *valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!*valueAllocCache) throw std::bad_alloc();
-    }
-
-    /* GC_NEXT is a convenience macro for accessing the first word of an object.
-       Take the first list item, advance the list to the next item, and clear the next pointer. */
-    void * p = *valueAllocCache;
-    GC_PTR_STORE_AND_DIRTY(&*valueAllocCache, GC_NEXT(p));
-    GC_NEXT(p) = nullptr;
-
-    nrValues++;
-    auto v = (Value *) p;
-    return v;
-}
-
-
-Env & EvalState::allocEnv(size_t size)
-{
-    nrEnvs++;
-    nrValuesInEnvs += size;
-    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->type = Env::Plain;
-
-    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
-
-    return *env;
 }
 
 
