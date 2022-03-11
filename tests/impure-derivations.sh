@@ -21,10 +21,10 @@ path2=$(nix build -L --no-link --json --file ./impure-derivations.nix impure | j
 [[ $(< $path2/n) = 1 ]]
 
 # Test impure derivations that depend on impure derivations.
-path3=$(nix build -L --no-link --json --file ./impure-derivations.nix impureOnImpure -vvvvv | jq -r .[].outputs.out)
+path3=$(nix build -L --no-link --json --file ./impure-derivations.nix impureOnImpure | jq -r .[].outputs.out)
 [[ $(< $path3/n) = X2 ]]
 
-path4=$(nix build -L --no-link --json --file ./impure-derivations.nix impureOnImpure -vvvvv | jq -r .[].outputs.out)
+path4=$(nix build -L --no-link --json --file ./impure-derivations.nix impureOnImpure | jq -r .[].outputs.out)
 [[ $(< $path4/n) = X3 ]]
 
 # Test that (self-)references work.
@@ -37,3 +37,18 @@ nix build -L --no-link --json --file ./impure-derivations.nix inputAddressed 2>&
 drvPath=$(nix eval --json --file ./impure-derivations.nix impure.drvPath | jq -r .)
 [[ $(nix show-derivation $drvPath | jq ".[\"$drvPath\"].outputs.out.impure") = true ]]
 [[ $(nix show-derivation $drvPath | jq ".[\"$drvPath\"].outputs.stuff.impure") = true ]]
+
+# Fixed-output derivations *can* depend on impure derivations.
+path5=$(nix build -L --no-link --json --file ./impure-derivations.nix contentAddressed | jq -r .[].outputs.out)
+[[ $(< $path5) = X ]]
+[[ $(< $TEST_ROOT/counter) = 5 ]]
+
+# And they should not be rebuilt.
+path5=$(nix build -L --no-link --json --file ./impure-derivations.nix contentAddressed | jq -r .[].outputs.out)
+[[ $(< $path5) = X ]]
+[[ $(< $TEST_ROOT/counter) = 5 ]]
+
+# Input-addressed derivations can depend on fixed-output derivations that depend on impure derivations.
+path6=$(nix build -L --no-link --json --file ./impure-derivations.nix inputAddressedAfterCA | jq -r .[].outputs.out)
+[[ $(< $path6) = X ]]
+[[ $(< $TEST_ROOT/counter) = 5 ]]

@@ -7,6 +7,7 @@ rec {
     outputs = [ "out" "stuff" ];
     buildCommand =
       ''
+        echo impure
         x=$(< $TEST_ROOT/counter)
         mkdir $out $stuff
         echo $x > $out/n
@@ -23,6 +24,7 @@ rec {
     name = "impure-on-impure";
     buildCommand =
       ''
+        echo impure-on-impure
         x=$(< ${impure}/n)
         mkdir $out
         printf X$x > $out/n
@@ -43,4 +45,24 @@ rec {
       '';
   };
 
+  contentAddressed = mkDerivation {
+    name = "content-addressed";
+    buildCommand =
+      ''
+        echo content-addressed
+        x=$(< ${impureOnImpure}/n)
+        printf ''${x:0:1} > $out
+      '';
+    outputHashAlgo = "sha256";
+    outputHashMode = "recursive";
+    outputHash = "sha256-eBYxcgkuWuiqs4cKNgKwkb3vY/HR0vVsJnqe8itJGcQ=";
+  };
+
+  inputAddressedAfterCA = mkDerivation {
+    name = "input-addressed-after-ca";
+    buildCommand =
+      ''
+        cat ${contentAddressed} > $out
+      '';
+  };
 }
