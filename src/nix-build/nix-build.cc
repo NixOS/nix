@@ -73,6 +73,47 @@ static std::vector<std::string> shellwords(const std::string & s)
     return res;
 }
 
+void buildPaths(ref<Store> store, ref<Store> evalStore, BuildMode buildMode, const std::vector<StorePathWithOutputs> & paths0, bool dryRun) {
+    auto paths = toDerivedPaths(paths0);
+    /* Note: we do this even when !printMissing to efficiently
+       fetch binary cache data. */
+    uint64_t downloadSize, narSize;
+    StorePathSet willBuild, willSubstitute, unknown;
+    store->queryMissing(paths,
+        willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (settings.printMissing)
+        printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (!dryRun)
+        store->buildPaths(paths, buildMode, evalStore);
+}
+
+
+std::map<std::string, std::string> getShellEnv(ref<Store> store, bool pure, std::set<string> & retainVarsInPure) {
+    auto env = getEnv();
+    auto tmp = getEnv("TMPDIR");
+    if (!tmp) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
+
+    if (pure) {
+        decltype(env) newEnv;
+        for (auto & i : env)
+            if (retainVarsInPure.count(i.first))
+                newEnv.emplace(i);
+        env = newEnv;
+        // NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
+        env["__ETC_PROFILE_SOURCED"] = "1";
+    }
+
+    env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = *tmp;
+    env["NIX_STORE"] = store->storeDir;
+    env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
+
+    return env;
+}
+
+
+
 static void main_nix_build(int argc, char * * argv)
 {
     auto dryRun = false;
@@ -101,6 +142,8 @@ static void main_nix_build(int argc, char * * argv)
     AutoDelete tmpDir(createTempDir("", myName));
 
     std::string outLink = "./result";
+
+    DrvInfos drvs;
 
     // List of environment variables kept for --pure
     std::set<std::string> keepVars{
@@ -282,7 +325,6 @@ static void main_nix_build(int argc, char * * argv)
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 
-    DrvInfos drvs;
 
     /* Parse the expressions. */
     std::vector<Expr *> exprs;
@@ -325,21 +367,6 @@ static void main_nix_build(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths0) {
-        auto paths = toDerivedPaths(paths0);
-        /* Note: we do this even when !printMissing to efficiently
-           fetch binary cache data. */
-        uint64_t downloadSize, narSize;
-        StorePathSet willBuild, willSubstitute, unknown;
-        store->queryMissing(paths,
-            willBuild, willSubstitute, unknown, downloadSize, narSize);
-
-        if (settings.printMissing)
-            printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
-
-        if (!dryRun)
-            store->buildPaths(paths, buildMode, evalStore);
-    };
 
     if (runEnv) {
         if (drvs.size() != 1)
@@ -396,7 +423,7 @@ static void main_nix_build(int argc, char * * argv)
             pathsToCopy.insert(src);
         }
 
-        buildPaths(pathsToBuild);
+        buildPaths(store, evalStore, buildMode, pathsToBuild, dryRun);
 
         if (dryRun) return;
 
@@ -412,24 +439,7 @@ static void main_nix_build(int argc, char * * argv)
         }
 
         // Set the environment.
-        auto env = getEnv();
-
-        auto tmp = getEnv("TMPDIR");
-        if (!tmp) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
-
-        if (pure) {
-            decltype(env) newEnv;
-            for (auto & i : env)
-                if (keepVars.count(i.first))
-                    newEnv.emplace(i);
-            env = newEnv;
-            // NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
-            env["__ETC_PROFILE_SOURCED"] = "1";
-        }
-
-        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = *tmp;
-        env["NIX_STORE"] = store->storeDir;
-        env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
+        auto env = getShellEnv(store, pure, keepVars);
 
         auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile").value_or(""));
 
@@ -542,7 +552,6 @@ static void main_nix_build(int argc, char * * argv)
     }
 
     else {
-
         std::vector<StorePathWithOutputs> pathsToBuild;
         std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
         RealisedPath::Set drvsToCopy;
@@ -566,8 +575,21 @@ static void main_nix_build(int argc, char * * argv)
             else
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
+        // Can only free the eval state after all the DrvInfo's have been freed
+        // as they carry a reference to the eval state instance (which isn't
+        // managed in any way).
+        drvs = {};
+        exprs = {};
+        state = nullptr;
 
-        buildPaths(pathsToBuild);
+        // Collect garbage a couple of times as per Boehm GC docs that suggest
+        // to run it more than just once.
+        // Running it 10 times seems reasonable and doesn't appear to take too
+        // much time.
+        for (int i = 0; i < 10; i++)
+            GC_gcollect();
+
+        buildPaths(store, evalStore, buildMode, pathsToBuild, dryRun);
 
         if (dryRun) return;
 
