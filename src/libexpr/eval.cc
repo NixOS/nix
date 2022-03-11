@@ -729,9 +729,18 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
     throw EvalError(s, s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
+{
+    throw EvalError(ErrorInfo {
+        .msg = hintfmt(s, s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
         .errPos = pos
     });
@@ -774,6 +783,16 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 }
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol & s2))
+{
+    throw TypeError(ErrorInfo {
+        .msg = hintfmt(s, fun.showNamePos(), s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
@@ -1247,8 +1266,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    std::set<std::string> allAttrNames;
+                    for (auto & attr : *vAttrs->attrs)
+                        allAttrNames.insert(attr.name);
+                    throwEvalError(
+                        pos,
+                        Suggestions::bestMatches(allAttrNames, name),
+                        "attribute '%1%' missing", name);
+                }
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1364,8 +1390,17 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (!lambda.formals->has(i.name))
-                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                        if (!lambda.formals->has(i.name)) {
+                            std::set<std::string> formalNames;
+                            for (auto & formal : lambda.formals->formals)
+                                formalNames.insert(formal.name);
+                            throwTypeError(
+                                pos,
+                                Suggestions::bestMatches(formalNames, i.name),
+                                "%1% called with unexpected argument '%2%'",
+                                lambda,
+                                i.name);
+                        }
                     abort(); // can't happen
                 }
             }
