@@ -239,13 +239,13 @@ struct GitInputScheme : InputScheme
             auto errorMessage = result.second;
 
             if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
-                throw Error("'%s' is not a git repository.", actualUrl);
+                throw Error("'%s' is not a Git repository", actualUrl);
             } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
                 // indicates that the repo does not have any commits
                 // we want to proceed and will consider it dirty later
             } else if (exitCode != 0) {
                 // any other errors should lead to a failure
-                throw Error("Getting the HEAD of the git tree '%s' failed with exit code %d:\n%s", actualUrl, exitCode, errorMessage);
+                throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", actualUrl, exitCode, errorMessage);
             }
 
             bool hasHead = exitCode == 0;
