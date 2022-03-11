@@ -24,10 +24,34 @@ R""(
 * Interact with Nixpkgs in the REPL:
 
   ```console
-  # nix repl '<nixpkgs>'
+  # nix repl --file example.nix
+  Loading Installable ''...
+  Added 3 variables.
 
-  Loading '<nixpkgs>'...
-  Added 12428 variables.
+  # nix repl --expr '{a={b=3;c=4;};}'
+  Loading Installable ''...
+  Added 1 variables.
+
+  # nix repl --expr '{a={b=3;c=4;};}' a
+  Loading Installable ''...
+  Added 1 variables.
+
+  # nix repl nixpkgs
+  Loading Installable 'flake:nixpkgs#'...
+  Added 5 variables.
+
+  nix-repl> legacyPackages.x86_64-linux.emacs.name
+  "emacs-27.1"
+
+  nix-repl> legacyPackages.x86_64-linux.emacs.name
+  "emacs-27.1"
+
+  nix-repl> :q
+
+  # nix repl --expr 'import <nixpkgs>{}' --impure
+
+  Loading Installable ''...
+  Added 12439 variables.
 
   nix-repl> emacs.name
   "emacs-27.1"

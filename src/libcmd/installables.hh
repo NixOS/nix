@@ -131,6 +131,7 @@ struct Installable
         OperateOn operateOn,
         const std::vector<std::shared_ptr<Installable>> & installables);
 };
+typedef std::vector<std::shared_ptr<Installable>> Installables;
 
 struct InstallableValue : Installable
 {

@@ -43,8 +43,6 @@ extern "C" {
 
 namespace nix {
 
-typedef std::vector<std::shared_ptr<Installable>> Installables;
-
 struct NixRepl
     #if HAVE_BOEHMGC
     : gc
@@ -899,16 +897,15 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
-struct CmdRepl : InstallableCommand
+struct CmdRepl : InstallablesCommand
 {
     std::vector<std::string> files;
-    Strings getDefaultFlakeAttrPathPrefixes()
-    override {
-        return {};
-    }
     Strings getDefaultFlakeAttrPaths()
     override {
         return {""};
+    }
+    virtual bool useDefaultInstallables() {
+        return file.has_value() or expr.has_value();
     }
 
     CmdRepl()
@@ -934,10 +931,14 @@ struct CmdRepl : InstallableCommand
         auto state = getEvalState();
         auto repl = std::make_unique<NixRepl>(searchPath, openStore(),state
                 ,[&]()->NixRepl::AnnotatedValues{
-                   auto installable = load();
-                   auto [val, pos] = installable->toValue(*state);
-                   auto what = installable->what();
-                   return { {val,what} };
+                   auto installables = load();
+                   NixRepl::AnnotatedValues values;
+                   for (auto & installable: installables){
+                       auto [val, pos] = installable->toValue(*state);
+                       auto what = installable->what();
+                       values.push_back( {val,what} );
+                   }
+                   return values;
                 }
             );
         repl->autoArgs = getAutoArgs(*repl->state);

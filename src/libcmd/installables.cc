@@ -1025,11 +1025,16 @@ InstallablesCommand::InstallablesCommand()
 
 void InstallablesCommand::prepare()
 {
+    installables = load();
+}
+
+Installables InstallablesCommand::load() {
+    Installables installables;
     if (_installables.empty() && useDefaultInstallables())
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
-    installables = parseInstallables(getStore(), _installables);
+    return parseInstallables(getStore(), _installables);
 }
 
 std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
@@ -1054,13 +1059,10 @@ InstallableCommand::InstallableCommand(bool supportReadOnlyMode)
         }}
     });
 }
-std::shared_ptr<Installable> InstallableCommand::load() {
-    return parseInstallable(getStore(), _installable);
-}
 
 void InstallableCommand::prepare()
 {
-    installable = load();
+    installable = parseInstallable(getStore(), _installable);
 }
 
 }
