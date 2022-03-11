@@ -3,6 +3,7 @@ source common.sh
 requireDaemonNewerThan "2.8pre20220311"
 
 enableFeatures "ca-derivations ca-references impure-derivations"
+restartDaemon
 
 clearStore
 
