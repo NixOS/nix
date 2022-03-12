@@ -57,6 +57,8 @@ struct ExprLambda;
 struct PrimOp;
 class Symbol;
 struct Pos;
+class StorePath;
+class Store;
 class EvalState;
 class XMLWriter;
 class JSONPlaceholder;
@@ -64,7 +66,7 @@ class JSONPlaceholder;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
-typedef std::pair<Path, std::string> NixStringContextElem;
+typedef std::pair<StorePath, std::string> NixStringContextElem;
 typedef std::vector<NixStringContextElem> NixStringContext;
 
 /* External values must descend from ExternalValueBase, so that
@@ -370,7 +372,7 @@ public:
        non-trivial. */
     bool isTrivial() const;
 
-    NixStringContext getContext();
+    NixStringContext getContext(const Store &);
 
     auto listItems()
     {

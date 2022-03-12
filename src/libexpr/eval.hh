@@ -17,7 +17,7 @@
 namespace nix {
 
 
-class Store;
+struct Store;
 class EvalState;
 class StorePath;
 enum RepairFlag : bool;
@@ -430,7 +430,7 @@ std::string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-NixStringContextElem decodeContext(std::string_view s);
+NixStringContextElem decodeContext(const Store & store, std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);

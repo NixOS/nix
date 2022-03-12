@@ -43,8 +43,8 @@ StringMap EvalState::realiseContext(const PathSet & context)
     StringMap res;
 
     for (auto & i : context) {
-        auto [ctxS, outputName] = decodeContext(i);
-        auto ctx = store->parseStorePath(ctxS);
+        auto [ctx, outputName] = decodeContext(*store, i);
+        auto ctxS = store->printStorePath(ctx);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
@@ -1118,8 +1118,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            auto ctx = decodeContext(path);
-            drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(ctx.second);
+            auto ctx = decodeContext(*state.store, path);
+            drv.inputDrvs[ctx.first].insert(ctx.second);
         }
 
         /* Otherwise it's a source file. */
