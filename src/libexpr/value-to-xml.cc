@@ -155,7 +155,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
 
         case nFloat:
-            doc.writeEmptyElement("float", singletonAttrs("value", (format("%1%") % v.fpoint).str()));
+            doc.writeEmptyElement("float", singletonAttrs("value", (format("%.15g") % v.fpoint).str()));
             break;
 
         case nThunk:
