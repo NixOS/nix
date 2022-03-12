@@ -918,12 +918,17 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
             pkgObj.attr("pname", drvName.name);
             pkgObj.attr("version", drvName.version);
             pkgObj.attr("system", i.querySystem());
+            pkgObj.attr("outputName", i.queryOutputName());
 
-            if (printOutPath) {
-                DrvInfo::Outputs outputs = i.queryOutputs();
+            {
+                DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
                 JSONObject outputObj = pkgObj.object("outputs");
-                for (auto & j : outputs)
-                    outputObj.attr(j.first, globals.state->store->printStorePath(j.second));
+                for (auto & j : outputs) {
+                    if (j.second)
+                        outputObj.attr(j.first, globals.state->store->printStorePath(*j.second));
+                    else
+                        outputObj.attr(j.first, nullptr);
+                }
             }
 
             if (printMeta) {
@@ -1154,13 +1159,16 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     columns.push_back(drvPath ? store.printStorePath(*drvPath) : "-");
             }
 
+            if (xmlOutput)
+                attrs["outputName"] = i.queryOutputName();
+
             if (printOutPath && !xmlOutput) {
                 DrvInfo::Outputs outputs = i.queryOutputs();
                 std::string s;
                 for (auto & j : outputs) {
                     if (!s.empty()) s += ';';
                     if (j.first != "out") { s += j.first; s += "="; }
-                    s += store.printStorePath(j.second);
+                    s += store.printStorePath(*j.second);
                 }
                 columns.push_back(s);
             }
@@ -1174,71 +1182,67 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             }
 
             if (xmlOutput) {
-                if (printOutPath || printMeta) {
-                    XMLOpenElement item(xml, "item", attrs);
-                    if (printOutPath) {
-                        DrvInfo::Outputs outputs = i.queryOutputs();
-                        for (auto & j : outputs) {
-                            XMLAttrs attrs2;
-                            attrs2["name"] = j.first;
-                            attrs2["path"] = store.printStorePath(j.second);
-                            xml.writeEmptyElement("output", attrs2);
-                        }
-                    }
-                    if (printMeta) {
-                        StringSet metaNames = i.queryMetaNames();
-                        for (auto & j : metaNames) {
-                            XMLAttrs attrs2;
-                            attrs2["name"] = j;
-                            Value * v = i.queryMeta(j);
-                            if (!v)
-                                printError(
-                                    "derivation '%s' has invalid meta attribute '%s'",
-                                    i.queryName(), j);
-                            else {
-                                if (v->type() == nString) {
-                                    attrs2["type"] = "string";
-                                    attrs2["value"] = v->string.s;
-                                    xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type() == nInt) {
-                                    attrs2["type"] = "int";
-                                    attrs2["value"] = (format("%1%") % v->integer).str();
-                                    xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type() == nFloat) {
-                                    attrs2["type"] = "float";
-                                    attrs2["value"] = (format("%1%") % v->fpoint).str();
-                                    xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type() == nBool) {
-                                    attrs2["type"] = "bool";
-                                    attrs2["value"] = v->boolean ? "true" : "false";
-                                    xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type() == nList) {
-                                    attrs2["type"] = "strings";
-                                    XMLOpenElement m(xml, "meta", attrs2);
-                                    for (auto elem : v->listItems()) {
-                                        if (elem->type() != nString) continue;
-                                        XMLAttrs attrs3;
-                                        attrs3["value"] = elem->string.s;
-                                        xml.writeEmptyElement("string", attrs3);
-                                    }
-                              } else if (v->type() == nAttrs) {
-                                  attrs2["type"] = "strings";
-                                  XMLOpenElement m(xml, "meta", attrs2);
-                                  Bindings & attrs = *v->attrs;
-                                  for (auto &i : attrs) {
-                                      Attr & a(*attrs.find(i.name));
-                                      if(a.value->type() != nString) continue;
-                                      XMLAttrs attrs3;
-                                      attrs3["type"] = i.name;
-                                      attrs3["value"] = a.value->string.s;
-                                      xml.writeEmptyElement("string", attrs3);
+                XMLOpenElement item(xml, "item", attrs);
+                DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
+                for (auto & j : outputs) {
+                    XMLAttrs attrs2;
+                    attrs2["name"] = j.first;
+                    if (j.second)
+                        attrs2["path"] = store.printStorePath(*j.second);
+                    xml.writeEmptyElement("output", attrs2);
+                }
+                if (printMeta) {
+                    StringSet metaNames = i.queryMetaNames();
+                    for (auto & j : metaNames) {
+                        XMLAttrs attrs2;
+                        attrs2["name"] = j;
+                        Value * v = i.queryMeta(j);
+                        if (!v)
+                            printError(
+                                "derivation '%s' has invalid meta attribute '%s'",
+                                i.queryName(), j);
+                        else {
+                            if (v->type() == nString) {
+                                attrs2["type"] = "string";
+                                attrs2["value"] = v->string.s;
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (v->type() == nInt) {
+                                attrs2["type"] = "int";
+                                attrs2["value"] = (format("%1%") % v->integer).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (v->type() == nFloat) {
+                                attrs2["type"] = "float";
+                                attrs2["value"] = (format("%1%") % v->fpoint).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (v->type() == nBool) {
+                                attrs2["type"] = "bool";
+                                attrs2["value"] = v->boolean ? "true" : "false";
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (v->type() == nList) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                for (auto elem : v->listItems()) {
+                                    if (elem->type() != nString) continue;
+                                    XMLAttrs attrs3;
+                                    attrs3["value"] = elem->string.s;
+                                    xml.writeEmptyElement("string", attrs3);
                                 }
-                              }
+                            } else if (v->type() == nAttrs) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                Bindings & attrs = *v->attrs;
+                                for (auto &i : attrs) {
+                                    Attr & a(*attrs.find(i.name));
+                                    if(a.value->type() != nString) continue;
+                                    XMLAttrs attrs3;
+                                    attrs3["type"] = i.name;
+                                    attrs3["value"] = a.value->string.s;
+                                    xml.writeEmptyElement("string", attrs3);
+                            }
                             }
                         }
                     }
-                } else
-                    xml.writeEmptyElement("item", attrs);
+                }
             } else
                 table.push_back(columns);
 
