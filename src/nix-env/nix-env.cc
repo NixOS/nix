@@ -128,7 +128,12 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = std::string(attrName, 0, attrName.size() - 4);
             if (!seen.insert(attrName).second) {
-                printError("warning: name collision in input Nix expressions, skipping '%1%'", path2);
+                std::string suggestionMessage = "";
+                if (path2.find("channels") != std::string::npos && path.find("channels") != std::string::npos) {
+                    suggestionMessage = fmt("\nsuggestion: remove '%s' from either the root channels or the user channels", attrName);
+                }
+                printError("warning: name collision in input Nix expressions, skipping '%1%'"
+                            "%2%", path2, suggestionMessage);
                 continue;
             }
             /* Load the expression on demand. */
