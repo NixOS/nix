@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 
 #include <sys/resource.h>
@@ -2017,7 +2018,11 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
         if (v.type() == nBool && v.boolean) return "1";
         if (v.type() == nBool && !v.boolean) return "";
         if (v.type() == nInt) return std::to_string(v.integer);
-        if (v.type() == nFloat) return std::to_string(v.fpoint);
+        if (v.type() == nFloat) {
+            std::stringstream out;
+            out << std::setprecision(15) << v.fpoint;
+            return out.str();
+        }
         if (v.type() == nNull) return "";
 
         if (v.isList()) {
