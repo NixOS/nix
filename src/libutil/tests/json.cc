@@ -49,12 +49,44 @@ namespace nix {
         ASSERT_EQ(out.str(), "1.024");
     }
 
+    TEST(toJSON, floatConversionPrecision) {
+        auto input = 1.000001f;
+        std::stringstream out;
+        toJSON(out, input);
+
+        ASSERT_EQ(out.str(), "1.000001");
+    }
+
+    TEST(toJSON, floatUsesScientific) {
+        auto input = 2.3e-10f;
+        std::stringstream out;
+        toJSON(out, input);
+
+        ASSERT_EQ(out.str(), "2.3e-10");
+    }
+
     TEST(toJSON, convertsDouble) {
         const double input = 1.024;
         std::stringstream out;
         toJSON(out, input);
 
         ASSERT_EQ(out.str(), "1.024");
+    }
+
+    TEST(toJSON, doubleConversionPrecision) {
+        const double input = 1.00000000001;
+        std::stringstream out;
+        toJSON(out, input);
+
+        ASSERT_EQ(out.str(), "1.00000000001");
+    }
+
+    TEST(toJSON, doubleUsesScientific) {
+        const double input = 2.3e-10;
+        std::stringstream out;
+        toJSON(out, input);
+
+        ASSERT_EQ(out.str(), "2.3e-10");
     }
 
     TEST(toJSON, convertsBool) {
