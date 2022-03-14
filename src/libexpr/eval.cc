@@ -37,8 +37,6 @@
 
 namespace nix {
 
-std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
-
 static char * allocString(size_t size)
 {
     char * t;

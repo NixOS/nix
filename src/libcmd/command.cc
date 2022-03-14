@@ -93,10 +93,6 @@ EvalCommand::EvalCommand()
     });
 }
 
-extern std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
-
-
-
 EvalCommand::~EvalCommand()
 {
     if (evalState)

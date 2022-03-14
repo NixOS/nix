@@ -6,6 +6,9 @@
 
 namespace nix {
 
+/* Launch the nix debugger */
+
+std::function<void(const Error * error, const Env & env, const Expr & expr)> debuggerHook;
 
 /* Displaying abstract syntax trees. */
 
