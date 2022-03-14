@@ -52,6 +52,10 @@ public:
     bool sameMachine() override
     { return false; }
 
+    // FIXME extend daemon protocol, move implementation to RemoteStore
+    std::optional<std::string> getBuildLog(const StorePath & path) override
+    { unsupported("getBuildLog"); }
+
 private:
 
     struct Connection : RemoteStore::Connection
