@@ -108,16 +108,16 @@ static void fetchTree(
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                throw Error({
+                state.debug_throw(EvalError({
                     .msg = hintfmt("unexpected attribute 'type'"),
                     .errPos = pos
-                });
+                }));
             type = state.forceStringNoCtx(*aType->value, *aType->pos);
         } else if (!type)
-            throw Error({
+            state.debug_throw(EvalError({
                 .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
                 .errPos = pos
-            });
+            }));
 
         attrs.emplace("type", type.value());
 
@@ -138,16 +138,16 @@ static void fetchTree(
             else if (attr.value->type() == nInt)
                 attrs.emplace(attr.name, uint64_t(attr.value->integer));
             else
-                throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    attr.name, showType(*attr.value));
+                state.debug_throw(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                    attr.name, showType(*attr.value)));
         }
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                throw Error({
+                state.debug_throw(EvalError({
                     .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
                     .errPos = pos
-                });
+                }));
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
@@ -167,7 +167,7 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isImmutable())
-        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
+        state.debug_throw(EvalError("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos));
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -206,17 +206,17 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError({
+                state.debug_throw(EvalError({
                     .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
                     .errPos = *attr.pos
-                });
+                }));
             }
 
         if (!url)
-            throw EvalError({
+            state.debug_throw(EvalError({
                 .msg = hintfmt("'url' argument required"),
                 .errPos = pos
-            });
+            }));
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
@@ -228,7 +228,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         name = baseNameOf(*url);
 
     if (evalSettings.pureEval && !expectedHash)
-        throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
+        state.debug_throw(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
 
     auto storePath =
         unpack
@@ -240,8 +240,8 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
-            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
+            state.debug_throw(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
     }
 
     state.allowPath(storePath);

@@ -783,13 +783,14 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     if (hasPrefix(path, "nix/"))
         return concatStrings(corepkgsPrefix, path.substr(4));
 
-    throw ThrownError({
+    debug_throw(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
         .errPos = pos
-    });
+    }));
+    return Path();   // should never execute due to debug_throw above.
 }
 
 

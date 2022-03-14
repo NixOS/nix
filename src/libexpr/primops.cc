@@ -2542,7 +2542,7 @@ static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args
                 attrsSeen[attr.name].first++;
         } catch (TypeError & e) {
             e.addTrace(pos, hintfmt("while invoking '%s'", "zipAttrsWith"));
-            throw;
+            state.debug_throw(e);
         }
     }
 
@@ -3127,7 +3127,7 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
             state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)));
         } catch (TypeError &e) {
             e.addTrace(pos, hintfmt("while invoking '%s'", "concatMap"));
-            throw;
+            state.debug_throw(e);
         }
         len += lists[n].listSize();
     }
