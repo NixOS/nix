@@ -1207,32 +1207,37 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         // hash per output.
         auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
         std::visit(overloaded {
-            [&](Hash & h) {
-                for (auto & i : outputs) {
-                    auto outPath = state.store->makeOutputPath(i, h, drvName);
-                    drv.env[i] = state.store->printStorePath(outPath);
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputInputAddressed {
-                                .path = std::move(outPath),
-                            },
-                        });
+            [&](const DrvHash & drvHash) {
+                auto & h = drvHash.hash;
+                switch (drvHash.kind) {
+                case DrvHash::Kind::Deferred:
+                    for (auto & i : outputs) {
+                        drv.outputs.insert_or_assign(i,
+                            DerivationOutput {
+                                .output = DerivationOutputDeferred{},
+                            });
+                    }
+                    break;
+                case DrvHash::Kind::Regular:
+                    for (auto & i : outputs) {
+                        auto outPath = state.store->makeOutputPath(i, h, drvName);
+                        drv.env[i] = state.store->printStorePath(outPath);
+                        drv.outputs.insert_or_assign(i,
+                            DerivationOutput {
+                                .output = DerivationOutputInputAddressed {
+                                    .path = std::move(outPath),
+                                },
+                            });
+                    }
+                    break;
                 }
             },
-            [&](CaOutputHashes &) {
+            [&](const CaOutputHashes &) {
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](DeferredHash &) {
-                for (auto & i : outputs) {
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputDeferred{},
-                        });
-                }
-            },
         },
-        hashModulo);
+        hashModulo.raw());
 
     }
 
