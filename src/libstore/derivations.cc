@@ -145,31 +145,66 @@ StorePath writeDerivation(Store & store,
 }
 
 
-/* Read string `s' from stream `str'. */
-static void expect(std::istream & str, std::string_view s)
-{
-    char s2[s.size()];
-    str.read(s2, s.size());
-    if (std::string(s2, s.size()) != s)
-        throw FormatError("expected string '%1%'", s);
-}
+struct DerivationParserContext {
+    /* input stream being parsed. */
+    std::string_view input;
 
+    DerivationParserContext(std::string_view i)
+        : input(i)
+    { }
 
-/* Read a C-style string from stream `str'. */
-static std::string parseString(std::istream & str)
+    char peek(void) {
+        if (input.empty())
+            throw FormatError("unexpected EOF");
+        return input.front();
+    }
+
+    char get() {
+        if (input.empty())
+            throw FormatError("unexpected EOF");
+        char r = input.front();
+        input.remove_prefix(1);
+        return r;
+    }
+
+    void expect(std::string_view s)
+    {
+        size_t sz = s.size();
+        if (input.size() < sz || s != input.substr(0, sz))
+            throw FormatError("expected string '%1%'", s);
+        input.remove_prefix(sz);
+    }
+
+    void expect(char c)
+    {
+        if (get() != c)
+            throw FormatError("expected char '%1%'", c);
+    }
+};
+
+static std::string parseString(DerivationParserContext & str)
 {
     std::string res;
-    expect(str, "\"");
-    int c;
-    while ((c = str.get()) != '"')
-        if (c == '\\') {
-            c = str.get();
-            if (c == 'n') res += '\n';
-            else if (c == 'r') res += '\r';
-            else if (c == 't') res += '\t';
-            else res += c;
-        }
+    str.expect('"');
+
+    /* Scan up to first '"' (closing string) or escape. Then append to a string. */
+    for (;;) {
+        std::string_view prefix = str.input.substr(0, str.input.find_first_of("\"\\"));
+        res.append(prefix);
+        str.input.remove_prefix(prefix.size());
+
+        int c = str.get();
+        if (c == '"')
+            break;
+
+        /* Handle '\\'. */
+        c = str.get();
+        if (c == 'n') res += '\n';
+        else if (c == 'r') res += '\r';
+        else if (c == 't') res += '\t';
         else res += c;
+    }
+
     return res;
 }
 
@@ -178,7 +213,7 @@ static void validatePath(std::string_view s) {
         throw FormatError("bad path '%1%' in derivation", s);
 }
 
-static Path parsePath(std::istream & str)
+static Path parsePath(DerivationParserContext & str)
 {
     auto s = parseString(str);
     validatePath(s);
@@ -186,7 +221,7 @@ static Path parsePath(std::istream & str)
 }
 
 
-static bool endOfList(std::istream & str)
+static bool endOfList(DerivationParserContext & str)
 {
     if (str.peek() == ',') {
         str.get();
@@ -200,7 +235,7 @@ static bool endOfList(std::istream & str)
 }
 
 
-static StringSet parseStrings(std::istream & str, bool arePaths)
+static StringSet parseStrings(DerivationParserContext & str, bool arePaths)
 {
     StringSet res;
     while (!endOfList(str))
@@ -253,12 +288,12 @@ static DerivationOutput parseDerivationOutput(const Store & store,
     }
 }
 
-static DerivationOutput parseDerivationOutput(const Store & store, std::istringstream & str)
+static DerivationOutput parseDerivationOutput(const Store & store, DerivationParserContext & str)
 {
-    expect(str, ","); const auto pathS = parseString(str);
-    expect(str, ","); const auto hashAlgo = parseString(str);
-    expect(str, ","); const auto hash = parseString(str);
-    expect(str, ")");
+    str.expect(','); const auto pathS = parseString(str);
+    str.expect(','); const auto hashAlgo = parseString(str);
+    str.expect(','); const auto hash = parseString(str);
+    str.expect(')');
 
     return parseDerivationOutput(store, pathS, hashAlgo, hash);
 }
@@ -269,45 +304,45 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
     Derivation drv;
     drv.name = name;
 
-    std::istringstream str(std::move(s));
-    expect(str, "Derive([");
+    DerivationParserContext str(s);
+    str.expect("Derive([");
 
     /* Parse the list of outputs. */
     while (!endOfList(str)) {
-        expect(str, "("); std::string id = parseString(str);
+        str.expect('('); std::string id = parseString(str);
         auto output = parseDerivationOutput(store, str);
         drv.outputs.emplace(std::move(id), std::move(output));
     }
 
     /* Parse the list of input derivations. */
-    expect(str, ",[");
+    str.expect(','); str.expect('[');
     while (!endOfList(str)) {
-        expect(str, "(");
+        str.expect('(');
         Path drvPath = parsePath(str);
-        expect(str, ",[");
+        str.expect(",[");
         drv.inputDrvs.insert_or_assign(store.parseStorePath(drvPath), parseStrings(str, false));
-        expect(str, ")");
+        str.expect(')');
     }
 
-    expect(str, ",["); drv.inputSrcs = store.parseStorePathSet(parseStrings(str, true));
-    expect(str, ","); drv.platform = parseString(str);
-    expect(str, ","); drv.builder = parseString(str);
+    str.expect(','); str.expect('['); drv.inputSrcs = store.parseStorePathSet(parseStrings(str, true));
+    str.expect(','); drv.platform = parseString(str);
+    str.expect(','); drv.builder = parseString(str);
 
     /* Parse the builder arguments. */
-    expect(str, ",[");
+    str.expect(','); str.expect('[');
     while (!endOfList(str))
         drv.args.push_back(parseString(str));
 
     /* Parse the environment variables. */
-    expect(str, ",[");
+    str.expect(','); str.expect('[');
     while (!endOfList(str)) {
-        expect(str, "("); auto name = parseString(str);
-        expect(str, ","); auto value = parseString(str);
-        expect(str, ")");
+        str.expect('('); auto name = parseString(str);
+        str.expect(','); auto value = parseString(str);
+        str.expect(')');
         drv.env[name] = value;
     }
 
-    expect(str, ")");
+    str.expect(')');
     return drv;
 }
 
