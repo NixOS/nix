@@ -48,6 +48,10 @@ namespace nix {
 void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
+/* Same as `void dumpPath()`, but returns the last modified date of the path */
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink,
+    PathFilter & filter = defaultPathFilter);
+
 void dumpString(std::string_view s, Sink & sink);
 
 /* FIXME: fix this API, it sucks. */

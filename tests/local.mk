@@ -21,6 +21,7 @@ nix_tests = \
   tarball.sh \
   fetchGit.sh \
   fetchurl.sh \
+  fetchPath.sh \
   simple.sh \
   referrers.sh \
   optimise-store.sh \
