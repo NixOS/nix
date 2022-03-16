@@ -202,12 +202,14 @@ bool isDerivation(const std::string & fileName);
    the output name is "out". */
 std::string outputPathName(std::string_view drvName, std::string_view outputName);
 
-// known CA drv's output hashes, current just for fixed-output derivations
-// whose output hashes are always known since they are fixed up-front.
-typedef std::map<std::string, Hash> CaOutputHashes;
 
-struct DrvHash {
-    Hash hash;
+// The hashes modulo of a derivation.
+//
+// Each output is given a hash, although in practice only the content-addressed
+// derivations (fixed-output or not) will have a different hash for each
+// output.
+struct DrvHashModulo {
+    std::map<std::string, Hash> hashes;
 
     enum struct Kind: bool {
         // Statically determined derivations.
@@ -218,30 +220,6 @@ struct DrvHash {
     };
 
     Kind kind;
-};
-
-void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
-
-typedef std::variant<
-    // Regular normalized derivation hash, and whether it was deferred (because
-    // an ancestor derivation is a floating content addressed derivation).
-    DrvHash,
-    // Fixed-output derivation hashes
-    CaOutputHashes
-> _DrvHashModuloRaw;
-
-struct DrvHashModulo : _DrvHashModuloRaw {
-    using Raw = _DrvHashModuloRaw;
-    using Raw::Raw;
-
-    /* Get hash, throwing if it is per-output CA hashes or a
-       deferred Drv hash.
-     */
-    const Hash & requireNoFixedNonDeferred() const;
-
-    inline const Raw & raw() const {
-        return static_cast<const Raw &>(*this);
-    }
 };
 
 /* Returns hashes with the details of fixed-output subderivations

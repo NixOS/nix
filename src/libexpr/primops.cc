@@ -1197,34 +1197,22 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 DerivationOutput::Deferred { });
         }
 
-        // Regular, non-CA derivation should always return a single hash and not
-        // hash per output.
-        auto hashModulo = hashDerivationModulo(*state.store, drv, true);
-        std::visit(overloaded {
-            [&](const DrvHash & drvHash) {
-                auto & h = drvHash.hash;
-                switch (drvHash.kind) {
-                case DrvHash::Kind::Deferred:
-                    /* Outputs already deferred, nothing to do */
-                    break;
-                case DrvHash::Kind::Regular:
-                    for (auto & [outputName, output] : drv.outputs) {
-                        auto outPath = state.store->makeOutputPath(outputName, h, drvName);
-                        drv.env[outputName] = state.store->printStorePath(outPath);
-                        output = DerivationOutput::InputAddressed {
-                            .path = std::move(outPath),
-                        };
-                    }
-                    break;
-                }
-            },
-            [&](const CaOutputHashes &) {
-                // Shouldn't happen as the toplevel derivation is not CA.
-                assert(false);
-            },
-        },
-        hashModulo.raw());
-
+        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        switch (hashModulo.kind) {
+        case DrvHashModulo::Kind::Deferred:
+            /* Outputs already deferred, nothing to do */
+            break;
+        case DrvHashModulo::Kind::Regular:
+            for (auto & [outputName, output] : drv.outputs) {
+                auto & h = hashModulo.hashes.at(outputName);
+                auto outPath = state.store->makeOutputPath(outputName, h, drvName);
+                drv.env[outputName] = state.store->printStorePath(outPath);
+                output = DerivationOutput::InputAddressed {
+                    .path = std::move(outPath),
+                };
+            }
+            break;
+        }
     }
 
     /* Write the resulting term into the Nix store directory. */
