@@ -52,6 +52,7 @@ nix_tests = \
   build-remote-content-addressed-floating.sh \
   nar-access.sh \
   pure-eval.sh \
+  eval.sh \
   ca/post-hook.sh \
   repl.sh \
   ca/repl.sh \
