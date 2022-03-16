@@ -1057,6 +1057,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
         queryJSON(globals, elems, printOutPath, printMeta);
+        cout << '\n';
         return;
     }
 
