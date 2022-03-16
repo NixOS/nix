@@ -841,7 +841,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);
 
-            results.bytesFreed += st.st_size;
+            /* Do not accound for deleted file here. Rely on deletePath()
+               accounting.  */
         }
 
         struct stat st;
