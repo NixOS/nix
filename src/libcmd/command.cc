@@ -128,7 +128,7 @@ ref<EvalState> EvalCommand::getEvalState()
                 else 
                 {
                     auto iter = evalState->debugTraces.begin();
-                    if (iter !=  evalState->debugTraces.end()) {
+                    if (iter != evalState->debugTraces.end()) {
                           std::cout << "\n" << "… " << iter->hint.str() << "\n";
 
                           if (iter->pos.has_value() && (*iter->pos)) {

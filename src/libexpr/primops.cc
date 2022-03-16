@@ -715,20 +715,20 @@ static RegisterPrimOp primop_break({
         });
         if (debuggerHook && !state.debugTraces.empty())
         {
-          auto &dt = state.debugTraces.front();
-          debuggerHook(&error, dt.env, dt.expr);
+            auto &dt = state.debugTraces.front();
+            debuggerHook(&error, dt.env, dt.expr);
 
-          if (state.debugQuit) {
-              // if the user elects to quit the repl, throw an exception.
-              throw Error(ErrorInfo{
-                  .level = lvlInfo,
-                  .msg = hintfmt("quit from debugger"),
-                  .errPos = pos,
-              });
-          }
+            if (state.debugQuit) {
+                // if the user elects to quit the repl, throw an exception.
+                throw Error(ErrorInfo{
+                    .level = lvlInfo,
+                    .msg = hintfmt("quit from debugger"),
+                    .errPos = noPos,
+                });
+            }
 
-          // returning the value we were passed.
-          v = *args[0];
+            // returning the value we were passed.
+            v = *args[0];
         }
     }
 });
