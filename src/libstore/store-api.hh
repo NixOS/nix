@@ -10,8 +10,8 @@
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
-#include "derivations.hh"
 #include "path-info.hh"
+#include "repair-flag.hh"
 
 #include <atomic>
 #include <limits>
@@ -62,6 +62,8 @@ MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+struct BasicDerivation;
+struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;

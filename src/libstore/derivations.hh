@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "repair-flag.hh"
 #include "sync.hh"
 
 #include <map>
@@ -44,19 +45,31 @@ struct DerivationOutputCAFloating
  */
 struct DerivationOutputDeferred {};
 
-struct DerivationOutput
+typedef std::variant<
+    DerivationOutputInputAddressed,
+    DerivationOutputCAFixed,
+    DerivationOutputCAFloating,
+    DerivationOutputDeferred
+> _DerivationOutputRaw;
+
+struct DerivationOutput : _DerivationOutputRaw
 {
-    std::variant<
-        DerivationOutputInputAddressed,
-        DerivationOutputCAFixed,
-        DerivationOutputCAFloating,
-        DerivationOutputDeferred
-    > output;
+    using Raw = _DerivationOutputRaw;
+    using Raw::Raw;
+
+    using InputAddressed = DerivationOutputInputAddressed;
+    using CAFixed = DerivationOutputCAFixed;
+    using CAFloating = DerivationOutputCAFloating;
+    using Deferred = DerivationOutputDeferred;
 
     /* Note, when you use this function you should make sure that you're passing
        the right derivation name. When in doubt, you should use the safer
        interface provided by BasicDerivation::outputsAndOptPaths */
     std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
 };
 
 typedef std::map<std::string, DerivationOutput> DerivationOutputs;
@@ -150,8 +163,6 @@ struct Derivation : BasicDerivation
 
 class Store;
 
-enum RepairFlag : bool { NoRepair = false, Repair = true };
-
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(Store & store,
     const Derivation & drv,
@@ -197,10 +208,10 @@ typedef std::variant<
     DrvHash,
     // Fixed-output derivation hashes
     CaOutputHashes
-> DrvHashModuloRaw;
+> _DrvHashModuloRaw;
 
-struct DrvHashModulo : DrvHashModuloRaw {
-    using Raw = DrvHashModuloRaw;
+struct DrvHashModulo : _DrvHashModuloRaw {
+    using Raw = _DrvHashModuloRaw;
     using Raw::Raw;
 
     /* Get hash, throwing if it is per-output CA hashes or a

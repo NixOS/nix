@@ -1,6 +1,7 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
+#include "derivations.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 

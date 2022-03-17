@@ -2279,7 +2279,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             return res;
         };
 
-        auto newInfoFromCA = [&](const DerivationOutputCAFloating outputHash) -> ValidPathInfo {
+        auto newInfoFromCA = [&](const DerivationOutput::CAFloating outputHash) -> ValidPathInfo {
             auto & st = outputStats.at(outputName);
             if (outputHash.method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
@@ -2346,7 +2346,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
         ValidPathInfo newInfo = std::visit(overloaded {
 
-            [&](const DerivationOutputInputAddressed & output) {
+            [&](const DerivationOutput::InputAddressed & output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
                 /* Preemptively add rewrite rule for final hash, as that is
@@ -2366,8 +2366,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 return newInfo0;
             },
 
-            [&](const DerivationOutputCAFixed & dof) {
-                auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
+            [&](const DerivationOutput::CAFixed & dof) {
+                auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.hash.method,
                     .hashType = dof.hash.hash.type,
                 });
@@ -2389,17 +2389,17 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 return newInfo0;
             },
 
-            [&](DerivationOutputCAFloating & dof) {
+            [&](const DerivationOutput::CAFloating & dof) {
                 return newInfoFromCA(dof);
             },
 
-            [&](DerivationOutputDeferred) -> ValidPathInfo {
+            [&](const DerivationOutput::Deferred &) -> ValidPathInfo {
                 // No derivation should reach that point without having been
                 // rewritten first
                 assert(false);
             },
 
-        }, output.output);
+        }, output.raw());
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */

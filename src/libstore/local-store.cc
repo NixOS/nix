@@ -698,7 +698,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     std::optional<Hash> h;
     for (auto & i : drv.outputs) {
         std::visit(overloaded {
-            [&](const DerivationOutputInputAddressed & doia) {
+            [&](const DerivationOutput::InputAddressed & doia) {
                 if (!h) {
                     // somewhat expensive so we do lazily
                     auto h0 = hashDerivationModulo(*this, drv, true);
@@ -710,16 +710,16 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
                 envHasRightPath(doia.path, i.first);
             },
-            [&](const DerivationOutputCAFixed & dof) {
+            [&](const DerivationOutput::CAFixed & dof) {
                 StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
                 envHasRightPath(path, i.first);
             },
-            [&](const DerivationOutputCAFloating &) {
+            [&](const DerivationOutput::CAFloating &) {
                 /* Nothing to check */
             },
-            [&](const DerivationOutputDeferred &) {
+            [&](const DerivationOutput::Deferred &) {
             },
-        }, i.second.output);
+        }, i.second.raw());
     }
 }
 
