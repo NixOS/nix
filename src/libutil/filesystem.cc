@@ -1,7 +1,10 @@
 #include <sys/time.h>
+#include <filesystem>
 
 #include "util.hh"
 #include "types.hh"
+
+namespace fs = std::filesystem;
 
 namespace nix {
 
@@ -42,8 +45,16 @@ void replaceSymlink(const Path & target, const Path & link,
 
 void moveFile(const Path & oldName, const Path & newName)
 {
-    if (::rename(oldName.c_str(), newName.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", oldName, newName);
+    auto oldPath = fs::path(oldName);
+    auto newPath = fs::path(newName);
+    try {
+        fs::rename(oldPath, newPath);
+    } catch (fs::filesystem_error & e) {
+        if (e.code().value() == EXDEV) {
+            fs::copy(oldName, newName, fs::copy_options::copy_symlinks);
+            fs::remove_all(oldName);
+        }
+    }
 }
 
 }
