@@ -2,7 +2,10 @@
 Description=Nix Daemon Socket
 Before=multi-user.target
 RequiresMountsFor=@storedir@
-ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
+# Skip activating nix-daemon.socket in case the socket already exists,
+# which is the case if we invoke a container and bind-mount the daemon
+# socket inside.
+ConditionPathExists=!@localstatedir@/nix/daemon-socket/socket
 
 [Socket]
 ListenStream=@localstatedir@/nix/daemon-socket/socket
