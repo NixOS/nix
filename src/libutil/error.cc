@@ -185,15 +185,15 @@ void printAtPos(const ErrPos & pos, std::ostream & out)
     if (pos) {
         switch (pos.origin) {
             case foFile: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
+                out << fmt(ANSI_BLUE "  at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
                 break;
             }
             case foString: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ANSI_BLUE "  at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             case foStdin: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ANSI_BLUE "  at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             default:
@@ -269,7 +269,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     oss << einfo.msg << "\n";
 
     if (einfo.errPos.has_value() && *einfo.errPos) {
-        oss << "\n";
         printAtPos(*einfo.errPos, oss);
 
         auto loc = getCodeLines(*einfo.errPos);
@@ -278,26 +277,34 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         if (loc.has_value()) {
             oss << "\n";
             printCodeLines(oss, "", *einfo.errPos, *loc);
-            oss << "\n";
         }
+        oss << "\n";
     }
 
     // traces
-    if (showTrace && !einfo.traces.empty()) {
+    if (!einfo.traces.empty()) {
+        unsigned int count = 0;
         for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {
+            if (!showTrace && count > 3) {
+                oss << "\n" << "(truncated)" << "\n";
+                break;
+            }
+
+            if (iter->hint.str().empty()) continue;
+            count++;
             oss << "\n" << "… " << iter->hint.str() << "\n";
 
             if (iter->pos.has_value() && (*iter->pos)) {
+                count++;
                 auto pos = iter->pos.value();
-                oss << "\n";
                 printAtPos(pos, oss);
 
                 auto loc = getCodeLines(pos);
                 if (loc.has_value()) {
                     oss << "\n";
                     printCodeLines(oss, "", pos, *loc);
-                    oss << "\n";
                 }
+                oss << "\n";
             }
         }
     }

@@ -396,7 +396,7 @@ expr_function
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr { $$ = new ExprIf(makeCurPos(@2, data), $2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
   | expr_op
   ;
 

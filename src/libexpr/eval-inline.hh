@@ -15,10 +15,10 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v, const std::string & s2))
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
 {
     throw TypeError({
-        .msg = hintfmt(s, showType(v), s2),
+        .msg = hintfmt(s, showType(v)),
         .errPos = pos
     });
 }
@@ -52,26 +52,39 @@ void EvalState::forceValue(Value & v, Callable getPos)
 }
 
 
-inline void EvalState::forceAttrs(Value & v, const Pos & pos, const std::string & errorCtx)
+inline void EvalState::forceAttrs(Value & v, const Pos & pos, const std::string_view & errorCtx)
 {
     forceAttrs(v, [&]() { return pos; }, errorCtx);
 }
 
 
 template <typename Callable>
-inline void EvalState::forceAttrs(Value & v, Callable getPos, const std::string & errorCtx)
+inline void EvalState::forceAttrs(Value & v, Callable getPos, const std::string_view & errorCtx)
 {
-    forceValue(v, getPos);
-    if (v.type() != nAttrs)
-        throwTypeError(getPos(), "%2%value is %1% while a set was expected", v, errorCtx);
+    try {
+        forceValue(v, noPos);
+        if (v.type() != nAttrs) {
+            throwTypeError(noPos, "value is %1% while a set was expected", v);
+        }
+    } catch (Error & e) {
+        Pos pos = getPos();
+        e.addTrace(pos, errorCtx);
+        throw;
+    }
 }
 
 
-inline void EvalState::forceList(Value & v, const Pos & pos, const std::string & errorCtx)
+inline void EvalState::forceList(Value & v, const Pos & pos, const std::string_view & errorCtx)
 {
-    forceValue(v, pos);
-    if (!v.isList())
-        throwTypeError(pos, "%2%value is %1% while a list was expected", v, errorCtx);
+    try {
+        forceValue(v, noPos);
+        if (!v.isList()) {
+            throwTypeError(noPos, "value is %1% while a list was expected", v);
+        }
+    } catch (Error & e) {
+        e.addTrace(pos, errorCtx);
+        throw;
+    }
 }
 
 /* Note: Various places expect the allocated memory to be zeroed. */

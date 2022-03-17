@@ -130,6 +130,8 @@ protected:
 public:
     unsigned int status = 1; // exit status
 
+    BaseError(const BaseError &) = default;
+
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
         : err { .level = lvlError, .msg = hintfmt(args...) }
@@ -165,10 +167,14 @@ public:
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
+    void pushTrace(Trace trace) {
+        err.traces.push_front(trace);
+    }
+
     template<typename... Args>
-    BaseError & addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
+    BaseError & addTrace(std::optional<ErrPos> e, const std::string_view & fs, const Args & ... args)
     {
-        return addTrace(e, hintfmt(fs, args...));
+        return addTrace(e, hintfmt(std::string(fs), args...));
     }
 
     BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
