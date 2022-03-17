@@ -229,7 +229,9 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     /* Atomically replace the old file with the new hard link. */
-    if (rename(tempLink.c_str(), path.c_str()) == -1) {
+    try {
+        moveFile(tempLink, path);
+    } catch (SysError & e) {
         if (unlink(tempLink.c_str()) == -1)
             printError("unable to unlink '%1%'", tempLink);
         if (errno == EMLINK) {
@@ -240,7 +242,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
             debug("'%s' has reached maximum number of links", linkPath);
             return;
         }
-        throw SysError("cannot rename '%1%' to '%2%'", tempLink, path);
+        throw;
     }
 
     stats.filesLinked++;

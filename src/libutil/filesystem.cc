@@ -34,11 +34,16 @@ void replaceSymlink(const Path & target, const Path & link,
             throw;
         }
 
-        if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
+        moveFile(tmp, link);
 
         break;
     }
+}
+
+void moveFile(const Path & oldName, const Path & newName)
+{
+    if (::rename(oldName.c_str(), newName.c_str()))
+        throw SysError("renaming '%1%' to '%2%'", oldName, newName);
 }
 
 }
