@@ -2805,7 +2805,7 @@ static RegisterPrimOp primop_foldlStrict({
 
 static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0], pos, std::string("While evaluating the first argument passed to builtins.") + (any ? "any" : "all: "));
+    state.forceFunction(*args[0], pos, std::string("While evaluating the first argument passed to builtins.") + (any ? "any" : "all"));
     state.forceList(*args[1], pos, std::string("While evaluating the second argument passed to builtins.") + (any ? "any" : "all"));
 
     Value vTmp;

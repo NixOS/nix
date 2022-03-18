@@ -126,12 +126,12 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
     std::function<void(const std::string & name, Value & vProvide, const Pos & pos)> callback)
 {
     auto pos = vFlake.determinePos(noPos);
-    state.forceAttrs(vFlake, pos, "While evaluating a flake to get its outputs: ");
+    state.forceAttrs(vFlake, pos, "While evaluating a flake to get its outputs");
 
     auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceAttrs(*aOutputs->value, pos, "While evaluating the outputs of a flake: ");
+    state.forceAttrs(*aOutputs->value, pos, "While evaluating the outputs of a flake");
 
     auto sHydraJobs = state.symbols.create("hydraJobs");
 

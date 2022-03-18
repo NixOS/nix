@@ -708,7 +708,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.requireExperimentalFeatureOnEvaluation(Xp::Flakes, "builtins.getFlake", pos);
 
-    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "While evaluating the argument passed to builtins.getFlake: "));
+    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "While evaluating the argument passed to builtins.getFlake"));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, pos);

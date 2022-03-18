@@ -297,7 +297,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue, noPos, "While evaluating an attribute name: ");
+        state.forceStringNoCtx(nameValue, noPos, "While evaluating an attribute name");
         return state.symbols.create(nameValue.string.s);
     }
 }
@@ -1111,7 +1111,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            Hence we need __overrides.) */
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
-            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); }, "While evaluating the `__overrides` attribute: ");
+            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); }, "While evaluating the `__overrides` attribute");
             Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
@@ -1139,7 +1139,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(nameVal, i.pos);
         if (nameVal.type() == nNull)
             continue;
-        state.forceStringNoCtx(nameVal, i.pos, "While evaluating the name of a dynamic attribute: ");
+        state.forceStringNoCtx(nameVal, i.pos, "While evaluating the name of a dynamic attribute");
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
@@ -1229,7 +1229,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     return;
                 }
             } else {
-                state.forceAttrs(*vAttrs, pos, "While selecting an attribute: ");
+                state.forceAttrs(*vAttrs, pos, "While selecting an attribute");
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                     throwEvalError(pos, "attribute '%1%' missing", name);
             }
