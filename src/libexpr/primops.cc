@@ -1163,26 +1163,24 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputCAFixed {
-                    .hash = FixedOutputHash {
-                        .method = ingestionMethod,
-                        .hash = std::move(h),
-                    },
+        drv.outputs.insert_or_assign("out",
+            DerivationOutput::CAFixed {
+                .hash = FixedOutputHash {
+                    .method = ingestionMethod,
+                    .hash = std::move(h),
                 },
-        });
+            });
     }
 
     else if (contentAddressed) {
         HashType ht = parseHashType(outputHashAlgo);
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i, DerivationOutput {
-                .output = DerivationOutputCAFloating {
+            drv.outputs.insert_or_assign(i,
+                DerivationOutput::CAFloating {
                     .method = ingestionMethod,
                     .hashType = ht,
-                },
-            });
+                });
         }
     }
 
@@ -1196,10 +1194,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = StorePath::dummy,
-                    },
+                DerivationOutput::InputAddressed {
+                    .path = StorePath::dummy,
                 });
         }
 
@@ -1213,9 +1209,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 case DrvHash::Kind::Deferred:
                     for (auto & i : outputs) {
                         drv.outputs.insert_or_assign(i,
-                            DerivationOutput {
-                                .output = DerivationOutputDeferred{},
-                            });
+                            DerivationOutput::Deferred { });
                     }
                     break;
                 case DrvHash::Kind::Regular:
@@ -1223,10 +1217,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         auto outPath = state.store->makeOutputPath(i, h, drvName);
                         drv.env[i] = state.store->printStorePath(outPath);
                         drv.outputs.insert_or_assign(i,
-                            DerivationOutput {
-                                .output = DerivationOutputInputAddressed {
-                                    .path = std::move(outPath),
-                                },
+                            DerivationOutput::InputAddressed {
+                                .path = std::move(outPath),
                             });
                     }
                     break;

@@ -87,7 +87,7 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
     if (out != drv.outputs.end()) {
-        if (auto v = std::get_if<DerivationOutputCAFixed>(&out->second.output))
+        if (const auto * v = std::get_if<DerivationOutput::CAFixed>(&out->second.raw()))
             return v->hash;
     }
     return std::nullopt;
