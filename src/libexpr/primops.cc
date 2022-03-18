@@ -1199,7 +1199,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         // Regular, non-CA derivation should always return a single hash and not
         // hash per output.
-        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        auto hashModulo = hashDerivationModulo(*state.store, drv, true);
         std::visit(overloaded {
             [&](const DrvHash & drvHash) {
                 auto & h = drvHash.hash;
@@ -1240,7 +1240,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
        However, we don't bother doing this for floating CA derivations because
        their "hash modulo" is indeterminate until built. */
     if (drv.type() != DerivationType::CAFloating) {
-        auto h = hashDerivationModulo(*state.store, Derivation(drv), false);
+        auto h = hashDerivationModulo(*state.store, drv, false);
         drvHashes.lock()->insert_or_assign(drvPath, h);
     }
 
