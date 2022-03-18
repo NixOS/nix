@@ -85,30 +85,50 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
    output IDs we are interested in. */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
-enum struct DerivationType : uint8_t {
-    InputAddressed,
-    DeferredInputAddressed,
-    CAFixed,
-    CAFloating,
+struct DerivationType_InputAddressed {
+    bool deferred;
 };
 
-/* Do the outputs of the derivation have paths calculated from their content,
-   or from the derivation itself? */
-bool derivationIsCA(DerivationType);
+struct DerivationType_ContentAddressed {
+    bool pure;
+    bool fixed;
+};
 
-/* Is the content of the outputs fixed a-priori via a hash? Never true for
-   non-CA derivations. */
-bool derivationIsFixed(DerivationType);
+typedef std::variant<
+    DerivationType_InputAddressed,
+    DerivationType_ContentAddressed
+> _DerivationTypeRaw;
 
-/* Is the derivation impure and needs to access non-deterministic resources, or
-   pure and can be sandboxed? Note that whether or not we actually sandbox the
-   derivation is controlled separately. Never true for non-CA derivations. */
-bool derivationIsImpure(DerivationType);
+struct DerivationType : _DerivationTypeRaw {
+    using Raw = _DerivationTypeRaw;
+    using Raw::Raw;
+    using InputAddressed = DerivationType_InputAddressed;
+    using ContentAddressed = DerivationType_ContentAddressed;
 
-/* Does the derivation knows its own output paths?
- * Only true when there's no floating-ca derivation involved in the closure.
- */
-bool derivationHasKnownOutputPaths(DerivationType);
+
+    /* Do the outputs of the derivation have paths calculated from their content,
+       or from the derivation itself? */
+    bool isCA() const;
+
+    /* Is the content of the outputs fixed a-priori via a hash? Never true for
+       non-CA derivations. */
+    bool isFixed() const;
+
+    /* Is the derivation impure and needs to access non-deterministic resources, or
+       pure and can be sandboxed? Note that whether or not we actually sandbox the
+       derivation is controlled separately. Never true for non-CA derivations. */
+    bool isImpure() const;
+
+    /* Does the derivation knows its own output paths?
+       Only true when there's no floating-ca derivation involved in the
+       closure, or if fixed output.
+     */
+    bool hasKnownOutputPaths() const;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+};
 
 struct BasicDerivation
 {
@@ -189,11 +209,11 @@ typedef std::map<std::string, Hash> CaOutputHashes;
 struct DrvHash {
     Hash hash;
 
-    enum struct Kind {
+    enum struct Kind: bool {
         // Statically determined derivations.
         // This hash will be directly used to compute the output paths
         Regular,
-        // Floating-output derivations (and their dependencies).
+        // Floating-output derivations (and their reverse dependencies).
         Deferred,
     };
 

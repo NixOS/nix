@@ -36,47 +36,46 @@ StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view 
 }
 
 
-bool derivationIsCA(DerivationType dt) {
-    switch (dt) {
-    case DerivationType::InputAddressed: return false;
-    case DerivationType::CAFixed: return true;
-    case DerivationType::CAFloating: return true;
-    case DerivationType::DeferredInputAddressed: return false;
-    };
-    // Since enums can have non-variant values, but making a `default:` would
-    // disable exhaustiveness warnings.
-    assert(false);
+bool DerivationType::isCA() const {
+    /* Normally we do the full `std::visit` to make sure we have
+       exhaustively handled all variants, but so long as there is a
+       variant called `ContentAddressed`, it must be the only one for
+       which `isCA` is true for this to make sense!. */
+    return std::holds_alternative<ContentAddressed>(raw());
 }
 
-bool derivationIsFixed(DerivationType dt) {
-    switch (dt) {
-    case DerivationType::InputAddressed: return false;
-    case DerivationType::CAFixed: return true;
-    case DerivationType::CAFloating: return false;
-    case DerivationType::DeferredInputAddressed: return false;
-    };
-    assert(false);
+bool DerivationType::isFixed() const {
+    return std::visit(overloaded {
+        [](const InputAddressed & ia) {
+            return false;
+        },
+        [](const ContentAddressed & ca) {
+            return ca.fixed;
+        },
+    }, raw());
 }
 
-bool derivationHasKnownOutputPaths(DerivationType dt) {
-    switch (dt) {
-    case DerivationType::InputAddressed: return true;
-    case DerivationType::CAFixed: return true;
-    case DerivationType::CAFloating: return false;
-    case DerivationType::DeferredInputAddressed: return false;
-    };
-    assert(false);
+bool DerivationType::hasKnownOutputPaths() const {
+    return std::visit(overloaded {
+        [](const InputAddressed & ia) {
+            return !ia.deferred;
+        },
+        [](const ContentAddressed & ca) {
+            return ca.fixed;
+        },
+    }, raw());
 }
 
 
-bool derivationIsImpure(DerivationType dt) {
-    switch (dt) {
-    case DerivationType::InputAddressed: return false;
-    case DerivationType::CAFixed: return true;
-    case DerivationType::CAFloating: return false;
-    case DerivationType::DeferredInputAddressed: return false;
-    };
-    assert(false);
+bool DerivationType::isImpure() const {
+    return std::visit(overloaded {
+        [](const InputAddressed & ia) {
+            return false;
+        },
+        [](const ContentAddressed & ca) {
+            return !ca.pure;
+        },
+    }, raw());
 }
 
 
@@ -439,18 +438,28 @@ DerivationType BasicDerivation::type() const
     if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty() && deferredIAOutputs.empty()) {
         throw Error("Must have at least one output");
     } else if (! inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty() && deferredIAOutputs.empty()) {
-        return DerivationType::InputAddressed;
+        return DerivationType::InputAddressed {
+            .deferred = false,
+        };
     } else if (inputAddressedOutputs.empty() && ! fixedCAOutputs.empty() && floatingCAOutputs.empty() && deferredIAOutputs.empty()) {
         if (fixedCAOutputs.size() > 1)
             // FIXME: Experimental feature?
             throw Error("Only one fixed output is allowed for now");
         if (*fixedCAOutputs.begin() != "out")
             throw Error("Single fixed output must be named \"out\"");
-        return DerivationType::CAFixed;
+        return DerivationType::ContentAddressed {
+            .pure = false,
+            .fixed = true,
+        };
     } else if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && ! floatingCAOutputs.empty() && deferredIAOutputs.empty()) {
-        return DerivationType::CAFloating;
+        return DerivationType::ContentAddressed {
+            .pure = true,
+            .fixed = false,
+        };
     } else if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty() && !deferredIAOutputs.empty()) {
-        return DerivationType::DeferredInputAddressed;
+        return DerivationType::InputAddressed {
+            .deferred = true,
+        };
     } else {
         throw Error("Can't mix derivation output types");
     }
@@ -502,10 +511,10 @@ static const DrvHashModulo pathDerivationModulo(Store & store, const StorePath &
  */
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
-    auto kind = DrvHash::Kind::Regular;
+    auto type = drv.type();
+
     /* Return a fixed hash for fixed-output derivations. */
-    switch (drv.type()) {
-    case DerivationType::CAFixed: {
+    if (type.isFixed()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw());
@@ -517,14 +526,19 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         }
         return outputHashes;
     }
-    case DerivationType::CAFloating:
-        kind = DrvHash::Kind::Deferred;
-        break;
-    case DerivationType::InputAddressed:
-        break;
-    case DerivationType::DeferredInputAddressed:
-        break;
-    }
+
+    auto kind = std::visit(overloaded {
+        [](const DerivationType::InputAddressed & ia) {
+            /* This might be a "pesimistically" deferred output, so we don't
+               "taint" the kind yet. */
+            return DrvHash::Kind::Regular;
+        },
+        [](const DerivationType::ContentAddressed & ca) {
+            return ca.fixed
+                ? DrvHash::Kind::Regular
+                : DrvHash::Kind::Deferred;
+        },
+    }, drv.type().raw());
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function. */
