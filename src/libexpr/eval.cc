@@ -709,12 +709,12 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const Pos & pos,
             const char * s,
-            const std::string & s2,
+            const std::string_view & s2,
             const Symbol & sym,
             const Pos & p2,
             const std::string_view & s3))
 {
-    throw TypeError({
+    throw TypeError(ErrorInfo {
         .msg = hintfmt(s, s2, sym),
         .errPos = pos,
     }).addTrace(p2, s3);
@@ -724,12 +724,12 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const Pos & pos,
             const Suggestions & suggestions,
             const char * s,
-            const std::string & s2,
+            const std::string_view & s2,
             const Symbol & sym,
             const Pos & p2,
             const std::string_view & s3))
 {
-    throw TypeError({
+    throw TypeError(ErrorInfo {
         .msg = hintfmt(s, s2, sym),
         .errPos = pos,
         .suggestions = suggestions
