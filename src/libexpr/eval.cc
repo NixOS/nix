@@ -714,7 +714,7 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const Pos & p2,
             const char * s3))
 {
-    throw EvalError({
+    throw TypeError({
         .msg = hintfmt(s, s2, sym),
         .errPos = pos,
     }).addTrace(p2, s3);
@@ -729,7 +729,7 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const Pos & p2,
             const char * s3))
 {
-    throw EvalError({
+    throw TypeError({
         .msg = hintfmt(s, s2, sym),
         .errPos = pos,
         .suggestions = suggestions
@@ -768,7 +768,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & s
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const Value & v))
 {
-    throw AssertionError({
+    throw EvalError({
         .msg = hintfmt(s, showType(v)),
         .errPos = pos
     });
