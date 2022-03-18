@@ -706,28 +706,63 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwTypeErrorWithTrace(const Pos & pos, const char * s, const std::string & s2, const Symbol & sym, const Pos & p2, const std::string & s3))
+LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
+            const Pos & pos,
+            const char * s,
+            const std::string & s2,
+            const Symbol & sym,
+            const Pos & p2,
+            const char * s3))
 {
     throw EvalError({
         .msg = hintfmt(s, s2, sym),
-        .errPos = pos
+        .errPos = pos,
     }).addTrace(p2, s3);
+}
+
+LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
+            const Pos & pos,
+            const Suggestions & suggestions,
+            const char * s,
+            const std::string & s2,
+            const Symbol & sym,
+            const Pos & p2,
+            const char * s3))
+{
+    throw EvalError({
+        .msg = hintfmt(s, s2, sym),
+        .errPos = pos,
+        .suggestions = suggestions
+    }).addTrace(p2, s3);
+}
+
+LocalNoInlineNoReturn(void throwTypeErrorWithTrace(const char * s, const std::string & s2, const Pos & p2, const std::string_view s3))
+{
+    throw TypeError(ErrorInfo {
+        .msg = hintfmt(s, s2),
+    }).addTrace(p2, s3);
+}
+
+LocalNoInlineNoReturn(void throwEvalErrorWithTrace(const char * s, const std::string & s2, const Pos & p2, const std::string_view s3))
+{
+    throw EvalError(ErrorInfo {
+        .msg = hintfmt(s, s2),
+    }).addTrace(p2, s3);
+}
+
+LocalNoInlineNoReturn(void throwEvalErrorWithTrace(const char * s, const std::string_view & s2, const std::string_view & s3, const Pos & p2, const std::string_view s4))
+{
+    throw EvalError(ErrorInfo {
+        .msg = hintfmt(s, s2, s3),
+    }).addTrace(p2, s4);
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
 {
-    throw EvalError(ErrorInfo {
+    throw EvalError({
         .msg = hintfmt(s, s2),
         .errPos = pos,
         .suggestions = suggestions,
-    });
-}
-
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
-{
-    throw EvalError(ErrorInfo {
-        .msg = hintfmt(s, s2),
-        .errPos = pos
     });
 }
 
@@ -748,31 +783,15 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const 
     });
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string_view & s1))
 {
-    throw TypeError({
-        .msg = hintfmt(s),
-        .errPos = pos
-    });
+    throw EvalError(s, s1);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string_view & s1, const std::string_view & s2))
 {
-    throw TypeError({
-        .msg = hintfmt(s, fun.showNamePos(), s2),
-        .errPos = pos
-    });
+    throw EvalError(s, s1, s2);
 }
-
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol & s2))
-{
-    throw TypeError(ErrorInfo {
-        .msg = hintfmt(s, fun.showNamePos(), s2),
-        .errPos = pos,
-        .suggestions = suggestions,
-    });
-}
-
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
@@ -1008,11 +1027,9 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial &&
-            !(dynamic_cast<ExprAttrs *>(e)))
-            throw EvalError("file '%s' must be an attribute set", path);
+        // Enforce that 'flake.nix' is a direct attrset, not a computation.
+        if (mustBeTrivial && !(dynamic_cast<ExprAttrs *>(e)))
+            throwEvalError("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
         addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
@@ -1036,7 +1053,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std:
         Value v;
         e->eval(*this, env, v);
         if (v.type() != nBool)
-            throw TypeError("value is %1% while a Boolean was expected", showType(v));
+            throwTypeError("value is %1% while a Boolean was expected", v);
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
@@ -1050,7 +1067,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
-            throw TypeError("value is %1% while a set was expected", showType(v));
+            throwTypeError("value is %1% while a set was expected", v);
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
         throw;
@@ -1857,7 +1874,7 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos, const std::string_view & 
     try {
         forceValue(v, pos);
         if (v.type() != nInt)
-            throw TypeError("value is %1% while an integer was expected", showType(v));
+            throwTypeError("value is %1% while an integer was expected", v);
         return v.integer;
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
@@ -1873,7 +1890,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos, const std::string_vie
         if (v.type() == nInt)
             return v.integer;
         else if (v.type() != nFloat)
-            throw TypeError("value is %1% while a float was expected", showType(v));
+            throwTypeError("value is %1% while a float was expected", v);
         return v.fpoint;
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
@@ -1887,7 +1904,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos, const std::string_view & e
     try {
         forceValue(v, pos);
         if (v.type() != nBool)
-            throw TypeError("value is %1% while a Boolean was expected", showType(v));
+            throwTypeError("value is %1% while a Boolean was expected", v);
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
@@ -1907,7 +1924,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos, const std::string_view
     try {
         forceValue(v, pos);
         if (v.type() != nFunction && !isFunctor(v))
-            throw TypeError("value is %1% while a function was expected", showType(v));
+            throwTypeError("value is %1% while a function was expected", v);
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
         throw;
@@ -1920,7 +1937,7 @@ std::string_view EvalState::forceString(Value & v, const Pos & pos, const std::s
     try {
         forceValue(v, pos);
         if (v.type() != nString)
-            throw TypeError("value is %1% while a string was expected", showType(v));
+            throwTypeError("value is %1% while a string was expected", v);
         return v.string.s;
     } catch (Error & e) {
         e.addTrace(pos, errorCtx);
@@ -1974,9 +1991,9 @@ std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos, const s
         auto s = forceString(v, pos, errorCtx);
         if (v.string.context) {
             if (pos)
-                throw EvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]);
+                throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]);
             else
-                throw EvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]);
+                throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]);
         }
         return s;
     } catch (Error & e) {
@@ -2035,9 +2052,8 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
         if (maybeString)
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) {
-            throw TypeError("cannot coerce %1% to a string", showType(v)).addTrace(pos, errorCtx);
-        }
+        if (i == v.attrs->end())
+            throwTypeErrorWithTrace("cannot coerce %1% to a string", showType(v), pos, errorCtx);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore, canonicalizePath, errorCtx);
     }
 
@@ -2073,14 +2089,14 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
         }
     }
 
-    throw TypeError("cannot coerce %1% to a string", showType(v)).addTrace(pos, errorCtx);
+    throwTypeErrorWithTrace("cannot coerce %1% to a string", showType(v), pos, errorCtx);
 }
 
 
 std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
-        throw EvalError("file names are not allowed to end in '%1%'", drvExtension);
+        throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
     Path dstPath;
     auto i = srcToStore.find(path);
@@ -2105,7 +2121,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context, cons
 {
     auto path = coerceToString(pos, v, context, false, false, true, errorCtx).toOwned();
     if (path == "" || path[0] != '/')
-        throw EvalError("string '%1%' doesn't represent an absolute path", path).addTrace(pos, errorCtx);
+        throwEvalErrorWithTrace("string '%1%' doesn't represent an absolute path", path, pos, errorCtx);
     return path;
 }
 
@@ -2115,7 +2131,7 @@ StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & con
     auto path = coerceToString(pos, v, context, false, false, true, errorCtx).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
         return *storePath;
-    throw EvalError("path '%1%' is not in the Nix store", path).addTrace(pos, errorCtx);
+    throwEvalErrorWithTrace("path '%1%' is not in the Nix store", path, pos, errorCtx);
 }
 
 
@@ -2193,7 +2209,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const Pos & pos, const std::str
             return v1.fpoint == v2.fpoint;
 
         default:
-            throw EvalError("cannot compare %1% with %2%", showType(v1), showType(v2)).addTrace(pos, errorCtx);
+            throwEvalErrorWithTrace("cannot compare %1% with %2%", showType(v1), showType(v2), pos, errorCtx);
     }
 }
 
@@ -2317,7 +2333,7 @@ void EvalState::printStats()
 
 std::string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore, const std::string_view & errorCtx) const
 {
-    throw TypeError("cannot coerce %1% to a string", showType()).addTrace(pos, errorCtx);
+    throwTypeErrorWithTrace("cannot coerce %1% to a string", showType(), pos, errorCtx);
 }
 
 
