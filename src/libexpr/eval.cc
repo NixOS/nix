@@ -712,7 +712,7 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const std::string & s2,
             const Symbol & sym,
             const Pos & p2,
-            const char * s3))
+            const std::string_view & s3))
 {
     throw TypeError({
         .msg = hintfmt(s, s2, sym),
@@ -727,7 +727,7 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const std::string & s2,
             const Symbol & sym,
             const Pos & p2,
-            const char * s3))
+            const std::string_view & s3))
 {
     throw TypeError({
         .msg = hintfmt(s, s2, sym),
