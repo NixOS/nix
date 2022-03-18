@@ -66,7 +66,6 @@ class Symbol;
 class PosIdx;
 struct Pos;
 class StorePath;
-class Store;
 class EvalState;
 class XMLWriter;
 

@@ -16,11 +16,11 @@ namespace nix {
 /* protocol-agnostic templates */
 
 #define COMMON_USE_LENGTH_PREFIX_SERIALISER(TEMPLATE, T) \
-    TEMPLATE T CommonProto::Serialise< T >::read(const Store & store, CommonProto::ReadConn conn) \
+    TEMPLATE T CommonProto::Serialise< T >::read(const StoreDirConfig & store, CommonProto::ReadConn conn) \
     { \
         return LengthPrefixedProtoHelper<CommonProto, T >::read(store, conn); \
     } \
-    TEMPLATE void CommonProto::Serialise< T >::write(const Store & store, CommonProto::WriteConn conn, const T & t) \
+    TEMPLATE void CommonProto::Serialise< T >::write(const StoreDirConfig & store, CommonProto::WriteConn conn, const T & t) \
     { \
         LengthPrefixedProtoHelper<CommonProto, T >::write(store, conn, t); \
     }

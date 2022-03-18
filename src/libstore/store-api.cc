@@ -1,6 +1,8 @@
 #include "crypto.hh"
 #include "source-accessor.hh"
 #include "globals.hh"
+#include "derived-path.hh"
+#include "realisation.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "util.hh"

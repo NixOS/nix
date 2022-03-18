@@ -4,6 +4,7 @@
 #include "local-store.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
+#include "realisation.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "closure.hh"
