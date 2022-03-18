@@ -1,8 +1,6 @@
 #pragma once
 ///@file
 
-#include "nar-info.hh"
-#include "realisation.hh"
 #include "path.hh"
 #include "derived-path.hh"
 #include "hash.hh"
@@ -68,8 +66,13 @@ MakeError(SubstituterDisabled, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+struct Realisation;
+struct RealisedPath;
+struct DrvOutput;
+
 struct BasicDerivation;
 struct Derivation;
+
 struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
@@ -788,7 +791,7 @@ void copyStorePath(
  */
 std::map<StorePath, StorePath> copyPaths(
     Store & srcStore, Store & dstStore,
-    const RealisedPath::Set &,
+    const std::set<RealisedPath> &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -805,7 +808,7 @@ std::map<StorePath, StorePath> copyPaths(
  */
 void copyClosure(
     Store & srcStore, Store & dstStore,
-    const RealisedPath::Set & paths,
+    const std::set<RealisedPath> & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);

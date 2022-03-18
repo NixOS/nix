@@ -4,6 +4,7 @@
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
+#include "realisation.hh"
 #include "nar-info.hh"
 #include "references.hh"
 #include "callback.hh"
