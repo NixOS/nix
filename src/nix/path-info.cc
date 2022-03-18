@@ -2,6 +2,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "common-args.hh"
+#include "nar-info.hh"
 
 #include <algorithm>
 #include <array>

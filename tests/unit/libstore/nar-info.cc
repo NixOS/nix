@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "path-info.hh"
+#include "nar-info.hh"
 
 #include "tests/characterization.hh"
 #include "tests/libstore.hh"

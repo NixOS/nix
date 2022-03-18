@@ -9,6 +9,7 @@
 #undef do_close
 
 #include "derivations.hh"
+#include "realisation.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "crypto.hh"

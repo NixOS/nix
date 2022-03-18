@@ -5,7 +5,7 @@
 
 namespace nix {
 
-std::string StorePathWithOutputs::to_string(const Store & store) const
+std::string StorePathWithOutputs::to_string(const StoreDirConfig & store) const
 {
     return outputs.empty()
         ? store.printStorePath(path)
@@ -85,7 +85,7 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 }
 
 
-StorePathWithOutputs parsePathWithOutputs(const Store & store, std::string_view pathWithOutputs)
+StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::string_view pathWithOutputs)
 {
     auto [path, outputs] = parsePathWithOutputs(pathWithOutputs);
     return StorePathWithOutputs { store.parseStorePath(path), std::move(outputs) };
