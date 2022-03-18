@@ -759,7 +759,7 @@ LocalNoInlineNoReturn(void throwEvalErrorWithTrace(const char * s, const std::st
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
         .errPos = pos,
         .suggestions = suggestions,
@@ -768,7 +768,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & s
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const Value & v))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, showType(v)),
         .errPos = pos
     });
@@ -777,7 +777,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
 LocalNoInlineNoReturn(void throwEvalError(const Pos & p1, const char * s, const Symbol & sym, const Pos & p2))
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, sym, p2),
         .errPos = p1
     });
