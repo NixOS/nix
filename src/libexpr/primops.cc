@@ -1235,11 +1235,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later.
-
-       However, we don't bother doing this for floating CA derivations because
-       their "hash modulo" is indeterminate until built. */
-    if (drv.type() != DerivationType::CAFloating) {
+       read them later. */
+    {
         auto h = hashDerivationModulo(*state.store, drv, false);
         drvHashes.lock()->insert_or_assign(drvPath, h);
     }

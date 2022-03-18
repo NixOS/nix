@@ -395,7 +395,7 @@ void LocalDerivationGoal::startBuilder()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !(derivationIsImpure(derivationType)) && !noChroot;
+            useChroot = !(derivationType.isImpure()) && !noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -608,7 +608,7 @@ void LocalDerivationGoal::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (!(derivationIsImpure(derivationType)))
+        if (!(derivationType.isImpure()))
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -796,7 +796,7 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (!(derivationIsImpure(derivationType)))
+        if (!(derivationType.isImpure()))
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -1049,7 +1049,7 @@ void LocalDerivationGoal::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (derivationIsFixed(derivationType)) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (derivationType.isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -1060,7 +1060,7 @@ void LocalDerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (derivationIsImpure(derivationType)) {
+    if (derivationType.isImpure()) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -1674,7 +1674,7 @@ void LocalDerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (derivationIsImpure(derivationType)) {
+            if (derivationType.isImpure()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
@@ -1918,7 +1918,7 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (derivationIsImpure(derivationType))
+                if (derivationType.isImpure())
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Add the output paths we'll use at build-time to the chroot */
