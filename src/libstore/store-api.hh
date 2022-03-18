@@ -76,59 +76,6 @@ enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 const uint32_t exportMagic = 0x4558494e;
 
 
-typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
-
-
-struct GCOptions
-{
-    /* Garbage collector operation:
-
-       - `gcReturnLive': return the set of paths reachable from
-         (i.e. in the closure of) the roots.
-
-       - `gcReturnDead': return the set of paths not reachable from
-         the roots.
-
-       - `gcDeleteDead': actually delete the latter set.
-
-       - `gcDeleteSpecific': delete the paths listed in
-          `pathsToDelete', insofar as they are not reachable.
-    */
-    typedef enum {
-        gcReturnLive,
-        gcReturnDead,
-        gcDeleteDead,
-        gcDeleteSpecific,
-    } GCAction;
-
-    GCAction action{gcDeleteDead};
-
-    /* If `ignoreLiveness' is set, then reachability from the roots is
-       ignored (dangerous!).  However, the paths must still be
-       unreferenced *within* the store (i.e., there can be no other
-       store paths that depend on them). */
-    bool ignoreLiveness{false};
-
-    /* For `gcDeleteSpecific', the paths to delete. */
-    StorePathSet pathsToDelete;
-
-    /* Stop after at least `maxFreed' bytes have been freed. */
-    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
-};
-
-
-struct GCResults
-{
-    /* Depending on the action, the GC roots, or the paths that would
-       be or have been deleted. */
-    PathSet paths;
-
-    /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
-       number of bytes that would be or was freed. */
-    uint64_t bytesFreed = 0;
-};
-
-
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
 struct BuildResult;
@@ -485,6 +432,16 @@ public:
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr);
 
+    /* Like `buildPaths()`, but return a vector of `BuildResult`s
+       corresponding to each element in `paths`. Note that in case of
+       a build/substitution error, this function won't throw an
+       exception, but return a `BuildResult` containing an error
+       message. */
+    virtual std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
+
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).
 
@@ -530,26 +487,6 @@ public:
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
     { debug("not creating temporary root, store doesn't support GC"); }
-
-    /* Add an indirect root, which is merely a symlink to `path' from
-       /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
-       to be a symlink to a store path.  The garbage collector will
-       automatically remove the indirect root when it finds that
-       `path' has disappeared. */
-    virtual void addIndirectRoot(const Path & path)
-    { unsupported("addIndirectRoot"); }
-
-    /* Find the roots of the garbage collector.  Each root is a pair
-       (link, storepath) where `link' is the path of the symlink
-       outside of the Nix store that point to `storePath'. If
-       'censor' is true, privacy-sensitive information about roots
-       found in /proc is censored. */
-    virtual Roots findRoots(bool censor)
-    { unsupported("findRoots"); }
-
-    /* Perform a garbage collection. */
-    virtual void collectGarbage(const GCOptions & options, GCResults & results)
-    { unsupported("collectGarbage"); }
 
     /* Return a string representing information about the path that
        can be loaded into the database using `nix-store --load-db' or
@@ -667,14 +604,6 @@ public:
        derivations that need this information for `exportReferencesGraph`.
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
-
-    /* Return the build log of the specified store path, if available,
-       or null otherwise. */
-    virtual std::optional<std::string> getBuildLog(const StorePath & path)
-    { return std::nullopt; }
-
-    virtual void addBuildLog(const StorePath & path, std::string_view log)
-    { unsupported("addBuildLog"); }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */

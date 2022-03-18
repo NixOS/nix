@@ -45,6 +45,7 @@ struct DerivedPathBuilt {
 
     std::string to_string(const Store & store) const;
     static DerivedPathBuilt parse(const Store & store, std::string_view);
+    nlohmann::json toJSON(ref<Store> store) const;
 };
 
 using _DerivedPathRaw = std::variant<
@@ -119,5 +120,6 @@ typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
 
 nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
+nlohmann::json derivedPathsToJSON(const DerivedPaths & , ref<Store> store);
 
 }

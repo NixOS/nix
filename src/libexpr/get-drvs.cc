@@ -102,7 +102,7 @@ StorePath DrvInfo::queryOutPath() const
 }
 
 
-DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
+DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall)
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
@@ -112,20 +112,24 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 
             /* For each output... */
             for (auto elem : i->value->listItems()) {
-                /* Evaluate the corresponding set. */
-                std::string name(state->forceStringNoCtx(*elem, *i->pos, "While evaluating the name of one output of a DrvInfo"));
-                Bindings::iterator out = attrs->find(state->symbols.create(name));
-                if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value, *i->pos, "While evaluating the description of a DrvInfo output");
+                std::string output(state->forceStringNoCtx(*elem, *i->pos, "While evaluating the name of one output of a DrvInfo"));
 
-                /* And evaluate its ‘outPath’ attribute. */
-                Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
-                if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
-                PathSet context;
-                outputs.emplace(name, state->coerceToStorePath(*outPath->pos, *outPath->value, context, "While evaluating the outPath of an output path of a DrvInfo"));
+                if (withPaths) {
+                    /* Evaluate the corresponding set. */
+                    Bindings::iterator out = attrs->find(state->symbols.create(output));
+                    if (out == attrs->end()) continue; // FIXME: throw error?
+                    state->forceAttrs(*out->value, *i->pos, "While evaluating the description of a DrvInfo output");
+
+                    /* And evaluate its ‘outPath’ attribute. */
+                    Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
+                    if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
+                    PathSet context;
+                    outputs.emplace(output, state->coerceToStorePath(*outPath->pos, *outPath->value, context, "While evaluating the outPath of an output path of a DrvInfo"));
+                } else
+                    outputs.emplace(output, std::nullopt);
             }
         } else
-            outputs.emplace("out", queryOutPath());
+            outputs.emplace("out", withPaths ? std::optional{queryOutPath()} : std::nullopt);
     }
     if (!onlyOutputsToInstall || !attrs)
         return outputs;

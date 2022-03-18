@@ -3,6 +3,9 @@
 #include "worker-protocol.hh"
 #include "build-result.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
+#include "gc-store.hh"
+#include "log-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
 #include "archive.hh"
@@ -531,6 +534,25 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopBuildPathsWithResults: {
+        auto drvs = readDerivedPaths(*store, clientVersion, from);
+        BuildMode mode = bmNormal;
+        mode = (BuildMode) readInt(from);
+
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients.  */
+        if (mode == bmRepair && !trusted)
+            throw Error("repairing is not allowed because you are not in 'trusted-users'");
+
+        logger->startWork();
+        auto results = store->buildPathsWithResults(drvs, mode);
+        logger->stopWork();
+
+        worker_proto::write(*store, to, results);
+
+        break;
+    }
+
     case wopBuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
@@ -623,9 +645,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopAddIndirectRoot: {
         Path path = absPath(readString(from));
+
         logger->startWork();
-        store->addIndirectRoot(path);
+        auto & gcStore = require<GcStore>(*store);
+        gcStore.addIndirectRoot(path);
         logger->stopWork();
+
         to << 1;
         break;
     }
@@ -640,7 +665,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots(!trusted);
+        auto & gcStore = require<GcStore>(*store);
+        Roots roots = gcStore.findRoots(!trusted);
         logger->stopWork();
 
         size_t size = 0;
@@ -671,7 +697,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
-        store->collectGarbage(options, results);
+        auto & gcStore = require<GcStore>(*store);
+        gcStore.collectGarbage(options, results);
         logger->stopWork();
 
         to << results.paths << results.bytesFreed << 0 /* obsolete */;
@@ -928,11 +955,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!trusted)
             throw Error("you are not privileged to add logs");
+        auto & logStore = require<LogStore>(*store);
         {
             FramedSource source(from);
             StringSink sink;
             source.drainInto(sink);
-            store->addBuildLog(path, sink.s);
+            logStore.addBuildLog(path, sink.s);
         }
         logger->stopWork();
         to << 1;

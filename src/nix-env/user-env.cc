@@ -56,7 +56,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
         std::optional<StorePath> drvPath = keepDerivations ? i.queryDrvPath() : std::nullopt;
-        DrvInfo::Outputs outputs = i.queryOutputs(true);
+        DrvInfo::Outputs outputs = i.queryOutputs(true, true);
         StringSet metaNames = i.queryMetaNames();
 
         auto attrs = state.buildBindings(7 + outputs.size());
@@ -76,15 +76,15 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         for (const auto & [m, j] : enumerate(outputs)) {
             (vOutputs.listElems()[m] = state.allocValue())->mkString(j.first);
             auto outputAttrs = state.buildBindings(2);
-            outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(j.second));
+            outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
             attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            state.store->addTempRoot(j.second);
-            state.store->ensurePath(j.second);
+            state.store->addTempRoot(*j.second);
+            state.store->ensurePath(*j.second);
 
-            references.insert(j.second);
+            references.insert(*j.second);
         }
 
         // Copy the meta attributes.

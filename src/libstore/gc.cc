@@ -678,7 +678,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 alive.insert(start);
                 try {
                     StorePathSet closure;
-                    computeFSClosure(*path, closure);
+                    computeFSClosure(*path, closure,
+                        /* flipDirection */ false, gcKeepOutputs, gcKeepDerivations);
                     for (auto & p : closure)
                         alive.insert(p);
                 } catch (InvalidPath &) { }
@@ -841,7 +842,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);
 
-            results.bytesFreed += st.st_size;
+            /* Do not accound for deleted file here. Rely on deletePath()
+               accounting.  */
         }
 
         struct stat st;

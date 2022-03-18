@@ -4,6 +4,8 @@
 #include <string>
 
 #include "store-api.hh"
+#include "gc-store.hh"
+#include "log-store.hh"
 
 
 namespace nix {
@@ -29,7 +31,10 @@ struct RemoteStoreConfig : virtual StoreConfig
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual RemoteStoreConfig, public virtual Store
+class RemoteStore : public virtual RemoteStoreConfig,
+    public virtual Store,
+    public virtual GcStore,
+    public virtual LogStore
 {
 public:
 
@@ -95,6 +100,11 @@ public:
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
+
+    std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode,
+        std::shared_ptr<Store> evalStore) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -170,6 +180,9 @@ private:
 
     std::atomic_bool failed{false};
 
+    void copyDrvsFromEvalStore(
+        const std::vector<DerivedPath> & paths,
+        std::shared_ptr<Store> evalStore);
 };
 
 

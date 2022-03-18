@@ -281,6 +281,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         oss << "\n";
     }
 
+    auto suggestions = einfo.suggestions.trim();
+    if (! suggestions.suggestions.empty()){
+        oss << "Did you mean " <<
+            suggestions.trim() <<
+            "?" << std::endl;
+    }
+
     // traces
     if (!einfo.traces.empty()) {
         unsigned int count = 0;
