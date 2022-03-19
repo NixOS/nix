@@ -390,7 +390,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
             ref_uri = line.substr(ref_index+5, line.length()-1);
         } else
-            ref_uri = fmt("refs/heads/%s", ref);
+            ref_uri = fmt("refs/(heads|tags)/%s", ref);
 
         auto file = store->toRealPath(
             downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
@@ -399,9 +399,9 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string line;
         std::string id;
         while(getline(is, line)) {
-            auto index = line.find(ref_uri);
-            if (index != std::string::npos) {
-                id = line.substr(0, index-1);
+            std::regex pattern(ref_uri);
+            if (std::regex_search(line, pattern)) {
+                id = line.substr(0, line.find('\t'));
                 break;
             }
         }
