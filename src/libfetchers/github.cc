@@ -399,7 +399,9 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string line;
         std::string id;
         while(getline(is, line)) {
-            std::regex pattern(ref_uri);
+            // Append $ to avoid partial name matches
+            std::regex pattern(fmt("%s$", ref_uri));
+
             if (std::regex_search(line, pattern)) {
                 id = line.substr(0, line.find('\t'));
                 break;
