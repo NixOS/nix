@@ -357,7 +357,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
         auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
-            if (std::regex_match(ent->d_name, digitsRegex)) {
+            if (std::regex_match(ent->d_name, digitsRegex) && ent->d_name != std::to_string(getpid())) {
                 readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
                 readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
 
