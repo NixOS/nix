@@ -43,12 +43,19 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
 
     copyClosure(*srcStore, *state.store, RealisedPath::Set { *storePath });
 
+    /* In pure mode, require a CA path. */
+    if (evalSettings.pureEval) {
+        auto info = state.store->queryPathInfo(*storePath);
+        if (!info->isContentAddressed(*state.store))
+            throw Error({
+                .msg = hintfmt("in pure mode, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
+                    state.store->printStorePath(*storePath)),
+                .errPos = pos
+            });
+    }
+
     auto storePathS = state.store->printStorePath(*storePath);
-
     v.mkString(storePathS, {storePathS});
-
-    // FIXME: in pure mode, require a CA path or a NAR hash of the
-    // top-level path.
 }
 
 static RegisterPrimOp primop_fetchClosure({
