@@ -11,6 +11,6 @@ store+=$remote_store
 store+=$remote_store
 store+=$remote_store
 
-out=$(nix add-to-store --store "$store" $TEST_ROOT/hello.sh)
+out=$(nix store add-path --store "$store" $TEST_ROOT/hello.sh)
 
 [ foo = $(< $out) ]

@@ -16,11 +16,12 @@ struct MixEvalArgs : virtual Args
 
     Strings searchPath;
 
-private:
+    std::optional<std::string> evalStoreUrl;
 
+private:
     std::map<std::string, std::string> autoArgs;
 };
 
-Path lookupFileArg(EvalState & state, string s);
+Path lookupFileArg(EvalState & state, std::string_view s);
 
 }

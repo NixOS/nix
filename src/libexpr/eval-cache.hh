@@ -94,15 +94,17 @@ public:
 
     std::string getAttrPathStr(Symbol name) const;
 
+    Suggestions getSuggestionsForAttr(Symbol name);
+
     std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
 
     std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
+    ref<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
 
-    std::shared_ptr<AttrCursor> getAttr(std::string_view name);
+    ref<AttrCursor> getAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> findAlongAttrPath(const std::vector<Symbol> & attrPath);
+    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
 
     std::string getString();
 

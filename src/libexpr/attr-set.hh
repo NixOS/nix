@@ -17,8 +17,8 @@ struct Attr
 {
     Symbol name;
     Value * value;
-    Pos * pos;
-    Attr(Symbol name, Value * value, Pos * pos = &noPos)
+    ptr<Pos> pos;
+    Attr(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
         : name(name), value(value), pos(pos) { };
     Attr() : pos(&noPos) { };
     bool operator < (const Attr & a) const
@@ -35,12 +35,13 @@ class Bindings
 {
 public:
     typedef uint32_t size_t;
+    ptr<Pos> pos;
 
 private:
     size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
+    Bindings(size_t capacity) : pos(&noPos), size_(0), capacity_(capacity) { }
     Bindings(const Bindings & bindings) = delete;
 
 public:
@@ -77,7 +78,7 @@ public:
         auto a = get(name);
         if (!a)
             throw Error({
-                .hint = hintfmt("attribute '%s' missing", name),
+                .msg = hintfmt("attribute '%s' missing", name),
                 .errPos = pos
             });
 
@@ -104,7 +105,7 @@ public:
         for (size_t n = 0; n < size_; n++)
             res.emplace_back(&attrs[n]);
         std::sort(res.begin(), res.end(), [](const Attr * a, const Attr * b) {
-            return (const string &) a->name < (const string &) b->name;
+            return (const std::string &) a->name < (const std::string &) b->name;
         });
         return res;
     }
@@ -112,5 +113,52 @@ public:
     friend class EvalState;
 };
 
+/* A wrapper around Bindings that ensures that its always in sorted
+   order at the end. The only way to consume a BindingsBuilder is to
+   call finish(), which sorts the bindings. */
+class BindingsBuilder
+{
+    Bindings * bindings;
+
+public:
+    // needed by std::back_inserter
+    using value_type = Attr;
+
+    EvalState & state;
+
+    BindingsBuilder(EvalState & state, Bindings * bindings)
+        : bindings(bindings), state(state)
+    { }
+
+    void insert(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
+    {
+        insert(Attr(name, value, pos));
+    }
+
+    void insert(const Attr & attr)
+    {
+        push_back(attr);
+    }
+
+    void push_back(const Attr & attr)
+    {
+        bindings->push_back(attr);
+    }
+
+    Value & alloc(const Symbol & name, ptr<Pos> pos = ptr(&noPos));
+
+    Value & alloc(std::string_view name, ptr<Pos> pos = ptr(&noPos));
+
+    Bindings * finish()
+    {
+        bindings->sort();
+        return bindings;
+    }
+
+    Bindings * alreadySorted()
+    {
+        return bindings;
+    }
+};
 
 }

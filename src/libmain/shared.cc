@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "util.hh"
 #include "loggers.hh"
 
@@ -15,8 +16,18 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#ifdef __linux__
+#include <features.h>
+#endif
+#ifdef __GLIBC__
+#include <gnu/lib-names.h>
+#include <nss.h>
+#include <dlfcn.h>
+#endif
 
 #include <openssl/crypto.h>
+
+#include <sodium.h>
 
 
 namespace nix {
@@ -34,7 +45,7 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
@@ -84,7 +95,7 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
 }
 
 
-string getArg(const string & opt,
+std::string getArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
@@ -108,6 +119,40 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
 }
 #endif
 
+static std::once_flag dns_resolve_flag;
+
+static void preloadNSS() {
+    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
+       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
+       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
+       load its lookup libraries in the parent before any child gets a chance to. */
+    std::call_once(dns_resolve_flag, []() {
+#ifdef __GLIBC__
+        /* On linux, glibc will run every lookup through the nss layer.
+         * That means every lookup goes, by default, through nscd, which acts as a local
+         * cache.
+         * Because we run builds in a sandbox, we also remove access to nscd otherwise
+         * lookups would leak into the sandbox.
+         *
+         * But now we have a new problem, we need to make sure the nss_dns backend that
+         * does the dns lookups when nscd is not available is loaded or available.
+         *
+         * We can't make it available without leaking nix's environment, so instead we'll
+         * load the backend, and configure nss so it does not try to run dns lookups
+         * through nscd.
+         *
+         * This is technically only used for builtins:fetch* functions so we only care
+         * about dns.
+         *
+         * All other platforms are unaffected.
+         */
+        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
+            warn("unable to load nss_dns backend");
+        // FIXME: get hosts entry from nsswitch.conf.
+        __nss_configure_lookup("hosts", "files dns");
+#endif
+    });
+}
 
 static void sigHandler(int signo) { }
 
@@ -125,6 +170,9 @@ void initNix()
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
 #endif
+
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
 
     loadConfFile();
 
@@ -171,6 +219,8 @@ void initNix()
     if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
+
+    preloadNSS();
 }
 
 
@@ -181,50 +231,64 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',
-        .description = "do not show build output",
+        .description = "Do not show build output.",
         .handler = {[&]() {setLogFormat(LogFormat::raw); }},
     });
 
     addFlag({
         .longName = "keep-failed",
         .shortName ='K',
-        .description = "keep temporary directories of failed builds",
+        .description = "Keep temporary directories of failed builds.",
         .handler = {&(bool&) settings.keepFailed, true},
     });
 
     addFlag({
         .longName = "keep-going",
         .shortName ='k',
-        .description = "keep going after a build fails",
+        .description = "Keep going after a build fails.",
         .handler = {&(bool&) settings.keepGoing, true},
     });
 
     addFlag({
         .longName = "fallback",
-        .description = "build from source if substitution fails",
+        .description = "Build from source if substitution fails.",
         .handler = {&(bool&) settings.tryFallback, true},
     });
 
     auto intSettingAlias = [&](char shortName, const std::string & longName,
-        const std::string & description, const std::string & dest) {
-        mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
-            settings.set(dest, std::to_string(n));
+        const std::string & description, const std::string & dest)
+    {
+        addFlag({
+            .longName = longName,
+            .shortName = shortName,
+            .description = description,
+            .labels = {"n"},
+            .handler = {[=](std::string s) {
+                auto n = string2IntWithUnitPrefix<uint64_t>(s);
+                settings.set(dest, std::to_string(n));
+            }}
         });
     };
 
-    intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
-    intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
-    intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
+    intSettingAlias(0, "cores", "Maximum number of CPU cores to use inside a build.", "cores");
+    intSettingAlias(0, "max-silent-time", "Number of seconds of silence before a build is killed.", "max-silent-time");
+    intSettingAlias(0, "timeout", "Number of seconds before a build is killed.", "timeout");
 
-    mkFlag(0, "readonly-mode", "do not write to the Nix store",
-        &settings.readOnlyMode);
+    addFlag({
+        .longName = "readonly-mode",
+        .description = "Do not write to the Nix store.",
+        .handler = {&settings.readOnlyMode, true},
+    });
 
-    mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
-        &gcWarning, false);
+    addFlag({
+        .longName = "no-gc-warning",
+        .description = "Disable warnings about not using `--add-root`.",
+        .handler = {&gcWarning, false},
+    });
 
     addFlag({
         .longName = "store",
-        .description = "URI of the Nix store to use",
+        .description = "The URL of the Nix store to use.",
         .labels = {"store-uri"},
         .handler = {&(std::string&) settings.storeUri},
     });
@@ -259,14 +323,14 @@ void parseCmdLine(int argc, char * * argv,
 }
 
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(const std::string & programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 
-void printVersion(const string & programName)
+void printVersion(const std::string & programName)
 {
     std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
     if (verbosity > lvlInfo) {
@@ -274,9 +338,7 @@ void printVersion(const string & programName)
 #if HAVE_BOEHMGC
         cfg.push_back("gc");
 #endif
-#if HAVE_SODIUM
         cfg.push_back("signed-caches");
-#endif
         std::cout << "System type: " << settings.thisSystem << "\n";
         std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
@@ -291,22 +353,22 @@ void printVersion(const string & programName)
 }
 
 
-void showManPage(const string & name)
+void showManPage(const std::string & name)
 {
-    restoreSignals();
+    restoreProcessContext();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
 }
 
 
-int handleExceptions(const string & programName, std::function<void()> fun)
+int handleExceptions(const std::string & programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
     ErrorInfo::programName = baseNameOf(programName);
 
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
             fun();
@@ -346,7 +408,7 @@ RunPager::RunPager()
     if (!isatty(STDOUT_FILENO)) return;
     char * pager = getenv("NIX_PAGER");
     if (!pager) pager = getenv("PAGER");
-    if (pager && ((string) pager == "" || (string) pager == "cat")) return;
+    if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
 
     Pipe toPager;
     toPager.create();
@@ -356,7 +418,7 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
-        restoreSignals();
+        restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
         execlp("pager", "pager", nullptr);
@@ -366,7 +428,7 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-
+    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
 }
@@ -377,7 +439,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            close(STDOUT_FILENO);
+            dup2(stdout, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {

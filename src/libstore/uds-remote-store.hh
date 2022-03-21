@@ -14,15 +14,10 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     {
     }
 
-    UDSRemoteStoreConfig()
-        : UDSRemoteStoreConfig(Store::Params({}))
-    {
-    }
-
     const std::string name() override { return "Local Daemon Store"; }
 };
 
-class UDSRemoteStore : public LocalFSStore, public RemoteStore, public virtual UDSRemoteStoreConfig
+class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual LocalFSStore, public virtual RemoteStore
 {
 public:
 
@@ -44,6 +39,12 @@ public:
     { LocalFSStore::narFromPath(path, sink); }
 
 private:
+
+    struct Connection : RemoteStore::Connection
+    {
+        AutoCloseFD fd;
+        void closeWrite() override;
+    };
 
     ref<RemoteStore::Connection> openConnection() override;
     std::optional<std::string> path;

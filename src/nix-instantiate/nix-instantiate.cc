@@ -10,7 +10,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -40,7 +40,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
-        state.forceValue(v);
+        state.forceValue(v, [&]() { return v.determinePos(noPos); });
 
         PathSet context;
         if (evalOnly) {
@@ -50,9 +50,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okXML)
-                printValueAsXML(state, strict, location, vRes, std::cout, context);
+                printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON)
-                printValueAsJSON(state, strict, vRes, std::cout, context);
+                printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
             else {
                 if (strict) state.forceValueDeep(vRes);
                 std::cout << vRes << std::endl;
@@ -61,12 +61,13 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             for (auto & i : drvs) {
-                Path drvPath = i.queryDrvPath();
+                auto drvPath = i.requireDrvPath();
+                auto drvPathS = state.store->printStorePath(drvPath);
 
                 /* What output do we want? */
-                string outputName = i.queryOutputName();
+                std::string outputName = i.queryOutputName();
                 if (outputName == "")
-                    throw Error("derivation '%1%' lacks an 'outputName' attribute ", drvPath);
+                    throw Error("derivation '%1%' lacks an 'outputName' attribute", drvPathS);
 
                 if (gcRoot == "")
                     printGCWarning();
@@ -75,9 +76,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
-                        drvPath = store2->addPermRoot(store2->parseStorePath(drvPath), rootName);
+                        drvPathS = store2->addPermRoot(drvPath, rootName);
                 }
-                std::cout << fmt("%s%s\n", drvPath, (outputName != "out" ? "!" + outputName : ""));
+                std::cout << fmt("%s%s\n", drvPathS, (outputName != "out" ? "!" + outputName : ""));
             }
         }
     }
@@ -149,14 +150,13 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
-        initPlugins();
-
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
         auto store = openStore();
+        auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
         state->repair = repair;
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);

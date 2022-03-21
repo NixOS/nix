@@ -16,10 +16,10 @@ std::ostream & operator << (std::ostream & str, const Expr & e)
     return str;
 }
 
-static void showString(std::ostream & str, const string & s)
+static void showString(std::ostream & str, std::string_view s)
 {
     str << '"';
-    for (auto c : (string) s)
+    for (auto c : s)
         if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
         else if (c == '\n') str << "\\n";
         else if (c == '\r') str << "\\r";
@@ -28,7 +28,7 @@ static void showString(std::ostream & str, const string & s)
     str << '"';
 }
 
-static void showId(std::ostream & str, const string & s)
+static void showId(std::ostream & str, std::string_view s)
 {
     if (s.empty())
         str << "\"\"";
@@ -103,11 +103,18 @@ void ExprAttrs::show(std::ostream & str) const
 {
     if (recursive) str << "rec ";
     str << "{ ";
-    for (auto & i : attrs)
-        if (i.second.inherited)
-            str << "inherit " << i.first << " " << "; ";
+    typedef const decltype(attrs)::value_type * Attr;
+    std::vector<Attr> sorted;
+    for (auto & i : attrs) sorted.push_back(&i);
+        std::sort(sorted.begin(), sorted.end(), [](Attr a, Attr b) {
+            return (const std::string &) a->first < (const std::string &) b->first;
+        });
+    for (auto & i : sorted) {
+        if (i->second.inherited)
+            str << "inherit " << i->first << " " << "; ";
         else
-            str << i.first << " = " << *i.second.e << "; ";
+            str << i->first << " = " << *i->second.e << "; ";
+    }
     for (auto & i : dynamicAttrs)
         str << "\"${" << *i.nameExpr << "}\" = " << *i.valueExpr << "; ";
     str << "}";
@@ -124,7 +131,7 @@ void ExprList::show(std::ostream & str) const
 void ExprLambda::show(std::ostream & str) const
 {
     str << "(";
-    if (matchAttrs) {
+    if (hasFormals()) {
         str << "{ ";
         bool first = true;
         for (auto & i : formals->formals) {
@@ -141,6 +148,16 @@ void ExprLambda::show(std::ostream & str) const
     }
     if (!arg.empty()) str << arg;
     str << ": " << *body << ")";
+}
+
+void ExprCall::show(std::ostream & str) const
+{
+    str << '(' << *fun;
+    for (auto e : args) {
+        str <<  ' ';
+        str << *e;
+    }
+    str << ')';
 }
 
 void ExprLet::show(std::ostream & str) const
@@ -181,7 +198,7 @@ void ExprConcatStrings::show(std::ostream & str) const
     str << "(";
     for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << *i;
+        str << *i.second;
     }
     str << ")";
 }
@@ -201,7 +218,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
         auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
         switch (pos.origin) {
             case foFile:
-                f % (string) pos.file;
+                f % (const std::string &) pos.file;
                 break;
             case foStdin:
             case foString:
@@ -217,7 +234,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 }
 
 
-string showAttrPath(const AttrPath & attrPath)
+std::string showAttrPath(const AttrPath & attrPath)
 {
     std::ostringstream out;
     bool first = true;
@@ -263,13 +280,13 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
-    unsigned int level;
+    Level level;
     int withLevel = -1;
     for (curEnv = &env, level = 0; curEnv; curEnv = curEnv->up, level++) {
         if (curEnv->isWith) {
             if (withLevel == -1) withLevel = level;
         } else {
-            StaticEnv::Vars::const_iterator i = curEnv->vars.find(name);
+            auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
                 fromWith = false;
                 this->level = level;
@@ -284,7 +301,7 @@ void ExprVar::bindVars(const StaticEnv & env)
        "undefined variable" error now. */
     if (withLevel == -1)
         throw UndefinedVarError({
-            .hint = hintfmt("undefined variable '%1%'", name),
+            .msg = hintfmt("undefined variable '%1%'", name),
             .errPos = pos
         });
     fromWith = true;
@@ -311,14 +328,16 @@ void ExprOpHasAttr::bindVars(const StaticEnv & env)
 void ExprAttrs::bindVars(const StaticEnv & env)
 {
     const StaticEnv * dynamicEnv = &env;
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(false, &env, recursive ? attrs.size() : 0);
 
     if (recursive) {
         dynamicEnv = &newEnv;
 
-        unsigned int displ = 0;
+        Displacement displ = 0;
         for (auto & i : attrs)
-            newEnv.vars[i.first] = i.second.displ = displ++;
+            newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+
+        // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
             i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -342,15 +361,20 @@ void ExprList::bindVars(const StaticEnv & env)
 
 void ExprLambda::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(
+        false, &env,
+        (hasFormals() ? formals->formals.size() : 0) +
+        (arg.empty() ? 0 : 1));
 
-    unsigned int displ = 0;
+    Displacement displ = 0;
 
-    if (!arg.empty()) newEnv.vars[arg] = displ++;
+    if (!arg.empty()) newEnv.vars.emplace_back(arg, displ++);
 
-    if (matchAttrs) {
+    if (hasFormals()) {
         for (auto & i : formals->formals)
-            newEnv.vars[i.name] = displ++;
+            newEnv.vars.emplace_back(i.name, displ++);
+
+        newEnv.sort();
 
         for (auto & i : formals->formals)
             if (i.def) i.def->bindVars(newEnv);
@@ -359,13 +383,22 @@ void ExprLambda::bindVars(const StaticEnv & env)
     body->bindVars(newEnv);
 }
 
+void ExprCall::bindVars(const StaticEnv & env)
+{
+    fun->bindVars(env);
+    for (auto e : args)
+        e->bindVars(env);
+}
+
 void ExprLet::bindVars(const StaticEnv & env)
 {
-    StaticEnv newEnv(false, &env);
+    StaticEnv newEnv(false, &env, attrs->attrs.size());
 
-    unsigned int displ = 0;
+    Displacement displ = 0;
     for (auto & i : attrs->attrs)
-        newEnv.vars[i.first] = i.second.displ = displ++;
+        newEnv.vars.emplace_back(i.first, i.second.displ = displ++);
+
+    // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
         i.second.e->bindVars(i.second.inherited ? env : newEnv);
@@ -379,7 +412,7 @@ void ExprWith::bindVars(const StaticEnv & env)
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
     const StaticEnv * curEnv;
-    unsigned int level;
+    Level level;
     prevWith = 0;
     for (curEnv = &env, level = 1; curEnv; curEnv = curEnv->up, level++)
         if (curEnv->isWith) {
@@ -413,7 +446,7 @@ void ExprOpNot::bindVars(const StaticEnv & env)
 void ExprConcatStrings::bindVars(const StaticEnv & env)
 {
     for (auto & i : *es)
-        i->bindVars(env);
+        i.second->bindVars(env);
 }
 
 void ExprPos::bindVars(const StaticEnv & env)
@@ -435,9 +468,9 @@ void ExprLambda::setName(Symbol & name)
 }
 
 
-string ExprLambda::showNamePos() const
+std::string ExprLambda::showNamePos() const
 {
-    return (format("%1% at %2%") % (name.set() ? "'" + (string) name + "'" : "anonymous function") % pos).str();
+    return fmt("%1% at %2%", name.set() ? "'" + (std::string) name + "'" : "anonymous function", pos);
 }
 
 
@@ -447,10 +480,9 @@ string ExprLambda::showNamePos() const
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    for (auto & i : symbols)
+    for (auto & i : store)
         n += i.size();
     return n;
 }
-
 
 }

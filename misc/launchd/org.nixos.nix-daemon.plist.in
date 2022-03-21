@@ -19,11 +19,16 @@
     <array>
       <string>/bin/sh</string>
       <string>-c</string>
-      <string>/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon &amp;&amp; /nix/var/nix/profiles/default/bin/nix-daemon</string>
+      <string>/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon &amp;&amp; exec /nix/var/nix/profiles/default/bin/nix-daemon</string>
     </array>
     <key>StandardErrorPath</key>
     <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
     <string>/dev/null</string>
+    <key>SoftResourceLimits</key>
+    <dict>
+      <key>NumberOfFiles</key>
+      <integer>4096</integer>
+    </dict>
   </dict>
 </plist>

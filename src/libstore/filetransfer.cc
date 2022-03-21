@@ -7,7 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 
-#ifdef ENABLE_S3
+#if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
@@ -33,12 +33,12 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
-std::string resolveUri(const std::string & uri)
+std::string resolveUri(std::string_view uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri, 8) + "/nixexprs.tar.xz";
+        return "https://nixos.org/channels/" + std::string(uri.substr(8)) + "/nixexprs.tar.xz";
     else
-        return uri;
+        return std::string(uri);
 }
 
 struct curlFileTransfer : public FileTransfer
@@ -95,18 +95,18 @@ struct curlFileTransfer : public FileTransfer
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
-            , finalSink([this](const unsigned char * data, size_t len) {
+            , finalSink([this](std::string_view data) {
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
                     /* Only write data to the sink if this is a
                        successful response. */
                     if (successfulStatuses.count(httpStatus)) {
-                        writtenToSink += len;
-                        this->request.dataCallback((char *) data, len);
+                        writtenToSink += data.size();
+                        this->request.dataCallback(data);
                     }
                 } else
-                    this->result.data->append((char *) data, len);
+                    this->result.data.append(data);
               })
         {
             if (!request.expectedETag.empty())
@@ -128,7 +128,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, nullptr, "download of '%s' was interrupted", request.uri));
+                    fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -148,7 +148,7 @@ struct curlFileTransfer : public FileTransfer
         }
 
         LambdaSink finalSink;
-        std::shared_ptr<CompressionSink> decompressionSink;
+        std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
         std::exception_ptr writeException;
@@ -171,8 +171,8 @@ struct curlFileTransfer : public FileTransfer
                 }
 
                 if (errorSink)
-                    (*errorSink)((unsigned char *) contents, realSize);
-                (*decompressionSink)((unsigned char *) contents, realSize);
+                    (*errorSink)({(char *) contents, realSize});
+                (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
             } catch (...) {
@@ -195,17 +195,17 @@ struct curlFileTransfer : public FileTransfer
             std::smatch match;
             if (std::regex_match(line, match, statusLine)) {
                 result.etag = "";
-                result.data = std::make_shared<std::string>();
+                result.data.clear();
                 result.bodySize = 0;
-                statusMsg = trim(match[1]);
+                statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
             } else {
                 auto i = line.find(':');
-                if (i != string::npos) {
-                    string name = toLower(trim(string(line, 0, i)));
+                if (i != std::string::npos) {
+                    std::string name = toLower(trim(line.substr(0, i)));
                     if (name == "etag") {
-                        result.etag = trim(string(line, i + 1));
+                        result.etag = trim(line.substr(i + 1));
                         /* Hack to work around a GitHub bug: it sends
                            ETags, but ignores If-None-Match. So if we get
                            the expected ETag on a 200 response, then shut
@@ -218,8 +218,8 @@ struct curlFileTransfer : public FileTransfer
                             return 0;
                         }
                     } else if (name == "content-encoding")
-                        encoding = trim(string(line, i + 1));
-                    else if (name == "accept-ranges" && toLower(trim(std::string(line, i + 1))) == "bytes")
+                        encoding = trim(line.substr(i + 1));
+                    else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
                 }
             }
@@ -340,7 +340,7 @@ struct curlFileTransfer : public FileTransfer
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
-            result.data = std::make_shared<std::string>();
+            result.data.clear();
             result.bodySize = 0;
         }
 
@@ -375,6 +375,13 @@ struct curlFileTransfer : public FileTransfer
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus))
             {
                 result.cached = httpStatus == 304;
+
+                // In 2021, GitHub responds to If-None-Match with 304,
+                // but omits ETag. We just use the If-None-Match etag
+                // since 304 implies they are the same.
+                if (httpStatus == 304 && result.etag == "")
+                    result.etag = request.expectedETag;
+
                 act.progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
@@ -427,21 +434,21 @@ struct curlFileTransfer : public FileTransfer
 
                 attempt++;
 
-                std::shared_ptr<std::string> response;
+                std::optional<std::string> response;
                 if (errorSink)
-                    response = errorSink->s;
+                    response = std::move(errorSink->s);
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? FileTransferError(Interrupted, response, "%s of '%s' was interrupted", request.verb(), request.uri)
+                    ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
                     ? FileTransferError(err,
-                        response,
+                        std::move(response),
                         fmt("unable to %s '%s': HTTP error %d ('%s')",
                             request.verb(), request.uri, httpStatus, statusMsg)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
                     : FileTransferError(err,
-                        response,
+                        std::move(response),
                         fmt("unable to %s '%s': %s (%d)",
                             request.verb(), request.uri, curl_easy_strerror(code), code));
 
@@ -536,6 +543,8 @@ struct curlFileTransfer : public FileTransfer
         auto callback = createInterruptCallback([&]() {
             stopWorkerThread();
         });
+
+        unshareFilesystem();
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
 
@@ -632,11 +641,7 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            logError({
-                .name = "File transfer",
-                .hint = hintfmt("unexpected error in download thread: %s",
-                                e.what())
-            });
+            printError("unexpected error in download thread: %s", e.what());
         }
 
         {
@@ -662,7 +667,7 @@ struct curlFileTransfer : public FileTransfer
         writeFull(wakeupPipe.writeSide.get(), " ");
     }
 
-#ifdef ENABLE_S3
+#if ENABLE_S3
     std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
@@ -685,7 +690,7 @@ struct curlFileTransfer : public FileTransfer
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
             try {
-#ifdef ENABLE_S3
+#if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
                 std::string profile = get(params, "profile").value_or("");
@@ -699,8 +704,8 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, nullptr, "S3 object '%s' does not exist", request.uri);
-                res.data = s3Res.data;
+                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
+                res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else
                 throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
@@ -713,15 +718,24 @@ struct curlFileTransfer : public FileTransfer
     }
 };
 
+ref<curlFileTransfer> makeCurlFileTransfer()
+{
+    return make_ref<curlFileTransfer>();
+}
+
 ref<FileTransfer> getFileTransfer()
 {
-    static ref<FileTransfer> fileTransfer = makeFileTransfer();
+    static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
+
+    if (fileTransfer->state_.lock()->quit)
+        fileTransfer = makeCurlFileTransfer();
+
     return fileTransfer;
 }
 
 ref<FileTransfer> makeFileTransfer()
 {
-    return make_ref<curlFileTransfer>();
+    return makeCurlFileTransfer();
 }
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
@@ -776,7 +790,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         state->request.notify_one();
     });
 
-    request.dataCallback = [_state](char * buf, size_t len) {
+    request.dataCallback = [_state](std::string_view data) {
 
         auto state(_state->lock());
 
@@ -794,7 +808,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
 
         /* Append data to the buffer and wake up the calling
            thread. */
-        state->data.append(buf, len);
+        state->data.append(data);
         state->avail.notify_one();
     };
 
@@ -840,31 +854,30 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            if it's blocked on a full buffer. We don't hold the state
            lock while doing this to prevent blocking the download
            thread if sink() takes a long time. */
-        sink((unsigned char *) chunk.data(), chunk.size());
+        sink(chunk);
     }
 }
 
 template<typename... Args>
-FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args)
+FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args)
     : Error(args...), error(error), response(response)
 {
     const auto hf = hintfmt(args...);
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
-    if (response && (response->size() < 1024 || response->find("<html>") != string::npos)) {
-            err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
-    } else {
-        err.hint = hf;
-    }
+    if (response && (response->size() < 1024 || response->find("<html>") != std::string::npos))
+        err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), chomp(*response));
+    else
+        err.msg = hf;
 }
 
-bool isUri(const string & s)
+bool isUri(std::string_view s)
 {
     if (s.compare(0, 8, "channel:") == 0) return true;
     size_t pos = s.find("://");
-    if (pos == string::npos) return false;
-    string scheme(s, 0, pos);
+    if (pos == std::string::npos) return false;
+    std::string scheme(s, 0, pos);
     return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
 }
 

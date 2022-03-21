@@ -9,7 +9,7 @@ namespace nix {
 static Strings parseAttrPath(std::string_view s)
 {
     Strings res;
-    string cur;
+    std::string cur;
     auto i = s.begin();
     while (i != s.end()) {
         if (*i == '.') {
@@ -19,7 +19,7 @@ static Strings parseAttrPath(std::string_view s)
             ++i;
             while (1) {
                 if (i == s.end())
-                    throw Error("missing closing quote in selection path '%1%'", s);
+                    throw ParseError("missing closing quote in selection path '%1%'", s);
                 if (*i == '"') break;
                 cur.push_back(*i++);
             }
@@ -41,7 +41,7 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
+std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
@@ -52,22 +52,20 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
     for (auto & attr : tokens) {
 
         /* Is i an index (integer) or a normal attribute name? */
-        enum { apAttr, apIndex } apType = apAttr;
-        unsigned int attrIndex;
-        if (string2Int(attr, attrIndex)) apType = apIndex;
+        auto attrIndex = string2Int<unsigned int>(attr);
 
         /* Evaluate the expression. */
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v);
+        state.forceValue(*v, noPos);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
 
-        if (apType == apAttr) {
+        if (!attrIndex) {
 
-            if (v->type != tAttrs)
+            if (v->type() != nAttrs)
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a set but is %2%",
                     attrPath,
@@ -76,23 +74,29 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end())
-                throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+            if (a == v->attrs->end()) {
+                std::set<std::string> attrNames;
+                for (auto & attr : *v->attrs)
+                    attrNames.insert(attr.name);
+
+                auto suggestions = Suggestions::bestMatches(attrNames, attr);
+                throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+            }
             v = &*a->value;
             pos = *a->pos;
         }
 
-        else if (apType == apIndex) {
+        else {
 
             if (!v->isList())
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a list but is %2%",
                     attrPath,
                     showType(*v));
-            if (attrIndex >= v->listSize())
-                throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", attrIndex, attrPath);
+            if (*attrIndex >= v->listSize())
+                throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", *attrIndex, attrPath);
 
-            v = v->listElems()[attrIndex];
+            v = v->listElems()[*attrIndex];
             pos = noPos;
         }
 
@@ -102,7 +106,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 }
 
 
-Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
+Pos findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -118,14 +122,14 @@ Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
 
     auto colon = pos.rfind(':');
     if (colon == std::string::npos)
-        throw Error("cannot parse meta.position attribute '%s'", pos);
+        throw ParseError("cannot parse meta.position attribute '%s'", pos);
 
     std::string filename(pos, 0, colon);
     unsigned int lineno;
     try {
-        lineno = std::stoi(std::string(pos, colon + 1));
+        lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
     } catch (std::invalid_argument & e) {
-        throw Error("cannot parse line number '%s'", pos);
+        throw ParseError("cannot parse line number '%s'", pos);
     }
 
     Symbol file = state.symbols.create(filename);

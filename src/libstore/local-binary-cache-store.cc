@@ -2,6 +2,8 @@
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 
+#include <atomic>
+
 namespace nix {
 
 struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
@@ -11,7 +13,7 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     const std::string name() override { return "Local Binary Cache Store"; }
 };
 
-class LocalBinaryCacheStore : public BinaryCacheStore, public virtual LocalBinaryCacheStoreConfig
+class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
 private:
 
@@ -24,6 +26,9 @@ public:
         const Path & binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , LocalBinaryCacheStoreConfig(params)
+        , Store(params)
         , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
@@ -47,7 +52,8 @@ protected:
         const std::string & mimeType) override
     {
         auto path2 = binaryCacheDir + "/" + path;
-        Path tmp = path2 + ".tmp." + std::to_string(getpid());
+        static std::atomic<int> counter{0};
+        Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
@@ -87,8 +93,10 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
+    createDirs(binaryCacheDir + "/" + realisationsPrefix);
     if (writeDebugInfo)
         createDirs(binaryCacheDir + "/debuginfo");
+    createDirs(binaryCacheDir + "/log");
     BinaryCacheStore::init();
 }
 

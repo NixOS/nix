@@ -1,12 +1,15 @@
 #pragma once
 
+#include "store-api.hh"
+#include "serialise.hh"
+
 namespace nix {
 
 
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x11b
+#define PROTOCOL_VERSION (1 << 8 | 34)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -50,6 +53,11 @@ typedef enum {
     wopAddToStoreNar = 39,
     wopQueryMissing = 40,
     wopQueryDerivationOutputMap = 41,
+    wopRegisterDrvOutput = 42,
+    wopQueryRealisation = 43,
+    wopAddMultipleToStore = 44,
+    wopAddBuildLog = 45,
+    wopBuildPathsWithResults = 46,
 } WorkerOp;
 
 
@@ -81,7 +89,12 @@ namespace worker_proto {
 MAKE_WORKER_PROTO(, std::string);
 MAKE_WORKER_PROTO(, StorePath);
 MAKE_WORKER_PROTO(, ContentAddress);
+MAKE_WORKER_PROTO(, DerivedPath);
+MAKE_WORKER_PROTO(, Realisation);
+MAKE_WORKER_PROTO(, DrvOutput);
+MAKE_WORKER_PROTO(, BuildResult);
 
+MAKE_WORKER_PROTO(template<typename T>, std::vector<T>);
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
 
 #define X_ template<typename K, typename V>
@@ -105,6 +118,26 @@ MAKE_WORKER_PROTO(X_, Y_);
  */
 MAKE_WORKER_PROTO(, std::optional<StorePath>);
 MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
+
+template<typename T>
+std::vector<T> read(const Store & store, Source & from, Phantom<std::vector<T>> _)
+{
+    std::vector<T> resSet;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resSet.push_back(read(store, from, Phantom<T> {}));
+    }
+    return resSet;
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::vector<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
+    }
+}
 
 template<typename T>
 std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)

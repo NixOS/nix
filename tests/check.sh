@@ -1,5 +1,8 @@
 source common.sh
 
+# XXX: This shouldn’t be, but #4813 cause this test to fail
+buggyNeedLocalStore "see #4813"
+
 checkBuildTempDirRemoved ()
 {
     buildDir=$(sed -n 's/CHECK_TMPDIR=//p' $1 | head -1)
@@ -74,12 +77,13 @@ nix-build check.nix -A fetchurl --no-out-link --check
 nix-build check.nix -A fetchurl --no-out-link --repair
 [[ $(cat $path) != foo ]]
 
+echo 'Hello World' > $TMPDIR/dummy
 nix-build check.nix -A hashmismatch --no-out-link || status=$?
 [ "$status" = "102" ]
 
-echo -n > ./dummy
+echo -n > $TMPDIR/dummy
 nix-build check.nix -A hashmismatch --no-out-link
-echo 'Hello World' > ./dummy
+echo 'Hello World' > $TMPDIR/dummy
 
 nix-build check.nix -A hashmismatch --no-out-link --check || status=$?
 [ "$status" = "102" ]

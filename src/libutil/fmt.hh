@@ -2,6 +2,7 @@
 
 #include <boost/format.hpp>
 #include <string>
+#include <regex>
 #include "ansicolor.hh"
 
 
@@ -9,7 +10,6 @@ namespace nix {
 
 
 /* Inherit some names from other namespaces for convenience. */
-using std::string;
 using boost::format;
 
 
@@ -20,8 +20,8 @@ struct nop { template<typename... T> nop(T...) {} };
 
 struct FormatOrString
 {
-    string s;
-    FormatOrString(const string & s) : s(s) { };
+    std::string s;
+    FormatOrString(std::string s) : s(std::move(s)) { };
     template<class F>
     FormatOrString(const F & f) : s(f.str()) { };
     FormatOrString(const char * s) : s(s) { };
@@ -82,7 +82,7 @@ struct yellowtxt
 template <class T>
 std::ostream & operator<<(std::ostream & out, const yellowtxt<T> & y)
 {
-    return out << ANSI_YELLOW << y.value << ANSI_NORMAL;
+    return out << ANSI_WARNING << y.value << ANSI_NORMAL;
 }
 
 template <class T>
@@ -101,7 +101,7 @@ std::ostream & operator<<(std::ostream & out, const normaltxt<T> & y)
 class hintformat
 {
 public:
-    hintformat(const string & format) : fmt(format)
+    hintformat(const std::string & format) : fmt(format)
     {
         fmt.exceptions(boost::io::all_error_bits ^
                        boost::io::too_many_args_bit ^
@@ -154,4 +154,16 @@ inline hintformat hintfmt(std::string plain_string)
     // we won't be receiving any args in this case, so just print the original string
     return hintfmt("%s", normaltxt(plain_string));
 }
+
+/* Highlight all the given matches in the given string `s` by wrapping
+   them between `prefix` and `postfix`.
+
+   If some matches overlap, then their union will be wrapped rather
+   than the individual matches. */
+std::string hiliteMatches(
+    std::string_view s,
+    std::vector<std::smatch> matches,
+    std::string_view prefix,
+    std::string_view postfix);
+
 }

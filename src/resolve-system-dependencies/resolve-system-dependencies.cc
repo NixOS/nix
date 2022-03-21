@@ -23,9 +23,9 @@ Path resolveCacheFile(Path lib)
     return cacheDir + "/" + lib;
 }
 
-std::set<string> readCacheFile(const Path & file)
+std::set<std::string> readCacheFile(const Path & file)
 {
-    return tokenizeString<set<string>>(readFile(file), "\n");
+    return tokenizeString<std::set<std::string>>(readFile(file), "\n");
 }
 
 std::set<std::string> runResolver(const Path & filename)
@@ -39,18 +39,12 @@ std::set<std::string> runResolver(const Path & filename)
         throw SysError("statting '%s'", filename);
 
     if (!S_ISREG(st.st_mode)) {
-        logError({
-            .name = "Regular MACH file",
-            .hint = hintfmt("file '%s' is not a regular file", filename)
-        });
+        printError("file '%s' is not a regular MACH binary", filename);
         return {};
     }
 
     if (st.st_size < sizeof(mach_header_64)) {
-        logError({
-            .name = "File too short",
-            .hint = hintfmt("file '%s' is too short for a MACH binary", filename)
-        });
+        printError("file '%s' is too short for a MACH binary", filename);
         return {};
     }
 
@@ -72,19 +66,13 @@ std::set<std::string> runResolver(const Path & filename)
             }
         }
         if (mach64_offset == 0) {
-            logError({
-                .name = "No mach64 blobs",
-                .hint = hintfmt("Could not find any mach64 blobs in file '%1%', continuing...", filename)
-            });
+            printError("could not find any mach64 blobs in file '%1%', continuing...", filename);
             return {};
         }
     } else if (magic == MH_MAGIC_64 || magic == MH_CIGAM_64) {
         mach64_offset = 0;
     } else {
-        logError({
-            .name = "Magic number",
-            .hint = hintfmt("Object file has unknown magic number '%1%', skipping it...", magic)
-        });
+        printError("Object file has unknown magic number '%1%', skipping it...", magic);
         return {};
     }
 
@@ -93,7 +81,7 @@ std::set<std::string> runResolver(const Path & filename)
     bool should_swap = magic == MH_CIGAM_64;
     ptrdiff_t cmd_offset = mach64_offset + sizeof(mach_header_64);
 
-    std::set<string> libs;
+    std::set<std::string> libs;
     for (uint32_t i = 0; i < DO_SWAP(should_swap, m_header->ncmds); i++) {
         load_command * cmd = (load_command *) (obj + cmd_offset);
         switch(DO_SWAP(should_swap, cmd->cmd)) {
@@ -119,12 +107,12 @@ Path resolveSymlink(const Path & path)
     auto target = readLink(path);
     return hasPrefix(target, "/")
         ? target
-        : dirOf(path) + "/" + target;
+        : concatStrings(dirOf(path), "/", target);
 }
 
-std::set<string> resolveTree(const Path & path, PathSet & deps)
+std::set<std::string> resolveTree(const Path & path, PathSet & deps)
 {
-    std::set<string> results;
+    std::set<std::string> results;
     if (!deps.insert(path).second) return {};
     for (auto & lib : runResolver(path)) {
         results.insert(lib);
@@ -135,7 +123,7 @@ std::set<string> resolveTree(const Path & path, PathSet & deps)
     return results;
 }
 
-std::set<string> getPath(const Path & path)
+std::set<std::string> getPath(const Path & path)
 {
     if (hasPrefix(path, "/dev")) return {};
 
@@ -143,7 +131,7 @@ std::set<string> getPath(const Path & path)
     if (pathExists(cacheFile))
         return readCacheFile(cacheFile);
 
-    std::set<string> deps, paths;
+    std::set<std::string> deps, paths;
     paths.insert(path);
 
     Path nextPath(path);
@@ -192,7 +180,7 @@ int main(int argc, char ** argv)
             impurePaths.insert("/usr/lib/libSystem.dylib");
         }
 
-        std::set<string> allPaths;
+        std::set<std::string> allPaths;
 
         for (auto & path : impurePaths)
             for (auto & p : getPath(path))

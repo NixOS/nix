@@ -1,18 +1,26 @@
 # Installing a Binary Distribution
 
-If you are using Linux or macOS versions up to 10.14 (Mojave), the
-easiest way to install Nix is to run the following command:
+The easiest way to install Nix is to run the following command:
 
 ```console
 $ sh <(curl -L https://nixos.org/nix/install)
 ```
 
-If you're using macOS 10.15 (Catalina) or newer, consult [the macOS
-installation instructions](#macos-installation) before installing.
+This will run the installer interactively (causing it to explain what
+it is doing more explicitly), and perform the default "type" of install
+for your platform:
+- single-user on Linux
+- multi-user on macOS
 
-As of Nix 2.1.0, the Nix installer will always default to creating a
-single-user installation, however opting in to the multi-user
-installation is highly recommended.
+  > **Notes on read-only filesystem root in macOS 10.15 Catalina +**
+  > 
+  > - It took some time to support this cleanly. You may see posts,
+  >   examples, and tutorials using obsolete workarounds.
+  > - Supporting it cleanly made macOS installs too complex to qualify
+  >   as single-user, so this type is no longer supported on macOS.
+
+We recommend the multi-user install if it supports your platform and
+you can authenticate with `sudo`.
 
 # Single User Installation
 
@@ -50,9 +58,9 @@ $ rm -rf /nix
 The multi-user Nix installation creates system users, and a system
 service for the Nix daemon.
 
-  - Linux running systemd, with SELinux disabled
-
-  - macOS
+**Supported Systems**
+- Linux running systemd, with SELinux disabled
+- macOS
 
 You can instruct the installer to perform a multi-user installation on
 your system:
@@ -96,165 +104,52 @@ sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 There may also be references to Nix in `/etc/profile`, `/etc/bashrc`,
 and `/etc/zshrc` which you may remove.
 
-# macOS Installation
+# macOS Installation <a name="sect-macos-installation-change-store-prefix"></a><a name="sect-macos-installation-encrypted-volume"></a><a name="sect-macos-installation-symlink"></a><a name="sect-macos-installation-recommended-notes"></a>
+<!-- Note: anchors above to catch permalinks to old explanations -->
 
-Starting with macOS 10.15 (Catalina), the root filesystem is read-only.
-This means `/nix` can no longer live on your system volume, and that
-you'll need a workaround to install Nix.
+We believe we have ironed out how to cleanly support the read-only root
+on modern macOS. New installs will do this automatically, and you can
+also re-run a new installer to convert your existing setup.
 
-The recommended approach, which creates an unencrypted APFS volume for
-your Nix store and a "synthetic" empty directory to mount it over at
-`/nix`, is least likely to impair Nix or your system.
+This section previously detailed the situation, options, and trade-offs,
+but it now only outlines what the installer does. You don't need to know
+this to run the installer, but it may help if you run into trouble:
 
-> **Note**
-> 
-> With all separate-volume approaches, it's possible something on your
-> system (particularly daemons/services and restored apps) may need
-> access to your Nix store before the volume is mounted. Adding
-> additional encryption makes this more likely.
+- create a new APFS volume for your Nix store
+- update `/etc/synthetic.conf` to direct macOS to create a "synthetic"
+  empty root directory to mount your volume
+- specify mount options for the volume in `/etc/fstab`
+  - `rw`: read-write
+  - `noauto`: prevent the system from auto-mounting the volume (so the
+    LaunchDaemon mentioned below can control mounting it, and to avoid
+    masking problems with that mounting service).
+  - `nobrowse`: prevent the Nix Store volume from showing up on your
+    desktop; also keeps Spotlight from spending resources to index
+    this volume
+  <!-- TODO:
+  - `suid`: honor setuid? surely not? ...
+  - `owners`: honor file ownership on the volume
 
-If you're using a recent Mac with a [T2
-chip](https://www.apple.com/euro/mac/shared/docs/Apple_T2_Security_Chip_Overview.pdf),
-your drive will still be encrypted at rest (in which case "unencrypted"
-is a bit of a misnomer). To use this approach, just install Nix with:
+    For now I'll avoid pretending to understand suid/owners more
+    than I do. There've been some vague reports of file-ownership
+    and permission issues, particularly in cloud/VM/headless setups.
+    My pet theory is that this has something to do with these setups
+    not having a token that gets delegated to initial/admin accounts
+    on macOS. See scripts/create-darwin-volume.sh for a little more.
 
-```console
-$ sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
-```
-
-If you don't like the sound of this, you'll want to weigh the other
-approaches and tradeoffs detailed in this section.
-
-> **Note**
-> 
-> All of the known workarounds have drawbacks, but we hope better
-> solutions will be available in the future. Some that we have our eye
-> on are:
-> 
-> 1.  A true firmlink would enable the Nix store to live on the primary
->     data volume without the build problems caused by the symlink
->     approach. End users cannot currently create true firmlinks.
-> 
-> 2.  If the Nix store volume shared FileVault encryption with the
->     primary data volume (probably by using the same volume group and
->     role), FileVault encryption could be easily supported by the
->     installer without requiring manual setup by each user.
-
-## Change the Nix store path prefix
-
-Changing the default prefix for the Nix store is a simple approach which
-enables you to leave it on your root volume, where it can take full
-advantage of FileVault encryption if enabled. Unfortunately, this
-approach also opts your device out of some benefits that are enabled by
-using the same prefix across systems:
-
-  - Your system won't be able to take advantage of the binary cache
-    (unless someone is able to stand up and support duplicate caching
-    infrastructure), which means you'll spend more time waiting for
-    builds.
-
-  - It's harder to build and deploy packages to Linux systems.
-
-It would also possible (and often requested) to just apply this change
-ecosystem-wide, but it's an intrusive process that has side effects we
-want to avoid for now.
-
-## Use a separate encrypted volume
-
-If you like, you can also add encryption to the recommended approach
-taken by the installer. You can do this by pre-creating an encrypted
-volume before you run the installer--or you can run the installer and
-encrypt the volume it creates later.
-
-In either case, adding encryption to a second volume isn't quite as
-simple as enabling FileVault for your boot volume. Before you dive in,
-there are a few things to weigh:
-
-1.  The additional volume won't be encrypted with your existing
-    FileVault key, so you'll need another mechanism to decrypt the
-    volume.
-
-2.  You can store the password in Keychain to automatically decrypt the
-    volume on boot--but it'll have to wait on Keychain and may not mount
-    before your GUI apps restore. If any of your launchd agents or apps
-    depend on Nix-installed software (for example, if you use a
-    Nix-installed login shell), the restore may fail or break.
-    
-    On a case-by-case basis, you may be able to work around this problem
-    by using `wait4path` to block execution until your executable is
-    available.
-    
-    It's also possible to decrypt and mount the volume earlier with a
-    login hook--but this mechanism appears to be deprecated and its
-    future is unclear.
-
-3.  You can hard-code the password in the clear, so that your store
-    volume can be decrypted before Keychain is available.
-
-If you are comfortable navigating these tradeoffs, you can encrypt the
-volume with something along the lines of:
-
-```console
-$ diskutil apfs enableFileVault /nix -user disk
-```
-
-## Symlink the Nix store to a custom location
-
-Another simple approach is using `/etc/synthetic.conf` to symlink the
-Nix store to the data volume. This option also enables your store to
-share any configured FileVault encryption. Unfortunately, builds that
-resolve the symlink may leak the canonical path or even fail.
-
-Because of these downsides, we can't recommend this approach.
-
-## Notes on the recommended approach
-
-This section goes into a little more detail on the recommended approach.
-You don't need to understand it to run the installer, but it can serve
-as a helpful reference if you run into trouble.
-
-1.  In order to compose user-writable locations into the new read-only
-    system root, Apple introduced a new concept called `firmlinks`,
-    which it describes as a "bi-directional wormhole" between two
-    filesystems. You can see the current firmlinks in
-    `/usr/share/firmlinks`. Unfortunately, firmlinks aren't (currently?)
-    user-configurable.
-    
-    For special cases like NFS mount points or package manager roots,
-    [synthetic.conf(5)](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man5/synthetic.conf.5.html)
-    supports limited user-controlled file-creation (of symlinks, and
-    synthetic empty directories) at `/`. To create a synthetic empty
-    directory for mounting at `/nix`, add the following line to
-    `/etc/synthetic.conf` (create it if necessary):
-    
-        nix
-
-2.  This configuration is applied at boot time, but you can use
-    `apfs.util` to trigger creation (not deletion) of new entries
-    without a reboot:
-    
-    ```console
-    $ /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -B
-    ```
-
-3.  Create the new APFS volume with diskutil:
-    
-    ```console
-    $ sudo diskutil apfs addVolume diskX APFS 'Nix Store' -mountpoint /nix
-    ```
-
-4.  Using `vifs`, add the new mount to `/etc/fstab`. If it doesn't
-    already have other entries, it should look something like:
-    
-        #
-        # Warning - this file should only be modified with vifs(8)
-        #
-        # Failure to do so is unsupported and may be destructive.
-        #
-        LABEL=Nix\040Store /nix apfs rw,nobrowse
-    
-    The nobrowse setting will keep Spotlight from indexing this volume,
-    and keep it from showing up on your desktop.
+    In any case, by Dec 4 2021, it _seems_ like some combination of
+    suid, owners, and calling diskutil enableOwnership have stopped
+    new reports from coming in. But I hesitate to celebrate because we
+    haven't really named and catalogued the behavior, understood what
+    we're fixing, and validated that all 3 components are essential.
+  -->
+- if you have FileVault enabled
+    - generate an encryption password
+    - put it in your system Keychain
+    - use it to encrypt the volume
+- create a system LaunchDaemon to mount this volume early enough in the
+  boot process to avoid problems loading or restoring any programs that
+  need access to your Nix store
 
 # Installing a pinned Nix version from a URL
 

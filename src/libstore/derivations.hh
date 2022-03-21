@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "repair-flag.hh"
 #include "sync.hh"
 
 #include <map>
@@ -18,8 +19,6 @@ namespace nix {
 /* The traditional non-fixed-output derivation type. */
 struct DerivationOutputInputAddressed
 {
-    /* Will need to become `std::optional<StorePath>` once input-addressed
-       derivations are allowed to depend on cont-addressed derivations */
     StorePath path;
 };
 
@@ -46,61 +45,96 @@ struct DerivationOutputCAFloating
  */
 struct DerivationOutputDeferred {};
 
-struct DerivationOutput
+typedef std::variant<
+    DerivationOutputInputAddressed,
+    DerivationOutputCAFixed,
+    DerivationOutputCAFloating,
+    DerivationOutputDeferred
+> _DerivationOutputRaw;
+
+struct DerivationOutput : _DerivationOutputRaw
 {
-    std::variant<
-        DerivationOutputInputAddressed,
-        DerivationOutputCAFixed,
-        DerivationOutputCAFloating,
-        DerivationOutputDeferred
-    > output;
-    std::optional<HashType> hashAlgoOpt(const Store & store) const;
+    using Raw = _DerivationOutputRaw;
+    using Raw::Raw;
+
+    using InputAddressed = DerivationOutputInputAddressed;
+    using CAFixed = DerivationOutputCAFixed;
+    using CAFloating = DerivationOutputCAFloating;
+    using Deferred = DerivationOutputDeferred;
+
     /* Note, when you use this function you should make sure that you're passing
        the right derivation name. When in doubt, you should use the safer
        interface provided by BasicDerivation::outputsAndOptPaths */
     std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
 };
 
-typedef std::map<string, DerivationOutput> DerivationOutputs;
+typedef std::map<std::string, DerivationOutput> DerivationOutputs;
 
 /* These are analogues to the previous DerivationOutputs data type, but they
    also contains, for each output, the (optional) store path in which it would
    be written. To calculate values of these types, see the corresponding
    functions in BasicDerivation */
-typedef std::map<string, std::pair<DerivationOutput, std::optional<StorePath>>>
+typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>>
   DerivationOutputsAndOptPaths;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
-typedef std::map<string, string> StringPairs;
-
-enum struct DerivationType : uint8_t {
-    InputAddressed,
-    DeferredInputAddressed,
-    CAFixed,
-    CAFloating,
+struct DerivationType_InputAddressed {
+    bool deferred;
 };
 
-/* Do the outputs of the derivation have paths calculated from their content,
-   or from the derivation itself? */
-bool derivationIsCA(DerivationType);
+struct DerivationType_ContentAddressed {
+    bool pure;
+    bool fixed;
+};
 
-/* Is the content of the outputs fixed a-priori via a hash? Never true for
-   non-CA derivations. */
-bool derivationIsFixed(DerivationType);
+typedef std::variant<
+    DerivationType_InputAddressed,
+    DerivationType_ContentAddressed
+> _DerivationTypeRaw;
 
-/* Is the derivation impure and needs to access non-deterministic resources, or
-   pure and can be sandboxed? Note that whether or not we actually sandbox the
-   derivation is controlled separately. Never true for non-CA derivations. */
-bool derivationIsImpure(DerivationType);
+struct DerivationType : _DerivationTypeRaw {
+    using Raw = _DerivationTypeRaw;
+    using Raw::Raw;
+    using InputAddressed = DerivationType_InputAddressed;
+    using ContentAddressed = DerivationType_ContentAddressed;
+
+
+    /* Do the outputs of the derivation have paths calculated from their content,
+       or from the derivation itself? */
+    bool isCA() const;
+
+    /* Is the content of the outputs fixed a-priori via a hash? Never true for
+       non-CA derivations. */
+    bool isFixed() const;
+
+    /* Is the derivation impure and needs to access non-deterministic resources, or
+       pure and can be sandboxed? Note that whether or not we actually sandbox the
+       derivation is controlled separately. Never true for non-CA derivations. */
+    bool isImpure() const;
+
+    /* Does the derivation knows its own output paths?
+       Only true when there's no floating-ca derivation involved in the
+       closure, or if fixed output.
+     */
+    bool hasKnownOutputPaths() const;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+};
 
 struct BasicDerivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
     StorePathSet inputSrcs; /* inputs that are sources */
-    string platform;
+    std::string platform;
     Path builder;
     Strings args;
     StringPairs env;
@@ -135,8 +169,8 @@ struct Derivation : BasicDerivation
 
     /* Return the underlying basic derivation but with these changes:
 
-	   1. Input drvs are emptied, but the outputs of them that were used are
-	      added directly to input sources.
+       1. Input drvs are emptied, but the outputs of them that were used are
+          added directly to input sources.
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);
@@ -149,8 +183,6 @@ struct Derivation : BasicDerivation
 
 class Store;
 
-enum RepairFlag : bool { NoRepair = false, Repair = true };
-
 /* Write a derivation to the Nix store, and return its path. */
 StorePath writeDerivation(Store & store,
     const Derivation & drv,
@@ -161,7 +193,7 @@ StorePath writeDerivation(Store & store,
 Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
 
 // FIXME: remove
-bool isDerivation(const string & fileName);
+bool isDerivation(const std::string & fileName);
 
 /* Calculate the name that will be used for the store path for this
    output.
@@ -174,13 +206,43 @@ std::string outputPathName(std::string_view drvName, std::string_view outputName
 // whose output hashes are always known since they are fixed up-front.
 typedef std::map<std::string, Hash> CaOutputHashes;
 
-struct UnknownHashes {};
+struct DrvHash {
+    Hash hash;
+
+    enum struct Kind: bool {
+        // Statically determined derivations.
+        // This hash will be directly used to compute the output paths
+        Regular,
+        // Floating-output derivations (and their reverse dependencies).
+        Deferred,
+    };
+
+    Kind kind;
+};
+
+void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
 
 typedef std::variant<
-    Hash, // regular DRV normalized hash
-    CaOutputHashes, // Fixed-output derivation hashes
-    UnknownHashes // Deferred hashes for floating outputs drvs and their dependencies
-> DrvHashModulo;
+    // Regular normalized derivation hash, and whether it was deferred (because
+    // an ancestor derivation is a floating content addressed derivation).
+    DrvHash,
+    // Fixed-output derivation hashes
+    CaOutputHashes
+> _DrvHashModuloRaw;
+
+struct DrvHashModulo : _DrvHashModuloRaw {
+    using Raw = _DrvHashModuloRaw;
+    using Raw::Raw;
+
+    /* Get hash, throwing if it is per-output CA hashes or a
+       deferred Drv hash.
+     */
+    const Hash & requireNoFixedNonDeferred() const;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+};
 
 /* Returns hashes with the details of fixed-output subderivations
    expunged.
@@ -207,23 +269,19 @@ typedef std::variant<
  */
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
+/*
+   Return a map associating each output to a hash that uniquely identifies its
+   derivation (modulo the self-references).
+ */
+std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& drv);
+
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
 // FIXME: global, though at least thread-safe.
 extern Sync<DrvHashes> drvHashes;
 
-/* Memoisation of `readDerivation(..).resove()`. */
-typedef std::map<
-    StorePath,
-    std::optional<StorePath>
-> DrvPathResolutions;
-
-// FIXME: global, though at least thread-safe.
-// FIXME: arguably overlaps with hashDerivationModulo memo table.
-extern Sync<DrvPathResolutions> drvPathResolutions;
-
-bool wantOutput(const string & output, const std::set<string> & wanted);
+bool wantOutput(const std::string & output, const std::set<std::string> & wanted);
 
 struct Source;
 struct Sink;
@@ -237,7 +295,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
    It is used as a placeholder to allow derivations to refer to their
    own outputs without needing to use the hash of a derivation in
    itself, making the hash near-impossible to calculate. */
-std::string hashPlaceholder(const std::string & outputName);
+std::string hashPlaceholder(const std::string_view outputName);
 
 /* This creates an opaque and almost certainly unique string
    deterministically from a derivation path and output name.

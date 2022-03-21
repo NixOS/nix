@@ -8,18 +8,20 @@
 
 namespace nix {
 
-struct CompressionSink : BufferedSink
+struct CompressionSink : BufferedSink, FinishSink
 {
-    virtual void finish() = 0;
+    using BufferedSink::operator ();
+    using BufferedSink::write;
+    using FinishSink::finish;
 };
 
-ref<std::string> decompress(const std::string & method, const std::string & in);
+std::string decompress(const std::string & method, std::string_view in);
 
-ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
+std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel = false);
+std::string compress(const std::string & method, std::string_view in, const bool parallel = false, int level = -1);
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false);
+ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false, int level = -1);
 
 MakeError(UnknownCompressionMethod, Error);
 

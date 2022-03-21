@@ -14,7 +14,17 @@ void Args::addFlag(Flag && flag_)
         assert(flag->handler.arity == flag->labels.size());
     assert(flag->longName != "");
     longFlags[flag->longName] = flag;
+    for (auto & alias : flag->aliases)
+        longFlags[alias] = flag;
     if (flag->shortName) shortFlags[flag->shortName] = flag;
+}
+
+void Args::removeFlag(const std::string & longName)
+{
+    auto flag = longFlags.find(longName);
+    assert(flag != longFlags.end());
+    if (flag->second->shortName) shortFlags.erase(flag->second->shortName);
+    longFlags.erase(flag);
 }
 
 void Completions::add(std::string completion, std::string description)
@@ -29,7 +39,7 @@ void Completions::add(std::string completion, std::string description)
 bool Completion::operator<(const Completion & other) const
 { return completion < other.completion || (completion == other.completion && description < other.description); }
 
-bool pathCompletions = false;
+CompletionType completionType = ctNormal;
 std::shared_ptr<Completions> completions;
 
 std::string completionMarker = "___COMPLETE___";
@@ -58,6 +68,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         verbosity = lvlError;
     }
 
+    bool argsSeen = false;
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
         auto arg = *pos;
@@ -65,13 +76,13 @@ void Args::parseCmdline(const Strings & _cmdline)
         /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f',
            `-j3` -> `-j 3`). */
         if (!dashDash && arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && isalpha(arg[1])) {
-            *pos = (string) "-" + arg[1];
+            *pos = (std::string) "-" + arg[1];
             auto next = pos; ++next;
             for (unsigned int j = 2; j < arg.length(); j++)
                 if (isalpha(arg[j]))
-                    cmdline.insert(next, (string) "-" + arg[j]);
+                    cmdline.insert(next, (std::string) "-" + arg[j]);
                 else {
-                    cmdline.insert(next, string(arg, j));
+                    cmdline.insert(next, std::string(arg, j));
                     break;
                 }
             arg = *pos;
@@ -86,6 +97,11 @@ void Args::parseCmdline(const Strings & _cmdline)
                 throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
+            if (!argsSeen) {
+                argsSeen = true;
+                initialFlagsProcessed();
+            }
+            pos = rewriteArgs(cmdline, pos);
             pendingArgs.push_back(*pos++);
             if (processArgs(pendingArgs, false))
                 pendingArgs.clear();
@@ -93,41 +109,9 @@ void Args::parseCmdline(const Strings & _cmdline)
     }
 
     processArgs(pendingArgs, true);
-}
 
-void Args::printHelp(const string & programName, std::ostream & out)
-{
-    std::cout << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "FLAGS..." ANSI_NORMAL, programName);
-    for (auto & exp : expectedArgs) {
-        std::cout << renderLabels({exp.label});
-        // FIXME: handle arity > 1
-        if (exp.handler.arity == ArityAny) std::cout << "...";
-        if (exp.optional) std::cout << "?";
-    }
-    std::cout << "\n";
-
-    auto s = description();
-    if (s != "")
-        std::cout << "\n" ANSI_BOLD "Summary:" ANSI_NORMAL " " << s << ".\n";
-
-    if (longFlags.size()) {
-        std::cout << "\n";
-        std::cout << ANSI_BOLD "Flags:" ANSI_NORMAL "\n";
-        printFlags(out);
-    }
-}
-
-void Args::printFlags(std::ostream & out)
-{
-    Table2 table;
-    for (auto & flag : longFlags) {
-        if (hiddenCategories.count(flag.second->category)) continue;
-        table.push_back(std::make_pair(
-                (flag.second->shortName ? std::string("-") + flag.second->shortName + ", " : "    ")
-                + "--" + flag.first + renderLabels(flag.second->labels),
-                flag.second->description));
-    }
-    printTable(out, table);
+    if (!argsSeen)
+        initialFlagsProcessed();
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -155,7 +139,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         return true;
     };
 
-    if (string(*pos, 0, 2) == "--") {
+    if (std::string(*pos, 0, 2) == "--") {
         if (auto prefix = needsCompletion(*pos)) {
             for (auto & [name, flag] : longFlags) {
                 if (!hiddenCategories.count(flag->category)
@@ -163,12 +147,12 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                     completions->add("--" + name, flag->description);
             }
         }
-        auto i = longFlags.find(string(*pos, 2));
+        auto i = longFlags.find(std::string(*pos, 2));
         if (i == longFlags.end()) return false;
         return process("--" + i->first, *i->second);
     }
 
-    if (string(*pos, 0, 1) == "-" && pos->size() == 2) {
+    if (std::string(*pos, 0, 1) == "-" && pos->size() == 2) {
         auto c = (*pos)[1];
         auto i = shortFlags.find(c);
         if (i == shortFlags.end()) return false;
@@ -225,12 +209,12 @@ nlohmann::json Args::toJSON()
 
     for (auto & [name, flag] : longFlags) {
         auto j = nlohmann::json::object();
+        if (flag->aliases.count(name)) continue;
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
         if (flag->description != "")
             j["description"] = flag->description;
-        if (flag->category != "")
-            j["category"] = flag->category;
+        j["category"] = flag->category;
         if (flag->handler.arity != ArityAny)
             j["arity"] = flag->handler.arity;
         if (!flag->labels.empty())
@@ -253,6 +237,8 @@ nlohmann::json Args::toJSON()
     res["description"] = description();
     res["flags"] = std::move(flags);
     res["args"] = std::move(args);
+    auto s = doc();
+    if (s != "") res.emplace("doc", stripIndentation(s));
     return res;
 }
 
@@ -291,7 +277,7 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
 
 static void _completePath(std::string_view prefix, bool onlyDirs)
 {
-    pathCompletions = true;
+    completionType = ctFilenames;
     glob_t globbuf;
     int flags = GLOB_NOESCAPE | GLOB_TILDE;
     #ifdef GLOB_ONLYDIR
@@ -328,117 +314,33 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
-std::string renderLabels(const Strings & labels)
-{
-    std::string res;
-    for (auto label : labels) {
-        for (auto & c : label) c = std::toupper(c);
-        res += " " ANSI_ITALIC + label + ANSI_NORMAL;
-    }
-    return res;
-}
-
-void printTable(std::ostream & out, const Table2 & table)
-{
-    size_t max = 0;
-    for (auto & row : table)
-        max = std::max(max, filterANSIEscapes(row.first, true).size());
-    for (auto & row : table) {
-        out << "  " << row.first
-            << std::string(max - filterANSIEscapes(row.first, true).size() + 2, ' ')
-            << row.second << "\n";
-    }
-}
-
-void Command::printHelp(const string & programName, std::ostream & out)
-{
-    Args::printHelp(programName, out);
-
-    auto exs = examples();
-    if (!exs.empty()) {
-        out << "\n" ANSI_BOLD "Examples:" ANSI_NORMAL "\n";
-        for (auto & ex : exs)
-            out << "\n"
-                << "  " << ex.description << "\n" // FIXME: wrap
-                << "  $ " << ex.command << "\n";
-    }
-}
-
-nlohmann::json Command::toJSON()
-{
-    auto exs = nlohmann::json::array();
-
-    for (auto & example : examples()) {
-        auto ex = nlohmann::json::object();
-        ex["description"] = example.description;
-        ex["command"] = chomp(stripIndentation(example.command));
-        exs.push_back(std::move(ex));
-    }
-
-    auto res = Args::toJSON();
-    res["examples"] = std::move(exs);
-    auto s = doc();
-    if (s != "") res.emplace("doc", stripIndentation(s));
-    return res;
-}
-
-MultiCommand::MultiCommand(const Commands & commands)
-    : commands(commands)
+MultiCommand::MultiCommand(const Commands & commands_)
+    : commands(commands_)
 {
     expectArgs({
         .label = "subcommand",
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
-            if (auto alias = get(deprecatedAliases, s)) {
-                warn("'%s' is a deprecated alias for '%s'", s, *alias);
-                s = *alias;
-            }
             if (auto prefix = needsCompletion(s)) {
                 for (auto & [name, command] : commands)
                     if (hasPrefix(name, *prefix))
                         completions->add(name);
             }
             auto i = commands.find(s);
-            if (i == commands.end())
-                throw UsageError("'%s' is not a recognised command", s);
+            if (i == commands.end()) {
+                std::set<std::string> commandNames;
+                for (auto & [name, _] : commands)
+                    commandNames.insert(name);
+                auto suggestions = Suggestions::bestMatches(commandNames, s);
+                throw UsageError(suggestions, "'%s' is not a recognised command", s);
+            }
             command = {s, i->second()};
+            command->second->parent = this;
         }}
     });
 
     categories[Command::catDefault] = "Available commands";
-}
-
-void MultiCommand::printHelp(const string & programName, std::ostream & out)
-{
-    if (command) {
-        command->second->printHelp(programName + " " + command->first, out);
-        return;
-    }
-
-    out << fmt(ANSI_BOLD "Usage:" ANSI_NORMAL " %s " ANSI_ITALIC "COMMAND FLAGS... ARGS..." ANSI_NORMAL "\n", programName);
-
-    out << "\n" ANSI_BOLD "Common flags:" ANSI_NORMAL "\n";
-    printFlags(out);
-
-    std::map<Command::Category, std::map<std::string, ref<Command>>> commandsByCategory;
-
-    for (auto & [name, commandFun] : commands) {
-        auto command = commandFun();
-        commandsByCategory[command->category()].insert_or_assign(name, command);
-    }
-
-    for (auto & [category, commands] : commandsByCategory) {
-        out << fmt("\n" ANSI_BOLD "%s:" ANSI_NORMAL "\n", categories[category]);
-
-        Table2 table;
-        for (auto & [name, command] : commands) {
-            auto descr = command->description();
-            if (!descr.empty())
-                table.push_back(std::make_pair(name, descr));
-        }
-        printTable(out, table);
-    }
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -463,7 +365,10 @@ nlohmann::json MultiCommand::toJSON()
     for (auto & [name, commandFun] : commands) {
         auto command = commandFun();
         auto j = command->toJSON();
-        j["category"] = categories[command->category()];
+        auto cat = nlohmann::json::object();
+        cat["id"] = command->category();
+        cat["description"] = categories[command->category()];
+        j["category"] = std::move(cat);
         cmds[name] = std::move(j);
     }
 

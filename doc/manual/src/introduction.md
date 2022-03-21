@@ -76,7 +76,7 @@ there after an upgrade.  This means that you can _roll back_ to the
 old version:
 
 ```console
-$ nix-env --upgrade some-packages
+$ nix-env --upgrade -A nixpkgs.some-package
 $ nix-env --rollback
 ```
 
@@ -122,12 +122,12 @@ Nix expressions generally describe how to build a package from
 source, so an installation action like
 
 ```console
-$ nix-env --install firefox
+$ nix-env --install -A nixpkgs.firefox
 ```
 
 _could_ cause quite a bit of build activity, as not only Firefox but
 also all its dependencies (all the way up to the C library and the
-compiler) would have to built, at least if they are not already in the
+compiler) would have to be built, at least if they are not already in the
 Nix store.  This is a _source deployment model_.  For most users,
 building from source is not very pleasant as it takes far too long.
 However, Nix can automatically skip building from source and instead
@@ -165,10 +165,10 @@ You’re then dropped into a shell where you can edit, build and test
 the package:
 
 ```console
-[nix-shell]$ tar xf $src
+[nix-shell]$ unpackPhase
 [nix-shell]$ cd pan-*
-[nix-shell]$ ./configure
-[nix-shell]$ make
+[nix-shell]$ configurePhase
+[nix-shell]$ buildPhase
 [nix-shell]$ ./pan/gui/pan
 ```
 

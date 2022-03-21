@@ -1,5 +1,9 @@
 set -e
 
+if [[ -z "$COMMON_SH_SOURCED" ]]; then
+
+COMMON_SH_SOURCED=1
+
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
@@ -11,7 +15,7 @@ export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
-export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/daemon-socket
+export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
 unset NIX_USER_CONF_FILES
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
@@ -29,16 +33,25 @@ unset XDG_CACHE_HOME
 mkdir -p $TEST_HOME
 
 export PATH=@bindir@:$PATH
+if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
+  export PATH="$NIX_CLIENT_PACKAGE/bin":$PATH
+fi
+DAEMON_PATH="$PATH"
+if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
+  DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
+fi
 coreutils=@coreutils@
 
 export dot=@dot@
 export SHELL="@bash@"
 export PAGER=cat
-export HAVE_SODIUM="@HAVE_SODIUM@"
 export busybox="@sandbox_shell@"
 
 export version=@PACKAGE_VERSION@
 export system=@system@
+
+export IMPURE_VAR1=foo
+export IMPURE_VAR2=bar
 
 cacheDir=$TEST_ROOT/binary-cache
 
@@ -58,7 +71,6 @@ clearStore() {
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_STATE_DIR"
     mkdir "$NIX_STATE_DIR"
-    nix-store --init
     clearProfiles
 }
 
@@ -71,28 +83,61 @@ clearCacheCache() {
 }
 
 startDaemon() {
-    # Start the daemon, wait for the socket to appear.  !!!
-    # ‘nix-daemon’ should have an option to fork into the background.
-    rm -f $NIX_STATE_DIR/daemon-socket/socket
-    nix-daemon &
-    for ((i = 0; i < 30; i++)); do
-        if [ -e $NIX_DAEMON_SOCKET_PATH ]; then break; fi
-        sleep 1
-    done
+    # Don’t start the daemon twice, as this would just make it loop indefinitely
+    if [[ "$NIX_REMOTE" == daemon ]]; then
+      return
+    fi
+    # Start the daemon, wait for the socket to appear.
+    rm -f $NIX_DAEMON_SOCKET_PATH
+    PATH=$DAEMON_PATH nix-daemon&
     pidDaemon=$!
-    trap "kill -9 $pidDaemon" EXIT
+    for ((i = 0; i < 300; i++)); do
+        if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then
+          DAEMON_STARTED=1
+          break;
+        fi
+        sleep 0.1
+    done
+    if [[ -z ${DAEMON_STARTED+x} ]]; then
+      fail "Didn’t manage to start the daemon"
+    fi
+    trap "killDaemon" EXIT
     export NIX_REMOTE=daemon
 }
 
 killDaemon() {
-    kill -9 $pidDaemon
+    kill $pidDaemon
+    for i in {0..100}; do
+        kill -0 $pidDaemon 2> /dev/null || break
+        sleep 0.1
+    done
+    kill -9 $pidDaemon 2> /dev/null || true
     wait $pidDaemon || true
     trap "" EXIT
+}
+
+restartDaemon() {
+  [[ -z "${pidDaemon:-}" ]] && return 0
+
+  killDaemon
+  unset NIX_REMOTE
+  startDaemon
 }
 
 if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true; then
     _canUseSandbox=1
 fi
+
+isDaemonNewer () {
+  [[ -n "${NIX_DAEMON_PACKAGE:-}" ]] || return 0
+  local requiredVersion="$1"
+  local daemonVersion=$($NIX_DAEMON_PACKAGE/bin/nix-daemon --version | cut -d' ' -f3)
+  [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
+}
+
+requireDaemonNewerThan () {
+  isDaemonNewer "$1" || exit 99
+}
 
 canUseSandbox() {
     if [[ ! $_canUseSandbox ]]; then
@@ -119,4 +164,27 @@ expect() {
     [[ $res -eq $expected ]]
 }
 
+needLocalStore() {
+  if [[ "$NIX_REMOTE" == "daemon" ]]; then
+    echo "Can’t run through the daemon ($1), skipping this test..."
+    return 99
+  fi
+}
+
+# Just to make it easy to find which tests should be fixed
+buggyNeedLocalStore() {
+  needLocalStore
+}
+
+enableFeatures() {
+    local features="$1"
+    sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
+}
+
 set -x
+
+if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
+    startDaemon
+fi
+
+fi # COMMON_SH_SOURCED

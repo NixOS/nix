@@ -1,6 +1,7 @@
 #include "config.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
+#include "experimental-features.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -20,7 +21,7 @@ bool Config::set(const std::string & name, const std::string & value)
             return false;
     }
     i->second.setting->set(value, append);
-    i->second.setting->overriden = true;
+    i->second.setting->overridden = true;
     return true;
 }
 
@@ -35,7 +36,7 @@ void Config::addSetting(AbstractSetting * setting)
     auto i = unknownSettings.find(setting->name);
     if (i != unknownSettings.end()) {
         setting->set(i->second);
-        setting->overriden = true;
+        setting->overridden = true;
         unknownSettings.erase(i);
         set = true;
     }
@@ -48,7 +49,7 @@ void Config::addSetting(AbstractSetting * setting)
                     alias, setting->name);
             else {
                 setting->set(i->second);
-                setting->overriden = true;
+                setting->overridden = true;
                 unknownSettings.erase(i);
                 set = true;
             }
@@ -69,10 +70,10 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & opt : _settings)
-        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
+        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
@@ -80,16 +81,16 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
-        string line;
+        std::string line;
         while (pos < contents.size() && contents[pos] != '\n')
             line += contents[pos++];
         pos++;
 
-        string::size_type hash = line.find('#');
-        if (hash != string::npos)
-            line = string(line, 0, hash);
+        auto hash = line.find('#');
+        if (hash != std::string::npos)
+            line = std::string(line, 0, hash);
 
-        vector<string> tokens = tokenizeString<vector<string> >(line);
+        auto tokens = tokenizeString<std::vector<std::string>>(line);
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
@@ -119,9 +120,9 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
         if (tokens[1] != "=")
             throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
 
-        string name = tokens[0];
+        std::string name = tokens[0];
 
-        vector<string>::iterator i = tokens.begin();
+        auto i = tokens.begin();
         advance(i, 2);
 
         set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
@@ -131,15 +132,15 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
 void AbstractConfig::applyConfigFile(const Path & path)
 {
     try {
-        string contents = readFile(path);
+        std::string contents = readFile(path);
         applyConfig(contents, path);
     } catch (SysError &) { }
 }
 
-void Config::resetOverriden()
+void Config::resetOverridden()
 {
     for (auto & s : _settings)
-        s.second.setting->overriden = false;
+        s.second.setting->overridden = false;
 }
 
 nlohmann::json Config::toJSON()
@@ -148,6 +149,16 @@ nlohmann::json Config::toJSON()
     for (auto & s : _settings)
         if (!s.second.isAlias) {
             res.emplace(s.first, s.second.setting->toJSON());
+        }
+    return res;
+}
+
+std::string Config::toKeyValue()
+{
+    auto res = std::string();
+    for (auto & s : _settings)
+        if (!s.second.isAlias) {
+            res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
         }
     return res;
 }
@@ -165,11 +176,6 @@ AbstractSetting::AbstractSetting(
     const std::set<std::string> & aliases)
     : name(name), description(stripIndentation(description)), aliases(aliases)
 {
-}
-
-void AbstractSetting::setDefault(const std::string & str)
-{
-    if (!overriden) set(str);
 }
 
 nlohmann::json AbstractSetting::toJSON()
@@ -203,7 +209,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
-        .handler = {[=](std::string s) { overriden = true; set(s); }},
+        .handler = {[=](std::string s) { overridden = true; set(s); }},
     });
 
     if (isAppendable())
@@ -212,7 +218,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
             .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},
-            .handler = {[=](std::string s) { overriden = true; set(s, true); }},
+            .handler = {[=](std::string s) { overridden = true; set(s, true); }},
         });
 }
 
@@ -230,7 +236,9 @@ template<typename T>
 void BaseSetting<T>::set(const std::string & str, bool append)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
-    if (!string2Int(str, value))
+    if (auto n = string2Int<T>(str))
+        value = *n;
+    else
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
 }
 
@@ -306,6 +314,31 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
+template<> void BaseSetting<std::set<ExperimentalFeature>>::set(const std::string & str, bool append)
+{
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<StringSet>(str)) {
+        auto thisXpFeature = parseExperimentalFeature(s);
+        if (thisXpFeature)
+            value.insert(thisXpFeature.value());
+        else
+            warn("unknown experimental feature '%s'", s);
+    }
+}
+
+template<> bool BaseSetting<std::set<ExperimentalFeature>>::isAppendable()
+{
+    return true;
+}
+
+template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
+{
+    StringSet stringifiedXpFeatures;
+    for (auto & feature : value)
+        stringifiedXpFeatures.insert(std::string(showExperimentalFeature(feature)));
+    return concatStringsSep(" ", stringifiedXpFeatures);
+}
+
 template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
 {
     if (!append) value.clear();
@@ -341,6 +374,7 @@ template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
+template class BaseSetting<std::set<ExperimentalFeature>>;
 
 void PathSetting::set(const std::string & str, bool append)
 {
@@ -363,16 +397,16 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
     return false;
 }
 
-void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & config : *configRegistrations)
-        config->getSettings(res, overridenOnly);
+        config->getSettings(res, overriddenOnly);
 }
 
-void GlobalConfig::resetOverriden()
+void GlobalConfig::resetOverridden()
 {
     for (auto & config : *configRegistrations)
-        config->resetOverriden();
+        config->resetOverridden();
 }
 
 nlohmann::json GlobalConfig::toJSON()
@@ -380,6 +414,16 @@ nlohmann::json GlobalConfig::toJSON()
     auto res = nlohmann::json::object();
     for (auto & config : *configRegistrations)
         res.update(config->toJSON());
+    return res;
+}
+
+std::string GlobalConfig::toKeyValue()
+{
+    std::string res;
+    std::map<std::string, Config::SettingInfo> settings;
+    globalConfig.getSettings(settings);
+    for (auto & s : settings)
+        res += fmt("%s = %s\n", s.first, s.second.value);
     return res;
 }
 

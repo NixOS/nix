@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "eval-inline.hh"
+#include "derivations.hh"
 #include "store-api.hh"
 
 namespace nix {
@@ -7,8 +8,8 @@ namespace nix {
 static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    mkString(v, s, PathSet());
+    auto s = state.coerceToString(pos, *args[0], context);
+    v.mkString(*s);
 }
 
 static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
@@ -18,7 +19,7 @@ static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, 
 {
     PathSet context;
     state.forceString(*args[0], context, pos);
-    mkBool(v, !context.empty());
+    v.mkBool(!context.empty());
 }
 
 static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
@@ -33,13 +34,13 @@ static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
+    auto s = state.coerceToString(pos, *args[0], context);
 
     PathSet context2;
     for (auto & p : context)
-        context2.insert(p.at(0) == '=' ? string(p, 1) : p);
+        context2.insert(p.at(0) == '=' ? std::string(p, 1) : p);
 
-    mkString(v, s, context2);
+    v.mkString(*s, context2);
 }
 
 static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
@@ -76,13 +77,13 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
     auto contextInfos = std::map<Path, ContextInfo>();
     for (const auto & p : context) {
         Path drv;
-        string output;
+        std::string output;
         const Path * path = &p;
         if (p.at(0) == '=') {
-            drv = string(p, 1);
+            drv = std::string(p, 1);
             path = &drv;
         } else if (p.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(p);
+            std::pair<std::string, std::string> ctx = decodeContext(p);
             drv = ctx.first;
             output = ctx.second;
             path = &drv;
@@ -103,28 +104,26 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
         }
     }
 
-    state.mkAttrs(v, contextInfos.size());
+    auto attrs = state.buildBindings(contextInfos.size());
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
     for (const auto & info : contextInfos) {
-        auto & infoVal = *state.allocAttr(v, state.symbols.create(info.first));
-        state.mkAttrs(infoVal, 3);
+        auto infoAttrs = state.buildBindings(3);
         if (info.second.path)
-            mkBool(*state.allocAttr(infoVal, sPath), true);
+            infoAttrs.alloc(sPath).mkBool(true);
         if (info.second.allOutputs)
-            mkBool(*state.allocAttr(infoVal, sAllOutputs), true);
+            infoAttrs.alloc(sAllOutputs).mkBool(true);
         if (!info.second.outputs.empty()) {
-            auto & outputsVal = *state.allocAttr(infoVal, state.sOutputs);
+            auto & outputsVal = infoAttrs.alloc(state.sOutputs);
             state.mkList(outputsVal, info.second.outputs.size());
-            size_t i = 0;
-            for (const auto & output : info.second.outputs) {
-                mkString(*(outputsVal.listElems()[i++] = state.allocValue()), output);
-            }
+            for (const auto & [i, output] : enumerate(info.second.outputs))
+                (outputsVal.listElems()[i] = state.allocValue())->mkString(output);
         }
-        infoVal.attrs->sort();
+        attrs.alloc(info.first).mkAttrs(infoAttrs);
     }
-    v.attrs->sort();
+
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
@@ -147,7 +146,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
     for (auto & i : *args[1]->attrs) {
         if (!state.store->isStorePath(i.name))
             throw EvalError({
-                .hint = hintfmt("Context key '%s' is not a store path", i.name),
+                .msg = hintfmt("Context key '%s' is not a store path", i.name),
                 .errPos = *i.pos
             });
         if (!settings.readOnlyMode)
@@ -164,11 +163,11 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             if (state.forceBool(*iter->value, *iter->pos)) {
                 if (!isDerivation(i.name)) {
                     throw EvalError({
-                        .hint = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
+                        .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
                         .errPos = *i.pos
                     });
                 }
-                context.insert("=" + string(i.name));
+                context.insert("=" + std::string(i.name));
             }
         }
 
@@ -177,18 +176,18 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             state.forceList(*iter->value, *iter->pos);
             if (iter->value->listSize() && !isDerivation(i.name)) {
                 throw EvalError({
-                    .hint = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
+                    .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
                     .errPos = *i.pos
                 });
             }
-            for (unsigned int n = 0; n < iter->value->listSize(); ++n) {
-                auto name = state.forceStringNoCtx(*iter->value->listElems()[n], *iter->pos);
-                context.insert("!" + name + "!" + string(i.name));
+            for (auto elem : iter->value->listItems()) {
+                auto name = state.forceStringNoCtx(*elem, *iter->pos);
+                context.insert(concatStrings("!", name, "!", i.name));
             }
         }
     }
 
-    mkString(v, orig, context);
+    v.mkString(orig, context);
 }
 
 static RegisterPrimOp primop_appendContext("__appendContext", 2, prim_appendContext);

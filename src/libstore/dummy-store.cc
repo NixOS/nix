@@ -9,7 +9,7 @@ struct DummyStoreConfig : virtual StoreConfig {
     const std::string name() override { return "Dummy Store"; }
 };
 
-struct DummyStore : public Store, public virtual DummyStoreConfig
+struct DummyStore : public virtual DummyStoreConfig, public virtual Store
 {
     DummyStore(const std::string scheme, const std::string uri, const Params & params)
         : DummyStore(params)
@@ -17,10 +17,11 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
 
     DummyStore(const Params & params)
         : StoreConfig(params)
+        , DummyStoreConfig(params)
         , Store(params)
     { }
 
-    string getUri() override
+    std::string getUri() override
     {
         return *uriSchemes().begin();
     }
@@ -42,24 +43,19 @@ struct DummyStore : public Store, public virtual DummyStoreConfig
         RepairFlag repair, CheckSigsFlag checkSigs) override
     { unsupported("addToStore"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override
-    { unsupported("addToStore"); }
-
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
 
-    void ensurePath(const StorePath & path) override
-    { unsupported("ensurePath"); }
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override
-    { unsupported("buildDerivation"); }
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    { callback(nullptr); }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;

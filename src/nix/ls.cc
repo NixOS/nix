@@ -17,9 +17,26 @@ struct MixLs : virtual Args, MixJSON
 
     MixLs()
     {
-        mkFlag('R', "recursive", "list subdirectories recursively", &recursive);
-        mkFlag('l', "long", "show more file information", &verbose);
-        mkFlag('d', "directory", "show directories rather than their contents", &showDirectory);
+        addFlag({
+            .longName = "recursive",
+            .shortName = 'R',
+            .description = "List subdirectories recursively.",
+            .handler = {&recursive, true},
+        });
+
+        addFlag({
+            .longName = "long",
+            .shortName = 'l',
+            .description = "Show detailed file information.",
+            .handler = {&verbose, true},
+        });
+
+        addFlag({
+            .longName = "directory",
+            .shortName = 'd',
+            .description = "Show directories rather than their contents.",
+            .handler = {&showDirectory, true},
+        });
     }
 
     void listText(ref<FSAccessor> accessor)
@@ -75,6 +92,8 @@ struct MixLs : virtual Args, MixJSON
 
         if (json) {
             JSONPlaceholder jsonRoot(std::cout);
+            if (showDirectory)
+                throw UsageError("'--directory' is useless with '--json'");
             listNar(jsonRoot, accessor, path, recursive);
         } else
             listText(accessor);
@@ -92,22 +111,17 @@ struct CmdLsStore : StoreCommand, MixLs
         });
     }
 
-    Examples examples() override
-    {
-        return {
-            Example{
-                "To list the contents of a store path in a binary cache:",
-                "nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
-            },
-        };
-    }
-
     std::string description() override
     {
         return "show information about a path in the Nix store";
     }
 
-    Category category() override { return catUtility; }
+    std::string doc() override
+    {
+        return
+          #include "store-ls.md"
+          ;
+    }
 
     void run(ref<Store> store) override
     {
@@ -129,14 +143,11 @@ struct CmdLsNar : Command, MixLs
         expectArg("path", &path);
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To list a specific file in a NAR:",
-                "nix ls-nar -l hello.nar /bin/hello"
-            },
-        };
+        return
+          #include "nar-ls.md"
+          ;
     }
 
     std::string description() override
@@ -144,13 +155,11 @@ struct CmdLsNar : Command, MixLs
         return "show information about a path inside a NAR file";
     }
 
-    Category category() override { return catUtility; }
-
     void run() override
     {
-        list(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
+        list(makeNarAccessor(readFile(narPath)));
     }
 };
 
-static auto rCmdLsStore = registerCommand<CmdLsStore>("ls-store");
-static auto rCmdLsNar = registerCommand<CmdLsNar>("ls-nar");
+static auto rCmdLsStore = registerCommand2<CmdLsStore>({"store", "ls"});
+static auto rCmdLsNar = registerCommand2<CmdLsNar>({"nar", "ls"});

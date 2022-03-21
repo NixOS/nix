@@ -44,12 +44,12 @@ with import ./config.nix;
   };
 
   hashmismatch = import <nix/fetchurl.nix> {
-    url = "file://" + toString ./dummy;
+    url = "file://" + builtins.getEnv "TMPDIR" + "/dummy";
     sha256 = "0mdqa9w1p6cmli6976v4wi0sw9r4p5prkj7lzfd1877wk11c9c73";
   };
 
   fetchurl = import <nix/fetchurl.nix> {
     url = "file://" + toString ./lang/eval-okay-xml.exp.xml;
-    sha256 = "0kg4sla7ihm8ijr8cb3117fhl99zrc2bwy1jrngsfmkh8bav4m0v";
+    sha256 = "sha256-behBlX+DQK/Pjvkuc8Tx68Jwi4E5v86wDq+ZLaHyhQE=";
   };
 }

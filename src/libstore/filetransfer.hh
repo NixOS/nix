@@ -59,11 +59,11 @@ struct FileTransferRequest
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
     bool decompress = true;
-    std::shared_ptr<std::string> data;
+    std::optional<std::string> data;
     std::string mimeType;
-    std::function<void(char *, size_t)> dataCallback;
+    std::function<void(std::string_view data)> dataCallback;
 
-    FileTransferRequest(const std::string & uri)
+    FileTransferRequest(std::string_view uri)
         : uri(uri), parentAct(getCurActivity()) { }
 
     std::string verb()
@@ -77,7 +77,7 @@ struct FileTransferResult
     bool cached = false;
     std::string etag;
     std::string effectiveUri;
-    std::shared_ptr<std::string> data;
+    std::string data;
     uint64_t bodySize = 0;
 };
 
@@ -119,17 +119,17 @@ class FileTransferError : public Error
 {
 public:
     FileTransfer::Error error;
-    std::shared_ptr<string> response; // intentionally optional
+    std::optional<std::string> response; // intentionally optional
 
     template<typename... Args>
-    FileTransferError(FileTransfer::Error error, std::shared_ptr<string> response, const Args & ... args);
+    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
 
     virtual const char* sname() const override { return "FileTransferError"; }
 };
 
-bool isUri(const string & s);
+bool isUri(std::string_view s);
 
 /* Resolve deprecated 'channel:<foo>' URLs. */
-std::string resolveUri(const std::string & uri);
+std::string resolveUri(std::string_view uri);
 
 }

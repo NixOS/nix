@@ -12,6 +12,8 @@
 #include "value-to-xml.hh"
 #include "primops.hh"
 
+#include <boost/container/small_vector.hpp>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -20,6 +22,8 @@
 #include <cstring>
 #include <regex>
 #include <dlfcn.h>
+
+#include <cmath>
 
 
 namespace nix {
@@ -33,9 +37,10 @@ namespace nix {
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
-void EvalState::realiseContext(const PathSet & context)
+StringMap EvalState::realiseContext(const PathSet & context)
 {
-    std::vector<StorePathWithOutputs> drvs;
+    std::vector<DerivedPath::Built> drvs;
+    StringMap res;
 
     for (auto & i : context) {
         auto [ctxS, outputName] = decodeContext(i);
@@ -43,35 +48,79 @@ void EvalState::realiseContext(const PathSet & context)
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
+            drvs.push_back({ctx, {outputName}});
+        } else {
+            res.insert_or_assign(ctxS, ctxS);
         }
     }
 
-    if (drvs.empty()) return;
+    if (drvs.empty()) return {};
 
     if (!evalSettings.enableImportFromDerivation)
-        throw EvalError("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false",
-            store->printStorePath(drvs.begin()->path));
+        throw Error(
+            "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
+            store->printStorePath(drvs.begin()->drvPath));
 
-    /* For performance, prefetch all substitute info. */
-    StorePathSet willBuild, willSubstitute, unknown;
-    uint64_t downloadSize, narSize;
-    store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    /* Build/substitute the context. */
+    std::vector<DerivedPath> buildReqs;
+    for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
+    store->buildPaths(buildReqs);
 
-    store->buildPaths(drvs);
+    /* Get all the output paths corresponding to the placeholders we had */
+    for (auto & [drvPath, outputs] : drvs) {
+        auto outputPaths = store->queryDerivationOutputMap(drvPath);
+        for (auto & outputName : outputs) {
+            if (outputPaths.count(outputName) == 0)
+                throw Error("derivation '%s' does not have an output named '%s'",
+                        store->printStorePath(drvPath), outputName);
+            res.insert_or_assign(
+                downstreamPlaceholder(*store, drvPath, outputName),
+                store->printStorePath(outputPaths.at(outputName))
+            );
+        }
+    }
 
     /* Add the output of this derivations to the allowed
        paths. */
     if (allowedPaths) {
-        for (auto & [drvPath, outputs] : drvs) {
-            auto outputPaths = store->queryDerivationOutputMap(drvPath);
-            for (auto & outputName : outputs) {
-                if (outputPaths.count(outputName) == 0)
-                    throw Error("derivation '%s' does not have an output named '%s'",
-                            store->printStorePath(drvPath), outputName);
-                allowedPaths->insert(store->printStorePath(outputPaths.at(outputName)));
-            }
+        for (auto & [_placeholder, outputPath] : res) {
+            allowPath(store->toRealPath(outputPath));
         }
+    }
+
+    return res;
+}
+
+struct RealisePathFlags {
+    // Whether to check that the path is allowed in pure eval mode
+    bool checkForPureEval = true;
+};
+
+static Path realisePath(EvalState & state, const Pos & pos, Value & v, const RealisePathFlags flags = {})
+{
+    PathSet context;
+
+    auto path = [&]()
+    {
+        try {
+            return state.coerceToPath(pos, v, context);
+        } catch (Error & e) {
+            e.addTrace(pos, "while realising the context of a path");
+            throw;
+        }
+    }();
+
+    try {
+        StringMap rewrites = state.realiseContext(context);
+
+        auto realPath = state.toRealPath(rewriteStrings(path, rewrites), context);
+
+        return flags.checkForPureEval
+            ? state.checkSourcePath(realPath)
+            : realPath;
+    } catch (Error & e) {
+        e.addTrace(pos, "while realising the context of path '%s'", path);
+        throw;
     }
 }
 
@@ -87,13 +136,15 @@ void EvalState::realiseContext(const PathSet & context)
    the actual path.
 
    The 'drv' and 'drvPath' outputs must correspond. */
-static void mkOutputString(EvalState & state, Value & v,
-    const StorePath & drvPath, const BasicDerivation & drv,
-    std::pair<string, DerivationOutput> o)
+static void mkOutputString(
+    EvalState & state,
+    BindingsBuilder & attrs,
+    const StorePath & drvPath,
+    const BasicDerivation & drv,
+    const std::pair<std::string, DerivationOutput> & o)
 {
     auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
-    mkString(
-        *state.allocAttr(v, state.symbols.create(o.first)),
+    attrs.alloc(o.first).mkString(
         optOutputPath
             ? state.store->printStorePath(*optOutputPath)
             /* Downstream we would substitute this for an actual path once
@@ -108,19 +159,7 @@ static void mkOutputString(EvalState & state, Value & v,
    argument. */
 static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vScope, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, vPath, context);
-
-    try {
-        state.realiseContext(context);
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .hint = hintfmt("cannot import '%1%', since path '%2%' is not valid", path, e.path),
-            .errPos = pos
-        });
-    }
-
-    Path realPath = state.checkSourcePath(state.toRealPath(path, context));
+    auto path = realisePath(state, pos, vPath);
 
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
@@ -135,54 +174,60 @@ static void import(EvalState & state, const Pos & pos, Value & vPath, Value * vS
     if (auto optStorePath = isValidDerivationInStore()) {
         auto storePath = *optStorePath;
         Derivation drv = state.store->readDerivation(storePath);
-        Value & w = *state.allocValue();
-        state.mkAttrs(w, 3 + drv.outputs.size());
-        Value * v2 = state.allocAttr(w, state.sDrvPath);
-        mkString(*v2, path, {"=" + path});
-        v2 = state.allocAttr(w, state.sName);
-        mkString(*v2, drv.env["name"]);
-        Value * outputsVal =
-            state.allocAttr(w, state.symbols.create("outputs"));
-        state.mkList(*outputsVal, drv.outputs.size());
-        unsigned int outputs_index = 0;
+        auto attrs = state.buildBindings(3 + drv.outputs.size());
+        attrs.alloc(state.sDrvPath).mkString(path, {"=" + path});
+        attrs.alloc(state.sName).mkString(drv.env["name"]);
+        auto & outputsVal = attrs.alloc(state.sOutputs);
+        state.mkList(outputsVal, drv.outputs.size());
 
-        for (const auto & o : drv.outputs) {
-            mkOutputString(state, w, storePath, drv, o);
-            outputsVal->listElems()[outputs_index] = state.allocValue();
-            mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
+        for (const auto & [i, o] : enumerate(drv.outputs)) {
+            mkOutputString(state, attrs, storePath, drv, o);
+            (outputsVal.listElems()[i] = state.allocValue())->mkString(o.first);
         }
-        w.attrs->sort();
 
-        static RootValue fun;
-        if (!fun) {
-            fun = allocRootValue(state.allocValue());
+        auto w = state.allocValue();
+        w->mkAttrs(attrs);
+
+        if (!state.vImportedDrvToDerivation) {
+            state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , "/"), **fun);
+                , "/"), **state.vImportedDrvToDerivation);
         }
 
-        state.forceFunction(**fun, pos);
-        mkApp(v, **fun, w);
+        state.forceFunction(**state.vImportedDrvToDerivation, pos);
+        v.mkApp(*state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos);
-    } else {
+    }
+
+    else if (path == corepkgsPrefix + "fetchurl.nix") {
+        state.eval(state.parseExprFromString(
+            #include "fetchurl.nix.gen.hh"
+            , "/"), v);
+    }
+
+    else {
         if (!vScope)
-            state.evalFile(realPath, v);
+            state.evalFile(path, v);
         else {
-            state.forceAttrs(*vScope);
+            state.forceAttrs(*vScope, pos);
 
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
-            StaticEnv staticEnv(false, &state.staticBaseEnv);
+            StaticEnv staticEnv(false, &state.staticBaseEnv, vScope->attrs->size());
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
-                staticEnv.vars[attr.name] = displ;
+                staticEnv.vars.emplace_back(attr.name, displ);
                 env->values[displ++] = attr.value;
             }
 
-            printTalkative("evaluating file '%1%'", realPath);
-            Expr * e = state.parseExprFromFile(resolveExprPath(realPath), staticEnv);
+            // No need to call staticEnv.sort(), because
+            // args[0]->attrs is already sorted.
+
+            printTalkative("evaluating file '%1%'", path);
+            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
 
             e->eval(state, *env, v);
         }
@@ -267,23 +312,9 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    auto path = realisePath(state, pos, *args[0]);
 
-    try {
-        state.realiseContext(context);
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .hint = hintfmt(
-                "cannot import '%1%', since path '%2%' is not valid",
-                path, e.path),
-            .errPos = pos
-        });
-    }
-
-    path = state.checkSourcePath(path);
-
-    string sym = state.forceStringNoCtx(*args[1], pos);
+    std::string sym(state.forceStringNoCtx(*args[1], pos));
 
     void *handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (!handle)
@@ -314,21 +345,21 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     auto count = args[0]->listSize();
     if (count == 0) {
         throw EvalError({
-            .hint = hintfmt("at least one argument to 'exec' required"),
+            .msg = hintfmt("at least one argument to 'exec' required"),
             .errPos = pos
         });
     }
     PathSet context;
-    auto program = state.coerceToString(pos, *elems[0], context, false, false);
+    auto program = state.coerceToString(pos, *elems[0], context, false, false).toOwned();
     Strings commandArgs;
     for (unsigned int i = 1; i < args[0]->listSize(); ++i) {
-        commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
+        commandArgs.push_back(state.coerceToString(pos, *elems[i], context, false, false).toOwned());
     }
     try {
-        state.realiseContext(context);
+        auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
         throw EvalError({
-            .hint = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
+            .msg = hintfmt("cannot execute '%1%', since path '%2%' is not valid",
                 program, e.path),
             .errPos = pos
         });
@@ -337,7 +368,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
     try {
-        parsed = state.parseExprFromString(output, pos.file);
+        parsed = state.parseExprFromString(std::move(output), pos.file);
     } catch (Error & e) {
         e.addTrace(pos, "While parsing the output from '%1%'", program);
         throw;
@@ -355,27 +386,23 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
 static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    string t;
-    switch (args[0]->type) {
-        case tInt: t = "int"; break;
-        case tBool: t = "bool"; break;
-        case tString: t = "string"; break;
-        case tPath: t = "path"; break;
-        case tNull: t = "null"; break;
-        case tAttrs: t = "set"; break;
-        case tList1: case tList2: case tListN: t = "list"; break;
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
-            t = "lambda";
-            break;
-        case tExternal:
+    std::string t;
+    switch (args[0]->type()) {
+        case nInt: t = "int"; break;
+        case nBool: t = "bool"; break;
+        case nString: t = "string"; break;
+        case nPath: t = "path"; break;
+        case nNull: t = "null"; break;
+        case nAttrs: t = "set"; break;
+        case nList: t = "list"; break;
+        case nFunction: t = "lambda"; break;
+        case nExternal:
             t = args[0]->external->typeOf();
             break;
-        case tFloat: t = "float"; break;
-        default: abort();
+        case nFloat: t = "float"; break;
+        case nThunk: abort();
     }
-    mkString(v, state.symbols.create(t));
+    v.mkString(state.symbols.create(t));
 }
 
 static RegisterPrimOp primop_typeOf({
@@ -393,7 +420,7 @@ static RegisterPrimOp primop_typeOf({
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tNull);
+    v.mkBool(args[0]->type() == nNull);
 }
 
 static RegisterPrimOp primop_isNull({
@@ -403,7 +430,7 @@ static RegisterPrimOp primop_isNull({
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
       > **Warning**
-      > 
+      >
       > This function is *deprecated*; just write `e == null` instead.
     )",
     .fun = prim_isNull,
@@ -413,18 +440,7 @@ static RegisterPrimOp primop_isNull({
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    bool res;
-    switch (args[0]->type) {
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
-            res = true;
-            break;
-        default:
-            res = false;
-            break;
-    }
-    mkBool(v, res);
+    v.mkBool(args[0]->type() == nFunction);
 }
 
 static RegisterPrimOp primop_isFunction({
@@ -440,7 +456,7 @@ static RegisterPrimOp primop_isFunction({
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tInt);
+    v.mkBool(args[0]->type() == nInt);
 }
 
 static RegisterPrimOp primop_isInt({
@@ -456,7 +472,7 @@ static RegisterPrimOp primop_isInt({
 static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tFloat);
+    v.mkBool(args[0]->type() == nFloat);
 }
 
 static RegisterPrimOp primop_isFloat({
@@ -472,7 +488,7 @@ static RegisterPrimOp primop_isFloat({
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tString);
+    v.mkBool(args[0]->type() == nString);
 }
 
 static RegisterPrimOp primop_isString({
@@ -488,7 +504,7 @@ static RegisterPrimOp primop_isString({
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tBool);
+    v.mkBool(args[0]->type() == nBool);
 }
 
 static RegisterPrimOp primop_isBool({
@@ -504,7 +520,7 @@ static RegisterPrimOp primop_isBool({
 static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tPath);
+    v.mkBool(args[0]->type() == nPath);
 }
 
 static RegisterPrimOp primop_isPath({
@@ -518,23 +534,38 @@ static RegisterPrimOp primop_isPath({
 
 struct CompareValues
 {
-    bool operator () (const Value * v1, const Value * v2) const
+    EvalState & state;
+
+    CompareValues(EvalState & state) : state(state) { };
+
+    bool operator () (Value * v1, Value * v2) const
     {
-        if (v1->type == tFloat && v2->type == tInt)
+        if (v1->type() == nFloat && v2->type() == nInt)
             return v1->fpoint < v2->integer;
-        if (v1->type == tInt && v2->type == tFloat)
+        if (v1->type() == nInt && v2->type() == nFloat)
             return v1->integer < v2->fpoint;
-        if (v1->type != v2->type)
+        if (v1->type() != v2->type())
             throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
-        switch (v1->type) {
-            case tInt:
+        switch (v1->type()) {
+            case nInt:
                 return v1->integer < v2->integer;
-            case tFloat:
+            case nFloat:
                 return v1->fpoint < v2->fpoint;
-            case tString:
+            case nString:
                 return strcmp(v1->string.s, v2->string.s) < 0;
-            case tPath:
+            case nPath:
                 return strcmp(v1->path, v2->path) < 0;
+            case nList:
+                // Lexicographic comparison
+                for (size_t i = 0;; i++) {
+                    if (i == v2->listSize()) {
+                        return false;
+                    } else if (i == v1->listSize()) {
+                        return true;
+                    } else if (!state.eqValues(*v1->listElems()[i], *v2->listElems()[i])) {
+                        return (*this)(v1->listElems()[i], v2->listElems()[i]);
+                    }
+                }
             default:
                 throw EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
         }
@@ -543,38 +574,77 @@ struct CompareValues
 
 
 #if HAVE_BOEHMGC
-typedef list<Value *, gc_allocator<Value *> > ValueList;
+typedef std::list<Value *, gc_allocator<Value *> > ValueList;
 #else
-typedef list<Value *> ValueList;
+typedef std::list<Value *> ValueList;
 #endif
 
+
+static Bindings::iterator getAttr(
+    EvalState & state,
+    std::string_view funcName,
+    Symbol attrSym,
+    Bindings * attrSet,
+    const Pos & pos)
+{
+    Bindings::iterator value = attrSet->find(attrSym);
+    if (value == attrSet->end()) {
+        hintformat errorMsg = hintfmt(
+            "attribute '%s' missing for call to '%s'",
+            attrSym,
+            funcName
+        );
+
+        Pos aPos = *attrSet->pos;
+        if (aPos == noPos) {
+            throw TypeError({
+                .msg = errorMsg,
+                .errPos = pos,
+            });
+        } else {
+            auto e = TypeError({
+                .msg = errorMsg,
+                .errPos = aPos,
+            });
+
+            // Adding another trace for the function name to make it clear
+            // which call received wrong arguments.
+            e.addTrace(pos, hintfmt("while invoking '%s'", funcName));
+            throw e;
+        }
+    }
+
+    return value;
+}
 
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
-    Bindings::iterator startSet =
-        args[0]->attrs->find(state.symbols.create("startSet"));
-    if (startSet == args[0]->attrs->end())
-        throw EvalError({
-            .hint = hintfmt("attribute 'startSet' required"),
-            .errPos = pos
-        });
+    Bindings::iterator startSet = getAttr(
+        state,
+        "genericClosure",
+        state.sStartSet,
+        args[0]->attrs,
+        pos
+    );
+
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
-    for (unsigned int n = 0; n < startSet->value->listSize(); ++n)
-        workSet.push_back(startSet->value->listElems()[n]);
+    for (auto elem : startSet->value->listItems())
+        workSet.push_back(elem);
 
     /* Get the operator. */
-    Bindings::iterator op =
-        args[0]->attrs->find(state.symbols.create("operator"));
-    if (op == args[0]->attrs->end())
-        throw EvalError({
-            .hint = hintfmt("attribute 'operator' required"),
-            .errPos = pos
-        });
+    Bindings::iterator op = getAttr(
+        state,
+        "genericClosure",
+        state.sOperator,
+        args[0]->attrs,
+        pos
+    );
+
     state.forceValue(*op->value, pos);
 
     /* Construct the closure by applying the operator to element of
@@ -583,7 +653,8 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     ValueList res;
     // `doneKeys' doesn't need to be a GC root, because its values are
     // reachable from res.
-    set<Value *, CompareValues> doneKeys;
+    auto cmp = CompareValues(state);
+    std::set<Value *, decltype(cmp)> doneKeys(cmp);
     while (!workSet.empty()) {
         Value * e = *(workSet.begin());
         workSet.pop_front();
@@ -591,10 +662,10 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         state.forceAttrs(*e, pos);
 
         Bindings::iterator key =
-            e->attrs->find(state.symbols.create("key"));
+            e->attrs->find(state.sKey);
         if (key == e->attrs->end())
             throw EvalError({
-                .hint = hintfmt("attribute 'key' required"),
+                .msg = hintfmt("attribute 'key' required"),
                 .errPos = pos
             });
         state.forceValue(*key->value, pos);
@@ -604,13 +675,13 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, *op->value, *e);
+        call.mkApp(op->value, e);
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
-        for (unsigned int n = 0; n < call.listSize(); ++n) {
-            state.forceValue(*call.listElems()[n], pos);
-            workSet.push_back(call.listElems()[n]);
+        for (auto elem : call.listItems()) {
+            state.forceValue(*elem, pos);
+            workSet.push_back(elem);
         }
     }
 
@@ -636,7 +707,7 @@ static RegisterPrimOp primop_abort({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         PathSet context;
-        string s = state.coerceToString(pos, *args[0], context);
+        auto s = state.coerceToString(pos, *args[0], context).toOwned();
         throw Abort("evaluation aborted with the following error message: '%1%'", s);
     }
 });
@@ -654,7 +725,7 @@ static RegisterPrimOp primop_throw({
     .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
       PathSet context;
-      string s = state.coerceToString(pos, *args[0], context);
+      auto s = state.coerceToString(pos, *args[0], context).toOwned();
       throw ThrownError(s);
     }
 });
@@ -666,7 +737,7 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context));
+        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context).toOwned());
         throw;
     }
 }
@@ -677,20 +748,58 @@ static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
     .fun = prim_addErrorContext,
 });
 
+static void prim_ceil(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
+    v.mkInt(ceil(value));
+}
+
+static RegisterPrimOp primop_ceil({
+    .name = "__ceil",
+    .args = {"double"},
+    .doc = R"(
+        Converts an IEEE-754 double-precision floating-point number (*double*) to
+        the next higher integer.
+
+        If the datatype is neither an integer nor a "float", an evaluation error will be
+        thrown.
+    )",
+    .fun = prim_ceil,
+});
+
+static void prim_floor(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto value = state.forceFloat(*args[0], args[0]->determinePos(pos));
+    v.mkInt(floor(value));
+}
+
+static RegisterPrimOp primop_floor({
+    .name = "__floor",
+    .args = {"double"},
+    .doc = R"(
+        Converts an IEEE-754 double-precision floating-point number (*double*) to
+        the next lower integer.
+
+        If the datatype is neither an integer nor a "float", an evaluation error will be
+        thrown.
+    )",
+    .fun = prim_floor,
+});
+
 /* Try evaluating the argument. Success => {success=true; value=something;},
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.mkAttrs(v, 2);
+    auto attrs = state.buildBindings(2);
     try {
         state.forceValue(*args[0], pos);
-        v.attrs->push_back(Attr(state.sValue, args[0]));
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
+        attrs.insert(state.sValue, args[0]);
+        attrs.alloc("success").mkBool(true);
     } catch (AssertionError & e) {
-        mkBool(*state.allocAttr(v, state.sValue), false);
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
+        attrs.alloc(state.sValue).mkBool(false);
+        attrs.alloc("success").mkBool(false);
     }
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_tryEval({
@@ -700,10 +809,14 @@ static RegisterPrimOp primop_tryEval({
       Try to shallowly evaluate *e*. Return a set containing the
       attributes `success` (`true` if *e* evaluated successfully,
       `false` if an error was thrown) and `value`, equalling *e* if
-      successful and `false` otherwise. Note that this doesn't evaluate
-      *e* deeply, so ` let e = { x = throw ""; }; in (builtins.tryEval
-      e).success ` will be `true`. Using ` builtins.deepSeq ` one can
-      get the expected result: `let e = { x = throw ""; }; in
+      successful and `false` otherwise. `tryEval` will only prevent
+      errors created by `throw` or `assert` from being thrown.
+      Errors `tryEval` will not catch are for example those created
+      by `abort` and type errors generated by builtins. Also note that
+      this doesn't evaluate *e* deeply, so `let e = { x = throw ""; };
+      in (builtins.tryEval e).success` will be `true`. Using
+      `builtins.deepSeq` one can get the expected result:
+      `let e = { x = throw ""; }; in
       (builtins.tryEval (builtins.deepSeq e e)).success` will be
       `false`.
     )",
@@ -713,8 +826,8 @@ static RegisterPrimOp primop_tryEval({
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
+    std::string name(state.forceStringNoCtx(*args[0], pos));
+    v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
 static RegisterPrimOp primop_getEnv({
@@ -777,7 +890,7 @@ static RegisterPrimOp primop_deepSeq({
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    if (args[0]->type == tString)
+    if (args[0]->type() == nString)
         printError("trace: %1%", args[0]->string.s);
     else
         printError("trace: %1%", *args[0]);
@@ -814,13 +927,15 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(state.sName);
-    if (attr == args[0]->attrs->end())
-        throw EvalError({
-            .hint = hintfmt("required attribute 'name' missing"),
-            .errPos = pos
-        });
-    string drvName;
+    Bindings::iterator attr = getAttr(
+        state,
+        "derivationStrict",
+        state.sName,
+        args[0]->attrs,
+        pos
+    );
+
+    std::string drvName;
     Pos & posDrvName(*attr->pos);
     try {
         drvName = state.forceStringNoCtx(*attr->value, pos);
@@ -858,15 +973,15 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     for (auto & i : args[0]->attrs->lexicographicOrder()) {
         if (i->name == state.sIgnoreNulls) continue;
-        const string & key = i->name;
+        const std::string & key = i->name;
         vomit("processing attribute '%1%'", key);
 
-        auto handleHashMode = [&](const std::string & s) {
+        auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
             else
                 throw EvalError({
-                    .hint = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
+                    .msg = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
                     .errPos = posDrvName
                 });
         };
@@ -876,7 +991,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             for (auto & j : ss) {
                 if (outputs.find(j) != outputs.end())
                     throw EvalError({
-                        .hint = hintfmt("duplicate derivation output '%1%'", j),
+                        .msg = hintfmt("duplicate derivation output '%1%'", j),
                         .errPos = posDrvName
                     });
                 /* !!! Check whether j is a valid attribute
@@ -886,14 +1001,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                    the resulting set. */
                 if (j == "drv")
                     throw EvalError({
-                        .hint = hintfmt("invalid derivation output name 'drv'" ),
+                        .msg = hintfmt("invalid derivation output name 'drv'" ),
                         .errPos = posDrvName
                     });
                 outputs.insert(j);
             }
             if (outputs.empty())
                 throw EvalError({
-                    .hint = hintfmt("derivation cannot have an empty set of outputs"),
+                    .msg = hintfmt("derivation cannot have an empty set of outputs"),
                     .errPos = posDrvName
                 });
         };
@@ -902,20 +1017,21 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
             if (ignoreNulls) {
                 state.forceValue(*i->value, pos);
-                if (i->value->type == tNull) continue;
+                if (i->value->type() == nNull) continue;
             }
 
             if (i->name == state.sContentAddressed) {
-                settings.requireExperimentalFeature("ca-derivations");
                 contentAddressed = state.forceBool(*i->value, pos);
+                if (contentAddressed)
+                    settings.requireExperimentalFeature(Xp::CaDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
-                for (unsigned int n = 0; n < i->value->listSize(); ++n) {
-                    string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
+                for (auto elem : i->value->listItems()) {
+                    auto s = state.coerceToString(posDrvName, *elem, context, true).toOwned();
                     drv.args.push_back(s);
                 }
             }
@@ -929,7 +1045,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     if (i->name == state.sStructuredAttrs) continue;
 
                     auto placeholder(jsonObject->placeholder(key));
-                    printValueAsJSON(state, true, *i->value, placeholder, context);
+                    printValueAsJSON(state, true, *i->value, pos, placeholder, context);
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, posDrvName);
@@ -945,18 +1061,18 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, posDrvName);
                         Strings ss;
-                        for (unsigned int n = 0; n < i->value->listSize(); ++n)
-                            ss.emplace_back(state.forceStringNoCtx(*i->value->listElems()[n], posDrvName));
+                        for (auto elem : i->value->listItems())
+                            ss.emplace_back(state.forceStringNoCtx(*elem, posDrvName));
                         handleOutputs(ss);
                     }
 
                 } else {
-                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    auto s = state.coerceToString(*i->pos, *i->value, context, true).toOwned();
                     drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder) drv.builder = s;
-                    else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sOutputHash) outputHash = s;
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
+                    if (i->name == state.sBuilder) drv.builder = std::move(s);
+                    else if (i->name == state.sSystem) drv.platform = std::move(s);
+                    else if (i->name == state.sOutputHash) outputHash = std::move(s);
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = std::move(s);
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
@@ -1002,7 +1118,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(path);
+            auto ctx = decodeContext(path);
             drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(ctx.second);
         }
 
@@ -1014,20 +1130,20 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Do we have all required attributes? */
     if (drv.builder == "")
         throw EvalError({
-            .hint = hintfmt("required attribute 'builder' missing"),
+            .msg = hintfmt("required attribute 'builder' missing"),
             .errPos = posDrvName
         });
 
     if (drv.platform == "")
         throw EvalError({
-            .hint = hintfmt("required attribute 'system' missing"),
+            .msg = hintfmt("required attribute 'system' missing"),
             .errPos = posDrvName
         });
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName))
         throw EvalError({
-            .hint = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
+            .msg = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
             .errPos = posDrvName
         });
 
@@ -1038,7 +1154,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            already content addressed. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error({
-                .hint = hintfmt("multiple outputs are not supported in fixed-output derivations"),
+                .msg = hintfmt("multiple outputs are not supported in fixed-output derivations"),
                 .errPos = posDrvName
             });
 
@@ -1047,26 +1163,24 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputCAFixed {
-                    .hash = FixedOutputHash {
-                        .method = ingestionMethod,
-                        .hash = std::move(h),
-                    },
+        drv.outputs.insert_or_assign("out",
+            DerivationOutput::CAFixed {
+                .hash = FixedOutputHash {
+                    .method = ingestionMethod,
+                    .hash = std::move(h),
                 },
-        });
+            });
     }
 
     else if (contentAddressed) {
         HashType ht = parseHashType(outputHashAlgo);
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i, DerivationOutput {
-                .output = DerivationOutputCAFloating {
+            drv.outputs.insert_or_assign(i,
+                DerivationOutput::CAFloating {
                     .method = ingestionMethod,
-                    .hashType = std::move(ht),
-                },
-            });
+                    .hashType = ht,
+                });
         }
     }
 
@@ -1080,43 +1194,36 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = StorePath::dummy,
-                    },
-                });
+                DerivationOutput::Deferred { });
         }
 
         // Regular, non-CA derivation should always return a single hash and not
         // hash per output.
-        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        auto hashModulo = hashDerivationModulo(*state.store, drv, true);
         std::visit(overloaded {
-            [&](Hash h) {
-                for (auto & i : outputs) {
-                    auto outPath = state.store->makeOutputPath(i, h, drvName);
-                    drv.env[i] = state.store->printStorePath(outPath);
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputInputAddressed {
-                                .path = std::move(outPath),
-                            },
-                        });
+            [&](const DrvHash & drvHash) {
+                auto & h = drvHash.hash;
+                switch (drvHash.kind) {
+                case DrvHash::Kind::Deferred:
+                    /* Outputs already deferred, nothing to do */
+                    break;
+                case DrvHash::Kind::Regular:
+                    for (auto & [outputName, output] : drv.outputs) {
+                        auto outPath = state.store->makeOutputPath(outputName, h, drvName);
+                        drv.env[outputName] = state.store->printStorePath(outPath);
+                        output = DerivationOutput::InputAddressed {
+                            .path = std::move(outPath),
+                        };
+                    }
+                    break;
                 }
             },
-            [&](CaOutputHashes) {
+            [&](const CaOutputHashes &) {
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](UnknownHashes) {
-                for (auto & i : outputs) {
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputDeferred{},
-                        });
-                }
-            },
         },
-        hashModulo);
+        hashModulo.raw());
 
     }
 
@@ -1128,20 +1235,17 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later.
-
-       However, we don't bother doing this for floating CA derivations because
-       their "hash modulo" is indeterminate until built. */
-    if (drv.type() != DerivationType::CAFloating) {
-        auto h = hashDerivationModulo(*state.store, Derivation(drv), false);
+       read them later. */
+    {
+        auto h = hashDerivationModulo(*state.store, drv, false);
         drvHashes.lock()->insert_or_assign(drvPath, h);
     }
 
-    state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPathS, {"=" + drvPathS});
+    auto attrs = state.buildBindings(1 + drv.outputs.size());
+    attrs.alloc(state.sDrvPath).mkString(drvPathS, {"=" + drvPathS});
     for (auto & i : drv.outputs)
-        mkOutputString(state, v, drvPath, drv, i);
-    v.attrs->sort();
+        mkOutputString(state, attrs, drvPath, drv, i);
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
@@ -1154,12 +1258,12 @@ static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
    substituted by the corresponding output path at build time. For
    example, 'placeholder "out"' returns the string
    /1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9. At build
-   time, any occurence of this string in an derivation attribute will
+   time, any occurrence of this string in an derivation attribute will
    be replaced with the concrete path in the Nix store of the output
    ‘out’. */
 static void prim_placeholder(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkString(v, hashPlaceholder(state.forceStringNoCtx(*args[0], pos)));
+    v.mkString(hashPlaceholder(state.forceStringNoCtx(*args[0], pos)));
 }
 
 static RegisterPrimOp primop_placeholder({
@@ -1184,7 +1288,7 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    mkString(v, canonPath(path), context);
+    v.mkString(canonPath(path), context);
 }
 
 static RegisterPrimOp primop_toPath({
@@ -1208,7 +1312,10 @@ static RegisterPrimOp primop_toPath({
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     if (evalSettings.pureEval)
-        throw EvalError("builtins.storePath' is not allowed in pure evaluation mode");
+        throw EvalError({
+            .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
+            .errPos = pos
+        });
 
     PathSet context;
     Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
@@ -1218,14 +1325,14 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     if (!state.store->isStorePath(path)) path = canonPath(path, true);
     if (!state.store->isInStore(path))
         throw EvalError({
-            .hint = hintfmt("path '%1%' is not in the Nix store", path),
+            .msg = hintfmt("path '%1%' is not in the Nix store", path),
             .errPos = pos
         });
     auto path2 = state.store->toStorePath(path).first;
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(state.store->printStorePath(path2));
-    mkString(v, path, context);
+    v.mkString(path, context);
 }
 
 static RegisterPrimOp primop_storePath({
@@ -1248,27 +1355,21 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
-    try {
-        state.realiseContext(context);
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .hint = hintfmt(
-                "cannot check the existence of '%1%', since path '%2%' is not valid",
-                path, e.path),
-            .errPos = pos
-        });
-    }
+    /* We don’t check the path right now, because we don’t want to
+      throw if the path isn’t allowed, but just return false (and we
+      can’t just catch the exception here because we still want to
+      throw if something in the evaluation of `*args[0]` tries to
+      access an unauthorized path). */
+    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
 
     try {
-        mkBool(v, pathExists(state.checkSourcePath(path)));
+        v.mkBool(pathExists(state.checkSourcePath(path)));
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
-        mkBool(v, false);
+        v.mkBool(false);
     } catch (RestrictedPathError & e) {
-        mkBool(v, false);
+        v.mkBool(false);
     }
 }
 
@@ -1287,7 +1388,7 @@ static RegisterPrimOp primop_pathExists({
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
+    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context, false, false)), context);
 }
 
 static RegisterPrimOp primop_baseNameOf({
@@ -1307,8 +1408,9 @@ static RegisterPrimOp primop_baseNameOf({
 static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path dir = dirOf(state.coerceToString(pos, *args[0], context, false, false));
-    if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
+    auto path = state.coerceToString(pos, *args[0], context, false, false);
+    auto dir = dirOf(*path);
+    if (args[0]->type() == nPath) v.mkPath(dir); else v.mkString(dir, context);
 }
 
 static RegisterPrimOp primop_dirOf({
@@ -1325,20 +1427,19 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
-    try {
-        state.realiseContext(context);
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
-            .errPos = pos
-        });
-    }
-    string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
-    if (s.find((char) 0) != string::npos)
+    auto path = realisePath(state, pos, *args[0]);
+    auto s = readFile(path);
+    if (s.find((char) 0) != std::string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
-    mkString(v, s.c_str());
+    StorePathSet refs;
+    if (state.store->isInStore(path)) {
+        try {
+            refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->references;
+        } catch (Error &) { // FIXME: should be InvalidPathError
+        }
+    }
+    auto context = state.store->printStorePathSet(refs);
+    v.mkString(s, context);
 }
 
 static RegisterPrimOp primop_readFile({
@@ -1358,40 +1459,42 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     SearchPath searchPath;
 
-    for (unsigned int n = 0; n < args[0]->listSize(); ++n) {
-        Value & v2(*args[0]->listElems()[n]);
-        state.forceAttrs(v2, pos);
+    for (auto v2 : args[0]->listItems()) {
+        state.forceAttrs(*v2, pos);
 
-        string prefix;
-        Bindings::iterator i = v2.attrs->find(state.symbols.create("prefix"));
-        if (i != v2.attrs->end())
+        std::string prefix;
+        Bindings::iterator i = v2->attrs->find(state.sPrefix);
+        if (i != v2->attrs->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
-        i = v2.attrs->find(state.symbols.create("path"));
-        if (i == v2.attrs->end())
-            throw EvalError({
-                .hint = hintfmt("attribute 'path' missing"),
-                .errPos = pos
-            });
+        i = getAttr(
+            state,
+            "findFile",
+            state.sPath,
+            v2->attrs,
+            pos
+        );
 
         PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false);
+        auto path = state.coerceToString(pos, *i->value, context, false, false).toOwned();
 
         try {
-            state.realiseContext(context);
+            auto rewrites = state.realiseContext(context);
+            path = rewriteStrings(path, rewrites);
         } catch (InvalidPathError & e) {
             throw EvalError({
-                .hint = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
+                .msg = hintfmt("cannot find '%1%', since path '%2%' is not valid", path, e.path),
                 .errPos = pos
             });
         }
 
+
         searchPath.emplace_back(prefix, path);
     }
 
-    string path = state.forceStringNoCtx(*args[1], pos);
+    auto path = state.forceStringNoCtx(*args[1], pos);
 
-    mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
+    v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
@@ -1403,18 +1506,17 @@ static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string type = state.forceStringNoCtx(*args[0], pos);
+    auto type = state.forceStringNoCtx(*args[0], pos);
     std::optional<HashType> ht = parseHashType(type);
     if (!ht)
-      throw Error({
-          .hint = hintfmt("unknown hash type '%1%'", type),
-          .errPos = pos
-      });
+        throw Error({
+            .msg = hintfmt("unknown hash type '%1%'", type),
+            .errPos = pos
+        });
 
-    PathSet context; // discarded
-    Path p = state.coerceToPath(pos, *args[1], context);
+    auto path = realisePath(state, pos, *args[1]);
 
-    mkString(v, hashFile(*ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    v.mkString(hashFile(*ht, path).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1431,32 +1533,23 @@ static RegisterPrimOp primop_hashFile({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet ctx;
-    Path path = state.coerceToPath(pos, *args[0], ctx);
-    try {
-        state.realiseContext(ctx);
-    } catch (InvalidPathError & e) {
-        throw EvalError({
-            .hint = hintfmt("cannot read '%1%', since path '%2%' is not valid", path, e.path),
-            .errPos = pos
-        });
-    }
+    auto path = realisePath(state, pos, *args[0]);
 
-    DirEntries entries = readDirectory(state.checkSourcePath(path));
-    state.mkAttrs(v, entries.size());
+    DirEntries entries = readDirectory(path);
+
+    auto attrs = state.buildBindings(entries.size());
 
     for (auto & ent : entries) {
-        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path + "/" + ent.name);
-        mkStringNoCopy(*ent_val,
+        attrs.alloc(ent.name).mkString(
             ent.type == DT_REG ? "regular" :
             ent.type == DT_DIR ? "directory" :
             ent.type == DT_LNK ? "symlink" :
             "unknown");
     }
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_readDir({
@@ -1491,8 +1584,8 @@ static void prim_toXML(EvalState & state, const Pos & pos, Value * * args, Value
 {
     std::ostringstream out;
     PathSet context;
-    printValueAsXML(state, true, false, *args[0], out, context);
-    mkString(v, out.str(), context);
+    printValueAsXML(state, true, false, *args[0], out, context, pos);
+    v.mkString(out.str(), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -1599,8 +1692,8 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     std::ostringstream out;
     PathSet context;
-    printValueAsJSON(state, true, *args[0], out, context);
-    mkString(v, out.str(), context);
+    printValueAsJSON(state, true, *args[0], pos, out, context);
+    v.mkString(out.str(), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -1620,8 +1713,13 @@ static RegisterPrimOp primop_toJSON({
 /* Parse a JSON string to a value. */
 static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string s = state.forceStringNoCtx(*args[0], pos);
-    parseJSON(state, s, v);
+    auto s = state.forceStringNoCtx(*args[0], pos);
+    try {
+        parseJSON(state, s, v);
+    } catch (JSONParseError &e) {
+        e.addTrace(pos, "while decoding a JSON string");
+        throw;
+    }
 }
 
 static RegisterPrimOp primop_fromJSON({
@@ -1644,15 +1742,15 @@ static RegisterPrimOp primop_fromJSON({
 static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string name = state.forceStringNoCtx(*args[0], pos);
-    string contents = state.forceString(*args[1], context, pos);
+    std::string name(state.forceStringNoCtx(*args[0], pos));
+    std::string contents(state.forceString(*args[1], context, pos));
 
     StorePathSet refs;
 
     for (auto path : context) {
         if (path.at(0) != '/')
             throw EvalError( {
-                .hint = hintfmt(
+                .msg = hintfmt(
                     "in 'toFile': the file named '%1%' must not contain a reference "
                     "to a derivation but contains (%2%)",
                     name, path),
@@ -1669,7 +1767,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
-    mkString(v, storePath, {storePath});
+    v.mkString(storePath, {storePath});
 }
 
 static RegisterPrimOp primop_toFile({
@@ -1750,50 +1848,78 @@ static RegisterPrimOp primop_toFile({
     .fun = prim_toFile,
 });
 
-static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, FileIngestionMethod method, const std::optional<Hash> expectedHash, Value & v)
+static void addPath(
+    EvalState & state,
+    const Pos & pos,
+    const std::string & name,
+    Path path,
+    Value * filterFun,
+    FileIngestionMethod method,
+    const std::optional<Hash> expectedHash,
+    Value & v,
+    const PathSet & context)
 {
-    const auto path = evalSettings.pureEval && expectedHash ?
-        path_ :
-        state.checkSourcePath(path_);
-    PathFilter filter = filterFun ? ([&](const Path & path) {
-        auto st = lstat(path);
+    try {
+        // FIXME: handle CA derivation outputs (where path needs to
+        // be rewritten to the actual output).
+        auto rewrites = state.realiseContext(context);
+        path = state.toRealPath(rewriteStrings(path, rewrites), context);
 
-        /* Call the filter function.  The first argument is the path,
-           the second is a string indicating the type of the file. */
-        Value arg1;
-        mkString(arg1, path);
+        StorePathSet refs;
 
-        Value fun2;
-        state.callFunction(*filterFun, arg1, fun2, noPos);
+        if (state.store->isInStore(path)) {
+            try {
+                auto [storePath, subPath] = state.store->toStorePath(path);
+                // FIXME: we should scanForReferences on the path before adding it
+                refs = state.store->queryPathInfo(storePath)->references;
+                path = state.store->toRealPath(storePath) + subPath;
+            } catch (Error &) { // FIXME: should be InvalidPathError
+            }
+        }
 
-        Value arg2;
-        mkString(arg2,
-            S_ISREG(st.st_mode) ? "regular" :
-            S_ISDIR(st.st_mode) ? "directory" :
-            S_ISLNK(st.st_mode) ? "symlink" :
-            "unknown" /* not supported, will fail! */);
+        path = evalSettings.pureEval && expectedHash
+            ? path
+            : state.checkSourcePath(path);
 
-        Value res;
-        state.callFunction(fun2, arg2, res, noPos);
+        PathFilter filter = filterFun ? ([&](const Path & path) {
+            auto st = lstat(path);
 
-        return state.forceBool(res, pos);
-    }) : defaultPathFilter;
+            /* Call the filter function.  The first argument is the path,
+               the second is a string indicating the type of the file. */
+            Value arg1;
+            arg1.mkString(path);
 
-    std::optional<StorePath> expectedStorePath;
-    if (expectedHash)
-        expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
-    Path dstPath;
-    if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-        dstPath = state.store->printStorePath(settings.readOnlyMode
-            ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-            : state.store->addToStore(name, path, method, htSHA256, filter, state.repair));
-        if (expectedHash && expectedStorePath != state.store->parseStorePath(dstPath))
-            throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
-    } else
-        dstPath = state.store->printStorePath(*expectedStorePath);
+            Value arg2;
+            arg2.mkString(
+                S_ISREG(st.st_mode) ? "regular" :
+                S_ISDIR(st.st_mode) ? "directory" :
+                S_ISLNK(st.st_mode) ? "symlink" :
+                "unknown" /* not supported, will fail! */);
 
-    mkString(v, dstPath, {dstPath});
+            Value * args []{&arg1, &arg2};
+            Value res;
+            state.callFunction(*filterFun, 2, args, res, pos);
+
+            return state.forceBool(res, pos);
+        }) : defaultPathFilter;
+
+        std::optional<StorePath> expectedStorePath;
+        if (expectedHash)
+            expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
+
+        if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
+            StorePath dstPath = settings.readOnlyMode
+                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
+                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs);
+            if (expectedHash && expectedStorePath != dstPath)
+                throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
+            state.allowAndSetStorePathString(dstPath, v);
+        } else
+            state.allowAndSetStorePathString(*expectedStorePath, v);
+    } catch (Error & e) {
+        e.addTrace(pos, "while adding path '%s'", path);
+        throw;
+    }
 }
 
 
@@ -1801,28 +1927,36 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context);
-    if (!context.empty())
-        throw EvalError({
-            .hint = hintfmt("string '%1%' cannot refer to other paths", path),
-            .errPos = pos
-        });
 
     state.forceValue(*args[0], pos);
-    if (args[0]->type != tLambda)
+    if (args[0]->type() != nFunction)
         throw TypeError({
-            .hint = hintfmt(
+            .msg = hintfmt(
                 "first argument in call to 'filterSource' is not a function but %1%",
                 showType(*args[0])),
             .errPos = pos
         });
 
-    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v);
+    addPath(state, pos, std::string(baseNameOf(path)), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
     .name = "__filterSource",
     .args = {"e1", "e2"},
     .doc = R"(
+      > **Warning**
+      >
+      > `filterSource` should not be used to filter store paths. Since
+      > `filterSource` uses the name of the input directory while naming
+      > the output directory, doing so will produce a directory name in
+      > the form of `<hash2>-<hash>-<name>`, where `<hash>-<name>` is
+      > the name of the input directory. Since `<hash>` depends on the
+      > unfiltered directory, the name of the output directory will
+      > indirectly depend on files that are filtered out by the
+      > function. This will trigger a rebuild even when a filtered out
+      > file is changed. Use `builtins.path` instead, which allows
+      > specifying the name of the output directory.
+
       This function allows you to copy sources into the Nix store while
       filtering certain files. For instance, suppose that you want to use
       the directory `source-dir` as an input to a Nix expression, e.g.
@@ -1865,22 +1999,17 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     state.forceAttrs(*args[0], pos);
     Path path;
-    string name;
+    std::string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
+    PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
-        const string & n(attr.name);
-        if (n == "path") {
-            PathSet context;
+        auto & n(attr.name);
+        if (n == "path")
             path = state.coerceToPath(*attr.pos, *attr.value, context);
-            if (!context.empty())
-                throw EvalError({
-                    .hint = hintfmt("string '%1%' cannot refer to other paths", path),
-                    .errPos = *attr.pos
-                });
-        } else if (attr.name == state.sName)
+        else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
             state.forceValue(*attr.value, pos);
@@ -1891,19 +2020,19 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
         else
             throw EvalError({
-                .hint = hintfmt("unsupported argument '%1%' to 'addPath'", attr.name),
+                .msg = hintfmt("unsupported argument '%1%' to 'addPath'", attr.name),
                 .errPos = *attr.pos
             });
     }
     if (path.empty())
         throw EvalError({
-            .hint = hintfmt("'path' required"),
+            .msg = hintfmt("'path' required"),
             .errPos = pos
         });
     if (name.empty())
         name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, method, expectedHash, v);
+    addPath(state, pos, name, path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({
@@ -1913,26 +2042,26 @@ static RegisterPrimOp primop_path({
       An enrichment of the built-in path type, based on the attributes
       present in *args*. All are optional except `path`:
 
-        - path  
+        - path\
           The underlying path.
 
-        - name  
+        - name\
           The name of the path when added to the store. This can used to
           reference paths that have nix-illegal characters in their names,
           like `@`.
 
-        - filter  
+        - filter\
           A function of the type expected by `builtins.filterSource`,
           with the same semantics.
 
-        - recursive  
+        - recursive\
           When `false`, when `path` is added to the store it is with a
           flat hash, rather than a hash of the NAR serialization of the
           file. Thus, `path` must refer to a regular file, not a
           directory. This allows similar behavior to `fetchurl`. Defaults
           to `true`.
 
-        - sha256  
+        - sha256\
           When provided, this is the expected hash of the file at the
           path. Evaluation will fail if the hash is incorrect, and
           providing a hash allows `builtins.path` to be used even when the
@@ -1957,7 +2086,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 
     size_t n = 0;
     for (auto & i : *args[0]->attrs)
-        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
+        (v.listElems()[n++] = state.allocValue())->mkString(i.name);
 
     std::sort(v.listElems(), v.listElems() + n,
               [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
@@ -1987,7 +2116,10 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
         v.listElems()[n++] = (Value *) &i;
 
     std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
+        [](Value * v1, Value * v2) {
+            std::string_view s1 = ((Attr *) v1)->name, s2 = ((Attr *) v2)->name;
+            return s1 < s2;
+        });
 
     for (unsigned int i = 0; i < n; ++i)
         v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
@@ -2006,17 +2138,17 @@ static RegisterPrimOp primop_attrValues({
 /* Dynamic version of the `.' operator. */
 void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0], pos);
+    auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
-        throw EvalError({
-            .hint = hintfmt("attribute '%1%' missing", attr),
-            .errPos = pos
-        });
+    Bindings::iterator i = getAttr(
+        state,
+        "getAttr",
+        state.symbols.create(attr),
+        args[1]->attrs,
+        pos
+    );
     // !!! add to stack trace?
-    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
+    if (state.countCalls && *i->pos != noPos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value, pos);
     v = *i->value;
 }
@@ -2036,11 +2168,11 @@ static RegisterPrimOp primop_getAttr({
 /* Return position information of the specified attribute. */
 static void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0], pos);
+    auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
-        mkNull(v);
+        v.mkNull();
     else
         state.mkPos(v, i->pos);
 }
@@ -2054,9 +2186,9 @@ static RegisterPrimOp primop_unsafeGetAttrPos(RegisterPrimOp::Info {
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0], pos);
+    auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
+    v.mkBool(args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
 
 static RegisterPrimOp primop_hasAttr({
@@ -2074,7 +2206,7 @@ static RegisterPrimOp primop_hasAttr({
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->type == tAttrs);
+    v.mkBool(args[0]->type() == nAttrs);
 }
 
 static RegisterPrimOp primop_isAttrs({
@@ -2091,21 +2223,26 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     state.forceAttrs(*args[0], pos);
     state.forceList(*args[1], pos);
 
-    /* Get the attribute names to be removed. */
-    std::set<Symbol> names;
-    for (unsigned int i = 0; i < args[1]->listSize(); ++i) {
-        state.forceStringNoCtx(*args[1]->listElems()[i], pos);
-        names.insert(state.symbols.create(args[1]->listElems()[i]->string.s));
+    /* Get the attribute names to be removed.
+       We keep them as Attrs instead of Symbols so std::set_difference
+       can be used to remove them from attrs[0]. */
+    boost::container::small_vector<Attr, 64> names;
+    names.reserve(args[1]->listSize());
+    for (auto elem : args[1]->listItems()) {
+        state.forceStringNoCtx(*elem, pos);
+        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
     }
+    std::sort(names.begin(), names.end());
 
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
-    state.mkAttrs(v, args[0]->attrs->size());
-    for (auto & i : *args[0]->attrs) {
-        if (names.find(i.name) == names.end())
-            v.attrs->push_back(i);
-    }
+    auto attrs = state.buildBindings(args[0]->attrs->size());
+    std::set_difference(
+        args[0]->attrs->begin(), args[0]->attrs->end(),
+        names.begin(), names.end(),
+        std::back_inserter(attrs));
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_removeAttrs({
@@ -2127,41 +2264,43 @@ static RegisterPrimOp primop_removeAttrs({
 /* Builds a set from a list specifying (name, value) pairs.  To be
    precise, a list [{name = "name1"; value = value1;} ... {name =
    "nameN"; value = valueN;}] is transformed to {name1 = value1;
-   ... nameN = valueN;}.  In case of duplicate occurences of the same
+   ... nameN = valueN;}.  In case of duplicate occurrences of the same
    name, the first takes precedence. */
 static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
 
-    state.mkAttrs(v, args[0]->listSize());
+    auto attrs = state.buildBindings(args[0]->listSize());
 
     std::set<Symbol> seen;
 
-    for (unsigned int i = 0; i < args[0]->listSize(); ++i) {
-        Value & v2(*args[0]->listElems()[i]);
-        state.forceAttrs(v2, pos);
+    for (auto v2 : args[0]->listItems()) {
+        state.forceAttrs(*v2, pos);
 
-        Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end())
-            throw TypeError({
-                .hint = hintfmt("'name' attribute missing in a call to 'listToAttrs'"),
-                .errPos = pos
-            });
-        string name = state.forceStringNoCtx(*j->value, pos);
+        Bindings::iterator j = getAttr(
+            state,
+            "listToAttrs",
+            state.sName,
+            v2->attrs,
+            pos
+        );
+
+        auto name = state.forceStringNoCtx(*j->value, *j->pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
-            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end())
-                throw TypeError({
-                    .hint = hintfmt("'value' attribute missing in a call to 'listToAttrs'"),
-                    .errPos = pos
-                });
-            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            Bindings::iterator j2 = getAttr(
+                state,
+                "listToAttrs",
+                state.sValue,
+                v2->attrs,
+                pos
+            );
+            attrs.insert(sym, j2->value, j2->pos);
         }
     }
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_listToAttrs({
@@ -2194,13 +2333,15 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
     state.forceAttrs(*args[0], pos);
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
+    auto attrs = state.buildBindings(std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
     for (auto & i : *args[0]->attrs) {
         Bindings::iterator j = args[1]->attrs->find(i.name);
         if (j != args[1]->attrs->end())
-            v.attrs->push_back(*j);
+            attrs.insert(*j);
     }
+
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_intersectAttrs({
@@ -2221,11 +2362,10 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     Value * res[args[1]->listSize()];
     unsigned int found = 0;
 
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        Value & v2(*args[1]->listElems()[n]);
-        state.forceAttrs(v2, pos);
-        Bindings::iterator i = v2.attrs->find(attrName);
-        if (i != v2.attrs->end())
+    for (auto v2 : args[1]->listItems()) {
+        state.forceAttrs(*v2, pos);
+        Bindings::iterator i = v2->attrs->find(attrName);
+        if (i != v2->attrs->end())
             res[found++] = i->value;
     }
 
@@ -2254,29 +2394,26 @@ static RegisterPrimOp primop_catAttrs({
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    if (args[0]->type == tPrimOpApp || args[0]->type == tPrimOp) {
-        state.mkAttrs(v, 0);
+    if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
+        v.mkAttrs(&state.emptyBindings);
         return;
     }
-    if (args[0]->type != tLambda)
+    if (!args[0]->isLambda())
         throw TypeError({
-            .hint = hintfmt("'functionArgs' requires a function"),
+            .msg = hintfmt("'functionArgs' requires a function"),
             .errPos = pos
         });
 
-    if (!args[0]->lambda.fun->matchAttrs) {
-        state.mkAttrs(v, 0);
+    if (!args[0]->lambda.fun->hasFormals()) {
+        v.mkAttrs(&state.emptyBindings);
         return;
     }
 
-    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals) {
+    auto attrs = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
+    for (auto & i : args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
-        Value * value = state.allocValue();
-        v.attrs->push_back(Attr(i.name, value, &i.pos));
-        mkBool(*value, i.def);
-    }
-    v.attrs->sort();
+        attrs.alloc(i.name, ptr(&i.pos)).mkBool(i.def);
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_functionArgs({
@@ -2301,15 +2438,17 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, args[1]->attrs->size());
+    auto attrs = state.buildBindings(args[1]->attrs->size());
 
     for (auto & i : *args[1]->attrs) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
-        mkString(*vName, i.name);
-        mkApp(*vFun2, *args[0], *vName);
-        mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
+        vName->mkString(i.name);
+        vFun2->mkApp(args[0], vName);
+        attrs.alloc(i.name).mkApp(vFun2, i.value);
     }
+
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_mapAttrs({
@@ -2327,6 +2466,91 @@ static RegisterPrimOp primop_mapAttrs({
     .fun = prim_mapAttrs,
 });
 
+static void prim_zipAttrsWith(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    // we will first count how many values are present for each given key.
+    // we then allocate a single attrset and pre-populate it with lists of
+    // appropriate sizes, stash the pointers to the list elements of each,
+    // and populate the lists. after that we replace the list in the every
+    // attribute with the merge function application. this way we need not
+    // use (slightly slower) temporary storage the GC does not know about.
+
+    std::map<Symbol, std::pair<size_t, Value * *>> attrsSeen;
+
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+    const auto listSize = args[1]->listSize();
+    const auto listElems = args[1]->listElems();
+
+    for (unsigned int n = 0; n < listSize; ++n) {
+        Value * vElem = listElems[n];
+        try {
+            state.forceAttrs(*vElem, noPos);
+            for (auto & attr : *vElem->attrs)
+                attrsSeen[attr.name].first++;
+        } catch (TypeError & e) {
+            e.addTrace(pos, hintfmt("while invoking '%s'", "zipAttrsWith"));
+            throw;
+        }
+    }
+
+    auto attrs = state.buildBindings(attrsSeen.size());
+    for (auto & [sym, elem] : attrsSeen) {
+        auto & list = attrs.alloc(sym);
+        state.mkList(list, elem.first);
+        elem.second = list.listElems();
+    }
+    v.mkAttrs(attrs.alreadySorted());
+
+    for (unsigned int n = 0; n < listSize; ++n) {
+        Value * vElem = listElems[n];
+        for (auto & attr : *vElem->attrs)
+            *attrsSeen[attr.name].second++ = attr.value;
+    }
+
+    for (auto & attr : *v.attrs) {
+        auto name = state.allocValue();
+        name->mkString(attr.name);
+        auto call1 = state.allocValue();
+        call1->mkApp(args[0], name);
+        auto call2 = state.allocValue();
+        call2->mkApp(call1, attr.value);
+        attr.value = call2;
+    }
+}
+
+static RegisterPrimOp primop_zipAttrsWith({
+    .name = "__zipAttrsWith",
+    .args = {"f", "list"},
+    .doc = R"(
+      Transpose a list of attribute sets into an attribute set of lists,
+      then apply `mapAttrs`.
+
+      `f` receives two arguments: the attribute name and a non-empty
+      list of all values encountered for that attribute name.
+
+      The result is an attribute set where the attribute names are the
+      union of the attribute names in each element of `list`. The attribute
+      values are the return values of `f`.
+
+      ```nix
+      builtins.zipAttrsWith
+        (name: values: { inherit name values; })
+        [ { a = "x"; } { a = "y"; b = "z"; } ]
+      ```
+
+      evaluates to
+
+      ```
+      {
+        a = { name = "a"; values = [ "x" "y" ]; };
+        b = { name = "b"; values = [ "z" ]; };
+      }
+      ```
+    )",
+    .fun = prim_zipAttrsWith,
+});
+
 
 /*************************************************************
  * Lists
@@ -2337,7 +2561,7 @@ static RegisterPrimOp primop_mapAttrs({
 static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    mkBool(v, args[0]->isList());
+    v.mkBool(args[0]->type() == nList);
 }
 
 static RegisterPrimOp primop_isList({
@@ -2354,7 +2578,7 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
     state.forceList(list, pos);
     if (n < 0 || (unsigned int) n >= list.listSize())
         throw Error({
-            .hint = hintfmt("list index %1% is out of bounds", n),
+            .msg = hintfmt("list index %1% is out of bounds", n),
             .errPos = pos
         });
     state.forceValue(*list.listElems()[n], pos);
@@ -2402,7 +2626,7 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
     state.forceList(*args[0], pos);
     if (args[0]->listSize() == 0)
         throw Error({
-            .hint = hintfmt("'tail' called on an empty list"),
+            .msg = hintfmt("'tail' called on an empty list"),
             .errPos = pos
         });
 
@@ -2419,7 +2643,7 @@ static RegisterPrimOp primop_tail({
       the argument isn’t a list or is an empty list.
 
       > **Warning**
-      > 
+      >
       > This function should generally be avoided since it's inefficient:
       > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
       > list by repeatedly calling `tail` takes O(n^2) time.
@@ -2435,8 +2659,8 @@ static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value &
     state.mkList(v, args[1]->listSize());
 
     for (unsigned int n = 0; n < v.listSize(); ++n)
-        mkApp(*(v.listElems()[n] = state.allocValue()),
-            *args[0], *args[1]->listElems()[n]);
+        (v.listElems()[n] = state.allocValue())->mkApp(
+            args[0], args[1]->listElems()[n]);
 }
 
 static RegisterPrimOp primop_map({
@@ -2500,12 +2724,12 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     bool res = false;
     state.forceList(*args[1], pos);
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n)
-        if (state.eqValues(*args[0], *args[1]->listElems()[n])) {
+    for (auto elem : args[1]->listItems())
+        if (state.eqValues(*args[0], *elem)) {
             res = true;
             break;
         }
-    mkBool(v, res);
+    v.mkBool(res);
 }
 
 static RegisterPrimOp primop_elem({
@@ -2538,7 +2762,7 @@ static RegisterPrimOp primop_concatLists({
 static void prim_length(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
-    mkInt(v, args[0]->listSize());
+    v.mkInt(args[0]->listSize());
 }
 
 static RegisterPrimOp primop_length({
@@ -2560,11 +2784,10 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
     if (args[2]->listSize()) {
         Value * vCur = args[1];
 
-        for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
-            Value vTmp;
-            state.callFunction(*args[0], *vCur, vTmp, pos);
+        for (auto [n, elem] : enumerate(args[2]->listItems())) {
+            Value * vs []{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
-            state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
+            state.callFunction(*args[0], 2, vs, *vCur, pos);
         }
         state.forceValue(v, pos);
     } else {
@@ -2578,9 +2801,9 @@ static RegisterPrimOp primop_foldlStrict({
     .args = {"op", "nul", "list"},
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
-      e.g. `foldl’ op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
+      e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
       ...`. The operator is applied strictly, i.e., its arguments are
-      evaluated first. For example, `foldl’ (x: y: x + y) 0 [1 2 3]`
+      evaluated first. For example, `foldl' (x: y: x + y) 0 [1 2 3]`
       evaluates to 6.
     )",
     .fun = prim_foldlStrict,
@@ -2592,16 +2815,16 @@ static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * arg
     state.forceList(*args[1], pos);
 
     Value vTmp;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        state.callFunction(*args[0], *args[1]->listElems()[n], vTmp, pos);
+    for (auto elem : args[1]->listItems()) {
+        state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos);
         if (res == any) {
-            mkBool(v, any);
+            v.mkBool(any);
             return;
         }
     }
 
-    mkBool(v, !any);
+    v.mkBool(!any);
 }
 
 
@@ -2641,16 +2864,16 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
 
     if (len < 0)
         throw EvalError({
-            .hint = hintfmt("cannot create list of size %1%", len),
+            .msg = hintfmt("cannot create list of size %1%", len),
             .errPos = pos
         });
 
     state.mkList(v, len);
 
     for (unsigned int n = 0; n < (unsigned int) len; ++n) {
-        Value * arg = state.allocValue();
-        mkInt(*arg, n);
-        mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
+        auto arg = state.allocValue();
+        arg->mkInt(n);
+        (v.listElems()[n] = state.allocValue())->mkApp(args[0], arg);
     }
 }
 
@@ -2685,17 +2908,16 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         v.listElems()[n] = args[1]->listElems()[n];
     }
 
-
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
-        if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
-            return CompareValues()(a, b);
+        if (args[0]->isPrimOp() && args[0]->primOp->fun == prim_lessThan)
+            return CompareValues(state)(a, b);
 
-        Value vTmp1, vTmp2;
-        state.callFunction(*args[0], *a, vTmp1, pos);
-        state.callFunction(vTmp1, *b, vTmp2, pos);
-        return state.forceBool(vTmp2, pos);
+        Value * vs[] = {a, b};
+        Value vBool;
+        state.callFunction(*args[0], 2, vs, vBool, pos);
+        return state.forceBool(vBool, pos);
     };
 
     /* FIXME: std::sort can segfault if the comparator is not a strict
@@ -2745,21 +2967,21 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
             wrong.push_back(vElem);
     }
 
-    state.mkAttrs(v, 2);
+    auto attrs = state.buildBindings(2);
 
-    Value * vRight = state.allocAttr(v, state.sRight);
+    auto & vRight = attrs.alloc(state.sRight);
     auto rsize = right.size();
-    state.mkList(*vRight, rsize);
+    state.mkList(vRight, rsize);
     if (rsize)
-        memcpy(vRight->listElems(), right.data(), sizeof(Value *) * rsize);
+        memcpy(vRight.listElems(), right.data(), sizeof(Value *) * rsize);
 
-    Value * vWrong = state.allocAttr(v, state.sWrong);
+    auto & vWrong = attrs.alloc(state.sWrong);
     auto wsize = wrong.size();
-    state.mkList(*vWrong, wsize);
+    state.mkList(vWrong, wsize);
     if (wsize)
-        memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wsize);
+        memcpy(vWrong.listElems(), wrong.data(), sizeof(Value *) * wsize);
 
-    v.attrs->sort();
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_partition({
@@ -2785,6 +3007,58 @@ static RegisterPrimOp primop_partition({
     .fun = prim_partition,
 });
 
+static void prim_groupBy(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+
+    ValueVectorMap attrs;
+
+    for (auto vElem : args[1]->listItems()) {
+        Value res;
+        state.callFunction(*args[0], *vElem, res, pos);
+        auto name = state.forceStringNoCtx(res, pos);
+        Symbol sym = state.symbols.create(name);
+        auto vector = attrs.try_emplace(sym, ValueVector()).first;
+        vector->second.push_back(vElem);
+    }
+
+    auto attrs2 = state.buildBindings(attrs.size());
+
+    for (auto & i : attrs) {
+        auto & list = attrs2.alloc(i.first);
+        auto size = i.second.size();
+        state.mkList(list, size);
+        memcpy(list.listElems(), i.second.data(), sizeof(Value *) * size);
+    }
+
+    v.mkAttrs(attrs2.alreadySorted());
+}
+
+static RegisterPrimOp primop_groupBy({
+    .name = "__groupBy",
+    .args = {"f", "list"},
+    .doc = R"(
+      Groups elements of *list* together by the string returned from the
+      function *f* called on each element. It returns an attribute set
+      where each attribute value contains the elements of *list* that are
+      mapped to the same corresponding attribute name returned by *f*.
+
+      For example,
+
+      ```nix
+      builtins.groupBy (builtins.substring 0 1) ["foo" "bar" "baz"]
+      ```
+
+      evaluates to
+
+      ```nix
+      { b = [ "bar" "baz" ]; f = [ "foo" ]; }
+      ```
+    )",
+    .fun = prim_groupBy,
+});
+
 static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceFunction(*args[0], pos);
@@ -2797,7 +3071,12 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], pos);
+        try {
+            state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)));
+        } catch (TypeError &e) {
+            e.addTrace(pos, hintfmt("while invoking '%s'", "concatMap"));
+            throw;
+        }
         len += lists[n].listSize();
     }
 
@@ -2831,10 +3110,10 @@ static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
-        mkFloat(v, state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
+    if (args[0]->type() == nFloat || args[1]->type() == nFloat)
+        v.mkFloat(state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
     else
-        mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
+        v.mkInt(state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_add({
@@ -2850,10 +3129,10 @@ static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
-        mkFloat(v, state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
+    if (args[0]->type() == nFloat || args[1]->type() == nFloat)
+        v.mkFloat(state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
     else
-        mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
+        v.mkInt(state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_sub({
@@ -2869,10 +3148,10 @@ static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
-        mkFloat(v, state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
+    if (args[0]->type() == nFloat || args[1]->type() == nFloat)
+        v.mkFloat(state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
     else
-        mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
+        v.mkInt(state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_mul({
@@ -2892,23 +3171,23 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     NixFloat f2 = state.forceFloat(*args[1], pos);
     if (f2 == 0)
         throw EvalError({
-            .hint = hintfmt("division by zero"),
+            .msg = hintfmt("division by zero"),
             .errPos = pos
         });
 
-    if (args[0]->type == tFloat || args[1]->type == tFloat) {
-        mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
+    if (args[0]->type() == nFloat || args[1]->type() == nFloat) {
+        v.mkFloat(state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
     } else {
         NixInt i1 = state.forceInt(*args[0], pos);
         NixInt i2 = state.forceInt(*args[1], pos);
         /* Avoid division overflow as it might raise SIGFPE. */
         if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
             throw EvalError({
-                .hint = hintfmt("overflow in integer division"),
+                .msg = hintfmt("overflow in integer division"),
                 .errPos = pos
             });
 
-        mkInt(v, i1 / i2);
+        v.mkInt(i1 / i2);
     }
 }
 
@@ -2923,7 +3202,7 @@ static RegisterPrimOp primop_div({
 
 static void prim_bitAnd(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
+    v.mkInt(state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_bitAnd({
@@ -2937,7 +3216,7 @@ static RegisterPrimOp primop_bitAnd({
 
 static void prim_bitOr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
+    v.mkInt(state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_bitOr({
@@ -2951,7 +3230,7 @@ static RegisterPrimOp primop_bitOr({
 
 static void prim_bitXor(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
+    v.mkInt(state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
 }
 
 static RegisterPrimOp primop_bitXor({
@@ -2967,8 +3246,8 @@ static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
-    CompareValues comp;
-    mkBool(v, comp(args[0], args[1]));
+    CompareValues comp{state};
+    v.mkBool(comp(args[0], args[1]));
 }
 
 static RegisterPrimOp primop_lessThan({
@@ -2994,8 +3273,8 @@ static RegisterPrimOp primop_lessThan({
 static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context, true, false);
-    mkString(v, s, context);
+    auto s = state.coerceToString(pos, *args[0], context, true, false);
+    v.mkString(*s, context);
 }
 
 static RegisterPrimOp primop_toString({
@@ -3008,7 +3287,7 @@ static RegisterPrimOp primop_toString({
 
         - A path (e.g., `toString /foo/bar` yields `"/foo/bar"`.
 
-        - A set containing `{ __toString = self: ...; }`.
+        - A set containing `{ __toString = self: ...; }` or `{ outPath = ...; }`.
 
         - An integer.
 
@@ -3031,15 +3310,15 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     int start = state.forceInt(*args[0], pos);
     int len = state.forceInt(*args[1], pos);
     PathSet context;
-    string s = state.coerceToString(pos, *args[2], context);
+    auto s = state.coerceToString(pos, *args[2], context);
 
     if (start < 0)
         throw EvalError({
-            .hint = hintfmt("negative start position in 'substring'"),
+            .msg = hintfmt("negative start position in 'substring'"),
             .errPos = pos
         });
 
-    mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
+    v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
 }
 
 static RegisterPrimOp primop_substring({
@@ -3065,8 +3344,8 @@ static RegisterPrimOp primop_substring({
 static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    mkInt(v, s.size());
+    auto s = state.coerceToString(pos, *args[0], context);
+    v.mkInt(s->size());
 }
 
 static RegisterPrimOp primop_stringLength({
@@ -3082,18 +3361,18 @@ static RegisterPrimOp primop_stringLength({
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string type = state.forceStringNoCtx(*args[0], pos);
+    auto type = state.forceStringNoCtx(*args[0], pos);
     std::optional<HashType> ht = parseHashType(type);
     if (!ht)
         throw Error({
-            .hint = hintfmt("unknown hash type '%1%'", type),
+            .msg = hintfmt("unknown hash type '%1%'", type),
             .errPos = pos
         });
 
     PathSet context; // discarded
-    string s = state.forceString(*args[1], context, pos);
+    auto s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(*ht, s).to_string(Base16, false), context);
+    v.mkString(hashString(*ht, s).to_string(Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({
@@ -3109,7 +3388,18 @@ static RegisterPrimOp primop_hashString({
 
 struct RegexCache
 {
-    std::unordered_map<std::string, std::regex> cache;
+    // TODO use C++20 transparent comparison when available
+    std::unordered_map<std::string_view, std::regex> cache;
+    std::list<std::string> keys;
+
+    std::regex get(std::string_view re)
+    {
+        auto it = cache.find(re);
+        if (it != cache.end())
+            return it->second;
+        keys.emplace_back(re);
+        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+    }
 };
 
 std::shared_ptr<RegexCache> makeRegexCache()
@@ -3123,16 +3413,14 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 
     try {
 
-        auto regex = state.regexCache->cache.find(re);
-        if (regex == state.regexCache->cache.end())
-            regex = state.regexCache->cache.emplace(re, std::regex(re, std::regex::extended)).first;
+        auto regex = state.regexCache->get(re);
 
         PathSet context;
-        const std::string str = state.forceString(*args[1], context, pos);
+        const auto str = state.forceString(*args[1], context, pos);
 
-        std::smatch match;
-        if (!std::regex_match(str, match, regex->second)) {
-            mkNull(v);
+        std::cmatch match;
+        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
+            v.mkNull();
             return;
         }
 
@@ -3141,21 +3429,21 @@ void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
         state.mkList(v, len);
         for (size_t i = 0; i < len; ++i) {
             if (!match[i+1].matched)
-                mkNull(*(v.listElems()[i] = state.allocValue()));
+                (v.listElems()[i] = state.allocValue())->mkNull();
             else
-                mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
+                (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
     } catch (std::regex_error &e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError({
-                .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
+                .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
                 .errPos = pos
             });
         } else {
             throw EvalError({
-                .hint = hintfmt("invalid regular expression '%s'", re),
+                .msg = hintfmt("invalid regular expression '%s'", re),
                 .errPos = pos
             });
         }
@@ -3200,70 +3488,67 @@ static RegisterPrimOp primop_match({
 
 /* Split a string with a regular expression, and return a list of the
    non-matching parts interleaved by the lists of the matching groups. */
-static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        std::regex regex(re, std::regex::extended);
+        auto regex = state.regexCache->get(re);
 
         PathSet context;
-        const std::string str = state.forceString(*args[1], context, pos);
+        const auto str = state.forceString(*args[1], context, pos);
 
-        auto begin = std::sregex_iterator(str.begin(), str.end(), regex);
-        auto end = std::sregex_iterator();
+        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
+        auto end = std::cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
         state.mkList(v, 2 * len + 1);
         size_t idx = 0;
-        Value * elem;
 
         if (len == 0) {
             v.listElems()[idx++] = args[1];
             return;
         }
 
-        for (std::sregex_iterator i = begin; i != end; ++i) {
+        for (auto i = begin; i != end; ++i) {
             assert(idx <= 2 * len + 1 - 3);
-            std::smatch match = *i;
+            auto match = *i;
 
             // Add a string for non-matched characters.
-            elem = v.listElems()[idx++] = state.allocValue();
-            mkString(*elem, match.prefix().str().c_str());
+            (v.listElems()[idx++] = state.allocValue())->mkString(match.prefix().str());
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
-            elem = v.listElems()[idx++] = state.allocValue();
+            auto elem = v.listElems()[idx++] = state.allocValue();
 
             // Start at 1, beacause the first match is the whole string.
             state.mkList(*elem, slen);
             for (size_t si = 0; si < slen; ++si) {
                 if (!match[si + 1].matched)
-                    mkNull(*(elem->listElems()[si] = state.allocValue()));
+                    (elem->listElems()[si] = state.allocValue())->mkNull();
                 else
-                    mkString(*(elem->listElems()[si] = state.allocValue()), match[si + 1].str().c_str());
+                    (elem->listElems()[si] = state.allocValue())->mkString(match[si + 1].str());
             }
 
             // Add a string for non-matched suffix characters.
-            if (idx == 2 * len) {
-                elem = v.listElems()[idx++] = state.allocValue();
-                mkString(*elem, match.suffix().str().c_str());
-            }
+            if (idx == 2 * len)
+                (v.listElems()[idx++] = state.allocValue())->mkString(match.suffix().str());
         }
+
         assert(idx == 2 * len + 1);
 
     } catch (std::regex_error &e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             throw EvalError({
-                .hint = hintfmt("memory limit exceeded by regular expression '%s'", re),
+                .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
                 .errPos = pos
             });
         } else {
             throw EvalError({
-                .hint = hintfmt("invalid regular expression '%s'", re),
+                .msg = hintfmt("invalid regular expression '%s'", re),
                 .errPos = pos
             });
         }
@@ -3314,16 +3599,16 @@ static void prim_concatStringsSep(EvalState & state, const Pos & pos, Value * * 
     auto sep = state.forceString(*args[0], context, pos);
     state.forceList(*args[1], pos);
 
-    string res;
+    std::string res;
     res.reserve((args[1]->listSize() + 32) * sep.size());
     bool first = true;
 
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (auto elem : args[1]->listItems()) {
         if (first) first = false; else res += sep;
-        res += state.coerceToString(pos, *args[1]->listElems()[n], context);
+        res += *state.coerceToString(pos, *elem, context);
     }
 
-    mkString(v, res, context);
+    v.mkString(res, context);
 }
 
 static RegisterPrimOp primop_concatStringsSep({
@@ -3343,27 +3628,27 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     state.forceList(*args[1], pos);
     if (args[0]->listSize() != args[1]->listSize())
         throw EvalError({
-            .hint = hintfmt("'from' and 'to' arguments to 'replaceStrings' have different lengths"),
+            .msg = hintfmt("'from' and 'to' arguments to 'replaceStrings' have different lengths"),
             .errPos = pos
         });
 
-    vector<string> from;
+    std::vector<std::string> from;
     from.reserve(args[0]->listSize());
-    for (unsigned int n = 0; n < args[0]->listSize(); ++n)
-        from.push_back(state.forceString(*args[0]->listElems()[n], pos));
+    for (auto elem : args[0]->listItems())
+        from.emplace_back(state.forceString(*elem, pos));
 
-    vector<std::pair<string, PathSet>> to;
+    std::vector<std::pair<std::string, PathSet>> to;
     to.reserve(args[1]->listSize());
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (auto elem : args[1]->listItems()) {
         PathSet ctx;
-        auto s = state.forceString(*args[1]->listElems()[n], ctx, pos);
-        to.push_back(std::make_pair(std::move(s), std::move(ctx)));
+        auto s = state.forceString(*elem, ctx, pos);
+        to.emplace_back(s, std::move(ctx));
     }
 
     PathSet context;
     auto s = state.forceString(*args[2], context, pos);
 
-    string res;
+    std::string res;
     // Loops one past last character to handle the case where 'from' contains an empty string.
     for (size_t p = 0; p <= s.size(); ) {
         bool found = false;
@@ -3392,7 +3677,7 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
         }
     }
 
-    mkString(v, res, context);
+    v.mkString(res, context);
 }
 
 static RegisterPrimOp primop_replaceStrings({
@@ -3419,12 +3704,12 @@ static RegisterPrimOp primop_replaceStrings({
 
 static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name = state.forceStringNoCtx(*args[0], pos);
+    auto name = state.forceStringNoCtx(*args[0], pos);
     DrvName parsed(name);
-    state.mkAttrs(v, 2);
-    mkString(*state.allocAttr(v, state.sName), parsed.name);
-    mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
-    v.attrs->sort();
+    auto attrs = state.buildBindings(2);
+    attrs.alloc(state.sName).mkString(parsed.name);
+    attrs.alloc("version").mkString(parsed.version);
+    v.mkAttrs(attrs);
 }
 
 static RegisterPrimOp primop_parseDrvName({
@@ -3443,9 +3728,9 @@ static RegisterPrimOp primop_parseDrvName({
 
 static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string version1 = state.forceStringNoCtx(*args[0], pos);
-    string version2 = state.forceStringNoCtx(*args[1], pos);
-    mkInt(v, compareVersions(version1, version2));
+    auto version1 = state.forceStringNoCtx(*args[0], pos);
+    auto version2 = state.forceStringNoCtx(*args[1], pos);
+    v.mkInt(compareVersions(version1, version2));
 }
 
 static RegisterPrimOp primop_compareVersions({
@@ -3463,21 +3748,18 @@ static RegisterPrimOp primop_compareVersions({
 
 static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string version = state.forceStringNoCtx(*args[0], pos);
+    auto version = state.forceStringNoCtx(*args[0], pos);
     auto iter = version.cbegin();
     Strings components;
     while (iter != version.cend()) {
         auto component = nextComponent(iter, version.cend());
         if (component.empty())
             break;
-        components.emplace_back(std::move(component));
+        components.emplace_back(component);
     }
     state.mkList(v, components.size());
-    unsigned int n = 0;
-    for (auto & component : components) {
-        auto listElem = v.listElems()[n++] = state.allocValue();
-        mkString(*listElem, std::move(component));
-    }
+    for (const auto & [n, component] : enumerate(components))
+        (v.listElems()[n] = state.allocValue())->mkString(std::move(component));
 }
 
 static RegisterPrimOp primop_splitVersion({
@@ -3500,15 +3782,13 @@ static RegisterPrimOp primop_splitVersion({
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun,
-    std::optional<std::string> requiredFeature)
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
 {
     if (!primOps) primOps = new PrimOps;
     primOps->push_back({
         .name = name,
         .args = {},
         .arity = arity,
-        .requiredFeature = std::move(requiredFeature),
         .fun = fun
     });
 }
@@ -3529,39 +3809,37 @@ void EvalState::createBaseEnv()
     Value v;
 
     /* `builtins' must be first! */
-    mkAttrs(v, 128);
+    v.mkAttrs(buildBindings(128).finish());
     addConstant("builtins", v);
 
-    mkBool(v, true);
+    v.mkBool(true);
     addConstant("true", v);
 
-    mkBool(v, false);
+    v.mkBool(false);
     addConstant("false", v);
 
-    mkNull(v);
+    v.mkNull();
     addConstant("null", v);
 
     if (!evalSettings.pureEval) {
-        mkInt(v, time(0));
+        v.mkInt(time(0));
         addConstant("__currentTime", v);
-    }
 
-    if (!evalSettings.pureEval) {
-        mkString(v, settings.thisSystem.get());
+        v.mkString(settings.thisSystem.get());
         addConstant("__currentSystem", v);
     }
 
-    mkString(v, nixVersion);
+    v.mkString(nixVersion);
     addConstant("__nixVersion", v);
 
-    mkString(v, store->storeDir);
+    v.mkString(store->storeDir);
     addConstant("__storeDir", v);
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
-    mkInt(v, 5);
+    v.mkInt(6);
     addConstant("__langVersion", v);
 
     // Miscellaneous
@@ -3574,36 +3852,43 @@ void EvalState::createBaseEnv()
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
-        auto v2 = v.listElems()[n++] = allocValue();
-        mkAttrs(*v2, 2);
-        mkString(*allocAttr(*v2, symbols.create("path")), i.second);
-        mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
-        v2->attrs->sort();
+        auto attrs = buildBindings(2);
+        attrs.alloc("path").mkString(i.second);
+        attrs.alloc("prefix").mkString(i.first);
+        (v.listElems()[n++] = allocValue())->mkAttrs(attrs);
     }
     addConstant("__nixPath", v);
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            if (!primOp.requiredFeature || settings.isExperimentalFeatureEnabled(*primOp.requiredFeature))
-                addPrimOp({
-                    .fun = primOp.fun,
-                    .arity = std::max(primOp.args.size(), primOp.arity),
-                    .name = symbols.create(primOp.name),
-                    .args = std::move(primOp.args),
-                    .doc = primOp.doc,
-                });
+            addPrimOp({
+                .fun = primOp.fun,
+                .arity = std::max(primOp.args.size(), primOp.arity),
+                .name = symbols.create(primOp.name),
+                .args = primOp.args,
+                .doc = primOp.doc,
+            });
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     sDerivationNix = symbols.create("//builtin/derivation.nix");
-    eval(parse(
-        #include "primops/derivation.nix.gen.hh"
-        , foFile, sDerivationNix, "/", staticBaseEnv), v);
-    addConstant("derivation", v);
+    auto vDerivation = allocValue();
+    addConstant("derivation", vDerivation);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
     baseEnv.values[0]->attrs->sort();
+
+    staticBaseEnv.sort();
+
+    /* Note: we have to initialize the 'derivation' constant *after*
+       building baseEnv/staticBaseEnv because it uses 'builtins'. */
+    char code[] =
+        #include "primops/derivation.nix.gen.hh"
+        // the parser needs two NUL bytes as terminators; one of them
+        // is implied by being a C string.
+        "\0";
+    eval(parse(code, sizeof(code), foFile, sDerivationNix, "/", staticBaseEnv), *vDerivation);
 }
 
 

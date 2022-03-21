@@ -8,25 +8,23 @@ struct CmdPingStore : StoreCommand
 {
     std::string description() override
     {
-        return "test whether a store can be opened";
+        return "test whether a store can be accessed";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To test whether connecting to a remote Nix store via SSH works:",
-                "nix ping-store --store ssh://mac1"
-            },
-        };
+        return
+          #include "ping-store.md"
+          ;
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
+        notice("Store URL: %s", store->getUri());
         store->connect();
+        if (auto version = store->getVersion())
+            notice("Version: %s", *version);
     }
 };
 
-static auto rCmdPingStore = registerCommand<CmdPingStore>("ping-store");
+static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "ping"});

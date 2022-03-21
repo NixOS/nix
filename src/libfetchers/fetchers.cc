@@ -24,11 +24,11 @@ static void fixupInput(Input & input)
     input.getType();
     input.getRef();
     if (input.getRev())
-        input.immutable = true;
+        input.locked = true;
     input.getRevCount();
     input.getLastModified();
     if (input.getNarHash())
-        input.immutable = true;
+        input.locked = true;
 }
 
 Input Input::fromURL(const ParsedURL & url)
@@ -124,18 +124,25 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            auto actualPath = store->toRealPath(storePath);
-
-            return {fetchers::Tree(std::move(actualPath), std::move(storePath)), *this};
+            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
 
-    auto [tree, input] = scheme->fetch(store, *this);
+    auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
+        try {
+            return scheme->fetch(store, *this);
+        } catch (Error & e) {
+            e.addTrace({}, "while fetching the input '%s'", to_string());
+            throw;
+        }
+    }();
 
-    if (tree.actualPath == "")
-        tree.actualPath = store->toRealPath(tree.storePath);
+    Tree tree {
+        .actualPath = store->toRealPath(storePath),
+        .storePath = storePath,
+    };
 
     auto narHash = store->queryPathInfo(tree.storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
@@ -158,7 +165,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
                 input.to_string(), *prevRevCount);
     }
 
-    input.immutable = true;
+    input.locked = true;
 
     assert(input.hasAllInfo());
 
@@ -193,12 +200,17 @@ void Input::markChangedFile(
     return scheme->markChangedFile(*this, file, commitMsg);
 }
 
+std::string Input::getName() const
+{
+    return maybeGetStrAttr(attrs, "name").value_or("source");
+}
+
 StorePath Input::computeStorePath(Store & store) const
 {
     auto narHash = getNarHash();
     if (!narHash)
-        throw Error("cannot compute store path for mutable input '%s'", to_string());
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, "source");
+        throw Error("cannot compute store path for unlocked input '%s'", to_string());
+    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, getName());
 }
 
 std::string Input::getType() const

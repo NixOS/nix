@@ -11,7 +11,7 @@
 
 namespace nix {
 
-static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
+static std::string_view getS(const std::vector<Logger::Field> & fields, size_t n)
 {
     assert(n < fields.size());
     assert(fields[n].type == Logger::Field::tString);
@@ -103,17 +103,19 @@ public:
     ~ProgressBar()
     {
         stop();
-        updateThread.join();
     }
 
     void stop() override
     {
-        auto state(state_.lock());
-        if (!state->active) return;
-        state->active = false;
-        writeToStderr("\r\e[K");
-        updateCV.notify_one();
-        quitCV.notify_one();
+        {
+            auto state(state_.lock());
+            if (!state->active) return;
+            state->active = false;
+            writeToStderr("\r\e[K");
+            updateCV.notify_one();
+            quitCV.notify_one();
+        }
+        updateThread.join();
     }
 
     bool isVerbose() override {
@@ -122,6 +124,7 @@ public:
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
+        if (lvl > verbosity) return;
         auto state(state_.lock());
         log(*state, lvl, fs.s);
     }
@@ -466,13 +469,24 @@ public:
             Logger::writeToStdout(s);
         }
     }
+
+    std::optional<char> ask(std::string_view msg) override
+    {
+        auto state(state_.lock());
+        if (!state->active || !isatty(STDIN_FILENO)) return {};
+        std::cerr << fmt("\r\e[K%s ", msg);
+        auto s = trim(readLine(STDIN_FILENO));
+        if (s.size() != 1) return {};
+        draw(*state);
+        return s[0];
+    }
 };
 
 Logger * makeProgressBar(bool printBuildLogs)
 {
     return new ProgressBar(
         printBuildLogs,
-        isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+        shouldANSI()
     );
 }
 
