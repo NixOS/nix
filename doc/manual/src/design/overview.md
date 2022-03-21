@@ -10,4 +10,4 @@ These are the layers which users interact with most.
 Below that is the *store layer*, Nix's machinery for presenting and files and fully elaborated build plans, and also executing those build plans.
 The store layer may not be as visible, but this is the heart of Nix.
 
-This chapter will start there and work up towards the more user-facing interfaces described in the rest of the manual.
+This chapter describes Nix starting with that bottom store layer, then working its way up until it reaches the more user-facing interfaces described in the rest of the manual."
