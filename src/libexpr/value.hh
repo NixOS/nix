@@ -119,9 +119,12 @@ private:
     InternalType internalType;
 
     friend std::string showType(const Value & v);
-    friend void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v);
+
+    void print(std::ostream & str, std::set<const void *> * seen) const;
 
 public:
+
+    void print(std::ostream & str, bool showRepeated = false) const;
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
