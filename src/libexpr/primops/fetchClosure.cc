@@ -1,6 +1,7 @@
 #include "primops.hh"
 #include "store-api.hh"
 #include "make-content-addressed.hh"
+#include "url.hh"
 
 namespace nix {
 
@@ -50,8 +51,15 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
-    // FIXME: only allow some "trusted" store types (like BinaryCacheStore).
-    auto fromStore = openStore(*fromStoreUrl);
+    auto parsedURL = parseURL(*fromStoreUrl);
+
+    if (parsedURL.scheme != "http" && parsedURL.scheme != "https")
+        throw Error({
+            .msg = hintfmt("'fetchClosure' only supports http:// and https:// stores"),
+            .errPos = pos
+        });
+
+    auto fromStore = openStore(parsedURL.to_string());
 
     if (toCA) {
         if (!toPath || !state.store->isValidPath(*toPath)) {
