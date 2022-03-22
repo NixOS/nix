@@ -54,26 +54,28 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
     auto fromStore = openStore(*fromStoreUrl);
 
     if (toCA) {
-        auto remappings = makeContentAddressed(*fromStore, *state.store, { *fromPath });
-        auto i = remappings.find(*fromPath);
-        assert(i != remappings.end());
-        if (toPath && *toPath != i->second)
-            throw Error({
-                .msg = hintfmt("rewriting '%s' to content-addressed form yielded '%s', while '%s' was expected",
-                    state.store->printStorePath(*fromPath),
-                    state.store->printStorePath(i->second),
-                    state.store->printStorePath(*toPath)),
-                .errPos = pos
-            });
-        if (!toPath)
-            throw Error({
-                .msg = hintfmt(
-                    "rewriting '%s' to content-addressed form yielded '%s'; "
-                    "please set this in the 'toPath' attribute passed to 'fetchClosure'",
-                    state.store->printStorePath(*fromPath),
-                    state.store->printStorePath(i->second)),
-                .errPos = pos
-            });
+        if (!toPath || !state.store->isValidPath(*toPath)) {
+            auto remappings = makeContentAddressed(*fromStore, *state.store, { *fromPath });
+            auto i = remappings.find(*fromPath);
+            assert(i != remappings.end());
+            if (toPath && *toPath != i->second)
+                throw Error({
+                    .msg = hintfmt("rewriting '%s' to content-addressed form yielded '%s', while '%s' was expected",
+                        state.store->printStorePath(*fromPath),
+                        state.store->printStorePath(i->second),
+                        state.store->printStorePath(*toPath)),
+                    .errPos = pos
+                });
+            if (!toPath)
+                throw Error({
+                    .msg = hintfmt(
+                        "rewriting '%s' to content-addressed form yielded '%s'; "
+                        "please set this in the 'toPath' attribute passed to 'fetchClosure'",
+                        state.store->printStorePath(*fromPath),
+                        state.store->printStorePath(i->second)),
+                    .errPos = pos
+                });
+        }
     } else {
         copyClosure(*fromStore, *state.store, RealisedPath::Set { *fromPath });
         toPath = fromPath;
