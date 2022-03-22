@@ -1,6 +1,6 @@
 #include "command.hh"
 #include "store-api.hh"
-#include "references.hh"
+#include "make-content-addressed.hh"
 #include "common-args.hh"
 #include "json.hh"
 
@@ -27,74 +27,25 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
 
     void run(ref<Store> store, StorePaths && storePaths) override
     {
-        auto paths = store->topoSortPaths(StorePathSet(storePaths.begin(), storePaths.end()));
+        auto remappings = makeContentAddressed(*store, *store,
+            StorePathSet(storePaths.begin(), storePaths.end()));
 
-        std::reverse(paths.begin(), paths.end());
-
-        std::map<StorePath, StorePath> remappings;
-
-        auto jsonRoot = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
-        auto jsonRewrites = json ? std::make_unique<JSONObject>(jsonRoot->object("rewrites")) : nullptr;
-
-        for (auto & path : paths) {
-            auto pathS = store->printStorePath(path);
-            auto oldInfo = store->queryPathInfo(path);
-            std::string oldHashPart(path.hashPart());
-
-            StringSink sink;
-            store->narFromPath(path, sink);
-
-            StringMap rewrites;
-
-            StorePathSet references;
-            bool hasSelfReference = false;
-            for (auto & ref : oldInfo->references) {
-                if (ref == path)
-                    hasSelfReference = true;
-                else {
-                    auto i = remappings.find(ref);
-                    auto replacement = i != remappings.end() ? i->second : ref;
-                    // FIXME: warn about unremapped paths?
-                    if (replacement != ref)
-                        rewrites.insert_or_assign(store->printStorePath(ref), store->printStorePath(replacement));
-                    references.insert(std::move(replacement));
-                }
+        if (json) {
+            JSONObject jsonRoot(std::cout);
+            JSONObject jsonRewrites(jsonRoot.object("rewrites"));
+            for (auto & path : storePaths) {
+                auto i = remappings.find(path);
+                assert(i != remappings.end());
+                jsonRewrites.attr(store->printStorePath(path), store->printStorePath(i->second));
             }
-
-            sink.s = rewriteStrings(sink.s, rewrites);
-
-            HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-            hashModuloSink(sink.s);
-
-            auto narHash = hashModuloSink.finish().first;
-
-            ValidPathInfo info {
-                store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference),
-                narHash,
-            };
-            info.references = std::move(references);
-            if (hasSelfReference) info.references.insert(info.path);
-            info.narSize = sink.s.size();
-            info.ca = FixedOutputHash {
-                .method = FileIngestionMethod::Recursive,
-                .hash = info.narHash,
-            };
-
-            if (!json)
-                notice("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
-
-            auto source = sinkToSource([&](Sink & nextSink) {
-                RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-                rsink2(sink.s);
-                rsink2.flush();
-            });
-
-            store->addToStore(info, *source);
-
-            if (json)
-                jsonRewrites->attr(store->printStorePath(path), store->printStorePath(info.path));
-
-            remappings.insert_or_assign(std::move(path), std::move(info.path));
+        } else {
+            for (auto & path : storePaths) {
+                auto i = remappings.find(path);
+                assert(i != remappings.end());
+                notice("rewrote '%s' to '%s'",
+                    store->printStorePath(path),
+                    store->printStorePath(i->second));
+            }
         }
     }
 };
