@@ -8,9 +8,10 @@ std::map<StorePath, StorePath> makeContentAddressed(
     Store & dstStore,
     const StorePathSet & storePaths)
 {
-    // FIXME: use closure of storePaths.
+    StorePathSet closure;
+    srcStore.computeFSClosure(storePaths, closure);
 
-    auto paths = srcStore.topoSortPaths(storePaths);
+    auto paths = srcStore.topoSortPaths(closure);
 
     std::reverse(paths.begin(), paths.end());
 
@@ -46,29 +47,29 @@ std::map<StorePath, StorePath> makeContentAddressed(
         HashModuloSink hashModuloSink(htSHA256, oldHashPart);
         hashModuloSink(sink.s);
 
-        auto narHash = hashModuloSink.finish().first;
+        auto narModuloHash = hashModuloSink.finish().first;
 
-        ValidPathInfo info {
-            dstStore.makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, path.name(), references, hasSelfReference),
-            narHash,
-        };
+        auto dstPath = dstStore.makeFixedOutputPath(
+            FileIngestionMethod::Recursive, narModuloHash, path.name(), references, hasSelfReference);
+
+        printInfo("rewroting '%s' to '%s'", pathS, srcStore.printStorePath(dstPath));
+
+        StringSink sink2;
+        RewritingSink rsink2(oldHashPart, std::string(dstPath.hashPart()), sink2);
+        rsink2(sink.s);
+        rsink2.flush();
+
+        ValidPathInfo info { dstPath, hashString(htSHA256, sink2.s) };
         info.references = std::move(references);
         if (hasSelfReference) info.references.insert(info.path);
         info.narSize = sink.s.size();
         info.ca = FixedOutputHash {
             .method = FileIngestionMethod::Recursive,
-            .hash = info.narHash,
+            .hash = narModuloHash,
         };
 
-        printInfo("rewrote '%s' to '%s'", pathS, srcStore.printStorePath(info.path));
-
-        auto source = sinkToSource([&](Sink & nextSink) {
-            RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-            rsink2(sink.s);
-            rsink2.flush();
-        });
-
-        dstStore.addToStore(info, *source);
+        StringSource source(sink2.s);
+        dstStore.addToStore(info, source);
 
         remappings.insert_or_assign(std::move(path), std::move(info.path));
     }
