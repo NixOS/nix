@@ -110,6 +110,39 @@ static RegisterPrimOp primop_fetchClosure({
     .name = "__fetchClosure",
     .args = {"args"},
     .doc = R"(
+      Fetch a Nix store closure from a binary cache, rewriting it into
+      content-addressed form. For example,
+
+      ```nix
+      builtins.fetchClosure {
+        fromStore = "https://cache.nixos.org";
+        fromPath = /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1;
+        toPath = /nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1;
+      }
+      ```
+
+      fetches `/nix/store/r2jd...` from the specified binary cache,
+      and rewrites it into the content-addressed store path
+      `/nix/store/ldbh...`.
+
+      If `fromPath` is already content-addressed, or if you are
+      allowing impure evaluation (`--impure`), then `toPath` may be
+      omitted.
+
+      To find out the correct value for `toPath` given a `fromPath`,
+      you can use `nix store make-content-addressed`:
+
+      ```console
+      # nix store make-content-addressed /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1
+      rewrote '/nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1' to '/nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1'
+      ```
+
+      This function is similar to `builtins.storePath` in that it
+      allows you to use a previously built store path in a Nix
+      expression. However, it is more reproducible because it requires
+      specifying a binary cache from which the path can be fetched.
+      Also, requiring a content-addressed final store path avoids the
+      need for users to configure binary cache public keys.
     )",
     .fun = prim_fetchClosure,
 });
