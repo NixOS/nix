@@ -6,9 +6,9 @@
 
 using namespace nix;
 
-struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
+struct CmdMakeContentAddressed : StorePathsCommand, MixJSON
 {
-    CmdMakeContentAddressable()
+    CmdMakeContentAddressed()
     {
         realiseMode = Realise::Outputs;
     }
@@ -21,7 +21,7 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "make-content-addressable.md"
+          #include "make-content-addressed.md"
           ;
     }
 
@@ -50,4 +50,4 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
     }
 };
 
-static auto rCmdMakeContentAddressable = registerCommand2<CmdMakeContentAddressable>({"store", "make-content-addressable"});
+static auto rCmdMakeContentAddressed = registerCommand2<CmdMakeContentAddressed>({"store", "make-content-addressed"});
