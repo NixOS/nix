@@ -133,7 +133,7 @@ static RegisterPrimOp primop_fetchClosure({
       you can use `nix store make-content-addressed`:
 
       ```console
-      # nix store make-content-addressed /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1
+      # nix store make-content-addressed --from https://cache.nixos.org /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1
       rewrote '/nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1' to '/nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1'
       ```
 

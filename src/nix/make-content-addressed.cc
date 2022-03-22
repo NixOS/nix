@@ -6,7 +6,7 @@
 
 using namespace nix;
 
-struct CmdMakeContentAddressed : StorePathsCommand, MixJSON
+struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand, MixJSON
 {
     CmdMakeContentAddressed()
     {
@@ -25,9 +25,11 @@ struct CmdMakeContentAddressed : StorePathsCommand, MixJSON
           ;
     }
 
-    void run(ref<Store> store, StorePaths && storePaths) override
+    void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
-        auto remappings = makeContentAddressed(*store, *store,
+        auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+
+        auto remappings = makeContentAddressed(*srcStore, *dstStore,
             StorePathSet(storePaths.begin(), storePaths.end()));
 
         if (json) {
@@ -36,15 +38,15 @@ struct CmdMakeContentAddressed : StorePathsCommand, MixJSON
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
                 assert(i != remappings.end());
-                jsonRewrites.attr(store->printStorePath(path), store->printStorePath(i->second));
+                jsonRewrites.attr(srcStore->printStorePath(path), srcStore->printStorePath(i->second));
             }
         } else {
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
                 assert(i != remappings.end());
                 notice("rewrote '%s' to '%s'",
-                    store->printStorePath(path),
-                    store->printStorePath(i->second));
+                    srcStore->printStorePath(path),
+                    srcStore->printStorePath(i->second));
             }
         }
     }
