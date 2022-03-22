@@ -52,7 +52,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
         auto dstPath = dstStore.makeFixedOutputPath(
             FileIngestionMethod::Recursive, narModuloHash, path.name(), references, hasSelfReference);
 
-        printInfo("rewroting '%s' to '%s'", pathS, srcStore.printStorePath(dstPath));
+        printInfo("rewriting '%s' to '%s'", pathS, srcStore.printStorePath(dstPath));
 
         StringSink sink2;
         RewritingSink rsink2(oldHashPart, std::string(dstPath.hashPart()), sink2);

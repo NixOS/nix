@@ -53,7 +53,9 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
 
     auto parsedURL = parseURL(*fromStoreUrl);
 
-    if (parsedURL.scheme != "http" && parsedURL.scheme != "https")
+    if (parsedURL.scheme != "http" &&
+        parsedURL.scheme != "https" &&
+        !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))
         throw Error({
             .msg = hintfmt("'fetchClosure' only supports http:// and https:// stores"),
             .errPos = pos
