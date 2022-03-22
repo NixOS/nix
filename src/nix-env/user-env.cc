@@ -105,8 +105,10 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
+    std::ostringstream str;
+    manifest.print(str, true);
     auto manifestFile = state.store->addTextToStore("env-manifest.nix",
-        fmt("%s", manifest), references);
+        str.str(), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
