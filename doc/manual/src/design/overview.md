@@ -1,6 +1,6 @@
 # Overview
 
-Nix is broken into layers that operate fairly independently.
+Nix consists of layers that operate fairly independently.
 
 At the top is the *command line interface*, i.e. the argument parsing of the various Nix executables.
 
