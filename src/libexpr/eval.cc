@@ -126,7 +126,7 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         break;
     case tAttrs: {
         if (!v.attrs->empty() && !seen.insert(v.attrs).second)
-            str << "<REPEAT>";
+            str << "«repeated»";
         else {
             str << "{ ";
             for (auto & i : v.attrs->lexicographicOrder()) {
@@ -142,7 +142,7 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
     case tList2:
     case tListN:
         if (v.listSize() && !seen.insert(v.listElems()).second)
-            str << "<REPEAT>";
+            str << "«repeated»";
         else {
             str << "[ ";
             for (auto v2 : v.listItems()) {
