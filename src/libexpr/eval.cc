@@ -1903,13 +1903,22 @@ std::string_view EvalState::forceString(Value & v, const Pos & pos)
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<std::string, std::string> decodeContext(std::string_view s)
+NixStringContextElem decodeContext(const Store & store, std::string_view s)
 {
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
-        return {std::string(s.substr(index + 1)), std::string(s.substr(1, index - 1))};
+        return {
+            store.parseStorePath(s.substr(index + 1)),
+            std::string(s.substr(1, index - 1)),
+        };
     } else
-        return {s.at(0) == '/' ? std::string(s) : std::string(s.substr(1)), ""};
+        return {
+            store.parseStorePath(
+                s.at(0) == '/'
+                ? s
+                : s.substr(1)),
+            "",
+        };
 }
 
 
@@ -1921,13 +1930,13 @@ void copyContext(const Value & v, PathSet & context)
 }
 
 
-std::vector<std::pair<Path, std::string>> Value::getContext()
+NixStringContext Value::getContext(const Store & store)
 {
-    std::vector<std::pair<Path, std::string>> res;
+    NixStringContext res;
     assert(internalType == tString);
     if (string.context)
         for (const char * * p = string.context; *p; ++p)
-            res.push_back(decodeContext(*p));
+            res.push_back(decodeContext(store, *p));
     return res;
 }
 
