@@ -96,20 +96,20 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v)
+void Value::print(std::ostream & str, std::set<const void *> * seen) const
 {
     checkInterrupt();
 
-    switch (v.internalType) {
+    switch (internalType) {
     case tInt:
-        str << v.integer;
+        str << integer;
         break;
     case tBool:
-        str << (v.boolean ? "true" : "false");
+        str << (boolean ? "true" : "false");
         break;
     case tString:
         str << "\"";
-        for (const char * i = v.string.s; *i; i++)
+        for (const char * i = string.s; *i; i++)
             if (*i == '\"' || *i == '\\') str << "\\" << *i;
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
@@ -119,19 +119,19 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         str << "\"";
         break;
     case tPath:
-        str << v.path; // !!! escaping?
+        str << path; // !!! escaping?
         break;
     case tNull:
         str << "null";
         break;
     case tAttrs: {
-        if (!v.attrs->empty() && !seen.insert(v.attrs).second)
-            str << "<REPEAT>";
+        if (seen && !attrs->empty() && !seen->insert(attrs).second)
+            str << "«repeated»";
         else {
             str << "{ ";
-            for (auto & i : v.attrs->lexicographicOrder()) {
+            for (auto & i : attrs->lexicographicOrder()) {
                 str << i->name << " = ";
-                printValue(str, seen, *i->value);
+                i->value->print(str, seen);
                 str << "; ";
             }
             str << "}";
@@ -141,12 +141,12 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
     case tList1:
     case tList2:
     case tListN:
-        if (v.listSize() && !seen.insert(v.listElems()).second)
-            str << "<REPEAT>";
+        if (seen && listSize() && !seen->insert(listElems()).second)
+            str << "«repeated»";
         else {
             str << "[ ";
-            for (auto v2 : v.listItems()) {
-                printValue(str, seen, *v2);
+            for (auto v2 : listItems()) {
+                v2->print(str, seen);
                 str << " ";
             }
             str << "]";
@@ -166,10 +166,10 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         str << "<PRIMOP-APP>";
         break;
     case tExternal:
-        str << *v.external;
+        str << *external;
         break;
     case tFloat:
-        str << v.fpoint;
+        str << fpoint;
         break;
     default:
         abort();
@@ -177,10 +177,16 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+void Value::print(std::ostream & str, bool showRepeated) const
 {
     std::set<const void *> seen;
-    printValue(str, seen, v);
+    print(str, showRepeated ? nullptr : &seen);
+}
+
+
+std::ostream & operator << (std::ostream & str, const Value & v)
+{
+    v.print(str, false);
     return str;
 }
 
