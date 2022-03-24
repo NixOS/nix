@@ -7,6 +7,8 @@ namespace nix {
 
 static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    settings.requireExperimentalFeature(Xp::FetchClosure);
+
     state.forceAttrs(*args[0], pos);
 
     std::optional<std::string> fromStoreUrl;

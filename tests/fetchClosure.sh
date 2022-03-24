@@ -1,5 +1,6 @@
 source common.sh
 
+enableFeatures "fetch-closure"
 needLocalStore "'--no-require-sigs' can’t be used with the daemon"
 
 clearStore
