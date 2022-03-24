@@ -694,7 +694,32 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
 static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
     .name = "__genericClosure",
+    .args = {"attrset"},
     .arity = 1,
+    .doc = R"(
+      Take an *attrset* with values named `startSet` and `operator` in order to
+      return a *list of attrsets* by starting with the `startSet`, recursively
+      applying the `operator` function to each element. The *attrsets* in the
+      `startSet` and produced by the `operator` must each contain value named
+      `key` which are comparable to each other. The result is produced by
+      repeatedly calling the operator for each element encountered with a
+      unique key, terminating when no new elements are produced. For example,
+
+      ```
+      builtins.genericClosure {
+        startSet = [ {key = 5;} ];
+        operator = item: [{
+          key = if (item.key / 2 ) * 2 == item.key
+               then item.key / 2
+               else 3 * item.key + 1;
+        }];
+      }
+      ```
+      evaluates to
+      ```
+      [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
+      ```
+      )",
     .fun = prim_genericClosure,
 });
 
