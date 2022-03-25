@@ -59,7 +59,7 @@ let
       echo 'ref: refs/heads/master' > $out/HEAD
 
       mkdir -p $out/info
-      echo '${nixpkgs.rev} refs/heads/master' > $out/info/refs
+      echo -e '${nixpkgs.rev}\trefs/heads/master' > $out/info/refs
     '';
 
 in

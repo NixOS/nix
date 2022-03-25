@@ -52,14 +52,25 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
     void run(ref<Store> store) override
     {
+        if (dryRun) {
+            std::vector<DerivedPath> pathsToBuild;
+
+            for (auto & i : installables) {
+                auto b = i->toDerivedPaths();
+                pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
+            }
+            printMissing(store, pathsToBuild, lvlError);
+            if (json)
+                logger->cout("%s", derivedPathsToJSON(pathsToBuild, store).dump());
+            return;
+        }
+
         auto buildables = Installable::build(
             getEvalStore(), store,
-            dryRun ? Realise::Derivation : Realise::Outputs,
+            Realise::Outputs,
             installables, buildMode);
 
         if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
-
-        if (dryRun) return;
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())

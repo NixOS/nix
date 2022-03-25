@@ -133,8 +133,13 @@ private:
     /* Cache used by prim_match(). */
     std::shared_ptr<RegexCache> regexCache;
 
+#if HAVE_BOEHMGC
     /* Allocation cache for GC'd Value objects. */
     std::shared_ptr<void *> valueAllocCache;
+
+    /* Allocation cache for size-1 Env objects. */
+    std::shared_ptr<void *> env1AllocCache;
+#endif
 
 public:
 
@@ -143,12 +148,6 @@ public:
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
-
-    void requireExperimentalFeatureOnEvaluation(
-        const ExperimentalFeature &,
-        const std::string_view fName,
-        const Pos & pos
-    );
 
     void addToSearchPath(const std::string & s);
 
@@ -347,8 +346,8 @@ public:
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
     /* Allocation primitives. */
-    Value * allocValue();
-    Env & allocEnv(size_t size);
+    inline Value * allocValue();
+    inline Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
     Value * allocAttr(Value & vAttrs, std::string_view name);
@@ -425,7 +424,7 @@ std::string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<std::string, std::string> decodeContext(std::string_view s);
+NixStringContextElem decodeContext(const Store & store, std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
@@ -509,3 +508,5 @@ extern EvalSettings evalSettings;
 static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 }
+
+#include "eval-inline.hh"

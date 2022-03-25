@@ -13,7 +13,7 @@ namespace nix {
 struct DrvInfo
 {
 public:
-    typedef std::map<std::string, StorePath> Outputs;
+    typedef std::map<std::string, std::optional<StorePath>> Outputs;
 
 private:
     EvalState * state;
@@ -46,8 +46,9 @@ public:
     StorePath requireDrvPath() const;
     StorePath queryOutPath() const;
     std::string queryOutputName() const;
-    /** Return the list of outputs. The "outputs to install" are determined by `meta.outputsToInstall`. */
-    Outputs queryOutputs(bool onlyOutputsToInstall = false);
+    /** Return the unordered map of output names to (optional) output paths.
+     * The "outputs to install" are determined by `meta.outputsToInstall`. */
+    Outputs queryOutputs(bool withPaths = true, bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
     Value * queryMeta(const std::string & name);
