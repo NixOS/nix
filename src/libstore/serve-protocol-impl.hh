@@ -1,9 +1,10 @@
 #pragma once
 
-#include "worker-protocol-impl.hh"
+#include "serve-protocol-impl.hh"
 
 namespace nix {
-namespace worker_proto {
+namespace serve_proto {
+
 
 /* protocol-agnostic templates */
 #include "gen-protocol-templates.hh"

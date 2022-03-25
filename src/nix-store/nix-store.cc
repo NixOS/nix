@@ -9,10 +9,9 @@
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-impl.hh"
 #include "shared.hh"
 #include "util.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"
@@ -832,7 +831,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = serve_proto::read(*store, in, Phantom<StorePathSet> {});
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -841,19 +840,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                worker_proto::write(*store, out, store->queryValidPaths(paths));
+                serve_proto::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = serve_proto::read(*store, in, Phantom<StorePathSet> {});
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        worker_proto::write(*store, out, info->references);
+                        serve_proto::write(*store, out, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -881,7 +880,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(worker_proto::read(*store, in, Phantom<StorePathSet> {}), out);
+                store->exportPaths(serve_proto::read(*store, in, Phantom<StorePathSet> {}), out);
                 break;
             }
 
@@ -924,7 +923,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
                 if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
-                    worker_proto::write(*store, out, status.builtOutputs);
+                    serve_proto::write(*store, out, status.builtOutputs);
                 }
 
 
@@ -934,9 +933,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(worker_proto::read(*store, in, Phantom<StorePathSet> {}),
+                store->computeFSClosure(serve_proto::read(*store, in, Phantom<StorePathSet> {}),
                     closure, false, includeOutputs);
-                worker_proto::write(*store, out, closure);
+                serve_proto::write(*store, out, closure);
                 break;
             }
 
@@ -951,7 +950,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                info.references = serve_proto::read(*store, in, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));

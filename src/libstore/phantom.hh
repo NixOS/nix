@@ -1,3 +1,5 @@
+#pragma once
+
 namespace nix {
 
 /* To guide overloading for serializers.
