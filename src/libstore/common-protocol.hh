@@ -26,23 +26,23 @@ struct WriteConn {
    Sink & to;
 };
 
-#define MAKE_COMMON_PROTO(TEMPLATE, T) \
+#define MAKE_PROTO(TEMPLATE, T) \
     TEMPLATE T read(const Store & store, ReadConn conn, Phantom< T > _); \
     TEMPLATE void write(const Store & store, WriteConn conn, const T & str)
 
-MAKE_COMMON_PROTO(, std::string);
-MAKE_COMMON_PROTO(, StorePath);
-MAKE_COMMON_PROTO(, ContentAddress);
-MAKE_COMMON_PROTO(, DerivedPath);
-MAKE_COMMON_PROTO(, Realisation);
-MAKE_COMMON_PROTO(, DrvOutput);
+MAKE_PROTO(, std::string);
+MAKE_PROTO(, StorePath);
+MAKE_PROTO(, ContentAddress);
+MAKE_PROTO(, DerivedPath);
+MAKE_PROTO(, Realisation);
+MAKE_PROTO(, DrvOutput);
 
-MAKE_COMMON_PROTO(template<typename T>, std::vector<T>);
-MAKE_COMMON_PROTO(template<typename T>, std::set<T>);
+MAKE_PROTO(template<typename T>, std::vector<T>);
+MAKE_PROTO(template<typename T>, std::set<T>);
 
 #define X_ template<typename K, typename V>
 #define Y_ std::map<K, V>
-MAKE_COMMON_PROTO(X_, Y_);
+MAKE_PROTO(X_, Y_);
 #undef X_
 #undef Y_
 
@@ -59,8 +59,8 @@ MAKE_COMMON_PROTO(X_, Y_);
    worker protocol harder to implement in other languages where such
    specializations may not be allowed.
  */
-MAKE_COMMON_PROTO(, std::optional<StorePath>);
-MAKE_COMMON_PROTO(, std::optional<ContentAddress>);
+MAKE_PROTO(, std::optional<StorePath>);
+MAKE_PROTO(, std::optional<ContentAddress>);
 
 }
 

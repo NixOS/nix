@@ -42,16 +42,12 @@ struct ReadConn : common_proto::ReadConn {
 struct WriteConn : common_proto::WriteConn {
 };
 
-#define MAKE_SERVE_PROTO(TEMPLATE, T) \
-    TEMPLATE T read(const Store & store, ReadConn conn, Phantom< T > _); \
-    TEMPLATE void write(const Store & store, WriteConn conn, const T & str)
-
-MAKE_SERVE_PROTO(template<typename T>, std::vector<T>);
-MAKE_SERVE_PROTO(template<typename T>, std::set<T>);
+MAKE_PROTO(template<typename T>, std::vector<T>);
+MAKE_PROTO(template<typename T>, std::set<T>);
 
 #define X_ template<typename K, typename V>
 #define Y_ std::map<K, V>
-MAKE_SERVE_PROTO(X_, Y_);
+MAKE_PROTO(X_, Y_);
 #undef X_
 #undef Y_
 
