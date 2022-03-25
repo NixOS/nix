@@ -84,11 +84,6 @@ struct BuildResult
     bool isNonDeterministic = false;
 
     /**
-     * The derivation we built or the store path we substituted.
-     */
-    DerivedPath path;
-
-    /**
      * For derivations, a mapping from the names of the wanted outputs
      * to actual paths.
      */
@@ -114,6 +109,17 @@ struct BuildResult
     {
         throw Error("%s", errorMsg);
     }
+};
+
+/**
+ * A `BuildResult` together with its "primary key".
+ */
+struct KeyedBuildResult : BuildResult
+{
+    /**
+     * The derivation we built or the store path we substituted.
+     */
+    DerivedPath path;
 };
 
 }

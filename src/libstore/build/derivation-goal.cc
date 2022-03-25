@@ -330,6 +330,10 @@ void DerivationGoal::outputsSubstitutionTried()
    produced using a substitute.  So we have to build instead. */
 void DerivationGoal::gaveUpOnSubstitution()
 {
+    /* Make sure checkPathValidity() from now on checks all
+       outputs. */
+    wantedOutputs = OutputsSpec::All { };
+
     /* The inputs must be built before we can build this goal. */
     inputDrvOutputs.clear();
     if (useDerivation)
@@ -570,8 +574,6 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
-
-    buildResult = BuildResult { .path = buildResult.path };
 }
 
 void DerivationGoal::started()
@@ -1452,12 +1454,28 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
     Goal::waiteeDone(waitee, result);
 
-    if (waitee->buildResult.success())
-        if (auto bfd = std::get_if<DerivedPath::Built>(&waitee->buildResult.path))
-            for (auto & [output, realisation] : waitee->buildResult.builtOutputs)
+    if (!useDerivation) return;
+    auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+
+    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
+    if (!dg) return;
+
+    auto outputs = fullDrv.inputDrvs.find(dg->drvPath);
+    if (outputs == fullDrv.inputDrvs.end()) return;
+
+    for (auto & outputName : outputs->second) {
+        auto buildResult = dg->getBuildResult(DerivedPath::Built {
+            .drvPath = dg->drvPath,
+            .outputs = OutputsSpec::Names { outputName },
+        });
+        if (buildResult.success()) {
+            for (auto & [output, realisation] : buildResult.builtOutputs) {
                 inputDrvOutputs.insert_or_assign(
-                    { bfd->drvPath, output.outputName },
+                    { dg->drvPath, output.outputName },
                     realisation.outPath);
+            }
+        }
+    }
 }
 
 }

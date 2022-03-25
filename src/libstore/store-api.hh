@@ -92,6 +92,7 @@ enum BuildMode { bmNormal, bmRepair, bmCheck };
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
+struct KeyedBuildResult;
 
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
@@ -575,7 +576,7 @@ public:
      * case of a build/substitution error, this function won't throw an
      * exception, but return a BuildResult containing an error message.
      */
-    virtual std::vector<BuildResult> buildPathsWithResults(
+    virtual std::vector<KeyedBuildResult> buildPathsWithResults(
         const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr);

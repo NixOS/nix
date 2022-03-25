@@ -39,7 +39,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     }
 }
 
-std::vector<BuildResult> Store::buildPathsWithResults(
+std::vector<KeyedBuildResult> Store::buildPathsWithResults(
     const std::vector<DerivedPath> & reqs,
     BuildMode buildMode,
     std::shared_ptr<Store> evalStore)
@@ -47,15 +47,23 @@ std::vector<BuildResult> Store::buildPathsWithResults(
     Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (const auto & br : reqs)
-        goals.insert(worker.makeGoal(br, buildMode));
+    std::vector<std::pair<const DerivedPath &, GoalPtr>> state;
+
+    for (const auto & req : reqs) {
+        auto goal = worker.makeGoal(req, buildMode);
+        goals.insert(goal);
+        state.push_back({req, goal});
+    }
 
     worker.run(goals);
 
-    std::vector<BuildResult> results;
+    std::vector<KeyedBuildResult> results;
 
-    for (auto & i : goals)
-        results.push_back(i->buildResult);
+    for (auto & [req, goalPtr] : state)
+        results.emplace_back(KeyedBuildResult {
+            goalPtr->getBuildResult(req),
+            /* .path = */ req,
+        });
 
     return results;
 }
@@ -68,15 +76,14 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
 
     try {
         worker.run(Goals{goal});
-        return goal->buildResult;
+        return goal->getBuildResult(DerivedPath::Built {
+            .drvPath = drvPath,
+            .outputs = OutputsSpec::All {},
+        });
     } catch (Error & e) {
         return BuildResult {
             .status = BuildResult::MiscFailure,
             .errorMsg = e.msg(),
-            .path = DerivedPath::Built {
-                .drvPath = drvPath,
-                .outputs = OutputsSpec::All { },
-            },
         };
     };
 }

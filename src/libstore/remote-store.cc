@@ -125,10 +125,26 @@ void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
 }
 
 
-BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+KeyedBuildResult read(const Store & store, Source & from, Phantom<KeyedBuildResult> _)
 {
     auto path = worker_proto::read(store, from, Phantom<DerivedPath> {});
-    BuildResult res { .path = path };
+    auto br = worker_proto::read(store, from, Phantom<BuildResult> {});
+    return KeyedBuildResult {
+        std::move(br),
+        /* .path = */ std::move(path),
+    };
+}
+
+void write(const Store & store, Sink & to, const KeyedBuildResult & res)
+{
+    worker_proto::write(store, to, res.path);
+    worker_proto::write(store, to, static_cast<const BuildResult &>(res));
+}
+
+
+BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+{
+    BuildResult res;
     res.status = (BuildResult::Status) readInt(from);
     from
         >> res.errorMsg
@@ -142,7 +158,6 @@ BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
 
 void write(const Store & store, Sink & to, const BuildResult & res)
 {
-    worker_proto::write(store, to, res.path);
     to
         << res.status
         << res.errorMsg
@@ -865,7 +880,7 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
     readInt(conn->from);
 }
 
-std::vector<BuildResult> RemoteStore::buildPathsWithResults(
+std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
     const std::vector<DerivedPath> & paths,
     BuildMode buildMode,
     std::shared_ptr<Store> evalStore)
@@ -880,7 +895,7 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
         writeDerivedPaths(*this, conn, paths);
         conn->to << buildMode;
         conn.processStderr();
-        return worker_proto::read(*this, conn->from, Phantom<std::vector<BuildResult>> {});
+        return worker_proto::read(*this, conn->from, Phantom<std::vector<KeyedBuildResult>> {});
     } else {
         // Avoid deadlock.
         conn_.reset();
@@ -889,21 +904,25 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
         // fails, but meh.
         buildPaths(paths, buildMode, evalStore);
 
-        std::vector<BuildResult> results;
+        std::vector<KeyedBuildResult> results;
 
         for (auto & path : paths) {
             std::visit(
                 overloaded {
                     [&](const DerivedPath::Opaque & bo) {
-                        results.push_back(BuildResult {
-                            .status = BuildResult::Substituted,
-                            .path = bo,
+                        results.push_back(KeyedBuildResult {
+                            {
+                                .status = BuildResult::Substituted,
+                            },
+                            /* .path = */ bo,
                         });
                     },
                     [&](const DerivedPath::Built & bfd) {
-                        BuildResult res {
-                            .status = BuildResult::Built,
-                            .path = bfd,
+                        KeyedBuildResult res {
+                            {
+                                .status = BuildResult::Built
+                            },
+                            /* .path = */ bfd,
                         };
 
                         OutputPathMap outputs;
@@ -952,12 +971,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res {
-        .path = DerivedPath::Built {
-            .drvPath = drvPath,
-            .outputs = OutputsSpec::All { },
-        },
-    };
+    BuildResult res;
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
