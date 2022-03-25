@@ -40,23 +40,19 @@ struct ServeProto
     /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
-     *
-     * This currently is just a `Source &`, but more fields will be added
-     * later.
      */
     struct ReadConn {
         Source & from;
+        Version version;
     };
 
     /**
      * A unidirectional write connection, to be used by the write half of the
      * canonical serializers below.
-     *
-     * This currently is just a `Sink &`, but more fields will be added
-     * later.
      */
     struct WriteConn {
         Sink & to;
+        Version version;
     };
 
     /**

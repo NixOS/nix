@@ -14,12 +14,21 @@ namespace nix {
 
 const char workerProtoDir[] = "worker-protocol";
 
-using WorkerProtoTest = ProtoTest<WorkerProto, workerProtoDir>;
+struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
+{
+    /**
+     * For serializers that don't care about the minimum version, we
+     * used the oldest one: 1.0.
+     */
+    WorkerProto::Version defaultVersion = 1 << 8 | 0;
+};
 
-CHARACTERIZATION_TEST(
+
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     string,
     "string",
+    defaultVersion,
     (std::tuple<std::string, std::string, std::string, std::string, std::string> {
         "",
         "hi",
@@ -28,19 +37,21 @@ CHARACTERIZATION_TEST(
         "oh no \0\0\0 what was that!",
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     storePath,
     "store-path",
+    defaultVersion,
     (std::tuple<StorePath, StorePath> {
         StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
         StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo-bar" },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     contentAddress,
     "content-address",
+    defaultVersion,
     (std::tuple<ContentAddress, ContentAddress, ContentAddress> {
         ContentAddress {
             .method = TextIngestionMethod {},
@@ -56,10 +67,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     derivedPath,
     "derived-path",
+    defaultVersion,
     (std::tuple<DerivedPath, DerivedPath> {
         DerivedPath::Opaque {
             .path = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
@@ -72,10 +84,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     drvOutput,
     "drv-output",
+    defaultVersion,
     (std::tuple<DrvOutput, DrvOutput> {
         {
             .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
@@ -87,10 +100,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     realisation,
     "realisation",
+    defaultVersion,
     (std::tuple<Realisation, Realisation> {
         Realisation {
             .id = DrvOutput {
@@ -119,10 +133,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     buildResult,
     "build-result",
+    defaultVersion,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t {
@@ -177,10 +192,11 @@ CHARACTERIZATION_TEST(
         t;
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     keyedBuildResult,
     "keyed-build-result",
+    defaultVersion,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<KeyedBuildResult, KeyedBuildResult/*, KeyedBuildResult*/> t {
@@ -213,20 +229,22 @@ CHARACTERIZATION_TEST(
         t;
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     optionalTrustedFlag,
     "optional-trusted-flag",
+    defaultVersion,
     (std::tuple<std::optional<TrustedFlag>, std::optional<TrustedFlag>, std::optional<TrustedFlag>> {
         std::nullopt,
         std::optional { Trusted },
         std::optional { NotTrusted },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     vector,
     "vector",
+    defaultVersion,
     (std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, std::vector<std::vector<std::string>>> {
         { },
         { "" },
@@ -234,10 +252,11 @@ CHARACTERIZATION_TEST(
         { {}, { "" }, { "", "1", "2" } },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     set,
     "set",
+    defaultVersion,
     (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
         { },
         { "" },
@@ -245,10 +264,11 @@ CHARACTERIZATION_TEST(
         { {}, { "" }, { "", "1", "2" } },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     optionalStorePath,
     "optional-store-path",
+    defaultVersion,
     (std::tuple<std::optional<StorePath>, std::optional<StorePath>> {
         std::nullopt,
         std::optional {
@@ -256,10 +276,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     optionalContentAddress,
     "optional-content-address",
+    defaultVersion,
     (std::tuple<std::optional<ContentAddress>, std::optional<ContentAddress>> {
         std::nullopt,
         std::optional {
