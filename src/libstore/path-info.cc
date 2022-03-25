@@ -17,7 +17,10 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     ValidPathInfo info(path, narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
     info.references = worker_proto::read(store,
-        worker_proto::ReadConn { { .from = source } },
+        worker_proto::ReadConn {
+            { .from = source },
+            .version = format,
+        },
         Phantom<StorePathSet> {});
     source >> info.registrationTime >> info.narSize;
     if (format >= 16) {
@@ -39,7 +42,10 @@ void ValidPathInfo::write(
     sink << (deriver ? store.printStorePath(*deriver) : "")
          << narHash.to_string(Base16, false);
     worker_proto::write(store,
-        worker_proto::WriteConn { { .to = sink } },
+        worker_proto::WriteConn {
+            { .to = sink },
+            .version = format,
+        },
         references);
     sink << registrationTime << narSize;
     if (format >= 16) {

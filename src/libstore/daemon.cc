@@ -270,8 +270,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
 {
-    worker_proto::ReadConn rconn { { .from = from } };
-    worker_proto::WriteConn wconn { { .to = to } };
+    worker_proto::ReadConn rconn {
+        { .from = from },
+        .version = clientVersion,
+    };
+    worker_proto::WriteConn wconn {
+        { .to = to },
+        .version = clientVersion,
+    };
 
     switch (op) {
 

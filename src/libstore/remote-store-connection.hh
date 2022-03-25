@@ -16,7 +16,8 @@ struct RemoteStore::Connection
         return worker_proto::ReadConn {
             {
                 .from = from,
-            }
+            },
+            .version = daemonVersion,
         };
     }
 
@@ -25,7 +26,8 @@ struct RemoteStore::Connection
         return worker_proto::WriteConn {
             {
                 .to = to,
-            }
+            },
+            .version = daemonVersion,
         };
     }
 

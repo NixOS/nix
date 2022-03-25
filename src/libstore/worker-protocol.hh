@@ -85,9 +85,11 @@ using common_proto::write;
 /* FIXME maybe move more stuff inside here */
 
 struct ReadConn : common_proto::ReadConn {
+    unsigned int version;
 };
 
 struct WriteConn : common_proto::WriteConn {
+    unsigned int version;
 };
 
 MAKE_PROTO(, BuildResult);
