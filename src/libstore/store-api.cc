@@ -855,6 +855,35 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
+void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set & paths,
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+{
+    StorePathSet storePaths;
+    std::set<Realisation> realisations;
+    for (auto & path : paths) {
+        storePaths.insert(path.path());
+        if (auto realisation = std::get_if<Realisation>(&path.raw)) {
+            settings.requireExperimentalFeature("ca-derivations");
+            realisations.insert(*realisation);
+        }
+    }
+    copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+    try {
+        for (auto & realisation : realisations) {
+            dstStore->registerDrvOutput(realisation);
+        }
+    } catch (MissingExperimentalFeature & e) {
+        // Don't fail if the remote doesn't support CA derivations is it might
+        // not be within our control to change that, and we might still want
+        // to at least copy the output paths.
+        if (e.missingFeature == "ca-derivations")
+            ignoreException();
+        else
+            throw;
+    }
+}
+
+
 void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
@@ -864,6 +893,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & st
     return copyPaths(srcStore, dstStore, storePaths2, repair, checkSigs, substitute);
 }
 
+
 void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedStorePathOrDesc> & storePaths,
     RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
 {
@@ -872,8 +902,6 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
     std::set<OwnedStorePathOrDesc>  missing;
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
-
-    if (missing.empty()) return;
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
@@ -948,20 +976,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
             nrDone++;
             showProgress();
         });
-
-    return;
 }
-
-
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths, RepairFlag repair, CheckSigsFlag checkSigs,
-    SubstituteFlag substitute)
-{
-    StorePathSet closure;
-    srcStore->computeFSClosure(storePaths, closure);
-    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
-}
-
 
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {

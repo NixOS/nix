@@ -12,6 +12,7 @@
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -49,6 +50,21 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
     out << renderContentAddress(ca);
 }
 
+Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
+{
+    std::string rawInput = readString(from);
+    return Realisation::fromJSON(
+        nlohmann::json::parse(rawInput),
+        "remote-protocol"
+    );
+}
+void write(const Store & store, Sink & out, const Realisation & realisation)
+{ out << realisation.toJSON().dump(); }
+
+DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
+{ return DrvOutput::parse(readString(from)); }
+void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
+{ out << drvOutput.to_string(); }
 
 StorePathDescriptor read(const Store & store, Source & from, Phantom<StorePathDescriptor> _)
 {
@@ -692,6 +708,10 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     unsigned int status;
     conn->from >> status >> res.errorMsg;
     res.status = (BuildResult::Status) status;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0xc) {
+        auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+        res.builtOutputs = builtOutputs;
+    }
     return res;
 }
 

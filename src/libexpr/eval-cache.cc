@@ -527,7 +527,7 @@ string_t AttrCursor::getStringWithContext()
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
                 for (auto & c : s->second) {
-                	auto storePath = root->state.store->parseStorePath(c.first);
+                    auto storePath = root->state.store->parseStorePath(c.first);
                     if (!root->state.store->isValidPath(storePath)) {
                         valid = false;
                         break;

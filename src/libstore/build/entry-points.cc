@@ -2,6 +2,7 @@
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "derivation-goal.hh"
+#include "local-store.hh"
 
 namespace nix {
 
@@ -57,6 +58,26 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
     } catch (Error & e) {
         result.status = BuildResult::MiscFailure;
         result.errorMsg = e.msg();
+    }
+    // XXX: Should use `goal->queryPartialDerivationOutputMap()` once it's
+    // extended to return the full realisation for each output
+    auto staticDrvOutputs = drv.outputsAndOptPaths(*this);
+    auto outputHashes = staticOutputHashes(*this, drv);
+    for (auto & [outputName, staticOutput] : staticDrvOutputs) {
+        auto outputId = DrvOutput{outputHashes.at(outputName), outputName};
+        if (staticOutput.second)
+            result.builtOutputs.insert_or_assign(
+                    outputId,
+                    Realisation{ outputId, *staticOutput.second}
+                    );
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+            auto realisation = this->queryRealisation(outputId);
+            if (realisation)
+                result.builtOutputs.insert_or_assign(
+                        outputId,
+                        *realisation
+                        );
+        }
     }
 
     return result;

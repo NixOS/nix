@@ -251,7 +251,7 @@ connected:
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
-        auto outputs = readStrings<PathSet>(source);
+        auto wantedOutputs = readStrings<StringSet>(source);
 
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 
@@ -276,6 +276,7 @@ connected:
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
+        auto outputHashes = staticOutputHashes(*store, drv);
         drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);
@@ -283,19 +284,42 @@ connected:
         if (!result.success())
             throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
 
-        StorePathSet missing;
-        for (auto & path : outputs) {
-            auto storePath = store->parseStorePath(path);
-            if (!store->isValidPath(storePath))
-                missing.insert(store->parseStorePath(path));
+        std::set<Realisation> missingRealisations;
+        StorePathSet missingPaths;
+        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+            for (auto & outputName : wantedOutputs) {
+                auto thisOutputHash = outputHashes.at(outputName);
+                auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
+                if (!store->queryRealisation(thisOutputId)) {
+                    debug("missing output %s", outputName);
+                    assert(result.builtOutputs.count(thisOutputId));
+                    auto newRealisation = result.builtOutputs.at(thisOutputId);
+                    missingRealisations.insert(newRealisation);
+                    missingPaths.insert(newRealisation.outPath);
+                }
+            }
+        } else {
+            auto outputPaths = drv.outputsAndOptPaths(*store);
+            for (auto & [outputName, hopefullyOutputPath] : outputPaths) {
+                assert(hopefullyOutputPath.second);
+                if (!store->isValidPath(*hopefullyOutputPath.second))
+                    missingPaths.insert(*hopefullyOutputPath.second);
+            }
         }
 
-        if (!missing.empty()) {
+        if (!missingPaths.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
-                for (auto & i : missing)
-                    localStore->locksHeld.insert(store->printStorePath(i)); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
+                for (auto & path : missingPaths)
+                    localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
+            copyPaths(ref<Store>(sshStore), store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
+        }
+        // XXX: Should be done as part of `copyPaths`
+        for (auto & realisation : missingRealisations) {
+            // Should hold, because if the feature isn't enabled the set
+            // of missing realisations should be empty
+            settings.requireExperimentalFeature("ca-derivations");
+            store->registerDrvOutput(realisation);
         }
 
         return 0;

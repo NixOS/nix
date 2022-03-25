@@ -106,6 +106,14 @@ struct CmdFlakeUpdate : FlakeCommand
         return "update flake lock file";
     }
 
+    CmdFlakeUpdate()
+    {
+        /* Remove flags that don't make sense. */
+        removeFlag("recreate-lock-file");
+        removeFlag("update-input");
+        removeFlag("no-update-lock-file");
+    }
+
     std::string doc() override
     {
         return
@@ -115,7 +123,30 @@ struct CmdFlakeUpdate : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        /* Use --refresh by default for 'nix flake update'. */
+        settings.tarballTtl = 0;
+
+        lockFlags.recreateLockFile = true;
+
+        lockFlake();
+    }
+};
+
+struct CmdFlakeLock : FlakeCommand
+{
+    std::string description() override
+    {
+        return "create missing lock file entries";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-lock.md"
+          ;
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
         settings.tarballTtl = 0;
 
         lockFlake();
@@ -1012,6 +1043,7 @@ struct CmdFlake : NixMultiCommand
     CmdFlake()
         : MultiCommand({
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
+                {"lock", []() { return make_ref<CmdFlakeLock>(); }},
                 {"info", []() { return make_ref<CmdFlakeInfo>(); }},
                 {"list-inputs", []() { return make_ref<CmdFlakeListInputs>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},

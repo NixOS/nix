@@ -232,7 +232,7 @@ nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2
 nix build -o $TEST_ROOT/result --no-registries $flake2Dir#bar --refresh
 
 # Updating the flake should not change the lockfile.
-nix flake update $flake2Dir
+nix flake lock $flake2Dir
 [[ -z $(git -C $flake2Dir diff master) ]]
 
 # Now we should be able to build the flake in pure mode.
@@ -354,10 +354,10 @@ nix build -o $TEST_ROOT/result flake3#xyzzy flake3#fnord
 nix build -o $TEST_ROOT/result flake4#xyzzy
 
 # Test 'nix flake update' and --override-flake.
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 [[ -z $(git -C $flake3Dir diff master) ]]
 
-nix flake update $flake3Dir --recreate-lock-file --override-flake flake2 nixpkgs
+nix flake update $flake3Dir --override-flake flake2 nixpkgs
 [[ ! -z $(git -C $flake3Dir diff master) ]]
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
@@ -389,7 +389,7 @@ cat > $flake3Dir/flake.nix <<EOF
   };
 }
 EOF
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 git -C $flake3Dir add flake.nix flake.lock
 git -C $flake3Dir commit -m 'Remove packages.xyzzy'
 git -C $flake3Dir checkout master
@@ -547,7 +547,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 [[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["foo"]' ]]
 
 cat > $flake3Dir/flake.nix <<EOF
@@ -559,7 +559,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 [[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["flake2","flake1"]' ]]
 
 cat > $flake3Dir/flake.nix <<EOF
@@ -571,7 +571,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 [[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["flake2"]' ]]
 
 # Test overriding inputs of inputs.
@@ -587,7 +587,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 [[ $(jq .nodes.flake1.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
 cat > $flake3Dir/flake.nix <<EOF
@@ -600,7 +600,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-nix flake update $flake3Dir --recreate-lock-file
+nix flake update $flake3Dir
 [[ $(jq -c .nodes.flake2.inputs.flake1 $flake3Dir/flake.lock) =~ '["foo"]' ]]
 [[ $(jq .nodes.foo.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
@@ -658,20 +658,20 @@ nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ
 
 # Test --override-input.
 git -C $flake3Dir reset --hard
-nix flake update $flake3Dir --override-input flake2/flake1 flake5 -vvvvv
+nix flake lock $flake3Dir --override-input flake2/flake1 flake5 -vvvvv
 [[ $(jq .nodes.flake1_2.locked.url $flake3Dir/flake.lock) =~ flake5 ]]
 
-nix flake update $flake3Dir --override-input flake2/flake1 flake1
+nix flake lock $flake3Dir --override-input flake2/flake1 flake1
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
 
-nix flake update $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
+nix flake lock $flake3Dir --override-input flake2/flake1 flake1/master/$hash1
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash1 ]]
 
 # Test --update-input.
-nix flake update $flake3Dir
+nix flake lock $flake3Dir
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) = $hash1 ]]
 
-nix flake update $flake3Dir --update-input flake2/flake1
+nix flake lock $flake3Dir --update-input flake2/flake1
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
 
 # Test 'nix flake list-inputs'.

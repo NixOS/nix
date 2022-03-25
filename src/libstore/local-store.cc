@@ -655,6 +655,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 
 void LocalStore::registerDrvOutput(const Realisation & info)
 {
+    settings.requireExperimentalFeature("ca-derivations");
     auto state(_state.lock());
     retrySQLite<void>([&]() {
         state->stmts->RegisterRealisedOutput.use()

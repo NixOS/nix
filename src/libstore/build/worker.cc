@@ -1,7 +1,7 @@
 #include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
-#include "derivation-goal.hh"
+#include "local-derivation-goal.hh"
 #include "hook-instance.hh"
 
 #include <poll.h>
@@ -59,8 +59,10 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
     const StringSet & wantedOutputs, BuildMode buildMode)
 {
-    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
-        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
+        return !dynamic_cast<LocalStore *>(&store)
+            ? std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
+            : std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
 }
 
@@ -68,8 +70,10 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
 std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
     const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
 {
-    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
-        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
+        return !dynamic_cast<LocalStore *>(&store)
+            ? std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
+            : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
 
