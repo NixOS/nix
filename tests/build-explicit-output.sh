@@ -9,6 +9,7 @@ nix build "$drv!first" --json | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-a.drv")) and
     (.outputs |
+      (keys | length == 1) and
       (.first | match(".*multiple-outputs-a-first")) and
       (has("second") | not)))
 '

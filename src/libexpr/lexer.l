@@ -28,6 +28,13 @@ using namespace nix;
 
 namespace nix {
 
+static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
+{
+    return Pos(data->origin, data->file, loc.first_line, loc.first_column);
+}
+
+#define CUR_POS makeCurPos(*yylloc, data)
+
 // backup to recover from yyless(0)
 YYLTYPE prev_yylloc;
 
@@ -36,7 +43,6 @@ static void initLoc(YYLTYPE * loc)
     loc->first_line = loc->last_line = 1;
     loc->first_column = loc->last_column = 1;
 }
-
 
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
@@ -147,14 +153,20 @@ or          { return OR_KW; }
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
               } catch (const boost::bad_lexical_cast &) {
-                  throw ParseError("invalid integer '%1%'", yytext);
+                  throw ParseError({
+                      .msg = hintfmt("invalid integer '%1%'", yytext),
+                      .errPos = CUR_POS,
+                  });
               }
               return INT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError("invalid float '%1%'", yytext);
+                  throw ParseError({
+                      .msg = hintfmt("invalid float '%1%'", yytext),
+                      .errPos = CUR_POS,
+                  });
               return FLOAT;
             }
 
@@ -280,7 +292,10 @@ or          { return OR_KW; }
 
 <INPATH_SLASH>{ANY} |
 <INPATH_SLASH><<EOF>> {
-  throw ParseError("path has a trailing slash");
+  throw ParseError({
+      .msg = hintfmt("path has a trailing slash"),
+      .errPos = CUR_POS,
+  });
 }
 
 {SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }

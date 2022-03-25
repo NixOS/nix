@@ -325,8 +325,7 @@ static void main_nix_build(int argc, char * * argv)
 
     state->printStats();
 
-    auto buildPaths = [&](const std::vector<StorePathWithOutputs> & paths0) {
-        auto paths = toDerivedPaths(paths0);
+    auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
         uint64_t downloadSize, narSize;
@@ -348,7 +347,7 @@ static void main_nix_build(int argc, char * * argv)
         auto & drvInfo = drvs.front();
         auto drv = evalStore->derivationFromPath(drvInfo.requireDrvPath());
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<DerivedPath> pathsToBuild;
         RealisedPath::Set pathsToCopy;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
@@ -370,7 +369,10 @@ static void main_nix_build(int argc, char * * argv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
                 auto bashDrv = drv->requireDrvPath();
-                pathsToBuild.push_back({bashDrv});
+                pathsToBuild.push_back(DerivedPath::Built {
+                    .drvPath = bashDrv,
+                    .outputs = {},
+                });
                 pathsToCopy.insert(bashDrv);
                 shellDrv = bashDrv;
 
@@ -382,17 +384,24 @@ static void main_nix_build(int argc, char * * argv)
         }
 
         // Build or fetch all dependencies of the derivation.
-        for (const auto & input : drv.inputDrvs)
+        for (const auto & [inputDrv0, inputOutputs] : drv.inputDrvs) {
+            // To get around lambda capturing restrictions in the
+            // standard.
+            const auto & inputDrv = inputDrv0;
             if (std::all_of(envExclude.cbegin(), envExclude.cend(),
                     [&](const std::string & exclude) {
-                        return !std::regex_search(store->printStorePath(input.first), std::regex(exclude));
+                        return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
                     }))
             {
-                pathsToBuild.push_back({input.first, input.second});
-                pathsToCopy.insert(input.first);
+                pathsToBuild.push_back(DerivedPath::Built {
+                    .drvPath = inputDrv,
+                    .outputs = inputOutputs
+                });
+                pathsToCopy.insert(inputDrv);
             }
+        }
         for (const auto & src : drv.inputSrcs) {
-            pathsToBuild.push_back({src});
+            pathsToBuild.push_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
 
@@ -543,7 +552,7 @@ static void main_nix_build(int argc, char * * argv)
 
     else {
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<DerivedPath> pathsToBuild;
         std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
         RealisedPath::Set drvsToCopy;
 
@@ -556,7 +565,7 @@ static void main_nix_build(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
-            pathsToBuild.push_back({drvPath, {outputName}});
+            pathsToBuild.push_back(DerivedPath::Built{drvPath, {outputName}});
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
             drvsToCopy.insert(drvPath);
 

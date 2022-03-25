@@ -21,6 +21,8 @@ struct AttrDb
 {
     std::atomic_bool failed{false};
 
+    const Store & cfg;
+
     struct State
     {
         SQLite db;
@@ -33,8 +35,9 @@ struct AttrDb
 
     std::unique_ptr<Sync<State>> _state;
 
-    AttrDb(const Hash & fingerprint)
-        : _state(std::make_unique<Sync<State>>())
+    AttrDb(const Store & cfg, const Hash & fingerprint)
+        : cfg(cfg)
+        , _state(std::make_unique<Sync<State>>())
     {
         auto state(_state->lock());
 
@@ -254,10 +257,10 @@ struct AttrDb
                 return {{rowId, attrs}};
             }
             case AttrType::String: {
-                std::vector<std::pair<Path, std::string>> context;
+                NixStringContext context;
                 if (!queryAttribute.isNull(3))
                     for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
-                        context.push_back(decodeContext(s));
+                        context.push_back(decodeContext(cfg, s));
                 return {{rowId, string_t{queryAttribute.getStr(2), context}}};
             }
             case AttrType::Bool:
@@ -274,10 +277,10 @@ struct AttrDb
     }
 };
 
-static std::shared_ptr<AttrDb> makeAttrDb(const Hash & fingerprint)
+static std::shared_ptr<AttrDb> makeAttrDb(const Store & cfg, const Hash & fingerprint)
 {
     try {
-        return std::make_shared<AttrDb>(fingerprint);
+        return std::make_shared<AttrDb>(cfg, fingerprint);
     } catch (SQLiteError &) {
         ignoreException();
         return nullptr;
@@ -288,7 +291,7 @@ EvalCache::EvalCache(
     std::optional<std::reference_wrapper<const Hash>> useCache,
     EvalState & state,
     RootLoader rootLoader)
-    : db(useCache ? makeAttrDb(*useCache) : nullptr)
+    : db(useCache ? makeAttrDb(*state.store, *useCache) : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {
@@ -546,7 +549,7 @@ string_t AttrCursor::getStringWithContext()
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
                 for (auto & c : s->second) {
-                    if (!root->state.store->isValidPath(root->state.store->parseStorePath(c.first))) {
+                    if (!root->state.store->isValidPath(c.first)) {
                         valid = false;
                         break;
                     }
@@ -563,7 +566,7 @@ string_t AttrCursor::getStringWithContext()
     auto & v = forceValue();
 
     if (v.type() == nString)
-        return {v.string.s, v.getContext()};
+        return {v.string.s, v.getContext(*root->state.store)};
     else if (v.type() == nPath)
         return {v.path, {}};
     else
