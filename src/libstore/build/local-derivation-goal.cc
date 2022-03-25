@@ -1267,7 +1267,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 result.rethrow();
     }
 
-    std::vector<BuildResult> buildPathsWithResults(
+    std::vector<KeyedBuildResult> buildPathsWithResults(
         const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr) override
@@ -2614,7 +2614,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        builtOutputs.emplace(thisRealisation.id, thisRealisation);
+        if (wantOutput(outputName, wantedOutputs))
+            builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 
     return builtOutputs;

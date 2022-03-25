@@ -15,10 +15,26 @@ namespace worker_proto {
 
 /* protocol-specific definitions */
 
+KeyedBuildResult read(const Store & store, ReadConn conn, Phantom<KeyedBuildResult> _)
+{
+    auto path = worker_proto::read(store, conn, Phantom<DerivedPath> {});
+    auto br = worker_proto::read(store, conn, Phantom<BuildResult> {});
+    return KeyedBuildResult {
+        std::move(br),
+        .path = std::move(path),
+    };
+}
+
+void write(const Store & store, WriteConn conn, const KeyedBuildResult & res)
+{
+    worker_proto::write(store, conn, res.path);
+    worker_proto::write(store, conn, static_cast<const BuildResult &>(res));
+}
+
 BuildResult read(const Store & store, ReadConn conn, Phantom<BuildResult> _)
 {
     auto path = worker_proto::read(store, conn, Phantom<DerivedPath> {});
-    BuildResult res { .path = path };
+    BuildResult res;
     res.status = (BuildResult::Status) readInt(conn.from);
     conn.from
         >> res.errorMsg
@@ -32,7 +48,6 @@ BuildResult read(const Store & store, ReadConn conn, Phantom<BuildResult> _)
 
 void write(const Store & store, WriteConn conn, const BuildResult & res)
 {
-    worker_proto::write(store, conn, res.path);
     conn.to
         << res.status
         << res.errorMsg

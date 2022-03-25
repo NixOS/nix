@@ -208,8 +208,6 @@ void DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         settings.requireExperimentalFeature(Xp::CaDerivations);
 
-    retrySubstitution = false;
-
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
@@ -427,7 +425,8 @@ void DerivationGoal::inputsRealised()
         return;
     }
 
-    if (retrySubstitution) {
+    if (retrySubstitution && !retriedSubstitution) {
+        retriedSubstitution = true;
         haveDerivation();
         return;
     }
@@ -528,8 +527,6 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
-
-    buildResult = BuildResult { .path = buildResult.path };
 }
 
 void DerivationGoal::started()

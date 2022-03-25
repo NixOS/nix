@@ -75,6 +75,7 @@ struct Source;
 
 // items being serialized
 struct BuildResult;
+struct KeyedBuildResult;
 struct PathInfo;
 
 
@@ -94,6 +95,7 @@ struct WriteConn : common_proto::WriteConn {
 };
 
 MAKE_PROTO(, BuildResult);
+MAKE_PROTO(, KeyedBuildResult);
 
 MAKE_PROTO(template<typename T>, std::vector<T>);
 MAKE_PROTO(template<typename T>, std::set<T>);

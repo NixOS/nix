@@ -297,7 +297,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
+        BuildResult status;
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 
@@ -335,7 +335,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult result { .path = DerivedPath::Opaque { StorePath::dummy } };
+        BuildResult result;
         result.status = (BuildResult::Status) readInt(conn->from);
 
         if (!result.success()) {

@@ -686,7 +686,7 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
     readInt(conn->from);
 }
 
-std::vector<BuildResult> RemoteStore::buildPathsWithResults(
+std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
     const std::vector<DerivedPath> & paths,
     BuildMode buildMode,
     std::shared_ptr<Store> evalStore)
@@ -701,7 +701,7 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
         writeDerivedPaths(*this, *conn, paths);
         conn->to << buildMode;
         conn.processStderr();
-        return worker_proto::read(*this, *conn, Phantom<std::vector<BuildResult>> {});
+        return worker_proto::read(*this, *conn, Phantom<std::vector<KeyedBuildResult>> {});
     } else {
         // Avoid deadlock.
         conn_.reset();
@@ -710,20 +710,24 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
         // fails, but meh.
         buildPaths(paths, buildMode, evalStore);
 
-        std::vector<BuildResult> results;
+        std::vector<KeyedBuildResult> results;
 
         for (auto & path : paths) {
             std::visit(
                 overloaded {
                     [&](const DerivedPath::Opaque & bo) {
-                        results.push_back(BuildResult {
-                            .status = BuildResult::Substituted,
+                        results.push_back(KeyedBuildResult {
+                            {
+                                .status = BuildResult::Substituted,
+                            },
                             .path = bo,
                         });
                     },
                     [&](const DerivedPath::Built & bfd) {
-                        BuildResult res {
-                            .status = BuildResult::Built,
+                        KeyedBuildResult res {
+                            {
+                                .status = BuildResult::Built
+                            },
                             .path = bfd,
                         };
 
@@ -780,7 +784,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res { .path = DerivedPath::Built { .drvPath = drvPath } };
+    BuildResult res;
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
