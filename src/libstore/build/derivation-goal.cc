@@ -309,11 +309,14 @@ void DerivationGoal::outputsSubstitutionTried()
     gaveUpOnSubstitution();
 }
 
-
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 void DerivationGoal::gaveUpOnSubstitution()
 {
+    /* Make sure checkPathValidity() from now on checks all
+       outputs. */
+    wantedOutputs.clear();
+
     /* The inputs must be built before we can build this goal. */
     if (useDerivation)
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs)
@@ -523,8 +526,6 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
-
-    buildResult = BuildResult { .path = buildResult.path };
 }
 
 void DerivationGoal::started()

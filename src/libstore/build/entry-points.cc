@@ -47,7 +47,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     }
 }
 
-std::vector<BuildResult> Store::buildPathsWithResults(
+std::vector<KeyedBuildResult> Store::buildPathsWithResults(
     const std::vector<DerivedPath> & reqs,
     BuildMode buildMode,
     std::shared_ptr<Store> evalStore)
@@ -55,23 +55,49 @@ std::vector<BuildResult> Store::buildPathsWithResults(
     Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (const auto & br : reqs) {
-        std::visit(overloaded {
-            [&](const DerivedPath::Built & bfd) {
-                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+    std::vector<std::pair<GoalPtr, const DerivedPath &>> reqs2;
+
+    for (const auto & req : reqs) {
+        auto g = std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) -> GoalPtr {
+                return worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode);
             },
-            [&](const DerivedPath::Opaque & bo) {
-                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+            [&](const DerivedPath::Opaque & bo) -> GoalPtr {
+                return worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
             },
-        }, br.raw());
+        }, req.raw());
+        goals.insert(g);
+        reqs2.push_back({g, req});
     }
 
     worker.run(goals);
 
-    std::vector<BuildResult> results;
+    std::vector<KeyedBuildResult> results;
 
-    for (auto & i : goals)
-        results.push_back(i->buildResult);
+    for (auto & [gp, req] : reqs2) {
+        auto & br = results.emplace_back(KeyedBuildResult {
+            gp->buildResult,
+            .path = req
+        });
+
+        auto pbp = std::get_if<DerivedPath::Built>(&req);
+        if (!pbp) continue;
+        auto & bp = *pbp;
+
+        /* Because goals are in general shared between derived paths
+           that share the same derivation, we need to filter their
+           results to get back just the results we care about.
+         */
+
+        auto & bos = br.builtOutputs;
+
+        for (auto it = bos.begin(); it != bos.end();) {
+            if (wantOutput(it->first.outputName, bp.outputs))
+                ++it;
+            else
+                it = bos.erase(it);
+        }
+    }
 
     return results;
 }
@@ -89,7 +115,6 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         return BuildResult {
             .status = BuildResult::MiscFailure,
             .errorMsg = e.msg(),
-            .path = DerivedPath::Built { .drvPath = drvPath },
         };
     };
 }

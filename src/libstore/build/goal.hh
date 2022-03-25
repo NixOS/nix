@@ -64,7 +64,6 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     Goal(Worker & worker, DerivedPath path)
         : worker(worker)
-        , buildResult { .path = std::move(path) }
     { }
 
     virtual ~Goal()

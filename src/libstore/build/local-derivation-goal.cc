@@ -1266,7 +1266,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 result.rethrow();
     }
 
-    std::vector<BuildResult> buildPathsWithResults(
+    std::vector<KeyedBuildResult> buildPathsWithResults(
         const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr) override
