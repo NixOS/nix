@@ -65,6 +65,15 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
     auto type = cursor->getAttr("type")->getString();
 
+    std::string expected;
+    if (hasPrefix(attrPath,"apps.")) {
+        expected = "app";
+    } else {
+        expected = "derivation";
+    }
+    if (type != expected) {
+        throw Error("Attribute '%s' should have type '%s'.", attrPath, expected);
+    }
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
