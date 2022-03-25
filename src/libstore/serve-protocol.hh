@@ -28,13 +28,12 @@ typedef enum {
 class Store;
 struct Source;
 
-// items being serialized
-struct DerivedPath;
-struct DrvOutput;
-struct Realisation;
-
 
 namespace serve_proto {
+
+using common_proto::read;
+using common_proto::write;
+
 /* FIXME maybe move more stuff inside here */
 
 struct ReadConn : common_proto::ReadConn {
@@ -47,13 +46,6 @@ struct WriteConn : common_proto::WriteConn {
     TEMPLATE T read(const Store & store, ReadConn conn, Phantom< T > _); \
     TEMPLATE void write(const Store & store, WriteConn conn, const T & str)
 
-MAKE_SERVE_PROTO(, std::string);
-MAKE_SERVE_PROTO(, StorePath);
-MAKE_SERVE_PROTO(, ContentAddress);
-MAKE_SERVE_PROTO(, DerivedPath);
-MAKE_SERVE_PROTO(, Realisation);
-MAKE_SERVE_PROTO(, DrvOutput);
-
 MAKE_SERVE_PROTO(template<typename T>, std::vector<T>);
 MAKE_SERVE_PROTO(template<typename T>, std::set<T>);
 
@@ -62,11 +54,6 @@ MAKE_SERVE_PROTO(template<typename T>, std::set<T>);
 MAKE_SERVE_PROTO(X_, Y_);
 #undef X_
 #undef Y_
-
-/* See note in common-protocol.hh
- */
-MAKE_SERVE_PROTO(, std::optional<StorePath>);
-MAKE_SERVE_PROTO(, std::optional<ContentAddress>);
 
 /* These are a non-standard form for historical reasons. */
 

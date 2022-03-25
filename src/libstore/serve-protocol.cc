@@ -12,9 +12,6 @@
 namespace nix {
 namespace serve_proto {
 
-/* protocol-agnostic definitions */
-#include "gen-protocol.cc-inc"
-
 /* protocol-specific definitions */
 
 }

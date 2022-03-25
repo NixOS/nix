@@ -13,9 +13,6 @@
 namespace nix {
 namespace worker_proto {
 
-/* protocol-agnostic definitions */
-#include "gen-protocol.cc-inc"
-
 /* protocol-specific definitions */
 
 BuildResult read(const Store & store, ReadConn conn, Phantom<BuildResult> _)

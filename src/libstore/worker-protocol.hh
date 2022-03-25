@@ -74,13 +74,14 @@ class Store;
 struct Source;
 
 // items being serialized
-struct DerivedPath;
-struct DrvOutput;
-struct Realisation;
 struct BuildResult;
 
 
 namespace worker_proto {
+
+using common_proto::read;
+using common_proto::write;
+
 /* FIXME maybe move more stuff inside here */
 
 struct ReadConn : common_proto::ReadConn {
@@ -93,12 +94,6 @@ struct WriteConn : common_proto::WriteConn {
     TEMPLATE T read(const Store & store, ReadConn conn, Phantom< T > _); \
     TEMPLATE void write(const Store & store, WriteConn conn, const T & str)
 
-MAKE_WORKER_PROTO(, std::string);
-MAKE_WORKER_PROTO(, StorePath);
-MAKE_WORKER_PROTO(, ContentAddress);
-MAKE_WORKER_PROTO(, DerivedPath);
-MAKE_WORKER_PROTO(, Realisation);
-MAKE_WORKER_PROTO(, DrvOutput);
 MAKE_WORKER_PROTO(, BuildResult);
 
 MAKE_WORKER_PROTO(template<typename T>, std::vector<T>);
@@ -109,11 +104,6 @@ MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
 MAKE_WORKER_PROTO(X_, Y_);
 #undef X_
 #undef Y_
-
-/* See note in common-protocol.hh
- */
-MAKE_WORKER_PROTO(, std::optional<StorePath>);
-MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
 
 }
 
