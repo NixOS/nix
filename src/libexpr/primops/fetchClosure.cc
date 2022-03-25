@@ -7,8 +7,6 @@ namespace nix {
 
 static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature(Xp::FetchClosure);
-
     state.forceAttrs(*args[0], pos);
 
     std::optional<std::string> fromStoreUrl;
@@ -145,8 +143,12 @@ static RegisterPrimOp primop_fetchClosure({
       specifying a binary cache from which the path can be fetched.
       Also, requiring a content-addressed final store path avoids the
       need for users to configure binary cache public keys.
+
+      This function is only available if you enable the experimental
+      feature `fetch-closure`.
     )",
     .fun = prim_fetchClosure,
+    .experimentalFeature = Xp::FetchClosure,
 });
 
 }
