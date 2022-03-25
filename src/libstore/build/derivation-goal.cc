@@ -207,8 +207,6 @@ void DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         settings.requireExperimentalFeature(Xp::CaDerivations);
 
-    retrySubstitution = false;
-
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
@@ -311,14 +309,11 @@ void DerivationGoal::outputsSubstitutionTried()
     gaveUpOnSubstitution();
 }
 
+
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 void DerivationGoal::gaveUpOnSubstitution()
 {
-    /* Make sure checkPathValidity() from now on checks all
-       outputs. */
-    wantedOutputs.clear();
-
     /* The inputs must be built before we can build this goal. */
     if (useDerivation)
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs)
@@ -426,7 +421,8 @@ void DerivationGoal::inputsRealised()
         return;
     }
 
-    if (retrySubstitution) {
+    if (retrySubstitution && !retriedSubstitution) {
+        retriedSubstitution = true;
         haveDerivation();
         return;
     }

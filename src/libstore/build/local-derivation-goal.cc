@@ -2613,7 +2613,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        builtOutputs.emplace(thisRealisation.id, thisRealisation);
+        if (wantOutput(outputName, wantedOutputs))
+            builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 
     return builtOutputs;
