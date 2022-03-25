@@ -3814,7 +3814,7 @@ RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
         .name = name,
         .args = {},
         .arity = arity,
-        .fun = fun
+        .fun = fun,
     });
 }
 
@@ -3886,13 +3886,17 @@ void EvalState::createBaseEnv()
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            addPrimOp({
-                .fun = primOp.fun,
-                .arity = std::max(primOp.args.size(), primOp.arity),
-                .name = symbols.create(primOp.name),
-                .args = primOp.args,
-                .doc = primOp.doc,
-            });
+            if (!primOp.experimentalFeature
+                || settings.isExperimentalFeatureEnabled(*primOp.experimentalFeature))
+            {
+                addPrimOp({
+                    .fun = primOp.fun,
+                    .arity = std::max(primOp.args.size(), primOp.arity),
+                    .name = symbols.create(primOp.name),
+                    .args = primOp.args,
+                    .doc = primOp.doc,
+                });
+            }
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

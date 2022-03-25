@@ -149,12 +149,6 @@ public:
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void requireExperimentalFeatureOnEvaluation(
-        const ExperimentalFeature &,
-        const std::string_view fName,
-        const Pos & pos
-    );
-
     void addToSearchPath(const std::string & s);
 
     SearchPath getSearchPath() { return searchPath; }

@@ -507,23 +507,6 @@ EvalState::~EvalState()
 }
 
 
-void EvalState::requireExperimentalFeatureOnEvaluation(
-    const ExperimentalFeature & feature,
-    const std::string_view fName,
-    const Pos & pos)
-{
-    if (!settings.isExperimentalFeatureEnabled(feature)) {
-        throw EvalError({
-            .msg = hintfmt(
-                "Cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
-                feature,
-                fName
-            ),
-            .errPos = pos
-        });
-    }
-}
-
 void EvalState::allowPath(const Path & path)
 {
     if (allowedPaths)

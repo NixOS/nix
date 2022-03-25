@@ -706,8 +706,6 @@ void callFlake(EvalState & state,
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.requireExperimentalFeatureOnEvaluation(Xp::Flakes, "builtins.getFlake", pos);
-
     std::string flakeRefS(state.forceStringNoCtx(*args[0], pos));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
@@ -723,7 +721,12 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
         v);
 }
 
-static RegisterPrimOp r2("__getFlake", 1, prim_getFlake);
+static RegisterPrimOp r2({
+    .name =  "__getFlake",
+    .args = {"args"},
+    .fun = prim_getFlake,
+    .experimentalFeature = Xp::Flakes,
+});
 
 }
 
