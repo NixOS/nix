@@ -1,91 +1,91 @@
-std::string read(const Store & store, Source & from, Phantom<std::string> _)
+std::string read(const Store & store, ReadConn conn, Phantom<std::string> _)
 {
-    return readString(from);
+    return readString(conn.from);
 }
 
-void write(const Store & store, Sink & out, const std::string & str)
+void write(const Store & store, WriteConn conn, const std::string & str)
 {
-    out << str;
-}
-
-
-StorePath read(const Store & store, Source & from, Phantom<StorePath> _)
-{
-    return store.parseStorePath(readString(from));
-}
-
-void write(const Store & store, Sink & out, const StorePath & storePath)
-{
-    out << store.printStorePath(storePath);
+    conn.to << str;
 }
 
 
-ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _)
+StorePath read(const Store & store, ReadConn conn, Phantom<StorePath> _)
 {
-    return parseContentAddress(readString(from));
+    return store.parseStorePath(readString(conn.from));
 }
 
-void write(const Store & store, Sink & out, const ContentAddress & ca)
+void write(const Store & store, WriteConn conn, const StorePath & storePath)
 {
-    out << renderContentAddress(ca);
+    conn.to << store.printStorePath(storePath);
 }
 
-DerivedPath read(const Store & store, Source & from, Phantom<DerivedPath> _)
+
+ContentAddress read(const Store & store, ReadConn conn, Phantom<ContentAddress> _)
 {
-    auto s = readString(from);
+    return parseContentAddress(readString(conn.from));
+}
+
+void write(const Store & store, WriteConn conn, const ContentAddress & ca)
+{
+    conn.to << renderContentAddress(ca);
+}
+
+DerivedPath read(const Store & store, ReadConn conn, Phantom<DerivedPath> _)
+{
+    auto s = readString(conn.from);
     return DerivedPath::parse(store, s);
 }
 
-void write(const Store & store, Sink & out, const DerivedPath & req)
+void write(const Store & store, WriteConn conn, const DerivedPath & req)
 {
-    out << req.to_string(store);
+    conn.to << req.to_string(store);
 }
 
 
-Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
+Realisation read(const Store & store, ReadConn conn, Phantom<Realisation> _)
 {
-    std::string rawInput = readString(from);
+    std::string rawInput = readString(conn.from);
     return Realisation::fromJSON(
         nlohmann::json::parse(rawInput),
         "remote-protocol"
     );
 }
 
-void write(const Store & store, Sink & out, const Realisation & realisation)
+void write(const Store & store, WriteConn conn, const Realisation & realisation)
 {
-    out << realisation.toJSON().dump();
+    conn.to << realisation.toJSON().dump();
 }
 
 
-DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
+DrvOutput read(const Store & store, ReadConn conn, Phantom<DrvOutput> _)
 {
-    return DrvOutput::parse(readString(from));
+    return DrvOutput::parse(readString(conn.from));
 }
 
-void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
+void write(const Store & store, WriteConn conn, const DrvOutput & drvOutput)
 {
-    out << drvOutput.to_string();
+    conn.to << drvOutput.to_string();
 }
 
 
-std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
+std::optional<StorePath> read(const Store & store, ReadConn conn, Phantom<std::optional<StorePath>> _)
 {
-    auto s = readString(from);
+    auto s = readString(conn.from);
     return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
 }
 
-void write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+void write(const Store & store, WriteConn conn, const std::optional<StorePath> & storePathOpt)
 {
-    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
+    conn.to << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
 }
 
 
-std::optional<ContentAddress> read(const Store & store, Source & from, Phantom<std::optional<ContentAddress>> _)
+std::optional<ContentAddress> read(const Store & store, ReadConn conn, Phantom<std::optional<ContentAddress>> _)
 {
-    return parseContentAddressOpt(readString(from));
+    return parseContentAddressOpt(readString(conn.from));
 }
 
-void write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
+void write(const Store & store, WriteConn conn, const std::optional<ContentAddress> & caOpt)
 {
-    out << (caOpt ? renderContentAddress(*caOpt) : "");
+    conn.to << (caOpt ? renderContentAddress(*caOpt) : "");
 }

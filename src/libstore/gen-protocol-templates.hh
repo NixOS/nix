@@ -2,64 +2,64 @@
  */
 
 template<typename T>
-std::vector<T> read(const Store & store, Source & from, Phantom<std::vector<T>> _)
+std::vector<T> read(const Store & store, ReadConn conn, Phantom<std::vector<T>> _)
 {
     std::vector<T> resSet;
-    auto size = readNum<size_t>(from);
+    auto size = readNum<size_t>(conn.from);
     while (size--) {
-        resSet.push_back(read(store, from, Phantom<T> {}));
+        resSet.push_back(read(store, conn, Phantom<T> {}));
     }
     return resSet;
 }
 
 template<typename T>
-void write(const Store & store, Sink & out, const std::vector<T> & resSet)
+void write(const Store & store, WriteConn conn, const std::vector<T> & resSet)
 {
-    out << resSet.size();
+    conn.to << resSet.size();
     for (auto & key : resSet) {
-        write(store, out, key);
+        write(store, conn, key);
     }
 }
 
 template<typename T>
-std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
+std::set<T> read(const Store & store, ReadConn conn, Phantom<std::set<T>> _)
 {
     std::set<T> resSet;
-    auto size = readNum<size_t>(from);
+    auto size = readNum<size_t>(conn.from);
     while (size--) {
-        resSet.insert(read(store, from, Phantom<T> {}));
+        resSet.insert(read(store, conn, Phantom<T> {}));
     }
     return resSet;
 }
 
 template<typename T>
-void write(const Store & store, Sink & out, const std::set<T> & resSet)
+void write(const Store & store, WriteConn conn, const std::set<T> & resSet)
 {
-    out << resSet.size();
+    conn.to << resSet.size();
     for (auto & key : resSet) {
-        write(store, out, key);
+        write(store, conn, key);
     }
 }
 
 template<typename K, typename V>
-std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
+std::map<K, V> read(const Store & store, ReadConn conn, Phantom<std::map<K, V>> _)
 {
     std::map<K, V> resMap;
-    auto size = readNum<size_t>(from);
+    auto size = readNum<size_t>(conn.from);
     while (size--) {
-        auto k = read(store, from, Phantom<K> {});
-        auto v = read(store, from, Phantom<V> {});
+        auto k = read(store, conn, Phantom<K> {});
+        auto v = read(store, conn, Phantom<V> {});
         resMap.insert_or_assign(std::move(k), std::move(v));
     }
     return resMap;
 }
 
 template<typename K, typename V>
-void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+void write(const Store & store, WriteConn conn, const std::map<K, V> & resMap)
 {
-    out << resMap.size();
+    conn.to << resMap.size();
     for (auto & i : resMap) {
-        write(store, out, i.first);
-        write(store, out, i.second);
+        write(store, conn, i.first);
+        write(store, conn, i.second);
     }
 }

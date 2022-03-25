@@ -1,7 +1,6 @@
 #pragma once
 
-#include "serialise.hh"
-#include "phantom.hh"
+#include "common-protocol.hh"
 
 namespace nix {
 
@@ -33,15 +32,20 @@ struct Source;
 struct DerivedPath;
 struct DrvOutput;
 struct Realisation;
-struct PathInfo;
 
 
 namespace serve_proto {
 /* FIXME maybe move more stuff inside here */
 
+struct ReadConn : common_proto::ReadConn {
+};
+
+struct WriteConn : common_proto::WriteConn {
+};
+
 #define MAKE_SERVE_PROTO(TEMPLATE, T) \
-    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
-    TEMPLATE void write(const Store & store, Sink & out, const T & str)
+    TEMPLATE T read(const Store & store, ReadConn conn, Phantom< T > _); \
+    TEMPLATE void write(const Store & store, WriteConn conn, const T & str)
 
 MAKE_SERVE_PROTO(, std::string);
 MAKE_SERVE_PROTO(, StorePath);
@@ -59,7 +63,7 @@ MAKE_SERVE_PROTO(X_, Y_);
 #undef X_
 #undef Y_
 
-/* See note in worker-protocol.hh
+/* See note in common-protocol.hh
  */
 MAKE_SERVE_PROTO(, std::optional<StorePath>);
 MAKE_SERVE_PROTO(, std::optional<ContentAddress>);

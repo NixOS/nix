@@ -1,7 +1,6 @@
 #pragma once
 
-#include "serialise.hh"
-#include "phantom.hh"
+#include "common-protocol.hh"
 
 namespace nix {
 
@@ -84,9 +83,15 @@ struct BuildResult;
 namespace worker_proto {
 /* FIXME maybe move more stuff inside here */
 
+struct ReadConn : common_proto::ReadConn {
+};
+
+struct WriteConn : common_proto::WriteConn {
+};
+
 #define MAKE_WORKER_PROTO(TEMPLATE, T) \
-    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
-    TEMPLATE void write(const Store & store, Sink & out, const T & str)
+    TEMPLATE T read(const Store & store, ReadConn conn, Phantom< T > _); \
+    TEMPLATE void write(const Store & store, WriteConn conn, const T & str)
 
 MAKE_WORKER_PROTO(, std::string);
 MAKE_WORKER_PROTO(, StorePath);
@@ -105,18 +110,7 @@ MAKE_WORKER_PROTO(X_, Y_);
 #undef X_
 #undef Y_
 
-/* These use the empty string for the null case, relying on the fact
-   that the underlying types never serialize to the empty string.
-
-   We do this instead of a generic std::optional<T> instance because
-   ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
-   the same reason, we don't have a std::variant<T..> instances (ordinal
-   tags 0...n).
-
-   We could the generic instances and then these as specializations for
-   compatability, but that's proven a bit finnicky, and also makes the
-   worker protocol harder to implement in other languages where such
-   specializations may not be allowed.
+/* See note in common-protocol.hh
  */
 MAKE_WORKER_PROTO(, std::optional<StorePath>);
 MAKE_WORKER_PROTO(, std::optional<ContentAddress>);

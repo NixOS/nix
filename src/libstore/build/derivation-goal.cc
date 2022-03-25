@@ -9,8 +9,8 @@
 #include "archive.hh"
 #include "json.hh"
 #include "compression.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "local-store.hh" // TODO remove, along with remaining downcasts
@@ -1073,9 +1073,11 @@ HookReply DerivationGoal::tryBuildHook()
         throw;
     }
 
+    common_proto::WriteConn conn { hook->sink };
+
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    worker_proto::write(worker.store, hook->sink, inputPaths);
+    common_proto::write(worker.store, conn, inputPaths);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
@@ -1086,7 +1088,7 @@ HookReply DerivationGoal::tryBuildHook()
             if (buildMode != bmCheck && status.known && status.known->isValid()) continue;
             missingOutputs.insert(outputName);
         }
-        worker_proto::write(worker.store, hook->sink, missingOutputs);
+        common_proto::write(worker.store, conn, missingOutputs);
     }
 
     hook->sink = FdSink();

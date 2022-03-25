@@ -1,6 +1,7 @@
 #pragma once
 
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "local-fs-store.hh"
 
 namespace nix {

@@ -11,8 +11,8 @@
 #include "json.hh"
 #include "compression.hh"
 #include "daemon.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 

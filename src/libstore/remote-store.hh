@@ -139,20 +139,7 @@ public:
 
     void flushBadConnections();
 
-    struct Connection
-    {
-        FdSink to;
-        FdSource from;
-        unsigned int daemonVersion;
-        std::optional<std::string> daemonNixVersion;
-        std::chrono::time_point<std::chrono::steady_clock> startTime;
-
-        virtual ~Connection();
-
-        virtual void closeWrite() = 0;
-
-        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
-    };
+    struct Connection;
 
     ref<Connection> openConnectionWrapper();
 

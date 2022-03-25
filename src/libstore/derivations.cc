@@ -2,8 +2,8 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
 
@@ -658,7 +658,9 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = worker_proto::read(store, in, Phantom<StorePathSet> {});
+    drv.inputSrcs = common_proto::read(store,
+        common_proto::ReadConn { .from = in },
+        Phantom<StorePathSet> {});
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -701,7 +703,9 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
         }, i.second.raw());
     }
-    worker_proto::write(store, out, drv.inputSrcs);
+    common_proto::write(store,
+        common_proto::WriteConn { .to = out },
+        drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
     for (auto & i : drv.env)

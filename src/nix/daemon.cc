@@ -2,6 +2,7 @@
 #include "shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "util.hh"
 #include "serialise.hh"
 #include "archive.hh"

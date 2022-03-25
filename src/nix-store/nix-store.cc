@@ -797,6 +797,9 @@ static void opServe(Strings opFlags, Strings opArgs)
     out.flush();
     unsigned int clientVersion = readInt(in);
 
+    serve_proto::ReadConn rconn { { .from = in } };
+    serve_proto::WriteConn wconn { { .to = out } };
+
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
@@ -831,7 +834,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = serve_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = serve_proto::read(*store, rconn, Phantom<StorePathSet> {});
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -840,19 +843,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                serve_proto::write(*store, out, store->queryValidPaths(paths));
+                serve_proto::write(*store, wconn, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = serve_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = serve_proto::read(*store, rconn, Phantom<StorePathSet> {});
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        serve_proto::write(*store, out, info->references);
+                        serve_proto::write(*store, wconn, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -880,7 +883,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(serve_proto::read(*store, in, Phantom<StorePathSet> {}), out);
+                store->exportPaths(serve_proto::read(*store, rconn, Phantom<StorePathSet> {}), out);
                 break;
             }
 
@@ -923,7 +926,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
                 if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
-                    serve_proto::write(*store, out, status.builtOutputs);
+                    serve_proto::write(*store, wconn, status.builtOutputs);
                 }
 
 
@@ -933,9 +936,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(serve_proto::read(*store, in, Phantom<StorePathSet> {}),
+                store->computeFSClosure(serve_proto::read(*store, rconn, Phantom<StorePathSet> {}),
                     closure, false, includeOutputs);
-                serve_proto::write(*store, out, closure);
+                serve_proto::write(*store, wconn, closure);
                 break;
             }
 
@@ -950,7 +953,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = serve_proto::read(*store, in, Phantom<StorePathSet> {});
+                info.references = serve_proto::read(*store, rconn, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));
