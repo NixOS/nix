@@ -1,7 +1,27 @@
+#pragma once
+
+#include "types.hh"
+
 /* Shared code between worker and serv protocols, injected into proper header.
  */
+namespace nix {
 
-template<typename T>
+struct Store;
+
+namespace meta_protocol {
+
+#define WRAP_META_PROTO(TEMPLATE, T) \
+    TEMPLATE \
+    T read(const Store & store, ReadConn conn, Phantom< T > p) { \
+       return meta_protocol::read(store, conn, p); \
+    } \
+    \
+    TEMPLATE \
+    void write(const Store & store, WriteConn conn, const T & v) { \
+       meta_protocol::write(store, conn, v); \
+    }
+
+template<typename ReadConn, typename T>
 std::vector<T> read(const Store & store, ReadConn conn, Phantom<std::vector<T>> _)
 {
     std::vector<T> resSet;
@@ -12,7 +32,7 @@ std::vector<T> read(const Store & store, ReadConn conn, Phantom<std::vector<T>> 
     return resSet;
 }
 
-template<typename T>
+template<typename WriteConn, typename T>
 void write(const Store & store, WriteConn conn, const std::vector<T> & resSet)
 {
     conn.to << resSet.size();
@@ -21,7 +41,7 @@ void write(const Store & store, WriteConn conn, const std::vector<T> & resSet)
     }
 }
 
-template<typename T>
+template<typename ReadConn, typename T>
 std::set<T> read(const Store & store, ReadConn conn, Phantom<std::set<T>> _)
 {
     std::set<T> resSet;
@@ -32,7 +52,7 @@ std::set<T> read(const Store & store, ReadConn conn, Phantom<std::set<T>> _)
     return resSet;
 }
 
-template<typename T>
+template<typename WriteConn, typename T>
 void write(const Store & store, WriteConn conn, const std::set<T> & resSet)
 {
     conn.to << resSet.size();
@@ -41,7 +61,7 @@ void write(const Store & store, WriteConn conn, const std::set<T> & resSet)
     }
 }
 
-template<typename K, typename V>
+template<typename ReadConn, typename K, typename V>
 std::map<K, V> read(const Store & store, ReadConn conn, Phantom<std::map<K, V>> _)
 {
     std::map<K, V> resMap;
@@ -54,7 +74,7 @@ std::map<K, V> read(const Store & store, ReadConn conn, Phantom<std::map<K, V>> 
     return resMap;
 }
 
-template<typename K, typename V>
+template<typename WriteConn, typename K, typename V>
 void write(const Store & store, WriteConn conn, const std::map<K, V> & resMap)
 {
     conn.to << resMap.size();
@@ -62,4 +82,8 @@ void write(const Store & store, WriteConn conn, const std::map<K, V> & resMap)
         write(store, conn, i.first);
         write(store, conn, i.second);
     }
+}
+
+}
+
 }
