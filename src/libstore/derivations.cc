@@ -4,8 +4,8 @@
 #include "globals.hh"
 #include "util.hh"
 #include "split.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -895,8 +895,8 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = WorkerProto::Serialise<StorePathSet>::read(store,
-        WorkerProto::ReadConn { .from = in });
+    drv.inputSrcs = CommonProto::Serialise<StorePathSet>::read(store,
+        CommonProto::ReadConn { .from = in });
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -944,8 +944,8 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
         }, i.second.raw);
     }
-    WorkerProto::write(store,
-        WorkerProto::WriteConn { .to = out },
+    CommonProto::write(store,
+        CommonProto::WriteConn { .to = out },
         drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
