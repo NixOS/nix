@@ -3,7 +3,9 @@
 #include "worker-protocol.hh"
 #include "build-result.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
 #include "gc-store.hh"
+#include "log-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
 #include "archive.hh"
@@ -562,6 +564,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
 
+        auto drvType = drv.type();
+
         /* Content-addressed derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
            try to produce such a path.
@@ -594,12 +598,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            derivations, we throw out the precomputed output paths and just
            store the hashes, so there aren't two competing sources of truth an
            attacker could exploit. */
-        if (drv.type() == DerivationType::InputAddressed && !trusted)
+        if (!(drvType.isCA() || trusted))
             throw Error("you are not privileged to build input-addressed derivations");
 
         /* Make sure that the non-input-addressed derivations that got this far
            are in fact content-addressed if we don't trust them. */
-        assert(derivationIsCA(drv.type()) || trusted);
+        assert(drvType.isCA() || trusted);
 
         /* Recompute the derivation path when we cannot trust the original. */
         if (!trusted) {
@@ -608,7 +612,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                original not-necessarily-resolved derivation to verify the drv
                derivation as adequate claim to the input-addressed output
                paths. */
-            assert(derivationIsCA(drv.type()));
+            assert(drvType.isCA());
 
             Derivation drv2;
             static_cast<BasicDerivation &>(drv2) = drv;
@@ -649,7 +653,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         Path path = absPath(readString(from));
 
         logger->startWork();
-        auto & gcStore = requireGcStore(*store);
+        auto & gcStore = require<GcStore>(*store);
         gcStore.addIndirectRoot(path);
         logger->stopWork();
 
@@ -667,7 +671,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        auto & gcStore = requireGcStore(*store);
+        auto & gcStore = require<GcStore>(*store);
         Roots roots = gcStore.findRoots(!trusted);
         logger->stopWork();
 
@@ -699,7 +703,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
-        auto & gcStore = requireGcStore(*store);
+        auto & gcStore = require<GcStore>(*store);
         gcStore.collectGarbage(options, results);
         logger->stopWork();
 
@@ -957,11 +961,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!trusted)
             throw Error("you are not privileged to add logs");
+        auto & logStore = require<LogStore>(*store);
         {
             FramedSource source(from);
             StringSink sink;
             source.drainInto(sink);
-            store->addBuildLog(path, sink.s);
+            logStore.addBuildLog(path, sink.s);
         }
         logger->stopWork();
         to << 1;

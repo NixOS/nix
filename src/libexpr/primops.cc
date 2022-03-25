@@ -43,8 +43,8 @@ StringMap EvalState::realiseContext(const PathSet & context)
     StringMap res;
 
     for (auto & i : context) {
-        auto [ctxS, outputName] = decodeContext(i);
-        auto ctx = store->parseStorePath(ctxS);
+        auto [ctx, outputName] = decodeContext(*store, i);
+        auto ctxS = store->printStorePath(ctx);
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
@@ -694,7 +694,32 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
 static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
     .name = "__genericClosure",
+    .args = {"attrset"},
     .arity = 1,
+    .doc = R"(
+      Take an *attrset* with values named `startSet` and `operator` in order to
+      return a *list of attrsets* by starting with the `startSet`, recursively
+      applying the `operator` function to each element. The *attrsets* in the
+      `startSet` and produced by the `operator` must each contain value named
+      `key` which are comparable to each other. The result is produced by
+      repeatedly calling the operator for each element encountered with a
+      unique key, terminating when no new elements are produced. For example,
+
+      ```
+      builtins.genericClosure {
+        startSet = [ {key = 5;} ];
+        operator = item: [{
+          key = if (item.key / 2 ) * 2 == item.key
+               then item.key / 2
+               else 3 * item.key + 1;
+        }];
+      }
+      ```
+      evaluates to
+      ```
+      [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
+      ```
+      )",
     .fun = prim_genericClosure,
 });
 
@@ -1114,7 +1139,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 drv.inputSrcs.insert(j);
                 if (j.isDerivation()) {
                     Derivation jDrv = state.store->readDerivation(j);
-                    if(jDrv.type() != DerivationType::CAFloating)
+                    if(jDrv.type().hasKnownOutputPaths())
                         drv.inputDrvs[j] = jDrv.outputNames();
                 }
             }
@@ -1122,8 +1147,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            auto ctx = decodeContext(path);
-            drv.inputDrvs[state.store->parseStorePath(ctx.first)].insert(ctx.second);
+            auto ctx = decodeContext(*state.store, path);
+            drv.inputDrvs[ctx.first].insert(ctx.second);
         }
 
         /* Otherwise it's a source file. */
@@ -1171,22 +1196,21 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             std::move(h),
             {});
 
-        DerivationOutputCAFixed dof { .ca = ca };
+        DerivationOutput::CAFixed dof { .ca = ca };
 
         drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
-        drv.outputs.insert_or_assign("out", DerivationOutput { .output = dof });
+        drv.outputs.insert_or_assign("out", dof);
     }
 
     else if (contentAddressed) {
         HashType ht = parseHashType(outputHashAlgo);
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i, DerivationOutput {
-                .output = DerivationOutputCAFloating {
+            drv.outputs.insert_or_assign(i,
+                DerivationOutput::CAFloating {
                     .method = ingestionMethod,
                     .hashType = ht,
-                },
-            });
+                });
         }
     }
 
@@ -1200,43 +1224,36 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = StorePath::dummy,
-                    },
-                });
+                DerivationOutput::Deferred { });
         }
 
         // Regular, non-CA derivation should always return a single hash and not
         // hash per output.
-        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        auto hashModulo = hashDerivationModulo(*state.store, drv, true);
         std::visit(overloaded {
-            [&](Hash & h) {
-                for (auto & i : outputs) {
-                    auto outPath = state.store->makeOutputPath(i, h, drvName);
-                    drv.env[i] = state.store->printStorePath(outPath);
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputInputAddressed {
-                                .path = std::move(outPath),
-                            },
-                        });
+            [&](const DrvHash & drvHash) {
+                auto & h = drvHash.hash;
+                switch (drvHash.kind) {
+                case DrvHash::Kind::Deferred:
+                    /* Outputs already deferred, nothing to do */
+                    break;
+                case DrvHash::Kind::Regular:
+                    for (auto & [outputName, output] : drv.outputs) {
+                        auto outPath = state.store->makeOutputPath(outputName, h, drvName);
+                        drv.env[outputName] = state.store->printStorePath(outPath);
+                        output = DerivationOutput::InputAddressed {
+                            .path = std::move(outPath),
+                        };
+                    }
+                    break;
                 }
             },
-            [&](CaOutputHashes &) {
+            [&](const CaOutputHashes &) {
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](DeferredHash &) {
-                for (auto & i : outputs) {
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputDeferred{},
-                        });
-                }
-            },
         },
-        hashModulo);
+        hashModulo.raw());
 
     }
 
@@ -1248,12 +1265,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later.
-
-       However, we don't bother doing this for floating CA derivations because
-       their "hash modulo" is indeterminate until built. */
-    if (drv.type() != DerivationType::CAFloating) {
-        auto h = hashDerivationModulo(*state.store, Derivation(drv), false);
+       read them later. */
+    {
+        auto h = hashDerivationModulo(*state.store, drv, false);
         drvHashes.lock()->insert_or_assign(drvPath, h);
     }
 
@@ -3811,7 +3825,7 @@ RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
         .name = name,
         .args = {},
         .arity = arity,
-        .fun = fun
+        .fun = fun,
     });
 }
 
@@ -3883,13 +3897,17 @@ void EvalState::createBaseEnv()
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            addPrimOp({
-                .fun = primOp.fun,
-                .arity = std::max(primOp.args.size(), primOp.arity),
-                .name = symbols.create(primOp.name),
-                .args = primOp.args,
-                .doc = primOp.doc,
-            });
+            if (!primOp.experimentalFeature
+                || settings.isExperimentalFeatureEnabled(*primOp.experimentalFeature))
+            {
+                addPrimOp({
+                    .fun = primOp.fun,
+                    .arity = std::max(primOp.args.size(), primOp.arity),
+                    .name = symbols.create(primOp.name),
+                    .args = primOp.args,
+                    .doc = primOp.doc,
+                });
+            }
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

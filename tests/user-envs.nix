@@ -8,6 +8,8 @@ assert foo == "foo";
 
 let
 
+  platforms = let x = "foobar"; in [ x x ];
+
   makeDrv = name: progName: (mkDerivation {
     name = assert progName != "fail"; name;
     inherit progName system;
@@ -15,6 +17,7 @@ let
   } // {
     meta = {
       description = "A silly test package with some \${escaped anti-quotation} in it";
+      inherit platforms;
     };
   });
 

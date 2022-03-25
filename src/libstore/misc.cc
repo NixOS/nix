@@ -87,7 +87,7 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
     auto out = drv.outputs.find("out");
     if (out == drv.outputs.end())
         return std::nullopt;
-    if (auto dof = std::get_if<DerivationOutputCAFixed>(&out->second.output)) {
+    if (auto dof = std::get_if<DerivationOutput::CAFixed>(&out->second)) {
         return std::visit(overloaded {
             [&](const TextInfo & ti) -> std::optional<ContentAddress> {
                 if (!ti.references.empty())

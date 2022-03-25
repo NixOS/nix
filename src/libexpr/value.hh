@@ -57,6 +57,8 @@ struct ExprLambda;
 struct PrimOp;
 class Symbol;
 struct Pos;
+class StorePath;
+class Store;
 class EvalState;
 class XMLWriter;
 class JSONPlaceholder;
@@ -64,6 +66,8 @@ class JSONPlaceholder;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
+typedef std::pair<StorePath, std::string> NixStringContextElem;
+typedef std::vector<NixStringContextElem> NixStringContext;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
@@ -115,9 +119,12 @@ private:
     InternalType internalType;
 
     friend std::string showType(const Value & v);
-    friend void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v);
+
+    void print(std::ostream & str, std::set<const void *> * seen) const;
 
 public:
+
+    void print(std::ostream & str, bool showRepeated = false) const;
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
@@ -368,7 +375,7 @@ public:
        non-trivial. */
     bool isTrivial() const;
 
-    std::vector<std::pair<Path, std::string>> getContext();
+    NixStringContext getContext(const Store &);
 
     auto listItems()
     {

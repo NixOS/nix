@@ -698,11 +698,11 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     std::optional<Hash> h;
     for (auto & i : drv.outputs) {
         std::visit(overloaded {
-            [&](const DerivationOutputInputAddressed & doia) {
+            [&](const DerivationOutput::InputAddressed & doia) {
                 if (!h) {
                     // somewhat expensive so we do lazily
-                    auto temp = hashDerivationModulo(*this, drv, true);
-                    h = std::get<Hash>(temp);
+                    auto h0 = hashDerivationModulo(*this, drv, true);
+                    h = h0.requireNoFixedNonDeferred();
                 }
                 StorePath recomputed = makeOutputPath(i.first, *h, drvName);
                 if (doia.path != recomputed)
@@ -710,16 +710,17 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
                 envHasRightPath(doia.path, i.first);
             },
-            [&](const DerivationOutputCAFixed & dof) {
+            [&](const DerivationOutput::CAFixed & dof) {
                 auto path = dof.path(*this, drvName, i.first);
                 envHasRightPath(path, i.first);
             },
-            [&](const DerivationOutputCAFloating &) {
+            [&](const DerivationOutput::CAFloating &) {
                 /* Nothing to check */
             },
-            [&](const DerivationOutputDeferred &) {
+            [&](const DerivationOutput::Deferred &) {
+                /* Nothing to check */
             },
-        }, i.second.output);
+        }, i.second.raw());
     }
 }
 

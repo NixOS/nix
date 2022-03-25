@@ -406,8 +406,29 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         throw SysError("getting status of '%1%'", path);
     }
 
-    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
-        bytesFreed += st.st_size;
+    if (!S_ISDIR(st.st_mode)) {
+        /* We are about to delete a file. Will it likely free space? */
+
+        switch (st.st_nlink) {
+            /* Yes: last link. */
+            case 1:
+                bytesFreed += st.st_size;
+                break;
+            /* Maybe: yes, if 'auto-optimise-store' or manual optimisation
+               was performed. Instead of checking for real let's assume
+               it's an optimised file and space will be freed.
+
+               In worst case we will double count on freed space for files
+               with exactly two hardlinks for unoptimised packages.
+             */
+            case 2:
+                bytesFreed += st.st_size;
+                break;
+            /* No: 3+ links. */
+            default:
+                break;
+        }
+    }
 
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
@@ -682,7 +703,14 @@ std::string drainFD(int fd, bool block, const size_t reserveSize)
 
 void drainFD(int fd, Sink & sink, bool block)
 {
-    int saved;
+    // silence GCC maybe-uninitialized warning in finally
+    int saved = 0;
+
+    if (!block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
 
     Finally finally([&]() {
         if (!block) {
@@ -690,12 +718,6 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("making file descriptor blocking");
         }
     });
-
-    if (!block) {
-        saved = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
-            throw SysError("making file descriptor non-blocking");
-    }
 
     std::vector<unsigned char> buf(64 * 1024);
     while (1) {

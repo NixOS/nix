@@ -4,6 +4,7 @@
 #include "eval-cache.hh"
 #include "names.hh"
 #include "command.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -70,7 +71,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
-            context2.push_back({state.store->parseStorePath(path), {name}});
+            context2.push_back({path, {name}});
 
         return UnresolvedApp{App {
             .context = std::move(context2),
