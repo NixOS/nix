@@ -396,6 +396,7 @@ StorePath NixRepl::getDerivationPath(Value & v) {
 
 bool NixRepl::processLine(std::string line)
 {
+    line = trim(line);
     if (line == "") return true;
 
     _isInterrupted = false;
