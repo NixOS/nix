@@ -1,3 +1,4 @@
+#include "globals.hh"
 #include "installables.hh"
 #include "command.hh"
 #include "attr-path.hh"
@@ -129,7 +130,7 @@ MixFlakeOptions::MixFlakeOptions()
     });
 }
 
-SourceExprCommand::SourceExprCommand()
+SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 {
     addFlag({
         .longName = "file",
@@ -157,6 +158,17 @@ SourceExprCommand::SourceExprCommand()
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
+
+    if (supportReadOnlyMode) {
+        addFlag({
+            .longName = "read-only",
+            .description =
+                "Do not instantiate each evaluated derivation. "
+                "This improves performance, but can cause errors when accessing "
+                "store paths of derivations during evaluation.",
+            .handler = {&readOnlyMode, true},
+        });
+    }
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
@@ -687,6 +699,10 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 {
     std::vector<std::shared_ptr<Installable>> result;
 
+    if (readOnlyMode) {
+        settings.readOnlyMode = true;
+    }
+
     if (file || expr) {
         if (file && expr)
             throw UsageError("'--file' and '--expr' are exclusive");
@@ -951,7 +967,8 @@ std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
     return parseFlakeRef(_installables.front(), absPath("."));
 }
 
-InstallableCommand::InstallableCommand()
+InstallableCommand::InstallableCommand(bool supportReadOnlyMode)
+    : SourceExprCommand(supportReadOnlyMode)
 {
     expectArgs({
         .label = "installable",
