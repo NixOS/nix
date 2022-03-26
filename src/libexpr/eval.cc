@@ -983,7 +983,8 @@ LocalNoInline(std::unique_ptr<DebugTraceStacker>
                 {.pos = pos,
                  .expr = expr,
                  .env = env,
-                 .hint = hintfmt(s, s2)
+                 .hint = hintfmt(s, s2),
+                 .is_error = false
                 }));
 }
 

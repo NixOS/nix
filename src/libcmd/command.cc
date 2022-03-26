@@ -122,29 +122,45 @@ ref<EvalState> EvalCommand::getEvalState()
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
                 // clear the screen.
                 // std::cout << "\033[2J\033[1;1H";
-              
+
+                auto dts =
+                    error && expr.getPos() ?
+                          std::unique_ptr<DebugTraceStacker>(
+                              new DebugTraceStacker(
+                                  *evalState,
+                                  DebugTrace 
+                                        {.pos = *expr.getPos(),
+                                         .expr = expr,
+                                         .env = env,
+                                         .hint = error->info().msg,
+                                         .is_error = true
+                                        }))
+                          : nullptr;
+
+
                 if (error)
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
-                else 
-                {
-                    auto iter = evalState->debugTraces.begin();
-                    if (iter != evalState->debugTraces.end()) {
-                          std::cout << "\n" << "… " << iter->hint.str() << "\n";
 
-                          if (iter->pos.has_value() && (*iter->pos)) {
-                              auto pos = iter->pos.value();
-                              std::cout << "\n";
-                              printAtPos(pos, std::cout);
+                // else 
+                // {
+                //     auto iter = evalState->debugTraces.begin();
+                //     if (iter != evalState->debugTraces.end()) {
+                //           std::cout << "\n" << "… " << iter->hint.str() << "\n";
 
-                              auto loc = getCodeLines(pos);
-                              if (loc.has_value()) {
-                                  std::cout << "\n";
-                                  printCodeLines(std::cout, "", pos, *loc);
-                                  std::cout << "\n";
-                              }
-                          }
-                      }
-                }
+                //           if (iter->pos.has_value() && (*iter->pos)) {
+                //               auto pos = iter->pos.value();
+                //               std::cout << "\n";
+                //               printAtPos(pos, std::cout);
+
+                //               auto loc = getCodeLines(pos);
+                //               if (loc.has_value()) {
+                //                   std::cout << "\n";
+                //                   printCodeLines(std::cout, "", pos, *loc);
+                //                   std::cout << "\n";
+                //             }
+                //         }
+                //     }
+                // }
 
                 if (expr.staticenv)
                 {

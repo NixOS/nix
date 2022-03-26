@@ -84,7 +84,7 @@ struct Expr
     virtual void setName(Symbol & name);
 
     std::shared_ptr<const StaticEnv> staticenv;
-    virtual Pos* getPos() = 0;
+    virtual const Pos* getPos() const = 0;
 };
 
 std::ostream & operator << (std::ostream & str, const Expr & e);
@@ -100,7 +100,7 @@ struct ExprInt : Expr
     Value v;
     ExprInt(NixInt n) : n(n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env);
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -110,7 +110,7 @@ struct ExprFloat : Expr
     Value v;
     ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env);
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -120,7 +120,7 @@ struct ExprString : Expr
     Value v;
     ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env);
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -130,7 +130,7 @@ struct ExprPath : Expr
     Value v;
     ExprPath(const string & s) : s(s) { v.mkPath(this->s.c_str()); };
     Value * maybeThunk(EvalState & state, Env & env);
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -158,7 +158,7 @@ struct ExprVar : Expr
     ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
     Value * maybeThunk(EvalState & state, Env & env);
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -169,7 +169,7 @@ struct ExprSelect : Expr
     AttrPath attrPath;
     ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
     ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -178,7 +178,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     AttrPath attrPath;
     ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
-    Pos* getPos() { return e->getPos(); }
+    const Pos* getPos() const { return e->getPos(); }
     COMMON_METHODS
 };
 
@@ -207,7 +207,7 @@ struct ExprAttrs : Expr
     DynamicAttrDefs dynamicAttrs;
     ExprAttrs(const Pos &pos) : recursive(false), pos(pos) { };
     ExprAttrs() : recursive(false), pos(noPos) { };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -215,7 +215,7 @@ struct ExprList : Expr
 {
     std::vector<Expr *> elems;
     ExprList() { };
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -264,7 +264,7 @@ struct ExprLambda : Expr
     void setName(Symbol & name);
     string showNamePos() const;
     inline bool hasFormals() const { return formals != nullptr; }
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -276,7 +276,7 @@ struct ExprCall : Expr
     ExprCall(const Pos & pos, Expr * fun, std::vector<Expr *> && args)
         : fun(fun), args(args), pos(pos)
     { }
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -285,7 +285,7 @@ struct ExprLet : Expr
     ExprAttrs * attrs;
     Expr * body;
     ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -295,7 +295,7 @@ struct ExprWith : Expr
     Expr * attrs, * body;
     size_t prevWith;
     ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -304,7 +304,7 @@ struct ExprIf : Expr
     Pos pos;
     Expr * cond, * then, * else_;
     ExprIf(const Pos & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -313,7 +313,7 @@ struct ExprAssert : Expr
     Pos pos;
     Expr * cond, * body;
     ExprAssert(const Pos & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -321,7 +321,7 @@ struct ExprOpNot : Expr
 {
     Expr * e;
     ExprOpNot(Expr * e) : e(e) { };
-    Pos* getPos() { return 0; }
+    const Pos* getPos() const { return 0; }
     COMMON_METHODS
 };
 
@@ -341,7 +341,7 @@ struct ExprOpNot : Expr
             e1->bindVars(env); e2->bindVars(env); \
         } \
         void eval(EvalState & state, Env & env, Value & v); \
-        Pos* getPos() { return &pos; } \
+        const Pos* getPos() const { return &pos; } \
     };
 
 MakeBinOp(ExprOpEq, "==")
@@ -359,7 +359,7 @@ struct ExprConcatStrings : Expr
     vector<std::pair<Pos, Expr *> > * es;
     ExprConcatStrings(const Pos & pos, bool forceString, vector<std::pair<Pos, Expr *> > * es)
         : pos(pos), forceString(forceString), es(es) { };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 
@@ -367,7 +367,7 @@ struct ExprPos : Expr
 {
     Pos pos;
     ExprPos(const Pos & pos) : pos(pos) { };
-    Pos* getPos() { return &pos; }
+    const Pos* getPos() const { return &pos; }
     COMMON_METHODS
 };
 

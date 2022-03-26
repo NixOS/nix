@@ -77,6 +77,7 @@ struct DebugTrace {
     const Expr &expr;
     const Env &env;
     hintformat hint;
+    bool is_error;
 };
 
 class EvalState
