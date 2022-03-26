@@ -935,7 +935,7 @@ InstallablesCommand::InstallablesCommand()
 void InstallablesCommand::prepare()
 {
     if (_installables.empty() && useDefaultInstallables())
-        // FIXME: commands like "nix install" should not have a
+        // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
     installables = parseInstallables(getStore(), _installables);
