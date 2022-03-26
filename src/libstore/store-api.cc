@@ -943,7 +943,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
     ThreadPool pool;
 
     processGraph<OwnedStorePathOrDesc>(pool,
-        std::set<OwnedStorePathOrDesc>(missing.begin(), missing.end()),
+        missing,
 
         [&](const OwnedStorePathOrDesc & storePathOrDesc) -> std::set<OwnedStorePathOrDesc> {
             auto info = srcStore->queryPathInfo(borrowStorePathOrDesc(storePathOrDesc));
