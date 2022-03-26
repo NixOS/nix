@@ -4,7 +4,7 @@ source common.sh
 
 requireDaemonNewerThan "2.4pre20210626"
 
-sed -i 's/experimental-features .*/& ca-derivations ca-references nix-command flakes/' "$NIX_CONF_DIR"/nix.conf
+enableFeatures "ca-derivations nix-command flakes"
 
 export NIX_TESTS_CA_BY_DEFAULT=1
 cd ..
