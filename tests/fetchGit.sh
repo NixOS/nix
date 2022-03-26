@@ -179,3 +179,13 @@ git clone --depth 1 file://$repo $TEST_ROOT/shallow
 path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).outPath")
 [[ $path3 = $path6 ]]
 [[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
+
+# Explicit ref = "HEAD" should work, and produce the same outPath as without ref
+path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
+path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
+[[ $path7 = $path8 ]]
+
+# ref = "HEAD" should fetch the HEAD revision
+rev4=$(git -C $repo rev-parse HEAD)
+rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).rev")
+[[ $rev4 = $rev4_nix ]]

@@ -54,9 +54,15 @@ ref<Store> Machine::openStore() const {
     if (hasPrefix(storeUri, "ssh://")) {
         storeParams["max-connections"] = "1";
         storeParams["log-fd"] = "4";
+    }
+
+    if (hasPrefix(storeUri, "ssh://") || hasPrefix(storeUri, "ssh-ng://")) {
         if (sshKey != "")
             storeParams["ssh-key"] = sshKey;
+        if (sshPublicHostKey != "")
+            storeParams["base64-ssh-public-host-key"] = sshPublicHostKey;
     }
+
     {
         auto & fs = storeParams["system-features"];
         auto append = [&](auto feats) {

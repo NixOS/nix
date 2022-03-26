@@ -62,9 +62,15 @@ void write(const Store & store, Sink & out, const Realisation & realisation)
 { out << realisation.toJSON().dump(); }
 
 DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
-{ return DrvOutput::parse(readString(from)); }
+{
+    return DrvOutput::parse(readString(from));
+}
+
 void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
-{ out << drvOutput.to_string(); }
+{
+    out << drvOutput.to_string();
+}
+
 
 StorePathDescriptor read(const Store & store, Source & from, Phantom<StorePathDescriptor> _)
 {
@@ -705,10 +711,12 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     conn->to << buildMode;
     conn.processStderr();
     BuildResult res;
-    unsigned int status;
-    conn->from >> status >> res.errorMsg;
-    res.status = (BuildResult::Status) status;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 0xc) {
+    res.status = (BuildResult::Status) readInt(conn->from);
+    conn->from >> res.errorMsg;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
+        conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
+    }
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
         auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
         res.builtOutputs = builtOutputs;
     }

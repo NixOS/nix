@@ -161,6 +161,8 @@ struct LocalDerivationGoal : public DerivationGoal
        as valid. */
     void registerOutputs() override;
 
+    void signRealisation(Realisation &) override;
+
     /* Check that an output meets the requirements specified by the
        'outputChecks' attribute (or the legacy
        '{allowed,disallowed}{References,Requisites}' attributes). */

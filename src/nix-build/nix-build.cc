@@ -447,6 +447,7 @@ static void main_nix_build(int argc, char * * argv)
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
                 "unset TZ; %6%"
+                "shopt -s execfail;"
                 "%7%",
                 shellEscape(tmpDir),
                 (pure ? "" : "p=$PATH; "),

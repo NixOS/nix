@@ -148,7 +148,13 @@ DownloadFileResult downloadFile(
     bool immutable,
     const Headers & headers = {});
 
-std::pair<Tree, time_t> downloadTarball(
+struct DownloadTarballMeta
+{
+    time_t lastModified;
+    std::string effectiveUrl;
+};
+
+std::pair<Tree, DownloadTarballMeta> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,

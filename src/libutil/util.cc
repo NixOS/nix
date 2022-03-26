@@ -1590,7 +1590,7 @@ void startSignalHandlerThread()
     updateWindowSize();
 
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
-        throw SysError("quering signal mask");
+        throw SysError("querying signal mask");
 
     sigset_t set;
     sigemptyset(&set);

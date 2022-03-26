@@ -25,6 +25,7 @@ templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 flakeA=$TEST_ROOT/flakeA
 flakeB=$TEST_ROOT/flakeB
+flakeGitBare=$TEST_ROOT/flakeGitBare
 
 for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB; do
     rm -rf $repo $repo.tmp
@@ -163,16 +164,17 @@ EOF
 # Test 'nix flake list'.
 [[ $(nix registry list | wc -l) == 7 ]]
 
-# Test 'nix flake info'.
-nix flake info flake1 | grep -q 'URL: .*flake1.*'
+# Test 'nix flake metadata'.
+nix flake metadata flake1
+nix flake metadata flake1 | grep -q 'Locked URL:.*flake1.*'
 
-# Test 'nix flake info' on a local flake.
-(cd $flake1Dir && nix flake info) | grep -q 'URL: .*flake1.*'
-(cd $flake1Dir && nix flake info .) | grep -q 'URL: .*flake1.*'
-nix flake info $flake1Dir | grep -q 'URL: .*flake1.*'
+# Test 'nix flake metadata' on a local flake.
+(cd $flake1Dir && nix flake metadata) | grep -q 'URL:.*flake1.*'
+(cd $flake1Dir && nix flake metadata .) | grep -q 'URL:.*flake1.*'
+nix flake metadata $flake1Dir | grep -q 'URL:.*flake1.*'
 
-# Test 'nix flake info --json'.
-json=$(nix flake info flake1 --json | jq .)
+# Test 'nix flake metadata --json'.
+json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
 [[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C $flake1Dir log -n1 --format=%ct) ]]
@@ -180,7 +182,7 @@ hash1=$(echo "$json" | jq -r .revision)
 
 echo -n '# foo' >> $flake1Dir/flake.nix
 git -C $flake1Dir commit -a -m 'Foo'
-hash2=$(nix flake info flake1 --json --refresh | jq -r .revision)
+hash2=$(nix flake metadata flake1 --json --refresh | jq -r .revision)
 [[ $hash1 != $hash2 ]]
 
 # Test 'nix build' on a flake.
@@ -604,6 +606,11 @@ nix flake update $flake3Dir
 [[ $(jq -c .nodes.flake2.inputs.flake1 $flake3Dir/flake.lock) =~ '["foo"]' ]]
 [[ $(jq .nodes.foo.locked.url $flake3Dir/flake.lock) =~ flake7 ]]
 
+# Test git+file with bare repo.
+rm -rf $flakeGitBare
+git clone --bare $flake1Dir $flakeGitBare
+nix build -o $TEST_ROOT/result git+file://$flakeGitBare
+
 # Test Mercurial flakes.
 rm -rf $flake5Dir
 hg init $flake5Dir
@@ -624,7 +631,7 @@ hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Initial commit'
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir
 [[ -e $TEST_ROOT/result/hello ]]
 
-(! nix flake info --json hg+file://$flake5Dir | jq -e -r .revision)
+(! nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revision)
 
 nix eval hg+file://$flake5Dir#expr
 
@@ -632,13 +639,13 @@ nix eval hg+file://$flake5Dir#expr
 
 (! nix eval hg+file://$flake5Dir#expr --no-allow-dirty)
 
-(! nix flake info --json hg+file://$flake5Dir | jq -e -r .revision)
+(! nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revision)
 
 hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Add lock file'
 
-nix flake info --json hg+file://$flake5Dir --refresh | jq -e -r .revision
-nix flake info --json hg+file://$flake5Dir
-[[ $(nix flake info --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
+nix flake metadata --json hg+file://$flake5Dir --refresh | jq -e -r .revision
+nix flake metadata --json hg+file://$flake5Dir
+[[ $(nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
 
 nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
 
@@ -648,7 +655,7 @@ tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT --exclude .hg flake5
 nix build -o $TEST_ROOT/result file://$TEST_ROOT/flake.tar.gz
 
 # Building with a tarball URL containing a SRI hash should also work.
-url=$(nix flake info --json file://$TEST_ROOT/flake.tar.gz | jq -r .url)
+url=$(nix flake metadata --json file://$TEST_ROOT/flake.tar.gz | jq -r .url)
 [[ $url =~ sha256- ]]
 
 nix build -o $TEST_ROOT/result $url
@@ -674,9 +681,8 @@ nix flake lock $flake3Dir
 nix flake lock $flake3Dir --update-input flake2/flake1
 [[ $(jq -r .nodes.flake1_2.locked.rev $flake3Dir/flake.lock) =~ $hash2 ]]
 
-# Test 'nix flake list-inputs'.
-[[ $(nix flake list-inputs $flake3Dir | wc -l) == 5 ]]
-nix flake list-inputs $flake3Dir --json | jq .
+# Test 'nix flake metadata --json'.
+nix flake metadata $flake3Dir --json | jq .
 
 # Test circular flake dependencies.
 cat > $flakeA/flake.nix <<EOF
@@ -715,4 +721,4 @@ git -C $flakeB commit -a -m 'Foo'
 [[ $(nix eval --update-input b $flakeA#foo) = 1912 ]]
 
 # Test list-inputs with circular dependencies
-nix flake list-inputs $flakeA
+nix flake metadata $flakeA

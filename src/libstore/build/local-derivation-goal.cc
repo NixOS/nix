@@ -287,7 +287,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
        So instead, check if the disk is (nearly) full now.  If
        so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
-	{
+    {
         auto & localStore = getLocalStore();
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
@@ -297,7 +297,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
         if (statvfs(tmpDir.c_str(), &st) == 0 &&
             (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
-	}
+    }
 #endif
 
     deleteTmpDir(false);
@@ -1705,18 +1705,18 @@ void LocalDerivationGoal::runChild()
                network, so give them access to /etc/resolv.conf and so
                on. */
             if (derivationIsImpure(derivationType)) {
-                ss.push_back("/etc/resolv.conf");
-
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
                 // potential impurities introduced in fixed-outputs.
                 writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
-                ss.push_back("/etc/services");
-                ss.push_back("/etc/hosts");
-                if (pathExists("/var/run/nscd/socket"))
-                    ss.push_back("/var/run/nscd/socket");
+                /* N.B. it is realistic that these paths might not exist. It
+                   happens when testing Nix building fixed-output derivations
+                   within a pure derivation. */
+                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts", "/var/run/nscd/socket" })
+                    if (pathExists(path))
+                        ss.push_back(path);
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);
@@ -2610,11 +2610,20 @@ void LocalDerivationGoal::registerOutputs()
        but it's fine to do in all cases. */
 
     if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
-        for (auto& [outputName, newInfo] : infos)
-            worker.store.registerDrvOutput(Realisation{
-                .id = DrvOutput{initialOutputs.at(outputName).outputHash, outputName},
-                .outPath = newInfo.path});
+        for (auto& [outputName, newInfo] : infos) {
+            auto thisRealisation = Realisation{
+                .id = DrvOutput{initialOutputs.at(outputName).outputHash,
+                                outputName},
+                .outPath = newInfo.path};
+            signRealisation(thisRealisation);
+            worker.store.registerDrvOutput(thisRealisation);
+        }
     }
+}
+
+void LocalDerivationGoal::signRealisation(Realisation & realisation)
+{
+    getLocalStore().signRealisation(realisation);
 }
 
 

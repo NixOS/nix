@@ -25,25 +25,67 @@ nlohmann::json Realisation::toJSON() const {
     return nlohmann::json{
         {"id", id.to_string()},
         {"outPath", outPath.to_string()},
+        {"signatures", signatures},
     };
 }
 
 Realisation Realisation::fromJSON(
     const nlohmann::json& json,
     const std::string& whence) {
-    auto getField = [&](std::string fieldName) -> std::string {
+    auto getOptionalField = [&](std::string fieldName) -> std::optional<std::string> {
         auto fieldIterator = json.find(fieldName);
         if (fieldIterator == json.end())
+            return std::nullopt;
+        return *fieldIterator;
+    };
+    auto getField = [&](std::string fieldName) -> std::string {
+        if (auto field = getOptionalField(fieldName))
+            return *field;
+        else
             throw Error(
                 "Drv output info file '%1%' is corrupt, missing field %2%",
                 whence, fieldName);
-        return *fieldIterator;
     };
+
+    StringSet signatures;
+    if (auto signaturesIterator = json.find("signatures"); signaturesIterator != json.end())
+        signatures.insert(signaturesIterator->begin(), signaturesIterator->end());
 
     return Realisation{
         .id = DrvOutput::parse(getField("id")),
         .outPath = StorePath(getField("outPath")),
+        .signatures = signatures,
     };
+}
+
+std::string Realisation::fingerprint() const
+{
+    auto serialized = toJSON();
+    serialized.erase("signatures");
+    return serialized.dump();
+}
+
+void Realisation::sign(const SecretKey & secretKey)
+{
+    signatures.insert(secretKey.signDetached(fingerprint()));
+}
+
+bool Realisation::checkSignature(const PublicKeys & publicKeys, const std::string & sig) const
+{
+    return verifyDetached(fingerprint(), sig, publicKeys);
+}
+
+size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
+{
+    // FIXME: Maybe we should return `maxSigs` if the realisation corresponds to
+    // an input-addressed one − because in that case the drv is enough to check
+    // it − but we can't know that here.
+
+    size_t good = 0;
+    for (auto & sig : signatures)
+        if (checkSignature(publicKeys, sig))
+            good++;
+    return good;
 }
 
 StorePath RealisedPath::path() const {
