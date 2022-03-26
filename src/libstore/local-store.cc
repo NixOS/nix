@@ -152,6 +152,8 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
                     select id from Realisations where outputPath = old.id
                     );
                 end;
+                -- used by deletion trigger
+                create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
             )");
             txn.commit();
         }
