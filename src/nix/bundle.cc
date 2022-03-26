@@ -70,7 +70,7 @@ struct CmdBundle : InstallableCommand
         auto evalState = getEvalState();
 
         auto app = installable->toApp(*evalState);
-        store->buildPaths(app.context);
+        store->buildPaths(toBuildableReqs(app.context));
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
@@ -110,7 +110,7 @@ struct CmdBundle : InstallableCommand
 
         StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
 
-        store->buildPaths({{drvPath}});
+        store->buildPaths({ BuildableReqFromDrv { drvPath } });
 
         auto outPathS = store->printStorePath(outPath);
 

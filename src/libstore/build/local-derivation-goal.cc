@@ -1190,6 +1190,26 @@ void LocalDerivationGoal::writeStructuredAttrs()
     chownToBuilder(tmpDir + "/.attrs.sh");
 }
 
+
+static StorePath pathPartOfReq(const BuildableReq & req)
+{
+    return std::visit(overloaded {
+        [&](BuildableOpaque bo) {
+            return bo.path;
+        },
+        [&](BuildableReqFromDrv bfd)  {
+            return bfd.drvPath;
+        },
+    }, req.raw());
+}
+
+
+bool LocalDerivationGoal::isAllowed(const BuildableReq & req)
+{
+    return this->isAllowed(pathPartOfReq(req));
+}
+
+
 struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
@@ -1314,25 +1334,27 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     // an allowed derivation
     { throw Error("queryRealisation"); }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & paths, BuildMode buildMode) override
+    void buildPaths(const std::vector<BuildableReq> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
 
         StorePathSet newPaths;
 
-        for (auto & path : paths) {
-            if (!goal.isAllowed(path.path))
-                throw InvalidPath("cannot build unknown path '%s' in recursive Nix", printStorePath(path.path));
+        for (auto & req : paths) {
+            if (!goal.isAllowed(req))
+                throw InvalidPath("cannot build '%s' in recursive Nix because path is unknown", req.to_string(*next));
         }
 
         next->buildPaths(paths, buildMode);
 
         for (auto & path : paths) {
-            if (!path.path.isDerivation()) continue;
-            auto outputs = next->queryDerivationOutputMap(path.path);
-            for (auto & output : outputs)
-                if (wantOutput(output.first, path.outputs))
-                    newPaths.insert(output.second);
+            auto p =  std::get_if<BuildableReqFromDrv>(&path);
+            if (!p) continue;
+            auto & bfd = *p;
+            auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
+            for (auto & [outputName, outputPath] : outputs)
+                if (wantOutput(outputName, bfd.outputs))
+                    newPaths.insert(outputPath);
         }
 
         StorePathSet closure;
@@ -1360,7 +1382,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override
     { unsupported("addSignatures"); }
 
-    void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    void queryMissing(const std::vector<BuildableReq> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override
     {
@@ -1368,12 +1390,12 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
            client about what paths will be built/substituted or are
            already present. Probably not a big deal. */
 
-        std::vector<StorePathWithOutputs> allowed;
-        for (auto & path : targets) {
-            if (goal.isAllowed(path.path))
-                allowed.emplace_back(path);
+        std::vector<BuildableReq> allowed;
+        for (auto & req : targets) {
+            if (goal.isAllowed(req))
+                allowed.emplace_back(req);
             else
-                unknown.insert(path.path);
+                unknown.insert(pathPartOfReq(req));
         }
 
         next->queryMissing(allowed, willBuild, willSubstitute,

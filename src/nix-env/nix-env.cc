@@ -6,6 +6,7 @@
 #include "globals.hh"
 #include "names.hh"
 #include "profiles.hh"
+#include "path-with-outputs.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
@@ -418,13 +419,13 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
-    std::vector<StorePathWithOutputs> targets;
+    std::vector<BuildableReq> targets;
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.push_back({state.store->parseStorePath(drvPath)});
+            targets.push_back(BuildableReqFromDrv{state.store->parseStorePath(drvPath)});
         else
-            targets.push_back({state.store->parseStorePath(i.queryOutPath())});
+            targets.push_back(BuildableOpaque{state.store->parseStorePath(i.queryOutPath())});
     }
 
     printMissing(state.store, targets);
@@ -693,18 +694,18 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     if (globals.forceName != "")
         drv.setName(globals.forceName);
 
-    if (drv.queryDrvPath() != "") {
-        std::vector<StorePathWithOutputs> paths{{globals.state->store->parseStorePath(drv.queryDrvPath())}};
-        printMissing(globals.state->store, paths);
-        if (globals.dryRun) return;
-        globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
-    } else {
-        printMissing(globals.state->store,
-            {{globals.state->store->parseStorePath(drv.queryOutPath())}});
-        if (globals.dryRun) return;
-        auto path = globals.state->store->parseStorePath(drv.queryOutPath());
-        globals.state->store->ensurePath(path);
-    }
+    std::vector<BuildableReq> paths {
+        (drv.queryDrvPath() != "")
+        ? (BuildableReq) (BuildableReqFromDrv {
+                globals.state->store->parseStorePath(drv.queryDrvPath())
+            })
+        : (BuildableReq) (BuildableOpaque {
+                globals.state->store->parseStorePath(drv.queryOutPath())
+            }),
+    };
+    printMissing(globals.state->store, paths);
+    if (globals.dryRun) return;
+    globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
     debug(format("switching to new user environment"));
     Path generation = createGeneration(

@@ -1,5 +1,6 @@
 #include "serialise.hh"
 #include "util.hh"
+#include "path-with-outputs.hh"
 #include "remote-fs-accessor.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
@@ -50,6 +51,19 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
     out << renderContentAddress(ca);
 }
 
+
+BuildableReq read(const Store & store, Source & from, Phantom<BuildableReq> _)
+{
+    auto s = readString(from);
+    return BuildableReq::parse(store, s);
+}
+
+void write(const Store & store, Sink & out, const BuildableReq & req)
+{
+    out << req.to_string(store);
+}
+
+
 Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
 {
     std::string rawInput = readString(from);
@@ -58,8 +72,12 @@ Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
         "remote-protocol"
     );
 }
+
 void write(const Store & store, Sink & out, const Realisation & realisation)
-{ out << realisation.toJSON().dump(); }
+{
+    out << realisation.toJSON().dump();
+}
+
 
 DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
 {
@@ -680,16 +698,36 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
     return {Realisation{.id = id, .outPath = *outPaths.begin()}};
 }
 
+static void writeBuildableReqs(RemoteStore & store, ConnectionHandle & conn, const std::vector<BuildableReq> & reqs)
+{
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
+        worker_proto::write(store, conn->to, reqs);
+    } else {
+        Strings ss;
+        for (auto & p : reqs) {
+            auto sOrDrvPath = StorePathWithOutputs::tryFromBuildableReq(p);
+            std::visit(overloaded {
+                [&](StorePathWithOutputs s) {
+                    ss.push_back(s.to_string(store));
+                },
+                [&](StorePath drvPath) {
+                    throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
+                        store.printStorePath(drvPath),
+                        GET_PROTOCOL_MAJOR(conn->daemonVersion),
+                        GET_PROTOCOL_MINOR(conn->daemonVersion));
+                },
+            }, sOrDrvPath);
+        }
+        conn->to << ss;
+    }
+}
 
-void RemoteStore::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+void RemoteStore::buildPaths(const std::vector<BuildableReq> & drvPaths, BuildMode buildMode)
 {
     auto conn(getConnection());
     conn->to << wopBuildPaths;
     assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
-    Strings ss;
-    for (auto & p : drvPaths)
-        ss.push_back(p.to_string(*this));
-    conn->to << ss;
+    writeBuildableReqs(*this, conn, drvPaths);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
@@ -829,7 +867,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 }
 
 
-void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets,
+void RemoteStore::queryMissing(const std::vector<BuildableReq> & targets,
     StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
     uint64_t & downloadSize, uint64_t & narSize)
 {
@@ -840,10 +878,7 @@ void RemoteStore::queryMissing(const std::vector<StorePathWithOutputs> & targets
             // to prevent a deadlock.
             goto fallback;
         conn->to << wopQueryMissing;
-        Strings ss;
-        for (auto & p : targets)
-            ss.push_back(p.to_string(*this));
-        conn->to << ss;
+        writeBuildableReqs(*this, conn, targets);
         conn.processStderr();
         willBuild = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
         willSubstitute = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});

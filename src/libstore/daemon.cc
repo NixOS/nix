@@ -2,6 +2,7 @@
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "finally.hh"
 #include "affinity.hh"
 #include "archive.hh"
@@ -259,6 +260,18 @@ static void writeValidPathInfo(
     }
 }
 
+static std::vector<BuildableReq> readBuildableReqs(Store & store, unsigned int clientVersion, Source & from)
+{
+    std::vector<BuildableReq> reqs;
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+        reqs = worker_proto::read(store, from, Phantom<std::vector<BuildableReq>> {});
+    } else {
+        for (auto & s : readStrings<Strings>(from))
+            reqs.push_back(parsePathWithOutputs(store, s).toBuildableReq());
+    }
+    return reqs;
+}
+
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
@@ -493,9 +506,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopBuildPaths: {
-        std::vector<StorePathWithOutputs> drvs;
-        for (auto & s : readStrings<Strings>(from))
-            drvs.push_back(store->parsePathWithOutputs(s));
+        auto drvs = readBuildableReqs(*store, clientVersion, from);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -856,9 +867,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQueryMissing: {
-        std::vector<StorePathWithOutputs> targets;
-        for (auto & s : readStrings<Strings>(from))
-            targets.push_back(store->parsePathWithOutputs(s));
+        auto targets = readBuildableReqs(*store, clientVersion, from);
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;

@@ -10,6 +10,7 @@
 #include "worker-protocol.hh"
 #include "graphml.hh"
 #include "legacy.hh"
+#include "path-with-outputs.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -62,7 +63,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
     auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
 
     if (path.path.isDerivation()) {
-        if (build) store->buildPaths({path});
+        if (build) store->buildPaths({path.toBuildableReq()});
         auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
@@ -128,11 +129,13 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     std::vector<StorePathWithOutputs> paths;
     for (auto & i : opArgs)
-        paths.push_back(store->followLinksToStorePathWithOutputs(i));
+        paths.push_back(followLinksToStorePathWithOutputs(*store, i));
 
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
-    store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    store->queryMissing(
+        toBuildableReqs(paths),
+        willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (ignoreUnknown) {
         std::vector<StorePathWithOutputs> paths2;
@@ -148,7 +151,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     if (dryRun) return;
 
     /* Build all paths at the same time to exploit parallelism. */
-    store->buildPaths(paths, buildMode);
+    store->buildPaths(toBuildableReqs(paths), buildMode);
 
     if (!ignoreUnknown)
         for (auto & i : paths) {
@@ -882,13 +885,13 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 std::vector<StorePathWithOutputs> paths;
                 for (auto & s : readStrings<Strings>(in))
-                    paths.push_back(store->parsePathWithOutputs(s));
+                    paths.push_back(parsePathWithOutputs(*store, s));
 
                 getBuildSettings();
 
                 try {
                     MonitorFdHup monitor(in.fd);
-                    store->buildPaths(paths);
+                    store->buildPaths(toBuildableReqs(paths));
                     out << 0;
                 } catch (Error & e) {
                     assert(e.status);
