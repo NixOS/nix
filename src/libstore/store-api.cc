@@ -899,9 +899,35 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
 {
     auto valid = dstStore->queryValidPaths(storePaths, substitute);
 
-    std::set<OwnedStorePathOrDesc>  missing;
-    for (auto & path : storePaths)
-        if (!valid.count(path)) missing.insert(path);
+    std::set<OwnedStorePathOrDesc> missing;
+
+    /* If we can "upgrade" the node into a descriptor, do that. We will
+       need to have a node for this. */
+    std::map<StorePath, const StorePathDescriptor *> upgraded;
+
+    for (auto & path : storePaths) {
+        if (valid.count(path)) continue;
+
+        missing.insert(path);
+
+        auto info = srcStore->queryPathInfo(borrowStorePathOrDesc(path));
+
+        auto storePathP = std::get_if<StorePath>(&path);
+        if (!storePathP) continue;
+        auto & storePath = *storePathP;
+
+        auto descOpt = info->fullStorePathDescriptorOpt();
+        if (!descOpt) continue;
+        auto desc = *std::move(descOpt);
+
+        debug("found CA description '%s' for path '%s'",
+            renderStorePathDescriptor(desc),
+            srcStore->printStorePath(storePath));
+
+        auto [it, _] = missing.insert(std::move(desc));
+        const auto & descRef = std::get<StorePathDescriptor>(*it);
+        upgraded.insert_or_assign(storePath, &descRef);
+    }
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
@@ -924,9 +950,14 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
 
             /* If we can "upgrade" the node into a descriptor, do that. */
             if (auto storePathP = std::get_if<StorePath>(&storePathOrDesc)) {
-                if (auto descOpt = info->fullStorePathDescriptorOpt()) {
-                    auto & desc = *descOpt;
-                    debug("found CA description for path '%s'", srcStore->printStorePath(*storePathP));
+                auto & storePath = *storePathP;
+                auto it = upgraded.find(storePath);
+                if (it != upgraded.end()) {
+                    auto & [_, descP] = *it;
+                    auto & desc = *descP;
+                    debug("Using found CA description '%s' for path '%s'",
+                        renderStorePathDescriptor(desc),
+                        srcStore->printStorePath(storePath));
                     return { desc };
                 }
             }
