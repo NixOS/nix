@@ -295,7 +295,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::vector<BuildableReq> drvPaths;
+        std::vector<DerivedPath> drvPaths;
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const Pos & pos) {
             try {
@@ -464,7 +464,7 @@ struct CmdFlakeCheck : FlakeCommand
                                         fmt("%s.%s.%s", name, attr.name, attr2.name),
                                         *attr2.value, *attr2.pos);
                                     if ((std::string) attr.name == settings.thisSystem.get())
-                                        drvPaths.push_back(BuildableReqFromDrv{drvPath});
+                                        drvPaths.push_back(DerivedPath::Built{drvPath});
                                 }
                             }
                         }

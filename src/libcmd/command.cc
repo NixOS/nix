@@ -163,7 +163,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
             profile2, storePath));
 }
 
-void MixProfile::updateProfile(const Buildables & buildables)
+void MixProfile::updateProfile(const DerivedPathsWithHints & buildables)
 {
     if (!profile) return;
 
@@ -171,10 +171,10 @@ void MixProfile::updateProfile(const Buildables & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuildableOpaque bo) {
+            [&](DerivedPathWithHints::Opaque bo) {
                 result.push_back(bo.path);
             },
-            [&](BuildableFromDrv bfd) {
+            [&](DerivedPathWithHints::Built bfd) {
                 for (auto & output : bfd.outputs) {
                     /* Output path should be known because we just tried to
                        build it. */
@@ -182,7 +182,7 @@ void MixProfile::updateProfile(const Buildables & buildables)
                     result.push_back(*output.second);
                 }
             },
-        }, buildable);
+        }, buildable.raw());
     }
 
     if (result.size() != 1)

@@ -268,14 +268,14 @@ public:
         return status;
     }
 
-    void buildPaths(const std::vector<BuildableReq> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode) override
     {
         auto conn(connections->get());
 
         conn->to << cmdBuildPaths;
         Strings ss;
         for (auto & p : drvPaths) {
-            auto sOrDrvPath = StorePathWithOutputs::tryFromBuildableReq(p);
+            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
             std::visit(overloaded {
                 [&](StorePathWithOutputs s) {
                     ss.push_back(s.to_string(*this));

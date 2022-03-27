@@ -1191,20 +1191,20 @@ void LocalDerivationGoal::writeStructuredAttrs()
 }
 
 
-static StorePath pathPartOfReq(const BuildableReq & req)
+static StorePath pathPartOfReq(const DerivedPath & req)
 {
     return std::visit(overloaded {
-        [&](BuildableOpaque bo) {
+        [&](DerivedPath::Opaque bo) {
             return bo.path;
         },
-        [&](BuildableReqFromDrv bfd)  {
+        [&](DerivedPath::Built bfd)  {
             return bfd.drvPath;
         },
     }, req.raw());
 }
 
 
-bool LocalDerivationGoal::isAllowed(const BuildableReq & req)
+bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
 {
     return this->isAllowed(pathPartOfReq(req));
 }
@@ -1334,7 +1334,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     // an allowed derivation
     { throw Error("queryRealisation"); }
 
-    void buildPaths(const std::vector<BuildableReq> & paths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override
     {
         if (buildMode != bmNormal) throw Error("unsupported build mode");
 
@@ -1348,7 +1348,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         next->buildPaths(paths, buildMode);
 
         for (auto & path : paths) {
-            auto p =  std::get_if<BuildableReqFromDrv>(&path);
+            auto p =  std::get_if<DerivedPath::Built>(&path);
             if (!p) continue;
             auto & bfd = *p;
             auto outputs = next->queryDerivationOutputMap(bfd.drvPath);
@@ -1382,7 +1382,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override
     { unsupported("addSignatures"); }
 
-    void queryMissing(const std::vector<BuildableReq> & targets,
+    void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override
     {
@@ -1390,7 +1390,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
            client about what paths will be built/substituted or are
            already present. Probably not a big deal. */
 
-        std::vector<BuildableReq> allowed;
+        std::vector<DerivedPath> allowed;
         for (auto & req : targets) {
             if (goal.isAllowed(req))
                 allowed.emplace_back(req);

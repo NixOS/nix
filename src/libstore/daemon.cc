@@ -260,14 +260,14 @@ static void writeValidPathInfo(
     }
 }
 
-static std::vector<BuildableReq> readBuildableReqs(Store & store, unsigned int clientVersion, Source & from)
+static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
 {
-    std::vector<BuildableReq> reqs;
+    std::vector<DerivedPath> reqs;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
-        reqs = worker_proto::read(store, from, Phantom<std::vector<BuildableReq>> {});
+        reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
     } else {
         for (auto & s : readStrings<Strings>(from))
-            reqs.push_back(parsePathWithOutputs(store, s).toBuildableReq());
+            reqs.push_back(parsePathWithOutputs(store, s).toDerivedPath());
     }
     return reqs;
 }
@@ -506,7 +506,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopBuildPaths: {
-        auto drvs = readBuildableReqs(*store, clientVersion, from);
+        auto drvs = readDerivedPaths(*store, clientVersion, from);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -867,7 +867,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQueryMissing: {
-        auto targets = readBuildableReqs(*store, clientVersion, from);
+        auto targets = readDerivedPaths(*store, clientVersion, from);
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;

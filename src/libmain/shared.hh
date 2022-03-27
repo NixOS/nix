@@ -4,7 +4,7 @@
 #include "args.hh"
 #include "common-args.hh"
 #include "path.hh"
-#include "buildable.hh"
+#include "derived-path.hh"
 
 #include <signal.h>
 
@@ -43,7 +43,7 @@ struct StorePathWithOutputs;
 
 void printMissing(
     ref<Store> store,
-    const std::vector<BuildableReq> & paths,
+    const std::vector<DerivedPath> & paths,
     Verbosity lvl = lvlInfo);
 
 void printMissing(ref<Store> store, const StorePathSet & willBuild,

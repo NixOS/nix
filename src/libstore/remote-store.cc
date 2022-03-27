@@ -52,13 +52,13 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
 }
 
 
-BuildableReq read(const Store & store, Source & from, Phantom<BuildableReq> _)
+DerivedPath read(const Store & store, Source & from, Phantom<DerivedPath> _)
 {
     auto s = readString(from);
-    return BuildableReq::parse(store, s);
+    return DerivedPath::parse(store, s);
 }
 
-void write(const Store & store, Sink & out, const BuildableReq & req)
+void write(const Store & store, Sink & out, const DerivedPath & req)
 {
     out << req.to_string(store);
 }
@@ -698,14 +698,14 @@ std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput &
     return {Realisation{.id = id, .outPath = *outPaths.begin()}};
 }
 
-static void writeBuildableReqs(RemoteStore & store, ConnectionHandle & conn, const std::vector<BuildableReq> & reqs)
+static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
 {
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
         worker_proto::write(store, conn->to, reqs);
     } else {
         Strings ss;
         for (auto & p : reqs) {
-            auto sOrDrvPath = StorePathWithOutputs::tryFromBuildableReq(p);
+            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
             std::visit(overloaded {
                 [&](StorePathWithOutputs s) {
                     ss.push_back(s.to_string(store));
@@ -722,12 +722,12 @@ static void writeBuildableReqs(RemoteStore & store, ConnectionHandle & conn, con
     }
 }
 
-void RemoteStore::buildPaths(const std::vector<BuildableReq> & drvPaths, BuildMode buildMode)
+void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode)
 {
     auto conn(getConnection());
     conn->to << wopBuildPaths;
     assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
-    writeBuildableReqs(*this, conn, drvPaths);
+    writeDerivedPaths(*this, conn, drvPaths);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
@@ -867,7 +867,7 @@ void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & s
 }
 
 
-void RemoteStore::queryMissing(const std::vector<BuildableReq> & targets,
+void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
     StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
     uint64_t & downloadSize, uint64_t & narSize)
 {
@@ -878,7 +878,7 @@ void RemoteStore::queryMissing(const std::vector<BuildableReq> & targets,
             // to prevent a deadlock.
             goto fallback;
         conn->to << wopQueryMissing;
-        writeBuildableReqs(*this, conn, targets);
+        writeDerivedPaths(*this, conn, targets);
         conn.processStderr();
         willBuild = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
         willSubstitute = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
