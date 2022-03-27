@@ -3,34 +3,79 @@
 #include "eval-inline.hh"
 #include "eval-cache.hh"
 #include "names.hh"
+#include "command.hh"
 
 namespace nix {
 
-App Installable::toApp(EvalState & state)
+struct InstallableDerivedPath : Installable
+{
+    ref<Store> store;
+    const DerivedPath derivedPath;
+
+    InstallableDerivedPath(ref<Store> store, const DerivedPath & derivedPath)
+        : store(store)
+        , derivedPath(derivedPath)
+    {
+    }
+
+
+    std::string what() override { return derivedPath.to_string(*store); }
+
+    DerivedPaths toDerivedPaths() override
+    {
+        return {derivedPath};
+    }
+
+    std::optional<StorePath> getStorePath() override
+    {
+        return std::nullopt;
+    }
+};
+
+/**
+ * Return the rewrites that are needed to resolve a string whose context is
+ * included in `dependencies`
+ */
+StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
+{
+    StringPairs res;
+    for (auto & dep : dependencies)
+        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep))
+            for (auto & [ outputName, outputPath ] : drvDep->outputs)
+                res.emplace(
+                    downstreamPlaceholder(store, drvDep->drvPath, outputName),
+                    store.printStorePath(outputPath)
+                );
+    return res;
+}
+
+/**
+ * Resolve the given string assuming the given context
+ */
+std::string resolveString(Store & store, const std::string & toResolve, const BuiltPaths dependencies)
+{
+    auto rewrites = resolveRewrites(store, dependencies);
+    return rewriteStrings(toResolve, rewrites);
+}
+
+UnresolvedApp Installable::toApp(EvalState & state)
 {
     auto [cursor, attrPath] = getCursor(state);
 
     auto type = cursor->getAttr("type")->getString();
 
-    auto checkProgram = [&](const Path & program)
-    {
-        if (!state.store->isInStore(program))
-            throw Error("app program '%s' is not in the Nix store", program);
-    };
-
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
-        checkProgram(program);
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
             context2.push_back({state.store->parseStorePath(path), {name}});
 
-        return App {
+        return UnresolvedApp{App {
             .context = std::move(context2),
             .program = program,
-        };
+        }};
     }
 
     else if (type == "derivation") {
@@ -45,15 +90,33 @@ App Installable::toApp(EvalState & state)
             ? aMainProgram->getString()
             : DrvName(name).name;
         auto program = outPath + "/bin/" + mainProgram;
-        checkProgram(program);
-        return App {
+        return UnresolvedApp { App {
             .context = { { drvPath, {outputName} } },
             .program = program,
-        };
+        }};
     }
 
     else
         throw Error("attribute '%s' has unsupported type '%s'", attrPath, type);
+}
+
+// FIXME: move to libcmd
+App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
+{
+    auto res = unresolved;
+
+    std::vector<std::shared_ptr<Installable>> installableContext;
+
+    for (auto & ctxElt : unresolved.context)
+        installableContext.push_back(
+            std::make_shared<InstallableDerivedPath>(store, ctxElt.toDerivedPath()));
+
+    auto builtContext = build(evalStore, store, Realise::Outputs, installableContext);
+    res.program = resolveString(*store, unresolved.program, builtContext);
+    if (!store->isInStore(res.program))
+        throw Error("app program '%s' is not in the Nix store", res.program);
+
+    return res;
 }
 
 }

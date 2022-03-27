@@ -1,3 +1,4 @@
+HOST_OS = @host_os@
 CC = @CC@
 CFLAGS = @CFLAGS@
 CXX = @CXX@

@@ -20,15 +20,7 @@ PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker &
 
 PathSubstitutionGoal::~PathSubstitutionGoal()
 {
-    try {
-        if (thr.joinable()) {
-            // FIXME: signal worker thread to quit.
-            thr.join();
-            worker.childTerminated(this);
-        }
-    } catch (...) {
-        ignoreException();
-    }
+    cleanup();
 }
 
 
@@ -62,6 +54,8 @@ void PathSubstitutionGoal::init()
 void PathSubstitutionGoal::tryNext()
 {
     trace("trying next substituter");
+
+    cleanup();
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
@@ -204,14 +198,14 @@ void PathSubstitutionGoal::tryToRun()
     thr = std::thread([this]() {
         try {
             /* Wake up the worker loop when we're done. */
-            Finally updateStats([this]() { outPipe.writeSide = -1; });
+            Finally updateStats([this]() { outPipe.writeSide.close(); });
 
             Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
             auto p = ca ? StorePathOrDesc { std::cref(*ca) } : std::cref(storePath);
 
-            copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
+            copyStorePath(*sub, worker.store,
                 p, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
@@ -288,5 +282,22 @@ void PathSubstitutionGoal::handleEOF(int fd)
 {
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
+
+
+void PathSubstitutionGoal::cleanup()
+{
+    try {
+        if (thr.joinable()) {
+            // FIXME: signal worker thread to quit.
+            thr.join();
+            worker.childTerminated(this);
+        }
+
+        outPipe.close();
+    } catch (...) {
+        ignoreException();
+    }
+}
+
 
 }

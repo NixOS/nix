@@ -203,13 +203,18 @@ void Input::markChangedFile(
     return scheme->markChangedFile(*this, file, commitMsg);
 }
 
+std::string Input::getName() const
+{
+    return maybeGetStrAttr(attrs, "name").value_or("source");
+}
+
 StorePathDescriptor Input::computeStorePath(Store & store) const
 {
     auto narHash = getNarHash();
     if (!narHash)
         throw Error("cannot compute store path for mutable input '%s'", to_string());
     return StorePathDescriptor {
-        "source",
+        getName(),
         FixedOutputInfo {
             {
                 .method = FileIngestionMethod::Recursive,

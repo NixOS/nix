@@ -52,9 +52,9 @@ void BinaryCacheStore::init()
                     throw Error("binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         getUri(), value, storeDir);
             } else if (name == "WantMassQuery") {
-                wantMassQuery.setDefault(value == "1" ? "true" : "false");
+                wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
-                priority.setDefault(fmt("%d", std::stoi(value)));
+                priority.setDefault(std::stoi(value));
             }
         }
     }
@@ -130,17 +130,6 @@ AutoCloseFD openFile(const Path & path)
     return fd;
 }
 
-struct FileSource : FdSource
-{
-    AutoCloseFD fd2;
-
-    FileSource(const Path & path)
-        : fd2(openFile(path))
-    {
-        fd = fd2.get();
-    }
-};
-
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
     std::function<ValidPathInfo(HashResult)> mkInfo)
@@ -179,6 +168,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     narInfo->url = "nar/" + narInfo->fileHash->to_string(Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
+           compression == "zstd" ? ".zst" :
+           compression == "lzip" ? ".lzip" :
+           compression == "lz4" ? ".lz4" :
            compression == "br" ? ".br" :
            "");
 
@@ -472,18 +464,43 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
 
 std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
 {
+    if (diskCache) {
+        auto [cacheOutcome, maybeCachedRealisation] =
+            diskCache->lookupRealisation(getUri(), id);
+        switch (cacheOutcome) {
+            case NarInfoDiskCache::oValid:
+                debug("Returning a cached realisation for %s", id.to_string());
+                return *maybeCachedRealisation;
+            case NarInfoDiskCache::oInvalid:
+                debug("Returning a cached missing realisation for %s", id.to_string());
+                return {};
+            case NarInfoDiskCache::oUnknown:
+                break;
+        }
+    }
+
     auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
     auto rawOutputInfo = getFile(outputInfoFilePath);
 
     if (rawOutputInfo) {
-        return {Realisation::fromJSON(
-            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath)};
+        auto realisation = Realisation::fromJSON(
+            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath);
+
+        if (diskCache)
+            diskCache->upsertRealisation(
+                getUri(), realisation);
+
+        return {realisation};
     } else {
+        if (diskCache)
+            diskCache->upsertAbsentRealisation(getUri(), id);
         return std::nullopt;
     }
 }
 
 void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
+    if (diskCache)
+        diskCache->upsertRealisation(getUri(), info);
     auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
     upsertFile(filePath, info.toJSON().dump(), "application/json");
 }

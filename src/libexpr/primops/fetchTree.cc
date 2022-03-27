@@ -7,6 +7,7 @@
 
 #include <ctime>
 #include <iomanip>
+#include <regex>
 
 namespace nix {
 
@@ -15,7 +16,8 @@ void emitTreeAttrs(
     const fetchers::Tree & tree,
     const fetchers::Input & input,
     Value & v,
-    bool emptyRevFallback)
+    bool emptyRevFallback,
+    bool forceDirty)
 {
     assert(input.isImmutable());
 
@@ -33,24 +35,28 @@ void emitTreeAttrs(
     mkString(*state.allocAttr(v, state.symbols.create("narHash")),
         narHash->to_string(SRI, true));
 
-    if (auto rev = input.getRev()) {
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
-    } else if (emptyRevFallback) {
-        // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
-        auto emptyHash = Hash(htSHA1);
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
-    }
-
     if (input.getType() == "git")
         mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
-    if (auto revCount = input.getRevCount())
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
-    else if (emptyRevFallback)
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+    if (!forceDirty) {
+
+        if (auto rev = input.getRev()) {
+            mkString(*state.allocAttr(v, state.symbols.create("rev")), rev->gitRev());
+            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), rev->gitShortRev());
+        } else if (emptyRevFallback) {
+            // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
+            auto emptyHash = Hash(htSHA1);
+            mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
+            mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
+        }
+
+        if (auto revCount = input.getRevCount())
+            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
+        else if (emptyRevFallback)
+            mkInt(*state.allocAttr(v, state.symbols.create("revCount")), 0);
+
+    }
 
     if (auto lastModified = input.getLastModified()) {
         mkInt(*state.allocAttr(v, state.symbols.create("lastModified")), *lastModified);
@@ -61,10 +67,19 @@ void emitTreeAttrs(
     v.attrs->sort();
 }
 
-std::string fixURI(std::string uri, EvalState &state)
+std::string fixURI(std::string uri, EvalState &state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : "file://" + uri;
+    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+}
+
+std::string fixURIForGit(std::string uri, EvalState & state)
+{
+    static std::regex scp_uri("([^/].*)@(.*):(.*)");
+    if (uri[0] != '/' && std::regex_match(uri, scp_uri))
+        return fixURI(std::regex_replace(uri, scp_uri, "$1@$2/$3"), state, "ssh");
+    else
+        return fixURI(uri, state);
 }
 
 void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v)
@@ -73,13 +88,18 @@ void addURI(EvalState &state, fetchers::Attrs &attrs, Symbol name, std::string v
     attrs.emplace(name, n == "url" ? fixURI(v, state) : v);
 }
 
+struct FetchTreeParams {
+    bool emptyRevFallback = false;
+    bool allowNameArgument = false;
+};
+
 static void fetchTree(
     EvalState &state,
     const Pos &pos,
     Value **args,
     Value &v,
     const std::optional<std::string> type,
-    bool emptyRevFallback = false
+    const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
     PathSet context;
@@ -120,17 +140,25 @@ static void fetchTree(
                 .errPos = pos
             });
 
+        if (!params.allowNameArgument)
+            if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
+                throw Error({
+                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
+                    .errPos = pos
+                });
+
+
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = fixURI(state.coerceToString(pos, *args[0], context, false, false), state);
+        auto url = state.coerceToString(pos, *args[0], context, false, false);
 
         if (type == "git") {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", url);
+            attrs.emplace("url", fixURIForGit(url, state));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(fixURI(url, state));
         }
     }
 
@@ -145,13 +173,13 @@ static void fetchTree(
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);
 
-    emitTreeAttrs(state, tree, input2, v, emptyRevFallback);
+    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     settings.requireExperimentalFeature("flakes");
-    fetchTree(state, pos, args, v, std::nullopt);
+    fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
 // FIXME: document
@@ -221,20 +249,22 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
-    auto path = state.store->toRealPath(state.store->makeFixedOutputPathFromCA(storePath));
+    auto actualStorePath = state.store->makeFixedOutputPathFromCA(storePath);
+    auto realPath = state.store->toRealPath(actualStorePath);
 
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, path);
+            : hashFile(htSHA256, realPath);
         if (hash != *expectedHash)
             throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
     if (state.allowedPaths)
-        state.allowedPaths->insert(path);
+        state.allowedPaths->insert(realPath);
 
+    auto path = state.store->printStorePath(actualStorePath);
     mkString(v, path, PathSet({path}));
 }
 
@@ -307,7 +337,7 @@ static RegisterPrimOp primop_fetchTarball({
 
 static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
 {
-    fetchTree(state, pos, args, v, "git", true);
+    fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }
 
 static RegisterPrimOp primop_fetchGit({
@@ -318,17 +348,17 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url  
+        - url\
           The URL of the repo.
 
-        - name  
+        - name\
           The name of the directory the repo should be exported to in the
           store. Defaults to the basename of the URL.
 
-        - rev  
+        - rev\
           The git revision to fetch. Defaults to the tip of `ref`.
 
-        - ref  
+        - ref\
           The git ref to look for the requested revision under. This is
           often a branch or tag name. Defaults to `HEAD`.
 
@@ -336,11 +366,11 @@ static RegisterPrimOp primop_fetchGit({
           of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
           with `refs/`.
 
-        - submodules  
+        - submodules\
           A Boolean parameter that specifies whether submodules should be
           checked out. Defaults to `false`.
 
-        - allRefs  
+        - allRefs\
           Whether to fetch all refs of the repository. With this argument being
           true, it's possible to load a `rev` from *any* `ref` (by default only
           `rev`s from the specified `ref` are supported).

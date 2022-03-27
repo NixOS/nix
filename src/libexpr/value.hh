@@ -341,6 +341,8 @@ public:
         return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
     }
 
+    Pos determinePos(const Pos &pos) const;
+
     /* Check whether forcing this value requires a trivial amount of
        computation. In particular, function applications are
        non-trivial. */

@@ -10,8 +10,25 @@ bin-scripts :=
 noinst-scripts :=
 man-pages :=
 install-tests :=
-OS = $(shell uname -s)
 
+ifdef HOST_OS
+  HOST_KERNEL = $(firstword $(subst -, ,$(HOST_OS)))
+  ifeq ($(HOST_KERNEL), cygwin)
+    HOST_CYGWIN = 1
+  endif
+  ifeq ($(patsubst darwin%,,$(HOST_KERNEL)),)
+    HOST_DARWIN = 1
+  endif
+  ifeq ($(patsubst freebsd%,,$(HOST_KERNEL)),)
+    HOST_FREEBSD = 1
+  endif
+  ifeq ($(HOST_KERNEL), linux)
+    HOST_LINUX = 1
+  endif
+  ifeq ($(patsubst solaris%,,$(HOST_KERNEL)),)
+    HOST_SOLARIS = 1
+  endif
+endif
 
 # Hack to define a literal space.
 space :=
@@ -50,16 +67,16 @@ endif
 BUILD_SHARED_LIBS ?= 1
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
-  ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
+  ifdef HOST_CYGWIN
     GLOBAL_CFLAGS += -U__STRICT_ANSI__ -D_GNU_SOURCE
     GLOBAL_CXXFLAGS += -U__STRICT_ANSI__ -D_GNU_SOURCE
   else
     GLOBAL_CFLAGS += -fPIC
     GLOBAL_CXXFLAGS += -fPIC
   endif
-  ifneq ($(OS), Darwin)
-   ifneq ($(OS), SunOS)
-    ifneq ($(OS), FreeBSD)
+  ifndef HOST_DARWIN
+   ifndef HOST_SOLARIS
+    ifndef HOST_FREEBSD
      GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
     endif
    endif

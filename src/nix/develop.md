@@ -84,11 +84,20 @@ the flake's `nixConfig` attribute.
 
 # Flake output attributes
 
-If no flake output attribute is given, `nix run` tries the following
+If no flake output attribute is given, `nix develop` tries the following
 flake output attributes:
 
 * `devShell.<system>`
 
 * `defaultPackage.<system>`
+
+If a flake output *name* is given, `nix develop` tries the following flake
+output attributes:
+
+* `devShells.<system>.<name>`
+
+* `packages.<system>.<name>`
+
+* `legacyPackages.<system>.<name>`
 
 )""

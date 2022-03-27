@@ -7,6 +7,8 @@ CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 
+AC_CANONICAL_HOST
+
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE
 

@@ -11,7 +11,7 @@ namespace nix {
 class StorePath;
 
 
-typedef unsigned int GenerationNumber;
+typedef uint64_t GenerationNumber;
 
 struct Generation
 {
@@ -45,6 +45,13 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun);
 void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun);
 
 void switchLink(Path link, Path target);
+
+/* Roll back a profile to the specified generation, or to the most
+   recent one older than the current. */
+void switchGeneration(
+    const Path & profile,
+    std::optional<GenerationNumber> dstGen,
+    bool dryRun);
 
 /* Ensure exclusive access to a profile.  Any command that modifies
    the profile first acquires this lock. */

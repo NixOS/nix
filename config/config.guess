@@ -1,8 +1,8 @@
 #! /bin/sh
 # Attempt to guess a canonical system name.
-#   Copyright 1992-2020 Free Software Foundation, Inc.
+#   Copyright 1992-2021 Free Software Foundation, Inc.
 
-timestamp='2020-11-19'
+timestamp='2021-01-25'
 
 # This file is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ version="\
 GNU config.guess ($timestamp)
 
 Originally written by Per Bothner.
-Copyright 1992-2020 Free Software Foundation, Inc.
+Copyright 1992-2021 Free Software Foundation, Inc.
 
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
@@ -188,10 +188,9 @@ case "$UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION" in
 	#
 	# Note: NetBSD doesn't particularly care about the vendor
 	# portion of the name.  We always set it to "unknown".
-	sysctl="sysctl -n hw.machine_arch"
 	UNAME_MACHINE_ARCH=$( (uname -p 2>/dev/null || \
-	    "/sbin/$sysctl" 2>/dev/null || \
-	    "/usr/sbin/$sysctl" 2>/dev/null || \
+	    /sbin/sysctl -n hw.machine_arch 2>/dev/null || \
+	    /usr/sbin/sysctl -n hw.machine_arch 2>/dev/null || \
 	    echo unknown))
 	case "$UNAME_MACHINE_ARCH" in
 	    aarch64eb) machine=aarch64_be-unknown ;;
@@ -996,6 +995,9 @@ EOF
     k1om:Linux:*:*)
 	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
 	exit ;;
+    loongarch32:Linux:*:* | loongarch64:Linux:*:* | loongarchx32:Linux:*:*)
+	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
+	exit ;;
     m32r*:Linux:*:*)
 	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
 	exit ;;
@@ -1084,7 +1086,7 @@ EOF
     ppcle:Linux:*:*)
 	echo powerpcle-unknown-linux-"$LIBC"
 	exit ;;
-    riscv32:Linux:*:* | riscv64:Linux:*:*)
+    riscv32:Linux:*:* | riscv32be:Linux:*:* | riscv64:Linux:*:* | riscv64be:Linux:*:*)
 	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
 	exit ;;
     s390:Linux:*:* | s390x:Linux:*:*)
@@ -1480,8 +1482,8 @@ EOF
     i*86:rdos:*:*)
 	echo "$UNAME_MACHINE"-pc-rdos
 	exit ;;
-    i*86:AROS:*:*)
-	echo "$UNAME_MACHINE"-pc-aros
+    *:AROS:*:*)
+	echo "$UNAME_MACHINE"-unknown-aros
 	exit ;;
     x86_64:VMkernel:*:*)
 	echo "$UNAME_MACHINE"-unknown-esx

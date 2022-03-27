@@ -12,6 +12,8 @@ makefiles = \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
   misc/bash/local.mk \
+  misc/fish/local.mk \
+  misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
@@ -31,4 +33,4 @@ endif
 
 include mk/lib.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17
+GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17 -I src

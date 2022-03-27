@@ -5,7 +5,7 @@ clearStore
 # Test fetching a flat file.
 hash=$(nix-hash --flat --type sha256 ./fetchurl.sh)
 
-outPath=$(nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link)
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link)
 
 cmp $outPath fetchurl.sh
 
@@ -14,7 +14,7 @@ clearStore
 
 hash=$(nix hash file --type sha512 --base64 ./fetchurl.sh)
 
-outPath=$(nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link)
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link)
 
 cmp $outPath fetchurl.sh
 
@@ -25,7 +25,7 @@ hash=$(nix hash file ./fetchurl.sh)
 
 [[ $hash =~ ^sha256- ]]
 
-outPath=$(nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr hash $hash --no-out-link)
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr hash $hash --no-out-link)
 
 cmp $outPath fetchurl.sh
 
@@ -38,10 +38,10 @@ hash=$(nix hash file --type sha256 --base16 ./fetchurl.sh)
 
 storePath=$(nix --store $other_store store add-file ./fetchurl.sh)
 
-outPath=$(nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha256 $hash --no-out-link --substituters $other_store)
 
 # Test hashed mirrors with an SRI hash.
-nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix hash to-sri --type sha256 $hash) \
+nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr hash $(nix hash to-sri --type sha256 $hash) \
           --no-out-link --substituters $other_store
 
 # Test unpacking a NAR.
@@ -55,7 +55,7 @@ nix-store --dump $TEST_ROOT/archive > $nar
 
 hash=$(nix-hash --flat --type sha256 $nar)
 
-outPath=$(nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
 echo $outPath | grep -q 'xyzzy'
@@ -69,7 +69,7 @@ nix-store --delete $outPath
 narxz=$TEST_ROOT/archive.nar.xz
 rm -f $narxz
 xz --keep $nar
-outPath=$(nix-build --expr 'import <nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
 test -x $outPath/fetchurl.sh

@@ -41,6 +41,9 @@ struct Input
     bool immutable = false;
     bool direct = true;
 
+    /* path of the parent of this input, used for relative path resolution */
+    std::optional<Path> parent;
+
 public:
     static Input fromURL(const std::string & url);
 
@@ -83,6 +86,8 @@ public:
     void markChangedFile(
         std::string_view file,
         std::optional<std::string> commitMsg) const;
+
+    std::string getName() const;
 
     StorePathDescriptor computeStorePath(Store & store) const;
 
@@ -148,13 +153,7 @@ DownloadFileResult downloadFile(
     bool immutable,
     const Headers & headers = {});
 
-struct DownloadTarballMeta
-{
-    time_t lastModified;
-    std::string effectiveUrl;
-};
-
-std::pair<Tree, DownloadTarballMeta> downloadTarball(
+std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,

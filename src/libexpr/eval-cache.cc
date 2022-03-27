@@ -486,11 +486,11 @@ std::shared_ptr<AttrCursor> AttrCursor::getAttr(std::string_view name)
     return getAttr(root->state.symbols.create(name));
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath)
+std::shared_ptr<AttrCursor> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force)
 {
     auto res = shared_from_this();
     for (auto & attr : attrPath) {
-        res = res->maybeGetAttr(attr);
+        res = res->maybeGetAttr(attr, force);
         if (!res) return {};
     }
     return res;

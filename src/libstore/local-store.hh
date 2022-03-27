@@ -83,9 +83,6 @@ private:
 
 public:
 
-    PathSetting realStoreDir_;
-
-    const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
     const Path reservedPath;
@@ -207,6 +204,8 @@ public:
     void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
 
+    std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
+    std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
     std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
 
 private:
@@ -280,9 +279,20 @@ private:
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
 
-    Path getRealStoreDir() override { return realStoreDir; }
-
     void createUser(const std::string & userName, uid_t userId) override;
+
+    // XXX: Make a generic `Store` method
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const StorePath & path);
+
+    FixedOutputHash hashCAPath(
+        const FileIngestionMethod & method,
+        const HashType & hashType,
+        const Path & path,
+        const std::string_view pathHash
+    );
 
     friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;

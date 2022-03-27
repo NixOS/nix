@@ -89,7 +89,7 @@ let
 in
 
 let
-  manpages = processCommand { filename = "nix"; command = "nix"; def = command; };
+  manpages = processCommand { filename = "nix"; command = "nix"; def = builtins.fromJSON command; };
   summary = concatStrings (map (manpage: "    - [${manpage.command}](command-ref/new-cli/${manpage.name})\n") manpages);
 in
 (listToAttrs manpages) // { "SUMMARY.md" = summary; }

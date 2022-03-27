@@ -11,34 +11,32 @@ using namespace std::string_literals;
 
 namespace nix::fetchers {
 
-namespace {
+static RunOptions hgOptions(const Strings & args)
+{
+    auto env = getEnv();
+    // Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
+    env["HGPLAIN"] = "";
 
-RunOptions hgOptions(const Strings & args) {
-	RunOptions opts("hg", args);
-	opts.searchPath = true;
-
-	auto env = getEnv();
-	// Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
-	env["HGPLAIN"] = "";
-	opts.environment = env;
-
-	return opts;
+    return {
+        .program = "hg",
+        .searchPath = true,
+        .args = args,
+        .environment = env
+    };
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.
-string runHg(const Strings & args, const std::optional<std::string> & input = {})
+static string runHg(const Strings & args, const std::optional<std::string> & input = {})
 {
-	RunOptions opts = hgOptions(args);
-	opts.input = input;
+    RunOptions opts = hgOptions(args);
+    opts.input = input;
 
-	auto res = runProgram(opts);
+    auto res = runProgram(std::move(opts));
 
-	if (!statusOk(res.first))
-		throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
+    if (!statusOk(res.first))
+        throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
 
-	return res.second;
-}
-
+    return res.second;
 }
 
 struct MercurialInputScheme : InputScheme
@@ -74,7 +72,7 @@ struct MercurialInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "hg") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash" && name != "name")
                 throw Error("unsupported Mercurial input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -147,9 +145,9 @@ struct MercurialInputScheme : InputScheme
 
     std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        auto name = "source";
-
         Input input(_input);
+
+        auto name = input.getName();
 
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
@@ -193,7 +191,7 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore("source", actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
                 // FIXME: just have Store::addToStore return a StorePathDescriptor, as
                 // it has the underlying information.
                 auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
@@ -262,9 +260,7 @@ struct MercurialInputScheme : InputScheme
            have to pull again. */
         if (!(input.getRev()
                 && pathExists(cacheDir)
-                && runProgram(
-                    hgOptions({ "log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1" })
-                    .killStderr(true)).second == "1"))
+                && runProgram(hgOptions({ "log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1" })).second == "1"))
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 

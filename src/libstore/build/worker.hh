@@ -110,6 +110,7 @@ public:
     bool checkMismatch;
 
     Store & store;
+    Store & evalStore;
 
     std::unique_ptr<HookInstance> hook;
 
@@ -131,7 +132,7 @@ public:
        it answers with "decline-permanently", we don't try again. */
     bool tryBuildHook = true;
 
-    Worker(Store & store);
+    Worker(Store & store, Store & evalStore);
     ~Worker();
 
     /* Make a goal (with caching). */

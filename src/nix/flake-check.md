@@ -22,13 +22,18 @@ This command verifies that the flake specified by flake reference
 that the derivations specified by the flake's `checks` output can be
 built successfully.
 
+If the `keep-going` option is set to `true`, Nix will keep evaluating as much
+as it can and report the errors as it encounters them. Otherwise it will stop
+at the first error.
+
 # Evaluation checks
 
-This following flake output attributes must be derivations:
+The following flake output attributes must be derivations:
 
 * `checks.`*system*`.`*name*
 * `defaultPackage.`*system*`
 * `devShell.`*system*`
+* `devShells.`*system*`.`*name*`
 * `nixosConfigurations.`*name*`.config.system.build.toplevel
 * `packages.`*system*`.`*name*
 

@@ -52,7 +52,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(store, dryRun ? Realise::Nothing : Realise::Outputs, installables, buildMode);
+        auto buildables = build(
+            getEvalStore(), store,
+            dryRun ? Realise::Derivation : Realise::Outputs,
+            installables, buildMode);
+
+        if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
 
         if (dryRun) return;
 
@@ -61,14 +66,13 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                 for (const auto & [_i, buildable] : enumerate(buildables)) {
                     auto i = _i;
                     std::visit(overloaded {
-                        [&](DerivedPathWithHints::Opaque bo) {
+                        [&](BuiltPath::Opaque bo) {
                             std::string symlink = outLink;
                             if (i) symlink += fmt("-%d", i);
                             store2->addPermRoot(bo.path, absPath(symlink));
                         },
-                        [&](DerivedPathWithHints::Built bfd) {
-                            auto builtOutputs = store->queryDerivationOutputMap(bfd.drvPath);
-                            for (auto & output : builtOutputs) {
+                        [&](BuiltPath::Built bfd) {
+                            for (auto & output : bfd.outputs) {
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);
                                 if (output.first != "out") symlink += fmt("-%s", output.first);
@@ -79,8 +83,6 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                 }
 
         updateProfile(buildables);
-
-        if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
     }
 };
 

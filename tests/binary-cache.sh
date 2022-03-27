@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "“--no-require-sigs” can’t be used with the daemon"
+
 # We can produce drvs directly into the binary cache
 clearStore
 clearCacheCache

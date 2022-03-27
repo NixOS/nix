@@ -227,6 +227,12 @@ struct ClientSettings
             try {
                 if (name == "ssh-auth-sock") // obsolete
                     ;
+                else if (name == settings.experimentalFeatures.name) {
+                    // We don’t want to forward the experimental features to
+                    // the daemon, as that could cause some pretty weird stuff
+                    if (tokenizeString<Strings>(value) != settings.experimentalFeatures.get())
+                        debug("Ignoring the client-specified experimental features");
+                }
                 else if (trusted
                     || name == settings.buildTimeout.name
                     || name == "connect-timeout"
@@ -243,27 +249,10 @@ struct ClientSettings
     }
 };
 
-static void writeValidPathInfo(
-    ref<Store> store,
-    unsigned int clientVersion,
-    Sink & to,
-    std::shared_ptr<const ValidPathInfo> info)
-{
-    to << (info->deriver ? store->printStorePath(*info->deriver) : "")
-       << info->narHash.to_string(Base16, false);
-    worker_proto::write(*store, to, info->referencesPossiblyToSelf());
-    to << info->registrationTime << info->narSize;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-        to << info->ultimate
-           << info->sigs
-           << renderContentAddress(info->ca);
-    }
-}
-
 static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
 {
     std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
         reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
     } else {
         for (auto & s : readStrings<Strings>(from))
@@ -422,9 +411,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             }();
             logger->stopWork();
 
-            to << store->printStorePath(pathInfo->path);
-            writeValidPathInfo(store, clientVersion, to, pathInfo);
-
+            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -468,6 +455,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
             to << store->printStorePath(path);
         }
+        break;
+    }
+
+    case wopAddMultipleToStore: {
+        bool repair, dontCheckSigs;
+        from >> repair >> dontCheckSigs;
+        if (!trusted && dontCheckSigs)
+            dontCheckSigs = false;
+
+        logger->startWork();
+        FramedSource source(from);
+        store->addMultipleToStore(source,
+            RepairFlag{repair},
+            dontCheckSigs ? NoCheckSigs : CheckSigs);
+        logger->stopWork();
         break;
     }
 
@@ -767,7 +769,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            writeValidPathInfo(store, clientVersion, to, info);
+            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
@@ -882,11 +884,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopRegisterDrvOutput: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(from));
-        auto outputPath = StorePath(readString(from));
-        auto resolvedDrv = StorePath(readString(from));
-        store->registerDrvOutput(Realisation{
-            .id = outputId, .outPath = outputPath});
+        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+            auto outputId = DrvOutput::parse(readString(from));
+            auto outputPath = StorePath(readString(from));
+            store->registerDrvOutput(Realisation{
+                .id = outputId, .outPath = outputPath});
+        } else {
+            auto realisation = worker_proto::read(*store, from, Phantom<Realisation>());
+            store->registerDrvOutput(realisation);
+        }
         logger->stopWork();
         break;
     }
@@ -896,9 +902,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto outputId = DrvOutput::parse(readString(from));
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
-        std::set<StorePath> outPaths;
-        if (info) outPaths.insert(info->outPath);
-        worker_proto::write(*store, to, outPaths);
+        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+            std::set<StorePath> outPaths;
+            if (info) outPaths.insert(info->outPath);
+            worker_proto::write(*store, to, outPaths);
+        } else {
+            std::set<Realisation> realisations;
+            if (info) realisations.insert(*info);
+            worker_proto::write(*store, to, realisations);
+        }
         break;
     }
 

@@ -1,3 +1,5 @@
+#compdef nix
+
 function _nix() {
   local ifs_bk="$IFS"
   local input=("${(Q)words[@]}")
@@ -18,4 +20,4 @@ function _nix() {
   _describe 'nix' suggestions
 }
 
-compdef _nix nix
+_nix "$@"

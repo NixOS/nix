@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdCopy : RealisedPathsCommand
+struct CmdCopy : BuiltPathsCommand
 {
     std::string srcUri, dstUri;
 
@@ -16,10 +16,10 @@ struct CmdCopy : RealisedPathsCommand
 
     SubstituteFlag substitute = NoSubstitute;
 
-    using RealisedPathsCommand::run;
+    using BuiltPathsCommand::run;
 
     CmdCopy()
-        : RealisedPathsCommand(true)
+        : BuiltPathsCommand(true)
     {
         addFlag({
             .longName = "from",
@@ -75,16 +75,22 @@ struct CmdCopy : RealisedPathsCommand
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
-        RealisedPathsCommand::run(store);
+        BuiltPathsCommand::run(store);
     }
 
-    void run(ref<Store> srcStore, std::vector<RealisedPath> paths) override
+    void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
+        RealisedPath::Set stuffToCopy;
+
+        for (auto & builtPath : paths) {
+            auto theseRealisations = builtPath.toRealisedPaths(*srcStore);
+            stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
+        }
+
         copyPaths(
-            srcStore, dstStore, RealisedPath::Set(paths.begin(), paths.end()),
-            NoRepair, checkSigs, substitute);
+            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
     }
 };
 

@@ -79,6 +79,11 @@ public:
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
+    void addMultipleToStore(
+        Source & source,
+        RepairFlag repair,
+        CheckSigsFlag checkSigs) override;
+
     StorePath addTextToStore(const string & name, const string & s,
         const StorePathSet & references, RepairFlag repair) override;
 
@@ -86,7 +91,7 @@ public:
 
     std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
 
-    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode) override;
+    void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -121,13 +126,14 @@ public:
 
     struct Connection
     {
-        AutoCloseFD fd;
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 
         virtual ~Connection();
+
+        virtual void closeWrite() = 0;
 
         std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
     };
@@ -151,8 +157,6 @@ protected:
     virtual ref<FSAccessor> getFSAccessor() override;
 
     virtual void narFromPath(StorePathOrDesc pathOrDesc, Sink & sink) override;
-
-    ref<const ValidPathInfo> readValidPathInfo(ConnectionHandle & conn, const StorePath & path);
 
 private:
 

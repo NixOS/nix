@@ -10,6 +10,7 @@
 #include "references.hh"
 #include "archive.hh"
 #include "callback.hh"
+#include "remote-store.hh"
 
 #include <regex>
 
@@ -283,6 +284,20 @@ StorePath Store::addToStore(const string & name, const Path & _srcPath,
 }
 
 
+void Store::addMultipleToStore(
+    Source & source,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
+    auto expected = readNum<uint64_t>(source);
+    for (uint64_t i = 0; i < expected; ++i) {
+        auto info = ValidPathInfo::read(source, *this, 16);
+        info.ultimate = false;
+        addToStore(info, source, repair, checkSigs);
+    }
+}
+
+
 /*
 The aim of this function is to compute in one pass the correct ValidPathInfo for
 the files that we are trying to add to the store. To accomplish that in one
@@ -380,6 +395,13 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     return info;
 }
 
+StringSet StoreConfig::getDefaultSystemFeatures()
+{
+    auto res = settings.systemFeatures.get();
+    if (settings.isExperimentalFeatureEnabled("ca-derivations"))
+        res.insert("ca-derivations");
+    return res;
+}
 
 Store::Store(const Params & params)
     : StoreConfig(params)
@@ -686,6 +708,42 @@ string Store::makeValidityRegistration(const StorePathSet & paths,
 }
 
 
+StorePathSet Store::exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths)
+{
+    StorePathSet paths;
+
+    for (auto & storePath : storePaths) {
+        if (!inputPaths.count(storePath))
+            throw BuildError("cannot export references of path '%s' because it is not in the input closure of the derivation", printStorePath(storePath));
+
+        computeFSClosure({storePath}, paths);
+    }
+
+    /* If there are derivations in the graph, then include their
+       outputs as well.  This is useful if you want to do things
+       like passing all build-time dependencies of some path to a
+       derivation that builds a NixOS DVD image. */
+    auto paths2 = paths;
+
+    for (auto & j : paths2) {
+        if (j.isDerivation()) {
+            Derivation drv = derivationFromPath(j);
+            for (auto & k : drv.outputsAndOptPaths(*this)) {
+                if (!k.second.second)
+                    /* FIXME: I am confused why we are calling
+                       `computeFSClosure` on the output path, rather than
+                       derivation itself. That doesn't seem right to me, so I
+                       won't try to implemented this for CA derivations. */
+                    throw UnimplementedError("exportReferences on CA derivations is not yet implemented");
+                computeFSClosure(*k.second.second, paths);
+            }
+        }
+    }
+
+    return paths;
+}
+
+
 void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
     Base hashBase,
@@ -786,26 +844,38 @@ const Store::Stats & Store::getStats()
 }
 
 
-void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    StorePathOrDesc storePath, RepairFlag repair, CheckSigsFlag checkSigs)
+static std::string makeCopyPathMessage(
+    std::string_view srcUri,
+    std::string_view dstUri,
+    std::string_view storePath)
 {
-    auto srcUri = srcStore->getUri();
-    auto dstUri = dstStore->getUri();
-
     // FIXME Use CA when we have it in messages below
+    return srcUri == "local" || srcUri == "daemon"
+        ? fmt("copying path '%s' to '%s'", storePath, dstUri)
+        : dstUri == "local" || dstUri == "daemon"
+        ? fmt("copying path '%s' from '%s'", storePath, srcUri)
+        : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri);
+}
 
-    auto actualStorePath = srcStore->bakeCaIfNeeded(storePath);
+void copyStorePath(
+    Store & srcStore,
+    Store & dstStore,
+    StorePathOrDesc storePath,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
 
+    auto actualStorePath = srcStore.bakeCaIfNeeded(storePath);
+
+    auto srcUri = srcStore.getUri();
+    auto dstUri = dstStore.getUri();
+    auto storePathS = srcStore.printStorePath(actualStorePath);
     Activity act(*logger, lvlInfo, actCopyPath,
-        srcUri == "local" || srcUri == "daemon"
-        ? fmt("copying path '%s' to '%s'", srcStore->printStorePath(actualStorePath), dstUri)
-          : dstUri == "local" || dstUri == "daemon"
-        ? fmt("copying path '%s' from '%s'", srcStore->printStorePath(actualStorePath), srcUri)
-          : fmt("copying path '%s' from '%s' to '%s'", srcStore->printStorePath(actualStorePath), srcUri, dstUri),
-        {srcStore->printStorePath(actualStorePath), srcUri, dstUri});
+        makeCopyPathMessage(srcUri, dstUri, storePathS),
+        {storePathS, srcUri, dstUri});
     PushActivity pact(act.id);
 
-    auto info = srcStore->queryPathInfo(storePath);
+    auto info = srcStore.queryPathInfo(storePath);
 
     uint64_t total = 0;
 
@@ -818,8 +888,8 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         // }
         if (info->references.empty()) {
             auto info2 = make_ref<ValidPathInfo>(*info);
-            ValidPathInfo dstInfoCA { *dstStore, StorePathDescriptor { ca }, info->narHash };
-            if (dstStore->storeDir == srcStore->storeDir)
+            ValidPathInfo dstInfoCA { dstStore, StorePathDescriptor { ca }, info->narHash };
+            if (dstStore.storeDir == srcStore.storeDir)
                 assert(info2->path == info2->path);
             info2->path = std::move(dstInfoCA.path);
             info2->ca = std::move(dstInfoCA.ca);
@@ -839,32 +909,56 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
             act.progress(total, info->narSize);
         });
         TeeSink tee { sink, progressSink };
-        srcStore->narFromPath(storePath, tee);
+        srcStore.narFromPath(storePath, tee);
     }, [&]() {
-           throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore->printStorePath(actualStorePath), srcStore->getUri());
+           throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore.printStorePath(actualStorePath), srcStore.getUri());
     });
 
-    dstStore->addToStore(*info, *source, repair, checkSigs);
+    dstStore.addToStore(*info, *source, repair, checkSigs);
 }
 
 
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set & paths,
-    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+void copyPaths(
+    Store & srcStore,
+    Store & dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
 {
     StorePathSet storePaths;
-    std::set<Realisation> realisations;
+    std::set<Realisation> toplevelRealisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
         if (auto realisation = std::get_if<Realisation>(&path.raw)) {
             settings.requireExperimentalFeature("ca-derivations");
-            realisations.insert(*realisation);
+            toplevelRealisations.insert(*realisation);
         }
     }
     copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+
+    ThreadPool pool;
+
     try {
-        for (auto & realisation : realisations) {
-            dstStore->registerDrvOutput(realisation, checkSigs);
-        }
+        // Copy the realisation closure
+        processGraph<Realisation>(
+            pool, Realisation::closure(srcStore, toplevelRealisations),
+            [&](const Realisation & current) -> std::set<Realisation> {
+                std::set<Realisation> children;
+                for (const auto & [drvOutput, _] : current.dependentRealisations) {
+                    auto currentChild = srcStore.queryRealisation(drvOutput);
+                    if (!currentChild)
+                        throw Error(
+                            "incomplete realisation closure: '%s' is a "
+                            "dependency of '%s' but isn't registered",
+                            drvOutput.to_string(), current.id.to_string());
+                    children.insert(*currentChild);
+                }
+                return children;
+            },
+            [&](const Realisation& current) -> void {
+                dstStore.registerDrvOutput(current, checkSigs);
+            });
     } catch (MissingExperimentalFeature & e) {
         // Don't fail if the remote doesn't support CA derivations is it might
         // not be within our control to change that, and we might still want
@@ -877,20 +971,55 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const RealisedPath::Set
 }
 
 
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const StorePathSet & storePaths,
-    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+void copyPaths(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePathSet & storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
 {
-    std::set<OwnedStorePathOrDesc> storePaths2;
-    for (auto & p : storePaths)
-        storePaths2.insert(p);
-    return copyPaths(srcStore, dstStore, storePaths2, repair, checkSigs, substitute);
+    auto valid = dstStore.queryValidPaths(storePaths, substitute);
+
+    StorePathSet missing;
+    for (auto & path : storePaths)
+        if (!valid.count(path)) missing.insert(path);
+
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+
+    auto sorted = srcStore.topoSortPaths(missing);
+    std::reverse(sorted.begin(), sorted.end());
+
+    auto source = sinkToSource([&](Sink & sink) {
+        sink << sorted.size();
+        for (auto & storePath : sorted) {
+            auto srcUri = srcStore.getUri();
+            auto dstUri = dstStore.getUri();
+            auto storePathS = srcStore.printStorePath(storePath);
+            Activity act(*logger, lvlInfo, actCopyPath,
+                makeCopyPathMessage(srcUri, dstUri, storePathS),
+                {storePathS, srcUri, dstUri});
+            PushActivity pact(act.id);
+
+            auto info = srcStore.queryPathInfo(storePath);
+            info->write(sink, srcStore, 16);
+            srcStore.narFromPath(storePath, sink);
+        }
+    });
+
+    dstStore.addMultipleToStore(*source, repair, checkSigs);
 }
 
 
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedStorePathOrDesc> & storePaths,
-    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+void copyPaths(
+    Store & srcStore,
+    Store & dstStore,
+    const std::set<OwnedStorePathOrDesc> & storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
 {
-    auto valid = dstStore->queryValidPaths(storePaths, substitute);
+    auto valid = dstStore.queryValidPaths(storePaths, substitute);
 
     std::set<OwnedStorePathOrDesc> missing;
 
@@ -903,7 +1032,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
 
         missing.insert(path);
 
-        auto info = srcStore->queryPathInfo(borrowStorePathOrDesc(path));
+        auto info = srcStore.queryPathInfo(borrowStorePathOrDesc(path));
 
         auto storePathP = std::get_if<StorePath>(&path);
         if (!storePathP) continue;
@@ -915,7 +1044,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
 
         debug("found CA description '%s' for path '%s'",
             renderStorePathDescriptor(desc),
-            srcStore->printStorePath(storePath));
+            srcStore.printStorePath(storePath));
 
         auto [it, _] = missing.insert(std::move(desc));
         const auto & descRef = std::get<StorePathDescriptor>(*it);
@@ -939,7 +1068,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
         missing,
 
         [&](const OwnedStorePathOrDesc & storePathOrDesc) -> std::set<OwnedStorePathOrDesc> {
-            auto info = srcStore->queryPathInfo(borrowStorePathOrDesc(storePathOrDesc));
+            auto info = srcStore.queryPathInfo(borrowStorePathOrDesc(storePathOrDesc));
 
             /* If we can "upgrade" the node into a descriptor, do that. */
             if (auto storePathP = std::get_if<StorePath>(&storePathOrDesc)) {
@@ -950,12 +1079,12 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
                     auto & desc = *descP;
                     debug("Using found CA description '%s' for path '%s'",
                         renderStorePathDescriptor(desc),
-                        srcStore->printStorePath(storePath));
+                        srcStore.printStorePath(storePath));
                     return { desc };
                 }
             }
 
-            if (dstStore->isValidPath(borrowStorePathOrDesc(storePathOrDesc))) {
+            if (dstStore.isValidPath(borrowStorePathOrDesc(storePathOrDesc))) {
                 nrDone++;
                 showProgress();
                 return {};
@@ -975,13 +1104,13 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
 
             auto storePathOrDescB = borrowStorePathOrDesc(storePathOrDesc);
 
-            auto info = srcStore->queryPathInfo(storePathOrDescB);
+            auto info = srcStore.queryPathInfo(storePathOrDescB);
 
             auto descOpt = info->fullStorePathDescriptorOpt();
             if (descOpt)
                 storePathOrDescB = *descOpt;
 
-            if (!dstStore->isValidPath(storePathOrDescB)) {
+            if (!dstStore.isValidPath(storePathOrDescB)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
@@ -990,8 +1119,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    auto storePath = dstStore->bakeCaIfNeeded(storePathOrDescB);
-                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore->printStorePath(storePath), e.what()));
+                    auto storePath = dstStore.bakeCaIfNeeded(storePathOrDescB);
+                    logger->log(lvlError, fmt("could not copy %s: %s", dstStore.printStorePath(storePath), e.what()));
                     showProgress();
                     return;
                 }
@@ -1000,6 +1129,22 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const std::set<OwnedSto
             nrDone++;
             showProgress();
         });
+}
+
+void copyClosure(
+    Store & srcStore,
+    Store & dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
+{
+    if (&srcStore == &dstStore) return;
+
+    RealisedPath::Set closure;
+    RealisedPath::closure(srcStore, paths, closure);
+
+    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)

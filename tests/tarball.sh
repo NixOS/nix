@@ -40,6 +40,11 @@ test_tarball() {
     (! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file://no-such-tarball$ext)
 
     nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file://no-such-tarball$ext -I fnord=.
+
+    # Ensure that the `name` attribute isn’t accepted as that would mess
+    # with the content-addressing
+    (! nix-instantiate --eval -E "fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; name = \"foo\"; }")
+
 }
 
 test_tarball '' cat

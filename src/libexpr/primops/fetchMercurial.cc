@@ -62,6 +62,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     fetchers::Attrs attrs;
     attrs.insert_or_assign("type", "hg");
     attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
+    attrs.insert_or_assign("name", name);
     if (ref) attrs.insert_or_assign("ref", *ref);
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));

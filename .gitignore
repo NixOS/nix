@@ -15,6 +15,7 @@ perl/Makefile.config
 /doc/manual/*.1
 /doc/manual/*.5
 /doc/manual/*.8
+/doc/manual/generated/*
 /doc/manual/nix.json
 /doc/manual/conf-file.json
 /doc/manual/builtins.json
@@ -56,9 +57,6 @@ perl/Makefile.config
 
 /src/nix-prefetch-url/nix-prefetch-url
 
-# /src/nix-daemon/
-/src/nix-daemon/nix-daemon
-
 /src/nix-collect-garbage/nix-collect-garbage
 
 # /src/nix-channel/
@@ -76,12 +74,12 @@ perl/Makefile.config
 # /tests/
 /tests/test-tmp
 /tests/common.sh
-/tests/dummy
 /tests/result*
 /tests/restricted-innocent
 /tests/shell
 /tests/shell.drv
 /tests/config.nix
+/tests/ca/config.nix
 
 # /tests/lang/
 /tests/lang/*.out

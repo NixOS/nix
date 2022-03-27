@@ -9,11 +9,12 @@
 
 namespace nix {
 
-Worker::Worker(Store & store)
+Worker::Worker(Store & store, Store & evalStore)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
+    , evalStore(evalStore)
 {
     /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
@@ -134,6 +135,7 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
     else
         assert(false);
+
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals

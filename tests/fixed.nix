@@ -21,6 +21,14 @@ rec {
     (f ./fixed.builder2.sh "recursive" "sha1" "vw46m23bizj4n8afrc0fj19wrp7mj3c0")
   ];
 
+  # Expression to test that `nix-build --check` also throws an error if the hash of
+  # fixed-output derivation has changed even if the hash exists in the store (in this
+  # case the hash exists because of `fixed.builder2.sh`, but building a derivation
+  # with the same hash and a different result must throw an error).
+  check = [
+    (f ./fixed.builder1.sh "recursive" "md5" "3670af73070fa14077ad74e0f5ea4e42")
+  ];
+
   good2 = [
     # Yes, this looks fscked up: builder2 doesn't have that result.
     # But Nix sees that an output with the desired hash already

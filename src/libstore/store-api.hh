@@ -190,6 +190,8 @@ struct StoreConfig : public Config
 
     StoreConfig() = delete;
 
+    StringSet getDefaultSystemFeatures();
+
     virtual ~StoreConfig() { }
 
     virtual const std::string name() = 0;
@@ -206,7 +208,7 @@ struct StoreConfig : public Config
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
-    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
 
@@ -437,9 +439,10 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a map of paths to their optional ca values. If a path
-       does not have substitute info, it's omitted from the resulting
-       ‘infos’ map. */
+       sizes) of a map of paths to their optional ca values. The info
+       of the first succeeding substituter for each path will be
+       returned. If a path does not have substitute info, it's omitted
+       from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathSet & paths,
         const std::set<StorePathDescriptor> & caPaths,
         SubstitutablePathInfos & infos) { return; };
@@ -447,6 +450,12 @@ public:
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
+
+    /* Import multiple paths into the store. */
+    virtual void addMultipleToStore(
+        Source & source,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -505,7 +514,8 @@ public:
        not derivations, substitute them. */
     virtual void buildPaths(
         const std::vector<DerivedPath> & paths,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
 
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).
@@ -551,7 +561,7 @@ public:
     /* Add a store path as a temporary root of the garbage collector.
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
-    { warn("not creating temp root, store doesn't support GC"); }
+    { debug("not creating temporary root, store doesn't support GC"); }
 
     /* Add an indirect root, which is merely a symlink to `path' from
        /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
@@ -705,6 +715,11 @@ public:
 
     const Stats & getStats();
 
+    /* Computes the full closure of of a set of store-paths for e.g.
+       derivations that need this information for `exportReferencesGraph`.
+     */
+    StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
+
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
     virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
@@ -754,9 +769,12 @@ protected:
 
 
 /* Copy a path from one store to another. */
-void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
+void copyStorePath(
+    Store & srcStore,
+    Store & dstStore,
     StorePathOrDesc storePath,
-    RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs);
 
 
 /* Copy store paths from one store to another. The paths may be copied
@@ -764,22 +782,34 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
    if A is a reference of B, then A is copied before B), but the set
    of store paths is not automatically closed; use copyClosure() for
    that. */
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+void copyPaths(
+    Store & srcStore, Store & dstStore,
     const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+
+void copyPaths(
+    Store & srcStore, Store & dstStore,
     const std::set<OwnedStorePathOrDesc> & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
-void copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+
+void copyPaths(
+    Store & srcStore, Store & dstStore,
     const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
+/* Copy the closure of `paths` from `srcStore` to `dstStore`. */
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
 
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered
@@ -878,5 +908,10 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv);
+
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath);
 
 }

@@ -331,6 +331,7 @@ MultiCommand::MultiCommand(const Commands & commands_)
             if (i == commands.end())
                 throw UsageError("'%s' is not a recognised command", s);
             command = {s, i->second()};
+            command->second->parent = this;
         }}
     });
 

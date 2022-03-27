@@ -5,6 +5,7 @@
 
 #include <map>
 #include <cstdlib>
+#include <mutex>
 
 
 namespace nix {
@@ -16,14 +17,13 @@ static unsigned int refLength = 32; /* characters */
 static void search(const unsigned char * s, size_t len,
     StringSet & hashes, StringSet & seen)
 {
-    static bool initialised = false;
+    static std::once_flag initialised;
     static bool isBase32[256];
-    if (!initialised) {
+    std::call_once(initialised, [](){
         for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
         for (unsigned int i = 0; i < base32Chars.size(); ++i)
             isBase32[(unsigned char) base32Chars[i]] = true;
-        initialised = true;
-    }
+    });
 
     for (size_t i = 0; i + refLength <= len; ) {
         int j;

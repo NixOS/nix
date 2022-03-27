@@ -57,8 +57,8 @@ public:
     {
         // FIXME: do this lazily?
         if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            priority.setDefault(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
