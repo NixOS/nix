@@ -49,7 +49,8 @@ struct NixRepl
     ref<EvalState> state;
     Bindings * autoArgs;
 
-    const Error *debugError;
+   const Error *debugError;
+    int debugTraceIndex;
 
     Strings loadedFiles;
 
@@ -96,6 +97,7 @@ string removeWhitespace(string s)
 
 NixRepl::NixRepl(ref<EvalState> state)
     : state(state)
+    , debugTraceIndex(0)
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
@@ -403,6 +405,28 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     return drvPath;
 }
 
+std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
+{
+    if (dt.is_error) 
+        out << ANSI_RED "error: " << ANSI_NORMAL;
+    out << dt.hint.str() << "\n";
+
+    if (dt.pos.has_value() && (*dt.pos)) {
+        auto pos = dt.pos.value();
+        out << "\n";
+        printAtPos(pos, out);
+
+        auto loc = getCodeLines(pos);
+        if (loc.has_value()) {
+            out << "\n";
+            printCodeLines(out, "", pos, *loc);
+            out << "\n";
+        }
+    }
+
+    return out;
+}
+
 bool NixRepl::processLine(string line)
 {
     if (line == "") return true;
@@ -444,7 +468,7 @@ bool NixRepl::processLine(string line)
              << "  :d <cmd>      Debug mode commands\n"
              << "  :d stack      Show call stack\n"
              << "  :d env        Show env stack\n"
-             << "  :d error      Show current error\n"
+             << "  :d show <idx> Show current trace, or change to call stack index\n"
              << "  :d go         Go until end of program, exception, or builtins.break().\n"
              << "  :d step       Go one step\n"
              ;
@@ -453,30 +477,63 @@ bool NixRepl::processLine(string line)
 
     else if (command == ":d" || command == ":debug") {
         if (arg == "stack") {
+            int idx = 0;
             for (auto iter = this->state->debugTraces.begin();
-                 iter !=  this->state->debugTraces.end(); ++iter) {
-                  std::cout << "\n" << "… " << iter->hint.str() << "\n";
-
-                  if (iter->pos.has_value() && (*iter->pos)) {
-                      auto pos = iter->pos.value();
-                      std::cout << "\n";
-                      printAtPos(pos, std::cout);
-
-                      auto loc = getCodeLines(pos);
-                      if (loc.has_value()) {
-                          std::cout << "\n";
-                          printCodeLines(std::cout, "", pos, *loc);
-                          std::cout << "\n";
-                      }
-                  }
-              }
+                 iter !=  this->state->debugTraces.end(); 
+                 ++iter, ++idx) {
+                 std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                 showDebugTrace(std::cout, *iter);
+            }
         } else if (arg == "env") {
-            auto iter = this->state->debugTraces.begin();
-            if (iter != this->state->debugTraces.end()) {
-               printStaticEnvBindings(iter->expr);
+            int idx = 0;
+            for (auto iter = this->state->debugTraces.begin();
+                 iter !=  this->state->debugTraces.end(); 
+                 ++iter, ++idx) {
+                 if (idx == this->debugTraceIndex)
+                 {
+                     // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                     printStaticEnvBindings(iter->expr);
+                     break;
+                 }
+                 // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                 // showDebugTrace(std::cout, *iter);
+            }
+
+            // auto iter = this->state->debugTraces.begin();
+            // if (iter != this->state->debugTraces.end()) {
+            //    printStaticEnvBindings(iter->expr);
+            // }
+        }
+        else if (arg.compare(0,4,"show") == 0) {
+            try {
+                // change the DebugTrace index.
+                debugTraceIndex = stoi(arg.substr(4));
+
+                // std::cout << "idx: " << idx << std::endl;
+                // debugTraceIndex = idx;
+
+            }
+            catch (...)
+            {
+                debugTraceIndex = 0;
+            }
+
+            int idx = 0;
+            for (auto iter = this->state->debugTraces.begin();
+                 iter !=  this->state->debugTraces.end(); 
+                 ++iter, ++idx) {
+                 if (idx == this->debugTraceIndex)
+                 {
+                     std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                     showDebugTrace(std::cout, *iter);
+                     break;
+                 }
+                 // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                 // showDebugTrace(std::cout, *iter);
             }
         }
         else if (arg == "error") {
+            // TODO: remove, along with debugError.
             if (this->debugError) {
                 showErrorInfo(std::cout, debugError->info(), true);
             }
