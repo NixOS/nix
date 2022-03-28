@@ -460,24 +460,28 @@ struct InstallableAttrPath : InstallableValue
     virtual std::vector<InstallableValue::DerivationInfo> toDerivations() override;
 };
 
-std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
+static std::vector<InstallableValue::DerivationInfo> derivationsFromInstallable(InstallableValue & installable, Bindings & autoArgs)
 {
-    auto v = toValue(*state).first;
-
-    Bindings & autoArgs = *cmd.getAutoArgs(*state);
+    auto state = installable.state;
+    auto v = installable.toValue(*state).first;
 
     DrvInfos drvInfos;
     getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-    std::vector<DerivationInfo> res;
+    std::vector<InstallableValue::DerivationInfo> res;
     for (auto & drvInfo : drvInfos) {
         auto drvPath = drvInfo.queryDrvPath();
         if (!drvPath)
-            throw Error("'%s' is not a derivation", what());
+            throw Error("'%s' is not a derivation", installable.what());
         res.push_back({ *drvPath, drvInfo.queryOutputName() });
     }
 
     return res;
+}
+
+std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
+{
+    return derivationsFromInstallable(*this, *cmd.getAutoArgs(*state));
 }
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
