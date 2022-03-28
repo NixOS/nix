@@ -13,7 +13,6 @@ using namespace nix;
 struct CmdEval : MixJSON, InstallableCommand
 {
     bool raw = false;
-    std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
     CmdEval()
@@ -22,13 +21,6 @@ struct CmdEval : MixJSON, InstallableCommand
             .longName = "raw",
             .description = "Print strings without quotes or escaping.",
             .handler = {&raw, true},
-        });
-
-        addFlag({
-            .longName = "apply",
-            .description = "Apply the function *expr* to each argument.",
-            .labels = {"expr"},
-            .handler = {&apply},
         });
 
         addFlag({
@@ -62,14 +54,6 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto [v, pos] = installable->toValue(*state);
         PathSet context;
-
-        if (apply) {
-            auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
-            auto vRes = state->allocValue();
-            state->callFunction(*vApply, *v, *vRes, noPos);
-            v = vRes;
-        }
 
         if (writeTo) {
             stopProgressBar();

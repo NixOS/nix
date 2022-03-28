@@ -152,6 +152,14 @@ SourceExprCommand::SourceExprCommand()
     });
 
     addFlag({
+        .longName = "apply",
+        .description = "Apply the function *expr* to each argument.",
+        .category = installablesCategory,
+        .labels = {"expr"},
+        .handler = {&apply},
+    });
+
+    addFlag({
         .longName = "derivation",
         .description = "Operate on the store derivation rather than its outputs.",
         .category = installablesCategory,
@@ -686,6 +694,42 @@ FlakeRef InstallableFlake::nixpkgsFlakeRef() const
     return Installable::nixpkgsFlakeRef();
 }
 
+struct InstallableValueWithApply : InstallableValue
+{
+    std::unique_ptr<InstallableValue> installable;
+    std::string apply;
+
+    InstallableValueWithApply(std::unique_ptr<InstallableValue> installable, std::string apply)
+        : InstallableValue(installable->state), installable(std::move(installable)), apply(apply) { }
+
+    std::string what() const override { return installable->what() + " (with applied function)"; }
+
+    std::pair<Value *, Pos> toValue(EvalState & state) override
+    {
+        auto [v, pos] = installable->toValue(state);
+        auto vApply = state.allocValue();
+        state.eval(state.parseExprFromString(apply, absPath(".")), *vApply);
+        auto vApplied = state.allocValue();
+        state.callFunction(*vApply, *v, *vApplied, noPos);
+        return {vApplied, pos};
+    }
+
+    std::vector<InstallableValue::DerivationInfo> toDerivations() override
+    {
+        return derivationsFromInstallable(*this, state->emptyBindings);
+    }
+};
+
+template<class T, class... U>
+static std::shared_ptr<Installable> makeInstallable(std::optional<std::string> & apply, U&&... u)
+{
+    if (!apply) {
+        return std::make_shared<T>(std::forward<U>(u)...);
+    } else {
+        return std::make_shared<InstallableValueWithApply>(std::make_unique<T>(std::forward<U>(u)...), *apply);
+    }
+}
+
 std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     ref<Store> store, std::vector<std::string> ss)
 {
@@ -712,7 +756,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         }
 
         for (auto & s : ss)
-            result.push_back(std::make_shared<InstallableAttrPath>(state, *this, vFile, s == "." ? "" : s));
+            result.push_back(makeInstallable<InstallableAttrPath>(apply, state, *this, vFile, s == "." ? "" : s));
 
     } else {
 
@@ -720,6 +764,9 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             if (s.find('/') != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
+                    if (apply) {
+                        throw UsageError("'--apply' cannot be used on a store path");
+                    }
                     continue;
                 // Ignore nonexisting store paths
                 } catch (BadStorePath &) {
@@ -727,7 +774,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
-            result.push_back(std::make_shared<InstallableFlake>(
+            result.push_back(makeInstallable<InstallableFlake>(
+                apply,
                 this,
                 getEvalState(),
                 std::move(flakeRef),
