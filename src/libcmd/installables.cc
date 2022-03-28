@@ -713,35 +713,24 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     } else {
 
         for (auto & s : ss) {
-            std::exception_ptr ex;
-
             if (s.find('/') != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
+                // Ignore nonexisting store paths
                 } catch (BadStorePath &) {
-                } catch (...) {
-                    if (!ex)
-                        ex = std::current_exception();
-                }
+                } catch (SysError &) { }
             }
 
-            try {
-                auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
-                result.push_back(std::make_shared<InstallableFlake>(
-                        this,
-                        getEvalState(),
-                        std::move(flakeRef),
-                        fragment,
-                        getDefaultFlakeAttrPaths(),
-                        getDefaultFlakeAttrPathPrefixes(),
-                        lockFlags));
-                continue;
-            } catch (...) {
-                ex = std::current_exception();
-            }
-
-            std::rethrow_exception(ex);
+            auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
+            result.push_back(std::make_shared<InstallableFlake>(
+                this,
+                getEvalState(),
+                std::move(flakeRef),
+                fragment,
+                getDefaultFlakeAttrPaths(),
+                getDefaultFlakeAttrPathPrefixes(),
+                lockFlags));
         }
     }
 
