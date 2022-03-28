@@ -78,6 +78,7 @@ struct NixRepl
     void addVarToScope(const Symbol & name, Value & v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
+    void loadDebugTraceEnv(DebugTrace &dt);
 
     typedef set<Value *> ValuesSeen;
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
@@ -427,6 +428,25 @@ std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
     return out;
 }
 
+void NixRepl::loadDebugTraceEnv(DebugTrace &dt)
+{
+    if (dt.expr.staticenv)
+    {
+        initEnv();
+
+        auto vm = std::make_unique<valmap>(*(mapStaticEnvBindings(*dt.expr.staticenv.get(), dt.env)));
+
+        // add staticenv vars.
+        for (auto & [name, value] : *(vm.get())) {
+            this->addVarToScope(this->state->symbols.create(name), *value);
+        }
+    }
+    else
+    {
+        initEnv();
+    }
+}
+
 bool NixRepl::processLine(string line)
 {
     if (line == "") return true;
@@ -491,31 +511,18 @@ bool NixRepl::processLine(string line)
                  ++iter, ++idx) {
                  if (idx == this->debugTraceIndex)
                  {
-                     // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
                      printStaticEnvBindings(iter->expr);
                      break;
                  }
-                 // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                 // showDebugTrace(std::cout, *iter);
             }
-
-            // auto iter = this->state->debugTraces.begin();
-            // if (iter != this->state->debugTraces.end()) {
-            //    printStaticEnvBindings(iter->expr);
-            // }
         }
         else if (arg.compare(0,4,"show") == 0) {
             try {
                 // change the DebugTrace index.
                 debugTraceIndex = stoi(arg.substr(4));
-
-                // std::cout << "idx: " << idx << std::endl;
-                // debugTraceIndex = idx;
-
             }
             catch (...)
             {
-                debugTraceIndex = 0;
             }
 
             int idx = 0;
@@ -526,6 +533,8 @@ bool NixRepl::processLine(string line)
                  {
                      std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
                      showDebugTrace(std::cout, *iter);
+                     printStaticEnvBindings(iter->expr);
+                     loadDebugTraceEnv(*iter);
                      break;
                  }
                  // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
