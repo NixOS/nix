@@ -77,6 +77,7 @@ nix-build check.nix -A fetchurl --no-out-link --check
 nix-build check.nix -A fetchurl --no-out-link --repair
 [[ $(cat $path) != foo ]]
 
+export TMPDIR=$TEST_HOME
 echo 'Hello World' > $TMPDIR/dummy
 nix-build check.nix -A hashmismatch --no-out-link || status=$?
 [ "$status" = "102" ]
