@@ -30,8 +30,9 @@ flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 flakeHierMain=$TEST_ROOT/hier/flakeMain
 flakeHierSub=$TEST_ROOT/hier/flakeSub
 flakeHierSubSub=$TEST_ROOT/hier/flakeSubSub
+flakeHierOtherSub=$TEST_ROOT/hier/flakeOtherSub
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA $flakeHierMain $flakeHierSub $flakeHierSubSub; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA $flakeHierMain $flakeHierSub $flakeHierSubSub $flakeHierOtherSub; do
     rm -rf $repo $repo.tmp
     mkdir -p $repo
     git -C $repo init
@@ -854,9 +855,21 @@ git -C $flakeHierSub commit -m 'Trivial sub-flake'
 
 hashSub="$(git -C $flakeHierSub rev-parse HEAD)"
 
+cat > $flakeHierOtherSub/flake.nix <<EOF
+{
+  outputs = { self }: { };
+}
+EOF
+
+git -C $flakeHierOtherSub add flake.nix
+git -C $flakeHierOtherSub commit -m 'Trivial sub-flake'
+
+hashOtherSub="$(git -C $flakeHierSub rev-parse HEAD)"
+
 cat > $flakeHierMain/flake.nix <<EOF
 {
   inputs.sub.url = "git+file://$flakeHierSub?rev=$hashSub";
+  inputs.otherSub.url = "git+file://$flakeHierOtherSub";
   outputs = { self }: { };
 }
 EOF
@@ -866,7 +879,7 @@ git -C $flakeHierMain add flake.nix
 nix flake update $flakeHierMain
 
 git -C $flakeHierMain add flake.lock
-git -C $flakeHierMain commit -m 'Reference sub-flake by commit'
+git -C $flakeHierMain commit -m 'Reference sub-flakes'
 
 # 2. Adds a "sub-sub" flake, references it *mutably* from the "sub"
 #    flake, and locks the "sub" flake via `nix flake update`;
@@ -890,6 +903,8 @@ nix flake update $flakeHierSub
 git -C $flakeHierSub add flake.lock
 git -C $flakeHierSub commit -a -m 'Reference trivial sub-sub-flake mutably'
 
+git -C $flakeHierOtherSub commit --allow-empty -m 'New commit in other-sub'
+
 # 3. Adds a new commit to the "sub-sub" flake;
 
 git -C $flakeHierSubSub commit --allow-empty -m 'New sub-sub commit'
@@ -909,3 +924,5 @@ git -C $flakeHierMain commit -a -m 'Reference sub-flake mutably'
 nix flake metadata $flakeHierMain
 
 [[ $(jq -r .nodes.subSub.locked.rev $flakeHierMain/flake.lock) = $hashSubSub ]]
+
+[[ $(jq -r .nodes.otherSub.locked.rev $flakeHierMain/flake.lock) = $hashOtherSub ]]
