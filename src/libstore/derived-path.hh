@@ -25,6 +25,9 @@ struct DerivedPathOpaque {
     nlohmann::json toJSON(ref<Store> store) const;
     std::string to_string(const Store & store) const;
     static DerivedPathOpaque parse(const Store & store, std::string_view);
+
+    bool operator < (const DerivedPathOpaque & b) const
+    { return path < b.path; }
 };
 
 /**
@@ -46,6 +49,9 @@ struct DerivedPathBuilt {
     std::string to_string(const Store & store) const;
     static DerivedPathBuilt parse(const Store & store, std::string_view);
     nlohmann::json toJSON(ref<Store> store) const;
+
+    bool operator < (const DerivedPathBuilt & b) const
+    { return std::make_pair(drvPath, outputs) < std::make_pair(b.drvPath, b.outputs); }
 };
 
 using _DerivedPathRaw = std::variant<
