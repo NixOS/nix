@@ -937,7 +937,7 @@ LocalNoInlineNoReturn(void throwAssertionError(const Pos & pos, const char * s, 
     throw error;
 }
 
-LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, Expr &expr))
+LocalNoInlineNoReturn(void throwUndefinedVarError(const Pos & pos, const char * s, const string & s1, Env & env, const Expr &expr))
 {
     auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
@@ -1053,8 +1053,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith) {
-            // TODO deal with const_cast
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, *const_cast<ExprVar*>(&var));
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name, *env, var);
         }
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
