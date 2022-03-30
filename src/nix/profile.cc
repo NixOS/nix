@@ -97,19 +97,30 @@ struct ProfileManifest
             auto json = nlohmann::json::parse(readFile(manifestPath));
 
             auto version = json.value("version", 0);
-            if (version != 1)
-                throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+            std::string sUrl;
+            std::string sOriginalUrl;
+            switch(version){
+                case 1:
+                    sUrl = "uri";
+                    sOriginalUrl = "originalUri";
+                    break;
+                case 2:
+                    sUrl = "url";
+                    sOriginalUrl = "originalUrl";
+                    break;
+                default:
+                    throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+            }
 
             for (auto & e : json["elements"]) {
                 ProfileElement element;
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
-                if (e.value("uri", "") != "") {
-                    auto originalUrl = e.value("originalUrl", e["originalUri"]);
+                if (e.value(sUrl,"") != "") {
                     element.source = ProfileElementSource{
-                        parseFlakeRef(originalUrl),
-                        parseFlakeRef(e["uri"]),
+                        parseFlakeRef(e[sOriginalUrl]),
+                        parseFlakeRef(e[sUrl]),
                         e["attrPath"]
                     };
                 }
@@ -144,13 +155,13 @@ struct ProfileManifest
             obj["active"] = element.active;
             if (element.source) {
                 obj["originalUrl"] = element.source->originalRef.to_string();
-                obj["uri"] = element.source->resolvedRef.to_string();
+                obj["url"] = element.source->resolvedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
             }
             array.push_back(obj);
         }
         nlohmann::json json;
-        json["version"] = 1;
+        json["version"] = 2;
         json["elements"] = array;
         return json.dump();
     }
