@@ -10,7 +10,7 @@ clearStore
 # Basic test of impure derivations: building one a second time should not use the previous result.
 printf 0 > $TEST_ROOT/counter
 
-json=$(nix build -L --no-link --json --file ./impure-derivations.nix impure)
+json=$(nix build -L --no-link --json --file ./impure-derivations.nix impure.all)
 path1=$(echo $json | jq -r .[].outputs.out)
 path1_stuff=$(echo $json | jq -r .[].outputs.stuff)
 [[ $(< $path1/n) = 0 ]]
