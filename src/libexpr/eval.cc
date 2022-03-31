@@ -781,10 +781,7 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
           std::cout << "(env.type == Env::HasWithAttrs)" << std::endl; 
           Bindings::iterator j = env.values[0]->attrs->begin();
           while (j != env.values[0]->attrs->end()) {
-              // std::cout << "adding : " << j->name << std::endl;
               map[j->name] = j->value;
-              // if (countCalls) attrSelects[*j->pos]++;
-              // return j->value;
               ++j;
           }
       }
