@@ -175,12 +175,12 @@ public:
     const ErrorInfo & info() const { calcWhat(); return err; }
 
     template<typename... Args>
-    BaseError & addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
+    void addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
     {
-        return addTrace(e, hintfmt(fs, args...));
+        addTrace(e, hintfmt(fs, args...));
     }
 
-    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
+    void addTrace(std::optional<ErrPos> e, hintformat hint);
 
     bool hasTrace() const { return !err.traces.empty(); }
 };

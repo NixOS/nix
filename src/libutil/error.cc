@@ -9,10 +9,9 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
+void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
     err.traces.push_front(Trace { .pos = e, .hint = hint });
-    return *this;
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
