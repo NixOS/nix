@@ -135,7 +135,10 @@ struct DerivationType : _DerivationTypeRaw {
        separately. Never true for non-CA derivations. */
     bool needsNetworkAccess() const;
 
-    /* FIXME */
+    /* Whether the derivation is expected to produce the same result
+       every time, and therefore it only needs to be built once. This
+       is only false for derivations that have the attribute '__impure
+       = true'. */
     bool isPure() const;
 
     /* Does the derivation knows its own output paths?
