@@ -71,13 +71,11 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
-void replaceEnv(std::map<std::string, std::string> newEnv)
+void replaceEnv(const std::map<std::string, std::string> & newEnv)
 {
     clearEnv();
-    for (auto newEnvVar : newEnv)
-    {
+    for (auto & newEnvVar : newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
-    }
 }
 
 
