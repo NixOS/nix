@@ -989,9 +989,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     PathSet context;
 
     bool contentAddressed = false;
+    bool isImpure = false;
     std::optional<std::string> outputHash;
-    std::string outputHashAlgo;
-    auto ingestionMethod = FileIngestionMethod::Flat;
+    std::optional<std::string> outputHashAlgo;
+    std::optional<FileIngestionMethod> ingestionMethod;
 
     StringSet outputs;
     outputs.insert("out");
@@ -1049,6 +1050,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 contentAddressed = state.forceBool(*i->value, pos);
                 if (contentAddressed)
                     settings.requireExperimentalFeature(Xp::CaDerivations);
+            }
+
+            else if (i->name == state.sImpure) {
+                isImpure = state.forceBool(*i->value, pos);
+                if (isImpure)
+                    settings.requireExperimentalFeature(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
@@ -1183,29 +1190,45 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .errPos = posDrvName
             });
 
-        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
+        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo.value_or("sha256"));
         Hash h = newHashAllowEmpty(*outputHash, ht);
 
-        auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
+        auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
+        auto outPath = state.store->makeFixedOutputPath(method, h, drvName);
         drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out",
             DerivationOutput::CAFixed {
                 .hash = FixedOutputHash {
-                    .method = ingestionMethod,
+                    .method = method,
                     .hash = std::move(h),
                 },
             });
     }
 
-    else if (contentAddressed) {
-        HashType ht = parseHashType(outputHashAlgo);
+    else if (contentAddressed || isImpure) {
+        if (contentAddressed && isImpure)
+            throw EvalError({
+                .msg = hintfmt("derivation cannot be both content-addressed and impure"),
+                .errPos = posDrvName
+            });
+
+        auto ht = parseHashType(outputHashAlgo.value_or("sha256"));
+        auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
+
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i,
-                DerivationOutput::CAFloating {
-                    .method = ingestionMethod,
-                    .hashType = ht,
-                });
+            if (isImpure)
+                drv.outputs.insert_or_assign(i,
+                    DerivationOutput::Impure {
+                        .method = method,
+                        .hashType = ht,
+                    });
+            else
+                drv.outputs.insert_or_assign(i,
+                    DerivationOutput::CAFloating {
+                        .method = method,
+                        .hashType = ht,
+                    });
         }
     }
 

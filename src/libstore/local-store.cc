@@ -719,6 +719,9 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
             [&](const DerivationOutput::Deferred &) {
                 /* Nothing to check */
             },
+            [&](const DerivationOutput::Impure &) {
+                /* Nothing to check */
+            },
         }, i.second.raw());
     }
 }
