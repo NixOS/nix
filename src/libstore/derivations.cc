@@ -97,7 +97,7 @@ bool DerivationType::isSandboxed() const
             return true;
         },
         [](const ContentAddressed & ca) {
-            return ca.pure;
+            return ca.sandboxed;
         },
         [](const Impure &) {
             return false;
@@ -530,7 +530,7 @@ DerivationType BasicDerivation::type() const
         if (*fixedCAOutputs.begin() != "out")
             throw Error("single fixed output must be named \"out\"");
         return DerivationType::ContentAddressed {
-            .pure = false,
+            .sandboxed = false,
             .fixed = true,
         };
     }
@@ -541,7 +541,7 @@ DerivationType BasicDerivation::type() const
         && deferredIAOutputs.empty()
         && impureOutputs.empty())
         return DerivationType::ContentAddressed {
-            .pure = true,
+            .sandboxed = true,
             .fixed = false,
         };
 

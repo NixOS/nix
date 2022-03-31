@@ -102,7 +102,7 @@ struct DerivationType_InputAddressed {
 };
 
 struct DerivationType_ContentAddressed {
-    bool pure;
+    bool sandboxed;
     bool fixed;
 };
 
