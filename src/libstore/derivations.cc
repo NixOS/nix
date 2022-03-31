@@ -90,17 +90,17 @@ bool DerivationType::hasKnownOutputPaths() const
 }
 
 
-bool DerivationType::needsNetworkAccess() const
+bool DerivationType::isSandboxed() const
 {
     return std::visit(overloaded {
         [](const InputAddressed & ia) {
-            return false;
+            return true;
         },
         [](const ContentAddressed & ca) {
-            return !ca.pure;
+            return ca.pure;
         },
         [](const Impure &) {
-            return true;
+            return false;
         },
     }, raw());
 }

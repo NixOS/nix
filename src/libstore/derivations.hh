@@ -130,10 +130,12 @@ struct DerivationType : _DerivationTypeRaw {
        non-CA derivations. */
     bool isFixed() const;
 
-    /* Whether the derivation needs to access the network. Note that
-       whether or not we actually sandbox the derivation is controlled
-       separately. Never true for non-CA derivations. */
-    bool needsNetworkAccess() const;
+    /* Whether the derivation is fully sandboxed. If false, the
+       sandbox is opened up, e.g. the derivation has access to the
+       network. Note that whether or not we actually sandbox the
+       derivation is controlled separately. Always true for non-CA
+       derivations. */
+    bool isSandboxed() const;
 
     /* Whether the derivation is expected to produce the same result
        every time, and therefore it only needs to be built once. This

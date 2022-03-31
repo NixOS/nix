@@ -395,7 +395,7 @@ void LocalDerivationGoal::startBuilder()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !derivationType.needsNetworkAccess() && !noChroot;
+            useChroot = derivationType.isSandboxed() && !noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -608,7 +608,7 @@ void LocalDerivationGoal::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (!derivationType.needsNetworkAccess())
+        if (derivationType.isSandboxed())
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -796,7 +796,7 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (!derivationType.needsNetworkAccess())
+        if (derivationType.isSandboxed())
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -1060,7 +1060,7 @@ void LocalDerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (derivationType.needsNetworkAccess()) {
+    if (!derivationType.isSandboxed()) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -1674,7 +1674,7 @@ void LocalDerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (derivationType.needsNetworkAccess()) {
+            if (!derivationType.isSandboxed()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
@@ -1918,7 +1918,7 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (derivationType.needsNetworkAccess())
+                if (!derivationType.isSandboxed())
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Add the output paths we'll use at build-time to the chroot */

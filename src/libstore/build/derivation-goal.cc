@@ -955,7 +955,7 @@ void DerivationGoal::buildDone()
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                derivationType.needsNetworkAccess() || diskFull ? BuildResult::TransientFailure :
+                !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
 
