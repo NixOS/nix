@@ -699,22 +699,46 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     return {};
 }
 
-void printStaticEnvBindings(const StaticEnv &se, int lvl)
+
+// just for the current level of StaticEnv, not the whole chain.
+void printStaticEnvBindings(const StaticEnv &se)
+{
+    std::cout << ANSI_MAGENTA;
+    for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
+    {
+      std::cout << i->first << " ";
+    }
+    std::cout << ANSI_NORMAL;
+    std::cout << std::endl;
+}
+
+// just for the current level of Env, not the whole chain.
+void printWithBindings(const Env &env)
+{
+    if (env.type == Env::HasWithAttrs)
+    {
+        std::cout << "with: "; 
+        std::cout << ANSI_MAGENTA;
+        Bindings::iterator j = env.values[0]->attrs->begin();
+        while (j != env.values[0]->attrs->end()) {
+            std::cout << j->name << " ";
+            ++j;
+        }
+        std::cout << ANSI_NORMAL;
+        std::cout << std::endl;
+    }
+}
+
+void printEnvBindings(const StaticEnv &se, const Env &env, int lvl)
 {
     std::cout << "Env level " << lvl << std::endl;
 
-    if (se.up) {
-        std::cout << ANSI_MAGENTA;
-        for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
-        {
-          std::cout << i->first << " ";
-        }
-        std::cout << ANSI_NORMAL;
-
+    if (se.up && env.up) {
+        std::cout << "static: "; 
+        printStaticEnvBindings(se);
+        printWithBindings(env);
         std::cout << std::endl;
-        std::cout << std::endl;
-
-        printStaticEnvBindings(*se.up, ++lvl);
+        printEnvBindings(*se.up, *env.up, ++lvl);
     }
     else 
     {
@@ -727,18 +751,19 @@ void printStaticEnvBindings(const StaticEnv &se, int lvl)
         }
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
+        printWithBindings(env);  // probably nothing there for the top level.
         std::cout << std::endl;
 
     }
-
 }
 
-void printStaticEnvBindings(const Expr &expr)
+// TODO: add accompanying env for With stuff.
+void printEnvBindings(const Expr &expr, const Env &env)
 {
     // just print the names for now
     if (expr.staticenv)
     {
-      printStaticEnvBindings(*expr.staticenv.get(), 0);
+      printEnvBindings(*expr.staticenv.get(), env, 0);
     }
 }
 
@@ -750,11 +775,26 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
   if (env.up && se.up) {
       mapStaticEnvBindings(*se.up, *env.up,vm);
 
-      // iterate through staticenv bindings and add them.
       auto map = valmap();
-      for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
+      if (env.type == Env::HasWithAttrs)
       {
-        map[iter->first] = env.values[iter->second];
+          std::cout << "(env.type == Env::HasWithAttrs)" << std::endl; 
+          Bindings::iterator j = env.values[0]->attrs->begin();
+          while (j != env.values[0]->attrs->end()) {
+              // std::cout << "adding : " << j->name << std::endl;
+              map[j->name] = j->value;
+              // if (countCalls) attrSelects[*j->pos]++;
+              // return j->value;
+              ++j;
+          }
+      }
+      else
+      {
+          // iterate through staticenv bindings and add them.
+          for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
+          {
+              map[iter->first] = env.values[iter->second];
+          }
       }
 
       vm.merge(map);

@@ -511,7 +511,7 @@ bool NixRepl::processLine(string line)
                  ++iter, ++idx) {
                  if (idx == this->debugTraceIndex)
                  {
-                     printStaticEnvBindings(iter->expr);
+                     printEnvBindings(iter->expr, iter->env);
                      break;
                  }
             }
@@ -533,7 +533,7 @@ bool NixRepl::processLine(string line)
                  {
                      std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
                      showDebugTrace(std::cout, *iter);
-                     printStaticEnvBindings(iter->expr);
+                     printEnvBindings(iter->expr, iter->env);
                      loadDebugTraceEnv(*iter);
                      break;
                  }
@@ -1010,14 +1010,14 @@ void runRepl(
     repl->initEnv();
 
     // add 'extra' vars.
-    std::set<std::string> names;
+    // std::set<std::string> names;
     for (auto & [name, value] : extraEnv) {
         // names.insert(ANSI_BOLD + name + ANSI_NORMAL);
-        names.insert(name);
+        // names.insert(name);
         repl->addVarToScope(repl->state->symbols.create(name), *value);
     }
 
-    printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
+    // printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
 
     repl->mainLoop({});
 }

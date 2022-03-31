@@ -25,8 +25,8 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
-void printStaticEnvBindings(const Expr &expr);
-void printStaticEnvBindings(const StaticEnv &se, int lvl = 0);
+void printEnvBindings(const Expr &expr, const Env &env);
+void printEnvBindings(const StaticEnv &se, const Env &env, int lvl = 0);
 
 struct PrimOp
 {
