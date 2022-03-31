@@ -222,11 +222,9 @@ static DerivationOutput parseDerivationOutput(const Store & store,
         if (hash == "impure") {
             settings.requireExperimentalFeature(Xp::ImpureDerivations);
             assert(pathS == "");
-            return DerivationOutput {
-                .output = DerivationOutputImpure {
-                    .method = std::move(method),
-                    .hashType = std::move(hashType),
-                },
+            return DerivationOutput::Impure {
+                .method = std::move(method),
+                .hashType = std::move(hashType),
             };
         } else if (hash != "") {
             validatePath(pathS);
