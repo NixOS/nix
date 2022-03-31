@@ -15,8 +15,6 @@ rec {
         printf $((x + 1)) > $TEST_ROOT/counter
       '';
     __impure = true;
-    outputHashAlgo = "sha256";
-    outputHashMode = "recursive";
     impureEnvVars = [ "TEST_ROOT" ];
   };
 
@@ -32,8 +30,6 @@ rec {
         ln -s $out $out/self
       '';
     __impure = true;
-    outputHashAlgo = "sha256";
-    outputHashMode = "recursive";
   };
 
   # This is not allowed.
@@ -53,7 +49,6 @@ rec {
         x=$(< ${impureOnImpure}/n)
         printf ''${x:0:1} > $out
       '';
-    outputHashAlgo = "sha256";
     outputHashMode = "recursive";
     outputHash = "sha256-eBYxcgkuWuiqs4cKNgKwkb3vY/HR0vVsJnqe8itJGcQ=";
   };
