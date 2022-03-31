@@ -201,29 +201,6 @@ void DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         settings.requireExperimentalFeature(Xp::CaDerivations);
 
-    if (!drv->type().isPure()) {
-        settings.requireExperimentalFeature(Xp::ImpureDerivations);
-
-        for (auto & [outputName, output] : drv->outputs) {
-            auto randomPath = StorePath::random(outputPathName(drv->name, outputName));
-            assert(!worker.store.isValidPath(randomPath));
-            initialOutputs.insert({
-                outputName,
-                InitialOutput {
-                    .wanted = true,
-                    .outputHash = impureOutputHash,
-                    .known = InitialOutputStatus {
-                        .path = randomPath,
-                        .status = PathStatus::Absent
-                    }
-                }
-            });
-        }
-
-        gaveUpOnSubstitution();
-        return;
-    }
-
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
@@ -237,6 +214,15 @@ void DerivationGoal::haveDerivation()
                 .outputHash = outputHash
             }
         });
+
+    if (!drv->type().isPure()) {
+        settings.requireExperimentalFeature(Xp::ImpureDerivations);
+
+        /* We don't yet have any safe way to cache an impure derivation at
+           this step. */
+        gaveUpOnSubstitution();
+        return;
+    }
 
     /* Check what outputs paths are not already valid. */
     auto [allValid, validOutputs] = checkPathValidity();
