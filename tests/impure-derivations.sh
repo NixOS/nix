@@ -5,6 +5,8 @@ requireDaemonNewerThan "2.8pre20220311"
 enableFeatures "ca-derivations ca-references impure-derivations"
 restartDaemon
 
+set -o pipefail
+
 clearStore
 
 # Basic test of impure derivations: building one a second time should not use the previous result.
@@ -33,7 +35,7 @@ path4=$(nix build -L --no-link --json --file ./impure-derivations.nix impureOnIm
 [[ $(< $path4/self/n) = X3 ]]
 
 # Input-addressed derivations cannot depend on impure derivations directly.
-nix build -L --no-link --json --file ./impure-derivations.nix inputAddressed 2>&1 | grep 'depends on impure derivation'
+(! nix build -L --no-link --json --file ./impure-derivations.nix inputAddressed 2>&1) | grep 'depends on impure derivation'
 
 drvPath=$(nix eval --json --file ./impure-derivations.nix impure.drvPath | jq -r .)
 [[ $(nix show-derivation $drvPath | jq ".[\"$drvPath\"].outputs.out.impure") = true ]]
