@@ -1918,7 +1918,7 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (derivationType.isImpure())
+                if (derivationType.needsNetworkAccess())
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Add the output paths we'll use at build-time to the chroot */
