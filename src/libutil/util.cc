@@ -1698,10 +1698,19 @@ void saveMountNamespace()
 #if __linux__
     static std::once_flag done;
     std::call_once(done, []() {
-        char* cwd = getcwd(NULL, 0);
-        if (cwd == NULL) throw SysError("getting cwd");
+#ifdef __GNU__
+        // getcwd allocating its return value is a GNU extension.
+        char *cwd = getcwd(NULL, 0);
+        if (cwd == NULL)
+#else
+        char cwd[PATH_MAX];
+        if (!getcwd(cwd, sizeof(cwd)))
+#endif
+            throw SysError("getting cwd");
         savedCwd.emplace(cwd);
+#ifdef __GNU__
         free(cwd);
+#endif
 
         AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
         if (!fd)
