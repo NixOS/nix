@@ -182,6 +182,7 @@ struct CmdRun : InstallableCommand
     {
         auto state = getEvalState();
 
+        lockFlags.applyNixConfig = true;
         auto app = installable->toApp(*state).resolve(getEvalStore(), store);
 
         Strings allArgs{app.program};
