@@ -10,7 +10,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <future>
 #include <iostream>
 #include <mutex>
@@ -1691,7 +1690,7 @@ void setStackSize(size_t stackSize)
 
 #if __linux__
 static AutoCloseFD fdSavedMountNamespace;
-std::optional<std::filesystem::path> savedCwd;
+std::optional<Path> savedCwd;
 #endif
 
 void saveMountNamespace()
@@ -1699,7 +1698,11 @@ void saveMountNamespace()
 #if __linux__
     static std::once_flag done;
     std::call_once(done, []() {
-        savedCwd.emplace(std::filesystem::current_path());
+        char* cwd = getcwd(NULL, 0);
+        if (cwd == NULL) throw SysError("getting cwd");
+        savedCwd.emplace(cwd);
+        free(cwd);
+
         AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
         if (!fd)
             throw SysError("saving parent mount namespace");
@@ -1717,11 +1720,8 @@ void restoreMountNamespace()
     } catch (Error & e) {
         debug(e.msg());
     }
-    try {
-        if (savedCwd)
-            std::filesystem::current_path(*savedCwd);
-    } catch (std::filesystem::filesystem_error const &e) {
-        debug(e.what());
+    if (savedCwd && chdir(savedCwd->c_str()) == -1) {
+        throw SysError("restoring cwd");
     }
 #endif
 }
