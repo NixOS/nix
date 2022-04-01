@@ -789,55 +789,20 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPaths & hopefullyBuiltPaths)
+BuiltPaths Installable::build(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode,
+    const std::vector<std::shared_ptr<Installable>> & installables,
+    BuildMode bMode)
 {
     BuiltPaths res;
-    for (const auto & b : hopefullyBuiltPaths)
-        std::visit(
-            overloaded{
-                [&](const DerivedPath::Opaque & bo) {
-                    res.push_back(BuiltPath::Opaque{bo.path});
-                },
-                [&](const DerivedPath::Built & bfd) {
-                    OutputPathMap outputs;
-                    auto drv = evalStore->readDerivation(bfd.drvPath);
-                    auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                    auto drvOutputs = drv.outputsAndOptPaths(*store);
-                    for (auto & output : bfd.outputs) {
-                        if (!outputHashes.count(output))
-                            throw Error(
-                                "the derivation '%s' doesn't have an output named '%s'",
-                                store->printStorePath(bfd.drvPath), output);
-                        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
-                            auto outputId =
-                                DrvOutput{outputHashes.at(output), output};
-                            auto realisation =
-                                store->queryRealisation(outputId);
-                            if (!realisation)
-                                throw Error(
-                                    "cannot operate on an output of unbuilt "
-                                    "content-addressed derivation '%s'",
-                                    outputId.to_string());
-                            outputs.insert_or_assign(
-                                output, realisation->outPath);
-                        } else {
-                            // If ca-derivations isn't enabled, assume that
-                            // the output path is statically known.
-                            assert(drvOutputs.count(output));
-                            assert(drvOutputs.at(output).second);
-                            outputs.insert_or_assign(
-                                output, *drvOutputs.at(output).second);
-                        }
-                    }
-                    res.push_back(BuiltPath::Built{bfd.drvPath, outputs});
-                },
-            },
-            b.raw());
-
+    for (auto & [_, builtPath] : build2(evalStore, store, mode, installables, bMode))
+        res.push_back(builtPath);
     return res;
 }
 
-BuiltPaths Installable::build(
+std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
@@ -848,39 +813,93 @@ BuiltPaths Installable::build(
         settings.readOnlyMode = true;
 
     std::vector<DerivedPath> pathsToBuild;
+    std::map<DerivedPath, std::vector<std::shared_ptr<Installable>>> backmap;
 
     for (auto & i : installables) {
-        auto b = i->toDerivedPaths();
-        pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
+        for (auto b : i->toDerivedPaths()) {
+            pathsToBuild.push_back(b);
+            backmap[b].push_back(i);
+        }
     }
 
+    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> res;
+
     switch (mode) {
+
     case Realise::Nothing:
     case Realise::Derivation:
         printMissing(store, pathsToBuild, lvlError);
-        return getBuiltPaths(evalStore, store, pathsToBuild);
+
+        for (auto & path : pathsToBuild) {
+            for (auto & installable : backmap[path]) {
+                std::visit(overloaded {
+                    [&](const DerivedPath::Built & bfd) {
+                        OutputPathMap outputs;
+                        auto drv = evalStore->readDerivation(bfd.drvPath);
+                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
+                        auto drvOutputs = drv.outputsAndOptPaths(*store);
+                        for (auto & output : bfd.outputs) {
+                            if (!outputHashes.count(output))
+                                throw Error(
+                                    "the derivation '%s' doesn't have an output named '%s'",
+                                    store->printStorePath(bfd.drvPath), output);
+                            if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+                                DrvOutput outputId { outputHashes.at(output), output };
+                                auto realisation = store->queryRealisation(outputId);
+                                if (!realisation)
+                                    throw Error(
+                                        "cannot operate on an output of unbuilt "
+                                        "content-addressed derivation '%s'",
+                                        outputId.to_string());
+                                outputs.insert_or_assign(output, realisation->outPath);
+                            } else {
+                                // If ca-derivations isn't enabled, assume that
+                                // the output path is statically known.
+                                assert(drvOutputs.count(output));
+                                assert(drvOutputs.at(output).second);
+                                outputs.insert_or_assign(
+                                    output, *drvOutputs.at(output).second);
+                            }
+                        }
+                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                    },
+                    [&](const DerivedPath::Opaque & bo) {
+                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                    },
+                }, path.raw());
+            }
+        }
+
+        break;
+
     case Realise::Outputs: {
-        BuiltPaths res;
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
                 buildResult.rethrow();
-            std::visit(overloaded {
-                [&](const DerivedPath::Built & bfd) {
-                    std::map<std::string, StorePath> outputs;
-                    for (auto & path : buildResult.builtOutputs)
-                        outputs.emplace(path.first.outputName, path.second.outPath);
-                    res.push_back(BuiltPath::Built { bfd.drvPath, outputs });
-                },
-                [&](const DerivedPath::Opaque & bo) {
-                    res.push_back(BuiltPath::Opaque { bo.path });
-                },
-            }, buildResult.path.raw());
+
+            for (auto & installable : backmap[buildResult.path]) {
+                std::visit(overloaded {
+                    [&](const DerivedPath::Built & bfd) {
+                        std::map<std::string, StorePath> outputs;
+                        for (auto & path : buildResult.builtOutputs)
+                            outputs.emplace(path.first.outputName, path.second.outPath);
+                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                    },
+                    [&](const DerivedPath::Opaque & bo) {
+                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                    },
+                }, buildResult.path.raw());
+            }
         }
-        return res;
+
+        break;
     }
+
     default:
         assert(false);
     }
+
+    return res;
 }
 
 BuiltPaths Installable::toBuiltPaths(

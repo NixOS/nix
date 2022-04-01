@@ -16,6 +16,7 @@ namespace nix {
 enum struct ExperimentalFeature
 {
     CaDerivations,
+    ImpureDerivations,
     Flakes,
     NixCommand,
     RecursiveNix,
