@@ -991,7 +991,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     bool contentAddressed = false;
     bool isImpure = false;
     std::optional<std::string> outputHash;
-    std::optional<std::string> outputHashAlgo;
+    std::string outputHashAlgo;
     std::optional<FileIngestionMethod> ingestionMethod;
 
     StringSet outputs;
@@ -1190,8 +1190,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .errPos = posDrvName
             });
 
-        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo.value_or("sha256"));
-        Hash h = newHashAllowEmpty(*outputHash, ht);
+        auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
         auto outPath = state.store->makeFixedOutputPath(method, h, drvName);
@@ -1212,7 +1211,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .errPos = posDrvName
             });
 
-        auto ht = parseHashType(outputHashAlgo.value_or("sha256"));
+        auto ht = parseHashTypeOpt(outputHashAlgo).value_or(htSHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {
