@@ -1,5 +1,8 @@
 source common.sh
 
+enableFeatures "computed-derivations"
+restartDaemon
+
 drv=$(nix eval -f multiple-outputs.nix --raw a.drvPath)
 if nix build "$drv!not-an-output" --json; then
     fail "'not-an-output' should fail to build"

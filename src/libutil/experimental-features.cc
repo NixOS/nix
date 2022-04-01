@@ -13,6 +13,7 @@ std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::RecursiveNix, "recursive-nix" },
     { Xp::NoUrlLiterals, "no-url-literals" },
     { Xp::FetchClosure, "fetch-closure" },
+    { Xp::ComputedDerivations, "computed-derivations" },
 };
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)

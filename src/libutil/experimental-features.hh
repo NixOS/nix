@@ -22,6 +22,7 @@ enum struct ExperimentalFeature
     RecursiveNix,
     NoUrlLiterals,
     FetchClosure,
+    ComputedDerivations, // RFC 92
 };
 
 /**
