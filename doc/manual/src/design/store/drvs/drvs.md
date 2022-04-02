@@ -26,7 +26,7 @@ Commands consist of 3 parts:
 
 1. Path to executable
 
-2. Arguments (Excecpt for `argv[0]`, which is taken from the path in the usual way)
+2. Arguments (Except for `argv[0]`, which is taken from the path in the usual way)
 
 3. Environment variables.
 
