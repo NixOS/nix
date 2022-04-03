@@ -116,6 +116,13 @@ public:
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
+    Setting<std::string> logFormat{this, "bar", "log-format",
+        R"(
+          The default log format to display when buuilding; options are `raw`,
+	  `raw-with-logs`, `internal-json`, `bar`, and `bar-with-logs`.  'Bar'
+          refers to the progress bar showing the build progress."
+        )"};
+
     MaxBuildJobsSetting maxBuildJobs{
         this, 1, "max-jobs",
         R"(
