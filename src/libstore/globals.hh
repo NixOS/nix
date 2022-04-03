@@ -406,10 +406,11 @@ public:
           not run in private network namespace to ensure they can access the
           network).
 
-          Currently, sandboxing only work on Linux and macOS. The use of a
-          sandbox requires that Nix is run as root (so you should use the
-          “build users” feature to perform the actual builds under different
-          users than root).
+          Currently, sandboxing only work on Linux and macOS. The use
+          of a sandbox requires that your system supports "user
+          namespaces" or else that Nix is run as root (so you should
+          use the “build users” feature to perform the actual builds
+          under different users than root).
 
           If this option is set to `relaxed`, then fixed-output derivations
           and derivations that have the `__noChroot` attribute set to `true`
