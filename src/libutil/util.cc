@@ -1709,13 +1709,11 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
-        AutoCloseFD fdSavedCwd = open("/proc/self/cwd", O_RDONLY);
-        if (!fdSavedCwd) {
-            throw SysError("saving cwd");
-        }
+        auto savedCwd = absPath(".");
+
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
-        if (fdSavedCwd && fchdir(fdSavedCwd.get()) == -1) {
+        if (chdir(savedCwd.c_str()) == -1) {
             throw SysError("restoring cwd");
         }
     } catch (Error & e) {
