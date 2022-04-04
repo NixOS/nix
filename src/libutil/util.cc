@@ -1690,7 +1690,6 @@ void setStackSize(size_t stackSize)
 
 #if __linux__
 static AutoCloseFD fdSavedMountNamespace;
-static AutoCloseFD fdSavedCwd;
 #endif
 
 void saveMountNamespace()
@@ -1702,11 +1701,6 @@ void saveMountNamespace()
         if (!fd)
             throw SysError("saving parent mount namespace");
         fdSavedMountNamespace = std::move(fd);
-
-        fd = open("/proc/self/cwd", O_RDONLY);
-        if (!fd)
-            throw SysError("saving cwd");
-        fdSavedCwd = std::move(fd);
     });
 #endif
 }
@@ -1715,6 +1709,10 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
+        AutoCloseFD fdSavedCwd = open("/proc/self/cwd", O_RDONLY);
+        if (!fdSavedCwd) {
+            throw SysError("saving cwd");
+        }
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
         if (fdSavedCwd && fchdir(fdSavedCwd.get()) == -1) {
