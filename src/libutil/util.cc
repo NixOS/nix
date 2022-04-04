@@ -1698,20 +1698,7 @@ void saveMountNamespace()
 #if __linux__
     static std::once_flag done;
     std::call_once(done, []() {
-#ifdef __GNU__
-        // getcwd allocating its return value is a GNU extension.
-        char *cwd = getcwd(NULL, 0);
-        if (cwd == NULL)
-#else
-        char cwd[PATH_MAX];
-        if (!getcwd(cwd, sizeof(cwd)))
-#endif
-            throw SysError("getting cwd");
-        savedCwd.emplace(cwd);
-#ifdef __GNU__
-        free(cwd);
-#endif
-
+        savedCwd = absPath(".");
         AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
         if (!fd)
             throw SysError("saving parent mount namespace");
