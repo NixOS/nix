@@ -1717,11 +1717,11 @@ void restoreMountNamespace()
     try {
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
+        if (fdSavedCwd && fchdir(fdSavedCwd.get()) == -1) {
+            throw SysError("restoring cwd");
+        }
     } catch (Error & e) {
         debug(e.msg());
-    }
-    if (fdSavedCwd && fchdir(fdSavedCwd.get()) == -1) {
-        throw SysError("restoring cwd");
     }
 #endif
 }
