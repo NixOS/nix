@@ -120,7 +120,7 @@ public:
         R"(
           The default log format to display when buuilding; options are `raw`,
           `raw-with-logs`, `internal-json`, `bar`, and `bar-with-logs`.  `bar`
-          refers to the progress bar showing the build progress."
+          refers to the progress bar showing the build progress.
         )"};
 
     MaxBuildJobsSetting maxBuildJobs{
