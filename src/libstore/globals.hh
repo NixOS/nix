@@ -119,7 +119,7 @@ public:
     Setting<std::string> logFormat{this, "bar", "log-format",
         R"(
           The default log format to display when buuilding; options are `raw`,
-          `raw-with-logs`, `internal-json`, `bar`, and `bar-with-logs`.  'Bar'
+          `raw-with-logs`, `internal-json`, `bar`, and `bar-with-logs`.  `bar`
           refers to the progress bar showing the build progress."
         )"};
 
