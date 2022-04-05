@@ -1471,6 +1471,7 @@ constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 std::string base64Encode(std::string_view s)
 {
     std::string res;
+    res.reserve((s.size() + 2) / 3 * 4);
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1502,6 +1503,9 @@ std::string base64Decode(std::string_view s)
     }();
 
     std::string res;
+    // Some sequences are missing the padding consisting of up to two '='.
+    //                    vvv
+    res.reserve((s.size() + 2) / 4 * 3);
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
