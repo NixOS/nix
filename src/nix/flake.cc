@@ -463,7 +463,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     std::string name(attr.name);
-                    if (name != "path" && name != "description")
+                    if (name != "path" && name != "description" && name != "welcomeText")
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
             } catch (Error & e) {
