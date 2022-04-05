@@ -1259,9 +1259,9 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
-    while (pos != std::string::npos) {
+    while (pos != std::string_view::npos) {
         auto end = s.find_first_of(separators, pos + 1);
-        if (end == std::string::npos) end = s.size();
+        if (end == std::string_view::npos) end = s.size();
         result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
