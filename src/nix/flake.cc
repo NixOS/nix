@@ -508,6 +508,7 @@ struct CmdFlakeCheck : FlakeCommand
                             name == "defaultBundler" ? "bundlers.<system>.default" :
                             name == "overlay" ? "overlays.default" :
                             name == "devShell" ? "devShells.<system>.default" :
+                            name == "nixosModule" ? "nixosModules.default" :
                             "";
                         if (replacement != "")
                             warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
