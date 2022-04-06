@@ -53,7 +53,10 @@ struct PathSubstitutionGoal : public Goal
     /* Content address for recomputing store path */
     std::optional<ContentAddress> ca;
 
-    void done(ExitCode result, BuildResult::Status status);
+    void done(
+        ExitCode result,
+        BuildResult::Status status,
+        std::optional<std::string> errorMsg = {});
 
 public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
