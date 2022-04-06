@@ -180,6 +180,30 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             fragment);
                     }
 
+
+                    if (pathExists(flakeRoot + "/.fslckout")) {
+                        auto base = std::string("fsl+file://") + flakeRoot;
+
+                        auto parsedURL = ParsedURL{
+                            .url = base, // FIXME
+                            .base = base,
+                            .scheme = "fsl+file",
+                            .authority = "",
+                            .path = flakeRoot,
+                            .query = decodeQuery(match[2]),
+                        };
+
+                        if (subdir != "") {
+                            if (parsedURL.query.count("dir"))
+                                throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+                            parsedURL.query.insert_or_assign("dir", subdir);
+                        }
+
+                        return std::make_pair(
+                            FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+                            fragment);
+                    }
+
                     subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
                     flakeRoot = dirOf(flakeRoot);
                 }
