@@ -109,7 +109,6 @@ struct Trace {
 
 struct ErrorInfo {
     Verbosity level;
-    std::string name; // FIXME: rename
     hintformat msg;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;

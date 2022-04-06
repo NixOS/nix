@@ -21,12 +21,9 @@ const std::string & BaseError::calcWhat() const
     if (what_.has_value())
         return *what_;
     else {
-        err.name = sname();
-
         std::ostringstream oss;
         showErrorInfo(oss, err, loggerSettings.showTrace);
         what_ = oss.str();
-
         return *what_;
     }
 }
