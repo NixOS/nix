@@ -39,19 +39,19 @@ Machine::Machine(decltype(storeUri) storeUri,
     sshPublicHostKey(sshPublicHostKey)
 {}
 
-bool Machine::allSupported(const std::set<string> & features) const
+bool Machine::allSupported(const std::set<std::string> & features) const
 {
     return std::all_of(features.begin(), features.end(),
-        [&](const string & feature) {
+        [&](const std::string & feature) {
             return supportedFeatures.count(feature) ||
                 mandatoryFeatures.count(feature);
         });
 }
 
-bool Machine::mandatoryMet(const std::set<string> & features) const
+bool Machine::mandatoryMet(const std::set<std::string> & features) const
 {
     return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
-        [&](const string & feature) {
+        [&](const std::string & feature) {
             return features.count(feature);
         });
 }
@@ -89,7 +89,7 @@ ref<Store> Machine::openStore() const
 static std::vector<std::string> expandBuilderLines(const std::string & builders)
 {
     std::vector<std::string> result;
-    for (auto line : tokenizeString<std::vector<string>>(builders, "\n;")) {
+    for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n;")) {
         trim(line);
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
         if (line.empty()) continue;
@@ -117,7 +117,7 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
 
 static Machine parseBuilderLine(const std::string & line)
 {
-    const auto tokens = tokenizeString<std::vector<string>>(line);
+    const auto tokens = tokenizeString<std::vector<std::string>>(line);
 
     auto isSet = [&](size_t fieldIndex) {
         return tokens.size() > fieldIndex && tokens[fieldIndex] != "" && tokens[fieldIndex] != "-";
@@ -146,17 +146,18 @@ static Machine parseBuilderLine(const std::string & line)
 
     return {
         tokens[0],
-        isSet(1) ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
+        isSet(1) ? tokenizeString<std::vector<std::string>>(tokens[1], ",") : std::vector<std::string>{settings.thisSystem},
         isSet(2) ? tokens[2] : "",
         isSet(3) ? parseUnsignedIntField(3) : 1U,
         isSet(4) ? parseUnsignedIntField(4) : 1U,
-        isSet(5) ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
-        isSet(6) ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{},
+        isSet(5) ? tokenizeString<std::set<std::string>>(tokens[5], ",") : std::set<std::string>{},
+        isSet(6) ? tokenizeString<std::set<std::string>>(tokens[6], ",") : std::set<std::string>{},
         isSet(7) ? ensureBase64(7) : ""
     };
 }
 
-static Machines parseBuilderLines(const std::vector<std::string>& builders) {
+static Machines parseBuilderLines(const std::vector<std::string> & builders)
+{
     Machines result;
     std::transform(builders.begin(), builders.end(), std::back_inserter(result), parseBuilderLine);
     return result;

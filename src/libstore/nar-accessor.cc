@@ -90,7 +90,7 @@ struct NarAccessor : public FSAccessor
         void receiveContents(std::string_view data) override
         { }
 
-        void createSymlink(const Path & path, const string & target) override
+        void createSymlink(const Path & path, const std::string & target) override
         {
             createMember(path,
                 NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});

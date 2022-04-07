@@ -77,7 +77,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     for (auto & i : autoArgs) {
         auto v = state.allocValue();
         if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
+            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), absPath(".")));
         else
             v->mkString(((std::string_view) i.second).substr(1));
         res.insert(state.symbols.create(i.first), v);
@@ -85,17 +85,17 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-Path lookupFileArg(EvalState & state, string s)
+Path lookupFileArg(EvalState & state, std::string_view s)
 {
     if (isUri(s)) {
         return state.store->toRealPath(
             fetchers::downloadTarball(
                 state.store, resolveUri(s), "source", false).first.storePath);
     } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
-        Path p = s.substr(1, s.size() - 2);
+        Path p(s.substr(1, s.size() - 2));
         return state.findFile(p);
     } else
-        return absPath(s);
+        return absPath(std::string(s));
 }
 
 }

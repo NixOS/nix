@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "util.hh"
 #include "loggers.hh"
 
@@ -94,7 +95,7 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
 }
 
 
-string getArg(const string & opt,
+std::string getArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
@@ -322,14 +323,14 @@ void parseCmdLine(int argc, char * * argv,
 }
 
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(const std::string & programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 
-void printVersion(const string & programName)
+void printVersion(const std::string & programName)
 {
     std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
     if (verbosity > lvlInfo) {
@@ -352,7 +353,7 @@ void printVersion(const string & programName)
 }
 
 
-void showManPage(const string & name)
+void showManPage(const std::string & name)
 {
     restoreProcessContext();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
@@ -361,13 +362,13 @@ void showManPage(const string & name)
 }
 
 
-int handleExceptions(const string & programName, std::function<void()> fun)
+int handleExceptions(const std::string & programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
     ErrorInfo::programName = baseNameOf(programName);
 
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
             fun();
@@ -407,7 +408,7 @@ RunPager::RunPager()
     if (!isatty(STDOUT_FILENO)) return;
     char * pager = getenv("NIX_PAGER");
     if (!pager) pager = getenv("PAGER");
-    if (pager && ((string) pager == "" || (string) pager == "cat")) return;
+    if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
 
     Pipe toPager;
     toPager.create();

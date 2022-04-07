@@ -15,8 +15,10 @@ cat <<EOF > flake.nix
 {
     inputs.foo.url = "$PWD/foo";
     outputs = a: {
-       defaultPackage.$system = import ./simple.nix;
-       packages.$system.test = import ./simple.nix;
+       packages.$system = rec {
+         test = import ./simple.nix;
+         default = test;
+       };
     };
 }
 EOF

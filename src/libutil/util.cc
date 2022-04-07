@@ -71,13 +71,11 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
-void replaceEnv(std::map<std::string, std::string> newEnv)
+void replaceEnv(const std::map<std::string, std::string> & newEnv)
 {
     clearEnv();
-    for (auto newEnvVar : newEnv)
-    {
+    for (auto & newEnvVar : newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
-    }
 }
 
 
@@ -110,13 +108,13 @@ Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
-    string s;
+    std::string s;
     s.reserve(256);
 
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);
 
-    string temp;
+    std::string temp;
 
     /* Count the number of times we follow a symlink and stop at some
        arbitrary (but high) limit to prevent infinite loops. */
@@ -142,7 +140,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
         /* Normal component; copy it. */
         else {
             s += '/';
-            if (const auto slash = path.find('/'); slash == string::npos) {
+            if (const auto slash = path.find('/'); slash == std::string::npos) {
                 s += path;
                 path = {};
             } else {
@@ -175,7 +173,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
-    if (pos == string::npos)
+    if (pos == std::string::npos)
         return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
@@ -191,7 +189,7 @@ std::string_view baseNameOf(std::string_view path)
         last -= 1;
 
     auto pos = path.rfind('/', last);
-    if (pos == string::npos)
+    if (pos == std::string::npos)
         pos = 0;
     else
         pos += 1;
@@ -249,7 +247,7 @@ Path readLink(const Path & path)
             else
                 throw SysError("reading symbolic link '%1%'", path);
         else if (rlSize < bufSize)
-            return string(buf.data(), rlSize);
+            return std::string(buf.data(), rlSize);
     }
 }
 
@@ -269,7 +267,7 @@ DirEntries readDirectory(DIR *dir, const Path & path)
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         entries.emplace_back(name, dirent->d_ino,
 #ifdef HAVE_STRUCT_DIRENT_D_TYPE
@@ -303,7 +301,7 @@ unsigned char getFileType(const Path & path)
 }
 
 
-string readFile(int fd)
+std::string readFile(int fd)
 {
     struct stat st;
     if (fstat(fd, &st) == -1)
@@ -313,7 +311,7 @@ string readFile(int fd)
 }
 
 
-string readFile(const Path & path)
+std::string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
@@ -366,9 +364,9 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-string readLine(int fd)
+std::string readLine(int fd)
 {
-    string s;
+    std::string s;
     while (1) {
         checkInterrupt();
         char ch;
@@ -387,7 +385,7 @@ string readLine(int fd)
 }
 
 
-void writeLine(int fd, string s)
+void writeLine(int fd, std::string s)
 {
     s += '\n';
     writeFull(fd, s);
@@ -398,7 +396,7 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
     checkInterrupt();
 
-    string name(baseNameOf(path));
+    std::string name(baseNameOf(path));
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
@@ -406,8 +404,29 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         throw SysError("getting status of '%1%'", path);
     }
 
-    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
-        bytesFreed += st.st_size;
+    if (!S_ISDIR(st.st_mode)) {
+        /* We are about to delete a file. Will it likely free space? */
+
+        switch (st.st_nlink) {
+            /* Yes: last link. */
+            case 1:
+                bytesFreed += st.st_size;
+                break;
+            /* Maybe: yes, if 'auto-optimise-store' or manual optimisation
+               was performed. Instead of checking for real let's assume
+               it's an optimised file and space will be freed.
+
+               In worst case we will double count on freed space for files
+               with exactly two hardlinks for unoptimised packages.
+             */
+            case 2:
+                bytesFreed += st.st_size;
+                break;
+            /* No: 3+ links. */
+            default:
+                break;
+        }
+    }
 
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
@@ -566,8 +585,8 @@ Path getConfigDir()
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
-    std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
+    auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
+    std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
     result.insert(result.begin(), configHome);
     return result;
 }
@@ -670,7 +689,7 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block, const size_t reserveSize)
+std::string drainFD(int fd, bool block, const size_t reserveSize)
 {
     // the parser needs two extra bytes to append terminating characters, other users will
     // not care very much about the extra memory.
@@ -682,7 +701,14 @@ string drainFD(int fd, bool block, const size_t reserveSize)
 
 void drainFD(int fd, Sink & sink, bool block)
 {
-    int saved;
+    // silence GCC maybe-uninitialized warning in finally
+    int saved = 0;
+
+    if (!block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
 
     Finally finally([&]() {
         if (!block) {
@@ -690,12 +716,6 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("making file descriptor blocking");
         }
     });
-
-    if (!block) {
-        saved = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
-            throw SysError("making file descriptor non-blocking");
-    }
 
     std::vector<unsigned char> buf(64 * 1024);
     while (1) {
@@ -719,7 +739,7 @@ void drainFD(int fd, Sink & sink, bool block)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
+AutoDelete::AutoDelete(const std::string & p, bool recursive) : path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -1036,7 +1056,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-string runProgram(Path program, bool searchPath, const Strings & args,
+std::string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
@@ -1174,7 +1194,7 @@ void runProgram2(const RunOptions & options)
 }
 
 
-void closeMostFDs(const set<int> & exceptions)
+void closeMostFDs(const std::set<int> & exceptions)
 {
 #if __linux__
     try {
@@ -1238,11 +1258,11 @@ void _interrupted()
 template<class C> C tokenizeString(std::string_view s, std::string_view separators)
 {
     C result;
-    string::size_type pos = s.find_first_not_of(separators, 0);
-    while (pos != string::npos) {
-        string::size_type end = s.find_first_of(separators, pos + 1);
-        if (end == string::npos) end = s.size();
-        result.insert(result.end(), string(s, pos, end - pos));
+    auto pos = s.find_first_not_of(separators, 0);
+    while (pos != std::string_view::npos) {
+        auto end = s.find_first_of(separators, pos + 1);
+        if (end == std::string_view::npos) end = s.size();
+        result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
     return result;
@@ -1250,29 +1270,30 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 
 template Strings tokenizeString(std::string_view s, std::string_view separators);
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
-template vector<string> tokenizeString(std::string_view s, std::string_view separators);
+template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 
-string chomp(std::string_view s)
+std::string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
-    return i == string::npos ? "" : string(s, 0, i + 1);
+    return i == std::string_view::npos ? "" : std::string(s, 0, i + 1);
 }
 
 
-string trim(const string & s, const string & whitespace)
+std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == string::npos) return "";
+    if (i == s.npos) return "";
     auto j = s.find_last_not_of(whitespace);
-    return string(s, i, j == string::npos ? j : j - i + 1);
+    return std::string(s, i, j == s.npos ? j : j - i + 1);
 }
 
 
-string replaceStrings(std::string_view s,
-    const std::string & from, const std::string & to)
+std::string replaceStrings(
+    std::string res,
+    std::string_view from,
+    std::string_view to)
 {
-    string res(s);
     if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
@@ -1283,20 +1304,19 @@ string replaceStrings(std::string_view s,
 }
 
 
-std::string rewriteStrings(const std::string & _s, const StringMap & rewrites)
+std::string rewriteStrings(std::string s, const StringMap & rewrites)
 {
-    auto s = _s;
     for (auto & i : rewrites) {
         if (i.first == i.second) continue;
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos)
+        while ((j = s.find(i.first, j)) != std::string::npos)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
 }
 
 
-string statusToString(int status)
+std::string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
@@ -1358,11 +1378,15 @@ std::string shellEscape(const std::string_view s)
 
 void ignoreException()
 {
+    /* Make sure no exceptions leave this function.
+       printError() also throws when remote is closed. */
     try {
-        throw;
-    } catch (std::exception & e) {
-        printError("error (ignored): %1%", e.what());
-    }
+        try {
+            throw;
+        } catch (std::exception & e) {
+            printError("error (ignored): %1%", e.what());
+        }
+    } catch (...) { }
 }
 
 bool shouldANSI()
@@ -1408,7 +1432,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             }
         }
 
-        else if (*i == '\r')
+        else if (*i == '\r' || *i == '\a')
             // do nothing for now
             i++;
 
@@ -1444,9 +1468,10 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
 constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-string base64Encode(std::string_view s)
+std::string base64Encode(std::string_view s)
 {
-    string res;
+    std::string res;
+    res.reserve((s.size() + 2) / 3 * 4);
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1465,7 +1490,7 @@ string base64Encode(std::string_view s)
 }
 
 
-string base64Decode(std::string_view s)
+std::string base64Decode(std::string_view s)
 {
     constexpr char npos = -1;
     constexpr std::array<char, 256> base64DecodeChars = [&]() {
@@ -1477,7 +1502,10 @@ string base64Decode(std::string_view s)
         return result;
     }();
 
-    string res;
+    std::string res;
+    // Some sequences are missing the padding consisting of up to two '='.
+    //                    vvv
+    res.reserve((s.size() + 2) / 4 * 3);
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
@@ -1561,7 +1589,22 @@ std::pair<unsigned short, unsigned short> getWindowSize()
 }
 
 
-static Sync<std::list<std::function<void()>>> _interruptCallbacks;
+/* We keep track of interrupt callbacks using integer tokens, so we can iterate
+   safely without having to lock the data structure while executing arbitrary
+   functions.
+ */
+struct InterruptCallbacks {
+    typedef int64_t Token;
+
+    /* We use unique tokens so that we can't accidentally delete the wrong
+       handler because of an erroneous double delete. */
+    Token nextToken = 0;
+
+    /* Used as a list, see InterruptCallbacks comment. */
+    std::map<Token, std::function<void()>> callbacks;
+};
+
+static Sync<InterruptCallbacks> _interruptCallbacks;
 
 static void signalHandlerThread(sigset_t set)
 {
@@ -1583,8 +1626,19 @@ void triggerInterrupt()
     _isInterrupted = true;
 
     {
-        auto interruptCallbacks(_interruptCallbacks.lock());
-        for (auto & callback : *interruptCallbacks) {
+        InterruptCallbacks::Token i = 0;
+        while (true) {
+            std::function<void()> callback;
+            {
+                auto interruptCallbacks(_interruptCallbacks.lock());
+                auto lb = interruptCallbacks->callbacks.lower_bound(i);
+                if (lb == interruptCallbacks->callbacks.end())
+                    break;
+
+                callback = lb->second;
+                i = lb->first + 1;
+            }
+
             try {
                 callback();
             } catch (...) {
@@ -1638,7 +1692,9 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
+#if __linux__
 static AutoCloseFD fdSavedMountNamespace;
+#endif
 
 void saveMountNamespace()
 {
@@ -1657,8 +1713,13 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
+        auto savedCwd = absPath(".");
+
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
+        if (chdir(savedCwd.c_str()) == -1) {
+            throw SysError("restoring cwd");
+        }
     } catch (Error & e) {
         debug(e.msg());
     }
@@ -1694,21 +1755,22 @@ void restoreProcessContext(bool restoreMounts)
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
-    std::list<std::function<void()>>::iterator it;
+    InterruptCallbacks::Token token;
     ~InterruptCallbackImpl() override
     {
-        _interruptCallbacks.lock()->erase(it);
+        auto interruptCallbacks(_interruptCallbacks.lock());
+        interruptCallbacks->callbacks.erase(token);
     }
 };
 
 std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback)
 {
     auto interruptCallbacks(_interruptCallbacks.lock());
-    interruptCallbacks->push_back(callback);
+    auto token = interruptCallbacks->nextToken++;
+    interruptCallbacks->callbacks.emplace(token, callback);
 
     auto res = std::make_unique<InterruptCallbackImpl>();
-    res->it = interruptCallbacks->end();
-    res->it--;
+    res->token = token;
 
     return std::unique_ptr<InterruptCallback>(res.release());
 }
@@ -1804,7 +1866,7 @@ void connect(int fd, const std::string & path)
 }
 
 
-string showBytes(uint64_t bytes)
+std::string showBytes(uint64_t bytes)
 {
     return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
@@ -1815,7 +1877,7 @@ void commonChildInit(Pipe & logPipe)
 {
     logger = makeSimpleLogger();
 
-    const static string pathNullDevice = "/dev/null";
+    const static std::string pathNullDevice = "/dev/null";
     restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate

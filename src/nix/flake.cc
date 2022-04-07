@@ -13,6 +13,7 @@
 #include "registry.hh"
 #include "json.hh"
 #include "eval-cache.hh"
+#include "markdown.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -326,7 +327,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!drvInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return std::make_optional(store->parseStorePath(drvInfo->queryDrvPath()));
+                return drvInfo->queryDrvPath();
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the derivation '%s'", attrPath));
                 reportError(e);
@@ -462,7 +463,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     std::string name(attr.name);
-                    if (name != "path" && name != "description")
+                    if (name != "path" && name != "description" && name != "welcomeText")
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
             } catch (Error & e) {
@@ -499,6 +500,18 @@ struct CmdFlakeCheck : FlakeCommand
                         evalSettings.enableImportFromDerivation.setDefault(name != "hydraJobs");
 
                         state->forceValue(vOutput, pos);
+
+                        std::string_view replacement =
+                            name == "defaultPackage" ? "packages.<system>.default" :
+                            name == "defaultApps" ? "apps.<system>.default" :
+                            name == "defaultTemplate" ? "templates.default" :
+                            name == "defaultBundler" ? "bundlers.<system>.default" :
+                            name == "overlay" ? "overlays.default" :
+                            name == "devShell" ? "devShells.<system>.default" :
+                            name == "nixosModule" ? "nixosModules.default" :
+                            "";
+                        if (replacement != "")
+                            warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
 
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos);
@@ -649,12 +662,14 @@ struct CmdFlakeCheck : FlakeCommand
     }
 };
 
+static Strings defaultTemplateAttrPathsPrefixes{"templates."};
+static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
+
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
     Path destDir;
 
-    const Strings attrsPathPrefixes{"templates."};
     const LockFlags lockFlags{ .writeLockFile = false };
 
     CmdFlakeInitCommon()
@@ -669,8 +684,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 completeFlakeRefWithFragment(
                     getEvalState(),
                     lockFlags,
-                    attrsPathPrefixes,
-                    {"defaultTemplate"},
+                    defaultTemplateAttrPathsPrefixes,
+                    defaultTemplateAttrPaths,
                     prefix);
             }}
         });
@@ -685,15 +700,21 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef),
-            Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings(attrsPathPrefixes), lockFlags);
+            evalState, std::move(templateFlakeRef), templateName,
+            defaultTemplateAttrPaths,
+            defaultTemplateAttrPathsPrefixes,
+            lockFlags);
 
         auto [cursor, attrPath] = installable.getCursor(*evalState);
 
-        auto templateDir = cursor->getAttr("path")->getString();
+        auto templateDirAttr = cursor->getAttr("path");
+        auto templateDir = templateDirAttr->getString();
 
-        assert(store->isInStore(templateDir));
+        if (!store->isInStore(templateDir))
+            throw TypeError(
+                "'%s' was not found in the Nix store\n"
+                "If you've set '%s' to a string, try using a path instead.",
+                templateDir, templateDirAttr->getAttrPathStr());
 
         std::vector<Path> files;
 
@@ -728,6 +749,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 else
                     throw Error("file '%s' has unsupported type", from2);
                 files.push_back(to2);
+                notice("wrote: %s", to2);
             }
         };
 
@@ -737,6 +759,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : files) args.push_back(s);
             runProgram("git", true, args);
+        }
+        auto welcomeText = cursor->maybeGetAttr("welcomeText");
+        if (welcomeText) {
+            notice("\n");
+            notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
     }
 };

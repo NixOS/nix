@@ -7,10 +7,12 @@ namespace nix {
 
 std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::CaDerivations, "ca-derivations" },
+    { Xp::ImpureDerivations, "impure-derivations" },
     { Xp::Flakes, "flakes" },
     { Xp::NixCommand, "nix-command" },
     { Xp::RecursiveNix, "recursive-nix" },
     { Xp::NoUrlLiterals, "no-url-literals" },
+    { Xp::FetchClosure, "fetch-closure" },
 };
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)

@@ -47,9 +47,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             throw;
         }
 
-        /* The files below are special-cased to that they don't show up
-         * in user profiles, either because they are useless, or
-         * because they would cauase pointless collisions (e.g., each
+        /* The files below are special-cased to that they don't show
+         * up in user profiles, either because they are useless, or
+         * because they would cause pointless collisions (e.g., each
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
@@ -57,7 +57,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             hasSuffix(srcFile, "/nix-support") ||
             hasSuffix(srcFile, "/perllocal.pod") ||
             hasSuffix(srcFile, "/info/dir") ||
-            hasSuffix(srcFile, "/log"))
+            hasSuffix(srcFile, "/log") ||
+            hasSuffix(srcFile, "/manifest.nix") ||
+            hasSuffix(srcFile, "/manifest.json"))
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
@@ -123,7 +125,7 @@ void buildProfile(const Path & out, Packages && pkgs)
         createLinks(state, pkgDir, out, priority);
 
         try {
-            for (const auto & p : tokenizeString<std::vector<string>>(
+            for (const auto & p : tokenizeString<std::vector<std::string>>(
                     readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
@@ -161,7 +163,7 @@ void buildProfile(const Path & out, Packages && pkgs)
 
 void builtinBuildenv(const BasicDerivation & drv)
 {
-    auto getAttr = [&](const string & name) {
+    auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
         if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
         return i->second;

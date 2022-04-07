@@ -24,21 +24,23 @@ extern std::function<void(const Error * error, const Env & env, const Expr & exp
 
 struct Pos
 {
-    FileOrigin origin;
     Symbol file;
-    unsigned int line, column;
-    Pos() : origin(foString), line(0), column(0) { };
-    Pos(FileOrigin origin, const Symbol & file, unsigned int line, unsigned int column)
-        : origin(origin), file(file), line(line), column(column) { };
+    uint32_t line;
+    FileOrigin origin:2;
+    uint32_t column:30;
+    Pos() : line(0), origin(foString), column(0) { };
+    Pos(FileOrigin origin, const Symbol & file, uint32_t line, uint32_t column)
+        : file(file), line(line), origin(origin), column(column) { };
     operator bool() const
     {
         return line != 0;
     }
+
     bool operator < (const Pos & p2) const
     {
         if (!line) return p2.line;
         if (!p2.line) return false;
-        int d = ((string) file).compare((string) p2.file);
+        int d = ((const std::string &) file).compare((const std::string &) p2.file);
         if (d < 0) return true;
         if (d > 0) return false;
         if (line < p2.line) return true;
@@ -69,7 +71,7 @@ struct AttrName
 
 typedef std::vector<AttrName> AttrPath;
 
-string showAttrPath(const AttrPath & attrPath);
+std::string showAttrPath(const AttrPath & attrPath);
 
 
 /* Abstract syntax of Nix expressions. */
@@ -116,7 +118,7 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    string s;
+    std::string s;
     Value v;
     ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env);
@@ -126,9 +128,9 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
-    string s;
+    std::string s;
     Value v;
-    ExprPath(const string & s) : s(s) { v.mkPath(this->s.c_str()); };
+    ExprPath(std::string s) : s(std::move(s)) { v.mkPath(this->s.c_str()); };
     Value * maybeThunk(EvalState & state, Env & env);
     const Pos* getPos() const { return 0; }
     COMMON_METHODS
@@ -262,7 +264,7 @@ struct ExprLambda : Expr
     {
     };
     void setName(Symbol & name);
-    string showNamePos() const;
+    std::string showNamePos() const;
     inline bool hasFormals() const { return formals != nullptr; }
     const Pos* getPos() const { return &pos; }
     COMMON_METHODS
@@ -356,8 +358,8 @@ struct ExprConcatStrings : Expr
 {
     Pos pos;
     bool forceString;
-    vector<std::pair<Pos, Expr *> > * es;
-    ExprConcatStrings(const Pos & pos, bool forceString, vector<std::pair<Pos, Expr *> > * es)
+    std::vector<std::pair<Pos, Expr *> > * es;
+    ExprConcatStrings(const Pos & pos, bool forceString, std::vector<std::pair<Pos, Expr *> > * es)
         : pos(pos), forceString(forceString), es(es) { };
     const Pos* getPos() const { return &pos; }
     COMMON_METHODS
@@ -390,15 +392,19 @@ struct StaticEnv
 
     void sort()
     {
-        std::sort(vars.begin(), vars.end(),
+        std::stable_sort(vars.begin(), vars.end(),
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
     }
 
     void deduplicate()
     {
-        const auto last = std::unique(vars.begin(), vars.end(),
-            [] (const Vars::value_type & a, const Vars::value_type & b) { return a.first == b.first; });
-        vars.erase(last, vars.end());
+        auto it = vars.begin(), jt = it, end = vars.end();
+        while (jt != end) {
+            *it = *jt++;
+            while (jt != end && it->first == jt->first) *it = *jt++;
+            it++;
+        }
+        vars.erase(it, end);
     }
 
     Vars::const_iterator find(const Symbol & name) const

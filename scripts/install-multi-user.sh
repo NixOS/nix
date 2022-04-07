@@ -23,10 +23,10 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="30000"
+readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 # darwin installer needs to override these
-NIX_FIRST_BUILD_UID="30001"
+NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
 NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
@@ -609,7 +609,7 @@ EOF
         fi
     fi
     _sudo "to make the basic directory structure of Nix (part 1)" \
-          install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
+          install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool,/daemon-socket} /nix/var/nix/{gcroots,profiles}/per-user
 
     _sudo "to make the basic directory structure of Nix (part 2)" \
           install -dv -g "$NIX_BUILD_GROUP_NAME" -m 1775 /nix/store
@@ -739,7 +739,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              cp -RLp ./store/* "$NIX_ROOT/store/"
+              cp -RPp ./store/* "$NIX_ROOT/store/"
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"

@@ -19,7 +19,7 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isImmutable());
+    assert(input.isLocked());
 
     auto attrs = state.buildBindings(8);
 
@@ -166,8 +166,8 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect())
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isImmutable())
-        state.debug_throw(EvalError("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos));
+    if (evalSettings.pureEval && !input.isLocked())
+        state.debug_throw(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos));
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -186,7 +186,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
-    const string & who, bool unpack, std::string name)
+    const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
@@ -198,7 +198,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            std::string n(attr.name);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
@@ -230,6 +230,21 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         state.debug_throw(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
 
+    // early exit if pinned and already in the store
+    if (expectedHash && expectedHash->type == htSHA256) {
+        auto expectedPath =
+            unpack
+            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
+            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+
+        if (state.store->isValidPath(expectedPath)) {
+            state.allowAndSetStorePathString(expectedPath, v);
+            return;
+        }
+    }
+
+    // TODO: fetching may fail, yet the path may be substitutable.
+    //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
@@ -244,10 +259,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
     }
 
-    state.allowPath(storePath);
-
-    auto path = state.store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
+    state.allowAndSetStorePathString(storePath, v);
 }
 
 static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -317,7 +329,7 @@ static RegisterPrimOp primop_fetchTarball({
     .fun = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
+static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }

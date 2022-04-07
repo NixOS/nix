@@ -4,6 +4,7 @@
 #include "eval-cache.hh"
 #include "names.hh"
 #include "command.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -70,7 +71,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
-            context2.push_back({state.store->parseStorePath(path), {name}});
+            context2.push_back({path, {name}});
 
         return UnresolvedApp{App {
             .context = std::move(context2),
@@ -114,7 +115,7 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
         installableContext.push_back(
             std::make_shared<InstallableDerivedPath>(store, ctxElt.toDerivedPath()));
 
-    auto builtContext = build(evalStore, store, Realise::Outputs, installableContext);
+    auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);
     if (!store->isInStore(res.program))
         throw Error("app program '%s' is not in the Nix store", res.program);

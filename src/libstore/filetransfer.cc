@@ -33,12 +33,12 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
-std::string resolveUri(const std::string & uri)
+std::string resolveUri(std::string_view uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri, 8) + "/nixexprs.tar.xz";
+        return "https://nixos.org/channels/" + std::string(uri.substr(8)) + "/nixexprs.tar.xz";
     else
-        return uri;
+        return std::string(uri);
 }
 
 struct curlFileTransfer : public FileTransfer
@@ -128,7 +128,7 @@ struct curlFileTransfer : public FileTransfer
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, nullptr, "download of '%s' was interrupted", request.uri));
+                    fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -197,15 +197,15 @@ struct curlFileTransfer : public FileTransfer
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
-                statusMsg = trim(match[1]);
+                statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
             } else {
                 auto i = line.find(':');
-                if (i != string::npos) {
-                    string name = toLower(trim(string(line, 0, i)));
+                if (i != std::string::npos) {
+                    std::string name = toLower(trim(line.substr(0, i)));
                     if (name == "etag") {
-                        result.etag = trim(string(line, i + 1));
+                        result.etag = trim(line.substr(i + 1));
                         /* Hack to work around a GitHub bug: it sends
                            ETags, but ignores If-None-Match. So if we get
                            the expected ETag on a 200 response, then shut
@@ -218,8 +218,8 @@ struct curlFileTransfer : public FileTransfer
                             return 0;
                         }
                     } else if (name == "content-encoding")
-                        encoding = trim(string(line, i + 1));
-                    else if (name == "accept-ranges" && toLower(trim(std::string(line, i + 1))) == "bytes")
+                        encoding = trim(line.substr(i + 1));
+                    else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
                 }
             }
@@ -704,7 +704,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, nullptr, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else
@@ -866,18 +866,18 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<st
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
-    if (response && (response->size() < 1024 || response->find("<html>") != string::npos))
+    if (response && (response->size() < 1024 || response->find("<html>") != std::string::npos))
         err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), chomp(*response));
     else
         err.msg = hf;
 }
 
-bool isUri(const string & s)
+bool isUri(std::string_view s)
 {
     if (s.compare(0, 8, "channel:") == 0) return true;
     size_t pos = s.find("://");
-    if (pos == string::npos) return false;
-    string scheme(s, 0, pos);
+    if (pos == std::string::npos) return false;
+    std::string scheme(s, 0, pos);
     return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
 }
 

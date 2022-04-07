@@ -5,8 +5,8 @@ namespace nix {
 
 
 bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) const {
-    string s1 = a->key();
-    string s2 = b->key();
+    std::string s1 = a->key();
+    std::string s2 = b->key();
     return s1 < s2;
 }
 
@@ -28,7 +28,7 @@ void Goal::addWaitee(GoalPtr waitee)
 
 void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
-    assert(waitees.find(waitee) != waitees.end());
+    assert(waitees.count(waitee));
     waitees.erase(waitee);
 
     trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));

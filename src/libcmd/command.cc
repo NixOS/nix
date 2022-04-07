@@ -209,7 +209,7 @@ void BuiltPathsCommand::run(ref<Store> store)
         for (auto & p : store->queryAllValidPaths())
             paths.push_back(BuiltPath::Opaque{p});
     } else {
-        paths = toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
@@ -260,7 +260,8 @@ Strings editorFor(const Pos & pos)
     if (pos.line > 0 && (
         editor.find("emacs") != std::string::npos ||
         editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos))
+        editor.find("vim") != std::string::npos ||
+        editor.find("kak") != std::string::npos))
         args.push_back(fmt("+%d", pos.line));
     args.push_back(pos.file);
     return args;

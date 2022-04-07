@@ -9,15 +9,14 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
+void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
     err.traces.push_front(Trace { .pos = e, .hint = hint });
-    return *this;
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
-const string & BaseError::calcWhat() const
+const std::string & BaseError::calcWhat() const
 {
     if (what_.has_value())
         return *what_;
@@ -32,14 +31,14 @@ const string & BaseError::calcWhat() const
     }
 }
 
-std::optional<string> ErrorInfo::programName = std::nullopt;
+std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
 std::ostream & operator<<(std::ostream & os, const hintformat & hf)
 {
     return os << hf.str();
 }
 
-string showErrPos(const ErrPos & errPos)
+std::string showErrPos(const ErrPos & errPos)
 {
     if (errPos.line > 0) {
         if (errPos.column > 0) {
@@ -68,7 +67,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 
             // count the newlines.
             int count = 0;
-            string line;
+            std::string line;
             int pl = errPos.line - 1;
             do
             {
@@ -100,7 +99,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
         std::istringstream iss(errPos.file);
         // count the newlines.
         int count = 0;
-        string line;
+        std::string line;
         int pl = errPos.line - 1;
 
         LinesOfCode loc;
@@ -132,7 +131,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
-    const string & prefix,
+    const std::string & prefix,
     const ErrPos & errPos,
     const LinesOfCode & loc)
 {
@@ -280,6 +279,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             printCodeLines(oss, "", *einfo.errPos, *loc);
             oss << "\n";
         }
+    }
+
+    auto suggestions = einfo.suggestions.trim();
+    if (! suggestions.suggestions.empty()){
+        oss << "Did you mean " <<
+            suggestions.trim() <<
+            "?" << std::endl;
     }
 
     // traces

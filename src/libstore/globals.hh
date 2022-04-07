@@ -113,7 +113,7 @@ public:
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
-        "If `verbose-build` is false, the number of lines of the tail of "
+        "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
@@ -880,55 +880,6 @@ public:
           are loaded as plugins (non-recursively).
         )"};
 
-    Setting<StringMap> accessTokens{this, {}, "access-tokens",
-        R"(
-          Access tokens used to access protected GitHub, GitLab, or
-          other locations requiring token-based authentication.
-
-          Access tokens are specified as a string made up of
-          space-separated `host=token` values.  The specific token
-          used is selected by matching the `host` portion against the
-          "host" specification of the input. The actual use of the
-          `token` value is determined by the type of resource being
-          accessed:
-
-          * Github: the token value is the OAUTH-TOKEN string obtained
-            as the Personal Access Token from the Github server (see
-            https://docs.github.com/en/developers/apps/authorizing-oath-apps).
-
-          * Gitlab: the token value is either the OAuth2 token or the
-            Personal Access Token (these are different types tokens
-            for gitlab, see
-            https://docs.gitlab.com/12.10/ee/api/README.html#authentication).
-            The `token` value should be `type:tokenstring` where
-            `type` is either `OAuth2` or `PAT` to indicate which type
-            of token is being specified.
-
-          Example `~/.config/nix/nix.conf`:
-
-          ```
-          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
-          ```
-
-          Example `~/code/flake.nix`:
-
-          ```nix
-          input.foo = {
-            type = "gitlab";
-            host = "gitlab.mycompany.com";
-            owner = "mycompany";
-            repo = "pro";
-          };
-          ```
-
-          This example specifies three tokens, one each for accessing
-          github.com, gitlab.mycompany.com, and sourceforge.net.
-
-          The `input.foo` uses the "gitlab" fetcher, which might
-          requires specifying the token type along with the token
-          value.
-          )"};
-
     Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
@@ -936,17 +887,8 @@ public:
 
     void requireExperimentalFeature(const ExperimentalFeature &);
 
-    Setting<bool> allowDirty{this, true, "allow-dirty",
-        "Whether to allow dirty Git/Mercurial trees."};
-
-    Setting<bool> warnDirty{this, true, "warn-dirty",
-        "Whether to warn about dirty Git/Mercurial trees."};
-
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};
-
-    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
 
     Setting<bool> allowSymlinkedStore{
         this, false, "allow-symlinked-store",
@@ -959,19 +901,6 @@ public:
           occur if those builds are then deployed to machines where /nix/store
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
-        )"};
-
-    Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references."};
-
-    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
-        "Whether to accept nix configuration from a flake without prompting."};
-
-    Setting<std::string> commitLockFileSummary{
-        this, "", "commit-lockfile-summary",
-        R"(
-          The commit summary to use when committing changed flake lock files. If
-          empty, the summary is generated based on the action performed.
         )"};
 };
 
@@ -988,6 +917,6 @@ void loadConfFile();
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const string nixVersion;
+extern const std::string nixVersion;
 
 }

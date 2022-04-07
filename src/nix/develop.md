@@ -88,9 +88,9 @@ the flake's `nixConfig` attribute.
 If no flake output attribute is given, `nix develop` tries the following
 flake output attributes:
 
-* `devShell.<system>`
+* `devShells.<system>.default`
 
-* `defaultPackage.<system>`
+* `packages.<system>.default`
 
 If a flake output *name* is given, `nix develop` tries the following flake
 output attributes:

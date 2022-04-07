@@ -58,11 +58,11 @@ struct LocalDerivationGoal : public DerivationGoal
     typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
 
-    typedef map<string, string> Environment;
+    typedef map<std::string, std::string> Environment;
     Environment env;
 
 #if __APPLE__
-    typedef string SandboxProfile;
+    typedef std::string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
 #endif
 
@@ -169,7 +169,7 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    void registerOutputs() override;
+    DrvOutputs registerOutputs() override;
 
     void signRealisation(Realisation &) override;
 

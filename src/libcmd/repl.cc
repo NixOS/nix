@@ -25,6 +25,7 @@ extern "C" {
 #include "eval-inline.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
+#include "log-store.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
@@ -45,7 +46,7 @@ struct NixRepl
     : gc
     #endif
 {
-    string curDir;
+    std::string curDir;
     ref<EvalState> state;
     Bindings * autoArgs;
 
@@ -65,10 +66,10 @@ struct NixRepl
     NixRepl(ref<EvalState> state);
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
-    StringSet completePrefix(string prefix);
-    bool getLine(string & input, const std::string &prompt);
+    StringSet completePrefix(const std::string & prefix);
+    bool getLine(std::string & input, const std::string &prompt);
     StorePath getDerivationPath(Value & v);
-    bool processLine(string line);
+    bool processLine(std::string line);
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
@@ -76,22 +77,21 @@ struct NixRepl
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value & v);
-    Expr * parseString(string s);
-    void evalString(string s, Value & v);
+    Expr * parseString(std::string s);
+    void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace &dt);
 
-    typedef set<Value *> ValuesSeen;
+    typedef std::set<Value *> ValuesSeen;
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
 
-string removeWhitespace(string s)
+std::string removeWhitespace(std::string s)
 {
     s = chomp(s);
     size_t n = s.find_first_not_of(" \n\r\t");
-    if (n != string::npos) s = string(s, n);
-
+    if (n != std::string::npos) s = std::string(s, n);
     return s;
 }
 
@@ -111,7 +111,7 @@ NixRepl::~NixRepl()
     write_history(historyFile.c_str());
 }
 
-string runNix(Path program, const Strings & args,
+std::string runNix(Path program, const Strings & args,
     const std::optional<std::string> & input = {})
 {
     auto subprocessEnv = getEnv();
@@ -229,7 +229,7 @@ std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
 
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
     if (!files.empty()) {
@@ -297,7 +297,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 }
 
 
-bool NixRepl::getLine(string & input, const std::string &prompt)
+bool NixRepl::getLine(std::string & input, const std::string & prompt)
 {
     struct sigaction act, old;
     sigset_t savedSignalMask, set;
@@ -342,7 +342,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
 }
 
 
-StringSet NixRepl::completePrefix(string prefix)
+StringSet NixRepl::completePrefix(const std::string & prefix)
 {
     StringSet completions;
 
@@ -358,7 +358,7 @@ StringSet NixRepl::completePrefix(string prefix)
 
     size_t slash, dot;
 
-    if ((slash = cur.rfind('/')) != string::npos) {
+    if ((slash = cur.rfind('/')) != std::string::npos) {
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
@@ -368,11 +368,11 @@ StringSet NixRepl::completePrefix(string prefix)
             }
         } catch (Error &) {
         }
-    } else if ((dot = cur.rfind('.')) == string::npos) {
+    } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
-            if (string(*i, 0, cur.size()) != cur) break;
+            if (i->substr(0, cur.size()) != cur) break;
             completions.insert(prev + *i);
             i++;
         }
@@ -381,8 +381,8 @@ StringSet NixRepl::completePrefix(string prefix)
             /* This is an expression that should evaluate to an
                attribute set.  Evaluate it to get the names of the
                attributes. */
-            string expr(cur, 0, dot);
-            string cur2 = string(cur, dot + 1);
+            auto expr = cur.substr(0, dot);
+            auto cur2 = cur.substr(dot + 1);
 
             Expr * e = parseString(expr);
             Value v;
@@ -390,8 +390,8 @@ StringSet NixRepl::completePrefix(string prefix)
             state->forceAttrs(v, noPos);
 
             for (auto & i : *v.attrs) {
-                string name = i.name;
-                if (string(name, 0, cur2.size()) != cur2) continue;
+                std::string name = i.name;
+                if (name.substr(0, cur2.size()) != cur2) continue;
                 completions.insert(prev + expr + "." + name);
             }
 
@@ -410,7 +410,7 @@ StringSet NixRepl::completePrefix(string prefix)
 }
 
 
-bool isVarName(const string & s)
+static bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
     char c = s[0];
@@ -429,13 +429,12 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    Path drvPathRaw = drvInfo->queryDrvPath();
-    if (drvPathRaw == "")
-        throw Error("expression did not evaluate to a valid derivation (no drv path)");
-    StorePath drvPath = state->store->parseStorePath(drvPathRaw);
-    if (!state->store->isValidPath(drvPath))
-        throw Error("expression did not evaluate to a valid derivation (invalid drv path)");
-    return drvPath;
+    auto drvPath = drvInfo->queryDrvPath();
+    if (!drvPath)
+        throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
+    if (!state->store->isValidPath(*drvPath))
+        throw Error("expression evaluated to invalid derivation '%s'", state->store->printStorePath(*drvPath));
+    return *drvPath;
 }
 
 void NixRepl::loadDebugTraceEnv(DebugTrace &dt)
@@ -457,18 +456,19 @@ void NixRepl::loadDebugTraceEnv(DebugTrace &dt)
     }
 }
 
-bool NixRepl::processLine(string line)
+bool NixRepl::processLine(std::string line)
 {
+    line = trim(line);
     if (line == "") return true;
 
     _isInterrupted = false;
 
-    string command, arg;
+    std::string command, arg;
 
     if (line[0] == ':') {
         size_t p = line.find_first_of(" \n\r\t");
-        command = string(line, 0, p);
-        if (p != string::npos) arg = removeWhitespace(string(line, p));
+        command = line.substr(0, p);
+        if (p != std::string::npos) arg = removeWhitespace(line.substr(p));
     } else {
         arg = line;
     }
@@ -667,9 +667,16 @@ bool NixRepl::processLine(string line)
             bool foundLog = false;
             RunPager pager;
             for (auto & sub : subs) {
-                auto log = sub->getBuildLog(drvPath);
+                auto * logSubP = dynamic_cast<LogStore *>(&*sub);
+                if (!logSubP) {
+                    printInfo("Skipped '%s' which does not support retrieving build logs", sub->getUri());
+                    continue;
+                }
+                auto & logSub = *logSubP;
+
+                auto log = logSub.getBuildLog(drvPath);
                 if (log) {
-                    printInfo("got build log for '%s' from '%s'", drvPathRaw, sub->getUri());
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.getUri());
                     logger->writeToStdout(*log);
                     foundLog = true;
                     break;
@@ -733,13 +740,13 @@ bool NixRepl::processLine(string line)
 
     else {
         size_t p = line.find('=');
-        string name;
-        if (p != string::npos &&
+        std::string name;
+        if (p != std::string::npos &&
             p < line.size() &&
             line[p + 1] != '=' &&
-            isVarName(name = removeWhitespace(string(line, 0, p))))
+            isVarName(name = removeWhitespace(line.substr(0, p))))
         {
-            Expr * e = parseString(string(line, p + 1));
+            Expr * e = parseString(line.substr(p + 1));
             Value & v(*state->allocValue());
             v.mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
@@ -766,9 +773,12 @@ void NixRepl::loadFile(const Path & path)
 
 void NixRepl::loadFlake(const std::string & flakeRefS)
 {
+    if (flakeRefS.empty())
+        throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
+
     auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
-    if (evalSettings.pureEval && !flakeRef.input.isImmutable())
-        throw Error("cannot use ':load-flake' on mutable flake reference '%s' (use --impure to override)", flakeRefS);
+    if (evalSettings.pureEval && !flakeRef.input.isLocked())
+        throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
 
@@ -829,7 +839,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     for (auto & i : *attrs.attrs) {
         staticEnv->vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
-        varNames.insert((string) i.name);
+        varNames.insert((std::string) i.name);
     }
     staticEnv->sort();
     staticEnv->deduplicate();
@@ -846,17 +856,18 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
     staticEnv->vars.emplace_back(name, displ);
     staticEnv->sort();
     env->values[displ++] = &v;
-    varNames.insert((string) name);
+    varNames.insert((std::string) name);
 }
 
-Expr * NixRepl::parseString(string s)
+
+Expr * NixRepl::parseString(std::string s)
 {
     Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
     return e;
 }
 
 
-void NixRepl::evalString(string s, Value & v)
+void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
@@ -925,14 +936,17 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
-            str << drvPath << "»";
+            if (i != v.attrs->end())
+                str << state->store->printStorePath(state->coerceToStorePath(*i->pos, *i->value, context));
+            else
+                str << "???";
+            str << "»";
         }
 
         else if (maxDepth > 0) {
             str << "{ ";
 
-            typedef std::map<string, Value *> Sorted;
+            typedef std::map<std::string, Value *> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
                 sorted[i.name] = i.value;
@@ -943,7 +957,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (seen.find(i.second) != seen.end())
+                if (seen.count(i.second))
                     str << "«repeated»";
                 else
                     try {

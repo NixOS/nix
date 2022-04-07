@@ -2,6 +2,7 @@
 
 #include "crypto.hh"
 #include "store-api.hh"
+#include "log-store.hh"
 
 #include "pool.hh"
 
@@ -28,7 +29,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
         "other than -1 which we reserve to indicate Nix defaults should be used"};
 };
 
-class BinaryCacheStore : public virtual BinaryCacheStoreConfig, public virtual Store
+class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
+    public virtual Store,
+    public virtual LogStore
 {
 
 private:
@@ -98,15 +101,23 @@ public:
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references ) override;
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair, const StorePathSet & references) override;
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 

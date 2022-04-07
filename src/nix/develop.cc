@@ -196,21 +196,22 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
-            output.second = {
-                .output = DerivationOutputDeferred{},
-            };
+            output.second = DerivationOutput::Deferred {},
             drv.env[output.first] = hashPlaceholder(output.first);
         }
     } else {
         for (auto & output : drv.outputs) {
-            output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+            output.second = DerivationOutput::Deferred { };
             drv.env[output.first] = "";
         }
-        Hash h = std::get<0>(hashDerivationModulo(*evalStore, drv, true));
+        auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
 
         for (auto & output : drv.outputs) {
+            Hash h = hashesModulo.hashes.at(output.first);
             auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+            output.second = DerivationOutput::InputAddressed {
+                .path = outPath,
+            };
             drv.env[output.first] = store->printStorePath(outPath);
         }
     }
@@ -307,7 +308,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto builtPaths = toStorePaths(
+            auto builtPaths = Installable::toStorePaths(
                 getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
@@ -325,8 +326,15 @@ struct Common : InstallableCommand, MixProfile
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+        Strings paths{
+            "devShells." + settings.thisSystem.get() + ".default",
+            "devShell." + settings.thisSystem.get(),
+        };
+        for (auto & p : SourceExprCommand::getDefaultFlakeAttrPaths())
+            paths.push_back(p);
+        return paths;
     }
+
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
         auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();
@@ -340,7 +348,7 @@ struct Common : InstallableCommand, MixProfile
         if (path && hasSuffix(path->to_string(), "-env"))
             return *path;
         else {
-            auto drvs = toDerivations(store, {installable});
+            auto drvs = Installable::toDerivations(store, {installable});
 
             if (drvs.size() != 1)
                 throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
@@ -498,12 +506,14 @@ struct CmdDevelop : Common, MixEnvironment
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
-                Strings{"bashInteractive"},
+                "bashInteractive",
+                Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
             shell = store->printStorePath(
-                toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+                Installable::toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable))
+                + "/bin/bash";
         } catch (Error &) {
             ignoreException();
         }

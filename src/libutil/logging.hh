@@ -4,6 +4,8 @@
 #include "error.hh"
 #include "config.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 typedef enum {
@@ -166,6 +168,12 @@ Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 
+std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
+
+bool handleJSONLogMessage(nlohmann::json & json,
+    const Activity & act, std::map<ActivityId, Activity> & activities,
+    bool trusted);
+
 bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted);
@@ -216,6 +224,6 @@ inline void warn(const std::string & fs, const Args & ... args)
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
-void writeToStderr(const string & s);
+void writeToStderr(std::string_view s);
 
 }

@@ -391,7 +391,7 @@ size_t readString(char * buf, size_t max, Source & source)
 }
 
 
-string readString(Source & source, size_t max)
+std::string readString(Source & source, size_t max)
 {
     auto len = readNum<size_t>(source);
     if (len > max) throw SerialisationError("string is too long");
@@ -401,7 +401,7 @@ string readString(Source & source, size_t max)
     return res;
 }
 
-Source & operator >> (Source & in, string & s)
+Source & operator >> (Source & in, std::string & s)
 {
     s = readString(in);
     return in;

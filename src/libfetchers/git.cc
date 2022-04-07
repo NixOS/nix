@@ -6,6 +6,8 @@
 #include "url-parts.hh"
 #include "pathlocks.hh"
 
+#include "fetch-settings.hh"
+
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -172,7 +174,7 @@ struct GitInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -187,7 +189,7 @@ struct GitInputScheme : InputScheme
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
 
-        auto getImmutableAttrs = [&]()
+        auto getLockedAttrs = [&]()
         {
             return Attrs({
                 {"type", cacheType},
@@ -197,21 +199,18 @@ struct GitInputScheme : InputScheme
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<Tree, Input>
+            -> std::pair<StorePath, Input>
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-            return {
-                Tree(store->toRealPath(storePath), std::move(storePath)),
-                input
-            };
+            return {std::move(storePath), input};
         };
 
         if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+            if (auto res = getCache()->lookup(store, getLockedAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
 
@@ -223,22 +222,46 @@ struct GitInputScheme : InputScheme
         if (!input.getRef() && !input.getRev() && isLocal) {
             bool clean = false;
 
-            /* Check whether this repo has any commits. There are
-               probably better ways to do this. */
-            auto gitDir = actualUrl + "/.git";
-            auto commonGitDir = chomp(runProgram(
-                "git",
-                true,
-                { "-C", actualUrl, "rev-parse", "--git-common-dir" }
-            ));
-            if (commonGitDir != ".git")
-                    gitDir = commonGitDir;
+            auto env = getEnv();
+            // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
+            // that way unknown errors can lead to a failure instead of continuing through the wrong code path
+            env["LC_ALL"] = "C";
 
-            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
+            /* Check whether HEAD points to something that looks like a commit,
+               since that is the refrence we want to use later on. */
+            auto result = runProgram(RunOptions {
+                .program = "git",
+                .args = { "-C", actualUrl, "--git-dir=.git", "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+                .environment = env,
+                .mergeStderrToStdout = true
+            });
+            auto exitCode = WEXITSTATUS(result.first);
+            auto errorMessage = result.second;
 
+            if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
+                throw Error("'%s' is not a Git repository", actualUrl);
+            } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
+                // indicates that the repo does not have any commits
+                // we want to proceed and will consider it dirty later
+            } else if (exitCode != 0) {
+                // any other errors should lead to a failure
+                throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", actualUrl, exitCode, errorMessage);
+            }
+
+            bool hasHead = exitCode == 0;
             try {
-                if (haveCommits) {
-                    runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
+                if (hasHead) {
+                    // Using git diff is preferrable over lower-level operations here,
+                    // because its conceptually simpler and we only need the exit code anyways.
+                    auto gitDiffOpts = Strings({ "-C", actualUrl, "diff", "HEAD", "--quiet"});
+                    if (!submodules) {
+                        // Changes in submodules should only make the tree dirty
+                        // when those submodules will be copied as well.
+                        gitDiffOpts.emplace_back("--ignore-submodules");
+                    }
+                    gitDiffOpts.emplace_back("--");
+                    runProgram("git", true, gitDiffOpts);
+
                     clean = true;
                 }
             } catch (ExecError & e) {
@@ -249,10 +272,10 @@ struct GitInputScheme : InputScheme
 
                 /* This is an unclean working tree. So copy all tracked files. */
 
-                if (!settings.allowDirty)
+                if (!fetchSettings.allowDirty)
                     throw Error("Git tree '%s' is dirty", actualUrl);
 
-                if (settings.warnDirty)
+                if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
                 auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
@@ -262,9 +285,11 @@ struct GitInputScheme : InputScheme
                 auto files = tokenizeString<std::set<std::string>>(
                     runProgram("git", true, gitOpts), "\0"s);
 
+                Path actualPath(absPath(actualUrl));
+
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                    assert(hasPrefix(p, actualPath));
+                    std::string file(p, actualPath.size() + 1);
 
                     auto st = lstat(p);
 
@@ -277,24 +302,21 @@ struct GitInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                return {
-                    Tree(store->toRealPath(storePath), std::move(storePath)),
-                    input
-                };
+                return {std::move(storePath), input};
             }
         }
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
 
-        Attrs mutableAttrs({
+        Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
@@ -313,7 +335,7 @@ struct GitInputScheme : InputScheme
 
         } else {
 
-            if (auto res = getCache()->lookup(store, mutableAttrs)) {
+            if (auto res = getCache()->lookup(store, unlockedAttrs)) {
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (!input.getRev() || input.getRev() == rev2) {
                     input.attrs.insert_or_assign("rev", rev2.gitRev());
@@ -410,7 +432,7 @@ struct GitInputScheme : InputScheme
 
         /* Now that we know the ref, check again whether we have it in
            the store. */
-        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+        if (auto res = getCache()->lookup(store, getLockedAttrs()))
             return makeResult(res->first, std::move(res->second));
 
         Path tmpDir = createTempDir();
@@ -482,14 +504,14 @@ struct GitInputScheme : InputScheme
         if (!_input.getRev())
             getCache()->add(
                 store,
-                mutableAttrs,
+                unlockedAttrs,
                 infoAttrs,
                 storePath,
                 false);
 
         getCache()->add(
             store,
-            getImmutableAttrs(),
+            getLockedAttrs(),
             infoAttrs,
             storePath,
             true);

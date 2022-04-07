@@ -92,22 +92,22 @@ bool isLink(const Path & path);
    removed. */
 struct DirEntry
 {
-    string name;
+    std::string name;
     ino_t ino;
     unsigned char type; // one of DT_*
-    DirEntry(const string & name, ino_t ino, unsigned char type)
-        : name(name), ino(ino), type(type) { }
+    DirEntry(std::string name, ino_t ino, unsigned char type)
+        : name(std::move(name)), ino(ino), type(type) { }
 };
 
-typedef vector<DirEntry> DirEntries;
+typedef std::vector<DirEntry> DirEntries;
 
 DirEntries readDirectory(const Path & path);
 
 unsigned char getFileType(const Path & path);
 
 /* Read the contents of a file into a string. */
-string readFile(int fd);
-string readFile(const Path & path);
+std::string readFile(int fd);
+std::string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
@@ -116,10 +116,10 @@ void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
 
 /* Read a line from a file descriptor. */
-string readLine(int fd);
+std::string readLine(int fd);
 
 /* Write a line to a file descriptor. */
-void writeLine(int fd, string s);
+void writeLine(int fd, std::string s);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively. It's not an error if the path does not exist. The
@@ -170,7 +170,7 @@ MakeError(EndOfFile, Error);
 
 
 /* Read a file descriptor until EOF occurs. */
-string drainFD(int fd, bool block = true, const size_t reserveSize=0);
+std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
@@ -268,7 +268,7 @@ void killUser(uid_t uid);
    pid to the caller. */
 struct ProcessOptions
 {
-    string errorPrefix = "";
+    std::string errorPrefix = "";
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = false;
@@ -279,7 +279,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
-string runProgram(Path program, bool searchPath = false,
+std::string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {});
 
@@ -343,7 +343,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
 /* Close all file descriptors except those listed in the given set.
    Good practice in child processes. */
-void closeMostFDs(const set<int> & exceptions);
+void closeMostFDs(const std::set<int> & exceptions);
 
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
@@ -378,12 +378,12 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 /* Concatenate the given strings with a separator between the
    elements. */
 template<class C>
-string concatStringsSep(const std::string_view sep, const C & ss)
+std::string concatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
     // need a cast to string_view since this is also called with Symbols
     for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
-    string s;
+    std::string s;
     s.reserve(size);
     for (auto & i : ss) {
         if (s.size() != 0) s += sep;
@@ -394,7 +394,7 @@ string concatStringsSep(const std::string_view sep, const C & ss)
 
 template<class ... Parts>
 auto concatStrings(Parts && ... parts)
-    -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), string>
+    -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
     std::string_view views[sizeof...(parts)] = { parts... };
     return concatStringsSep({}, views);
@@ -413,24 +413,26 @@ template<class C> Strings quoteStrings(const C & c)
 
 /* Remove trailing whitespace from a string. FIXME: return
    std::string_view. */
-string chomp(std::string_view s);
+std::string chomp(std::string_view s);
 
 
 /* Remove whitespace from the start and end of a string. */
-string trim(const string & s, const string & whitespace = " \n\r\t");
+std::string trim(std::string_view s, std::string_view whitespace = " \n\r\t");
 
 
 /* Replace all occurrences of a string inside another string. */
-string replaceStrings(std::string_view s,
-    const std::string & from, const std::string & to);
+std::string replaceStrings(
+    std::string s,
+    std::string_view from,
+    std::string_view to);
 
 
-std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
+std::string rewriteStrings(std::string s, const StringMap & rewrites);
 
 
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
-string statusToString(int status);
+std::string statusToString(int status);
 
 bool statusOk(int status);
 
@@ -525,8 +527,8 @@ std::string filterANSIEscapes(const std::string & s,
 
 
 /* Base64 encoding/decoding. */
-string base64Encode(std::string_view s);
-string base64Decode(std::string_view s);
+std::string base64Encode(std::string_view s);
+std::string base64Decode(std::string_view s);
 
 
 /* Remove common leading whitespace from the lines in the string

@@ -6,7 +6,7 @@
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+    : Goal(worker, DerivedPath::Opaque { storePath })
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
@@ -24,6 +24,20 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
+void PathSubstitutionGoal::done(
+    ExitCode result,
+    BuildResult::Status status,
+    std::optional<std::string> errorMsg)
+{
+    buildResult.status = status;
+    if (errorMsg) {
+        debug(*errorMsg);
+        buildResult.errorMsg = *errorMsg;
+    }
+    amDone(result);
+}
+
+
 void PathSubstitutionGoal::work()
 {
     (this->*state)();
@@ -38,7 +52,7 @@ void PathSubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        amDone(ecSuccess);
+        done(ecSuccess, BuildResult::AlreadyValid);
         return;
     }
 
@@ -60,12 +74,14 @@ void PathSubstitutionGoal::tryNext()
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        debug("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath));
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
-        amDone(substituterFailed ? ecFailed : ecNoSubstituters);
+        done(
+            substituterFailed ? ecFailed : ecNoSubstituters,
+            BuildResult::NoSubstituters,
+            fmt("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath)));
 
         if (substituterFailed) {
             worker.failedSubstitutions++;
@@ -162,8 +178,10 @@ void PathSubstitutionGoal::referencesValid()
     trace("all references realised");
 
     if (nrFailed > 0) {
-        debug("some references of path '%s' could not be realised", worker.store.printStorePath(storePath));
-        amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
+        done(
+            nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
+            BuildResult::DependencyFailed,
+            fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
         return;
     }
 
@@ -268,11 +286,11 @@ void PathSubstitutionGoal::finished()
 
     worker.updateProgress();
 
-    amDone(ecSuccess);
+    done(ecSuccess, BuildResult::Substituted);
 }
 
 
-void PathSubstitutionGoal::handleChildOutput(int fd, const string & data)
+void PathSubstitutionGoal::handleChildOutput(int fd, std::string_view data)
 {
 }
 

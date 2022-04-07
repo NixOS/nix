@@ -9,7 +9,7 @@ using namespace nix;
 
 struct CmdBundle : InstallableCommand
 {
-    std::string bundler = "github:matthewbauer/nix-bundle";
+    std::string bundler = "github:NixOS/bundlers";
     std::optional<Path> outLink;
 
     CmdBundle()
@@ -49,9 +49,11 @@ struct CmdBundle : InstallableCommand
 
     Category category() override { return catSecondary; }
 
+    // FIXME: cut&paste from CmdRun.
     Strings getDefaultFlakeAttrPaths() override
     {
         Strings res{
+            "apps." + settings.thisSystem.get() + ".default",
             "defaultApp." + settings.thisSystem.get()
         };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
@@ -61,10 +63,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{
-            "apps." + settings.thisSystem.get() + "."
-
-        };
+        Strings res{"apps." + settings.thisSystem.get() + "."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -74,21 +73,18 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto [progFlakeRef, progName] = parseFlakeRefWithFragment(installable->what(), absPath("."));
-        const flake::LockFlags lockFlagsProg{ .writeLockFile = false };
-        auto programInstallable = InstallableFlake(this,
-            evalState, std::move(progFlakeRef),
-            Strings{progName == "" ? "defaultApp" : progName},
-            Strings(this->getDefaultFlakeAttrPathPrefixes()),
-            lockFlagsProg);
-        auto val = programInstallable.toValue(*evalState).first;
+        auto val = installable->toValue(*evalState).first;
 
         auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
-        auto bundler = InstallableFlake(this,
-            evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? "defaultBundler." + settings.thisSystem.get() : settings.thisSystem.get() + "." + bundlerName, bundlerName},
-            Strings({"","bundlers."}), lockFlags);
+        InstallableFlake bundler{this,
+            evalState, std::move(bundlerFlakeRef), bundlerName,
+            {"bundlers." + settings.thisSystem.get() + ".default",
+             "defaultBundler." + settings.thisSystem.get()
+            },
+            {"bundlers." + settings.thisSystem.get() + "."},
+            lockFlags
+        };
 
         auto vRes = evalState->allocValue();
         evalState->callFunction(*bundler.toValue(*evalState).first, *val, *vRes, noPos);
@@ -101,13 +97,13 @@ struct CmdBundle : InstallableCommand
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         PathSet context2;
-        StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*attr1->pos, *attr1->value, context2));
+        auto drvPath = evalState->coerceToStorePath(*attr1->pos, *attr1->value, context2);
 
         auto attr2 = vRes->attrs->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
+        auto outPath = evalState->coerceToStorePath(*attr2->pos, *attr2->value, context2);
 
         store->buildPaths({ DerivedPath::Built { drvPath } });
 

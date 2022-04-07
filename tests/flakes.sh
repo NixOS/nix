@@ -41,8 +41,10 @@ cat > $flake1Dir/flake.nix <<EOF
   description = "Bla bla";
 
   outputs = inputs: rec {
-    packages.$system.foo = import ./simple.nix;
-    defaultPackage.$system = packages.$system.foo;
+    packages.$system = rec {
+      foo = import ./simple.nix;
+      default = foo;
+    };
 
     # To test "nix flake init".
     legacyPackages.x86_64-linux.hello = import ./simple.nix;
@@ -128,7 +130,7 @@ hash2=$(nix flake metadata flake1 --json --refresh | jq -r .revision)
 nix build -o $TEST_ROOT/result flake1#foo
 [[ -e $TEST_ROOT/result/hello ]]
 
-# Test defaultPackage.
+# Test packages.default.
 nix build -o $TEST_ROOT/result flake1
 [[ -e $TEST_ROOT/result/hello ]]
 
@@ -140,11 +142,11 @@ nix build -o $flake1Dir/result git+file://$flake1Dir
 nix path-info $flake1Dir/result
 
 # 'getFlake' on a mutable flakeref should fail in pure mode, but succeed in impure mode.
-(! nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"$flake1Dir\").defaultPackage.$system")
-nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"$flake1Dir\").defaultPackage.$system" --impure
+(! nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"$flake1Dir\").packages.$system.default")
+nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"$flake1Dir\").packages.$system.default" --impure
 
 # 'getFlake' on an immutable flakeref should succeed even in pure mode.
-nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").defaultPackage.$system"
+nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o $TEST_ROOT/result flake2#bar --no-registries)
@@ -370,13 +372,16 @@ cat > $templatesDir/flake.nix <<EOF
   description = "Some templates";
 
   outputs = { self }: {
-    templates = {
+    templates = rec {
       trivial = {
         path = ./trivial;
         description = "A trivial flake";
+        welcomeText = ''
+            Welcome to my trivial flake
+        '';
       };
+      default = trivial;
     };
-    defaultTemplate = self.templates.trivial;
   };
 }
 EOF
@@ -388,8 +393,10 @@ cat > $templatesDir/trivial/flake.nix <<EOF
   description = "A flake for building Hello World";
 
   outputs = { self, nixpkgs }: {
-    packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-    defaultPackage.x86_64-linux = self.packages.x86_64-linux.hello;
+    packages.x86_64-linux = rec {
+      hello = nixpkgs.legacyPackages.x86_64-linux.hello;
+      default = hello;
+    };
   };
 }
 EOF
@@ -496,17 +503,15 @@ EOF
 cat > $flake3Dir/flake.nix <<EOF
 {
   outputs = { flake1, self }: {
-    defaultPackage = {
-        system-1 = "foo";
-        system-2 = "bar";
-    };
+    packages.system-1.default = "foo";
+    packages.system-2.default = "bar";
   };
 }
 EOF
 
 checkRes=$(nix flake check --keep-going $flake3Dir 2>&1 && fail "nix flake check should have failed" || true)
-echo "$checkRes" | grep -q "defaultPackage.system-1"
-echo "$checkRes" | grep -q "defaultPackage.system-2"
+echo "$checkRes" | grep -q "packages.system-1.default"
+echo "$checkRes" | grep -q "packages.system-2.default"
 
 # Test 'follows' inputs.
 cat > $flake3Dir/flake.nix <<EOF
@@ -591,7 +596,7 @@ mkdir $flake5Dir
 cat > $flake5Dir/flake.nix <<EOF
 {
   outputs = { self, flake1 }: {
-    defaultPackage.$system = flake1.defaultPackage.$system;
+    packages.$system.default = flake1.packages.$system.default;
     expr = assert builtins.pathExists ./flake.lock; 123;
   };
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "suggestions.hh"
 #include "ref.hh"
 #include "types.hh"
 #include "fmt.hh"
@@ -53,6 +54,7 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
+/* adjust Pos::origin bit width when adding stuff here */
 typedef enum {
     foFile,
     foStdin,
@@ -61,16 +63,16 @@ typedef enum {
 
 // the lines of code surrounding an error.
 struct LinesOfCode {
-    std::optional<string> prevLineOfCode;
-    std::optional<string> errLineOfCode;
-    std::optional<string> nextLineOfCode;
+    std::optional<std::string> prevLineOfCode;
+    std::optional<std::string> errLineOfCode;
+    std::optional<std::string> nextLineOfCode;
 };
 
 // ErrPos indicates the location of an error in a nix file.
 struct ErrPos {
     int line = 0;
     int column = 0;
-    string file;
+    std::string file;
     FileOrigin origin;
 
     operator bool() const
@@ -80,7 +82,7 @@ struct ErrPos {
 
     // convert from the Pos struct, found in libexpr.
     template <class P>
-    ErrPos& operator=(const P &pos)
+    ErrPos & operator=(const P & pos)
     {
         origin = pos.origin;
         line = pos.line;
@@ -94,7 +96,7 @@ struct ErrPos {
     }
 
     template <class P>
-    ErrPos(const P &p)
+    ErrPos(const P & p)
     {
         *this = p;
     }
@@ -102,7 +104,7 @@ struct ErrPos {
 
 std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
 void printCodeLines(std::ostream & out,
-    const string & prefix,
+    const std::string & prefix,
     const ErrPos & errPos,
     const LinesOfCode & loc);
 
@@ -116,15 +118,17 @@ struct Trace {
 
 struct ErrorInfo {
     Verbosity level;
-    string name; // FIXME: rename
+    std::string name; // FIXME: rename
     hintformat msg;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
 
-    static std::optional<string> programName;
+    Suggestions suggestions;
+
+    static std::optional<std::string> programName;
 };
 
-std::ostream& showErrorInfo(std::ostream &out, const ErrorInfo &einfo, bool showTrace);
+std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
 
 /* BaseError should generally not be caught, as it has Interrupted as
    a subclass. Catch Error instead. */
@@ -133,8 +137,8 @@ class BaseError : public std::exception
 protected:
     mutable ErrorInfo err;
 
-    mutable std::optional<string> what_;
-    const string& calcWhat() const;
+    mutable std::optional<std::string> what_;
+    const std::string & calcWhat() const;
 
 public:
     unsigned int status = 1; // exit status
@@ -148,6 +152,11 @@ public:
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args & ... args)
         : err { .level = lvlError, .msg = hintfmt(fs, args...) }
+    { }
+
+    template<typename... Args>
+    BaseError(const Suggestions & sug, const Args & ... args)
+        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
     { }
 
     BaseError(hintformat hint)
@@ -171,16 +180,16 @@ public:
     const char * what() const noexcept override { return calcWhat().c_str(); }
 #endif
 
-    const string & msg() const { return calcWhat(); }
+    const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
     template<typename... Args>
-    BaseError & addTrace(std::optional<ErrPos> e, const string &fs, const Args & ... args)
+    void addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
     {
-        return addTrace(e, hintfmt(fs, args...));
+        addTrace(e, hintfmt(fs, args...));
     }
 
-    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
+    void addTrace(std::optional<ErrPos> e, hintformat hint);
 
     bool hasTrace() const { return !err.traces.empty(); }
 };
