@@ -164,7 +164,7 @@ ref<EvalState> EvalCommand::getEvalState()
 
                 if (expr.staticenv)
                 {
-                    auto vm = mapStaticEnvBindings(*expr.staticenv.get(), env);
+                    std::unique_ptr<valmap> vm(mapStaticEnvBindings(*expr.staticenv.get(), env));
                     runRepl(evalState, error, expr, *vm);
                 }
             };
