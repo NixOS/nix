@@ -1,6 +1,7 @@
 #pragma once
 
 #include "realisation.hh"
+#include "derived-path.hh"
 
 #include <string>
 #include <chrono>
