@@ -778,7 +778,6 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
       auto map = valmap();
       if (env.type == Env::HasWithAttrs)
       {
-          std::cout << "(env.type == Env::HasWithAttrs)" << std::endl; 
           Bindings::iterator j = env.values[0]->attrs->begin();
           while (j != env.values[0]->attrs->end()) {
               map[j->name] = j->value;
