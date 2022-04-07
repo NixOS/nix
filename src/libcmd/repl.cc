@@ -203,6 +203,30 @@ namespace {
     }
 }
 
+std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
+{
+    if (dt.is_error)
+        out << ANSI_RED "error: " << ANSI_NORMAL;
+    out << dt.hint.str() << "\n";
+
+    // prefer direct pos, but if noPos then try the expr.
+    auto pos = (*dt.pos ? *dt.pos :
+      (dt.expr.getPos() ? *dt.expr.getPos() : noPos));
+
+    if (pos) {
+        printAtPos(pos, out);
+
+        auto loc = getCodeLines(pos);
+        if (loc.has_value()) {
+            out << "\n";
+            printCodeLines(out, "", pos, *loc);
+            out << "\n";
+        }
+    }
+
+    return out;
+}
+
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
@@ -251,6 +275,14 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             } else {
               printMsg(lvlError, e.msg());
             }
+        } catch (EvalError & e) {
+            // in debugger mode, an EvalError should trigger another repl session.  
+            // when that session returns the exception will land here.  No need to show it again;
+            // show the error for this repl session instead.
+            if (debuggerHook && !this->state->debugTraces.empty()) 
+                showDebugTrace(std::cout, this->state->debugTraces.front());
+            else
+                printMsg(lvlError, e.msg());
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
@@ -404,30 +436,6 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     if (!state->store->isValidPath(drvPath))
         throw Error("expression did not evaluate to a valid derivation (invalid drv path)");
     return drvPath;
-}
-
-std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
-{
-    if (dt.is_error) 
-        out << ANSI_RED "error: " << ANSI_NORMAL;
-    out << dt.hint.str() << "\n";
-
-    // prefer direct pos, but if noPos then try the expr.
-    auto pos = (*dt.pos ? *dt.pos :
-      (dt.expr.getPos() ? *dt.expr.getPos() : noPos));
-
-    if (pos) {
-        printAtPos(pos, out);
-
-        auto loc = getCodeLines(pos);
-        if (loc.has_value()) {
-            out << "\n";
-            printCodeLines(out, "", pos, *loc);
-            out << "\n";
-        }
-    }
-
-    return out;
 }
 
 void NixRepl::loadDebugTraceEnv(DebugTrace &dt)
