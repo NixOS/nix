@@ -32,3 +32,11 @@
   paths. Like fixed-output derivations, impure derivations have access
   to the network. Only fixed-output derivations and impure derivations
   can depend on an impure derivation.
+
+* The `nixosModule` flake output attribute has been renamed consistent
+  with the `.default` renames in nix 2.7.
+
+  * `nixosModule` → `nixosModules.default`
+
+  As before, the old output will continue to work, but `nix flake check` will
+  issue a warning about it.
