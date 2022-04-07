@@ -40,3 +40,6 @@
 
   As before, the old output will continue to work, but `nix flake check` will
   issue a warning about it.
+
+* Add experimental *indexed store derivations* installable syntax, part of the
+  the `computed-derivations` experimental feature.
