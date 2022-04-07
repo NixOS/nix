@@ -129,7 +129,7 @@ ref<EvalState> EvalCommand::getEvalState()
                               new DebugTraceStacker(
                                   *evalState,
                                   DebugTrace 
-                                        {.pos = *expr.getPos(),
+                                        {.pos = (error->info().errPos ? *error->info().errPos : *expr.getPos()),
                                          .expr = expr,
                                          .env = env,
                                          .hint = error->info().msg,

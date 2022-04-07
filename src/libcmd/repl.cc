@@ -412,9 +412,11 @@ std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
         out << ANSI_RED "error: " << ANSI_NORMAL;
     out << dt.hint.str() << "\n";
 
-    if (dt.pos.has_value() && (*dt.pos)) {
-        auto pos = dt.pos.value();
-        out << "\n";
+    // prefer direct pos, but if noPos then try the expr.
+    auto pos = (*dt.pos ? *dt.pos :
+      (dt.expr.getPos() ? *dt.expr.getPos() : noPos));
+
+    if (pos) {
         printAtPos(pos, out);
 
         auto loc = getCodeLines(pos);
