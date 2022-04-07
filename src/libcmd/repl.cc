@@ -535,6 +535,7 @@ bool NixRepl::processLine(string line)
                  {
                      std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
                      showDebugTrace(std::cout, *iter);
+                     std::cout << std::endl;
                      printEnvBindings(iter->expr, iter->env);
                      loadDebugTraceEnv(*iter);
                      break;
