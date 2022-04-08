@@ -495,7 +495,7 @@ bool NixRepl::processLine(std::string line)
              << "  :log <expr>   Show logs for a derivation\n"
              << "  :st [bool]    Enable, disable or toggle showing traces for errors\n"
              << "  :d <cmd>      Debug mode commands\n"
-             << "  :d stack      Show call stack\n"
+             << "  :d stack      Show trace stack\n"
              << "  :d env        Show env stack\n"
              << "  :d show <idx> Show current trace, or change to call stack index\n"
              << "  :d go         Go until end of program, exception, or builtins.break().\n"
