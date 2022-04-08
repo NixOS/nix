@@ -497,7 +497,8 @@ bool NixRepl::processLine(std::string line)
              << "  :d <cmd>      Debug mode commands\n"
              << "  :d stack      Show trace stack\n"
              << "  :d env        Show env stack\n"
-             << "  :d show <idx> Show current trace, or change to call stack index\n"
+             << "  :d show       Show current trace\n"
+             << "  :d show <idx> Change to another trace in the stack\n"
              << "  :d go         Go until end of program, exception, or builtins.break().\n"
              << "  :d step       Go one step\n"
              ;
