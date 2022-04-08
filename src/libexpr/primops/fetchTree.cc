@@ -108,16 +108,25 @@ static void fetchTree(
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                state.debug_throw(EvalError({
+            {
+                auto e = EvalError({
                     .msg = hintfmt("unexpected attribute 'type'"),
                     .errPos = pos
-                }));
+                });
+                state.debugLastTrace(e);
+                throw e;
+
+            }
             type = state.forceStringNoCtx(*aType->value, *aType->pos);
         } else if (!type)
-            state.debug_throw(EvalError({
+        {
+            auto e = EvalError({
                 .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
                 .errPos = pos
-            }));
+            });
+            state.debugLastTrace(e);
+            throw e;
+        }
 
         attrs.emplace("type", type.value());
 
@@ -138,16 +147,24 @@ static void fetchTree(
             else if (attr.value->type() == nInt)
                 attrs.emplace(attr.name, uint64_t(attr.value->integer));
             else
-                state.debug_throw(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    attr.name, showType(*attr.value)));
+            {
+                auto e = TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                    attr.name, showType(*attr.value));
+                state.debugLastTrace(e);
+                throw e;
+            }
         }
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                state.debug_throw(EvalError({
+            {
+                auto e = EvalError({
                     .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
                     .errPos = pos
-                }));
+                });
+                state.debugLastTrace(e);
+                throw e;
+            }
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
@@ -167,7 +184,11 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
-        state.debug_throw(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos));
+    {
+        auto e = EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
+        state.debugLastTrace(e);
+        throw e;
+    }
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -205,18 +226,25 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else
-                state.debug_throw(EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
-                    .errPos = *attr.pos
-                }));
+            else {
+                    auto e = EvalError({
+                        .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                        .errPos = *attr.pos
+                    });
+                    state.debugLastTrace(e);
+                    throw e;
             }
+        }
 
         if (!url)
-            state.debug_throw(EvalError({
+        {
+            auto e = EvalError({
                 .msg = hintfmt("'url' argument required"),
                 .errPos = pos
-            }));
+            });
+            state.debugLastTrace(e);
+            throw e;
+        }
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
@@ -228,7 +256,11 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         name = baseNameOf(*url);
 
     if (evalSettings.pureEval && !expectedHash)
-        state.debug_throw(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
+    {
+        auto e = EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
+        state.debugLastTrace(e);
+        throw e;
+    }
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->type == htSHA256) {
@@ -255,8 +287,12 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
-            state.debug_throw(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
+        {
+            auto e = EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
+            state.debugLastTrace(e);
+            throw e;
+        }
     }
 
     state.allowAndSetStorePathString(storePath, v);

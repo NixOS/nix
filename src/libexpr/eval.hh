@@ -119,7 +119,7 @@ public:
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
-    void debug_throw(Error e);
+    void debugLastTrace(Error & e);
 
 private:
     SrcToStore srcToStore;

@@ -833,15 +833,13 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
     throw error;
 }
 
-void EvalState::debug_throw(Error e) {
+void EvalState::debugLastTrace(Error & e) {
     // call this in the situation where Expr and Env are inaccessible.  The debugger will start in the last context
     // that's in the DebugTrace stack.
-
     if (debuggerHook && !debugTraces.empty()) {
         DebugTrace &last = debugTraces.front();
         debuggerHook(&e, last.env, last.expr);
     }
-    throw e;
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2, Env & env, Expr &expr))
@@ -865,10 +863,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook && !evalState.debugTraces.empty()) {
-        DebugTrace &last = evalState.debugTraces.front();
-        debuggerHook(&error, last.env, last.expr);
-    }
+    evalState.debugLastTrace(error);
 
     throw error;
 }
@@ -906,10 +901,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 
-    if (debuggerHook && !evalState.debugTraces.empty()) {
-        DebugTrace &last = evalState.debugTraces.front();
-        debuggerHook(&error, last.env, last.expr);
-    }
+    evalState.debugLastTrace(error);
 
     throw error;
 }
@@ -921,10 +913,7 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
         .errPos = noPos
     });
 
-    if (debuggerHook && !evalState.debugTraces.empty()) {
-        DebugTrace &last = evalState.debugTraces.front();
-        debuggerHook(&error, last.env, last.expr);
-    }
+    evalState.debugLastTrace(error);
 
     throw error;
 }
@@ -950,10 +939,7 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, EvalS
         .errPos = pos
     });
 
-    if (debuggerHook && !evalState.debugTraces.empty()) {
-        DebugTrace &last = evalState.debugTraces.front();
-        debuggerHook(&error, last.env, last.expr);
-    }
+    evalState.debugLastTrace(error);
 
     throw error;
 }
@@ -971,8 +957,6 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
 
     throw error;
 }
-
-// LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v));
 
 LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const ExprLambda & fun, const Symbol & s2, Env & env, Expr &expr))
 {

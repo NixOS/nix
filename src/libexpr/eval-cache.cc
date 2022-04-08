@@ -528,14 +528,22 @@ std::string AttrCursor::getString()
                 debug("using cached string attribute '%s'", getAttrPathStr());
                 return s->first;
             } else
-                root->state.debug_throw(TypeError("'%s' is not a string", getAttrPathStr()));
+            {
+                auto e = TypeError("'%s' is not a string", getAttrPathStr());
+                root->state.debugLastTrace(e);
+                throw e;
+            }
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nString && v.type() != nPath)
-        root->state.debug_throw(TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type())));
+    {
+        auto e = TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
+        root->state.debugLastTrace(e);
+        throw e;
+    }
 
     return v.type() == nString ? v.string.s : v.path;
 }
@@ -559,7 +567,11 @@ string_t AttrCursor::getStringWithContext()
                     return *s;
                 }
             } else
-                root->state.debug_throw(TypeError("'%s' is not a string", getAttrPathStr()));
+            {
+                auto e = TypeError("'%s' is not a string", getAttrPathStr());
+                root->state.debugLastTrace(e);
+                throw e;
+            }
         }
     }
 
@@ -571,7 +583,9 @@ string_t AttrCursor::getStringWithContext()
         return {v.path, {}};
     else
     {
-        root->state.debug_throw(TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type())));
+        auto e = TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
+        root->state.debugLastTrace(e);
+        throw e;
         return {v.path, {}}; // should never execute
     }
 }
@@ -586,14 +600,22 @@ bool AttrCursor::getBool()
                 debug("using cached Boolean attribute '%s'", getAttrPathStr());
                 return *b;
             } else
-                root->state.debug_throw(TypeError("'%s' is not a Boolean", getAttrPathStr()));
+            {
+                auto e = TypeError("'%s' is not a Boolean", getAttrPathStr());
+                root->state.debugLastTrace(e);
+                throw e;
+            }
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nBool)
-        root->state.debug_throw(TypeError("'%s' is not a Boolean", getAttrPathStr()));
+    {
+        auto e = TypeError("'%s' is not a Boolean", getAttrPathStr());
+        root->state.debugLastTrace(e);
+        throw e;
+    }
 
     return v.boolean;
 }
@@ -608,14 +630,22 @@ std::vector<Symbol> AttrCursor::getAttrs()
                 debug("using cached attrset attribute '%s'", getAttrPathStr());
                 return *attrs;
             } else
-                root->state.debug_throw(TypeError("'%s' is not an attribute set", getAttrPathStr()));
+            {
+                auto e = TypeError("'%s' is not an attribute set", getAttrPathStr());
+                root->state.debugLastTrace(e);
+                throw e;
+            }
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nAttrs)
-        root->state.debug_throw(TypeError("'%s' is not an attribute set", getAttrPathStr()));
+    {
+        auto e = TypeError("'%s' is not an attribute set", getAttrPathStr());
+        root->state.debugLastTrace(e);
+        throw e;
+    }
 
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs)

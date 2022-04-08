@@ -50,7 +50,7 @@ struct NixRepl
     ref<EvalState> state;
     Bindings * autoArgs;
 
-   const Error *debugError;
+    const Error *debugError;
     int debugTraceIndex;
 
     Strings loadedFiles;

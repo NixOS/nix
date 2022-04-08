@@ -85,7 +85,8 @@ void printValueAsJSON(EvalState & state, bool strict,
                 .errPos = v.determinePos(pos)
             });
             e.addTrace(pos, hintfmt("message for the trace"));
-            state.debug_throw(e);
+            state.debugLastTrace(e);
+            throw e;
     }
 }
 
@@ -99,7 +100,9 @@ void printValueAsJSON(EvalState & state, bool strict,
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
     JSONPlaceholder & out, PathSet & context) const
 {
-    state.debug_throw(TypeError("cannot convert %1% to JSON", showType()));
+    auto e = TypeError("cannot convert %1% to JSON", showType());
+    state.debugLastTrace(e);
+    throw e;
 }
 
 
