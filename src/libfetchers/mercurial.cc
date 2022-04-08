@@ -201,8 +201,17 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
 
+        auto checkHashType = [&](const std::optional<Hash> & hash)
+        {
+            if (hash.has_value() && hash->type != htSHA1)
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
+        };
+
+
         auto getLockedAttrs = [&]()
         {
+            checkHashType(input.getRev());
+
             return Attrs({
                 {"type", "hg"},
                 {"name", name},
