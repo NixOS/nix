@@ -123,8 +123,6 @@ public:
 
     template<typename... Args>
     FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
-
-    virtual const char* sname() const override { return "FileTransferError"; }
 };
 
 bool isUri(std::string_view s);
