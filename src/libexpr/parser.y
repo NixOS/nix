@@ -23,7 +23,6 @@
 #include "nixexpr.hh"
 #include "eval.hh"
 #include "globals.hh"
-#include <iostream>
 
 namespace nix {
 

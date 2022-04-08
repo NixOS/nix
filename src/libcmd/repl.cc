@@ -547,8 +547,6 @@ bool NixRepl::processLine(std::string line)
                      loadDebugTraceEnv(*iter);
                      break;
                  }
-                 // std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                 // showDebugTrace(std::cout, *iter);
             }
         }
         else if (arg == "step") {

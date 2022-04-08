@@ -226,13 +226,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else {
-                    auto e = EvalError({
-                        .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
-                        .errPos = *attr.pos
-                    });
-                    state.debugLastTrace(e);
-                    throw e;
+            else
+            {
+                auto e = EvalError({
+                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                    .errPos = *attr.pos
+                });
+                state.debugLastTrace(e);
+                throw e;
             }
         }
 

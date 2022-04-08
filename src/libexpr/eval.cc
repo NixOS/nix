@@ -789,6 +789,7 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
       auto map = valmap();
       if (env.type == Env::HasWithAttrs)
       {
+          // add 'with' bindings.
           Bindings::iterator j = env.values[0]->attrs->begin();
           while (j != env.values[0]->attrs->end()) {
               map[j->name] = j->value;
@@ -1485,15 +1486,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     try {
         auto dts =
-          debuggerHook ?
-              makeDebugTraceStacker(
-                  state,
-                  *this,
-                  env,
-                  *pos2,
-                  "while evaluating the attribute '%1%'",
-                  showAttrPath(state, env, attrPath))
-          : nullptr;
+            debuggerHook ?
+                makeDebugTraceStacker(
+                    state,
+                    *this,
+                    env,
+                    *pos2,
+                    "while evaluating the attribute '%1%'",
+                    showAttrPath(state, env, attrPath))
+            : nullptr;
 
         for (auto & i : attrPath) {
             state.nrLookups++;
@@ -2082,13 +2083,13 @@ void EvalState::forceValueDeep(Value & v)
                 try {
 
                     auto dts =
-                      debuggerHook ?
-                          // if the value is a thunk, we're evaling.  otherwise no trace necessary.
-                          (i.value->isThunk() ? 
-                              makeDebugTraceStacker(*this, *v.thunk.expr, *v.thunk.env, *i.pos,
-                                                "while evaluating the attribute '%1%'", i.name)
-                              : nullptr)
-                      : nullptr;
+                        debuggerHook ?
+                            // if the value is a thunk, we're evaling.  otherwise no trace necessary.
+                            (i.value->isThunk() ?
+                                makeDebugTraceStacker(*this, *v.thunk.expr, *v.thunk.env, *i.pos,
+                                                  "while evaluating the attribute '%1%'", i.name)
+                                : nullptr)
+                        : nullptr;
 
                     recurse(*i.value);
                 } catch (Error & e) {
@@ -2123,8 +2124,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
     if (v.type() == nInt)
         return v.integer;
     else if (v.type() != nFloat)
-        throwTypeError(pos, "value is %1% while a float was expected", v,
-            *this);
+        throwTypeError(pos, "value is %1% while a float was expected", v, *this);
     return v.fpoint;
 }
 
@@ -2133,8 +2133,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v,
-            *this);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v, *this);
     return v.boolean;
 }
 
@@ -2149,8 +2148,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nFunction && !isFunctor(v))
-        throwTypeError(pos, "value is %1% while a function was expected", v,
-            *this);
+        throwTypeError(pos, "value is %1% while a function was expected", v, *this);
 }
 
 
@@ -2158,8 +2156,7 @@ std::string_view EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
     if (v.type() != nString) {
-        throwTypeError(pos, "value is %1% while a string was expected", v,
-            *this);
+        throwTypeError(pos, "value is %1% while a string was expected", v, *this);
     }
     return v.string.s;
 }
