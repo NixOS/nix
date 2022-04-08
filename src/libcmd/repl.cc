@@ -50,7 +50,6 @@ struct NixRepl
     ref<EvalState> state;
     Bindings * autoArgs;
 
-    const Error *debugError;
     int debugTraceIndex;
 
     Strings loadedFiles;
@@ -552,16 +551,6 @@ bool NixRepl::processLine(std::string line)
                  // showDebugTrace(std::cout, *iter);
             }
         }
-        else if (arg == "error") {
-            // TODO: remove, along with debugError.
-            if (this->debugError) {
-                showErrorInfo(std::cout, debugError->info(), true);
-            }
-            else
-            {
-                notice("error information not available");
-            }
-        }
         else if (arg == "step") {
             // set flag to stop at next DebugTrace; exit repl.
             state->debugStop = true;
@@ -1024,25 +1013,17 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 void runRepl(
     ref<EvalState> evalState,
-    const Error *debugError,
     const Expr &expr,
     const std::map<std::string, Value *> & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
 
-    repl->debugError = debugError;
-
     repl->initEnv();
 
     // add 'extra' vars.
-    // std::set<std::string> names;
     for (auto & [name, value] : extraEnv) {
-        // names.insert(ANSI_BOLD + name + ANSI_NORMAL);
-        // names.insert(name);
         repl->addVarToScope(repl->state->symbols.create(name), *value);
     }
-
-    // printError(hintfmt("The following extra variables are in scope: %s\n", concatStringsSep(", ", names)).str());
 
     repl->mainLoop({});
 }

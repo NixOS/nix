@@ -120,9 +120,6 @@ ref<EvalState> EvalCommand::getEvalState()
             ;
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
-                // clear the screen.
-                // std::cout << "\033[2J\033[1;1H";
-
                 auto dts =
                     error && expr.getPos() ?
                           std::unique_ptr<DebugTraceStacker>(
@@ -137,35 +134,13 @@ ref<EvalState> EvalCommand::getEvalState()
                                         }))
                           : nullptr;
 
-
                 if (error)
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
-
-                // else 
-                // {
-                //     auto iter = evalState->debugTraces.begin();
-                //     if (iter != evalState->debugTraces.end()) {
-                //           std::cout << "\n" << "… " << iter->hint.str() << "\n";
-
-                //           if (iter->pos.has_value() && (*iter->pos)) {
-                //               auto pos = iter->pos.value();
-                //               std::cout << "\n";
-                //               printAtPos(pos, std::cout);
-
-                //               auto loc = getCodeLines(pos);
-                //               if (loc.has_value()) {
-                //                   std::cout << "\n";
-                //                   printCodeLines(std::cout, "", pos, *loc);
-                //                   std::cout << "\n";
-                //             }
-                //         }
-                //     }
-                // }
 
                 if (expr.staticenv)
                 {
                     std::unique_ptr<valmap> vm(mapStaticEnvBindings(*expr.staticenv.get(), env));
-                    runRepl(evalState, error, expr, *vm);
+                    runRepl(evalState, expr, *vm);
                 }
             };
     }
