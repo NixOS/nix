@@ -155,7 +155,7 @@ static std::pair<std::optional<HashType>, bool> getParsedTypeAndSRI(std::string_
 {
     bool isSRI = false;
 
-    // Parse the has type before the separater, if there was one.
+    // Parse the hash type before the separator, if there was one.
     std::optional<HashType> optParsedType;
     {
         auto hashRaw = splitPrefixTo(rest, ':');

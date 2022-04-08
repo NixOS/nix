@@ -238,9 +238,18 @@ std::optional<std::string> Input::getRef() const
 
 std::optional<Hash> Input::getRev() const
 {
-    if (auto s = maybeGetStrAttr(attrs, "rev"))
-        return Hash::parseAny(*s, htSHA1);
-    return {};
+    std::optional<Hash> hash = {};
+
+    if (auto s = maybeGetStrAttr(attrs, "rev")) {
+        try {
+            hash = Hash::parseAnyPrefixed(*s);
+        } catch (BadHash &e) {
+            // Default to sha1 for backwards compatibility with existing flakes
+            hash = Hash::parseAny(*s, htSHA1);
+        }
+    }
+
+    return hash;
 }
 
 std::optional<uint64_t> Input::getRevCount() const
