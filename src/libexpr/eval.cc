@@ -784,15 +784,14 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
   // override the higher levels.
   // The top level bindings (builtins) are skipped since they are added for us by initEnv() 
   if (env.up && se.up) {
-      mapStaticEnvBindings(*se.up, *env.up,vm);
+      mapStaticEnvBindings(*se.up, *env.up, vm);
 
-      auto map = valmap();
       if (env.type == Env::HasWithAttrs)
       {
           // add 'with' bindings.
           Bindings::iterator j = env.values[0]->attrs->begin();
           while (j != env.values[0]->attrs->end()) {
-              map[j->name] = j->value;
+              vm[j->name] = j->value;
               ++j;
           }
       }
@@ -801,11 +800,9 @@ void mapStaticEnvBindings(const StaticEnv &se, const Env &env, valmap & vm)
           // iterate through staticenv bindings and add them.
           for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
           {
-              map[iter->first] = env.values[iter->second];
+              vm[iter->first] = env.values[iter->second];
           }
       }
-
-      vm.merge(map);
   }
 }
 
