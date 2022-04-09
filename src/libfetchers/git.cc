@@ -28,9 +28,7 @@ static std::string readHead(const Path & path)
 
 static bool isNotDotGitDirectory(const Path & path)
 {
-    static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
-
-    return not std::regex_match(path, gitDirRegex);
+    return baseNameOf(path) != ".git";
 }
 
 struct GitInputScheme : InputScheme
