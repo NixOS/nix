@@ -845,7 +845,7 @@ LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & s
     auto error = EvalError({
         .msg = hintfmt(s, s2),
         .errPos = pos,
-        .suggestions = suggestions,
+        .suggestions = suggestions
     });
 
     if (debuggerHook)
