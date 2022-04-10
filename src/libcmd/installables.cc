@@ -871,12 +871,13 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                         auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                         auto drvOutputs = drv.outputsAndOptPaths(*store);
                         for (auto & output : bfd.outputs) {
-                            if (!outputHashes.count(output))
+                            auto outputHash = get(outputHashes, output);
+                            if (!outputHash)
                                 throw Error(
                                     "the derivation '%s' doesn't have an output named '%s'",
                                     store->printStorePath(bfd.drvPath), output);
                             if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
-                                DrvOutput outputId { outputHashes.at(output), output };
+                                DrvOutput outputId { *outputHash, output };
                                 auto realisation = store->queryRealisation(outputId);
                                 if (!realisation)
                                     throw Error(
@@ -887,10 +888,11 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                             } else {
                                 // If ca-derivations isn't enabled, assume that
                                 // the output path is statically known.
-                                assert(drvOutputs.count(output));
-                                assert(drvOutputs.at(output).second);
+                                auto drvOutput = get(drvOutputs, output);
+                                assert(drvOutput);
+                                assert(drvOutput->second);
                                 outputs.insert_or_assign(
-                                    output, *drvOutputs.at(output).second);
+                                    output, *drvOutput->second);
                             }
                         }
                         res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});

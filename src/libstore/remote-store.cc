@@ -853,15 +853,15 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
 
                         OutputPathMap outputs;
                         auto drv = evalStore->readDerivation(bfd.drvPath);
-                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                        auto drvOutputs = drv.outputsAndOptPaths(*this);
+                        const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
+                        const auto drvOutputs = drv.outputsAndOptPaths(*this);
                         for (auto & output : bfd.outputs) {
-                            if (!outputHashes.count(output))
+                            auto outputHash = get(outputHashes, output);
+                            if (!outputHash)
                                 throw Error(
                                     "the derivation '%s' doesn't have an output named '%s'",
                                     printStorePath(bfd.drvPath), output);
-                            auto outputId =
-                                DrvOutput{outputHashes.at(output), output};
+                            auto outputId = DrvOutput{ *outputHash, output };
                             if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
                                 auto realisation =
                                     queryRealisation(outputId);
@@ -874,13 +874,14 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                             } else {
                                 // If ca-derivations isn't enabled, assume that
                                 // the output path is statically known.
-                                assert(drvOutputs.count(output));
-                                assert(drvOutputs.at(output).second);
+                                const auto drvOutput = get(drvOutputs, output);
+                                assert(drvOutput);
+                                assert(drvOutput->second);
                                 res.builtOutputs.emplace(
                                     outputId,
                                     Realisation {
                                         .id = outputId,
-                                        .outPath = *drvOutputs.at(output).second
+                                        .outPath = *drvOutput->second,
                                     });
                             }
                         }
