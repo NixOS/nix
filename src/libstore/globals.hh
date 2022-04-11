@@ -94,6 +94,13 @@ public:
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         "The default Nix store to use."};
 
+    Setting<std::string> gcSocketPath {
+        this,
+        getEnv("NIX_GC_SOCKET_PATH").value_or("auto"),
+        "gc-socket-path",
+        "Path to the socket used to communicate with an external GC."
+    };
+
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};
 

@@ -269,8 +269,9 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
         throw SysError("cannot create Unix domain socket");
     closeOnExec(fd.get());
 
-    // FIXME: Don’t hardcode
-    string socketPath = getEnv("NIX_GC_SOCKET_PATH").value_or("/nix/var/nix/gc-socket/socket");
+    std::string socketPath = settings.gcSocketPath.get() != "auto"
+        ? settings.gcSocketPath.get()
+        : stateDir.get() + gcSocketPath;
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
