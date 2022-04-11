@@ -124,6 +124,13 @@ public:
           section of the manual for supported store types and settings.
         )"};
 
+    Setting<std::string> gcSocketPath {
+        this,
+        getEnv("NIX_GC_SOCKET_PATH").value_or("auto"),
+        "gc-socket-path",
+        "Path to the socket used to communicate with an external GC."
+    };
+
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};
 

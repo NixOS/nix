@@ -31,6 +31,7 @@ namespace nix {
 
 
 static std::string gcSocketPath = "/gc-socket/socket";
+static std::string rootsSocketPath = "/gc-roots-socket/socket";
 static std::string gcRootsDir = "gcroots";
 
 
@@ -143,7 +144,7 @@ void LocalStore::addTempRoot(const StorePath & path)
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
-            auto socketPath = stateDir.get() + gcSocketPath;
+            auto socketPath = stateDir.get() + rootsSocketPath;
             debug("connecting to '%s'", socketPath);
             *fdRootsSocket = createUnixDomainSocket();
             try {
@@ -304,8 +305,10 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 }
 
 
-void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
+void LocalStore::findRootsNoTempNoExternalDaemon(Roots & roots, bool censor)
 {
+    debug("Can’t connect to the tracing daemon socket, fallback to the internal trace");
+
     /* Process direct roots in {gcroots,profiles}. */
     findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
     findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
@@ -322,9 +325,55 @@ Roots LocalStore::findRoots(bool censor)
     Roots roots;
     findRootsNoTemp(roots, censor);
 
-    findTempRoots(roots, censor);
+    FDs fds;
+    findTempRoots(fds, roots, censor);
 
     return roots;
+}
+
+void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
+{
+
+    auto fd = createUnixDomainSocket();
+
+    std::string socketPath = settings.gcSocketPath.get() != "auto"
+        ? settings.gcSocketPath.get()
+        : stateDir.get() + gcSocketPath;
+
+    try {
+        nix::connect(fd.get(), socketPath);
+    } catch (SysError & e) {
+        return findRootsNoTempNoExternalDaemon(roots, censor);
+    }
+
+    experimentalFeatureSettings.require(Xp::ExternalGCDaemon);
+
+    try {
+        StringMap unescapes = {
+            { "\\n", "\n"},
+            { "\\t", "\t"},
+        };
+        while (true) {
+            auto line = readLine(fd.get());
+            if (line.empty()) break; // TODO: Handle the broken symlinks
+            auto parsedLine = tokenizeString<std::vector<std::string>>(line, "\t");
+            if (parsedLine.size() != 2)
+                throw Error("Invalid result from the gc helper");
+            auto rawDestPath = rewriteStrings(parsedLine[0], unescapes);
+            auto retainer = rewriteStrings(parsedLine[1], unescapes);
+            if (!isInStore(rawDestPath)) continue;
+            try {
+                auto destPath = toStorePath(rawDestPath).first;
+                if (!isValidPath(destPath)) continue;
+                roots[destPath].insert(
+                    (!censor || isInDir(retainer, stateDir)) ? retainer : censored);
+            } catch (Error &) {
+            }
+        }
+    } catch (EndOfFile &) {
+    }
+
+    findRuntimeRoots(roots, censor);
 }
 
 typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots;
@@ -516,7 +565,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         readFile(*p);
 
     /* Start the server for receiving new roots. */
-    auto socketPath = stateDir.get() + gcSocketPath;
+    auto socketPath = stateDir.get() + rootsSocketPath;
     createDirs(dirOf(socketPath));
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
@@ -625,7 +674,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     printInfo("finding garbage collector roots...");
     Roots rootMap;
     if (!options.ignoreLiveness)
-        findRootsNoTemp(rootMap, true);
+        rootMap = findRoots(true);
 
     for (auto & i : rootMap) roots.insert(i.first);
 

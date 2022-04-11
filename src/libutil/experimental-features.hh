@@ -35,6 +35,7 @@ enum struct ExperimentalFeature
     ReadOnlyLocalStore,
     ConfigurableImpureEnv,
     MountedSSHStore,
+    ExternalGCDaemon,
     VerifiedFetches,
 };
 
