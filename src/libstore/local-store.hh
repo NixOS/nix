@@ -250,11 +250,11 @@ private:
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    Roots findRootsNoExternalDaemon(bool censor);
-
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
+
+    void findRootsNoTempNoExternalDaemon(Roots & roots, bool censor);
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
