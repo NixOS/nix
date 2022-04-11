@@ -144,22 +144,26 @@ int main(int argc, char * * argv)
 
         opts.log("accepted connection");
 
+        auto printToSocket = [&](std::string_view s) {
+            send(remoteSocket, s.data(), s.size(), MSG_NOSIGNAL);
+        };
+
         auto traceResult = traceStaticRoots(opts, standardRoots);
         auto runtimeRoots = getRuntimeRoots(opts);
         traceResult.storeRoots.insert(runtimeRoots.begin(), runtimeRoots.end());
         for (auto & [rootInStore, externalRoots] : traceResult.storeRoots) {
             for (auto & externalRoot : externalRoots) {
-                send(remoteSocket, escape(rootInStore.string()).c_str(), rootInStore.string().size(), 0);
-                send(remoteSocket, "\t", strlen("\t"), 0);
-                send(remoteSocket, escape(externalRoot.string()).c_str(), externalRoot.string().size(), 0);
-                send(remoteSocket, "\n", strlen("\n"), 0);
+                printToSocket(escape(rootInStore.string()));
+                printToSocket("\t");
+                printToSocket(escape(externalRoot.string()));
+                printToSocket("\n");
             }
 
         }
-        send(remoteSocket, "\n", strlen("\n"), 0);
+        printToSocket("\n");
         for (auto & deadLink : traceResult.deadLinks) {
-            send(remoteSocket, escape(deadLink.string()).c_str(), deadLink.string().size(), 0);
-            send(remoteSocket, "\n", strlen("\n"), 0);
+            printToSocket(escape(deadLink.string()));
+            printToSocket("\n");
         }
 
         close(remoteSocket);
