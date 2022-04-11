@@ -293,9 +293,19 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 }
 
 
-Roots LocalStore::findRoots(bool censor)
+Roots LocalStore::findRootsNoExternalDaemon(bool censor)
 {
     Roots roots;
+    findRootsNoTemp(roots, censor);
+
+    FDs fds;
+    findTempRoots(fds, roots, censor);
+
+    return roots;
+}
+
+Roots LocalStore::findRoots(bool censor)
+{
 
     auto fd = AutoCloseFD(socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -317,7 +327,9 @@ Roots LocalStore::findRoots(bool censor)
     strcpy(addr.sun_path, socketPath.c_str());
 
     if (::connect(fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot connect to the gc daemon at '%1%'", socketPath);
+        return findRootsNoExternalDaemon(censor);
+
+    Roots roots;
 
     try {
         while (true) {
