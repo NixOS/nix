@@ -340,11 +340,13 @@ Roots LocalStore::findRoots(bool censor)
             if (parsedLine.size() != 2)
                 throw Error("Invalid result from the gc helper");
             auto rawDestPath = parsedLine[0];
+            auto retainer = parsedLine[1];
             if (!isInStore(rawDestPath)) continue;
             try {
                 auto destPath = toStorePath(rawDestPath).first;
                 if (!isValidPath(destPath)) continue;
-                roots[destPath].insert(parsedLine[1]);
+                roots[destPath].insert(
+                    (!censor || isInDir(retainer, stateDir)) ? retainer : censored);
             } catch (Error &) {
             }
         }
