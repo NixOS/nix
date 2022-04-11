@@ -75,10 +75,19 @@ GlobalOpts parseCmdLine(int argc, char** argv)
     return res;
 }
 
+/*
+ * A value of type `Roots` is a mapping from a store path to the set of roots that keep it alive
+ */
+typedef std::map<fs::path, std::set<fs::path>> Roots;
 struct TraceResult {
-    set<fs::path> storeRoots;
+    Roots storeRoots;
     set<fs::path> deadLinks;
 };
+
+bool isInStore(fs::path storeDir, fs::path dir)
+{
+    return (std::search(dir.begin(), dir.end(), storeDir.begin(), storeDir.end()) == dir.begin());
+}
 
 void followPathToStore(
     const GlobalOpts & opts,
@@ -91,11 +100,6 @@ void followPathToStore(
 
     if (recursionsLeft < 0)
         return;
-
-    if (std::search(root.begin(), root.end(), opts.storeDir.begin(), opts.storeDir.end()) == root.begin()) {
-        res.storeRoots.insert(root);
-        return;
-    }
 
     switch (status.type()) {
         case fs::file_type::directory:
@@ -117,7 +121,13 @@ void followPathToStore(
                     auto target_status = fs::symlink_status(target);
                     if (target_status.type() == fs::file_type::not_found)
                         not_found("Not found");
-                    followPathToStore(opts, recursionsLeft - 1, res, target, target_status);
+
+                    if (isInStore(opts.storeDir, target)) {
+                        res.storeRoots[target].insert(root);
+                        return;
+                    } else {
+                        followPathToStore(opts, recursionsLeft - 1, res, target, target_status);
+                    }
 
                 } catch (fs::filesystem_error & e) {
                     not_found(e.what());
@@ -127,7 +137,7 @@ void followPathToStore(
             {
                 auto possibleStorePath = opts.storeDir / root.filename();
                 if (fs::exists(possibleStorePath))
-                res.storeRoots.insert(possibleStorePath);
+                res.storeRoots[possibleStorePath].insert(root);
             }
         default:
             break;
@@ -176,8 +186,9 @@ int main(int argc, char * * argv)
         opts.stateDir / fs::path("gcroots"),
     };
     auto traceResult = followPathsToStore(opts, standardRoots);
-    for (auto & rootInStore : traceResult.storeRoots) {
-        std::cout << rootInStore.string() << std::endl;
+    for (auto & [rootInStore, externalRoots] : traceResult.storeRoots) {
+        for (auto & externalRoot : externalRoots)
+            std::cout << rootInStore.string() << '\t' << externalRoot.string() << std::endl;
     }
     std::cout << std::endl;
     for (auto & deadLink : traceResult.deadLinks) {
