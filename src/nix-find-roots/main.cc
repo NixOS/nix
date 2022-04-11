@@ -68,6 +68,7 @@ TracerConfig parseCmdLine(int argc, char** argv)
     };
 }
 
+#define SD_LISTEN_FDS_START 3 // Like in systemd
 
 int main(int argc, char * * argv)
 {
@@ -77,23 +78,33 @@ int main(int argc, char * * argv)
         opts.stateDir / fs::path("gcroots"),
     };
 
-    int mySock = socket(PF_UNIX, SOCK_STREAM, 0);
-    if (mySock == 0) {
-        throw Error("Cannot create Unix domain socket");
+    int mySock;
+
+    //  Handle socket-based activation by systemd.
+    auto rawListenFds = std::getenv("LISTEN_FDS");
+    if (rawListenFds) {
+        auto listenFds = std::string(rawListenFds);
+        if (std::getenv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
+            throw Error("unexpected systemd environment variables");
+        mySock = SD_LISTEN_FDS_START;
+    } else {
+        mySock = socket(PF_UNIX, SOCK_STREAM, 0);
+        if (mySock == 0) {
+            throw Error("Cannot create Unix domain socket");
+        }
+        struct sockaddr_un addr;
+        addr.sun_family = AF_UNIX;
+
+        unlink(opts.socketPath.c_str());
+        strcpy(addr.sun_path, opts.socketPath.c_str());
+        if (bind(mySock, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
+            throw Error("Cannot bind to socket");
+        }
+
+        if (listen(mySock, 5) == -1)
+            throw Error("cannot listen on socket " + opts.socketPath.string());
     }
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
 
-    unlink(opts.socketPath.c_str());
-    strcpy(addr.sun_path, opts.socketPath.c_str());
-    if (bind(mySock, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
-        throw Error("Cannot bind to socket");
-    }
-
-    if (listen(mySock, 5) == -1)
-        throw Error("cannot listen on socket " + opts.socketPath.string());
-
-    addr.sun_family = AF_UNIX;
     while (1) {
         struct sockaddr_un remoteAddr;
         socklen_t remoteAddrLen = sizeof(remoteAddr);
