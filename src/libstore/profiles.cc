@@ -305,11 +305,16 @@ Path getDefaultProfile()
         if (!pathExists(profileLink)
             || (isLink(profileLink)
                 && readLink(profileLink) == legacyProfile)) {
+            warn("Migrating the default profile");
             replaceSymlink(newProfile, profileLink);
-            for (auto & oldGen : findGenerations(legacyProfile).first) {
-                replaceSymlink(
-                    oldGen.path,
-                    newProfile + "/" + std::string(baseNameOf(oldGen.path)));
+            replaceSymlink(legacyProfile, newProfile);
+            if (pathExists(legacyProfile)) {
+                for (auto & oldGen : findGenerations(legacyProfile).first) {
+                    replaceSymlink(
+                        oldGen.path,
+                        dirOf(newProfile) + "/"
+                            + std::string(baseNameOf(oldGen.path)));
+                }
             }
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
