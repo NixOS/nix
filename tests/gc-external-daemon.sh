@@ -33,7 +33,7 @@ killGcDaemon() {
 
 startGcDaemon
 
-bash ./gc.sh
-bash ./gc-concurrent.sh
-bash ./gc-runtime.sh
-bash ./gc-auto.sh
+source ./gc.sh
+source ./gc-concurrent.sh
+source ./gc-runtime.sh
+source ./gc-auto.sh
