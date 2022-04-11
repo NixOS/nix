@@ -234,8 +234,11 @@ void scanMapsFile(const GlobalOpts & opts, const fs::path & mapsFile, Roots & re
     std::string line;
     while (std::getline(mappedFile, line)) {
         auto match = std::smatch{};
-        if (std::regex_match(line, match, mapRegex))
-            res[fs::path(match[1])].emplace(mapsFile);
+        if (std::regex_match(line, match, mapRegex)) {
+            auto matchedPath = fs::path(match[1]);
+            if (isInStore(opts.storeDir, matchedPath))
+                res[fs::path(match[1])].emplace(mapsFile);
+        }
     }
 
 }
