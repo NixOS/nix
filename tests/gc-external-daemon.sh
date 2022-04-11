@@ -5,7 +5,7 @@ startGcDaemon() {
     # Start the daemon, wait for the socket to appear.  !!!
     # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_GC_SOCKET_PATH
-    $(dirname $(which nix))/../libexec/nix/nix-find-roots \
+    $(dirname $(command -v nix))/../libexec/nix/nix-find-roots \
         -l "$NIX_GC_SOCKET_PATH" \
         -d "$NIX_STATE_DIR" \
         -s "$NIX_STORE_DIR" \
