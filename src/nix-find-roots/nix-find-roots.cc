@@ -12,12 +12,14 @@
 #include <set>
 #include <vector>
 #include <algorithm>
+#include <getopt.h>
 
 namespace fs = std::filesystem;
 using std::set, std::string;
 
 struct GlobalOpts {
-    fs::path storeDir;
+    fs::path storeDir = "/nix/store";
+    fs::path stateDir = "/nix/var/nix";
     enum VerbosityLvl {
         Quiet,
         Verbose
@@ -36,22 +38,40 @@ GlobalOpts parseCmdLine(int argc, char** argv)
 {
     GlobalOpts res;
     auto usage = [&]() {
-        std::cerr << "Usage: " << string(argv[0]) << " [-v] [storeDir]" << std::endl;
+        std::cerr << "Usage: " << string(argv[0]) << " [--verbose|-v] [-s storeDir] [-d stateDir]" << std::endl;
         exit(1);
     };
-    auto args = std::vector<char*>(argv+1, argv+argc);
-    bool storeDirSet = false;
-    for (auto & arg : args) {
-        if (string(arg) == "-v")
-            res.verbosity = GlobalOpts::Verbose;
-        else if (!storeDirSet) {
-            res.storeDir = arg;
-            storeDirSet = true;
-        }
-        else usage();
+    static struct option long_options[] = {
+        { "verbose", no_argument, (int*)&res.verbosity, GlobalOpts::Verbose },
+        { "store_dir", required_argument, 0, 's' },
+        { "state_dir", required_argument, 0, 'd' },
     };
-    if (!storeDirSet)
-        usage();
+
+    int option_index = 0;
+    int opt_char;
+    while((opt_char = getopt_long(argc, argv, "vs:",
+                    long_options, &option_index)) != -1) {
+        switch (opt_char) {
+            case 0:
+                break;
+          break;
+            case '?':
+                usage();
+                break;
+            case 'v':
+                res.verbosity = GlobalOpts::Verbose;
+                break;
+            case 's':
+                res.storeDir = fs::path(optarg);
+                break;
+            case 'd':
+                res.stateDir = fs::path(optarg);
+                break;
+            default:
+                std::cerr << "Got invalid char: " << (char)opt_char << std::endl;
+                abort();
+        }
+    };
     return res;
 }
 
@@ -151,12 +171,11 @@ TraceResult followPathsToStore(GlobalOpts opts, set<fs::path> roots)
 int main(int argc, char * * argv)
 {
     GlobalOpts opts = parseCmdLine(argc, argv);
-    set<fs::path> originalRoots;
-    std::string currentLine;
-    while (std::getline(std::cin, currentLine)) {
-        originalRoots.insert(fs::path(currentLine));
-    }
-    auto traceResult = followPathsToStore(opts, originalRoots);
+    set<fs::path> standardRoots = {
+        opts.stateDir / fs::path("profiles"),
+        opts.stateDir / fs::path("gcroots"),
+    };
+    auto traceResult = followPathsToStore(opts, standardRoots);
     for (auto & rootInStore : traceResult.storeRoots) {
         std::cout << rootInStore.string() << std::endl;
     }
