@@ -25,6 +25,7 @@ namespace nix {
 
 
 static std::string gcSocketPath = "/gc-socket/socket";
+static std::string rootsSocketPath = "/gc-roots-socket/socket";
 static std::string gcRootsDir = "gcroots";
 
 
@@ -122,7 +123,7 @@ void LocalStore::addTempRoot(const StorePath & path)
            collector is running. So we have to connect to the garbage
            collector and inform it about our root. */
         if (!state->fdRootsSocket) {
-            auto socketPath = stateDir.get() + gcSocketPath;
+            auto socketPath = stateDir.get() + rootsSocketPath;
             debug("connecting to '%s'", socketPath);
             state->fdRootsSocket = createUnixDomainSocket();
             try {
@@ -296,25 +297,31 @@ Roots LocalStore::findRoots(bool censor)
 {
     Roots roots;
 
-    Pipe fromHelper;
-    fromHelper.create();
-    Pid helperPid = startProcess([&]() {
-        if (dup2(fromHelper.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("cannot pipe standard output into log file");
-        if (chdir("/") == -1) throw SysError("changing into /");
-        auto helperProgram = settings.nixLibexecDir + "/nix/nix-find-roots";
-        Strings args = {std::string(baseNameOf(helperProgram))};
-        execv(
-            helperProgram.c_str(),
-            stringsToCharPtrs(args).data()
-        );
+    auto fd = AutoCloseFD(socket(PF_UNIX, SOCK_STREAM
+        #ifdef SOCK_CLOEXEC
+        | SOCK_CLOEXEC
+        #endif
+        , 0));
+    if (!fd)
+        throw SysError("cannot create Unix domain socket");
+    closeOnExec(fd.get());
 
-        throw SysError("executing '%s'", helperProgram);
-    });
+    // FIXME: Don’t hardcode
+    string socketPath = "/nix/var/nix/gc-socket/socket";
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (socketPath.size() + 1 >= sizeof(addr.sun_path))
+        throw Error("socket path '%1%' is too long", socketPath);
+    strcpy(addr.sun_path, socketPath.c_str());
+
+    if (::connect(fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        throw SysError("cannot connect to the gc daemon at '%1%'", socketPath);
 
     try {
         while (true) {
-            auto line = readLine(fromHelper.readSide.get());
+            auto line = readLine(fd.get());
             if (line.empty()) break; // TODO: Handle the broken symlinks
             auto parsedLine = tokenizeString<std::vector<std::string>>(line, "\t");
             if (parsedLine.size() != 2)
@@ -327,10 +334,6 @@ Roots LocalStore::findRoots(bool censor)
         }
     } catch (EndOfFile &) {
     }
-
-    int res = helperPid.wait();
-    if (res != 0)
-        throw Error("unable to start the gc helper process");
 
     return roots;
 }
@@ -524,7 +527,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     FdLock gcLock(fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
 
     /* Start the server for receiving new roots. */
-    auto socketPath = stateDir.get() + gcSocketPath;
+    auto socketPath = stateDir.get() + rootsSocketPath;
     createDirs(dirOf(socketPath));
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
