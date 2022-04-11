@@ -330,8 +330,6 @@ private:
 
     void findRootsNoTempNoExternalDaemon(Roots & roots, bool censor);
 
-    void findRuntimeRoots(Roots & roots, bool censor);
-
     std::pair<Path, AutoCloseFD> createTempDirInStore();
 
     typedef std::unordered_set<ino_t> InodeHash;

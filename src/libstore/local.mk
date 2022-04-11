@@ -6,7 +6,7 @@ libstore_DIR := $(d)
 
 libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 
-libstore_LIBS = libutil
+libstore_LIBS = libutil libfindroots
 
 libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(THREAD_LDFLAGS)
 ifdef HOST_LINUX
@@ -28,7 +28,7 @@ ifeq ($(HAVE_SECCOMP), 1)
 endif
 
 libstore_CXXFLAGS += \
- -I src/libutil -I src/libstore -I src/libstore/build \
+ -I src/libutil -I src/libstore -I src/libstore/build -I src/nix-find-roots/lib \
  -DNIX_PREFIX=\"$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
