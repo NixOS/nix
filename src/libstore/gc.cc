@@ -3,6 +3,7 @@
 #include "local-store.hh"
 #include "local-fs-store.hh"
 #include "finally.hh"
+#include "find-roots.hh"
 
 #include <functional>
 #include <queue>
@@ -284,14 +285,28 @@ void LocalStore::findRootsNoTempNoExternalDaemon(Roots & roots, bool censor)
 {
     debug("Can’t connect to the tracing daemon socket, fallback to the internal trace");
 
-    /* Process direct roots in {gcroots,profiles}. */
-    findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
-    findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
+    using namespace nix::roots_tracer;
 
-    /* Add additional roots returned by different platforms-specific
-       heuristics.  This is typically used to add running programs to
-       the set of roots (to prevent them from being garbage collected). */
-    findRuntimeRoots(roots, censor);
+    const TracerConfig opts {
+      .storeDir = fs::path(storeDir),
+      .stateDir = fs::path(stateDir.get())
+    };
+    const std::set<fs::path> standardRoots = {
+        opts.stateDir / fs::path(gcRootsDir),
+        opts.stateDir / fs::path("gcroots"),
+    };
+    auto traceResult = traceStaticRoots(opts, standardRoots);
+    auto runtimeRoots = getRuntimeRoots(opts);
+    traceResult.storeRoots.insert(runtimeRoots.begin(), runtimeRoots.end());
+    for (auto & [rawRootInStore, externalRoots] : traceResult.storeRoots) {
+        if (!isInStore(rawRootInStore)) continue;
+        auto rootInStore = toStorePath(rawRootInStore).first;
+        if (!isValidPath(rootInStore)) continue;
+        std::unordered_set<std::string> primRoots;
+        for (const auto & externalRoot : externalRoots)
+            primRoots.insert(externalRoot.string());
+        roots.emplace(rootInStore, primRoots);
+    }
 }
 
 

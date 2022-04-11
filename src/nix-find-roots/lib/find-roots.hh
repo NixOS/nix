@@ -26,9 +26,9 @@ inline void logNone(std::string_view)
 { }
 
 struct TracerConfig {
-    fs::path storeDir = "/nix/store";
-    fs::path stateDir = "/nix/var/nix";
-    fs::path socketPath = "/nix/var/nix/gc-socket/socket";
+    const fs::path storeDir = "/nix/store";
+    const fs::path stateDir = "/nix/var/nix";
+    const fs::path socketPath = "/nix/var/nix/gc-socket/socket";
 
     std::function<void(std::string_view msg)> log = logNone;
     std::function<void(std::string_view msg)> debug = logNone;

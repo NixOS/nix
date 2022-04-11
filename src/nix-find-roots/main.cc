@@ -15,8 +15,12 @@ void logStderr(std::string_view msg)
 
 TracerConfig parseCmdLine(int argc, char** argv)
 {
-    TracerConfig res;
-    res.log = logStderr;
+    std::function<void(std::string_view msg)> log = logStderr;
+    std::function<void(std::string_view msg)> debug = logNone;
+    fs::path storeDir = "/nix/store";
+    fs::path stateDir = "/nix/var/nix";
+    fs::path socketPath = "/nix/var/nix/gc-trace-socket/socket";
+
     auto usage = [&]() {
         std::cerr << "Usage: " << string(argv[0]) << " [--verbose|-v] [-s storeDir] [-d stateDir] [-l socketPath]" << std::endl;
         exit(1);
@@ -40,23 +44,28 @@ TracerConfig parseCmdLine(int argc, char** argv)
                 usage();
                 break;
             case 'v':
-                res.debug = logStderr;
+                debug = logStderr;
                 break;
             case 's':
-                res.storeDir = fs::path(optarg);
+                storeDir = fs::path(optarg);
                 break;
             case 'd':
-                res.stateDir = fs::path(optarg);
+                stateDir = fs::path(optarg);
                 break;
             case 'l':
-                res.socketPath = fs::path(optarg);
+                socketPath = fs::path(optarg);
                 break;
             default:
                 std::cerr << "Got invalid char: " << (char)opt_char << std::endl;
                 abort();
         }
     };
-    return res;
+    return TracerConfig {
+        .storeDir = storeDir,
+        .stateDir = stateDir,
+        .socketPath = socketPath,
+        .debug = debug,
+    };
 }
 
 
