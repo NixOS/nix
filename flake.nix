@@ -412,7 +412,7 @@
             CXXFLAGS = prev.lib.optionalString prev.stdenv.hostPlatform.isStatic "-static";
 
             buildPhase = ''
-              $CXX $CXXFLAGS -std=c++17 nix-find-roots.cc -o nix-find-roots
+              $CXX $CXXFLAGS -std=c++17 *.cc **/*.cc -I lib -o nix-find-roots
             '';
 
             installPhase = ''
