@@ -1,5 +1,7 @@
 source common.sh
 
+sed -i 's/experimental-features .*/& external-gc-daemon/' "$NIX_CONF_DIR"/nix.conf
+
 export NIX_GC_SOCKET_PATH=$TEST_ROOT/gc.socket
 startGcDaemon() {
     # Start the daemon, wait for the socket to appear.  !!!

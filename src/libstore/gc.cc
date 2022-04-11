@@ -283,6 +283,8 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
     if (::connect(fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
         return findRootsNoTempNoExternalDaemon(roots, censor);
 
+    settings.requireExperimentalFeature(Xp::ExternalGCDaemon);
+
     try {
         while (true) {
             auto line = readLine(fd.get());

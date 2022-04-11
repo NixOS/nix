@@ -19,7 +19,8 @@ enum struct ExperimentalFeature
     Flakes,
     NixCommand,
     RecursiveNix,
-    NoUrlLiterals
+    NoUrlLiterals,
+    ExternalGCDaemon,
 };
 
 /**

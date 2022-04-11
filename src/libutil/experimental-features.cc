@@ -11,6 +11,7 @@ std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::NixCommand, "nix-command" },
     { Xp::RecursiveNix, "recursive-nix" },
     { Xp::NoUrlLiterals, "no-url-literals" },
+    { Xp::ExternalGCDaemon, "external-gc-daemon" },
 };
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)
