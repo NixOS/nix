@@ -1,11 +1,11 @@
 ifndef HOST_DARWIN
-libraries += find-roots
+libraries += libfindroots
 
-find-roots_NAME = libfindroots
+libfindroots_NAME = libnixfindroots
 
-find-roots_DIR := $(d)/lib
+libfindroots_DIR := $(d)/lib
 
-find-roots_SOURCES := $(wildcard $(d)/lib/*.cc)
+libfindroots_SOURCES := $(wildcard $(d)/lib/*.cc)
 
 programs += nix-find-roots
 
@@ -13,7 +13,7 @@ nix-find-roots_DIR := $(d)
 
 nix-find-roots_SOURCES := $(d)/main.cc
 
-nix-find-roots_LIBS := find-roots
+nix-find-roots_LIBS := libfindroots
 
 nix-find-roots_CXXFLAGS += \
 	-I src/nix-find-roots/lib

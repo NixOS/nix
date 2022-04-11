@@ -6,7 +6,7 @@ libstore_DIR := $(d)
 
 libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 
-libstore_LIBS = libutil find-roots
+libstore_LIBS = libutil libfindroots
 
 libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
 ifdef HOST_LINUX
