@@ -197,15 +197,19 @@ TraceResult followPathsToStore(GlobalOpts opts, set<fs::path> roots)
  */
 void scanFileContent(const GlobalOpts & opts, const fs::path & fileToScan, Roots & res)
 {
-    std::ifstream fs;
-    fs.open(fileToScan);
-    std::string content;
-    fs >> content;
-    auto fileEnd = std::sregex_iterator();
+    std::ostringstream contentStream;
+    {
+        std::ifstream fs;
+        fs.open(fileToScan);
+        fs >> contentStream.rdbuf();
+    }
+    std::string content = contentStream.str();
     auto regex = storePathRegex(opts.storeDir);
-    auto firstMatch = std::sregex_iterator(content.begin(), content.end(), regex);
-    for (auto & i = firstMatch; i != fileEnd; i++)
-        res[i->str()].insert(fileToScan);
+    auto firstMatch
+        = std::sregex_iterator { content.begin(), content.end(), regex };
+    auto fileEnd = std::sregex_iterator{};
+    for (auto i = firstMatch; i != fileEnd; ++i)
+        res[i->str()].emplace(fileToScan);
 }
 
 /**
