@@ -295,6 +295,7 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 
 Roots LocalStore::findRootsNoExternalDaemon(bool censor)
 {
+    debug("Can’t connect to the tracing daemon socket, fallback to the internal trace");
     Roots roots;
     findRootsNoTemp(roots, censor);
 
