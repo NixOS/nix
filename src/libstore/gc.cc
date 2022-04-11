@@ -218,69 +218,6 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     }
 }
 
-
-void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
-{
-    auto foundRoot = [&](const Path & path, const Path & target) {
-        try {
-            auto storePath = toStorePath(target).first;
-            if (isValidPath(storePath))
-                roots[std::move(storePath)].emplace(path);
-            else
-                printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
-        } catch (BadStorePath &) { }
-    };
-
-    try {
-
-        if (type == DT_UNKNOWN)
-            type = getFileType(path);
-
-        if (type == DT_DIR) {
-            for (auto & i : readDirectory(path))
-                findRoots(path + "/" + i.name, i.type, roots);
-        }
-
-        else if (type == DT_LNK) {
-            Path target = readLink(path);
-            if (isInStore(target))
-                foundRoot(path, target);
-
-            /* Handle indirect roots. */
-            else {
-                target = absPath(target, dirOf(path));
-                if (!pathExists(target)) {
-                    if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
-                        printInfo(format("removing stale link from '%1%' to '%2%'") % path % target);
-                        unlink(path.c_str());
-                    }
-                } else {
-                    struct stat st2 = lstat(target);
-                    if (!S_ISLNK(st2.st_mode)) return;
-                    Path target2 = readLink(target);
-                    if (isInStore(target2)) foundRoot(target, target2);
-                }
-            }
-        }
-
-        else if (type == DT_REG) {
-            auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path)));
-            if (storePath && isValidPath(*storePath))
-                roots[std::move(*storePath)].emplace(path);
-        }
-
-    }
-
-    catch (SysError & e) {
-        /* We only ignore permanent failures. */
-        if (e.errNo == EACCES || e.errNo == ENOENT || e.errNo == ENOTDIR)
-            printInfo("cannot read potential root '%1%'", path);
-        else
-            throw;
-    }
-}
-
-
 void LocalStore::findRootsNoTempNoExternalDaemon(Roots & roots, bool censor)
 {
     debug("Can’t connect to the tracing daemon socket, fallback to the internal trace");
@@ -315,8 +252,7 @@ Roots LocalStore::findRoots(bool censor)
     Roots roots;
     findRootsNoTemp(roots, censor);
 
-    FDs fds;
-    findTempRoots(fds, roots, censor);
+    findTempRoots(roots, censor);
 
     return roots;
 }
@@ -360,162 +296,17 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
                 auto destPath = toStorePath(rawDestPath).first;
                 if (!isValidPath(destPath)) continue;
                 roots[destPath].insert(
-                    (!censor || isInDir(retainer, stateDir)) ? retainer : censored);
+                    (!censor || isInDir(retainer, stateDir.get())) ? retainer : censored);
             } catch (Error &) {
             }
         }
     } catch (EndOfFile &) {
     }
-
-    findRuntimeRoots(roots, censor);
 }
 
 typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots;
 
-static void readProcLink(const std::string & file, UncheckedRoots & roots)
-{
-    /* 64 is the starting buffer size gnu readlink uses... */
-    auto bufsiz = ssize_t{64};
-try_again:
-    char buf[bufsiz];
-    auto res = readlink(file.c_str(), buf, bufsiz);
-    if (res == -1) {
-        if (errno == ENOENT || errno == EACCES || errno == ESRCH)
-            return;
-        throw SysError("reading symlink");
-    }
-    if (res == bufsiz) {
-        if (SSIZE_MAX / 2 < bufsiz)
-            throw Error("stupidly long symlink");
-        bufsiz *= 2;
-        goto try_again;
-    }
-    if (res > 0 && buf[0] == '/')
-        roots[std::string(static_cast<char *>(buf), res)]
-            .emplace(file);
-}
-
-static std::string quoteRegexChars(const std::string & raw)
-{
-    static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
-    return std::regex_replace(raw, specialRegex, R"(\$&)");
-}
-
-#if __linux__
-static void readFileRoots(const char * path, UncheckedRoots & roots)
-{
-    try {
-        roots[readFile(path)].emplace(path);
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT && e.errNo != EACCES)
-            throw;
-    }
-}
-#endif
-
-void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
-{
-    UncheckedRoots unchecked;
-
-    auto procDir = AutoCloseDir{opendir("/proc")};
-    if (procDir) {
-        struct dirent * ent;
-        auto digitsRegex = std::regex(R"(^\d+$)");
-        auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
-        while (errno = 0, ent = readdir(procDir.get())) {
-            checkInterrupt();
-            if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
-                readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
-
-                auto fdStr = fmt("/proc/%s/fd", ent->d_name);
-                auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
-                if (!fdDir) {
-                    if (errno == ENOENT || errno == EACCES)
-                        continue;
-                    throw SysError("opening %1%", fdStr);
-                }
-                struct dirent * fd_ent;
-                while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                    if (fd_ent->d_name[0] != '.')
-                        readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
-                }
-                if (errno) {
-                    if (errno == ESRCH)
-                        continue;
-                    throw SysError("iterating /proc/%1%/fd", ent->d_name);
-                }
-                fdDir.reset();
-
-                try {
-                    auto mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile), "\n");
-                    for (const auto & line : mapLines) {
-                        auto match = std::smatch{};
-                        if (std::regex_match(line, match, mapRegex))
-                            unchecked[match[1]].emplace(mapFile);
-                    }
-
-                    auto envFile = fmt("/proc/%s/environ", ent->d_name);
-                    auto envString = readFile(envFile);
-                    auto env_end = std::sregex_iterator{};
-                    for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
-                        unchecked[i->str()].emplace(envFile);
-                } catch (SysError & e) {
-                    if (errno == ENOENT || errno == EACCES || errno == ESRCH)
-                        continue;
-                    throw;
-                }
-            }
-        }
-        if (errno)
-            throw SysError("iterating /proc");
-    }
-
-#if !defined(__linux__)
-    // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
-    // See: https://github.com/NixOS/nix/issues/3011
-    // Because of this we disable lsof when running the tests.
-    if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
-        try {
-            std::regex lsofRegex(R"(^n(/.*)$)");
-            auto lsofLines =
-                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
-            for (const auto & line : lsofLines) {
-                std::smatch match;
-                if (std::regex_match(line, match, lsofRegex))
-                    unchecked[match[1]].emplace("{lsof}");
-            }
-        } catch (ExecError & e) {
-            /* lsof not installed, lsof failed */
-        }
-    }
-#endif
-
-#if __linux__
-    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
-    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
-    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
-#endif
-
-    for (auto & [target, links] : unchecked) {
-        if (!isInStore(target)) continue;
-        try {
-            auto path = toStorePath(target).first;
-            if (!isValidPath(path)) continue;
-            debug("got additional root '%1%'", printStorePath(path));
-            if (censor)
-                roots[path].insert(censored);
-            else
-                roots[path].insert(links.begin(), links.end());
-        } catch (BadStorePath &) { }
-    }
-}
-
-
 struct GCLimitReached { };
-
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
