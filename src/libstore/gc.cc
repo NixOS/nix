@@ -260,28 +260,17 @@ Roots LocalStore::findRoots(bool censor)
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
 
-    auto fd = AutoCloseFD(socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0));
-    if (!fd)
-        throw SysError("cannot create Unix domain socket");
-    closeOnExec(fd.get());
+    auto fd = createUnixDomainSocket();
 
     std::string socketPath = settings.gcSocketPath.get() != "auto"
         ? settings.gcSocketPath.get()
         : stateDir.get() + gcSocketPath;
 
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-
-    if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", socketPath);
-    strcpy(addr.sun_path, socketPath.c_str());
-
-    if (::connect(fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
+    try {
+        nix::connect(fd.get(), socketPath);
+    } catch (SysError & e) {
         return findRootsNoTempNoExternalDaemon(roots, censor);
+    }
 
     settings.requireExperimentalFeature(Xp::ExternalGCDaemon);
 
