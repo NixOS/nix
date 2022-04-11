@@ -73,7 +73,7 @@ clearProfiles() {
 
 clearStore() {
     echo "clearing store..."
-    chmod -R +w "$NIX_STORE_DIR"
+    chmod -R +w "$NIX_STORE_DIR" || true
     rm -rf "$NIX_STORE_DIR"
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_STATE_DIR"
@@ -88,6 +88,15 @@ clearCache() {
 clearCacheCache() {
     rm -f $TEST_HOME/.cache/nix/binary-cache*
 }
+
+declare -A trapFunctions
+
+callTraps() {
+    for f in "${trapFunctions[@]}"; do
+        $f
+    done
+}
+trap callTraps EXIT
 
 startDaemon() {
     # Don’t start the daemon twice, as this would just make it loop indefinitely
@@ -110,6 +119,7 @@ startDaemon() {
       fail "Didn’t manage to start the daemon"
     fi
     trap "killDaemon" EXIT
+    trapFunctions[killDaemon]=killDaemon
     # Save for if daemon is killed
     NIX_REMOTE_OLD=$NIX_REMOTE
     export NIX_REMOTE=daemon
@@ -132,7 +142,7 @@ killDaemon() {
     unset _NIX_TEST_DAEMON_PID
     # Restore old nix remote
     NIX_REMOTE=$NIX_REMOTE_OLD
-    trap "" EXIT
+    trapFunctions[killDaemon]=:
 }
 
 restartDaemon() {
