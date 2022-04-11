@@ -318,7 +318,7 @@ Roots LocalStore::findRoots(bool censor)
     closeOnExec(fd.get());
 
     // FIXME: Don’t hardcode
-    string socketPath = "/nix/var/nix/gc-socket/socket";
+    string socketPath = getEnv("NIX_GC_SOCKET_PATH").value_or("/nix/var/nix/gc-socket/socket");
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
