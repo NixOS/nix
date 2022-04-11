@@ -66,7 +66,7 @@ clearProfiles() {
 
 clearStore() {
     echo "clearing store..."
-    chmod -R +w "$NIX_STORE_DIR"
+    chmod -R +w "$NIX_STORE_DIR" || true
     rm -rf "$NIX_STORE_DIR"
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_STATE_DIR"
