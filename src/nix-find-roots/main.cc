@@ -30,17 +30,20 @@ TracerConfig parseCmdLine(int argc, char** argv)
         { "socket_path", required_argument, 0, 'l' },
         { "store_dir", required_argument, 0, 's' },
         { "state_dir", required_argument, 0, 'd' },
+        { "help", no_argument, 0, 'h' },
+        { 0, 0, 0, 0 },
     };
 
     int option_index = 0;
     int opt_char;
-    while((opt_char = getopt_long(argc, argv, "vd:s:l:",
+    while((opt_char = getopt_long(argc, argv, "vd:s:l:h",
                     long_options, &option_index)) != -1) {
         switch (opt_char) {
             case 0:
                 break;
           break;
             case '?':
+            case 'h':
                 usage();
                 break;
             case 'v':
