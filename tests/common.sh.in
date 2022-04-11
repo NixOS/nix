@@ -82,6 +82,15 @@ clearCacheCache() {
     rm -f $TEST_HOME/.cache/nix/binary-cache*
 }
 
+declare -A trapFunctions
+
+callTraps() {
+    for f in "${trapFunctions[@]}"; do
+        $f
+    done
+}
+trap callTraps EXIT
+
 startDaemon() {
     # Don’t start the daemon twice, as this would just make it loop indefinitely
     if [[ "$NIX_REMOTE" == daemon ]]; then
@@ -101,7 +110,7 @@ startDaemon() {
     if [[ -z ${DAEMON_STARTED+x} ]]; then
       fail "Didn’t manage to start the daemon"
     fi
-    trap "killDaemon" EXIT
+    trapFunctions[killDaemon]=killDaemon
     export NIX_REMOTE=daemon
 }
 
@@ -113,7 +122,7 @@ killDaemon() {
     done
     kill -9 $pidDaemon 2> /dev/null || true
     wait $pidDaemon || true
-    trap "" EXIT
+    trapFunctions[killDaemon]=:
 }
 
 restartDaemon() {

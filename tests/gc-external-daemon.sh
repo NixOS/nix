@@ -17,7 +17,7 @@ startGcDaemon() {
         sleep 1
     done
     pidGcDaemon=$!
-    trap "killGcDaemon" EXIT
+    trapFunctions[killGcDaemon]=killGcDaemon
 }
 
 killGcDaemon() {
@@ -28,7 +28,7 @@ killGcDaemon() {
     done
     kill -9 $pidGcDaemon || true
     wait $pidGcDaemon || true
-    trap "" EXIT
+    trapFunctions[killGcDaemon]=:
 }
 
 startGcDaemon
