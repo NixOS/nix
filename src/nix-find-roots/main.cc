@@ -5,6 +5,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <cstring>
+#include <signal.h>
 
 using namespace nix::roots_tracer;
 
@@ -128,6 +129,9 @@ int main(int argc, char * * argv)
             throw Error("cannot listen on socket " + opts.socketPath.string());
     }
 
+    // Ignore SIGPIPE so that an interrupted connection doesn’t stop the daemon
+    signal(SIGPIPE, SIG_IGN);
+
     while (1) {
         struct sockaddr_un remoteAddr;
         socklen_t remoteAddrLen = sizeof(remoteAddr);
@@ -145,7 +149,7 @@ int main(int argc, char * * argv)
         opts.log("accepted connection");
 
         auto printToSocket = [&](std::string_view s) {
-            send(remoteSocket, s.data(), s.size(), MSG_NOSIGNAL);
+            send(remoteSocket, s.data(), s.size(), 0);
         };
 
         auto traceResult = traceStaticRoots(opts, standardRoots);
