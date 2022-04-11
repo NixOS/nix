@@ -2,6 +2,7 @@ nix_tests = \
   flakes.sh \
   ca/gc.sh \
   gc.sh \
+  gc-external-daemon.sh \
   remote-store.sh \
   lang.sh \
   fetchMercurial.sh \
