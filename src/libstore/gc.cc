@@ -341,9 +341,12 @@ Roots LocalStore::findRoots(bool censor)
                 throw Error("Invalid result from the gc helper");
             auto rawDestPath = parsedLine[0];
             if (!isInStore(rawDestPath)) continue;
-            auto destPath = toStorePath(rawDestPath).first;
-            if (!isValidPath(destPath)) continue;
-            roots[destPath].insert(parsedLine[1]);
+            try {
+                auto destPath = toStorePath(rawDestPath).first;
+                if (!isValidPath(destPath)) continue;
+                roots[destPath].insert(parsedLine[1]);
+            } catch (Error &) {
+            }
         }
     } catch (EndOfFile &) {
     }
