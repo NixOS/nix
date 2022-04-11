@@ -295,9 +295,42 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 Roots LocalStore::findRoots(bool censor)
 {
     Roots roots;
-    findRootsNoTemp(roots, censor);
 
-    findTempRoots(roots, censor);
+    Pipe fromHelper;
+    fromHelper.create();
+    Pid helperPid = startProcess([&]() {
+        if (dup2(fromHelper.writeSide.get(), STDOUT_FILENO) == -1)
+            throw SysError("cannot pipe standard output into log file");
+        if (chdir("/") == -1) throw SysError("changing into /");
+        auto helperProgram = settings.nixLibexecDir + "/nix/nix-find-roots";
+        Strings args = {std::string(baseNameOf(helperProgram))};
+        execv(
+            helperProgram.c_str(),
+            stringsToCharPtrs(args).data()
+        );
+
+        throw SysError("executing '%s'", helperProgram);
+    });
+
+    try {
+        while (true) {
+            auto line = readLine(fromHelper.readSide.get());
+            if (line.empty()) break; // TODO: Handle the broken symlinks
+            auto parsedLine = tokenizeString<std::vector<std::string>>(line, "\t");
+            if (parsedLine.size() != 2)
+                throw Error("Invalid result from the gc helper");
+            auto rawDestPath = parsedLine[0];
+            if (!isInStore(rawDestPath)) continue;
+            auto destPath = toStorePath(rawDestPath).first;
+            if (!isValidPath(destPath)) continue;
+            roots[destPath].insert(parsedLine[1]);
+        }
+    } catch (EndOfFile &) {
+    }
+
+    int res = helperPid.wait();
+    if (res != 0)
+        throw Error("unable to start the gc helper process");
 
     return roots;
 }
