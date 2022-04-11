@@ -282,15 +282,6 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
 
 
-# This is needed if bzip2 is a static library, and the Nix libraries
-# are dynamic.
-case "${host_os}" in
-  darwin*)
-    LDFLAGS="-all_load $LDFLAGS"
-    ;;
-esac
-
-
 AC_ARG_WITH(sandbox-shell, AS_HELP_STRING([--with-sandbox-shell=PATH],[path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
