@@ -197,6 +197,9 @@ TraceResult followPathsToStore(GlobalOpts opts, set<fs::path> roots)
  */
 void scanFileContent(const GlobalOpts & opts, const fs::path & fileToScan, Roots & res)
 {
+    if (!fs::exists(fileToScan))
+        return;
+
     std::ostringstream contentStream;
     {
         std::ifstream fs;
@@ -218,6 +221,9 @@ void scanFileContent(const GlobalOpts & opts, const fs::path & fileToScan, Roots
  */
 void scanMapsFile(const GlobalOpts & opts, const fs::path & mapsFile, Roots & res)
 {
+    if (!fs::exists(mapsFile))
+        return;
+
     static auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
     std::stringstream mappedFile;
     {
@@ -275,6 +281,13 @@ Roots getRuntimeRoots(GlobalOpts opts)
         scanFileContent(opts, procEntry.path()/"environ", res);
         scanMapsFile(opts, procEntry.path()/"maps", res);
     }
+
+    // Mostly useful for NixOS, but doesn’t hurt to check on other systems
+    // anyways
+    scanFileContent(opts, "/proc/sys/kernel/modprobe", res);
+    scanFileContent(opts, "/proc/sys/kernel/fbsplash", res);
+    scanFileContent(opts, "/proc/sys/kernel/poweroff_cmd", res);
+
     return res;
 }
 
