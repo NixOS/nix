@@ -22,7 +22,7 @@ startGcDaemon() {
 
 killGcDaemon() {
     kill $pidGcDaemon
-    for i in {0.10}; do
+    for i in {0..10}; do
         kill -0 $pidGcDaemon || break
         sleep 1
     done
