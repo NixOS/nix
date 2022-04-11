@@ -9,10 +9,12 @@
 
 #include <filesystem>
 #include <iostream>
+#include <regex>
 #include <set>
 #include <vector>
 #include <algorithm>
 #include <getopt.h>
+#include <fstream>
 
 namespace fs = std::filesystem;
 using std::set, std::string;
@@ -83,6 +85,16 @@ struct TraceResult {
     Roots storeRoots;
     set<fs::path> deadLinks;
 };
+
+string quoteRegexChars(const string & raw)
+{
+    static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
+    return std::regex_replace(raw, specialRegex, R"(\$&)");
+}
+std::regex storePathRegex(const fs::path storeDir)
+{
+    return std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+}
 
 bool isInStore(fs::path storeDir, fs::path dir)
 {
@@ -178,6 +190,90 @@ TraceResult followPathsToStore(GlobalOpts opts, set<fs::path> roots)
     return res;
 }
 
+/**
+ * Scan the content of the given file for al the occurences of something that looks
+ * like a store path (i.e. that matches `storePathRegex(opts.storeDir)`) and add them
+ * to `res`
+ */
+void scanFileContent(const GlobalOpts & opts, const fs::path & fileToScan, Roots & res)
+{
+    std::ifstream fs;
+    fs.open(fileToScan);
+    std::string content;
+    fs >> content;
+    auto fileEnd = std::sregex_iterator();
+    auto regex = storePathRegex(opts.storeDir);
+    auto firstMatch = std::sregex_iterator(content.begin(), content.end(), regex);
+    for (auto & i = firstMatch; i != fileEnd; i++)
+        res[i->str()].insert(fileToScan);
+}
+
+/**
+ * Scan the content of a `/proc/[pid]/maps` file for regions that are mmaped to
+ * a store path
+ */
+void scanMapsFile(const GlobalOpts & opts, const fs::path & mapsFile, Roots & res)
+{
+    static auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
+    std::stringstream mappedFile;
+    {
+        std::ifstream fs;
+        fs.open(mapsFile);
+        fs >> mappedFile.rdbuf();
+    }
+    std::string line;
+    while (std::getline(mappedFile, line)) {
+        auto match = std::smatch{};
+        if (std::regex_match(line, match, mapRegex))
+            res[fs::path(match[1])].emplace(mapsFile);
+    }
+
+}
+
+Roots getRuntimeRoots(GlobalOpts opts)
+{
+    auto procDir = fs::path("/proc");
+    if (!fs::exists(procDir))
+        return {};
+    Roots res;
+    auto digitsRegex = std::regex(R"(^\d+$)");
+    for (auto & procEntry : fs::directory_iterator(procDir)) {
+        // Only the directories whose name is a sequence of digits represent
+        // pids
+        if (!std::regex_match(procEntry.path().filename().string(), digitsRegex)
+            || !procEntry.is_directory())
+            continue;
+
+        log(opts.verbosity, "Considering path " + procEntry.path().string());
+
+        // A set of paths used by the executable and possibly symlinks to a
+        // path in the store
+        set<fs::path> pathsToConsider;
+        pathsToConsider.insert(procEntry.path()/"exe");
+        pathsToConsider.insert(procEntry.path()/"cwd");
+        try {
+            auto fdDir = procEntry.path()/"fd";
+            for (auto & fdFile : fs::directory_iterator(fdDir))
+                pathsToConsider.insert(fdFile.path());
+        } catch (fs::filesystem_error & e) {
+            if (e.code().value() != ENOENT && e.code().value() != EACCES)
+                throw;
+        }
+        for (auto & path : pathsToConsider) try {
+            auto realPath = fs::read_symlink(path);
+            if (isInStore(opts.storeDir, realPath))
+                res[realPath].insert(path);
+        } catch (fs::filesystem_error &e) {
+            log(opts.verbosity, e.what());
+        }
+
+        // Scan the environment of the executable
+        scanFileContent(opts, procEntry.path()/"environ", res);
+        scanMapsFile(opts, procEntry.path()/"maps", res);
+    }
+    return res;
+}
+
 int main(int argc, char * * argv)
 {
     GlobalOpts opts = parseCmdLine(argc, argv);
@@ -186,6 +282,8 @@ int main(int argc, char * * argv)
         opts.stateDir / fs::path("gcroots"),
     };
     auto traceResult = followPathsToStore(opts, standardRoots);
+    auto runtimeRoots = getRuntimeRoots(opts);
+    traceResult.storeRoots.insert(runtimeRoots.begin(), runtimeRoots.end());
     for (auto & [rootInStore, externalRoots] : traceResult.storeRoots) {
         for (auto & externalRoot : externalRoots)
             std::cout << rootInStore.string() << '\t' << externalRoot.string() << std::endl;
