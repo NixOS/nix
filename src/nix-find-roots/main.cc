@@ -68,6 +68,26 @@ TracerConfig parseCmdLine(int argc, char** argv)
     };
 }
 
+/**
+ * Return `original` with every newline or tab character escaped
+ */
+std::string escape(std::string original)
+{
+    map<string, string> replacements = {
+        {"\n", "\\n"},
+        {"\n", "\\t"},
+    };
+    for (auto [oldStr, newStr] : replacements) {
+        size_t currentPos = 0;
+        while ((currentPos = original.find(oldStr)) != std::string::npos) {
+            original.replace(currentPos, oldStr.length(), newStr);
+            currentPos += newStr.length();
+        }
+    }
+
+    return original;
+}
+
 #define SD_LISTEN_FDS_START 3 // Like in systemd
 
 int main(int argc, char * * argv)
@@ -126,16 +146,16 @@ int main(int argc, char * * argv)
         traceResult.storeRoots.insert(runtimeRoots.begin(), runtimeRoots.end());
         for (auto & [rootInStore, externalRoots] : traceResult.storeRoots) {
             for (auto & externalRoot : externalRoots) {
-                send(remoteSocket, rootInStore.string().c_str(), rootInStore.string().size(), 0);
+                send(remoteSocket, escape(rootInStore.string()).c_str(), rootInStore.string().size(), 0);
                 send(remoteSocket, "\t", strlen("\t"), 0);
-                send(remoteSocket, externalRoot.string().c_str(), externalRoot.string().size(), 0);
+                send(remoteSocket, escape(externalRoot.string()).c_str(), externalRoot.string().size(), 0);
                 send(remoteSocket, "\n", strlen("\n"), 0);
             }
 
         }
         send(remoteSocket, "\n", strlen("\n"), 0);
         for (auto & deadLink : traceResult.deadLinks) {
-            send(remoteSocket, deadLink.string().c_str(), deadLink.string().size(), 0);
+            send(remoteSocket, escape(deadLink.string()).c_str(), deadLink.string().size(), 0);
             send(remoteSocket, "\n", strlen("\n"), 0);
         }
 

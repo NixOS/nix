@@ -286,14 +286,18 @@ void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
     settings.requireExperimentalFeature(Xp::ExternalGCDaemon);
 
     try {
+        StringMap unescapes = {
+            { "\\n", "\n"},
+            { "\\t", "\t"},
+        };
         while (true) {
             auto line = readLine(fd.get());
             if (line.empty()) break; // TODO: Handle the broken symlinks
             auto parsedLine = tokenizeString<std::vector<std::string>>(line, "\t");
             if (parsedLine.size() != 2)
                 throw Error("Invalid result from the gc helper");
-            auto rawDestPath = parsedLine[0];
-            auto retainer = parsedLine[1];
+            auto rawDestPath = rewriteStrings(parsedLine[0], unescapes);
+            auto retainer = rewriteStrings(parsedLine[1], unescapes);
             if (!isInStore(rawDestPath)) continue;
             try {
                 auto destPath = toStorePath(rawDestPath).first;
