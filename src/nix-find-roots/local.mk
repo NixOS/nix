@@ -1,4 +1,3 @@
-ifndef HOST_DARWIN
 libraries += libfindroots
 
 libfindroots_NAME = libnixfindroots
@@ -19,4 +18,3 @@ nix-find-roots_CXXFLAGS += \
 	-I src/nix-find-roots/lib
 
 nix-find-roots_INSTALL_DIR := $(libexecdir)/nix
-endif
