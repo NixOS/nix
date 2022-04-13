@@ -1,12 +1,66 @@
 #include <sys/time.h>
 #include <filesystem>
 
+#include "finally.hh"
 #include "util.hh"
 #include "types.hh"
 
 namespace fs = std::filesystem;
 
 namespace nix {
+
+static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
+    int & counter)
+{
+    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
+    if (includePid)
+        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
+    else
+        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
+}
+
+Path createTempDir(const Path & tmpRoot, const Path & prefix,
+    bool includePid, bool useGlobalCounter, mode_t mode)
+{
+    static int globalCounter = 0;
+    int localCounter = 0;
+    int & counter(useGlobalCounter ? globalCounter : localCounter);
+
+    while (1) {
+        checkInterrupt();
+        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
+        if (mkdir(tmpDir.c_str(), mode) == 0) {
+#if __FreeBSD__
+            /* Explicitly set the group of the directory.  This is to
+               work around around problems caused by BSD's group
+               ownership semantics (directories inherit the group of
+               the parent).  For instance, the group of /tmp on
+               FreeBSD is "wheel", so all directories created in /tmp
+               will be owned by "wheel"; but if the user is not in
+               "wheel", then "tar" will fail to unpack archives that
+               have the setgid bit set on directories. */
+            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
+                throw SysError("setting group of directory '%1%'", tmpDir);
+#endif
+            return tmpDir;
+        }
+        if (errno != EEXIST)
+            throw SysError("creating directory '%1%'", tmpDir);
+    }
+}
+
+
+std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
+{
+    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    // Strictly speaking, this is UB, but who cares...
+    // FIXME: use O_TMPFILE.
+    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    if (!fd)
+        throw SysError("creating temporary file '%s'", tmpl);
+    closeOnExec(fd.get());
+    return {std::move(fd), tmpl};
+}
 
 void createSymlink(const Path & target, const Path & link,
     std::optional<time_t> mtime)
@@ -101,10 +155,16 @@ void moveFile(const Path & oldName, const Path & newName)
     } catch (fs::filesystem_error & e) {
         auto oldPath = fs::path(oldName);
         auto newPath = fs::path(newName);
+        // For the move to be as atomic as possible, copy to a temporary
+        // directory
+        fs::path temp = createTempDir(newPath.parent_path(), "rename-tmp");
+        Finally removeTemp = [&]() { fs::remove(temp); };
+        auto tempCopyTarget = temp / "copy-target";
         if (e.code().value() == EXDEV) {
             fs::remove(newPath);
             warn("Can’t rename %s as %s, copying instead", oldName, newName);
-            copy(fs::directory_entry(oldPath), newPath, true);
+            copy(fs::directory_entry(oldPath), tempCopyTarget, true);
+            renameFile(tempCopyTarget, newPath);
         }
     }
 }
