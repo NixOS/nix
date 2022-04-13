@@ -54,7 +54,6 @@ void setWriteTime(const fs::path & p, const struct stat & st)
         .tv_sec = st.st_mtime,
         .tv_usec = 0,
     };
-    warn("Setting the mtime of %s to %d", p.c_str(), st.st_mtim.tv_sec);
     if (lutimes(p.c_str(), times) != 0)
         throw SysError("changing modification time of '%s'", p);
 }
@@ -92,14 +91,19 @@ void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
 
 void renameFile(const Path & oldName, const Path & newName)
 {
-    auto oldPath = fs::path(oldName);
-    auto newPath = fs::path(newName);
+    fs::rename(oldName, newName);
+}
+
+void moveFile(const Path & oldName, const Path & newName)
+{
     try {
-        fs::rename(oldPath, newPath);
+        renameFile(oldName, newName);
     } catch (fs::filesystem_error & e) {
+        auto oldPath = fs::path(oldName);
+        auto newPath = fs::path(newName);
         if (e.code().value() == EXDEV) {
             fs::remove(newPath);
-            warn("Copying %s to %s", oldName, newName);
+            warn("Can’t rename %s as %s, copying instead", oldName, newName);
             copy(fs::directory_entry(oldPath), newPath, true);
         }
     }

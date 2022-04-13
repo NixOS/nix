@@ -170,6 +170,15 @@ void replaceSymlink(const Path & target, const Path & link,
 
 void renameFile(const Path & src, const Path & dst);
 
+/**
+ * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
+ * are on a different filesystem.
+ *
+ * Beware that this might not be atomic because of the copy that happens behind
+ * the scenes
+ */
+void moveFile(const Path & src, const Path & dst);
+
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */

@@ -1430,7 +1430,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                     writeFile(realPath, dumpSource);
             } else {
                 /* Move the temporary path we restored above. */
-                renameFile(tempPath, realPath);
+                moveFile(tempPath, realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
