@@ -17,6 +17,8 @@ clearCache
 nix-build --no-out-link dependencies.nix --dry-run 2>&1 | grep "will be built"
 # Now new command:
 nix build -f dependencies.nix --dry-run 2>&1 | grep "will be built"
+nix build -f dependencies.nix --apply 'deps: deps.input1_drv' --dry-run 2>&1 | \
+    tr -d "\n" | grep "derivation will be built.*input-1"
 
 # TODO: XXX: FIXME: #1793
 # Disable this part of the test until the problem is resolved:
