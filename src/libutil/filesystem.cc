@@ -37,7 +37,7 @@ void replaceSymlink(const Path & target, const Path & link,
             throw;
         }
 
-        moveFile(tmp, link);
+        renameFile(tmp, link);
 
         break;
     }
@@ -90,7 +90,7 @@ void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
     }
 }
 
-void moveFile(const Path & oldName, const Path & newName)
+void renameFile(const Path & oldName, const Path & newName)
 {
     auto oldPath = fs::path(oldName);
     auto newPath = fs::path(newName);

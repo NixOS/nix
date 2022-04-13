@@ -1430,7 +1430,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                     writeFile(realPath, dumpSource);
             } else {
                 /* Move the temporary path we restored above. */
-                moveFile(tempPath, realPath);
+                renameFile(tempPath, realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1941,7 +1941,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     writeFile(tmpFile, compress("bzip2", log));
 
-    moveFile(tmpFile, logPath);
+    renameFile(tmpFile, logPath);
 }
 
 std::optional<std::string> LocalStore::getVersion()

@@ -223,7 +223,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    moveFile(src, dst);
+    renameFile(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -310,7 +310,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.printStorePath(status.known->path);
             if (pathExists(chrootRootDir + p))
-                moveFile((chrootRootDir + p), p);
+                renameFile((chrootRootDir + p), p);
         }
 
     return diskFull;
@@ -2624,7 +2624,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             Path prev = path + checkSuffix;
             deletePath(prev);
             Path dst = path + checkSuffix;
-            moveFile(path, dst);
+            renameFile(path, dst);
         }
     }
 

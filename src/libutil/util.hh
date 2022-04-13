@@ -168,7 +168,7 @@ void createSymlink(const Path & target, const Path & link,
 void replaceSymlink(const Path & target, const Path & link,
     std::optional<time_t> mtime = {});
 
-void moveFile(const Path & src, const Path & dst);
+void renameFile(const Path & src, const Path & dst);
 
 
 /* Wrappers arount read()/write() that read/write exactly the

@@ -39,7 +39,7 @@ static void makeSymlink(const Path & link, const Path & target)
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    moveFile(tempLink, link);
+    renameFile(tempLink, link);
 }
 
 

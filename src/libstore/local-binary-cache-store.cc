@@ -57,7 +57,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        moveFile(tmp, path2);
+        renameFile(tmp, path2);
         del.cancel();
     }
 

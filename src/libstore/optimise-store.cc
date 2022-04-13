@@ -230,7 +230,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     /* Atomically replace the old file with the new hard link. */
     try {
-        moveFile(tempLink, path);
+        renameFile(tempLink, path);
     } catch (SysError & e) {
         if (unlink(tempLink.c_str()) == -1)
             printError("unable to unlink '%1%'", tempLink);
