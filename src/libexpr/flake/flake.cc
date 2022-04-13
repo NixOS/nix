@@ -237,11 +237,14 @@ static Flake getFlake(
 
         if (outputs->value->isLambda() && outputs->value->lambda.fun->hasFormals()) {
             for (auto & formal : outputs->value->lambda.fun->formals->formals) {
-                if (formal.name != state.sSelf)
+                if (formal.name != state.sSelf) {
+                    if (!flake.inputs.count(formal.name))
+                        warn("implicit flake:%s input via output function argument in %s", formal.name, lockedRef);
                     flake.inputs.emplace(formal.name, FlakeInput {
                         .ref = parseFlakeRef(formal.name)
                     });
-            }
+                };
+            };
         }
 
     } else

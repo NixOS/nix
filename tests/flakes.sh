@@ -191,6 +191,53 @@ nix build -o $TEST_ROOT/result --no-use-registries git+file://$flake2Dir#bar --r
 nix build -o $TEST_ROOT/result $flake3Dir#xyzzy
 git -C $flake3Dir add flake.lock
 
+# Check how non-existent implicit input references are handled with
+# body eval errors
+rm $flake3Dir/flake.nix
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  description = "Fnord";
+
+  outputs = { self, noflake }: rec {
+    packages.$system.xyzzy = nofluke.packages.$system.foo;
+  };
+}
+EOF
+
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Update flake.nix with fluke'
+
+err=$flake3Dir/impl.errout
+! nix build -o $TEST_ROOT/result $flake3Dir#xyzzy 2>$err
+cat $err
+grep -q UndefinedVarError $err
+grep -q nofluke $err
+
+# Check how non-existent implicit input references are handled
+rm $flake3Dir/flake.nix
+
+cat > $flake3Dir/flake.nix <<EOF
+{
+  description = "Fnord";
+
+  outputs = { self, noflake }: rec {
+    packages.$system.xyzzy = noflake.packages.$system.foo;
+  };
+}
+EOF
+
+git -C $flake3Dir add flake.nix
+git -C $flake3Dir commit -m 'Update flake.nix with noflake'
+
+err=$flake3Dir/impl.errout
+! nix build -o $TEST_ROOT/result $flake3Dir#xyzzy
+! nix build -o $TEST_ROOT/result $flake3Dir#xyzzy 2>$err
+cat $err
+grep "warning: implicit flake:noflake input via output function argument in git+file:///" $err
+grep error $err
+grep "cannot find flake 'flake:noflake' in the flake registries" $err
+
 # Add dependency to flake3.
 rm $flake3Dir/flake.nix
 
