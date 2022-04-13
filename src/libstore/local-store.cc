@@ -185,8 +185,6 @@ LocalStore::LocalStore(const Params & params)
             throw SysError("could not set permissions on '%s' to 755", perUserDir);
     }
 
-    createUser(getUserName(), getuid());
-
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
@@ -1785,20 +1783,6 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
     }
 }
 
-
-void LocalStore::createUser(const std::string & userName, uid_t userId)
-{
-    for (auto & dir : {
-        fmt("%s/profiles/per-user/%s", stateDir, userName),
-        fmt("%s/gcroots/per-user/%s", stateDir, userName)
-    }) {
-        createDirs(dir);
-        if (chmod(dir.c_str(), 0755) == -1)
-            throw SysError("changing permissions of directory '%s'", dir);
-        if (chown(dir.c_str(), userId, getgid()) == -1)
-            throw SysError("changing owner of directory '%s'", dir);
-    }
-}
 
 std::optional<std::pair<int64_t, Realisation>> LocalStore::queryRealisationCore_(
         LocalStore::State & state,

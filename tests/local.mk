@@ -7,6 +7,7 @@ nix_tests = \
   fetchMercurial.sh \
   gc-auto.sh \
   user-envs.sh \
+  user-envs-migration.sh \
   binary-cache.sh \
   multiple-outputs.sh \
   ca/build.sh \

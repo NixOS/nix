@@ -130,6 +130,9 @@ void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
 
+/* Return the given user's home directory from /etc/passwd. */
+Path getHomeOf(uid_t userId);
+
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 

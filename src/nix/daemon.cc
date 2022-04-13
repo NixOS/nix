@@ -248,7 +248,6 @@ static void daemonLoop()
                         querySetting("build-users-group", "") == "")
                         throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
 #endif
-                    store.createUser(user, peer.uid);
                 });
 
                 exit(0);

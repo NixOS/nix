@@ -60,7 +60,7 @@ readLink() {
 }
 
 clearProfiles() {
-    profiles="$NIX_STATE_DIR"/profiles
+    profiles="$HOME"/.local/share/nix/profiles
     rm -rf $profiles
 }
 

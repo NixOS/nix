@@ -529,6 +529,16 @@ std::string getUserName()
     return name;
 }
 
+Path getHomeOf(uid_t userId)
+{
+    std::vector<char> buf(16384);
+    struct passwd pwbuf;
+    struct passwd * pw;
+    if (getpwuid_r(userId, &pwbuf, buf.data(), buf.size(), &pw) != 0
+        || !pw || !pw->pw_dir || !pw->pw_dir[0])
+        throw Error("cannot determine user's home directory");
+    return pw->pw_dir;
+}
 
 Path getHome()
 {
@@ -536,13 +546,7 @@ Path getHome()
     {
         auto homeDir = getEnv("HOME");
         if (!homeDir) {
-            std::vector<char> buf(16384);
-            struct passwd pwbuf;
-            struct passwd * pw;
-            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
-                || !pw || !pw->pw_dir || !pw->pw_dir[0])
-                throw Error("cannot determine user's home directory");
-            homeDir = pw->pw_dir;
+            homeDir = getHomeOf(geteuid());
         }
         return *homeDir;
     }();
