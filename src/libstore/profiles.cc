@@ -280,16 +280,30 @@ std::string optimisticLockProfile(const Path & profile)
 }
 
 
+Path profilesDir()
+{
+    auto profileRoot = getDataDir() + "/nix/profiles";
+    createDirs(profileRoot);
+    return profileRoot;
+}
+
+
 Path getDefaultProfile()
 {
     Path profileLink = getHome() + "/.nix-profile";
     try {
-        if (!pathExists(profileLink)) {
-            replaceSymlink(
-                getuid() == 0
-                ? settings.nixStateDir + "/profiles/default"
-                : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                profileLink);
+        // Migrate from the “old-style” profiles stored under `/nix/var`:
+        // If the link exists and points to the old location, rewrite it to the
+        // new one (otherwise keep-it as-it-is as it might have been
+        // intentionnally changed, in which case we shouldn’t touch it)
+        auto legacyProfile = getuid() == 0
+            ? settings.nixStateDir + "/profiles/default"
+            : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName());
+        if (!pathExists(profileLink) ||
+            (isLink(profileLink) &&
+            readLink(profileLink) == legacyProfile)
+            ) {
+            replaceSymlink(profilesDir() + "/profile", profileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
