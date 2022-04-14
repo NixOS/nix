@@ -187,8 +187,16 @@ struct GitInputScheme : InputScheme
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
 
+        auto checkHashType = [&](const std::optional<Hash> & hash)
+        {
+            if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
+                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+        };
+
         auto getLockedAttrs = [&]()
         {
+            checkHashType(input.getRev());
+
             return Attrs({
                 {"type", cacheType},
                 {"name", name},
