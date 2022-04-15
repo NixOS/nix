@@ -85,11 +85,12 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
+    bool readOnlyMode = false;
 
     // FIXME: move this; not all commands (e.g. 'nix run') use it.
     OperateOn operateOn = OperateOn::Output;
 
-    SourceExprCommand();
+    SourceExprCommand(bool supportReadOnlyMode = false);
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
@@ -128,7 +129,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand();
+    InstallableCommand(bool supportReadOnlyMode = false);
 
     void prepare() override;
 
