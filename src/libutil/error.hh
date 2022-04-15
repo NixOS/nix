@@ -118,7 +118,6 @@ struct Trace {
 
 struct ErrorInfo {
     Verbosity level;
-    std::string name; // FIXME: rename
     hintformat msg;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
@@ -171,8 +170,6 @@ public:
         : err(e)
     { }
 
-    virtual const char* sname() const { return "BaseError"; }
-
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
     const char * what() const throw () { return calcWhat().c_str(); }
@@ -199,7 +196,6 @@ public:
     {                                                   \
     public:                                             \
         using superClass::superClass;                   \
-        virtual const char* sname() const override { return #newClass; } \
     }
 
 MakeError(Error, BaseError);
@@ -219,8 +215,6 @@ public:
         auto hf = hintfmt(args...);
         err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
-
-    virtual const char* sname() const override { return "SysError"; }
 };
 
 }

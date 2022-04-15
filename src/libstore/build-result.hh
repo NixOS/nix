@@ -31,6 +31,8 @@ struct BuildResult
         ResolvesToAlreadyValid,
         NoSubstituters,
     } status = MiscFailure;
+
+    // FIXME: include entire ErrorInfo object.
     std::string errorMsg;
 
     std::string toString() const {
