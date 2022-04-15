@@ -9,6 +9,8 @@ ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
 [Service]
 ExecStart=@@bindir@/nix-daemon nix-daemon --daemon
 KillMode=process
+# https://github.com/NixOS/nix/issues/2803
+IgnoreSIGPIPE=no
 
 [Install]
 WantedBy=multi-user.target
