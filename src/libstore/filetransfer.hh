@@ -31,7 +31,7 @@ struct FileTransferSettings : Config
         R"(
           The timeout (in seconds) for establishing connections in the
           binary cache substituter. It corresponds to `curl`’s
-          `--connect-timeout` option.
+          `--connect-timeout` option. The default 0 means no limit.
         )"};
 
     Setting<unsigned long> stalledDownloadTimeout{
