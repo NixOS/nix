@@ -33,6 +33,7 @@ extern "C" {
 #include "command.hh"
 #include "finally.hh"
 #include "markdown.hh"
+#include "local-fs-store.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -419,7 +420,8 @@ bool NixRepl::processLine(std::string line)
              << "  <expr>        Evaluate and print expression\n"
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
-             << "  :b <expr>     Build derivation\n"
+             << "  :b <expr>     Build a derivation\n"
+             << "  :bl <expr>    Build a derivation, creating GC roots in the working directory\n"
              << "  :e <expr>     Open package or function in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
@@ -502,18 +504,26 @@ bool NixRepl::processLine(std::string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":i" || command == ":s" || command == ":log") {
+    else if (command == ":b" || command == ":bl" || command == ":i" || command == ":s" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
-        if (command == ":b") {
+        if (command == ":b" || command == ":bl") {
             state->store->buildPaths({DerivedPath::Built{drvPath}});
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath))
-                logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
+            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
+                auto localStore = state->store.dynamic_pointer_cast<LocalFSStore>();
+                if (localStore && command == ":bl") {
+                    std::string symlink = "repl-result-" + outputName;
+                    localStore->addPermRoot(outputPath, absPath(symlink));
+                    logger->cout("  ./%s -> %s", symlink, state->store->printStorePath(outputPath));
+                } else {
+                    logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
+                }
+            }
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
         } else if (command == ":log") {
