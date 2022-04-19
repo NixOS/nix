@@ -1,33 +1,45 @@
 # Store Objects
 
 File system data in Nix is organized into *store objects*.
-A store object is the combination of
+A store object is the pair of
 
   - A (root) file system object
-  - references to store objects
+  - A set of references to store objects
 
 ## File system objects
 
-The nix store uses a simple filesystem model, similar to the one Git uses.
+The nix store uses a simple filesystem model.
 In particular, every file system object falls into these three cases:
 
- - File: arbitrary data
+ - File: an executable flag, and arbitrary data
 
  - Directory: mapping of names to child file system objects.
-   File children additionally have an executable flag.
 
  - Symlink: may point anywhere.
+
    In particular, Symlinks that do not point within the containing root file system object or that of another store object referenced by the containing store object are allowed, but might not function as intended.
 
-A bare file as the "root" file system object is allowed.
-Note that it cannot be executable, though.
-This is a consequence of the executable flags being part of the child entries of the directory, rather than the child files themselves.
-A root file has no parent directory; so there is no child entry about the root file, and therefore no executable flag for it.
-Without a flag saying which, whether root files are executable or non-executable by default must be decided by convention, and the choice of Nix (and git) is to make them non-executable.
+A bare file or symlink as the "root" file system object is allowed.
+
+### Comparison with Git
+
+This is close to Git's model, but with one crucial difference:
+Git puts the "permission" info within the directory map's values instead of making it part of the file (blob, in it's parlance) object.
+
+So long as the root object is a directory, the representations are isomorphic.
+There is no "wiggle room" the git way since whenever the permission info wouldn't matter (e.g. the child object being mapped to is a directory), the permission info must be a sentinel value.
+
+However, if the root object is a file, there is loss of fidelity.
+Since the permission info is used to distinguish executable files, non-executable files, and symlinks, but there isn't a "parent" directory of the root to contain that info, these 3 cases cannot be distinguished.
+
+Git's model matches Unix tradition, but Nix's model is more natural.
 
 ## References
 
 Store objects can refer to both other store objects and themselves.
+
+Self-reference may seem pointless, but tracking them is in fact useful.
+We can best explain why later after more concepts have been established.
 
 References are normally calculated by scanning the rooted file system objects for store paths (which we describe in the next section) referring to store objects.
 For now, it suffices to say that a store path is a string encoding of a reference to a store paths, and therefore it is something that we can search for in the contents of files, and thus in store objects by searching in all their files.   
