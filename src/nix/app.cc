@@ -61,7 +61,7 @@ std::string resolveString(Store & store, const std::string & toResolve, const Bu
 
 UnresolvedApp Installable::toApp(EvalState & state)
 {
-    auto [cursor, attrPath] = getCursor(state);
+    auto cursor = getCursor(state);
 
     auto type = cursor->getAttr("type")->getString();
 
@@ -101,7 +101,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
     }
 
     else
-        throw Error("attribute '%s' has unsupported type '%s'", attrPath, type);
+        throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), type);
 }
 
 // FIXME: move to libcmd
