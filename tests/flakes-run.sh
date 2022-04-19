@@ -8,22 +8,22 @@ cd $TEST_HOME
 cat <<EOF > flake.nix
 {
     outputs = {self}: {
-      packages.$system.PkgAsPkg = (import ./shell-hello.nix).hello;
-      packages.$system.AppAsApp = self.packages.$system.AppAsApp;
+      packages.$system.pkgAsPkg = (import ./shell-hello.nix).hello;
+      packages.$system.appAsApp = self.packages.$system.appAsApp;
 
-      apps.$system.PkgAsApp = self.packages.$system.PkgAsPkg;
-      apps.$system.AppAsApp = {
+      apps.$system.pkgAsApp = self.packages.$system.pkgAsPkg;
+      apps.$system.appAsApp = {
         type = "app";
         program = "\${(import ./shell-hello.nix).hello}/bin/hello";
       };
     };
 }
 EOF
-nix run --no-write-lock-file .#AppAsApp
-nix run --no-write-lock-file .#PkgAsPkg
+nix run --no-write-lock-file .#appAsApp
+nix run --no-write-lock-file .#pkgAsPkg
 
-! nix run --no-write-lock-file .#PkgAsApp || fail "'nix run' shouldn’t accept an 'app' defined under 'packages'"
-! nix run --no-write-lock-file .#AppAsPkg || fail "elements of 'apps' should be of type 'app'"
+! nix run --no-write-lock-file .#pkgAsApp || fail "'nix run' shouldn’t accept an 'app' defined under 'packages'"
+! nix run --no-write-lock-file .#appAsPkg || fail "elements of 'apps' should be of type 'app'"
 
 clearStore
 

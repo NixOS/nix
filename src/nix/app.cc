@@ -62,21 +62,16 @@ std::string resolveString(Store & store, const std::string & toResolve, const Bu
 UnresolvedApp Installable::toApp(EvalState & state)
 {
     auto cursor = getCursor(state);
+    auto attrPath = cursor->getAttrPath();
 
     auto type = cursor->getAttr("type")->getString();
 
-    std::string expected;
-    if (hasPrefix(attrPath,"apps.")) {
-        expected = "app";
-    } else {
-        expected = "derivation";
-    }
-    if (type != expected) {
-        throw Error("Attribute '%s' should have type '%s'.", attrPath, expected);
-    }
+    std::string expected = !attrPath.empty() && attrPath[0] == "apps" ? "app" : "derivation";
+    if (type != expected)
+        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
+
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
-
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
