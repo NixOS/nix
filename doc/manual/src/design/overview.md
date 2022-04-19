@@ -2,7 +2,7 @@
 
 Nix consists of layers that operate fairly independently.
 
-At the top is the *command line interface*, i.e. the argument parsing of the various Nix executables.
+At the top is the *command line interface*.
 
 Below that is the Nix *expression language*, in which packages and configurations are written.
 

@@ -2,10 +2,10 @@
 
 ## Scanning for references
 
-Before in the section on [store entries](../entries.md), we talked abstractly about scanning for references.
+Before in the section on [store objects](../entries.md), we talked abstractly about scanning for references.
 Now we can make this concrete.
 
-After the derivation's command is run, Nix needs to process the "raw" output directories to turn them into legit store entries.
+After the derivation's command is run, Nix needs to process the "raw" output directories to turn them into legit store objects.
 There is a few steps of this, but let's start with the simple case of one input-addressed output first.
 
 \[Overview of things that need to happen.]

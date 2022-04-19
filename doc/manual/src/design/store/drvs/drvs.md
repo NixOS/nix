@@ -1,23 +1,23 @@
 # Derivations
 
-Derivations are recipes to create store entries.
+Derivations are recipes to create store objects.
 
 Derivations are the heart of Nix.
 Other system (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
 This is where Nix comes in.
 
 Derivations produce data by running arbitrary commands, like Make or Ninja rules.
-Unlike those systems, derivations do not produce arbitrary files, but only specific store entries.
-They cannot modify the store in any way, other than creating those store entries.
+Unlike those systems, derivations do not produce arbitrary files, but only specific store objects.
+They cannot modify the store in any way, other than creating those store objects.
 This rigid specification of what they do is what allows Nix's caching to be so simple and yet robust.
 
 Based on the above, we can conceptually break derivations down into 3 parts:
 
 1. What command will be run?
 
-2. What existing store entries are needed as inputs?
+2. What existing store objects are needed as inputs?
 
-3. What store entries will be produced as outputs?
+3. What store objects will be produced as outputs?
 
 ## What command will be run?
 
@@ -30,12 +30,12 @@ Commands consist of 3 parts:
 
 3. Environment variables.
 
-## What existing store entries are needed as inputs?
+## What existing store objects are needed as inputs?
 
 The previous sub-section begs the question "how can we be sure the path to the executable points to what we think it does?"
 It's a good questions!
 
-## What store entries will be produced as outputs?
+## What store objects will be produced as outputs?
 
 ## Extra extensions
 

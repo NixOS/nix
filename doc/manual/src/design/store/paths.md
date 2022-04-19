@@ -39,12 +39,12 @@ Some of the details will be saved for later.
 
 Store paths are either content-addressed or "input-addressed".
 
-Content addressing means that the digest ultimately derives from referred store entry's file system data and references, and thus can be verified (if one knows how it was calculated).
+Content addressing means that the digest ultimately derives from referred store object's file system data and references, and thus can be verified (if one knows how it was calculated).
 
 Input addressing means that the digest derives from how the store path was produced -- the "inputs" and plan that it was built from.
-Store paths of this sort can not be validated from the content of the store entry.
-Rather, the store entry might come with the store path it expects to be referred to by, and a signature of that path, the contents of the store path, and other metadata.
-The signature indicates that someone is vouching for the store entry really being the results of a plan with that digest.
+Store paths of this sort can not be validated from the content of the store object.
+Rather, the store object might come with the store path it expects to be referred to by, and a signature of that path, the contents of the store path, and other metadata.
+The signature indicates that someone is vouching for the store object really being the results of a plan with that digest.
 
 While metadata is included in the digest calculation explaining which method it was calculated by, this only serves to thwart pre-image attacks.
 That metadata is scrambled with everything else so that it is difficult to tell how a given store path was produced short of a brute-force search.
