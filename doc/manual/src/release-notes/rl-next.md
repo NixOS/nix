@@ -40,3 +40,7 @@
 
   As before, the old output will continue to work, but `nix flake check` will
   issue a warning about it.
+
+* `nix run` is now stricter wrt what it accepts:
+    * Members of `apps` are now required to be apps (as defined in [the manual](https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-run.html#apps))
+    * Member of `packages` or `legacyPackages` cannot be of type "app" when used by `nix run`.
