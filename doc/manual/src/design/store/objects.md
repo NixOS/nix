@@ -1,6 +1,6 @@
 # Store Objects
 
-File system data in Nix is organized into *store objects*.
+Data in Nix is chiefly organized into *store objects*.
 A store object is the pair of
 
   - A (root) file system object
@@ -8,7 +8,7 @@ A store object is the pair of
 
 ## File system objects
 
-The nix store uses a simple filesystem model.
+The Nix store uses a simple filesystem model.
 In particular, every file system object falls into these three cases:
 
  - File: an executable flag, and arbitrary data
