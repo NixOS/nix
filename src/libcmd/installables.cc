@@ -1,5 +1,6 @@
 #include "globals.hh"
 #include "installables.hh"
+#include "util.hh"
 #include "command.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
@@ -100,6 +101,14 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
                 parseFlakeRef(flakeRef, absPath("."), true));
+        }},
+        .completer = {[&](size_t n, std::string_view prefix) {
+            if (n == 0) {
+                if (auto flakeRef = getFlakeRefForCompletion())
+                    completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
+            } else if (n == 1) {
+                completeFlakeRef(getEvalState()->store, prefix);
+            }
         }}
     });
 
@@ -194,6 +203,8 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
     if (file) {
+        completionType = ctAttrs;
+
         evalSettings.pureEval = false;
         auto state = getEvalState();
         Expr *e = state->parseExprFromFile(
@@ -222,13 +233,14 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         Value v2;
         state->autoCallFunction(*autoArgs, v1, v2);
 
-        completionType = ctAttrs;
-
         if (v2.type() == nAttrs) {
             for (auto & i : *v2.attrs) {
                 std::string name = i.name;
                 if (name.find(searchWord) == 0) {
-                    completions->add(i.name);
+                    if (prefix_ == "")
+                        completions->add(name);
+                    else
+                        completions->add(prefix_ + "." + name);
                 }
             }
         }
@@ -256,10 +268,11 @@ void completeFlakeRefWithFragment(
         if (hash == std::string::npos) {
             completeFlakeRef(evalState->store, prefix);
         } else {
+            completionType = ctAttrs;
+
             auto fragment = prefix.substr(hash + 1);
             auto flakeRefS = std::string(prefix.substr(0, hash));
-            // FIXME: do tilde expansion.
-            auto flakeRef = parseFlakeRef(flakeRefS, absPath("."));
+            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath("."));
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)));
@@ -270,8 +283,6 @@ void completeFlakeRefWithFragment(
                attrpath prefixes as well as the root of the
                flake. */
             attrPathPrefixes.push_back("");
-
-            completionType = ctAttrs;
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
                 auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
@@ -969,10 +980,10 @@ std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
 {
     if (_installables.empty()) {
         if (useDefaultInstallables())
-            return parseFlakeRef(".", absPath("."));
+            return parseFlakeRefWithFragment(".", absPath(".")).first;
         return {};
     }
-    return parseFlakeRef(_installables.front(), absPath("."));
+    return parseFlakeRefWithFragment(_installables.front(), absPath(".")).first;
 }
 
 InstallableCommand::InstallableCommand(bool supportReadOnlyMode)
