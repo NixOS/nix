@@ -695,16 +695,15 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     // combinations that are currently prohibited.
     drv.type();
 
-    std::optional<Hash> h;
+    std::optional<DrvHash> hashesModulo;
     for (auto & i : drv.outputs) {
         std::visit(overloaded {
             [&](const DerivationOutput::InputAddressed & doia) {
-                if (!h) {
+                if (!hashesModulo) {
                     // somewhat expensive so we do lazily
-                    auto h0 = hashDerivationModulo(*this, drv, true);
-                    h = h0.requireNoFixedNonDeferred();
+                    hashesModulo = hashDerivationModulo(*this, drv, true);
                 }
-                StorePath recomputed = makeOutputPath(i.first, *h, drvName);
+                StorePath recomputed = makeOutputPath(i.first, hashesModulo->hashes.at(i.first), drvName);
                 if (doia.path != recomputed)
                     throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
@@ -718,6 +717,9 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                 /* Nothing to check */
             },
             [&](const DerivationOutput::Deferred &) {
+                /* Nothing to check */
+            },
+            [&](const DerivationOutput::Impure &) {
                 /* Nothing to check */
             },
         }, i.second.raw());

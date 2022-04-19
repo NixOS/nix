@@ -82,7 +82,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 if command -v curl > /dev/null 2>&1; then
-    fetch() { curl -L "$1" -o "$2"; }
+    fetch() { curl --fail -L "$1" -o "$2"; }
 elif command -v wget > /dev/null 2>&1; then
     fetch() { wget "$1" -O "$2"; }
 else

@@ -276,15 +276,15 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 {
     std::set<Realisation> inputRealisations;
 
-    for (const auto& [inputDrv, outputNames] : drv.inputDrvs) {
+    for (const auto & [inputDrv, outputNames] : drv.inputDrvs) {
         auto outputHashes =
             staticOutputHashes(store, store.readDerivation(inputDrv));
-        for (const auto& outputName : outputNames) {
+        for (const auto & outputName : outputNames) {
             auto thisRealisation = store.queryRealisation(
                 DrvOutput{outputHashes.at(outputName), outputName});
             if (!thisRealisation)
                 throw Error(
-                    "output '%s' of derivation '%s' isn’t built", outputName,
+                    "output '%s' of derivation '%s' isn't built", outputName,
                     store.printStorePath(inputDrv));
             inputRealisations.insert(*thisRealisation);
         }
@@ -294,4 +294,5 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
     return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
 }
+
 }

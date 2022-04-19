@@ -463,7 +463,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     std::string name(attr.name);
-                    if (name != "path" && name != "description")
+                    if (name != "path" && name != "description" && name != "welcomeText")
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
             } catch (Error & e) {
@@ -508,6 +508,7 @@ struct CmdFlakeCheck : FlakeCommand
                             name == "defaultBundler" ? "bundlers.<system>.default" :
                             name == "overlay" ? "overlays.default" :
                             name == "devShell" ? "devShells.<system>.default" :
+                            name == "nixosModule" ? "nixosModules.default" :
                             "";
                         if (replacement != "")
                             warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
@@ -524,6 +525,16 @@ struct CmdFlakeCheck : FlakeCommand
                                     if (drvPath && (std::string) attr.name == settings.thisSystem.get())
                                         drvPaths.push_back(DerivedPath::Built{*drvPath});
                                 }
+                            }
+                        }
+
+                        else if (name == "formatter") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkApp(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
                             }
                         }
 
@@ -704,7 +715,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             defaultTemplateAttrPathsPrefixes,
             lockFlags);
 
-        auto [cursor, attrPath] = installable.getCursor(*evalState);
+        auto cursor = installable.getCursor(*evalState);
 
         auto templateDirAttr = cursor->getAttr("path");
         auto templateDir = templateDirAttr->getString();
@@ -1010,6 +1021,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     || (attrPath.size() == 1 && (
                             attrPath[0] == "defaultPackage"
                             || attrPath[0] == "devShell"
+                            || attrPath[0] == "formatter"
                             || attrPath[0] == "nixosConfigurations"
                             || attrPath[0] == "nixosModules"
                             || attrPath[0] == "defaultApp"
@@ -1026,7 +1038,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 }
 
                 else if (
-                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell"))
+                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell" || attrPath[0] == "formatter"))
                     || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages" || attrPath[0] == "devShells"))
                     )
                 {
