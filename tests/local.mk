@@ -80,6 +80,7 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   flake-local-settings.sh \
+  fmt.sh \
   eval-store.sh \
   why-depends.sh \
   import-derivation.sh \

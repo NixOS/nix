@@ -35,7 +35,7 @@ struct InstallableDerivedPath : Installable
 
 /**
  * Return the rewrites that are needed to resolve a string whose context is
- * included in `dependencies`
+ * included in `dependencies`.
  */
 StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 {
@@ -51,7 +51,7 @@ StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 }
 
 /**
- * Resolve the given string assuming the given context
+ * Resolve the given string assuming the given context.
  */
 std::string resolveString(Store & store, const std::string & toResolve, const BuiltPaths dependencies)
 {
