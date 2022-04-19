@@ -3,6 +3,7 @@
 #include <variant>
 #include "hash.hh"
 #include "path.hh"
+#include "comparator.hh"
 
 namespace nix {
 
@@ -56,6 +57,8 @@ std::pair<ContentAddressMethod, HashType> parseContentAddressMethod(std::string_
 
 struct TextHash {
     Hash hash;
+
+    GENERATE_CMP(TextHash, me->hash);
 };
 
 /// Pair of a hash, and how the file system was ingested
@@ -63,6 +66,8 @@ struct FixedOutputHash {
     FileIngestionMethod method;
     Hash hash;
     std::string printMethodAlgo() const;
+
+    GENERATE_CMP(FixedOutputHash, me->method, me->hash);
 };
 
 /*
@@ -102,23 +107,13 @@ struct PathReferences
     std::set<Ref> references;
     bool hasSelfReference = false;
 
-    bool operator == (const PathReferences<Ref> & other) const
-    {
-        return references == other.references
-            && hasSelfReference == other.hasSelfReference;
-    }
-
-    bool operator != (const PathReferences<Ref> & other) const
-    {
-        return references != other.references
-            || hasSelfReference != other.hasSelfReference;
-    }
-
     /* Functions to view references + hasSelfReference as one set, mainly for
        compatibility's sake. */
     StorePathSet referencesPossiblyToSelf(const Ref & self) const;
     void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
     void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
+
+    GENERATE_CMP(PathReferences<Ref>, me->references, me->hasSelfReference);
 };
 
 template<typename Ref>
@@ -159,11 +154,15 @@ void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set
 struct TextInfo : TextHash {
     // References for the paths, self references disallowed
     StorePathSet references;
+
+    GENERATE_CMP(TextInfo, *(const TextHash *)me, me->references);
 };
 
 struct FixedOutputInfo : FixedOutputHash {
     // References for the paths
     PathReferences<StorePath> references;
+
+    GENERATE_CMP(FixedOutputInfo, *(const FixedOutputHash *)me, me->references);
 };
 
 typedef std::variant<
@@ -185,17 +184,7 @@ struct StorePathDescriptor {
     std::string name;
     ContentAddressWithReferences info;
 
-    bool operator == (const StorePathDescriptor & other) const
-    {
-        return name == other.name;
-        // FIXME second field
-    }
-
-    bool operator < (const StorePathDescriptor & other) const
-    {
-        return name < other.name;
-        // FIXME second field
-    }
+    GENERATE_CMP(StorePathDescriptor, me->name, me->info);
 };
 
 }
