@@ -11,16 +11,15 @@ namespace nix {
  * Content addressing method
  */
 
+/* We only have one way to hash text with references, so this is a single-value
+   type, mainly useful with std::variant.
+*/
+struct TextHashMethod : std::monostate { };
+
 enum struct FileIngestionMethod : uint8_t {
     Flat = false,
     Recursive = true
 };
-
-/*
-  We only have one way to hash text with references, so this is single-value
-  type is only useful in std::variant.
-*/
-struct TextHashMethod { };
 
 struct FixedOutputHashMethod {
   FileIngestionMethod fileIngestionMethod;
@@ -29,9 +28,13 @@ struct FixedOutputHashMethod {
 
 /* Compute the prefix to the hash algorithm which indicates how the files were
    ingested. */
-std::string makeFileIngestionPrefix(const FileIngestionMethod m);
+std::string makeFileIngestionPrefix(FileIngestionMethod m);
 
 
+/* Just the type of a content address. Combine with the hash itself, and we
+   have a `ContentAddress` as defined below. Combine that, in turn, with info
+   on references, and we have `ContentAddressWithReferences`, as defined
+   further below. */
 typedef std::variant<
     TextHashMethod,
     FixedOutputHashMethod
@@ -85,6 +88,7 @@ ContentAddress parseContentAddress(std::string_view rawCa);
 std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
 
 Hash getContentAddressHash(const ContentAddress & ca);
+
 
 /*
  * References set

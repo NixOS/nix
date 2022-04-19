@@ -10,7 +10,7 @@ std::string FixedOutputHash::printMethodAlgo() const
 }
 
 
-std::string makeFileIngestionPrefix(const FileIngestionMethod m)
+std::string makeFileIngestionPrefix(FileIngestionMethod m)
 {
     switch (m) {
     case FileIngestionMethod::Flat:
