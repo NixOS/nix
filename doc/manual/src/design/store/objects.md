@@ -62,9 +62,8 @@ Store objects can refer to both other store objects and themselves.
 Self-reference may seem pointless, but tracking them is in fact useful.
 We can best explain why later after more concepts have been established.
 
-References are normally calculated by scanning the rooted file system objects for store paths (which we describe in the next section) referring to store objects.
-For now, it suffices to say that a store path is a string encoding of a reference to a store paths, and therefore it is something that we can search for in the contents of files, and thus in store objects by searching in all their files.   
-When we get to building in a future section, this process will be described in precise detail.
+References are normally calculated so as to to record the presence of textual references in store object's file systems obejcts.
+This process will be described precisely in the section on [building](./building.md), once more concepts are explained, as building is the primary path new store objects with non-trivial references are created.
 
 However, scanning for references is not mandatory.
 Store objects are allowed to have official references that *don't* correspond to store paths contained in their contents,
