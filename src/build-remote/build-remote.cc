@@ -121,6 +121,7 @@ static int main_build_remote(int argc, char * * argv)
             mkdir(currentLoad.c_str(), 0777);
 
             while (true) {
+search:;
                 bestSlotLock = -1;
                 AutoCloseFD lock = openLockFile(currentLoad + "/main-lock", true);
                 lockFile(lock.get(), ltWrite, true);
@@ -154,7 +155,7 @@ static int main_build_remote(int argc, char * * argv)
                             }
                         }
                         if (!free) {
-                            continue;
+                            goto search;
                         }
                         bool best = false;
                         if (!bestSlotLock) {
