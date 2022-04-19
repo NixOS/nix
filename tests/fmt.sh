@@ -25,6 +25,6 @@ cat << EOF > flake.nix
 EOF
 nix fmt ./file ./folder | grep 'Formatting: ./file ./folder'
 nix flake check
-nix flake show | grep -P 'x86_64-linux|x86_64-darwin'
+nix flake show | grep -P "package 'formatter'"
 
 clearStore
