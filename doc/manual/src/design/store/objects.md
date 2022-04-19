@@ -17,7 +17,7 @@ In particular, every file system object falls into these three cases:
 
  - Symlink: may point anywhere.
 
-   In particular, Symlinks that do not point within the containing root file system object or that of another store object referenced by the containing store object are allowed, but might not function as intended.
+   In particular, symlinks that do not point within the containing root file system object or that of another store object referenced by the containing store object are allowed, but might not function as intended.
 
 A bare file or symlink as the "root" file system object is allowed.
 
