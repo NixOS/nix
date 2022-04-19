@@ -3,10 +3,10 @@
 File system data in Nix is organized into *store objects*.
 A store object is the combination of
 
-  - some file system data
+  - A (root) file system object
   - references to store objects
 
-## File system data
+## File system objects
 
 The nix store uses a simple filesystem model, similar to the one Git uses.
 In particular, every file system object falls into these three cases:
@@ -17,7 +17,7 @@ In particular, every file system object falls into these three cases:
    File children additionally have an executable flag.
 
  - Symlink: may point anywhere.
-   In particular, Symlinks that do not point within the containing file system data or that of another store object referenced by the containing store object are allowed, but might not function as intended.
+   In particular, Symlinks that do not point within the containing root file system object or that of another store object referenced by the containing store object are allowed, but might not function as intended.
 
 A bare file as the "root" file system object is allowed.
 Note that it cannot be executable, though.
@@ -29,7 +29,7 @@ Without a flag saying which, whether root files are executable or non-executable
 
 Store objects can refer to both other store objects and themselves.
 
-References are normally calculated by scanning the file system data for store paths (which we describe in the next section) referring to store objects.
+References are normally calculated by scanning the rooted file system objects for store paths (which we describe in the next section) referring to store objects.
 For now, it suffices to say that a store path is a string encoding of a reference to a store paths, and therefore it is something that we can search for in the contents of files, and thus in store objects by searching in all their files.   
 When we get to building in a future section, this process will be described in precise detail.
 
