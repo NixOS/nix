@@ -1038,7 +1038,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 }
 
                 else if (
-                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell"))
+                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell" || attrPath[0] == "formatter"))
                     || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages" || attrPath[0] == "devShells"))
                     )
                 {
@@ -1071,7 +1071,6 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 else if (
                     (attrPath.size() == 2 && attrPath[0] == "defaultApp") ||
-                    (attrPath.size() == 2 && attrPath[0] == "formatter") ||
                     (attrPath.size() == 3 && attrPath[0] == "apps"))
                 {
                     auto aType = visitor.maybeGetAttr("type");

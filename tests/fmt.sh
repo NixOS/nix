@@ -14,10 +14,12 @@ nix fmt --help | grep "Format"
 cat << EOF > flake.nix
 {
   outputs = _: {
-    formatter.$system = {
-      type = "app";
-      program = ./fmt.simple.sh;
-    };
+    formatter.$system =
+      with import ./config.nix;
+      mkDerivation {
+        name = "formatter";
+        buildCommand = "mkdir -p \$out/bin; cp \${./fmt.simple.sh} \$out/bin/formatter";
+      };
   };
 }
 EOF
