@@ -47,20 +47,28 @@ This does, however, mean the string representation of a store path is not derive
 ## The digest
 
 The calculation of the digest is quite complicated for historical reasons.
-Some of the details will be saved for later.
+The details of the algorithms will be discussed later once more concepts have been introduced.
+For now, we just concern ourselves with the *key properties* of those algorithms.
 
-> Historical note. The 20 byte restriction is because originally a digests were SHA-1 hashes.
-> This is no longer true, but longer hashes and other information is still boiled down to 20 bytes.
+::: {.note}
+**Historical note** The 20 byte restriction is because originally a digests were SHA-1 hashes.
+This is no longer true, but longer hashes and other information are still boiled down to 20 bytes.
+:::
 
-Store paths are either content-addressed or "input-addressed".
+Store paths are either *content-addressed* or *input-addressed*.
 
-Content addressing means that the digest ultimately derives from referred store object's file system objects and references, and thus can be verified.
+::: {.note}
+The former is a standard term used elsewhere.
+The later is our own creation to evoke a contrast with content addressing.
+:::
+
+Content addressing means that the store path digest ultimately derives from referred store object's contents, namely its file system objects and references.
 There is more than one *method* of content-addressing, however.
-Still, if one does know the the content addressing schema that was used,
+Still, if one does know the content addressing schema that was used,
 (or guesses, there isn't that many yet!)
-one can recalcuate the store path and thus verify the store object.
+one can recalculate the store path and thus verify the store object.
 
-Input addressing means that the digest derives from how the store path was produced -- the "inputs" and plan that it was built from.
+Input addressing means that the store path digest derives from how the store path was produced, namely the "inputs" and plan that it was built from.
 Store paths of this sort can *not* be validated from the content of the store object.
 Rather, the store object might come with the store path it expects to be referred to by, and a signature of that path, the contents of the store path, and other metadata.
 The signature indicates that someone is vouching for the store object really being the results of a plan with that digest.
