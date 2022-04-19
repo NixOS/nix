@@ -215,7 +215,6 @@ void handleSQLiteBusy(const SQLiteBusy & e)
     if (now > lastWarned + 10) {
         lastWarned = now;
         logWarning({
-            .name = "Sqlite busy",
             .msg = hintfmt(e.what())
         });
     }

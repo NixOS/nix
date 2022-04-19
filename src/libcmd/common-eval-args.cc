@@ -7,6 +7,7 @@
 #include "registry.hh"
 #include "flake/flakeref.hh"
 #include "store-api.hh"
+#include "command.hh"
 
 namespace nix {
 
@@ -59,6 +60,9 @@ MixEvalArgs::MixEvalArgs()
             fetchers::Attrs extraAttrs;
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
+        }},
+        .completer = {[&](size_t, std::string_view prefix) {
+            completeFlakeRef(openStore(), prefix);
         }}
     });
 

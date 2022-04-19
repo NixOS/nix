@@ -61,13 +61,17 @@ std::string resolveString(Store & store, const std::string & toResolve, const Bu
 
 UnresolvedApp Installable::toApp(EvalState & state)
 {
-    auto [cursor, attrPath] = getCursor(state);
+    auto cursor = getCursor(state);
+    auto attrPath = cursor->getAttrPath();
 
     auto type = cursor->getAttr("type")->getString();
 
+    std::string expected = !attrPath.empty() && attrPath[0] == "apps" ? "app" : "derivation";
+    if (type != expected)
+        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
+
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
-
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
@@ -101,7 +105,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
     }
 
     else
-        throw Error("attribute '%s' has unsupported type '%s'", attrPath, type);
+        throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), type);
 }
 
 // FIXME: move to libcmd

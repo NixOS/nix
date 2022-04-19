@@ -50,10 +50,6 @@ public:
     ExperimentalFeature missingFeature;
 
     MissingExperimentalFeature(ExperimentalFeature);
-    virtual const char * sname() const override
-    {
-        return "MissingExperimentalFeature";
-    }
 };
 
 }

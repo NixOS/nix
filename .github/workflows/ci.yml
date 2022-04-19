@@ -14,10 +14,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v16
+    - uses: cachix/install-nix-action@v17
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v10
       if: needs.check_cachix.outputs.secret == 'true'
@@ -46,11 +46,11 @@ jobs:
     outputs:
       installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v16
+    - uses: cachix/install-nix-action@v17
     - uses: cachix/cachix-action@v10
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -67,9 +67,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v16
+    - uses: cachix/install-nix-action@v17
       with:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
@@ -83,10 +83,10 @@ jobs:
       needs.check_cachix.outputs.secret == 'true'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v16
+    - uses: cachix/install-nix-action@v17
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - run: echo NIX_VERSION="$(nix-instantiate --eval -E '(import ./default.nix).defaultPackage.${builtins.currentSystem}.version' | tr -d \")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v10

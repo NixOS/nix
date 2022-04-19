@@ -31,7 +31,7 @@ struct FileTransferSettings : Config
         R"(
           The timeout (in seconds) for establishing connections in the
           binary cache substituter. It corresponds to `curl`’s
-          `--connect-timeout` option.
+          `--connect-timeout` option. A value of 0 means no limit.
         )"};
 
     Setting<unsigned long> stalledDownloadTimeout{
@@ -123,8 +123,6 @@ public:
 
     template<typename... Args>
     FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
-
-    virtual const char* sname() const override { return "FileTransferError"; }
 };
 
 bool isUri(std::string_view s);

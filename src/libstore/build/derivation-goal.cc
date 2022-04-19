@@ -1371,8 +1371,7 @@ void DerivationGoal::done(
 {
     buildResult.status = status;
     if (ex)
-        // FIXME: strip: "error: "
-        buildResult.errorMsg = ex->what();
+        buildResult.errorMsg = fmt("%s", normaltxt(ex->info().msg));
     if (buildResult.status == BuildResult::TimedOut)
         worker.timedOut = true;
     if (buildResult.status == BuildResult::PermanentFailure)

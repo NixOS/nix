@@ -704,6 +704,9 @@ void LocalDerivationGoal::startBuilder()
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
+    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
+    for (auto & i : drv->env)
+        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
     Path logFile = openLogFile();
