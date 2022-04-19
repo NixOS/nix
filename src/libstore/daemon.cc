@@ -395,13 +395,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
-                    [&](TextHashMethod &_) {
+                    [&](TextHashMethod &) {
                         // We could stream this by changing Store
                         std::string contents = source.drain();
                         auto path = store->addTextToStore(name, contents, refs, repair);
                         return store->queryPathInfo(path);
                     },
-                    [&](FixedOutputHashMethod &fohm) {
+                    [&](FixedOutputHashMethod & fohm) {
                         if (!refs.empty())
                             throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
                         auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);

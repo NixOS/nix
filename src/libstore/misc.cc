@@ -173,7 +173,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
         }
 
         std::visit(overloaded {
-          [&](DerivedPath::Built bfd) {
+          [&](const DerivedPath::Built & bfd) {
             if (!isValidPath(bfd.drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
@@ -206,7 +206,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 mustBuildDrv(bfd.drvPath, *drv);
 
           },
-          [&](DerivedPath::Opaque bo) {
+          [&](const DerivedPath::Opaque & bo) {
 
             if (isValidPath(bo.path)) return;
 
