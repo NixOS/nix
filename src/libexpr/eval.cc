@@ -436,6 +436,7 @@ EvalState::EvalState(
     , sBuilder(symbols.create("builder"))
     , sArgs(symbols.create("args"))
     , sContentAddressed(symbols.create("__contentAddressed"))
+    , sImpure(symbols.create("__impure"))
     , sOutputHash(symbols.create("outputHash"))
     , sOutputHashAlgo(symbols.create("outputHashAlgo"))
     , sOutputHashMode(symbols.create("outputHashMode"))

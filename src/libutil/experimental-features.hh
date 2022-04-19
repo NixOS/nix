@@ -16,6 +16,7 @@ namespace nix {
 enum struct ExperimentalFeature
 {
     CaDerivations,
+    ImpureDerivations,
     Flakes,
     NixCommand,
     RecursiveNix,
@@ -48,10 +49,6 @@ public:
     ExperimentalFeature missingFeature;
 
     MissingExperimentalFeature(ExperimentalFeature);
-    virtual const char * sname() const override
-    {
-        return "MissingExperimentalFeature";
-    }
 };
 
 }

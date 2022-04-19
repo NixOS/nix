@@ -989,9 +989,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     PathSet context;
 
     bool contentAddressed = false;
+    bool isImpure = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    ContentAddressMethod ingestionMethod = FileIngestionMethod::Flat;
+    std::optional<ContentAddressMethod> ingestionMethod;
 
     StringSet outputs;
     outputs.insert("out");
@@ -1050,6 +1051,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 contentAddressed = state.forceBool(*i->value, pos);
                 if (contentAddressed)
                     settings.requireExperimentalFeature(Xp::CaDerivations);
+            }
+
+            else if (i->name == state.sImpure) {
+                isImpure = state.forceBool(*i->value, pos);
+                if (isImpure)
+                    settings.requireExperimentalFeature(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
@@ -1187,12 +1194,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 .errPos = posDrvName
             });
 
-        std::optional<HashType> ht = parseHashTypeOpt(outputHashAlgo);
-        Hash h = newHashAllowEmpty(*outputHash, ht);
+        auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
 
+        auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
         // FIXME non-trivial fixed refs set
         auto ca = contentAddressFromMethodHashAndRefs(
-            ingestionMethod,
+            method,
             std::move(h),
             {});
 
@@ -1202,15 +1209,30 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         drv.outputs.insert_or_assign("out", dof);
     }
 
-    else if (contentAddressed) {
-        HashType ht = parseHashType(outputHashAlgo);
+    else if (contentAddressed || isImpure) {
+        if (contentAddressed && isImpure)
+            throw EvalError({
+                .msg = hintfmt("derivation cannot be both content-addressed and impure"),
+                .errPos = posDrvName
+            });
+
+        auto ht = parseHashTypeOpt(outputHashAlgo).value_or(htSHA256);
+        auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
+
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i,
-                DerivationOutput::CAFloating {
-                    .method = ingestionMethod,
-                    .hashType = ht,
-                });
+            if (isImpure)
+                drv.outputs.insert_or_assign(i,
+                    DerivationOutput::Impure {
+                        .method = method,
+                        .hashType = ht,
+                    });
+            else
+                drv.outputs.insert_or_assign(i,
+                    DerivationOutput::CAFloating {
+                        .method = method,
+                        .hashType = ht,
+                    });
         }
     }
 
@@ -1227,34 +1249,26 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 DerivationOutput::Deferred { });
         }
 
-        // Regular, non-CA derivation should always return a single hash and not
-        // hash per output.
-        auto hashModulo = hashDerivationModulo(*state.store, drv, true);
-        std::visit(overloaded {
-            [&](const DrvHash & drvHash) {
-                auto & h = drvHash.hash;
-                switch (drvHash.kind) {
-                case DrvHash::Kind::Deferred:
-                    /* Outputs already deferred, nothing to do */
-                    break;
-                case DrvHash::Kind::Regular:
-                    for (auto & [outputName, output] : drv.outputs) {
-                        auto outPath = state.store->makeOutputPath(outputName, h, drvName);
-                        drv.env[outputName] = state.store->printStorePath(outPath);
-                        output = DerivationOutput::InputAddressed {
-                            .path = std::move(outPath),
-                        };
-                    }
-                    break;
-                }
-            },
-            [&](const CaOutputHashes &) {
-                // Shouldn't happen as the toplevel derivation is not CA.
-                assert(false);
-            },
-        },
-        hashModulo.raw());
-
+        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        switch (hashModulo.kind) {
+        case DrvHash::Kind::Regular:
+            for (auto & i : outputs) {
+                auto h = hashModulo.hashes.at(i);
+                auto outPath = state.store->makeOutputPath(i, h, drvName);
+                drv.env[i] = state.store->printStorePath(outPath);
+                drv.outputs.insert_or_assign(
+                    i,
+                    DerivationOutputInputAddressed {
+                        .path = std::move(outPath),
+                    });
+            }
+            break;
+            ;
+        case DrvHash::Kind::Deferred:
+            for (auto & i : outputs) {
+                drv.outputs.insert_or_assign(i, DerivationOutputDeferred {});
+            }
+        }
     }
 
     /* Write the resulting term into the Nix store directory. */

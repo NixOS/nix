@@ -28,9 +28,7 @@ static std::string readHead(const Path & path)
 
 static bool isNotDotGitDirectory(const Path & path)
 {
-    static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
-
-    return not std::regex_match(path, gitDirRegex);
+    return baseNameOf(path) != ".git";
 }
 
 struct GitInputScheme : InputScheme
@@ -189,8 +187,16 @@ struct GitInputScheme : InputScheme
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
 
+        auto checkHashType = [&](const std::optional<Hash> & hash)
+        {
+            if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
+                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+        };
+
         auto getLockedAttrs = [&]()
         {
+            checkHashType(input.getRev());
+
             return Attrs({
                 {"type", cacheType},
                 {"name", name},
@@ -285,9 +291,11 @@ struct GitInputScheme : InputScheme
                 auto files = tokenizeString<std::set<std::string>>(
                     runProgram("git", true, gitOpts), "\0"s);
 
+                Path actualPath(absPath(actualUrl));
+
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                    assert(hasPrefix(p, actualPath));
+                    std::string file(p, actualPath.size() + 1);
 
                     auto st = lstat(p);
 
@@ -300,13 +308,13 @@ struct GitInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 // FIXME: maybe we should use the timestamp of the last
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePath), input};
             }
