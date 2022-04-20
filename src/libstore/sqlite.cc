@@ -1,5 +1,4 @@
 #include "sqlite.hh"
-#include "sqlite-impl.hh"
 #include "globals.hh"
 #include "util.hh"
 
@@ -8,6 +7,34 @@
 #include <atomic>
 
 namespace nix {
+
+SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf)
+  : Error(""), path(path), errNo(errNo), extendedErrNo(extendedErrNo)
+{
+    err.msg = hintfmt("%s: %s (in '%s')",
+        normaltxt(hf.str()),
+        sqlite3_errstr(extendedErrNo),
+        path ? path : "(in-memory)");
+}
+
+[[noreturn]] void SQLiteError::throw_(sqlite3 * db, hintformat && hf)
+{
+    int err = sqlite3_errcode(db);
+    int exterr = sqlite3_extended_errcode(db);
+
+    auto path = sqlite3_db_filename(db, nullptr);
+
+    if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
+        auto exp = SQLiteBusy(path, err, exterr, std::move(hf));
+        exp.err.msg = hintfmt(
+            err == SQLITE_PROTOCOL
+                ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
+                : "SQLite database '%s' is busy",
+            path ? path : "(in-memory)");
+        throw exp;
+    } else
+        throw SQLiteError(path, err, exterr, std::move(hf));
+}
 
 SQLite::SQLite(const Path & path, bool create)
 {
