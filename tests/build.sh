@@ -2,15 +2,8 @@ source common.sh
 
 clearStore
 
-# Make sure that 'nix build' only returns the outputs we asked for.
-nix build -f multiple-outputs.nix --json a --no-link | jq --exit-status '
-  (.[0] |
-    (.drvPath | match(".*multiple-outputs-a.drv")) and
-    (.outputs | keys | length == 1) and
-    (.outputs.first | match(".*multiple-outputs-a-first")))
-'
-
-nix build -f multiple-outputs.nix --json a.all b.all --no-link | jq --exit-status '
+# Make sure that 'nix build' returns all outputs by default.
+nix build -f multiple-outputs.nix --json a b --no-link | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-a.drv")) and
     (.outputs | keys | length == 2) and

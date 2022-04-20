@@ -141,7 +141,7 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        std::string outputName;
+        std::set<std::string> outputsToInstall;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
