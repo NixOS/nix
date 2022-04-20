@@ -57,10 +57,10 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
                 refs.references.insert(std::move(replacement));
             }
 
-            *sink.s = rewriteStrings(*sink.s, rewrites);
+            sink.s = rewriteStrings(sink.s, rewrites);
 
             HashModuloSink hashModuloSink(htSHA256, oldHashPart);
-            hashModuloSink(*sink.s);
+            hashModuloSink(sink.s);
 
             auto narHash = hashModuloSink.finish().first;
 
@@ -78,14 +78,14 @@ struct CmdMakeContentAddressable : StorePathsCommand, MixJSON
                 },
                 narHash,
             };
-            info.narSize = sink.s->size();
+            info.narSize = sink.s.size();
 
             if (!json)
                 notice("rewrote '%s' to '%s'", pathS, store->printStorePath(info.path));
 
             auto source = sinkToSource([&](Sink & nextSink) {
                 RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), nextSink);
-                rsink2(*sink.s);
+                rsink2(sink.s);
                 rsink2.flush();
             });
 

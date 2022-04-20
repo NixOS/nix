@@ -35,7 +35,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , originalRef(getFlakeRef(json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
-    if (!lockedRef.input.isImmutable())
+    if (!lockedRef.input.isLocked())
         throw Error("lockfile contains mutable lock '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
@@ -220,7 +220,7 @@ bool LockFile::isImmutable() const
     for (auto & i : nodes) {
         if (i == root) continue;
         auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(i);
-        if (lockedNode && !lockedNode->lockedRef.input.isImmutable()) return false;
+        if (lockedNode && !lockedNode->lockedRef.input.isLocked()) return false;
     }
 
     return true;

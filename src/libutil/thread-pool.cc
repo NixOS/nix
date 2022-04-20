@@ -1,13 +1,10 @@
 #include "thread-pool.hh"
-#include "affinity.hh"
 
 namespace nix {
 
 ThreadPool::ThreadPool(size_t _maxThreads)
     : maxThreads(_maxThreads)
 {
-    restoreAffinity(); // FIXME
-
     if (!maxThreads) {
         maxThreads = std::thread::hardware_concurrency();
         if (!maxThreads) maxThreads = 1;

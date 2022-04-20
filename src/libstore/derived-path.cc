@@ -75,9 +75,9 @@ DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_vi
     assert(n != s.npos);
     auto drvPath = store.parseStorePath(s.substr(0, n));
     auto outputsS = s.substr(n + 1);
-    std::set<string> outputs;
+    std::set<std::string> outputs;
     if (outputsS != "*")
-        outputs = tokenizeString<std::set<string>>(outputsS, ",");
+        outputs = tokenizeString<std::set<std::string>>(outputsS, ",");
     return {drvPath, outputs};
 }
 
@@ -100,7 +100,7 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                     staticOutputHashes(store, store.readDerivation(p.drvPath));
                 for (auto& [outputName, outputPath] : p.outputs) {
                     if (settings.isExperimentalFeatureEnabled(
-                            "ca-derivations")) {
+                                Xp::CaDerivations)) {
                         auto thisRealisation = store.queryRealisation(
                             DrvOutput{drvHashes.at(outputName), outputName});
                         assert(thisRealisation);  // We’ve built it, so we must h

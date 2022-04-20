@@ -20,7 +20,10 @@ struct CmdPingStore : StoreCommand
 
     void run(ref<Store> store) override
     {
+        notice("Store URL: %s", store->getUri());
         store->connect();
+        if (auto version = store->getVersion())
+            notice("Version: %s", *version);
     }
 };
 

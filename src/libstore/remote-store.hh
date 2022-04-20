@@ -4,6 +4,7 @@
 #include <string>
 
 #include "store-api.hh"
+#include "gc-store.hh"
 
 
 namespace nix {
@@ -29,7 +30,7 @@ struct RemoteStoreConfig : virtual StoreConfig
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public virtual RemoteStoreConfig, public virtual Store
+class RemoteStore : public virtual RemoteStoreConfig, public virtual Store, public virtual GcStore
 {
 public:
 
@@ -67,14 +68,14 @@ public:
     /* Add a content-addressable store path. `dump` will be drained. */
     ref<const ValidPathInfo> addCAToStore(
         Source & dump,
-        const string & name,
+        std::string_view name,
         ContentAddressMethod caMethod,
         const StorePathSet & references,
         RepairFlag repair);
 
     /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
-    StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -84,14 +85,23 @@ public:
         RepairFlag repair,
         CheckSigsFlag checkSigs) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput &) override;
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
+
+    std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode,
+        std::shared_ptr<Store> evalStore) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
@@ -101,8 +111,6 @@ public:
     void addTempRoot(const StorePath & path) override;
 
     void addIndirectRoot(const Path & path) override;
-
-    void syncWithGC() override;
 
     Roots findRoots(bool censor) override;
 
@@ -118,6 +126,10 @@ public:
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize) override;
 
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
+
+    std::optional<std::string> getVersion() override;
+
     void connect() override;
 
     unsigned int getProtocol() override;
@@ -129,6 +141,7 @@ public:
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
+        std::optional<std::string> daemonNixVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 
         virtual ~Connection();
@@ -150,6 +163,8 @@ protected:
 
     virtual void setOptions(Connection & conn);
 
+    void setOptions() override;
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
@@ -162,6 +177,9 @@ private:
 
     std::atomic_bool failed{false};
 
+    void copyDrvsFromEvalStore(
+        const std::vector<DerivedPath> & paths,
+        std::shared_ptr<Store> evalStore);
 };
 
 

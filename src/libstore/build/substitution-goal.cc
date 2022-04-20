@@ -6,7 +6,7 @@
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<StorePathDescriptor> ca)
-    : Goal(worker)
+    : Goal(worker, DerivedPath::Opaque { storePath })
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
@@ -24,6 +24,13 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
+void PathSubstitutionGoal::done(ExitCode result, BuildResult::Status status)
+{
+    buildResult.status = status;
+    amDone(result);
+}
+
+
 void PathSubstitutionGoal::work()
 {
     (this->*state)();
@@ -38,7 +45,7 @@ void PathSubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        amDone(ecSuccess);
+        done(ecSuccess, BuildResult::AlreadyValid);
         return;
     }
 
@@ -65,7 +72,7 @@ void PathSubstitutionGoal::tryNext()
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
-        amDone(substituterFailed ? ecFailed : ecNoSubstituters);
+        done(substituterFailed ? ecFailed : ecNoSubstituters, BuildResult::NoSubstituters);
 
         if (substituterFailed) {
             worker.failedSubstitutions++;
@@ -139,8 +146,8 @@ void PathSubstitutionGoal::tryNext()
        only after we've downloaded the path. */
     if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
     {
-        warn("substituter '%s' does not have a valid signature for path '%s'",
-            sub->getUri(), worker.store.printStorePath(storePath));
+        warn("the substitute for '%s' from '%s' is not signed by any of the keys in 'trusted-public-keys'",
+            worker.store.printStorePath(storePath), sub->getUri());
         tryNext();
         return;
     }
@@ -163,7 +170,9 @@ void PathSubstitutionGoal::referencesValid()
 
     if (nrFailed > 0) {
         debug("some references of path '%s' could not be realised", worker.store.printStorePath(storePath));
-        amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
+        done(
+            nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
+            BuildResult::DependencyFailed);
         return;
     }
 
@@ -269,11 +278,11 @@ void PathSubstitutionGoal::finished()
 
     worker.updateProgress();
 
-    amDone(ecSuccess);
+    done(ecSuccess, BuildResult::Substituted);
 }
 
 
-void PathSubstitutionGoal::handleChildOutput(int fd, const string & data)
+void PathSubstitutionGoal::handleChildOutput(int fd, std::string_view data)
 {
 }
 

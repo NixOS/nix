@@ -59,20 +59,18 @@ struct DerivationOutput
     std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 };
 
-typedef std::map<string, DerivationOutput> DerivationOutputs;
+typedef std::map<std::string, DerivationOutput> DerivationOutputs;
 
 /* These are analogues to the previous DerivationOutputs data type, but they
    also contains, for each output, the (optional) store path in which it would
    be written. To calculate values of these types, see the corresponding
    functions in BasicDerivation */
-typedef std::map<string, std::pair<DerivationOutput, std::optional<StorePath>>>
+typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>>
   DerivationOutputsAndOptPaths;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
 typedef std::map<StorePath, StringSet> DerivationInputs;
-
-typedef std::map<string, string> StringPairs;
 
 enum struct DerivationType : uint8_t {
     InputAddressed,
@@ -103,7 +101,7 @@ struct BasicDerivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
     StorePathSet inputSrcs; /* inputs that are sources */
-    string platform;
+    std::string platform;
     Path builder;
     Strings args;
     StringPairs env;
@@ -138,8 +136,8 @@ struct Derivation : BasicDerivation
 
     /* Return the underlying basic derivation but with these changes:
 
-	   1. Input drvs are emptied, but the outputs of them that were used are
-	      added directly to input sources.
+       1. Input drvs are emptied, but the outputs of them that were used are
+          added directly to input sources.
 
        2. Input placeholders are replaced with realized input store paths. */
     std::optional<BasicDerivation> tryResolve(Store & store);
@@ -164,7 +162,7 @@ StorePath writeDerivation(Store & store,
 Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
 
 // FIXME: remove
-bool isDerivation(const string & fileName);
+bool isDerivation(const std::string & fileName);
 
 /* Calculate the name that will be used for the store path for this
    output.
@@ -222,7 +220,7 @@ typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 // FIXME: global, though at least thread-safe.
 extern Sync<DrvHashes> drvHashes;
 
-bool wantOutput(const string & output, const std::set<string> & wanted);
+bool wantOutput(const std::string & output, const std::set<std::string> & wanted);
 
 struct Source;
 struct Sink;
@@ -236,7 +234,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
    It is used as a placeholder to allow derivations to refer to their
    own outputs without needing to use the hash of a derivation in
    itself, making the hash near-impossible to calculate. */
-std::string hashPlaceholder(const std::string & outputName);
+std::string hashPlaceholder(const std::string_view outputName);
 
 /* This creates an opaque and almost certainly unique string
    deterministically from a derivation path and output name.

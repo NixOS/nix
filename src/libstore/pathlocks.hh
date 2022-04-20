@@ -20,19 +20,33 @@ class PathLocks
 {
 private:
     typedef std::pair<int, Path> FDPair;
-    list<FDPair> fds;
+    std::list<FDPair> fds;
     bool deletePaths;
 
 public:
     PathLocks();
     PathLocks(const PathSet & paths,
-        const string & waitMsg = "");
+        const std::string & waitMsg = "");
     bool lockPaths(const PathSet & _paths,
-        const string & waitMsg = "",
+        const std::string & waitMsg = "",
         bool wait = true);
     ~PathLocks();
     void unlock();
     void setDeletion(bool deletePaths);
+};
+
+struct FdLock
+{
+    int fd;
+    bool acquired = false;
+
+    FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg);
+
+    ~FdLock()
+    {
+        if (acquired)
+            lockFile(fd, ltNone, false);
+    }
 };
 
 }

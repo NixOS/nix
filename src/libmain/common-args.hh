@@ -11,8 +11,8 @@ class MixCommonArgs : public virtual Args
 {
     void initialFlagsProcessed() override;
 public:
-    string programName;
-    MixCommonArgs(const string & programName);
+    std::string programName;
+    MixCommonArgs(const std::string & programName);
 protected:
     virtual void pluginsInited() {}
 };
