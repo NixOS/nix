@@ -10,6 +10,7 @@
 #include "topo-sort.hh"
 #include "finally.hh"
 #include "compression.hh"
+#include "sqlite-impl.hh"
 
 #include <iostream>
 #include <algorithm>
