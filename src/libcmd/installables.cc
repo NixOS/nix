@@ -1,5 +1,6 @@
 #include "globals.hh"
 #include "installables.hh"
+#include "util.hh"
 #include "command.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
@@ -100,6 +101,14 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
                 parseFlakeRef(flakeRef, absPath("."), true));
+        }},
+        .completer = {[&](size_t n, std::string_view prefix) {
+            if (n == 0) {
+                if (auto flakeRef = getFlakeRefForCompletion())
+                    completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
+            } else if (n == 1) {
+                completeFlakeRef(getEvalState()->store, prefix);
+            }
         }}
     });
 
@@ -194,6 +203,8 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
     if (file) {
+        completionType = ctAttrs;
+
         evalSettings.pureEval = false;
         auto state = getEvalState();
         Expr *e = state->parseExprFromFile(
@@ -222,13 +233,14 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
         Value v2;
         state->autoCallFunction(*autoArgs, v1, v2);
 
-        completionType = ctAttrs;
-
         if (v2.type() == nAttrs) {
             for (auto & i : *v2.attrs) {
                 std::string name = i.name;
                 if (name.find(searchWord) == 0) {
-                    completions->add(i.name);
+                    if (prefix_ == "")
+                        completions->add(name);
+                    else
+                        completions->add(prefix_ + "." + name);
                 }
             }
         }
@@ -256,10 +268,11 @@ void completeFlakeRefWithFragment(
         if (hash == std::string::npos) {
             completeFlakeRef(evalState->store, prefix);
         } else {
+            completionType = ctAttrs;
+
             auto fragment = prefix.substr(hash + 1);
             auto flakeRefS = std::string(prefix.substr(0, hash));
-            // FIXME: do tilde expansion.
-            auto flakeRef = parseFlakeRef(flakeRefS, absPath("."));
+            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath("."));
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)));
@@ -270,8 +283,6 @@ void completeFlakeRefWithFragment(
                attrpath prefixes as well as the root of the
                flake. */
             attrPathPrefixes.push_back("");
-
-            completionType = ctAttrs;
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
                 auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
@@ -346,16 +357,16 @@ DerivedPath Installable::toDerivedPath()
     return std::move(buildables[0]);
 }
 
-std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+std::vector<ref<eval_cache::AttrCursor>>
 Installable::getCursors(EvalState & state)
 {
     auto evalCache =
         std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
             [&]() { return toValue(state).first; });
-    return {{evalCache->getRoot(), ""}};
+    return {evalCache->getRoot()};
 }
 
-std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
+ref<eval_cache::AttrCursor>
 Installable::getCursor(EvalState & state)
 {
     auto cursors = getCursors(state);
@@ -578,43 +589,21 @@ InstallableFlake::InstallableFlake(
 
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
-    auto lockedFlake = getLockedFlake();
+    auto attr = getCursor(*state);
 
-    auto cache = openEvalCache(*state, lockedFlake);
-    auto root = cache->getRoot();
+    auto attrPath = attr->getAttrPathStr();
 
-    Suggestions suggestions;
+    if (!attr->isDerivation())
+        throw Error("flake output attribute '%s' is not a derivation", attrPath);
 
-    for (auto & attrPath : getActualAttrPaths()) {
-        debug("trying flake output attribute '%s'", attrPath);
+    auto drvPath = attr->forceDerivation();
 
-        auto attrOrSuggestions = root->findAlongAttrPath(
-            parseAttrPath(*state, attrPath),
-            true
-        );
+    auto drvInfo = DerivationInfo {
+        std::move(drvPath),
+        attr->getAttr(state->sOutputName)->getString()
+    };
 
-        if (!attrOrSuggestions) {
-            suggestions += attrOrSuggestions.getSuggestions();
-            continue;
-        }
-
-        auto attr = *attrOrSuggestions;
-
-        if (!attr->isDerivation())
-            throw Error("flake output attribute '%s' is not a derivation", attrPath);
-
-        auto drvPath = attr->forceDerivation();
-
-        auto drvInfo = DerivationInfo {
-            std::move(drvPath),
-            attr->getAttr(state->sOutputName)->getString()
-        };
-
-        return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
-    }
-
-    throw Error(suggestions, "flake '%s' does not provide attribute %s",
-        flakeRef, showAttrPaths(getActualAttrPaths()));
+    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
 }
 
 std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
@@ -626,33 +615,10 @@ std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
 
 std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 {
-    auto lockedFlake = getLockedFlake();
-
-    auto vOutputs = getFlakeOutputs(state, *lockedFlake);
-
-    auto emptyArgs = state.allocBindings(0);
-
-    Suggestions suggestions;
-
-    for (auto & attrPath : getActualAttrPaths()) {
-        try {
-            auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
-            state.forceValue(*v, pos);
-            return {v, pos};
-        } catch (AttrPathNotFound & e) {
-            suggestions += e.info().suggestions;
-        }
-    }
-
-    throw Error(
-        suggestions,
-        "flake '%s' does not provide attribute %s",
-        flakeRef,
-        showAttrPaths(getActualAttrPaths())
-    );
+    return {&getCursor(state)->forceValue(), noPos};
 }
 
-std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+std::vector<ref<eval_cache::AttrCursor>>
 InstallableFlake::getCursors(EvalState & state)
 {
     auto evalCache = openEvalCache(state,
@@ -660,21 +626,55 @@ InstallableFlake::getCursors(EvalState & state)
 
     auto root = evalCache->getRoot();
 
-    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>> res;
+    std::vector<ref<eval_cache::AttrCursor>> res;
 
     for (auto & attrPath : getActualAttrPaths()) {
         auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
-        if (attr) res.push_back({*attr, attrPath});
+        if (attr) res.push_back(ref(*attr));
     }
 
     return res;
 }
 
+ref<eval_cache::AttrCursor> InstallableFlake::getCursor(EvalState & state)
+{
+    auto lockedFlake = getLockedFlake();
+
+    auto cache = openEvalCache(state, lockedFlake);
+    auto root = cache->getRoot();
+
+    Suggestions suggestions;
+
+    auto attrPaths = getActualAttrPaths();
+
+    for (auto & attrPath : attrPaths) {
+        debug("trying flake output attribute '%s'", attrPath);
+
+        auto attrOrSuggestions = root->findAlongAttrPath(
+            parseAttrPath(state, attrPath),
+            true
+        );
+
+        if (!attrOrSuggestions) {
+            suggestions += attrOrSuggestions.getSuggestions();
+            continue;
+        }
+
+        return *attrOrSuggestions;
+    }
+
+    throw Error(
+        suggestions,
+        "flake '%s' does not provide attribute %s",
+        flakeRef,
+        showAttrPaths(attrPaths));
+}
+
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
-    flake::LockFlags lockFlagsApplyConfig = lockFlags;
-    lockFlagsApplyConfig.applyNixConfig = true;
     if (!_lockedFlake) {
+        flake::LockFlags lockFlagsApplyConfig = lockFlags;
+        lockFlagsApplyConfig.applyNixConfig = true;
         _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlagsApplyConfig));
     }
     return _lockedFlake;
@@ -980,10 +980,10 @@ std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
 {
     if (_installables.empty()) {
         if (useDefaultInstallables())
-            return parseFlakeRef(".", absPath("."));
+            return parseFlakeRefWithFragment(".", absPath(".")).first;
         return {};
     }
-    return parseFlakeRef(_installables.front(), absPath("."));
+    return parseFlakeRefWithFragment(_installables.front(), absPath(".")).first;
 }
 
 InstallableCommand::InstallableCommand(bool supportReadOnlyMode)

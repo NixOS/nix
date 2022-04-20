@@ -15,7 +15,7 @@ function _complete_nix {
         else
             COMPREPLY+=("$completion")
         fi
-    done < <(NIX_GET_COMPLETIONS=$cword "${words[@]/#\~/$HOME}" 2>/dev/null)
+    done < <(NIX_GET_COMPLETIONS=$cword "${words[@]}" 2>/dev/null)
     __ltrim_colon_completions "$cur"
 }
 

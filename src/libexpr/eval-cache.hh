@@ -33,7 +33,7 @@ public:
         EvalState & state,
         RootLoader rootLoader);
 
-    std::shared_ptr<AttrCursor> getRoot();
+    ref<AttrCursor> getRoot();
 };
 
 enum AttrType {
@@ -104,6 +104,8 @@ public:
 
     ref<AttrCursor> getAttr(std::string_view name);
 
+    /* Get an attribute along a chain of attrsets. Note that this does
+       not auto-call functors or functions. */
     OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
 
     std::string getString();

@@ -1,5 +1,6 @@
 nix_tests = \
   flakes.sh \
+  flakes-run.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
@@ -79,6 +80,7 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   flake-local-settings.sh \
+  fmt.sh \
   eval-store.sh \
   why-depends.sh \
   import-derivation.sh \
