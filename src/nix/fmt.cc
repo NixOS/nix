@@ -36,7 +36,7 @@ struct CmdFmt : SourceExprCommand {
         Strings programArgs{app.program};
 
         // Propagate arguments from the CLI
-        if (args.empty()) {
+        if (args.empty() && isatty(STDIN_FILENO)) {
             // Format the current flake out of the box
             programArgs.push_back(".");
         } else {
