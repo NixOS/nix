@@ -165,8 +165,8 @@ struct CmdSearch : InstallableCommand, MixJSON
             }
         };
 
-        for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix), true);
+        for (auto & cursor : installable->getCursors(*state))
+            visit(*cursor, cursor->getAttrPath(), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

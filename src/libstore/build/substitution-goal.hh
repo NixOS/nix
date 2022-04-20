@@ -51,7 +51,10 @@ struct PathSubstitutionGoal : public Goal
     // TODO delete once `storePath` is variant.
     std::optional<StorePathDescriptor> ca;
 
-    void done(ExitCode result, BuildResult::Status status);
+    void done(
+        ExitCode result,
+        BuildResult::Status status,
+        std::optional<std::string> errorMsg = {});
 
 public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);

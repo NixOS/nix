@@ -7,6 +7,7 @@ namespace nix {
 
 std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::CaDerivations, "ca-derivations" },
+    { Xp::ImpureDerivations, "impure-derivations" },
     { Xp::Flakes, "flakes" },
     { Xp::NixCommand, "nix-command" },
     { Xp::RecursiveNix, "recursive-nix" },
