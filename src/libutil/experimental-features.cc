@@ -58,4 +58,18 @@ std::ostream & operator <<(std::ostream & str, const ExperimentalFeature & featu
     return str << showExperimentalFeature(feature);
 }
 
+void to_json(nlohmann::json& j, const ExperimentalFeature& feature) {
+    j = showExperimentalFeature(feature);
+}
+
+void from_json(const nlohmann::json& j, ExperimentalFeature& feature) {
+    const std::string input = j;
+    const auto parsed = parseExperimentalFeature(input);
+
+    if (parsed.has_value())
+        feature = *parsed;
+    else
+        throw Error("Unknown experimental feature '%s' in JSON input", input);
+}
+
 }
