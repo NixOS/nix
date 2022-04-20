@@ -222,22 +222,46 @@ struct GitInputScheme : InputScheme
         if (!input.getRef() && !input.getRev() && isLocal) {
             bool clean = false;
 
-            /* Check whether this repo has any commits. There are
-               probably better ways to do this. */
-            auto gitDir = actualUrl + "/.git";
-            auto commonGitDir = chomp(runProgram(
-                "git",
-                true,
-                { "-C", actualUrl, "rev-parse", "--git-common-dir" }
-            ));
-            if (commonGitDir != ".git")
-                    gitDir = commonGitDir;
+            auto env = getEnv();
+            // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
+            // that way unknown errors can lead to a failure instead of continuing through the wrong code path
+            env["LC_ALL"] = "C";
 
-            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
+            /* Check whether HEAD points to something that looks like a commit,
+               since that is the refrence we want to use later on. */
+            auto result = runProgram(RunOptions {
+                .program = "git",
+                .args = { "-C", actualUrl, "--git-dir=.git", "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+                .environment = env,
+                .mergeStderrToStdout = true
+            });
+            auto exitCode = WEXITSTATUS(result.first);
+            auto errorMessage = result.second;
 
+            if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
+                throw Error("'%s' is not a Git repository", actualUrl);
+            } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
+                // indicates that the repo does not have any commits
+                // we want to proceed and will consider it dirty later
+            } else if (exitCode != 0) {
+                // any other errors should lead to a failure
+                throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", actualUrl, exitCode, errorMessage);
+            }
+
+            bool hasHead = exitCode == 0;
             try {
-                if (haveCommits) {
-                    runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
+                if (hasHead) {
+                    // Using git diff is preferrable over lower-level operations here,
+                    // because its conceptually simpler and we only need the exit code anyways.
+                    auto gitDiffOpts = Strings({ "-C", actualUrl, "diff", "HEAD", "--quiet"});
+                    if (!submodules) {
+                        // Changes in submodules should only make the tree dirty
+                        // when those submodules will be copied as well.
+                        gitDiffOpts.emplace_back("--ignore-submodules");
+                    }
+                    gitDiffOpts.emplace_back("--");
+                    runProgram("git", true, gitDiffOpts);
+
                     clean = true;
                 }
             } catch (ExecError & e) {
@@ -285,7 +309,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePathDesc), input};
             }

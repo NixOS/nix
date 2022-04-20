@@ -146,7 +146,7 @@ static void fetchTree(
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 throw Error({
-                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
+                    .msg = hintfmt("attribute 'name' isn't supported in call to 'fetchTree'"),
                     .errPos = pos
                 });
 
@@ -348,7 +348,7 @@ static RegisterPrimOp primop_fetchTarball({
     .fun = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
+static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }

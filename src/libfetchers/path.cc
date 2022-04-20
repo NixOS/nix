@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 namespace nix::fetchers {
 
@@ -80,8 +81,9 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
+        Input input(_input);
         std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
@@ -111,10 +113,15 @@ struct PathInputScheme : InputScheme
         if (storePath)
             store->addTempRoot(*storePath);
 
+        time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
-            storePath = store->addToStore("source", absPath);
+            auto src = sinkToSource([&](Sink & sink) {
+                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
+            });
+            storePath = store->addToStoreFromDump(*src, "source");
         }
+        input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
         // FIXME: just have Store::addToStore return a StorePathDescriptor, as
         // it has the underlying information.

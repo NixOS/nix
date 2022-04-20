@@ -10,8 +10,8 @@
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
-#include "derivations.hh"
 #include "path-info.hh"
+#include "repair-flag.hh"
 
 #include <atomic>
 #include <limits>
@@ -62,6 +62,8 @@ MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+struct BasicDerivation;
+struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
@@ -614,14 +616,6 @@ public:
        derivations that need this information for `exportReferencesGraph`.
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
-
-    /* Return the build log of the specified store path, if available,
-       or null otherwise. */
-    virtual std::optional<std::string> getBuildLog(const StorePath & path)
-    { return std::nullopt; }
-
-    virtual void addBuildLog(const StorePath & path, std::string_view log)
-    { unsupported("addBuildLog"); }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */

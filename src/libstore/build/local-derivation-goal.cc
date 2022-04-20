@@ -395,7 +395,7 @@ void LocalDerivationGoal::startBuilder()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !(derivationIsImpure(derivationType)) && !noChroot;
+            useChroot = !(derivationType.isImpure()) && !noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -608,7 +608,7 @@ void LocalDerivationGoal::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (!(derivationIsImpure(derivationType)))
+        if (!(derivationType.isImpure()))
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -796,7 +796,7 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (!(derivationIsImpure(derivationType)))
+        if (!(derivationType.isImpure()))
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -1049,7 +1049,7 @@ void LocalDerivationGoal::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (derivationIsFixed(derivationType)) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (derivationType.isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -1060,7 +1060,7 @@ void LocalDerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (derivationIsImpure(derivationType)) {
+    if (derivationType.isImpure()) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -1342,6 +1342,12 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
         next->queryMissing(allowed, willBuild, willSubstitute,
             unknown, downloadSize, narSize);
     }
+
+    virtual std::optional<std::string> getBuildLog(const StorePath & path) override
+    { return std::nullopt; }
+
+    virtual void addBuildLog(const StorePath & path, std::string_view log) override
+    { unsupported("addBuildLog"); }
 };
 
 
@@ -1670,7 +1676,7 @@ void LocalDerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (derivationIsImpure(derivationType)) {
+            if (derivationType.isImpure()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
@@ -1914,7 +1920,7 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (derivationIsImpure(derivationType))
+                if (derivationType.isImpure())
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Add the output paths we'll use at build-time to the chroot */
@@ -2274,7 +2280,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             return res;
         };
 
-        auto newInfoFromCA = [&](const DerivationOutputCAFloating outputHash) -> ValidPathInfo {
+        auto newInfoFromCA = [&](const DerivationOutput::CAFloating outputHash) -> ValidPathInfo {
             auto & st = outputStats.at(outputName);
             if (outputHash.method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
@@ -2336,7 +2342,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
         ValidPathInfo newInfo = std::visit(overloaded {
 
-            [&](const DerivationOutputInputAddressed & output) {
+            [&](const DerivationOutput::InputAddressed & output) {
                 /* input-addressed case */
                 auto requiredFinalPath = output.path;
                 /* Preemptively add rewrite rule for final hash, as that is
@@ -2353,8 +2359,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 return newInfo0;
             },
 
-            [&](const DerivationOutputCAFixed & dof) {
-                auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
+            [&](const DerivationOutput::CAFixed & dof) {
+                auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.hash.method,
                     .hashType = dof.hash.hash.type,
                 });
@@ -2376,17 +2382,17 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 return newInfo0;
             },
 
-            [&](DerivationOutputCAFloating & dof) {
+            [&](const DerivationOutput::CAFloating & dof) {
                 return newInfoFromCA(dof);
             },
 
-            [&](DerivationOutputDeferred) -> ValidPathInfo {
+            [&](const DerivationOutput::Deferred &) -> ValidPathInfo {
                 // No derivation should reach that point without having been
                 // rewritten first
                 assert(false);
             },
 
-        }, output.output);
+        }, output.raw());
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
@@ -2600,7 +2606,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        builtOutputs.emplace(thisRealisation.id, thisRealisation);
+        if (wantOutput(outputName, wantedOutputs))
+            builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 
     return builtOutputs;
