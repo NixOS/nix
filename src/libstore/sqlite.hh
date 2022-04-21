@@ -106,9 +106,9 @@ struct SQLiteError : Error
         throw_(db, hintfmt(fs, args...));
     }
 
-protected:
-
     SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf);
+
+protected:
 
     template<typename... Args>
     SQLiteError(const char *path, int errNo, int extendedErrNo, const std::string & fs, const Args & ... args)
