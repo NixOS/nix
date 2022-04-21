@@ -5,6 +5,8 @@
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
 , extraPkgs ? []
+, substituters ? []
+, trustedSubstituters ? []
 }:
 let
   defaultPkgs = with pkgs; [
@@ -126,8 +128,12 @@ let
     sandbox = "false";
     build-users-group = "nixbld";
     trusted-public-keys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-  };
-  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${v}") nixConf)) + "\n";
+  } // (if substituters == [] then {} else {
+    substituters = substituters;
+  }) // (if trustedSubstituters == [] then {} else {
+    trusted-substituters = trustedSubstituters;
+  });
+  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${toString v}") nixConf)) + "\n";
 
   baseSystem =
     let
