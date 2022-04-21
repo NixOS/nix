@@ -9,7 +9,7 @@
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
-#include "fmt.hh"
+#include "hilite.hh"
 
 #include <regex>
 #include <fstream>
