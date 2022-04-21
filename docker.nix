@@ -4,6 +4,7 @@
 , tag ? "latest"
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
+, extraPkgs ? []
 }:
 let
   defaultPkgs = with pkgs; [
@@ -23,7 +24,7 @@ let
     iana-etc
     git
     openssh
-  ];
+  ] ++ extraPkgs;
 
   users = {
 
