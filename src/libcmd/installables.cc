@@ -831,8 +831,8 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                                 auto realisation = store->queryRealisation(outputId);
                                 if (!realisation)
                                     throw Error(
-                                        "cannot operate on an output of unbuilt "
-                                        "content-addressed derivation '%s'",
+                                        "cannot operate on an output of the "
+                                        "unbuilt derivation '%s'",
                                         outputId.to_string());
                                 outputs.insert_or_assign(output, realisation->outPath);
                             } else {
