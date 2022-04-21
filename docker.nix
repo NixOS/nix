@@ -7,6 +7,7 @@
 , extraPkgs ? []
 , substituters ? []
 , trustedSubstituters ? []
+, extraEnv ? []
 }:
 let
   defaultPkgs = with pkgs; [
@@ -266,7 +267,7 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
       "GIT_SSL_CAINFO=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_PATH=/nix/var/nix/profiles/per-user/root/channels:/root/.nix-defexpr/channels"
-    ];
+    ] ++ extraEnv;
   };
 
 }
