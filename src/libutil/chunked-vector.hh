@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bits/stdint-uintn.h>
+#include <cstdint>
 #include <cstdlib>
 #include <vector>
 #include <limits>
