@@ -443,6 +443,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
                     "",
+                    DefaultOutputs(), // FIXME
                     Strings{element.source->attrPath},
                     Strings{},
                     lockFlags);

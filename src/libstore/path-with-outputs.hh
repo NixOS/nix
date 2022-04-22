@@ -32,4 +32,16 @@ StorePathWithOutputs parsePathWithOutputs(const Store & store, std::string_view 
 
 StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
 
+typedef std::set<std::string> OutputNames;
+
+struct AllOutputs { };
+
+struct DefaultOutputs { };
+
+typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> OutputsSpec;
+
+/* Parse a string of the form 'prefix^output1,...outputN' or
+   'prefix^*', returning the prefix and the outputs spec. */
+std::pair<std::string, OutputsSpec> parseOutputsSpec(const std::string & s);
+
 }

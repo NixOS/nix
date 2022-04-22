@@ -1,6 +1,8 @@
 #include "path-with-outputs.hh"
 #include "store-api.hh"
 
+#include <regex>
+
 namespace nix {
 
 std::string StorePathWithOutputs::to_string(const Store & store) const
@@ -66,6 +68,20 @@ StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std:
 {
     auto [path, outputs] = parsePathWithOutputs(pathWithOutputs);
     return StorePathWithOutputs { store.followLinksToStorePath(path), std::move(outputs) };
+}
+
+std::pair<std::string, OutputsSpec> parseOutputsSpec(const std::string & s)
+{
+    static std::regex regex(R"((.*)\^((\*)|([a-z]+(,[a-z]+)*)))");
+
+    std::smatch match;
+    if (!std::regex_match(s, match, regex))
+        return {s, DefaultOutputs()};
+
+    if (match[3].matched)
+        return {match[1], AllOutputs()};
+
+    return {match[1], tokenizeString<OutputNames>(match[4].str(), ",")};
 }
 
 }

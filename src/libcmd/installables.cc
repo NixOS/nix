@@ -464,9 +464,19 @@ struct InstallableAttrPath : InstallableValue
     SourceExprCommand & cmd;
     RootValue v;
     std::string attrPath;
+    OutputsSpec outputsSpec;
 
-    InstallableAttrPath(ref<EvalState> state, SourceExprCommand & cmd, Value * v, const std::string & attrPath)
-        : InstallableValue(state), cmd(cmd), v(allocRootValue(v)), attrPath(attrPath)
+    InstallableAttrPath(
+        ref<EvalState> state,
+        SourceExprCommand & cmd,
+        Value * v,
+        const std::string & attrPath,
+        OutputsSpec outputsSpec)
+        : InstallableValue(state)
+        , cmd(cmd)
+        , v(allocRootValue(v))
+        , attrPath(attrPath)
+        , outputsSpec(std::move(outputsSpec))
     { }
 
     std::string what() const override { return attrPath; }
@@ -495,9 +505,15 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
         auto drvPath = drvInfo.queryDrvPath();
         if (!drvPath)
             throw Error("'%s' is not a derivation", what());
+
         std::set<std::string> outputsToInstall;
-        for (auto & output : drvInfo.queryOutputs(false, true))
-            outputsToInstall.insert(output.first);
+
+        if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+            outputsToInstall = *outputNames;
+        else
+            for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
+                outputsToInstall.insert(output.first);
+
         res.push_back(DerivationInfo {
             .drvPath = *drvPath,
             .outputsToInstall = std::move(outputsToInstall)
@@ -578,6 +594,7 @@ InstallableFlake::InstallableFlake(
     ref<EvalState> state,
     FlakeRef && flakeRef,
     std::string_view fragment,
+    OutputsSpec outputsSpec,
     Strings attrPaths,
     Strings prefixes,
     const flake::LockFlags & lockFlags)
@@ -585,6 +602,7 @@ InstallableFlake::InstallableFlake(
       flakeRef(flakeRef),
       attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
       prefixes(fragment == "" ? Strings{} : prefixes),
+      outputsSpec(std::move(outputsSpec)),
       lockFlags(lockFlags)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
@@ -609,13 +627,18 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
             for (auto & s : aOutputsToInstall->getListOfStrings())
                 outputsToInstall.insert(s);
 
-    if (outputsToInstall.empty())
+    if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
+        outputsToInstall.clear();
         if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
             for (auto & s : aOutputs->getListOfStrings())
                 outputsToInstall.insert(s);
+    }
 
     if (outputsToInstall.empty())
         outputsToInstall.insert("out");
+
+    if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+        outputsToInstall = *outputNames;
 
     auto drvInfo = DerivationInfo {
         .drvPath = std::move(drvPath),
@@ -742,8 +765,14 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             state->eval(e, *vFile);
         }
 
-        for (auto & s : ss)
-            result.push_back(std::make_shared<InstallableAttrPath>(state, *this, vFile, s == "." ? "" : s));
+        for (auto & s : ss) {
+            auto [prefix, outputsSpec] = parseOutputsSpec(s);
+            result.push_back(
+                std::make_shared<InstallableAttrPath>(
+                    state, *this, vFile,
+                    prefix == "." ? "" : prefix,
+                    outputsSpec));
+        }
 
     } else {
 
@@ -762,12 +791,13 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment] = parseFlakeRefWithFragment(s, absPath("."));
+                auto [flakeRef, fragment, outputsSpec] = parseFlakeRefWithFragmentAndOutputsSpec(s, absPath("."));
                 result.push_back(std::make_shared<InstallableFlake>(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
                         fragment,
+                        outputsSpec,
                         getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));

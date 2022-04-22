@@ -724,7 +724,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef), templateName,
+            evalState, std::move(templateFlakeRef), templateName, DefaultOutputs(),
             defaultTemplateAttrPaths,
             defaultTemplateAttrPathsPrefixes,
             lockFlags);
