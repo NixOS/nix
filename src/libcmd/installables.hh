@@ -68,7 +68,7 @@ struct Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
+    virtual std::pair<Value *, PosIdx> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -178,7 +178,7 @@ struct InstallableFlake : InstallableValue
 
     std::vector<DerivationInfo> toDerivations() override;
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
+    std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
     /* Get a cursor to every attrpath in getActualAttrPaths() that
        exists. */

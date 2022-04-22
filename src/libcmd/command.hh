@@ -219,7 +219,7 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
 
 /* Helper function to generate args that invoke $EDITOR on
    filename:lineno. */
-Strings editorFor(const Pos & pos);
+Strings editorFor(const Path & file, uint32_t line);
 
 struct MixProfile : virtual StoreCommand
 {
