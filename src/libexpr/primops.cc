@@ -1798,15 +1798,16 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
         refs.insert(state.store->parseStorePath(path));
     }
 
-    auto storePath = state.store->printStorePath(settings.readOnlyMode
+    auto storePath = settings.readOnlyMode
         ? state.store->computeStorePathForText(name, contents, refs)
-        : state.store->addTextToStore(name, contents, refs, state.repair));
+        : state.store->addTextToStore(name, contents, refs, state.repair);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
-    v.mkString(storePath, {storePath});
+    /* Add the output of this to the allowed paths. */
+    state.allowAndSetStorePathString(storePath, v);
 }
 
 static RegisterPrimOp primop_toFile({
