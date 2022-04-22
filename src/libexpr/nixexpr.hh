@@ -6,6 +6,7 @@
 #include "value.hh"
 #include "symbol-table.hh"
 #include "error.hh"
+#include "chunked-vector.hh"
 
 
 namespace nix {

@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "types.hh"
+#include "chunked-vector.hh"
 
 namespace nix {
 
