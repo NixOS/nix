@@ -2,26 +2,7 @@
 
 #include "eval.hh"
 
-#define LocalNoInline(f) static f __attribute__((noinline)); f
-#define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
-
 namespace nix {
-
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
-{
-    throw EvalError({
-        .msg = hintfmt(s),
-        .errPos = pos
-    });
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
-{
-    throw TypeError({
-        .msg = hintfmt(s, showType(v)),
-        .errPos = pos
-    });
-}
 
 
 /* Note: Various places expect the allocated memory to be zeroed. */
@@ -99,7 +80,7 @@ Env & EvalState::allocEnv(size_t size)
 
 
 [[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const Pos & pos)
+void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     forceValue(v, [&]() { return pos; });
 }
@@ -128,7 +109,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const Pos & pos)
+inline void EvalState::forceAttrs(Value & v, const PosIdx pos)
 {
     forceAttrs(v, [&]() { return pos; });
 }
@@ -145,7 +126,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos)
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const Pos & pos)
+inline void EvalState::forceList(Value & v, const PosIdx pos)
 {
     forceValue(v, pos);
     if (!v.isList())

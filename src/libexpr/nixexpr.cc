@@ -1,5 +1,7 @@
 #include "nixexpr.hh"
 #include "derivations.hh"
+#include "eval.hh"
+#include "symbol-table.hh"
 #include "util.hh"
 
 #include <cstdlib>
@@ -9,12 +11,6 @@ namespace nix {
 
 
 /* Displaying abstract syntax trees. */
-
-std::ostream & operator << (std::ostream & str, const Expr & e)
-{
-    e.show(str);
-    return str;
-}
 
 static void showString(std::ostream & str, std::string_view s)
 {
@@ -54,81 +50,101 @@ static void showId(std::ostream & str, std::string_view s)
 
 std::ostream & operator << (std::ostream & str, const Symbol & sym)
 {
-    showId(str, *sym.s);
+    showId(str, sym.s);
     return str;
 }
 
-void Expr::show(std::ostream & str) const
+void Expr::show(const SymbolTable & symbols, std::ostream & str) const
 {
     abort();
 }
 
-void ExprInt::show(std::ostream & str) const
+void ExprInt::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << n;
 }
 
-void ExprFloat::show(std::ostream & str) const
+void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << nf;
 }
 
-void ExprString::show(std::ostream & str) const
+void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
     showString(str, s);
 }
 
-void ExprPath::show(std::ostream & str) const
+void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << s;
 }
 
-void ExprVar::show(std::ostream & str) const
+void ExprVar::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << name;
+    str << symbols[name];
 }
 
-void ExprSelect::show(std::ostream & str) const
+void ExprSelect::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << "(" << *e << ")." << showAttrPath(attrPath);
-    if (def) str << " or (" << *def << ")";
+    str << "(";
+    e->show(symbols, str);
+    str << ")." << showAttrPath(symbols, attrPath);
+    if (def) {
+        str << " or (";
+        def->show(symbols, str);
+        str << ")";
+    }
 }
 
-void ExprOpHasAttr::show(std::ostream & str) const
+void ExprOpHasAttr::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << "((" << *e << ") ? " << showAttrPath(attrPath) << ")";
+    str << "((";
+    e->show(symbols, str);
+    str << ") ? " << showAttrPath(symbols, attrPath) << ")";
 }
 
-void ExprAttrs::show(std::ostream & str) const
+void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
 {
     if (recursive) str << "rec ";
     str << "{ ";
     typedef const decltype(attrs)::value_type * Attr;
     std::vector<Attr> sorted;
     for (auto & i : attrs) sorted.push_back(&i);
-        std::sort(sorted.begin(), sorted.end(), [](Attr a, Attr b) {
-            return (const std::string &) a->first < (const std::string &) b->first;
-        });
+    std::sort(sorted.begin(), sorted.end(), [&](Attr a, Attr b) {
+        std::string_view sa = symbols[a->first], sb = symbols[b->first];
+        return sa < sb;
+    });
     for (auto & i : sorted) {
         if (i->second.inherited)
-            str << "inherit " << i->first << " " << "; ";
-        else
-            str << i->first << " = " << *i->second.e << "; ";
+            str << "inherit " << symbols[i->first] << " " << "; ";
+        else {
+            str << symbols[i->first] << " = ";
+            i->second.e->show(symbols, str);
+            str << "; ";
+        }
     }
-    for (auto & i : dynamicAttrs)
-        str << "\"${" << *i.nameExpr << "}\" = " << *i.valueExpr << "; ";
+    for (auto & i : dynamicAttrs) {
+        str << "\"${";
+        i.nameExpr->show(symbols, str);
+        str << "}\" = ";
+        i.valueExpr->show(symbols, str);
+        str << "; ";
+    }
     str << "}";
 }
 
-void ExprList::show(std::ostream & str) const
+void ExprList::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "[ ";
-    for (auto & i : elems)
-        str << "(" << *i << ") ";
+    for (auto & i : elems) {
+        str << "(";
+        i->show(symbols, str);
+        str << ") ";
+    }
     str << "]";
 }
 
-void ExprLambda::show(std::ostream & str) const
+void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(";
     if (hasFormals()) {
@@ -136,74 +152,100 @@ void ExprLambda::show(std::ostream & str) const
         bool first = true;
         for (auto & i : formals->formals) {
             if (first) first = false; else str << ", ";
-            str << i.name;
-            if (i.def) str << " ? " << *i.def;
+            str << symbols[i.name];
+            if (i.def) {
+                str << " ? ";
+                i.def->show(symbols, str);
+            }
         }
         if (formals->ellipsis) {
             if (!first) str << ", ";
             str << "...";
         }
         str << " }";
-        if (!arg.empty()) str << " @ ";
+        if (arg) str << " @ ";
     }
-    if (!arg.empty()) str << arg;
-    str << ": " << *body << ")";
+    if (arg) str << symbols[arg];
+    str << ": ";
+    body->show(symbols, str);
+    str << ")";
 }
 
-void ExprCall::show(std::ostream & str) const
+void ExprCall::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << '(' << *fun;
+    str << '(';
+    fun->show(symbols, str);
     for (auto e : args) {
         str <<  ' ';
-        str << *e;
+        e->show(symbols, str);
     }
     str << ')';
 }
 
-void ExprLet::show(std::ostream & str) const
+void ExprLet::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(let ";
     for (auto & i : attrs->attrs)
         if (i.second.inherited) {
-            str << "inherit " << i.first << "; ";
+            str << "inherit " << symbols[i.first] << "; ";
         }
-        else
-            str << i.first << " = " << *i.second.e << "; ";
-    str << "in " << *body << ")";
+        else {
+            str << symbols[i.first] << " = ";
+            i.second.e->show(symbols, str);
+            str << "; ";
+        }
+    str << "in ";
+    body->show(symbols, str);
+    str << ")";
 }
 
-void ExprWith::show(std::ostream & str) const
+void ExprWith::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << "(with " << *attrs << "; " << *body << ")";
+    str << "(with ";
+    attrs->show(symbols, str);
+    str << "; ";
+    body->show(symbols, str);
+    str << ")";
 }
 
-void ExprIf::show(std::ostream & str) const
+void ExprIf::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << "(if " << *cond << " then " << *then << " else " << *else_ << ")";
+    str << "(if ";
+    cond->show(symbols, str);
+    str << " then ";
+    then->show(symbols, str);
+    str << " else ";
+    else_->show(symbols, str);
+    str << ")";
 }
 
-void ExprAssert::show(std::ostream & str) const
+void ExprAssert::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << "assert " << *cond << "; " << *body;
+    str << "assert ";
+    cond->show(symbols, str);
+    str << "; ";
+    body->show(symbols, str);
 }
 
-void ExprOpNot::show(std::ostream & str) const
+void ExprOpNot::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << "(! " << *e << ")";
+    str << "(! ";
+    e->show(symbols, str);
+    str << ")";
 }
 
-void ExprConcatStrings::show(std::ostream & str) const
+void ExprConcatStrings::show(const SymbolTable & symbols, std::ostream & str) const
 {
     bool first = true;
     str << "(";
     for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << *i.second;
+        i.second->show(symbols, str);
     }
     str << ")";
 }
 
-void ExprPos::show(std::ostream & str) const
+void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "__curPos";
 }
@@ -234,48 +276,49 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 }
 
 
-std::string showAttrPath(const AttrPath & attrPath)
+std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 {
     std::ostringstream out;
     bool first = true;
     for (auto & i : attrPath) {
         if (!first) out << '.'; else first = false;
-        if (i.symbol.set())
-            out << i.symbol;
-        else
-            out << "\"${" << *i.expr << "}\"";
+        if (i.symbol)
+            out << symbols[i.symbol];
+        else {
+            out << "\"${";
+            i.expr->show(symbols, out);
+            out << "}\"";
+        }
     }
     return out.str();
 }
 
 
-Pos noPos;
-
 
 /* Computing levels/displacements for variables. */
 
-void Expr::bindVars(const StaticEnv & env)
+void Expr::bindVars(const EvalState & es, const StaticEnv & env)
 {
     abort();
 }
 
-void ExprInt::bindVars(const StaticEnv & env)
+void ExprInt::bindVars(const EvalState & es, const StaticEnv & env)
 {
 }
 
-void ExprFloat::bindVars(const StaticEnv & env)
+void ExprFloat::bindVars(const EvalState & es, const StaticEnv & env)
 {
 }
 
-void ExprString::bindVars(const StaticEnv & env)
+void ExprString::bindVars(const EvalState & es, const StaticEnv & env)
 {
 }
 
-void ExprPath::bindVars(const StaticEnv & env)
+void ExprPath::bindVars(const EvalState & es, const StaticEnv & env)
 {
 }
 
-void ExprVar::bindVars(const StaticEnv & env)
+void ExprVar::bindVars(const EvalState & es, const StaticEnv & env)
 {
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
@@ -301,31 +344,31 @@ void ExprVar::bindVars(const StaticEnv & env)
        "undefined variable" error now. */
     if (withLevel == -1)
         throw UndefinedVarError({
-            .msg = hintfmt("undefined variable '%1%'", name),
-            .errPos = pos
+            .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
+            .errPos = es.positions[pos]
         });
     fromWith = true;
     this->level = withLevel;
 }
 
-void ExprSelect::bindVars(const StaticEnv & env)
+void ExprSelect::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    e->bindVars(env);
-    if (def) def->bindVars(env);
+    e->bindVars(es, env);
+    if (def) def->bindVars(es, env);
     for (auto & i : attrPath)
-        if (!i.symbol.set())
-            i.expr->bindVars(env);
+        if (!i.symbol)
+            i.expr->bindVars(es, env);
 }
 
-void ExprOpHasAttr::bindVars(const StaticEnv & env)
+void ExprOpHasAttr::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    e->bindVars(env);
+    e->bindVars(es, env);
     for (auto & i : attrPath)
-        if (!i.symbol.set())
-            i.expr->bindVars(env);
+        if (!i.symbol)
+            i.expr->bindVars(es, env);
 }
 
-void ExprAttrs::bindVars(const StaticEnv & env)
+void ExprAttrs::bindVars(const EvalState & es, const StaticEnv & env)
 {
     const StaticEnv * dynamicEnv = &env;
     StaticEnv newEnv(false, &env, recursive ? attrs.size() : 0);
@@ -340,35 +383,35 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
-            i.second.e->bindVars(i.second.inherited ? env : newEnv);
+            i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
     }
 
     else
         for (auto & i : attrs)
-            i.second.e->bindVars(env);
+            i.second.e->bindVars(es, env);
 
     for (auto & i : dynamicAttrs) {
-        i.nameExpr->bindVars(*dynamicEnv);
-        i.valueExpr->bindVars(*dynamicEnv);
+        i.nameExpr->bindVars(es, *dynamicEnv);
+        i.valueExpr->bindVars(es, *dynamicEnv);
     }
 }
 
-void ExprList::bindVars(const StaticEnv & env)
+void ExprList::bindVars(const EvalState & es, const StaticEnv & env)
 {
     for (auto & i : elems)
-        i->bindVars(env);
+        i->bindVars(es, env);
 }
 
-void ExprLambda::bindVars(const StaticEnv & env)
+void ExprLambda::bindVars(const EvalState & es, const StaticEnv & env)
 {
     StaticEnv newEnv(
         false, &env,
         (hasFormals() ? formals->formals.size() : 0) +
-        (arg.empty() ? 0 : 1));
+        (!arg ? 0 : 1));
 
     Displacement displ = 0;
 
-    if (!arg.empty()) newEnv.vars.emplace_back(arg, displ++);
+    if (arg) newEnv.vars.emplace_back(arg, displ++);
 
     if (hasFormals()) {
         for (auto & i : formals->formals)
@@ -377,20 +420,20 @@ void ExprLambda::bindVars(const StaticEnv & env)
         newEnv.sort();
 
         for (auto & i : formals->formals)
-            if (i.def) i.def->bindVars(newEnv);
+            if (i.def) i.def->bindVars(es, newEnv);
     }
 
-    body->bindVars(newEnv);
+    body->bindVars(es, newEnv);
 }
 
-void ExprCall::bindVars(const StaticEnv & env)
+void ExprCall::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    fun->bindVars(env);
+    fun->bindVars(es, env);
     for (auto e : args)
-        e->bindVars(env);
+        e->bindVars(es, env);
 }
 
-void ExprLet::bindVars(const StaticEnv & env)
+void ExprLet::bindVars(const EvalState & es, const StaticEnv & env)
 {
     StaticEnv newEnv(false, &env, attrs->attrs.size());
 
@@ -401,12 +444,12 @@ void ExprLet::bindVars(const StaticEnv & env)
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
-        i.second.e->bindVars(i.second.inherited ? env : newEnv);
+        i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
 
-    body->bindVars(newEnv);
+    body->bindVars(es, newEnv);
 }
 
-void ExprWith::bindVars(const StaticEnv & env)
+void ExprWith::bindVars(const EvalState & es, const StaticEnv & env)
 {
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
@@ -420,57 +463,60 @@ void ExprWith::bindVars(const StaticEnv & env)
             break;
         }
 
-    attrs->bindVars(env);
+    attrs->bindVars(es, env);
     StaticEnv newEnv(true, &env);
-    body->bindVars(newEnv);
+    body->bindVars(es, newEnv);
 }
 
-void ExprIf::bindVars(const StaticEnv & env)
+void ExprIf::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    cond->bindVars(env);
-    then->bindVars(env);
-    else_->bindVars(env);
+    cond->bindVars(es, env);
+    then->bindVars(es, env);
+    else_->bindVars(es, env);
 }
 
-void ExprAssert::bindVars(const StaticEnv & env)
+void ExprAssert::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    cond->bindVars(env);
-    body->bindVars(env);
+    cond->bindVars(es, env);
+    body->bindVars(es, env);
 }
 
-void ExprOpNot::bindVars(const StaticEnv & env)
+void ExprOpNot::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    e->bindVars(env);
+    e->bindVars(es, env);
 }
 
-void ExprConcatStrings::bindVars(const StaticEnv & env)
+void ExprConcatStrings::bindVars(const EvalState & es, const StaticEnv & env)
 {
-    for (auto & i : *es)
-        i.second->bindVars(env);
+    for (auto & i : *this->es)
+        i.second->bindVars(es, env);
 }
 
-void ExprPos::bindVars(const StaticEnv & env)
+void ExprPos::bindVars(const EvalState & es, const StaticEnv & env)
 {
 }
 
 
 /* Storing function names. */
 
-void Expr::setName(Symbol & name)
+void Expr::setName(SymbolIdx name)
 {
 }
 
 
-void ExprLambda::setName(Symbol & name)
+void ExprLambda::setName(SymbolIdx name)
 {
     this->name = name;
     body->setName(name);
 }
 
 
-std::string ExprLambda::showNamePos() const
+std::string ExprLambda::showNamePos(const EvalState & state) const
 {
-    return fmt("%1% at %2%", name.set() ? "'" + (std::string) name + "'" : "anonymous function", pos);
+    std::string id(name
+        ? concatStrings("'", state.symbols[name], "'")
+        : "anonymous function");
+    return fmt("%1% at %2%", id, state.positions[pos]);
 }
 
 
@@ -480,8 +526,7 @@ std::string ExprLambda::showNamePos() const
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    for (auto & i : store)
-        n += i.size();
+    dump([&] (const Symbol & s) { n += std::string_view(s).size(); });
     return n;
 }
 

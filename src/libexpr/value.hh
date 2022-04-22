@@ -55,7 +55,8 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-class Symbol;
+class SymbolIdx;
+class PosIdx;
 struct Pos;
 class StorePath;
 class Store;
@@ -103,7 +104,7 @@ class ExternalValueBase
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
         XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
-        const Pos & pos) const;
+        const PosIdx pos) const;
 
     virtual ~ExternalValueBase()
     {
@@ -120,11 +121,11 @@ private:
 
     friend std::string showType(const Value & v);
 
-    void print(std::ostream & str, std::set<const void *> * seen) const;
+    void print(const SymbolTable & symbols, std::ostream & str, std::set<const void *> * seen) const;
 
 public:
 
-    void print(std::ostream & str, bool showRepeated = false) const;
+    void print(const SymbolTable & symbols, std::ostream & str, bool showRepeated = false) const;
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
@@ -252,7 +253,7 @@ public:
 
     inline void mkString(const Symbol & s)
     {
-        mkString(((const std::string &) s).c_str());
+        mkString(std::string_view(s).data());
     }
 
     inline void mkPath(const char * s)
@@ -368,7 +369,7 @@ public:
         return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
     }
 
-    Pos determinePos(const Pos & pos) const;
+    PosIdx determinePos(const PosIdx pos) const;
 
     /* Check whether forcing this value requires a trivial amount of
        computation. In particular, function applications are
@@ -409,12 +410,12 @@ public:
 
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
-typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector> > > ValueVectorMap;
+typedef std::map<SymbolIdx, Value *, std::less<SymbolIdx>, traceable_allocator<std::pair<const SymbolIdx, Value *> > > ValueMap;
+typedef std::map<SymbolIdx, ValueVector, std::less<SymbolIdx>, traceable_allocator<std::pair<const SymbolIdx, ValueVector> > > ValueVectorMap;
 #else
 typedef std::vector<Value *> ValueVector;
-typedef std::map<Symbol, Value *> ValueMap;
-typedef std::map<Symbol, ValueVector> ValueVectorMap;
+typedef std::map<SymbolIdx, Value *> ValueMap;
+typedef std::map<SymbolIdx, ValueVector> ValueVectorMap;
 #endif
 
 

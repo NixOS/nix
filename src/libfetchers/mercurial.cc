@@ -36,7 +36,7 @@ static std::string runHg(const Strings & args, const std::optional<std::string> 
     auto res = runProgram(std::move(opts));
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
+        throw ExecError(res.first, "hg %1%", statusToString(res.first));
 
     return res.second;
 }
@@ -273,7 +273,7 @@ struct MercurialInputScheme : InputScheme
                         runHg({ "recover", "-R", cacheDir });
                         runHg({ "pull", "-R", cacheDir, "--", actualUrl });
                     } else {
-                        throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
+                        throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {

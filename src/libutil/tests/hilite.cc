@@ -1,8 +1,6 @@
-#include "fmt.hh"
+#include "hilite.hh"
 
 #include <gtest/gtest.h>
-
-#include <regex>
 
 namespace nix {
 /* ----------- tests for fmt.hh -------------------------------------------------*/

@@ -81,7 +81,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 3;
+    const int nixCASchemaVersion = 4;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -143,6 +143,21 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             )");
             txn.commit();
         }
+        if (curCASchema < 4) {
+            SQLiteTxn txn(db);
+            db.exec(R"(
+                create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
+                begin
+                    delete from RealisationsRefs where realisationReference in (
+                    select id from Realisations where outputPath = old.id
+                    );
+                end;
+                -- used by deletion trigger
+                create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
+            )");
+            txn.commit();
+        }
+
         writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
         lockFile(lockFd.get(), ltRead, true);
     }
@@ -482,18 +497,18 @@ void LocalStore::openDB(State & state, bool create)
         SQLiteStmt stmt;
         stmt.create(db, "pragma main.journal_mode;");
         if (sqlite3_step(stmt) != SQLITE_ROW)
-            throwSQLiteError(db, "querying journal mode");
+            SQLiteError::throw_(db, "querying journal mode");
         prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
     }
     if (prevMode != mode &&
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting journal mode");
+        SQLiteError::throw_(db, "setting journal mode");
 
     /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
     if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 40000;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting autocheckpoint interval");
+        SQLiteError::throw_(db, "setting autocheckpoint interval");
 
     /* Initialise the database schema, if necessary. */
     if (create) {
