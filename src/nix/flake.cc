@@ -311,7 +311,7 @@ struct CmdFlakeCheck : FlakeCommand
             return state->positions[p];
         };
 
-        auto argHasName = [&] (SymbolIdx arg, std::string_view expected) {
+        auto argHasName = [&] (Symbol arg, std::string_view expected) {
             std::string_view name = state->symbols[arg];
             return
                 name == expected
@@ -986,8 +986,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         {
             auto j = nlohmann::json::object();
 
+            auto attrPathS = state->symbols.resolve(attrPath);
+
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
+                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+
             try {
                 auto recurse = [&]()
                 {
@@ -995,14 +998,15 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         logger->cout("%s", headerPrefix);
                     auto attrs = visitor.getAttrs();
                     for (const auto & [i, attr] : enumerate(attrs)) {
+                        const auto & attrName = state->symbols[attr];
                         bool last = i + 1 == attrs.size();
-                        auto visitor2 = visitor.getAttr(attr);
+                        auto visitor2 = visitor.getAttr(attrName);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
                         auto j2 = visit(*visitor2, attrPath2,
-                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attr),
+                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attrName),
                             nextPrefix + (last ? treeNull : treeLine));
-                        if (json) j.emplace(attr, std::move(j2));
+                        if (json) j.emplace(attrName, std::move(j2));
                     }
                 };
 
@@ -1022,10 +1026,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,
-                            attrPath.size() == 2 && attrPath[0] == "devShell" ? "development environment" :
-                            attrPath.size() >= 2 && attrPath[0] == "devShells" ? "development environment" :
-                            attrPath.size() == 3 && attrPath[0] == "checks" ? "derivation" :
-                            attrPath.size() >= 1 && attrPath[0] == "hydraJobs" ? "derivation" :
+                            attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
+                            attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
+                            attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
+                            attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
                             "package",
                             name);
                     }
@@ -1033,27 +1037,27 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 if (attrPath.size() == 0
                     || (attrPath.size() == 1 && (
-                            attrPath[0] == "defaultPackage"
-                            || attrPath[0] == "devShell"
-                            || attrPath[0] == "formatter"
-                            || attrPath[0] == "nixosConfigurations"
-                            || attrPath[0] == "nixosModules"
-                            || attrPath[0] == "defaultApp"
-                            || attrPath[0] == "templates"
-                            || attrPath[0] == "overlays"))
+                            attrPathS[0] == "defaultPackage"
+                            || attrPathS[0] == "devShell"
+                            || attrPathS[0] == "formatter"
+                            || attrPathS[0] == "nixosConfigurations"
+                            || attrPathS[0] == "nixosModules"
+                            || attrPathS[0] == "defaultApp"
+                            || attrPathS[0] == "templates"
+                            || attrPathS[0] == "overlays"))
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
-                        && (attrPath[0] == "checks"
-                            || attrPath[0] == "packages"
-                            || attrPath[0] == "devShells"
-                            || attrPath[0] == "apps"))
+                        && (attrPathS[0] == "checks"
+                            || attrPathS[0] == "packages"
+                            || attrPathS[0] == "devShells"
+                            || attrPathS[0] == "apps"))
                     )
                 {
                     recurse();
                 }
 
                 else if (
-                    (attrPath.size() == 2 && (attrPath[0] == "defaultPackage" || attrPath[0] == "devShell" || attrPath[0] == "formatter"))
-                    || (attrPath.size() == 3 && (attrPath[0] == "checks" || attrPath[0] == "packages" || attrPath[0] == "devShells"))
+                    (attrPath.size() == 2 && (attrPathS[0] == "defaultPackage" || attrPathS[0] == "devShell" || attrPathS[0] == "formatter"))
+                    || (attrPath.size() == 3 && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "devShells"))
                     )
                 {
                     if (visitor.isDerivation())
@@ -1062,14 +1066,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         throw Error("expected a derivation");
                 }
 
-                else if (attrPath.size() > 0 && attrPath[0] == "hydraJobs") {
+                else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
                     if (visitor.isDerivation())
                         showDerivation();
                     else
                         recurse();
                 }
 
-                else if (attrPath.size() > 0 && attrPath[0] == "legacyPackages") {
+                else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
                     if (attrPath.size() == 1)
                         recurse();
                     else if (!showLegacy)
@@ -1084,8 +1088,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 }
 
                 else if (
-                    (attrPath.size() == 2 && attrPath[0] == "defaultApp") ||
-                    (attrPath.size() == 3 && attrPath[0] == "apps"))
+                    (attrPath.size() == 2 && attrPathS[0] == "defaultApp") ||
+                    (attrPath.size() == 3 && attrPathS[0] == "apps"))
                 {
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
@@ -1098,8 +1102,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 }
 
                 else if (
-                    (attrPath.size() == 1 && attrPath[0] == "defaultTemplate") ||
-                    (attrPath.size() == 2 && attrPath[0] == "templates"))
+                    (attrPath.size() == 1 && attrPathS[0] == "defaultTemplate") ||
+                    (attrPath.size() == 2 && attrPathS[0] == "templates"))
                 {
                     auto description = visitor.getAttr("description")->getString();
                     if (json) {
@@ -1112,11 +1116,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 else {
                     auto [type, description] =
-                        (attrPath.size() == 1 && attrPath[0] == "overlay")
-                        || (attrPath.size() == 2 && attrPath[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
-                        attrPath.size() == 2 && attrPath[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
-                        (attrPath.size() == 1 && attrPath[0] == "nixosModule")
-                        || (attrPath.size() == 2 && attrPath[0] == "nixosModules") ? std::make_pair("nixos-module", "NixOS module") :
+                        (attrPath.size() == 1 && attrPathS[0] == "overlay")
+                        || (attrPath.size() == 2 && attrPathS[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
+                        attrPath.size() == 2 && attrPathS[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
+                        (attrPath.size() == 1 && attrPathS[0] == "nixosModule")
+                        || (attrPath.size() == 2 && attrPathS[0] == "nixosModules") ? std::make_pair("nixos-module", "NixOS module") :
                         std::make_pair("unknown", "unknown");
                     if (json) {
                         j.emplace("type", type);
@@ -1125,7 +1129,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     }
                 }
             } catch (EvalError & e) {
-                if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
+                if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
                     throw;
             }
 

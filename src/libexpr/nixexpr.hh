@@ -126,9 +126,9 @@ struct StaticEnv;
 /* An attribute path is a sequence of attribute names. */
 struct AttrName
 {
-    SymbolIdx symbol;
+    Symbol symbol;
     Expr * expr;
-    AttrName(const SymbolIdx & s) : symbol(s) {};
+    AttrName(const Symbol & s) : symbol(s) {};
     AttrName(Expr * e) : expr(e) {};
 };
 
@@ -146,7 +146,7 @@ struct Expr
     virtual void bindVars(const EvalState & es, const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
-    virtual void setName(SymbolIdx name);
+    virtual void setName(Symbol name);
 };
 
 #define COMMON_METHODS \
@@ -196,7 +196,7 @@ typedef uint32_t Displacement;
 struct ExprVar : Expr
 {
     PosIdx pos;
-    SymbolIdx name;
+    Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
        or function argument) or from a "with". */
@@ -211,8 +211,8 @@ struct ExprVar : Expr
     Level level;
     Displacement displ;
 
-    ExprVar(const SymbolIdx & name) : name(name) { };
-    ExprVar(const PosIdx & pos, const SymbolIdx & name) : pos(pos), name(name) { };
+    ExprVar(const Symbol & name) : name(name) { };
+    ExprVar(const PosIdx & pos, const Symbol & name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -223,7 +223,7 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(const PosIdx & pos, Expr * e, const SymbolIdx & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const PosIdx & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
 };
 
@@ -248,7 +248,7 @@ struct ExprAttrs : Expr
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
-    typedef std::map<SymbolIdx, AttrDef> AttrDefs;
+    typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
@@ -273,7 +273,7 @@ struct ExprList : Expr
 struct Formal
 {
     PosIdx pos;
-    SymbolIdx name;
+    Symbol name;
     Expr * def;
 };
 
@@ -283,9 +283,9 @@ struct Formals
     Formals_ formals;
     bool ellipsis;
 
-    bool has(SymbolIdx arg) const {
+    bool has(Symbol arg) const {
         auto it = std::lower_bound(formals.begin(), formals.end(), arg,
-            [] (const Formal & f, const SymbolIdx & sym) { return f.name < sym; });
+            [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
         return it != formals.end() && it->name == arg;
     }
 
@@ -304,11 +304,11 @@ struct Formals
 struct ExprLambda : Expr
 {
     PosIdx pos;
-    SymbolIdx name;
-    SymbolIdx arg;
+    Symbol name;
+    Symbol arg;
     Formals * formals;
     Expr * body;
-    ExprLambda(PosIdx pos, SymbolIdx arg, Formals * formals, Expr * body)
+    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
     };
@@ -316,7 +316,7 @@ struct ExprLambda : Expr
         : pos(pos), formals(formals), body(body)
     {
     }
-    void setName(SymbolIdx name);
+    void setName(Symbol name);
     std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
@@ -426,7 +426,7 @@ struct StaticEnv
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
-    typedef std::vector<std::pair<SymbolIdx, Displacement>> Vars;
+    typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
     StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
@@ -450,7 +450,7 @@ struct StaticEnv
         vars.erase(it, end);
     }
 
-    Vars::const_iterator find(const SymbolIdx & name) const
+    Vars::const_iterator find(const Symbol & name) const
     {
         Vars::value_type key(name, 0);
         auto i = std::lower_bound(vars.begin(), vars.end(), key);

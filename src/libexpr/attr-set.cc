@@ -26,7 +26,7 @@ Bindings * EvalState::allocBindings(size_t capacity)
 /* Create a new attribute named 'name' on an existing attribute set stored
    in 'vAttrs' and return the newly allocated Value which is associated with
    this attribute. */
-Value * EvalState::allocAttr(Value & vAttrs, const SymbolIdx & name)
+Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 {
     Value * v = allocValue();
     vAttrs.attrs->push_back(Attr(name, v));
@@ -40,7 +40,7 @@ Value * EvalState::allocAttr(Value & vAttrs, std::string_view name)
 }
 
 
-Value & BindingsBuilder::alloc(const SymbolIdx & name, PosIdx pos)
+Value & BindingsBuilder::alloc(const Symbol & name, PosIdx pos)
 {
     auto value = state.allocValue();
     bindings->push_back(Attr(name, value, pos));

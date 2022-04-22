@@ -86,7 +86,7 @@ static void dupAttr(const EvalState & state, const AttrPath & attrPath, const Po
     });
 }
 
-static void dupAttr(const EvalState & state, SymbolIdx attr, const PosIdx pos, const PosIdx prevPos)
+static void dupAttr(const EvalState & state, Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
         .msg = hintfmt("attribute '%1%' already defined at %2%", state.symbols[attr], state.positions[prevPos]),
@@ -157,14 +157,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 
 
 static Formals * toFormals(ParseData & data, ParserFormals * formals,
-    PosIdx pos = noPos, SymbolIdx arg = {})
+    PosIdx pos = noPos, Symbol arg = {})
 {
     std::sort(formals->formals.begin(), formals->formals.end(),
         [] (const auto & a, const auto & b) {
             return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
         });
 
-    std::optional<std::pair<SymbolIdx, PosIdx>> duplicate;
+    std::optional<std::pair<Symbol, PosIdx>> duplicate;
     for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
         if (formals->formals[i].name != formals->formals[i + 1].name)
             continue;

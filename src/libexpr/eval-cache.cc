@@ -92,6 +92,7 @@ struct AttrDb
 
     AttrId setAttrs(
         AttrKey key,
+        const SymbolTable & symbols,
         const std::vector<Symbol> & attrs)
     {
         return doSQLite([&]()
@@ -110,7 +111,7 @@ struct AttrDb
             for (auto & attr : attrs)
                 state->insertAttribute.use()
                     (rowId)
-                    (attr)
+                    (symbols[attr])
                     (AttrType::Placeholder)
                     (0, false).exec();
 
@@ -253,7 +254,7 @@ struct AttrDb
                 std::vector<Symbol> attrs;
                 auto queryAttributes(state->queryAttributes.use()(rowId));
                 while (queryAttributes.next())
-                    attrs.emplace_back(queryAttributes.getStr(0));
+                    attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
                 return {{rowId, attrs}};
             }
             case AttrType::String: {
@@ -331,7 +332,7 @@ AttrKey AttrCursor::getKey()
             parent->first->getKey(), root->state.symbols);
         assert(parent->first->cachedValue);
     }
-    return {parent->first->cachedValue->first, parent->second};
+    return {parent->first->cachedValue->first, root->state.symbols[parent->second]};
 }
 
 Value & AttrCursor::getValue()
@@ -340,7 +341,7 @@ Value & AttrCursor::getValue()
         if (parent) {
             auto & vParent = parent->first->getValue();
             root->state.forceAttrs(vParent, noPos);
-            auto attr = vParent.attrs->get(root->state.symbols.create(parent->second));
+            auto attr = vParent.attrs->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
             _value = allocRootValue(attr->value);
@@ -369,12 +370,12 @@ std::vector<Symbol> AttrCursor::getAttrPath(Symbol name) const
 
 std::string AttrCursor::getAttrPathStr() const
 {
-    return concatStringsSep(".", getAttrPath());
+    return concatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
 }
 
 std::string AttrCursor::getAttrPathStr(Symbol name) const
 {
-    return concatStringsSep(".", getAttrPath(name));
+    return concatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
 }
 
 Value & AttrCursor::forceValue()
@@ -414,9 +415,9 @@ Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
     auto attrNames = getAttrs();
     std::set<std::string> strAttrNames;
     for (auto & name : attrNames)
-        strAttrNames.insert(std::string(name));
+        strAttrNames.insert(root->state.symbols[name]);
 
-    return Suggestions::bestMatches(strAttrNames, name);
+    return Suggestions::bestMatches(strAttrNames, root->state.symbols[name]);
 }
 
 std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name, bool forceErrors)
@@ -428,11 +429,11 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name, bool
         if (cachedValue) {
             if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                 for (auto & attr : *attrs)
-                    if (attr == name)
-                        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), name));
+                    if (root->state.symbols[attr] == name)
+                        return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), attr));
                 return nullptr;
             } else if (std::get_if<placeholder_t>(&cachedValue->second)) {
-                auto attr = root->db->getAttr({cachedValue->first, name}, root->state.symbols);
+                auto attr = root->db->getAttr({cachedValue->first, std::string(name)}, root->state.symbols);
                 if (attr) {
                     if (std::get_if<missing_t>(&attr->second))
                         return nullptr;
@@ -440,10 +441,10 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name, bool
                         if (forceErrors)
                             debug("reevaluating failed cached attribute '%s'");
                         else
-                            throw CachedEvalError("cached failure of attribute '%s'", getAttrPathStr(name));
+                            throw CachedEvalError("cached failure of attribute '%s'", getAttrPathStr(root->state.symbols.create(name)));
                     } else
                         return std::make_shared<AttrCursor>(root,
-                            std::make_pair(shared_from_this(), name), nullptr, std::move(attr));
+                            std::make_pair(shared_from_this(), root->state.symbols.create(name)), nullptr, std::move(attr));
                 }
                 // Incomplete attrset, so need to fall thru and
                 // evaluate to see whether 'name' exists
@@ -470,7 +471,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name, bool
         if (root->db) {
             if (!cachedValue)
                 cachedValue = {root->db->setPlaceholder(getKey()), placeholder_t()};
-            root->db->setMissing({cachedValue->first, name});
+            root->db->setMissing({cachedValue->first, std::string(name)});
         }
         return nullptr;
     }
@@ -479,18 +480,18 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name, bool
     if (root->db) {
         if (!cachedValue)
             cachedValue = {root->db->setPlaceholder(getKey()), placeholder_t()};
-        cachedValue2 = {root->db->setPlaceholder({cachedValue->first, name}), placeholder_t()};
+        cachedValue2 = {root->db->setPlaceholder({cachedValue->first, std::string(name)}), placeholder_t()};
     }
 
     return make_ref<AttrCursor>(
-        root, std::make_pair(shared_from_this(), name), attr->value, std::move(cachedValue2));
+        root, std::make_pair(shared_from_this(), root->state.symbols.create(name)), attr->value, std::move(cachedValue2));
 }
 
 ref<AttrCursor> AttrCursor::getAttr(std::string_view name, bool forceErrors)
 {
     auto p = maybeGetAttr(name, forceErrors);
     if (!p)
-        throw Error("attribute '%s' does not exist", getAttrPathStr(name));
+        throw Error("attribute '%s' does not exist", getAttrPathStr(root->state.symbols.create(name)));
     return ref(p);
 }
 
@@ -498,7 +499,7 @@ OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<S
 {
     auto res = shared_from_this();
     for (auto & attr : attrPath) {
-        auto child = res->maybeGetAttr(attr, force);
+        auto child = res->maybeGetAttr(root->state.symbols[attr], force);
         if (!child) {
             auto suggestions = res->getSuggestionsForAttr(attr);
             return OrSuggestions<ref<AttrCursor>>::failed(suggestions);
@@ -606,13 +607,14 @@ std::vector<Symbol> AttrCursor::getAttrs()
 
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs)
-        attrs.push_back(root->state.symbols[attr.name]);
-    std::sort(attrs.begin(), attrs.end(), [](const Symbol & a, const Symbol & b) {
-        return (const std::string &) a < (const std::string &) b;
+        attrs.push_back(attr.name);
+    std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
+        std::string_view sa = root->state.symbols[a], sb = root->state.symbols[b];
+        return sa < sb;
     });
 
     if (root->db)
-        cachedValue = {root->db->setAttrs(getKey(), attrs), attrs};
+        cachedValue = {root->db->setAttrs(getKey(), root->state.symbols, attrs), attrs};
 
     return attrs;
 }

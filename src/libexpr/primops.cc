@@ -584,7 +584,7 @@ typedef std::list<Value *> ValueList;
 static Bindings::iterator getAttr(
     EvalState & state,
     std::string_view funcName,
-    SymbolIdx attrSym,
+    Symbol attrSym,
     Bindings * attrSet,
     const PosIdx pos)
 {
@@ -2047,7 +2047,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
-        auto & n(state.symbols[attr.name]);
+        auto n = state.symbols[attr.name];
         if (n == "path")
             path = state.coerceToPath(attr.pos, *attr.value, context);
         else if (attr.name == state.sName)
@@ -2314,7 +2314,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
     auto attrs = state.buildBindings(args[0]->listSize());
 
-    std::set<SymbolIdx> seen;
+    std::set<Symbol> seen;
 
     for (auto v2 : args[0]->listItems()) {
         state.forceAttrs(*v2, pos);
@@ -2517,7 +2517,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
     // attribute with the merge function application. this way we need not
     // use (slightly slower) temporary storage the GC does not know about.
 
-    std::map<SymbolIdx, std::pair<size_t, Value * *>> attrsSeen;
+    std::map<Symbol, std::pair<size_t, Value * *>> attrsSeen;
 
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
