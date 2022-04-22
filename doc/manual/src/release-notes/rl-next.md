@@ -6,3 +6,6 @@
 * The path produced by `builtins.toFile` is now allowed to be imported or read
   even with restricted evaluation. Note that this will not work with a
   read-only store.
+
+* `nix build` has a new `--print-out-paths` flag to print the resulting output paths.
+  This matches the default behaviour of `nix-build`.
