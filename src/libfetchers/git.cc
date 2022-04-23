@@ -23,7 +23,7 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 
 static std::string readHead(const Path & path)
 {
-    return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+    return chomp(runProgram("git", true, { "-C", path, "--git-dir", ".git", "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
 static bool isNotDotGitDirectory(const Path & path)
@@ -154,11 +154,11 @@ struct GitInputScheme : InputScheme
         assert(sourcePath);
 
         runProgram("git", true,
-            { "-C", *sourcePath, "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", *sourcePath, "--git-dir", ".git", "add", "--force", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", *sourcePath, "--git-dir", ".git", "commit", std::string(file), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -237,7 +237,7 @@ struct GitInputScheme : InputScheme
 
             try {
                 if (haveCommits) {
-                    runProgram("git", true, { "-C", actualUrl, "diff-index", "--quiet", "HEAD", "--" });
+                    runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "diff-index", "--quiet", "HEAD", "--" });
                     clean = true;
                 }
             } catch (ExecError & e) {
@@ -254,7 +254,7 @@ struct GitInputScheme : InputScheme
                 if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
-                auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
+                auto gitOpts = Strings({ "-C", actualUrl, "--git-dir", ".git", "ls-files", "-z" });
                 if (submodules)
                     gitOpts.emplace_back("--recurse-submodules");
 
@@ -282,7 +282,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePath), input};
             }
@@ -303,7 +303,7 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
