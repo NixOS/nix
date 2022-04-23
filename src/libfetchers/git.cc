@@ -23,7 +23,7 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 
 static std::string readHead(const Path & path)
 {
-    return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+    return chomp(runProgram("git", true, { "-C", path, "--git-dir", ".git", "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
 static bool isNotDotGitDirectory(const Path & path)
@@ -152,11 +152,11 @@ struct GitInputScheme : InputScheme
         assert(sourcePath);
 
         runProgram("git", true,
-            { "-C", *sourcePath, "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", *sourcePath, "--git-dir", ".git", "add", "--force", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", *sourcePath, "--git-dir", ".git", "commit", std::string(file), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -259,7 +259,7 @@ struct GitInputScheme : InputScheme
                 if (hasHead) {
                     // Using git diff is preferrable over lower-level operations here,
                     // because its conceptually simpler and we only need the exit code anyways.
-                    auto gitDiffOpts = Strings({ "-C", actualUrl, "diff", "HEAD", "--quiet"});
+                    auto gitDiffOpts = Strings({ "-C", actualUrl, "--git-dir", ".git", "diff", "HEAD", "--quiet"});
                     if (!submodules) {
                         // Changes in submodules should only make the tree dirty
                         // when those submodules will be copied as well.
@@ -284,7 +284,7 @@ struct GitInputScheme : InputScheme
                 if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
-                auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
+                auto gitOpts = Strings({ "-C", actualUrl, "--git-dir", ".git", "ls-files", "-z" });
                 if (submodules)
                     gitOpts.emplace_back("--recurse-submodules");
 
@@ -314,7 +314,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "--git-dir", ".git", "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePath), input};
             }
@@ -335,7 +335,7 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
