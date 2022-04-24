@@ -21,6 +21,15 @@ namespace nix::fetchers {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
+static std::string getGitDir()
+{
+    auto gitDir = getEnv("GIT_DIR");
+    if (!gitDir) {
+        return ".git";
+    }
+    return *gitDir;
+}
+
 static std::string readHead(const Path & path)
 {
     return chomp(runProgram("git", true, { "-C", path, "--git-dir", ".git", "rev-parse", "--abbrev-ref", "HEAD" }));
@@ -152,13 +161,14 @@ struct GitInputScheme : InputScheme
     {
         auto sourcePath = getSourcePath(input);
         assert(sourcePath);
+        auto gitDir = getGitDir();
 
         runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", ".git", "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "--git-dir", ".git", "commit", std::string(file), "-m", *commitMsg });
+                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -177,6 +187,7 @@ struct GitInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
+        auto gitDir = getGitDir();
 
         std::string name = input.getName();
 
@@ -224,20 +235,19 @@ struct GitInputScheme : InputScheme
 
             /* Check whether this repo has any commits. There are
                probably better ways to do this. */
-            auto gitDir = actualUrl + "/.git";
             auto commonGitDir = chomp(runProgram(
                 "git",
                 true,
-                { "-C", actualUrl, "rev-parse", "--git-common-dir" }
+                { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", "--git-common-dir" }
             ));
-            if (commonGitDir != ".git")
-                    gitDir = commonGitDir;
+            if (commonGitDir[0] != '/')
+                commonGitDir = concatStrings(actualUrl, "/", commonGitDir);
 
-            bool haveCommits = !readDirectory(gitDir + "/refs/heads").empty();
+            bool haveCommits = !readDirectory(commonGitDir + "/refs/heads").empty();
 
             try {
                 if (haveCommits) {
-                    runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "diff-index", "--quiet", "HEAD", "--" });
+                    runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "diff-index", "--quiet", "HEAD", "--" });
                     clean = true;
                 }
             } catch (ExecError & e) {
@@ -254,7 +264,7 @@ struct GitInputScheme : InputScheme
                 if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
-                auto gitOpts = Strings({ "-C", actualUrl, "--git-dir", ".git", "ls-files", "-z" });
+                auto gitOpts = Strings({ "-C", actualUrl, "--git-dir", gitDir, "ls-files", "-z" });
                 if (submodules)
                     gitOpts.emplace_back("--recurse-submodules");
 
@@ -282,7 +292,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePath), input};
             }
@@ -303,7 +313,7 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", ".git", "rev-parse", *input.getRef() })), htSHA1).gitRev());
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
@@ -319,6 +329,7 @@ struct GitInputScheme : InputScheme
 
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
+            gitDir = ".";
 
             createDirs(dirOf(cacheDir));
             PathLocks cacheDirLock({cacheDir + ".lock"});
@@ -395,7 +406,7 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
+        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
         if (isShallow && !shallow)
             throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", actualUrl);
