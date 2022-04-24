@@ -81,7 +81,7 @@ case "$1" in
     case "$2" in
       add-file|add-path|cat|copy-sigs|delete|diff-closures|dump-path|gc|ls)
         ;& # fallthrough
-      make-content-addressable|optimise|ping|prefetch-file|repair|sign|verify)
+      make-content-addressed|optimise|ping|prefetch-file|repair|sign|verify)
         man "nix3-$1-$2" ;;
       *)
         man "nix3-$1" ;;
