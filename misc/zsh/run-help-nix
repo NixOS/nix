@@ -1,0 +1,97 @@
+emulate -L zsh
+
+# run-help is a zsh widget that can be bound to a key. It mainly looks up the
+# man page for the currently typed in command.
+#
+# Although run-help works for any command without requiring special support,
+# it can only deduce the right man page based solely on the name of the
+# command. Programs like Nix provide better integration with run-help by
+# helping zsh identify Nix subcommands and their corresponding man pages. This
+# is what this function does.
+#
+# To actually use run-help on zsh, place the following lines in your .zshrc:
+#
+#     (( $+aliases[run-help] )) && unalias run-help
+#     autoload -Uz run-help run-help-nix
+#
+# Then also assign run-help to any key of choice:
+#
+#     bindkey '^[h' run-help
+
+if (( $# == 0 )); then
+  man nix
+  return
+fi
+
+while [[ "$#" != 0 && "$1" == -* ]]; do
+  shift
+done
+
+case "$1" in
+  flake)
+    case "$2" in
+      archive|check|clone|info|init|lock|metadata|new|prefetch|show|update)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  hash)
+    case "$2" in
+      file|path|to-base16|to-base32|to-base64|to-sri)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  key)
+    case "$2" in
+      convert-secret-to-public|generate-secret)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  nar)
+    case "$2" in
+      cat|dump-path|ls)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  profile)
+    case "$2" in
+      diff-closures|history|install|list|remove|rollback|upgrade|wipe-history)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  realisation)
+    case "$2" in
+      info)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  registry)
+    case "$2" in
+      add|list|pin|remove)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  store)
+    case "$2" in
+      add-file|add-path|cat|copy-sigs|delete|diff-closures|dump-path|gc|ls)
+        ;& # fallthrough
+      make-content-addressable|optimise|ping|prefetch-file|repair|sign|verify)
+        man "nix3-$1-$2" ;;
+      *)
+        man "nix3-$1" ;;
+    esac ;;
+  *)
+    if man -w "nix3-$1" >/dev/null 2>&1; then
+      man "nix3-$1"
+    else
+      man nix
+    fi ;;
+esac
+
+return $?
