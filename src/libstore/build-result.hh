@@ -1,6 +1,7 @@
 #pragma once
 
 #include "realisation.hh"
+#include "derived-path.hh"
 
 #include <string>
 #include <chrono>
@@ -30,6 +31,8 @@ struct BuildResult
         ResolvesToAlreadyValid,
         NoSubstituters,
     } status = MiscFailure;
+
+    // FIXME: include entire ErrorInfo object.
     std::string errorMsg;
 
     std::string toString() const {

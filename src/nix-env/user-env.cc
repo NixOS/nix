@@ -56,7 +56,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
         std::optional<StorePath> drvPath = keepDerivations ? i.queryDrvPath() : std::nullopt;
-        DrvInfo::Outputs outputs = i.queryOutputs(true);
+        DrvInfo::Outputs outputs = i.queryOutputs(true, true);
         StringSet metaNames = i.queryMetaNames();
 
         auto attrs = state.buildBindings(7 + outputs.size());
@@ -76,15 +76,15 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         for (const auto & [m, j] : enumerate(outputs)) {
             (vOutputs.listElems()[m] = state.allocValue())->mkString(j.first);
             auto outputAttrs = state.buildBindings(2);
-            outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(j.second));
+            outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
             attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            state.store->addTempRoot(j.second);
-            state.store->ensurePath(j.second);
+            state.store->addTempRoot(*j.second);
+            state.store->ensurePath(*j.second);
 
-            references.insert(j.second);
+            references.insert(*j.second);
         }
 
         // Copy the meta attributes.
@@ -105,8 +105,10 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
+    std::ostringstream str;
+    manifest.print(state.symbols, str, true);
     auto manifestFile = state.store->addTextToStore("env-manifest.nix",
-        fmt("%s", manifest), references);
+        str.str(), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
@@ -132,9 +134,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
     PathSet context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
-    auto topLevelDrv = state.coerceToStorePath(*aDrvPath.pos, *aDrvPath.value, context);
+    auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context);
     Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
-    auto topLevelOut = state.coerceToStorePath(*aOutPath.pos, *aOutPath.value, context);
+    auto topLevelOut = state.coerceToStorePath(aOutPath.pos, *aOutPath.value, context);
 
     /* Realise the resulting store expression. */
     debug("building user environment");

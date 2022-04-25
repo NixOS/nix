@@ -62,22 +62,21 @@ struct ProfileElement
         return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
     }
 
-    void updateStorePaths(ref<Store> evalStore, ref<Store> store, Installable & installable)
+    void updateStorePaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        const BuiltPaths & builtPaths)
     {
         // FIXME: respect meta.outputsToInstall
         storePaths.clear();
-        for (auto & buildable : getBuiltPaths(evalStore, store, installable.toDerivedPaths())) {
+        for (auto & buildable : builtPaths) {
             std::visit(overloaded {
                 [&](const BuiltPath::Opaque & bo) {
                     storePaths.insert(bo.path);
                 },
                 [&](const BuiltPath::Built & bfd) {
-                    // TODO: Why are we querying if we know the output
-                    // names already? Is it just to figure out what the
-                    // default one is?
-                    for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
+                    for (auto & output : bfd.outputs)
                         storePaths.insert(output.second);
-                    }
                 },
             }, buildable.raw());
         }
@@ -98,18 +97,30 @@ struct ProfileManifest
             auto json = nlohmann::json::parse(readFile(manifestPath));
 
             auto version = json.value("version", 0);
-            if (version != 1)
-                throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+            std::string sUrl;
+            std::string sOriginalUrl;
+            switch(version){
+                case 1:
+                    sUrl = "uri";
+                    sOriginalUrl = "originalUri";
+                    break;
+                case 2:
+                    sUrl = "url";
+                    sOriginalUrl = "originalUrl";
+                    break;
+                default:
+                    throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+            }
 
             for (auto & e : json["elements"]) {
                 ProfileElement element;
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
-                if (e.value("uri", "") != "") {
+                if (e.value(sUrl,"") != "") {
                     element.source = ProfileElementSource{
-                        parseFlakeRef(e["originalUri"]),
-                        parseFlakeRef(e["uri"]),
+                        parseFlakeRef(e[sOriginalUrl]),
+                        parseFlakeRef(e[sUrl]),
                         e["attrPath"]
                     };
                 }
@@ -143,14 +154,14 @@ struct ProfileManifest
             obj["storePaths"] = paths;
             obj["active"] = element.active;
             if (element.source) {
-                obj["originalUri"] = element.source->originalRef.to_string();
-                obj["uri"] = element.source->resolvedRef.to_string();
+                obj["originalUrl"] = element.source->originalRef.to_string();
+                obj["url"] = element.source->resolvedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
             }
             array.push_back(obj);
         }
         nlohmann::json json;
-        json["version"] = 1;
+        json["version"] = 2;
         json["elements"] = array;
         return json.dump();
     }
@@ -235,6 +246,16 @@ struct ProfileManifest
     }
 };
 
+static std::map<Installable *, BuiltPaths>
+builtPathsPerInstallable(
+    const std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> & builtPaths)
+{
+    std::map<Installable *, BuiltPaths> res;
+    for (auto & [installable, builtPath] : builtPaths)
+        res[installable.get()].push_back(builtPath);
+    return res;
+}
+
 struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 {
     std::string description() override
@@ -253,7 +274,9 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        auto builtPaths = Installable::build(getEvalStore(), store, Realise::Outputs, installables, bmNormal);
+        auto builtPaths = builtPathsPerInstallable(
+            Installable::build2(
+                getEvalStore(), store, Realise::Outputs, installables, bmNormal));
 
         for (auto & installable : installables) {
             ProfileElement element;
@@ -268,7 +291,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 };
             }
 
-            element.updateStorePaths(getEvalStore(), store, *installable);
+            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
 
             manifest.elements.push_back(std::move(element));
         }
@@ -456,12 +479,14 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
             warn ("Use 'nix profile list' to see the current profile.");
         }
 
-        auto builtPaths = Installable::build(getEvalStore(), store, Realise::Outputs, installables, bmNormal);
+        auto builtPaths = builtPathsPerInstallable(
+            Installable::build2(
+                getEvalStore(), store, Realise::Outputs, installables, bmNormal));
 
         for (size_t i = 0; i < installables.size(); ++i) {
             auto & installable = installables.at(i);
             auto & element = manifest.elements[indices.at(i)];
-            element.updateStorePaths(getEvalStore(), store, *installable);
+            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
         }
 
         updateProfile(manifest.build(store));

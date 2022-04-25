@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
 #include "gc-store.hh"
 
 using namespace nix;
@@ -34,7 +35,7 @@ struct CmdStoreGC : StoreCommand, MixDryRun
 
     void run(ref<Store> store) override
     {
-        auto & gcStore = requireGcStore(*store);
+        auto & gcStore = require<GcStore>(*store);
 
         options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
         GCResults results;

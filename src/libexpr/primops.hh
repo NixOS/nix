@@ -16,6 +16,7 @@ struct RegisterPrimOp
         size_t arity = 0;
         const char * doc;
         PrimOpFun fun;
+        std::optional<ExperimentalFeature> experimentalFeature;
     };
 
     typedef std::vector<Info> PrimOps;
@@ -35,10 +36,11 @@ struct RegisterPrimOp
 /* These primops are disabled without enableNativeCode, but plugins
    may wish to use them in limited contexts without globally enabling
    them. */
+
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
-void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v);
+void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 /* Execute a program and parse its output */
-void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v);
+void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 }

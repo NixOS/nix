@@ -79,6 +79,7 @@ perl/Makefile.config
 /tests/shell.drv
 /tests/config.nix
 /tests/ca/config.nix
+/tests/repl-result-out
 
 # /tests/lang/
 /tests/lang/*.out
@@ -90,6 +91,7 @@ perl/Makefile.config
 
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
+/misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
 
 /src/resolve-system-dependencies/resolve-system-dependencies

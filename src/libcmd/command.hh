@@ -85,11 +85,12 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
+    bool readOnlyMode = false;
 
     // FIXME: move this; not all commands (e.g. 'nix run') use it.
     OperateOn operateOn = OperateOn::Output;
 
-    SourceExprCommand();
+    SourceExprCommand(bool supportReadOnlyMode = false);
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
@@ -128,13 +129,13 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand();
+    InstallableCommand(bool supportReadOnlyMode = false);
 
     void prepare() override;
 
     std::optional<FlakeRef> getFlakeRefForCompletion() override
     {
-        return parseFlakeRef(_installable, absPath("."));
+        return parseFlakeRefWithFragment(_installable, absPath(".")).first;
     }
 
 private:
@@ -218,7 +219,7 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
 
 /* Helper function to generate args that invoke $EDITOR on
    filename:lineno. */
-Strings editorFor(const Pos & pos);
+Strings editorFor(const Path & file, uint32_t line);
 
 struct MixProfile : virtual StoreCommand
 {

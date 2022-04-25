@@ -70,7 +70,7 @@ are installed in this version of the profile. It looks like this:
     {
       "active": true,
       "attrPath": "legacyPackages.x86_64-linux.zoom-us",
-      "originalUri": "flake:nixpkgs",
+      "originalUrl": "flake:nixpkgs",
       "storePaths": [
         "/nix/store/wbhg2ga8f3h87s9h5k0slxk0m81m4cxl-zoom-us-5.3.469451.0927"
       ],
@@ -84,11 +84,11 @@ are installed in this version of the profile. It looks like this:
 Each object in the array `elements` denotes an installed package and
 has the following fields:
 
-* `originalUri`: The [flake reference](./nix3-flake.md) specified by
+* `originalUrl`: The [flake reference](./nix3-flake.md) specified by
   the user at the time of installation (e.g. `nixpkgs`). This is also
   the flake reference that will be used by `nix profile upgrade`.
 
-* `uri`: The immutable flake reference to which `originalUri`
+* `uri`: The immutable flake reference to which `originalUrl`
   resolved.
 
 * `attrPath`: The flake output attribute that provided this

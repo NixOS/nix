@@ -7,11 +7,13 @@ fi
 
 clearStore
 
-repo=$TEST_ROOT/git
+# Intentionally not in a canonical form
+# See https://github.com/NixOS/nix/issues/6195
+repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix $TEST_ROOT/worktree $TEST_ROOT/shallow $TEST_ROOT/minimal
 
 git init $repo
 git -C $repo config user.email "foobar@example.com"
@@ -147,8 +149,13 @@ path3=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 # (check dirty-tree handling was used)
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).shortRev") = 0000000 ]]
+# Making a dirty tree clean again and fetching it should
+# record correct revision information. See: #4140
+echo world > $repo/hello
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = $rev2 ]]
 
 # Committing shouldn't change store path, or switch to using 'master'
+echo dev > $repo/hello
 git -C $repo commit -m 'Bla5' -a
 path4=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [[ $(cat $path4/hello) = dev ]]
@@ -169,6 +176,14 @@ NIX=$(command -v nix)
 # Try again, with 'git' available.  This should work.
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
+
+# Fetching from a repo with only a specific revision and no branches should
+# not fall back to copying files and record correct revision information. See: #5302
+mkdir $TEST_ROOT/minimal
+git -C $TEST_ROOT/minimal init
+git -C $TEST_ROOT/minimal fetch $repo $rev2
+git -C $TEST_ROOT/minimal checkout $rev2
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = $rev2 ]]
 
 # Fetching a shallow repo shouldn't work by default, because we can't
 # return a revCount.
@@ -193,3 +208,11 @@ rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$
 # The name argument should be handled
 path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; name = \"foo\"; }).outPath")
 [[ $path9 =~ -foo$ ]]
+
+# should fail if there is no repo
+rm -rf $repo/.git
+(! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
+
+# should succeed for a repo without commits
+git init $repo
+path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")

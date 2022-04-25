@@ -21,6 +21,8 @@ struct AttrDb
 {
     std::atomic_bool failed{false};
 
+    const Store & cfg;
+
     struct State
     {
         SQLite db;
@@ -33,8 +35,9 @@ struct AttrDb
 
     std::unique_ptr<Sync<State>> _state;
 
-    AttrDb(const Hash & fingerprint)
-        : _state(std::make_unique<Sync<State>>())
+    AttrDb(const Store & cfg, const Hash & fingerprint)
+        : cfg(cfg)
+        , _state(std::make_unique<Sync<State>>())
     {
         auto state(_state->lock());
 
@@ -250,14 +253,14 @@ struct AttrDb
                 std::vector<Symbol> attrs;
                 auto queryAttributes(state->queryAttributes.use()(rowId));
                 while (queryAttributes.next())
-                    attrs.push_back(symbols.create(queryAttributes.getStr(0)));
+                    attrs.emplace_back(queryAttributes.getStr(0));
                 return {{rowId, attrs}};
             }
             case AttrType::String: {
-                std::vector<std::pair<Path, std::string>> context;
+                NixStringContext context;
                 if (!queryAttribute.isNull(3))
                     for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
-                        context.push_back(decodeContext(s));
+                        context.push_back(decodeContext(cfg, s));
                 return {{rowId, string_t{queryAttribute.getStr(2), context}}};
             }
             case AttrType::Bool:
@@ -274,10 +277,10 @@ struct AttrDb
     }
 };
 
-static std::shared_ptr<AttrDb> makeAttrDb(const Hash & fingerprint)
+static std::shared_ptr<AttrDb> makeAttrDb(const Store & cfg, const Hash & fingerprint)
 {
     try {
-        return std::make_shared<AttrDb>(fingerprint);
+        return std::make_shared<AttrDb>(cfg, fingerprint);
     } catch (SQLiteError &) {
         ignoreException();
         return nullptr;
@@ -288,7 +291,7 @@ EvalCache::EvalCache(
     std::optional<std::reference_wrapper<const Hash>> useCache,
     EvalState & state,
     RootLoader rootLoader)
-    : db(useCache ? makeAttrDb(*useCache) : nullptr)
+    : db(useCache ? makeAttrDb(*state.store, *useCache) : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {
@@ -303,9 +306,9 @@ Value * EvalCache::getRootValue()
     return *value;
 }
 
-std::shared_ptr<AttrCursor> EvalCache::getRoot()
+ref<AttrCursor> EvalCache::getRoot()
 {
-    return std::make_shared<AttrCursor>(ref(shared_from_this()), std::nullopt);
+    return make_ref<AttrCursor>(ref(shared_from_this()), std::nullopt);
 }
 
 AttrCursor::AttrCursor(
@@ -322,7 +325,7 @@ AttrCursor::AttrCursor(
 AttrKey AttrCursor::getKey()
 {
     if (!parent)
-        return {0, root->state.sEpsilon};
+        return {0, {""}};
     if (!parent->first->cachedValue) {
         parent->first->cachedValue = root->db->getAttr(
             parent->first->getKey(), root->state.symbols);
@@ -337,7 +340,7 @@ Value & AttrCursor::getValue()
         if (parent) {
             auto & vParent = parent->first->getValue();
             root->state.forceAttrs(vParent, noPos);
-            auto attr = vParent.attrs->get(parent->second);
+            auto attr = vParent.attrs->get(root->state.symbols.create(parent->second));
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
             _value = allocRootValue(attr->value);
@@ -416,7 +419,7 @@ Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
     return Suggestions::bestMatches(strAttrNames, name);
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErrors)
+std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name, bool forceErrors)
 {
     if (root->db) {
         if (!cachedValue)
@@ -458,10 +461,10 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
 
     for (auto & attr : *v.attrs) {
         if (root->db)
-            root->db->setPlaceholder({cachedValue->first, attr.name});
+            root->db->setPlaceholder({cachedValue->first, root->state.symbols[attr.name]});
     }
 
-    auto attr = v.attrs->get(name);
+    auto attr = v.attrs->get(root->state.symbols.create(name));
 
     if (!attr) {
         if (root->db) {
@@ -483,22 +486,12 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
         root, std::make_pair(shared_from_this(), name), attr->value, std::move(cachedValue2));
 }
 
-std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(std::string_view name)
-{
-    return maybeGetAttr(root->state.symbols.create(name));
-}
-
-ref<AttrCursor> AttrCursor::getAttr(Symbol name, bool forceErrors)
+ref<AttrCursor> AttrCursor::getAttr(std::string_view name, bool forceErrors)
 {
     auto p = maybeGetAttr(name, forceErrors);
     if (!p)
         throw Error("attribute '%s' does not exist", getAttrPathStr(name));
     return ref(p);
-}
-
-ref<AttrCursor> AttrCursor::getAttr(std::string_view name)
-{
-    return getAttr(root->state.symbols.create(name));
 }
 
 OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force)
@@ -546,7 +539,7 @@ string_t AttrCursor::getStringWithContext()
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
                 for (auto & c : s->second) {
-                    if (!root->state.store->isValidPath(root->state.store->parseStorePath(c.first))) {
+                    if (!root->state.store->isValidPath(c.first)) {
                         valid = false;
                         break;
                     }
@@ -563,7 +556,7 @@ string_t AttrCursor::getStringWithContext()
     auto & v = forceValue();
 
     if (v.type() == nString)
-        return {v.string.s, v.getContext()};
+        return {v.string.s, v.getContext(*root->state.store)};
     else if (v.type() == nPath)
         return {v.path, {}};
     else
@@ -613,7 +606,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
 
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs)
-        attrs.push_back(attr.name);
+        attrs.push_back(root->state.symbols[attr.name]);
     std::sort(attrs.begin(), attrs.end(), [](const Symbol & a, const Symbol & b) {
         return (const std::string &) a < (const std::string &) b;
     });
@@ -632,7 +625,7 @@ bool AttrCursor::isDerivation()
 
 StorePath AttrCursor::forceDerivation()
 {
-    auto aDrvPath = getAttr(root->state.sDrvPath, true);
+    auto aDrvPath = getAttr("drvPath", true);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has

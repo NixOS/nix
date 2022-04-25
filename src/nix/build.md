@@ -25,6 +25,13 @@ R""(
   lrwxrwxrwx 1 … result-1 -> /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
   ```
 
+* Build GNU Hello and print the resulting store path.
+
+  ```console
+  # nix build nixpkgs#hello --print-out-paths
+  /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+  ```
+
 * Build a specific output:
 
   ```console

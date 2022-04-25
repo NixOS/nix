@@ -71,13 +71,11 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
-void replaceEnv(std::map<std::string, std::string> newEnv)
+void replaceEnv(const std::map<std::string, std::string> & newEnv)
 {
     clearEnv();
-    for (auto newEnvVar : newEnv)
-    {
+    for (auto & newEnvVar : newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
-    }
 }
 
 
@@ -200,6 +198,17 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
+std::string expandTilde(std::string_view path)
+{
+    // TODO: expand ~user ?
+    auto tilde = path.substr(0, 2);
+    if (tilde == "~/" || tilde == "~")
+        return getHome() + std::string(path.substr(1));
+    else
+        return std::string(path);
+}
+
+
 bool isInDir(std::string_view path, std::string_view dir)
 {
     return path.substr(0, 1) == "/"
@@ -212,6 +221,15 @@ bool isInDir(std::string_view path, std::string_view dir)
 bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
+}
+
+
+struct stat stat(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError("getting status of '%1%'", path);
+    return st;
 }
 
 
@@ -406,8 +424,29 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         throw SysError("getting status of '%1%'", path);
     }
 
-    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
-        bytesFreed += st.st_size;
+    if (!S_ISDIR(st.st_mode)) {
+        /* We are about to delete a file. Will it likely free space? */
+
+        switch (st.st_nlink) {
+            /* Yes: last link. */
+            case 1:
+                bytesFreed += st.st_size;
+                break;
+            /* Maybe: yes, if 'auto-optimise-store' or manual optimisation
+               was performed. Instead of checking for real let's assume
+               it's an optimised file and space will be freed.
+
+               In worst case we will double count on freed space for files
+               with exactly two hardlinks for unoptimised packages.
+             */
+            case 2:
+                bytesFreed += st.st_size;
+                break;
+            /* No: 3+ links. */
+            default:
+                break;
+        }
+    }
 
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
@@ -682,7 +721,14 @@ std::string drainFD(int fd, bool block, const size_t reserveSize)
 
 void drainFD(int fd, Sink & sink, bool block)
 {
-    int saved;
+    // silence GCC maybe-uninitialized warning in finally
+    int saved = 0;
+
+    if (!block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
 
     Finally finally([&]() {
         if (!block) {
@@ -690,12 +736,6 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("making file descriptor blocking");
         }
     });
-
-    if (!block) {
-        saved = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
-            throw SysError("making file descriptor non-blocking");
-    }
 
     std::vector<unsigned char> buf(64 * 1024);
     while (1) {
@@ -1042,7 +1082,7 @@ std::string runProgram(Path program, bool searchPath, const Strings & args,
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -1170,7 +1210,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
+        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
 
 
@@ -1239,9 +1279,9 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
-    while (pos != std::string::npos) {
+    while (pos != std::string_view::npos) {
         auto end = s.find_first_of(separators, pos + 1);
-        if (end == std::string::npos) end = s.size();
+        if (end == std::string_view::npos) end = s.size();
         result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
@@ -1451,6 +1491,7 @@ constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 std::string base64Encode(std::string_view s)
 {
     std::string res;
+    res.reserve((s.size() + 2) / 3 * 4);
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1482,6 +1523,9 @@ std::string base64Decode(std::string_view s)
     }();
 
     std::string res;
+    // Some sequences are missing the padding consisting of up to two '='.
+    //                    vvv
+    res.reserve((s.size() + 2) / 4 * 3);
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
@@ -1668,7 +1712,9 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
+#if __linux__
 static AutoCloseFD fdSavedMountNamespace;
+#endif
 
 void saveMountNamespace()
 {
@@ -1687,8 +1733,13 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
+        auto savedCwd = absPath(".");
+
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
+        if (chdir(savedCwd.c_str()) == -1) {
+            throw SysError("restoring cwd");
+        }
     } catch (Error & e) {
         debug(e.msg());
     }

@@ -1,5 +1,6 @@
 nix_tests = \
   flakes.sh \
+  flakes-run.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
@@ -21,6 +22,7 @@ nix_tests = \
   tarball.sh \
   fetchGit.sh \
   fetchurl.sh \
+  fetchPath.sh \
   simple.sh \
   referrers.sh \
   optimise-store.sh \
@@ -52,6 +54,7 @@ nix_tests = \
   build-remote-content-addressed-floating.sh \
   nar-access.sh \
   pure-eval.sh \
+  eval.sh \
   ca/post-hook.sh \
   repl.sh \
   ca/repl.sh \
@@ -77,6 +80,7 @@ nix_tests = \
   post-hook.sh \
   function-trace.sh \
   flake-local-settings.sh \
+  fmt.sh \
   eval-store.sh \
   why-depends.sh \
   import-derivation.sh \
@@ -88,13 +92,16 @@ nix_tests = \
   plugins.sh \
   build.sh \
   ca/nix-run.sh \
+  selfref-gc.sh ca/selfref-gc.sh \
   db-migration.sh \
   bash-profile.sh \
   pass-as-file.sh \
   describe-stores.sh \
   nix-profile.sh \
   suggestions.sh \
-  store-ping.sh
+  store-ping.sh \
+  fetchClosure.sh \
+  impure-derivations.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh

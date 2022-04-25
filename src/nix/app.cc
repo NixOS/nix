@@ -4,6 +4,7 @@
 #include "eval-cache.hh"
 #include "names.hh"
 #include "command.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -34,7 +35,7 @@ struct InstallableDerivedPath : Installable
 
 /**
  * Return the rewrites that are needed to resolve a string whose context is
- * included in `dependencies`
+ * included in `dependencies`.
  */
 StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 {
@@ -50,7 +51,7 @@ StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 }
 
 /**
- * Resolve the given string assuming the given context
+ * Resolve the given string assuming the given context.
  */
 std::string resolveString(Store & store, const std::string & toResolve, const BuiltPaths dependencies)
 {
@@ -60,17 +61,21 @@ std::string resolveString(Store & store, const std::string & toResolve, const Bu
 
 UnresolvedApp Installable::toApp(EvalState & state)
 {
-    auto [cursor, attrPath] = getCursor(state);
+    auto cursor = getCursor(state);
+    auto attrPath = cursor->getAttrPath();
 
     auto type = cursor->getAttr("type")->getString();
+
+    std::string expected = !attrPath.empty() && attrPath[0] == "apps" ? "app" : "derivation";
+    if (type != expected)
+        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
 
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
-
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
-            context2.push_back({state.store->parseStorePath(path), {name}});
+            context2.push_back({path, {name}});
 
         return UnresolvedApp{App {
             .context = std::move(context2),
@@ -80,9 +85,9 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
     else if (type == "derivation") {
         auto drvPath = cursor->forceDerivation();
-        auto outPath = cursor->getAttr(state.sOutPath)->getString();
-        auto outputName = cursor->getAttr(state.sOutputName)->getString();
-        auto name = cursor->getAttr(state.sName)->getString();
+        auto outPath = cursor->getAttr("outPath")->getString();
+        auto outputName = cursor->getAttr("outputName")->getString();
+        auto name = cursor->getAttr("name")->getString();
         auto aPname = cursor->maybeGetAttr("pname");
         auto aMeta = cursor->maybeGetAttr("meta");
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
@@ -100,7 +105,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
     }
 
     else
-        throw Error("attribute '%s' has unsupported type '%s'", attrPath, type);
+        throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), type);
 }
 
 // FIXME: move to libcmd

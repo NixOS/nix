@@ -9,7 +9,7 @@
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
-#include "fmt.hh"
+#include "hilite.hh"
 
 #include <regex>
 #include <fstream>
@@ -154,7 +154,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                     recurse();
 
                 else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
-                    auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
+                    auto attr = cursor.maybeGetAttr("recurseForDerivations");
                     if (attr && attr->getBool())
                         recurse();
                 }
@@ -165,8 +165,8 @@ struct CmdSearch : InstallableCommand, MixJSON
             }
         };
 
-        for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix), true);
+        for (auto & cursor : installable->getCursors(*state))
+            visit(*cursor, cursor->getAttrPath(), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

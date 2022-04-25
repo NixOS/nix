@@ -15,17 +15,26 @@ struct Value;
 /* Map one attribute name to its value. */
 struct Attr
 {
-    Symbol name;
+    /* the placement of `name` and `pos` in this struct is important.
+       both of them are uint32 wrappers, they are next to each other
+       to make sure that Attr has no padding on 64 bit machines. that
+       way we keep Attr size at two words with no wasted space. */
+    SymbolIdx name;
+    PosIdx pos;
     Value * value;
-    ptr<Pos> pos;
-    Attr(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
-        : name(name), value(value), pos(pos) { };
-    Attr() : pos(&noPos) { };
+    Attr(SymbolIdx name, Value * value, PosIdx pos = noPos)
+        : name(name), pos(pos), value(value) { };
+    Attr() { };
     bool operator < (const Attr & a) const
     {
         return name < a.name;
     }
 };
+
+static_assert(sizeof(Attr) == 2 * sizeof(uint32_t) + sizeof(Value *),
+    "performance of the evaluator is highly sensitive to the size of Attr. "
+    "avoid introducing any padding into Attr if at all possible, and do not "
+    "introduce new fields that need not be present for almost every instance.");
 
 /* Bindings contains all the attributes of an attribute set. It is defined
    by its size and its capacity, the capacity being the number of Attr
@@ -35,13 +44,13 @@ class Bindings
 {
 public:
     typedef uint32_t size_t;
-    ptr<Pos> pos;
+    PosIdx pos;
 
 private:
     size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : pos(&noPos), size_(0), capacity_(capacity) { }
+    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
     Bindings(const Bindings & bindings) = delete;
 
 public:
@@ -57,7 +66,7 @@ public:
         attrs[size_++] = attr;
     }
 
-    iterator find(const Symbol & name)
+    iterator find(const SymbolIdx & name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
@@ -65,24 +74,12 @@ public:
         return end();
     }
 
-    Attr * get(const Symbol & name)
+    Attr * get(const SymbolIdx & name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
         if (i != end() && i->name == name) return &*i;
         return nullptr;
-    }
-
-    Attr & need(const Symbol & name, const Pos & pos = noPos)
-    {
-        auto a = get(name);
-        if (!a)
-            throw Error({
-                .msg = hintfmt("attribute '%s' missing", name),
-                .errPos = pos
-            });
-
-        return *a;
     }
 
     iterator begin() { return &attrs[0]; }
@@ -98,14 +95,15 @@ public:
     size_t capacity() { return capacity_; }
 
     /* Returns the attributes in lexicographically sorted order. */
-    std::vector<const Attr *> lexicographicOrder() const
+    std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
     {
         std::vector<const Attr *> res;
         res.reserve(size_);
         for (size_t n = 0; n < size_; n++)
             res.emplace_back(&attrs[n]);
-        std::sort(res.begin(), res.end(), [](const Attr * a, const Attr * b) {
-            return (const std::string &) a->name < (const std::string &) b->name;
+        std::sort(res.begin(), res.end(), [&](const Attr * a, const Attr * b) {
+            std::string_view sa = symbols[a->name], sb = symbols[b->name];
+            return sa < sb;
         });
         return res;
     }
@@ -130,7 +128,7 @@ public:
         : bindings(bindings), state(state)
     { }
 
-    void insert(Symbol name, Value * value, ptr<Pos> pos = ptr(&noPos))
+    void insert(SymbolIdx name, Value * value, PosIdx pos = noPos)
     {
         insert(Attr(name, value, pos));
     }
@@ -145,9 +143,9 @@ public:
         bindings->push_back(attr);
     }
 
-    Value & alloc(const Symbol & name, ptr<Pos> pos = ptr(&noPos));
+    Value & alloc(const SymbolIdx & name, PosIdx pos = noPos);
 
-    Value & alloc(std::string_view name, ptr<Pos> pos = ptr(&noPos));
+    Value & alloc(std::string_view name, PosIdx pos = noPos);
 
     Bindings * finish()
     {
