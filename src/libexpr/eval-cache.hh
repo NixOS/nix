@@ -96,9 +96,13 @@ public:
 
     Suggestions getSuggestionsForAttr(Symbol name);
 
-    std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name, bool forceErrors = false);
+    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
 
-    ref<AttrCursor> getAttr(std::string_view name, bool forceErrors = false);
+    std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
+
+    ref<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
+
+    ref<AttrCursor> getAttr(std::string_view name);
 
     /* Get an attribute along a chain of attrsets. Note that this does
        not auto-call functors or functions. */

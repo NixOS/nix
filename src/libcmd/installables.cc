@@ -600,7 +600,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
     auto drvInfo = DerivationInfo {
         std::move(drvPath),
-        attr->getAttr("outputName")->getString()
+        attr->getAttr(state->sOutputName)->getString()
     };
 
     return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
