@@ -51,7 +51,7 @@ struct missing_t {};
 struct misc_t {};
 struct failed_t {};
 typedef uint64_t AttrId;
-typedef std::pair<AttrId, std::string> AttrKey;
+typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
 
 typedef std::variant<
@@ -96,9 +96,13 @@ public:
 
     Suggestions getSuggestionsForAttr(Symbol name);
 
-    std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name, bool forceErrors = false);
+    std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
 
-    ref<AttrCursor> getAttr(std::string_view name, bool forceErrors = false);
+    std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
+
+    ref<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
+
+    ref<AttrCursor> getAttr(std::string_view name);
 
     /* Get an attribute along a chain of attrsets. Note that this does
        not auto-call functors or functions. */
