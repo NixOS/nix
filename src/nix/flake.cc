@@ -1084,6 +1084,16 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 }
 
                 else if (
+                    ((attrPath.size() == 2 && attrPath[0] == "defaultApp" && attrPath[1] == "program") || attrPath[2] == "type"))
+                {
+                  throw EvalError("flake attribute 'defaultApp' should be defaultApp.<system>, where <system> is a valid architecture such as x86_64-linux");
+                }
+                else if (
+                    ((attrPath.size() == 3 && attrPath[0] == "apps" && attrPath[2] == "program") || attrPath[2] == "type"))
+                {
+                  throw EvalError("flake attribute 'apps' should be apps.<system>.name rather than apps.name, where <system> is a valid architecture such as x86_64-linux");
+                }
+                else if (
                     (attrPath.size() == 2 && attrPath[0] == "defaultApp") ||
                     (attrPath.size() == 3 && attrPath[0] == "apps"))
                 {
