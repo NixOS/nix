@@ -1,5 +1,10 @@
 # Release X.Y (202?-??-??)
 
+* Nix now provides better integration with zsh's run-help feature. It is now
+  included in the Nix installation in the form of an autoloadable shell
+  function, run-help-nix. It picks up Nix subcommands from the currently typed
+  in command and directs the user to the associated man pages.
+
 * `nix repl` has a new build-'n-link (`:bl`) command that builds a derivation
   while creating GC root symlinks.
 
