@@ -72,12 +72,14 @@ private:
     ChunkedVector<std::string, 8192> store{16};
 
 public:
+
     Symbol create(std::string_view s)
     {
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // TODO: could probably be done more efficiently with transparent Hash and Equals
         // on the original implementation using unordered_set
+        // FIXME: make this thread-safe.
         auto it = symbols.find(s);
         if (it != symbols.end()) return Symbol(it->second.second + 1);
 

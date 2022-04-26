@@ -35,9 +35,15 @@ struct AttrDb
 
     std::unique_ptr<Sync<State>> _state;
 
-    AttrDb(const Store & cfg, const Hash & fingerprint)
+    SymbolTable & symbols;
+
+    AttrDb(
+        const Store & cfg,
+        const Hash & fingerprint,
+        SymbolTable & symbols)
         : cfg(cfg)
         , _state(std::make_unique<Sync<State>>())
+        , symbols(symbols)
     {
         auto state(_state->lock());
 
@@ -92,7 +98,6 @@ struct AttrDb
 
     AttrId setAttrs(
         AttrKey key,
-        const SymbolTable & symbols,
         const std::vector<Symbol> & attrs)
     {
         return doSQLite([&]()
@@ -101,7 +106,7 @@ struct AttrDb
 
             state->insertAttribute.use()
                 (key.first)
-                (key.second)
+                (symbols[key.second])
                 (AttrType::FullAttrs)
                 (0, false).exec();
 
@@ -136,14 +141,14 @@ struct AttrDb
                 }
                 state->insertAttributeWithContext.use()
                     (key.first)
-                    (key.second)
+                    (symbols[key.second])
                     (AttrType::String)
                     (s)
                     (ctx).exec();
             } else {
                 state->insertAttribute.use()
                     (key.first)
-                    (key.second)
+                    (symbols[key.second])
                     (AttrType::String)
                 (s).exec();
             }
@@ -162,7 +167,7 @@ struct AttrDb
 
             state->insertAttribute.use()
                 (key.first)
-                (key.second)
+                (symbols[key.second])
                 (AttrType::Bool)
                 (b ? 1 : 0).exec();
 
@@ -178,7 +183,7 @@ struct AttrDb
 
             state->insertAttribute.use()
                 (key.first)
-                (key.second)
+                (symbols[key.second])
                 (AttrType::Placeholder)
                 (0, false).exec();
 
@@ -194,7 +199,7 @@ struct AttrDb
 
             state->insertAttribute.use()
                 (key.first)
-                (key.second)
+                (symbols[key.second])
                 (AttrType::Missing)
                 (0, false).exec();
 
@@ -210,7 +215,7 @@ struct AttrDb
 
             state->insertAttribute.use()
                 (key.first)
-                (key.second)
+                (symbols[key.second])
                 (AttrType::Misc)
                 (0, false).exec();
 
@@ -226,7 +231,7 @@ struct AttrDb
 
             state->insertAttribute.use()
                 (key.first)
-                (key.second)
+                (symbols[key.second])
                 (AttrType::Failed)
                 (0, false).exec();
 
@@ -234,13 +239,11 @@ struct AttrDb
         });
     }
 
-    std::optional<std::pair<AttrId, AttrValue>> getAttr(
-        AttrKey key,
-        SymbolTable & symbols)
+    std::optional<std::pair<AttrId, AttrValue>> getAttr(AttrKey key)
     {
         auto state(_state->lock());
 
-        auto queryAttribute(state->queryAttribute.use()(key.first)(key.second));
+        auto queryAttribute(state->queryAttribute.use()(key.first)(symbols[key.second]));
         if (!queryAttribute.next()) return {};
 
         auto rowId = (AttrType) queryAttribute.getInt(0);
@@ -278,10 +281,13 @@ struct AttrDb
     }
 };
 
-static std::shared_ptr<AttrDb> makeAttrDb(const Store & cfg, const Hash & fingerprint)
+static std::shared_ptr<AttrDb> makeAttrDb(
+    const Store & cfg,
+    const Hash & fingerprint,
+    SymbolTable & symbols)
 {
     try {
-        return std::make_shared<AttrDb>(cfg, fingerprint);
+        return std::make_shared<AttrDb>(cfg, fingerprint, symbols);
     } catch (SQLiteError &) {
         ignoreException();
         return nullptr;
@@ -292,7 +298,7 @@ EvalCache::EvalCache(
     std::optional<std::reference_wrapper<const Hash>> useCache,
     EvalState & state,
     RootLoader rootLoader)
-    : db(useCache ? makeAttrDb(*state.store, *useCache) : nullptr)
+    : db(useCache ? makeAttrDb(*state.store, *useCache, state.symbols) : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {
@@ -326,13 +332,12 @@ AttrCursor::AttrCursor(
 AttrKey AttrCursor::getKey()
 {
     if (!parent)
-        return {0, {""}};
+        return {0, root->state.sEpsilon};
     if (!parent->first->cachedValue) {
-        parent->first->cachedValue = root->db->getAttr(
-            parent->first->getKey(), root->state.symbols);
+        parent->first->cachedValue = root->db->getAttr(parent->first->getKey());
         assert(parent->first->cachedValue);
     }
-    return {parent->first->cachedValue->first, root->state.symbols[parent->second]};
+    return {parent->first->cachedValue->first, parent->second};
 }
 
 Value & AttrCursor::getValue()
@@ -422,11 +427,9 @@ Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
 
 std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErrors)
 {
-    auto nameS = root->state.symbols[name];
-
     if (root->db) {
         if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+            cachedValue = root->db->getAttr(getKey());
 
         if (cachedValue) {
             if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
@@ -435,7 +438,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
                         return std::make_shared<AttrCursor>(root, std::make_pair(shared_from_this(), attr));
                 return nullptr;
             } else if (std::get_if<placeholder_t>(&cachedValue->second)) {
-                auto attr = root->db->getAttr({cachedValue->first, nameS}, root->state.symbols);
+                auto attr = root->db->getAttr({cachedValue->first, name});
                 if (attr) {
                     if (std::get_if<missing_t>(&attr->second))
                         return nullptr;
@@ -464,7 +467,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
 
     for (auto & attr : *v.attrs) {
         if (root->db)
-            root->db->setPlaceholder({cachedValue->first, root->state.symbols[attr.name]});
+            root->db->setPlaceholder({cachedValue->first, attr.name});
     }
 
     auto attr = v.attrs->get(name);
@@ -473,7 +476,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
         if (root->db) {
             if (!cachedValue)
                 cachedValue = {root->db->setPlaceholder(getKey()), placeholder_t()};
-            root->db->setMissing({cachedValue->first, nameS});
+            root->db->setMissing({cachedValue->first, name});
         }
         return nullptr;
     }
@@ -482,7 +485,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
     if (root->db) {
         if (!cachedValue)
             cachedValue = {root->db->setPlaceholder(getKey()), placeholder_t()};
-        cachedValue2 = {root->db->setPlaceholder({cachedValue->first, nameS}), placeholder_t()};
+        cachedValue2 = {root->db->setPlaceholder({cachedValue->first, name}), placeholder_t()};
     }
 
     return make_ref<AttrCursor>(
@@ -525,7 +528,7 @@ std::string AttrCursor::getString()
 {
     if (root->db) {
         if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+            cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 debug("using cached string attribute '%s'", getAttrPathStr());
@@ -547,7 +550,7 @@ string_t AttrCursor::getStringWithContext()
 {
     if (root->db) {
         if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+            cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
@@ -580,7 +583,7 @@ bool AttrCursor::getBool()
 {
     if (root->db) {
         if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+            cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto b = std::get_if<bool>(&cachedValue->second)) {
                 debug("using cached Boolean attribute '%s'", getAttrPathStr());
@@ -602,7 +605,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
 {
     if (root->db) {
         if (!cachedValue)
-            cachedValue = root->db->getAttr(getKey(), root->state.symbols);
+            cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
                 debug("using cached attrset attribute '%s'", getAttrPathStr());
@@ -626,7 +629,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     });
 
     if (root->db)
-        cachedValue = {root->db->setAttrs(getKey(), root->state.symbols, attrs), attrs};
+        cachedValue = {root->db->setAttrs(getKey(), attrs), attrs};
 
     return attrs;
 }
