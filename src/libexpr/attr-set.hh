@@ -66,7 +66,7 @@ public:
         attrs[size_++] = attr;
     }
 
-    iterator find(const Symbol & name)
+    iterator find(Symbol name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
@@ -74,7 +74,7 @@ public:
         return end();
     }
 
-    Attr * get(const Symbol & name)
+    Attr * get(Symbol name)
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
@@ -143,7 +143,7 @@ public:
         bindings->push_back(attr);
     }
 
-    Value & alloc(const Symbol & name, PosIdx pos = noPos);
+    Value & alloc(Symbol name, PosIdx pos = noPos);
 
     Value & alloc(std::string_view name, PosIdx pos = noPos);
 

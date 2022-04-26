@@ -392,7 +392,7 @@ public:
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
-    Value * allocAttr(Value & vAttrs, const Symbol & name);
+    Value * allocAttr(Value & vAttrs, Symbol name);
     Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);

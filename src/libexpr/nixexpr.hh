@@ -128,7 +128,7 @@ struct AttrName
 {
     Symbol symbol;
     Expr * expr;
-    AttrName(const Symbol & s) : symbol(s) {};
+    AttrName(Symbol s) : symbol(s) {};
     AttrName(Expr * e) : expr(e) {};
 };
 
@@ -211,8 +211,8 @@ struct ExprVar : Expr
     Level level;
     Displacement displ;
 
-    ExprVar(const Symbol & name) : name(name) { };
-    ExprVar(const PosIdx & pos, const Symbol & name) : pos(pos), name(name) { };
+    ExprVar(Symbol name) : name(name) { };
+    ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -223,7 +223,7 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(const PosIdx & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
 };
 
@@ -283,7 +283,8 @@ struct Formals
     Formals_ formals;
     bool ellipsis;
 
-    bool has(Symbol arg) const {
+    bool has(Symbol arg) const
+    {
         auto it = std::lower_bound(formals.begin(), formals.end(), arg,
             [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
         return it != formals.end() && it->name == arg;
@@ -450,7 +451,7 @@ struct StaticEnv
         vars.erase(it, end);
     }
 
-    Vars::const_iterator find(const Symbol & name) const
+    Vars::const_iterator find(Symbol name) const
     {
         Vars::value_type key(name, 0);
         auto i = std::lower_bound(vars.begin(), vars.end(), key);
