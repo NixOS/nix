@@ -47,7 +47,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v2";
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v3";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
