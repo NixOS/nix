@@ -291,7 +291,7 @@ void completeFlakeRefWithFragment(
 
                 std::string lastAttr;
                 if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
-                    lastAttr = attrPath.back();
+                    lastAttr = evalState->symbols[attrPath.back()];
                     attrPath.pop_back();
                 }
 
@@ -299,11 +299,11 @@ void completeFlakeRefWithFragment(
                 if (!attr) continue;
 
                 for (auto & attr2 : (*attr)->getAttrs()) {
-                    if (hasPrefix(attr2, lastAttr)) {
+                    if (hasPrefix(evalState->symbols[attr2], lastAttr)) {
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
-                        completions->add(flakeRefS + "#" + concatStringsSep(".", attrPath2));
+                        completions->add(flakeRefS + "#" + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
                     }
                 }
             }

@@ -66,7 +66,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
     auto type = cursor->getAttr("type")->getString();
 
-    std::string expected = !attrPath.empty() && attrPath[0] == "apps" ? "app" : "derivation";
+    std::string expected = !attrPath.empty() && state.symbols[attrPath[0]] == "apps" ? "app" : "derivation";
     if (type != expected)
         throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
 

@@ -36,7 +36,7 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 {
     std::vector<Symbol> res;
     for (auto & a : parseAttrPath(s))
-        res.emplace_back(a);
+        res.push_back(state.symbols.create(a));
     return res;
 }
 

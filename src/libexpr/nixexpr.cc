@@ -24,8 +24,10 @@ static void showString(std::ostream & str, std::string_view s)
     str << '"';
 }
 
-static void showId(std::ostream & str, std::string_view s)
+std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
+    std::string_view s = symbol;
+
     if (s.empty())
         str << "\"\"";
     else if (s == "if") // FIXME: handle other keywords
@@ -34,7 +36,7 @@ static void showId(std::ostream & str, std::string_view s)
         char c = s[0];
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
             showString(str, s);
-            return;
+            return str;
         }
         for (auto c : s)
             if (!((c >= 'a' && c <= 'z') ||
@@ -42,15 +44,10 @@ static void showId(std::ostream & str, std::string_view s)
                   (c >= '0' && c <= '9') ||
                   c == '_' || c == '\'' || c == '-')) {
                 showString(str, s);
-                return;
+                return str;
             }
         str << s;
     }
-}
-
-std::ostream & operator << (std::ostream & str, const Symbol & sym)
-{
-    showId(str, sym.s);
     return str;
 }
 
@@ -499,12 +496,12 @@ void ExprPos::bindVars(const EvalState & es, const StaticEnv & env)
 
 /* Storing function names. */
 
-void Expr::setName(SymbolIdx name)
+void Expr::setName(Symbol name)
 {
 }
 
 
-void ExprLambda::setName(SymbolIdx name)
+void ExprLambda::setName(Symbol name)
 {
     this->name = name;
     body->setName(name);
@@ -526,7 +523,7 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    dump([&] (const Symbol & s) { n += std::string_view(s).size(); });
+    dump([&] (const std::string & s) { n += s.size(); });
     return n;
 }
 

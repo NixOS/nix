@@ -73,7 +73,7 @@ struct NixRepl
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
-    void addVarToScope(const SymbolIdx name, Value & v);
+    void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
     void evalString(std::string s, Value & v);
 
@@ -711,7 +711,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
 }
 
 
-void NixRepl::addVarToScope(const SymbolIdx name, Value & v)
+void NixRepl::addVarToScope(const Symbol name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");

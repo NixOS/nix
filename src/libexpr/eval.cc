@@ -308,7 +308,7 @@ static BoehmGCStackAllocator boehmGCStackAllocator;
 #endif
 
 
-static SymbolIdx getName(const AttrName & name, EvalState & state, Env & env)
+static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 {
     if (name.symbol) {
         return name.symbol;
@@ -769,7 +769,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     });
 }
 
-void EvalState::throwEvalError(const PosIdx p1, const char * s, const SymbolIdx sym, const PosIdx p2) const
+void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
@@ -787,7 +787,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s) const
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun,
-    const SymbolIdx s2) const
+    const Symbol s2) const
 {
     throw TypeError({
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
@@ -796,7 +796,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambd
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const ExprLambda & fun, const SymbolIdx s2) const
+    const ExprLambda & fun, const Symbol s2) const
 {
     throw TypeError(ErrorInfo {
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
