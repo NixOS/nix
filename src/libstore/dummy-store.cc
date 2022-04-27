@@ -27,7 +27,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     }
 
     void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) override
     {
         callback(nullptr);
     }
@@ -54,7 +54,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     { unsupported("narFromPath"); }
 
     void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+        Callback<std::shared_ptr<const Realisation>> callback) override
     { callback(nullptr); }
 };
 

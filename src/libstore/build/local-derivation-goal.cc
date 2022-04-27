@@ -1161,7 +1161,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     }
 
     void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) override
     {
         if (goal.isAllowed(path)) {
             try {
@@ -1253,7 +1253,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     { throw Error("registerDrvOutput"); }
 
     void queryRealisationUncached(const DrvOutput & id,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+        Callback<std::shared_ptr<const Realisation>> callback) override
     // XXX: This should probably be allowed if the realisation corresponds to
     // an allowed derivation
     {

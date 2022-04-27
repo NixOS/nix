@@ -159,7 +159,7 @@ protected:
     }
 
     void getFile(const std::string & path,
-        Callback<std::optional<std::string>> callback) noexcept override
+        Callback<std::optional<std::string>> callback) override
     {
         checkEnabled();
 

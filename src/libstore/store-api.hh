@@ -278,14 +278,14 @@ public:
 
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const StorePath & path,
-        Callback<ref<const ValidPathInfo>> callback) noexcept;
+        Callback<ref<const ValidPathInfo>> callback);
 
     /* Query the information about a realisation. */
     std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
 
     /* Asynchronous version of queryRealisation(). */
     void queryRealisation(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept;
+        Callback<std::shared_ptr<const Realisation>> callback);
 
 
     /* Check whether the given valid path info is sufficiently attested, by
@@ -311,9 +311,9 @@ public:
 protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) = 0;
     virtual void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
+        Callback<std::shared_ptr<const Realisation>> callback) = 0;
 
 public:
 

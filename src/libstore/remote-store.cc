@@ -435,7 +435,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 
 
 void RemoteStore::queryPathInfoUncached(const StorePath & path,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+    Callback<std::shared_ptr<const ValidPathInfo>> callback)
 {
     try {
         std::shared_ptr<const ValidPathInfo> info;
@@ -716,7 +716,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 }
 
 void RemoteStore::queryRealisationUncached(const DrvOutput & id,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    Callback<std::shared_ptr<const Realisation>> callback)
 {
     auto conn(getConnection());
 

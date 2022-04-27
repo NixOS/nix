@@ -872,7 +872,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
 
 void LocalStore::queryPathInfoUncached(const StorePath & path,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+    Callback<std::shared_ptr<const ValidPathInfo>> callback)
 {
     try {
         callback(retrySQLite<std::shared_ptr<const ValidPathInfo>>([&]() {
@@ -1873,7 +1873,7 @@ std::optional<const Realisation> LocalStore::queryRealisation_(
 }
 
 void LocalStore::queryRealisationUncached(const DrvOutput & id,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept
+        Callback<std::shared_ptr<const Realisation>> callback)
 {
     try {
         auto maybeRealisation

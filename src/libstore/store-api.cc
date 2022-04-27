@@ -497,7 +497,7 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
 
 
 void Store::queryPathInfo(const StorePath & storePath,
-    Callback<ref<const ValidPathInfo>> callback) noexcept
+    Callback<ref<const ValidPathInfo>> callback)
 {
     auto hashPart = std::string(storePath.hashPart());
 
@@ -557,7 +557,7 @@ void Store::queryPathInfo(const StorePath & storePath,
 }
 
 void Store::queryRealisation(const DrvOutput & id,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept
+        Callback<std::shared_ptr<const Realisation>> callback)
 {
 
     try {

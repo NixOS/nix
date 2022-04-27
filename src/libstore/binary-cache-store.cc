@@ -68,7 +68,7 @@ void BinaryCacheStore::upsertFile(const std::string & path,
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
-    Callback<std::optional<std::string>> callback) noexcept
+    Callback<std::optional<std::string>> callback)
 {
     try {
         callback(getFile(path));
@@ -354,7 +354,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
-    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+    Callback<std::shared_ptr<const ValidPathInfo>> callback)
 {
     auto uri = getUri();
     auto storePathS = printStorePath(storePath);
@@ -449,7 +449,7 @@ StorePath BinaryCacheStore::addTextToStore(
 }
 
 void BinaryCacheStore::queryRealisationUncached(const DrvOutput & id,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    Callback<std::shared_ptr<const Realisation>> callback)
 {
     auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
 

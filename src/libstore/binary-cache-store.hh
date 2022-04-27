@@ -68,7 +68,7 @@ public:
        the result. A subclass may implement this asynchronously. */
     virtual void getFile(
         const std::string & path,
-        Callback<std::optional<std::string>> callback) noexcept;
+        Callback<std::optional<std::string>> callback)
 
     std::optional<std::string> getFile(const std::string & path);
 
@@ -93,7 +93,7 @@ public:
     bool isValidPathUncached(const StorePath & path) override;
 
     void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
@@ -122,7 +122,7 @@ public:
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        Callback<std::shared_ptr<const Realisation>> callback) override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 
