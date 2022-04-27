@@ -1,8 +1,9 @@
-# Design and Data Model
+# Architecture
 
-This chapter is about the technical principles behind Nix.
+This chapter describes how Nix works.
+It should help users understand why Nix behaves as it does, and it should help developers understand how to modify Nix and how to write similar tools.
 
-## Architecture
+## Overview
 
 Nix consists of hierarchical [layers](https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers).
 
