@@ -1,4 +1,4 @@
-# Nix Store
+# Store
 
 A Nix store is a collection of *store objects* referred to by *store paths*.
 Every store also has a "store directory path", which is a path prefix used for various purposes.
