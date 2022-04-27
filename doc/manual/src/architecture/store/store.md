@@ -4,11 +4,18 @@ A Nix store is a collection of [store objects](objects.md) and associated operat
 
 These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build plans.
 
-Store objects are accessible in a file system through [store paths](paths.md).
-Every store has a *store directory*, which contains that store’s objects and is a prefix of their store paths.
-It defaults to `/nix/store`, but is in principle arbitrary.
+A Nix store allows to add and retrieve store objects.
+It can perform builds, that is, transform build inputs using instructions from the build plans into build outputs.
+It also keeps track of *references* between data and can therefore garbage-collect unused store objects.
 
-A Nix store can perform builds, that is, transform build inputs using instructions from the build plans into build outputs. It also keeps track of *references* between data and can therefore garbage-collect unused store objects.
+There exist different types of stores, which all follow this model.
+Examples:
+- store on the local file system
+- remote store accessible via SSH
+- binary cache store accessible via HTTP
+
+Every store with a file system representation has a *store directory*, which contains that store’s objects accessible through [store paths](paths.md).
+The store directory defaults to `/nix/store`, but is in principle arbitrary.
 
 ## A Rosetta stone for the Nix store.
 
