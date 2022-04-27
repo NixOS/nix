@@ -25,7 +25,7 @@ Nix consists of hierarchical [layers](https://en.m.wikipedia.org/wiki/Multitier_
 
 At the top is the *command line interface*, translating from invocations of Nix executables to interactions with the underlying layers.
 
-Below that is the *Nix language*, a [purely functional programming](https://en.m.wikipedia.org/wiki/Purely_functional_programming) language.
+Below that is the *Nix language*, a [purely functional](https://en.m.wikipedia.org/wiki/Purely_functional_programming) configuration language.
 It is used to compose expressions which ultimately evaluate to self-contained *build steps*, used to derive *build results* from referenced *build inputs*.
 
 ::: {.note}
