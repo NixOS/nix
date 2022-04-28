@@ -27,9 +27,9 @@ The following translation table points out similarities and equivalent terms, to
 generic build system | Nix | [Bazel](https://bazel.build/start/bazel-intro) | [Build Systems à la Carte](https://www.microsoft.com/en-us/research/uploads/prod/2018/03/build-systems.pdf) | programming language
 -- | -- | -- | -- | --
 data (build input, build result) | component | [artifact](https://bazel.build/reference/glossary#artifact) | value | value
-build plan | derivation | [action](https://bazel.build/reference/glossary#action) | `Task` | [thunk](https://en.m.wikipedia.org/wiki/Thunk)
-build graph | derivation graph | [action graph](https://bazel.build/reference/glossary#action-graph), [build graph](https://bazel.build/reference/glossary#build-graph) | `Tasks` | [call graph](https://en.m.wikipedia.org/wiki/Call_graph)
 build instructions | builder | ([depends on action type](https://docs.bazel.build/versions/main/skylark/lib/actions.html)) | `Task` | function
+build step | derivation | [action](https://bazel.build/reference/glossary#action) | `Task` | [thunk](https://en.m.wikipedia.org/wiki/Thunk)
+build plan | derivation graph | [action graph](https://bazel.build/reference/glossary#action-graph), [build graph](https://bazel.build/reference/glossary#build-graph) | `Tasks` | [call graph](https://en.m.wikipedia.org/wiki/Call_graph)
 build | realisation | build | application of `Build` | evaluation
 persistence layer | store | [action cache](https://bazel.build/reference/glossary#action-cache) | `Store` | heap
 
