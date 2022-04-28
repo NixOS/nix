@@ -25,6 +25,30 @@ Do we have open terms?
 Do we hve thunks vs expressions distinction?
 c.f. John Shutt's modern fexprs, when the syntax can "leak".
 
+## Comparison with Git file system model
+
+This is close to Git's model, but with one crucial difference:
+Git puts the "permission" info within the directory map's values instead of making it part of the file (blob, in it's parlance) object.
+
+    data GitObject
+      = Blob ByteString
+      | Tree (Map FileName (Persission, FSO))
+
+    data Persission
+      = Directory -- IFF paired with tree
+      -- Iff paired with blob, one of:
+      | RegFile
+      | ExecutableFile
+      | Symlink
+
+So long as the root object is a directory, the representations are isomorphic.
+There is no "wiggle room" the git way since whenever the permission info wouldn't matter (e.g. the child object being mapped to is a directory), the permission info must be a sentinel value.
+
+However, if the root object is a blob, there is loss of fidelity.
+Since the permission info is used to distinguish executable files, non-executable files, and symlinks, but there isn't a "parent" directory of the root to contain that info, these 3 cases cannot be distinguished.
+
+Git's model matches Unix tradition, but Nix's model is more natural.
+
 ## Machine models
 
 TODO
