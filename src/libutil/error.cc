@@ -347,7 +347,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *  to make a decision between the two following options.
      *
      *  ``` long traces
-     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string_view & errorCtx)
+     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
      *  {
      *      try {
      *          e->eval(*this, env, v);
@@ -361,7 +361,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *  ```
      *
      *  ``` short traces
-     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string_view & errorCtx)
+     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
      *  {
      *      e->eval(*this, env, v);
      *      try {

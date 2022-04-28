@@ -222,8 +222,8 @@ public:
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
-    inline bool evalBool(Env & env, Expr * e, const Pos & pos, const std::string_view & errorCtx);
-    inline void evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string_view & errorCtx);
+    inline bool evalBool(Env & env, Expr * e, const Pos & pos, std::string_view errorCtx);
+    inline void evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
@@ -239,20 +239,20 @@ public:
     void forceValueDeep(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
-    NixInt forceInt(Value & v, const Pos & pos, const std::string_view & errorCtx);
-    NixFloat forceFloat(Value & v, const Pos & pos, const std::string_view & errorCtx);
-    bool forceBool(Value & v, const Pos & pos, const std::string_view & errorCtx);
+    NixInt forceInt(Value & v, const Pos & pos, std::string_view errorCtx);
+    NixFloat forceFloat(Value & v, const Pos & pos, std::string_view errorCtx);
+    bool forceBool(Value & v, const Pos & pos, std::string_view errorCtx);
 
-    void forceAttrs(Value & v, const Pos & pos, const std::string_view & errorCtx);
+    void forceAttrs(Value & v, const Pos & pos, std::string_view errorCtx);
 
     template <typename Callable>
-    inline void forceAttrs(Value & v, Callable getPos, const std::string_view & errorCtx);
+    inline void forceAttrs(Value & v, Callable getPos, std::string_view errorCtx);
 
-    inline void forceList(Value & v, const Pos & pos, const std::string_view & errorCtx);
-    void forceFunction(Value & v, const Pos & pos, const std::string_view & errorCtx); // either lambda or primop
-    std::string_view forceString(Value & v, const Pos & pos, const std::string_view & errorCtx);
-    std::string_view forceString(Value & v, PathSet & context, const Pos & pos, const std::string_view & errorCtx);
-    std::string_view forceStringNoCtx(Value & v, const Pos & pos, const std::string_view & errorCtx);
+    inline void forceList(Value & v, const Pos & pos, std::string_view errorCtx);
+    void forceFunction(Value & v, const Pos & pos, std::string_view errorCtx); // either lambda or primop
+    std::string_view forceString(Value & v, const Pos & pos, std::string_view errorCtx);
+    std::string_view forceString(Value & v, PathSet & context, const Pos & pos, std::string_view errorCtx);
+    std::string_view forceStringNoCtx(Value & v, const Pos & pos, std::string_view errorCtx);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
@@ -268,17 +268,17 @@ public:
     BackedStringView coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true,
-        const std::string_view & errorCtx = "");
+        std::string_view errorCtx = "");
 
     std::string copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    Path coerceToPath(const Pos & pos, Value & v, PathSet & context, const std::string_view & errorCtx);
+    Path coerceToPath(const Pos & pos, Value & v, PathSet & context, std::string_view errorCtx);
 
     /* Like coerceToPath, but the result must be a store path. */
-    StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context, const std::string_view & errorCtx);
+    StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context, std::string_view errorCtx);
 
 public:
 
@@ -334,7 +334,7 @@ public:
 
     /* Do a deep equality test between two values.  That is, list
        elements and attributes are compared recursively. */
-    bool eqValues(Value & v1, Value & v2, const Pos & pos, const std::string_view & errorCtx);
+    bool eqValues(Value & v1, Value & v2, const Pos & pos, std::string_view errorCtx);
 
     bool isFunctor(Value & fun);
 
@@ -369,7 +369,7 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, ptr<Pos> pos);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos, const std::string_view & errorCtx);
+    void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos, std::string_view errorCtx);
 
     /* Print statistics. */
     void printStats();

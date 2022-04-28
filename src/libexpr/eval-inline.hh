@@ -128,7 +128,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const Pos & pos, const std::string_view & errorCtx)
+inline void EvalState::forceAttrs(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     forceAttrs(v, [&]() { return pos; }, errorCtx);
 }
@@ -136,7 +136,7 @@ inline void EvalState::forceAttrs(Value & v, const Pos & pos, const std::string_
 
 template <typename Callable>
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, Callable getPos, const std::string_view & errorCtx)
+inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
 {
     try {
         forceValue(v, noPos);
@@ -152,7 +152,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, const std::string_
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const Pos & pos, const std::string_view & errorCtx)
+inline void EvalState::forceList(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, noPos);
