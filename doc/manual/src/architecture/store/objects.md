@@ -1,40 +1,32 @@
-# Store Objects
+# Store Object
 
-Data in Nix is chiefly organized into *store objects*.
+Nix organizes the data it manages into *store objects*.
 A store object is the pair of
 
-  - A (root) file system object
-  - A set of references to store objects
+  - a [file system object](#file-system-object)
+  - a set of [references](#reference) to store objects.
 
-## File system objects
+## File system object {#file-system-object}
 
-The Nix store uses a simple filesystem model.
+The Nix store uses a simple file system model.
 
     data FileSystemObject
-      = Regular Executable ByteString
-      | Directory (Map FileName FSO)
-      | SymLink ByteString
+      = File Executable Data
+      | Directory (Map FileName FileSystemObject)
+      | SymLink Path
 
-    data Executable
-      = Executable
-      | NonExecutable
-
-In particular, every file system object falls into these three cases:
-
+Every file system object is one of the following:
  - File: an executable flag, and arbitrary data
+ - Directory: mapping of names to child file system objects
+ - [Symbolic link](https://en.m.wikipedia.org/wiki/Symbolic_link): may point anywhere.
 
- - Directory: mapping of names to child file system objects.
+   In particular, symlinks pointing outside of their own root file system object, or to a store object without a matching reference, are allowed, but might not function as intended.
 
- - Symlink: may point anywhere.
+A bare file or symlink can be a root file system object.
 
-   In particular, symlinks that do not point within the containing root file system object or that of another store object referenced by the containing store object are allowed, but might not function as intended.
+## Reference {#reference}
 
-A bare file or symlink as the "root" file system object is allowed.
-
-
-## References
-
-Store objects can refer to both other store objects and themselves.
+A store object can refer to both other store objects and itself.
 
 Self-reference may seem pointless, but tracking them is in fact useful.
 We can best explain why later after more concepts have been established.
