@@ -180,20 +180,24 @@ void printCodeLines(std::ostream & out,
     }
 }
 
+// Enough indent to align with with the `... `
+// prepended to each element of the trace
+#define ELLIPSIS_INDENT "  "
+
 void printAtPos(const ErrPos & pos, std::ostream & out)
 {
     if (pos) {
         switch (pos.origin) {
             case foFile: {
-                out << fmt(ANSI_BLUE "  at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
+                out << fmt(ELLIPSIS_INDENT "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
                 break;
             }
             case foString: {
-                out << fmt(ANSI_BLUE "  at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ELLIPSIS_INDENT "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             case foStdin: {
-                out << fmt(ANSI_BLUE "  at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ELLIPSIS_INDENT "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             default:
