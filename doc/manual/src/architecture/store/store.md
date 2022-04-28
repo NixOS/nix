@@ -1,6 +1,6 @@
 # Store
 
-A Nix store is a collection of [store objects](objects.md) and associated operations.
+A Nix store is a collection of [store objects](objects.md) with associated operations.
 
 These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build plans.
 
