@@ -753,7 +753,7 @@ LocalNoInlineNoReturn(void throwEvalErrorWithTrace(const char * s, const std::st
 {
     auto e = EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
-    })
+    });
     e.addTrace(p2, s3);
     throw e;
 }
