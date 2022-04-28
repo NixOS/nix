@@ -1529,6 +1529,11 @@ void setupSeccomp()
         seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
         printError("unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
 
+    /* big-endian only because seccomp does not support powerpcle (32-bit) */
+    if (nativeSystem == "powerpc64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_PPC) != 0)
+        printError("unable to add powerpc64 (big endian) seccomp architecture");
+
     /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
