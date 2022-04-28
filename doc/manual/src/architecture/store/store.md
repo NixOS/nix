@@ -4,7 +4,7 @@ A Nix store is a collection of [store objects](objects.md) and associated operat
 
 These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build plans.
 
-A Nix store allows to add and retrieve store objects.
+A Nix store allows adding and retrieving store objects.
 It can perform builds, that is, transform build inputs using instructions from the build plans into build outputs.
 It also keeps track of *references* between data and can therefore garbage-collect unused store objects.
 
