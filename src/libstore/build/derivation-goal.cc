@@ -786,8 +786,7 @@ void runPostBuildHook(
     Store & store,
     Logger & logger,
     const StorePath & drvPath,
-    StorePathSet outputPaths
-)
+    const StorePathSet & outputPaths)
 {
     auto hook = settings.postBuildHook;
     if (hook == "")
@@ -906,7 +905,7 @@ void DerivationGoal::buildDone()
         auto builtOutputs = registerOutputs();
 
         StorePathSet outputPaths;
-        for (auto & [_, output] : buildResult.builtOutputs)
+        for (auto & [_, output] : builtOutputs)
             outputPaths.insert(output.outPath);
         runPostBuildHook(
             worker.store,
