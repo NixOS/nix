@@ -2,26 +2,7 @@
 
 #include "eval.hh"
 
-#define LocalNoInline(f) static f __attribute__((noinline)); f
-#define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
-
 namespace nix {
-
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s))
-{
-    throw EvalError({
-        .msg = hintfmt(s),
-        .errPos = pos
-    });
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const Value & v))
-{
-    throw TypeError({
-        .msg = hintfmt(s, showType(v)),
-        .errPos = pos
-    });
-}
 
 
 /* Note: Various places expect the allocated memory to be zeroed. */
@@ -99,7 +80,7 @@ Env & EvalState::allocEnv(size_t size)
 
 
 [[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const Pos & pos)
+void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     forceValue(v, [&]() { return pos; });
 }
@@ -128,7 +109,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const Pos & pos, std::string_view errorCtx)
+inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     forceAttrs(v, [&]() { return pos; }, errorCtx);
 }
@@ -144,15 +125,15 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view e
             throwTypeError(noPos, "value is %1% while a set was expected", v);
         }
     } catch (Error & e) {
-        Pos pos = getPos();
-        e.addTrace(pos, errorCtx);
+        PosIdx pos = getPos();
+        e.addTrace(positions[pos], errorCtx);
         throw;
     }
 }
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const Pos & pos, std::string_view errorCtx)
+inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, noPos);
@@ -160,7 +141,7 @@ inline void EvalState::forceList(Value & v, const Pos & pos, std::string_view er
             throwTypeError(noPos, "value is %1% while a list was expected", v);
         }
     } catch (Error & e) {
-        e.addTrace(pos, errorCtx);
+        e.addTrace(positions[pos], errorCtx);
         throw;
     }
 }

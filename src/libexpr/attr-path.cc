@@ -41,13 +41,13 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string & attrPath,
+std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
 
     Value * v = &vIn;
-    Pos pos = noPos;
+    PosIdx pos = noPos;
 
     for (auto & attr : tokens) {
 
@@ -77,13 +77,13 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
             if (a == v->attrs->end()) {
                 std::set<std::string> attrNames;
                 for (auto & attr : *v->attrs)
-                    attrNames.insert(attr.name);
+                    attrNames.insert(state.symbols[attr.name]);
 
                 auto suggestions = Suggestions::bestMatches(attrNames, attr);
                 throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             }
             v = &*a->value;
-            pos = *a->pos;
+            pos = a->pos;
         }
 
         else {
@@ -106,7 +106,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
 }
 
 
-Pos findPackageFilename(EvalState & state, Value & v, std::string what)
+std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -132,9 +132,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
         throw ParseError("cannot parse line number '%s'", pos);
     }
 
-    Symbol file = state.symbols.create(filename);
-
-    return { foFile, file, lineno, 0 };
+    return { std::move(filename), lineno };
 }
 
 

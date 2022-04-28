@@ -560,6 +560,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
 
+        auto drvType = drv.type();
+
         /* Content-addressed derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
            try to produce such a path.
@@ -592,12 +594,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            derivations, we throw out the precomputed output paths and just
            store the hashes, so there aren't two competing sources of truth an
            attacker could exploit. */
-        if (drv.type() == DerivationType::InputAddressed && !trusted)
+        if (!(drvType.isCA() || trusted))
             throw Error("you are not privileged to build input-addressed derivations");
 
         /* Make sure that the non-input-addressed derivations that got this far
            are in fact content-addressed if we don't trust them. */
-        assert(derivationIsCA(drv.type()) || trusted);
+        assert(drvType.isCA() || trusted);
 
         /* Recompute the derivation path when we cannot trust the original. */
         if (!trusted) {
@@ -606,7 +608,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                original not-necessarily-resolved derivation to verify the drv
                derivation as adequate claim to the input-addressed output
                paths. */
-            assert(derivationIsCA(drv.type()));
+            assert(drvType.isCA());
 
             Derivation drv2;
             static_cast<BasicDerivation &>(drv2) = drv;

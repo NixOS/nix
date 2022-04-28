@@ -71,13 +71,11 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
-void replaceEnv(std::map<std::string, std::string> newEnv)
+void replaceEnv(const std::map<std::string, std::string> & newEnv)
 {
     clearEnv();
-    for (auto newEnvVar : newEnv)
-    {
+    for (auto & newEnvVar : newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
-    }
 }
 
 
@@ -200,6 +198,17 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
+std::string expandTilde(std::string_view path)
+{
+    // TODO: expand ~user ?
+    auto tilde = path.substr(0, 2);
+    if (tilde == "~/" || tilde == "~")
+        return getHome() + std::string(path.substr(1));
+    else
+        return std::string(path);
+}
+
+
 bool isInDir(std::string_view path, std::string_view dir)
 {
     return path.substr(0, 1) == "/"
@@ -212,6 +221,15 @@ bool isInDir(std::string_view path, std::string_view dir)
 bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
+}
+
+
+struct stat stat(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError("getting status of '%1%'", path);
+    return st;
 }
 
 
@@ -1064,7 +1082,7 @@ std::string runProgram(Path program, bool searchPath, const Strings & args,
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -1192,7 +1210,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
+        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
 
 
@@ -1261,9 +1279,9 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
-    while (pos != std::string::npos) {
+    while (pos != std::string_view::npos) {
         auto end = s.find_first_of(separators, pos + 1);
-        if (end == std::string::npos) end = s.size();
+        if (end == std::string_view::npos) end = s.size();
         result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
@@ -1473,6 +1491,7 @@ constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 std::string base64Encode(std::string_view s)
 {
     std::string res;
+    res.reserve((s.size() + 2) / 3 * 4);
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1504,6 +1523,9 @@ std::string base64Decode(std::string_view s)
     }();
 
     std::string res;
+    // Some sequences are missing the padding consisting of up to two '='.
+    //                    vvv
+    res.reserve((s.size() + 2) / 4 * 3);
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
@@ -1690,7 +1712,9 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
+#if __linux__
 static AutoCloseFD fdSavedMountNamespace;
+#endif
 
 void saveMountNamespace()
 {
@@ -1709,8 +1733,13 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
+        auto savedCwd = absPath(".");
+
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
+        if (chdir(savedCwd.c_str()) == -1) {
+            throw SysError("restoring cwd");
+        }
     } catch (Error & e) {
         debug(e.msg());
     }

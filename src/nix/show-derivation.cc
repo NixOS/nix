@@ -65,19 +65,23 @@ struct CmdShowDerivation : InstallablesCommand
                     auto & outputName = _outputName; // work around clang bug
                     auto outputObj { outputsObj.object(outputName) };
                     std::visit(overloaded {
-                        [&](const DerivationOutputInputAddressed & doi) {
+                        [&](const DerivationOutput::InputAddressed & doi) {
                             outputObj.attr("path", store->printStorePath(doi.path));
                         },
-                        [&](const DerivationOutputCAFixed & dof) {
+                        [&](const DerivationOutput::CAFixed & dof) {
                             outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
                             outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
                             outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
                         },
-                        [&](const DerivationOutputCAFloating & dof) {
+                        [&](const DerivationOutput::CAFloating & dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
-                        [&](const DerivationOutputDeferred &) {},
-                    }, output.output);
+                        [&](const DerivationOutput::Deferred &) {},
+                        [&](const DerivationOutput::Impure & doi) {
+                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(doi.method) + printHashType(doi.hashType));
+                            outputObj.attr("impure", true);
+                        },
+                    }, output.raw());
                 }
             }
 

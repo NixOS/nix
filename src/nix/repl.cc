@@ -33,6 +33,7 @@ extern "C" {
 #include "command.hh"
 #include "finally.hh"
 #include "markdown.hh"
+#include "local-fs-store.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -72,7 +73,7 @@ struct NixRepl
     void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
-    void addVarToScope(const Symbol & name, Value & v);
+    void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
     void evalString(std::string s, Value & v);
 
@@ -119,7 +120,7 @@ std::string runNix(Path program, const Strings & args,
     });
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -346,9 +347,9 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             state->forceAttrs(v, noPos, "nevermind, it is ignored anyway");
 
             for (auto & i : *v.attrs) {
-                std::string name = i.name;
+                std::string_view name = state->symbols[i.name];
                 if (name.substr(0, cur2.size()) != cur2) continue;
-                completions.insert(prev + expr + "." + name);
+                completions.insert(concatStrings(prev, expr, ".", name));
             }
 
         } catch (ParseError & e) {
@@ -396,6 +397,7 @@ StorePath NixRepl::getDerivationPath(Value & v) {
 
 bool NixRepl::processLine(std::string line)
 {
+    line = trim(line);
     if (line == "") return true;
 
     _isInterrupted = false;
@@ -418,7 +420,8 @@ bool NixRepl::processLine(std::string line)
              << "  <expr>        Evaluate and print expression\n"
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
-             << "  :b <expr>     Build derivation\n"
+             << "  :b <expr>     Build a derivation\n"
+             << "  :bl <expr>    Build a derivation, creating GC roots in the working directory\n"
              << "  :e <expr>     Open package or function in $EDITOR\n"
              << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
@@ -458,21 +461,23 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        Pos pos;
-
-        if (v.type() == nPath || v.type() == nString) {
-            PathSet context;
-            auto filename = state->coerceToString(noPos, v, context, "while evaluating the filename to edit");
-            pos.file = state->symbols.create(*filename);
-        } else if (v.isLambda()) {
-            pos = v.lambda.fun->pos;
-        } else {
-            // assume it's a derivation
-            pos = findPackageFilename(*state, v, arg);
-        }
+        const auto [file, line] = [&] () -> std::pair<std::string, uint32_t> {
+            if (v.type() == nPath || v.type() == nString) {
+                PathSet context;
+                auto filename = state->coerceToString(noPos, v, context, "while evaluating the filename to edit").toOwned();
+                state->symbols.create(filename);
+                return {filename, 0};
+            } else if (v.isLambda()) {
+                auto pos = state->positions[v.lambda.fun->pos];
+                return {pos.file, pos.line};
+            } else {
+                // assume it's a derivation
+                return findPackageFilename(*state, v, arg);
+            }
+        }();
 
         // Open in EDITOR
-        auto args = editorFor(pos);
+        auto args = editorFor(file, line);
         auto editor = args.front();
         args.pop_front();
 
@@ -495,24 +500,32 @@ bool NixRepl::processLine(std::string line)
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
-        state->callFunction(f, v, result, Pos());
+        state->callFunction(f, v, result, PosIdx());
 
         StorePath drvPath = getDerivationPath(result);
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":i" || command == ":s" || command == ":log") {
+    else if (command == ":b" || command == ":bl" || command == ":i" || command == ":s" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
-        if (command == ":b") {
+        if (command == ":b" || command == ":bl") {
             state->store->buildPaths({DerivedPath::Built{drvPath}});
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath))
-                logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
+            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
+                auto localStore = state->store.dynamic_pointer_cast<LocalFSStore>();
+                if (localStore && command == ":bl") {
+                    std::string symlink = "repl-result-" + outputName;
+                    localStore->addPermRoot(outputPath, absPath(symlink));
+                    logger->cout("  ./%s -> %s", symlink, state->store->printStorePath(outputPath));
+                } else {
+                    logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
+                }
+            }
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
         } else if (command == ":log") {
@@ -660,7 +673,7 @@ void NixRepl::initEnv()
 
     varNames.clear();
     for (auto & i : state->staticBaseEnv.vars)
-        varNames.insert(i.first);
+        varNames.emplace(state->symbols[i.first]);
 }
 
 
@@ -690,7 +703,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     for (auto & i : *attrs.attrs) {
         staticEnv.vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
-        varNames.insert((std::string) i.name);
+        varNames.emplace(state->symbols[i.name]);
     }
     staticEnv.sort();
     staticEnv.deduplicate();
@@ -698,7 +711,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
 }
 
 
-void NixRepl::addVarToScope(const Symbol & name, Value & v)
+void NixRepl::addVarToScope(const Symbol name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
@@ -707,7 +720,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
     staticEnv.vars.emplace_back(name, displ);
     staticEnv.sort();
     env->values[displ++] = &v;
-    varNames.insert((std::string) name);
+    varNames.emplace(state->symbols[name]);
 }
 
 
@@ -788,7 +801,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
             if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(*i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
+                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
             else
                 str << "???";
             str << "»";
@@ -800,7 +813,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             typedef std::map<std::string, Value *> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
-                sorted[i.name] = i.value;
+                sorted.emplace(state->symbols[i.name], i.value);
 
             for (auto & i : sorted) {
                 if (isVarName(i.first))
@@ -850,7 +863,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case nFunction:
         if (v.isLambda()) {
             std::ostringstream s;
-            s << v.lambda.fun->pos;
+            s << state->positions[v.lambda.fun->pos];
             str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
         } else if (v.isPrimOp()) {
             str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;

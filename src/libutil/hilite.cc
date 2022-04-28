@@ -1,6 +1,4 @@
-#include "fmt.hh"
-
-#include <regex>
+#include "hilite.hh"
 
 namespace nix {
 

@@ -16,7 +16,7 @@ struct CmdEval : MixJSON, InstallableCommand
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval()
+    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
     {
         addFlag({
             .longName = "raw",
@@ -77,9 +77,9 @@ struct CmdEval : MixJSON, InstallableCommand
             if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", *writeTo);
 
-            std::function<void(Value & v, const Pos & pos, const Path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const Path & path)> recurse;
 
-            recurse = [&](Value & v, const Pos & pos, const Path & path)
+            recurse = [&](Value & v, const PosIdx pos, const Path & path)
             {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
@@ -88,18 +88,22 @@ struct CmdEval : MixJSON, InstallableCommand
                 else if (v.type() == nAttrs) {
                     if (mkdir(path.c_str(), 0777) == -1)
                         throw SysError("creating directory '%s'", path);
-                    for (auto & attr : *v.attrs)
+                    for (auto & attr : *v.attrs) {
+                        std::string_view name = state->symbols[attr.name];
                         try {
-                            if (attr.name == "." || attr.name == "..")
-                                throw Error("invalid file name '%s'", attr.name);
-                            recurse(*attr.value, *attr.pos, path + "/" + std::string(attr.name));
+                            if (name == "." || name == "..")
+                                throw Error("invalid file name '%s'", name);
+                            recurse(*attr.value, attr.pos, concatStrings(path, "/", name));
                         } catch (Error & e) {
-                            e.addTrace(*attr.pos, hintfmt("while evaluating the attribute '%s'", attr.name));
+                            e.addTrace(
+                                state->positions[attr.pos],
+                                hintfmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
+                    }
                 }
                 else
-                    throw TypeError("value at '%s' is not a string or an attribute set", pos);
+                    throw TypeError("value at '%s' is not a string or an attribute set", state->positions[pos]);
             };
 
             recurse(*v, pos, *writeTo);
@@ -117,7 +121,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else {
             state->forceValueDeep(*v);
-            logger->cout("%s", *v);
+            logger->cout("%s", printValue(*state, *v));
         }
     }
 };

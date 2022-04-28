@@ -423,6 +423,18 @@ EOF
         fi
     done
 
+    if [ "$(uname -s)" = "Linux" ] && [ ! -e /run/systemd/system ]; then
+        warning <<EOF
+We did not detect systemd on your system. With a multi-user install
+without systemd you will have to manually configure your init system to
+launch the Nix daemon after installation.
+EOF
+        if ! ui_confirm "Do you want to proceed with a multi-user installation?"; then
+            failure <<EOF
+You have aborted the installation.
+EOF
+        fi
+    fi
 }
 
 setup_report() {
@@ -739,7 +751,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              cp -RLp ./store/* "$NIX_ROOT/store/"
+              cp -RPp ./store/* "$NIX_ROOT/store/"
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"

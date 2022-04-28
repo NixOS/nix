@@ -33,7 +33,7 @@ public:
         EvalState & state,
         RootLoader rootLoader);
 
-    std::shared_ptr<AttrCursor> getRoot();
+    ref<AttrCursor> getRoot();
 };
 
 enum AttrType {
@@ -52,7 +52,7 @@ struct misc_t {};
 struct failed_t {};
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
-typedef std::pair<std::string, std::vector<std::pair<Path, std::string>>> string_t;
+typedef std::pair<std::string, NixStringContext> string_t;
 
 typedef std::variant<
     std::vector<Symbol>,
@@ -104,6 +104,8 @@ public:
 
     ref<AttrCursor> getAttr(std::string_view name);
 
+    /* Get an attribute along a chain of attrsets. Note that this does
+       not auto-call functors or functions. */
     OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
 
     std::string getString();
