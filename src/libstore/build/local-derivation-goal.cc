@@ -1529,6 +1529,22 @@ void setupSeccomp()
         seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
         printError("unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
 
+    if (nativeSystem == "mips64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPS) != 0)
+        printError("unable to add mips seccomp architecture");
+
+    if (nativeSystem == "mips64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPS64N32) != 0)
+        printError("unable to add mips64-*abin32 seccomp architecture");
+
+    if (nativeSystem == "mips64el-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL) != 0)
+        printError("unable to add mipsel seccomp architecture");
+
+    if (nativeSystem == "mips64el-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL64N32) != 0)
+        printError("unable to add mips64el-*abin32 seccomp architecture");
+
     /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
