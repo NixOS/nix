@@ -38,9 +38,9 @@ struct RegisterPrimOp
    them. */
 
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
-void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v);
+void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 /* Execute a program and parse its output */
-void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v);
+void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 }

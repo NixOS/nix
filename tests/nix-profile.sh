@@ -3,7 +3,7 @@ source common.sh
 clearStore
 clearProfiles
 
-enableFeatures "ca-derivations ca-references"
+enableFeatures "ca-derivations"
 restartDaemon
 
 # Make a flake.

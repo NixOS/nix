@@ -22,6 +22,7 @@ let
     findutils
     iana-etc
     git
+    openssh
   ];
 
   users = {

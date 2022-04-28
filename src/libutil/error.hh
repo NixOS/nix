@@ -87,11 +87,7 @@ struct ErrPos {
         origin = pos.origin;
         line = pos.line;
         column = pos.column;
-        // is file symbol null?
-        if (pos.file.set())
-            file = pos.file;
-        else
-            file = "";
+        file = pos.file;
         return *this;
     }
 
