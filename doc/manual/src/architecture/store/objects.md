@@ -11,12 +11,12 @@ A store object is the pair of
 The Nix store uses a simple file system model.
 
     data FileSystemObject
-      = File Executable Data
+      = File Executable Contents
       | Directory (Map FileName FileSystemObject)
       | SymLink Path
 
 Every file system object is one of the following:
- - File: an executable flag, and arbitrary data
+ - File: an executable flag, and arbitrary data for contents
  - Directory: mapping of names to child file system objects
  - [Symbolic link](https://en.m.wikipedia.org/wiki/Symbolic_link): may point anywhere.
 
@@ -26,17 +26,16 @@ A bare file or symlink can be a root file system object.
 
 ## Reference {#reference}
 
-A store object can refer to both other store objects and itself.
+A store object can refer to other store objects or itself.
 
-Self-reference may seem pointless, but tracking them is in fact useful.
-We can best explain why later after more concepts have been established.
+Nix collects these references by scanning file contents for [store paths](./paths.md) when a new store object is created.
 
-References are normally calculated so as to to record the presence of textual references in store object's file systems obejcts.
-This process will be described precisely in the section on [building](./building.md), once more concepts are explained, as building is the primary path new store objects with non-trivial references are created.
+While references could be arbitrary paths, Nix requires them to be store paths to ensure correctness:
+Anything outside a given store is not under control of Nix, and therefore cannot be guaranteed to be present when needed.
 
-However, scanning for references is not mandatory.
-Store objects are allowed to have official references that *don't* correspond to store paths contained in their contents,
-and they are also allowed to *not* have references that *do* correspond to store paths contained in their store.
-Taken together, this means there is no actual rule relating the store paths contained in the contents to the store paths deemed references.
+However, having references match store paths in files is not enforced by the data model:
+Store objects could have excess or incomplete references with respect to store paths found in their file contents.
 
-This is why it's its necessary for correctness, and not just performance, that Nix remember the references of each store object, rather than try to recompute them on the fly by scanning their contents.
+Scanning files therefore allows reliably capturing run time dependencies without declaring them explicitly.
+Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
+
