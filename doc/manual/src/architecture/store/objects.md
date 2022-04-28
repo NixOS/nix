@@ -37,9 +37,20 @@ Symlinks pointing outside of their own root, or to a store object without a matc
 
 ## Reference {#reference}
 
-A store object can refer to other store objects or itself.
+A store object can reference other store objects.
 
-Nix collects these references by scanning file contents for [store paths](./paths.md) when a new store object is created.
+Nix stores have the *closure property*: for each store object in the store, all the store objects it references must also be in the store.
+
+Building, copying and deleting store objects must be done in a way that obeys this property:
+
+- We can only safely delete unreferenced objects.
+
+- When copying, to maintain correctness, either the result must be "revealed" atomically to the destination store, or objects must be copied in reference-dependency order.
+
+- Newly built store objects must only refer to store objects in the closure of the build inputs.
+  This ensures the purity of the build.
+
+### Reference scanning
 
 While references could be arbitrary paths, Nix requires them to be store paths to ensure correctness.
 Anything outside a given store is not under control of Nix, and therefore cannot be guaranteed to be present when needed.
