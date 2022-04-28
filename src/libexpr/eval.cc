@@ -307,7 +307,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue, noPos, "While evaluating an attribute name");
+        state.forceStringNoCtx(nameValue, noPos, "while evaluating an attribute name");
         return state.symbols.create(nameValue.string.s);
     }
 }
@@ -509,7 +509,7 @@ void EvalState::requireExperimentalFeatureOnEvaluation(
     if (!settings.isExperimentalFeatureEnabled(feature)) {
         throw EvalError({
             .msg = hintfmt(
-                "Cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
+                "cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
                 feature,
                 fName
             ),
@@ -714,10 +714,12 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const Pos & p2,
             const std::string_view & s3))
 {
-    throw TypeError(ErrorInfo {
+    auto e = TypeError(ErrorInfo {
         .msg = hintfmt(s, s2, sym),
         .errPos = pos,
-    }).addTrace(p2, s3);
+    });
+    e.addTrace(p2, s3);
+    throw e;
 }
 
 LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
@@ -729,32 +731,40 @@ LocalNoInlineNoReturn(void throwTypeErrorWithTrace(
             const Pos & p2,
             const std::string_view & s3))
 {
-    throw TypeError(ErrorInfo {
+    auto e = TypeError(ErrorInfo {
         .msg = hintfmt(s, s2, sym),
         .errPos = pos,
         .suggestions = suggestions
-    }).addTrace(p2, s3);
+    });
+    e.addTrace(p2, s3);
+    throw e;
 }
 
 LocalNoInlineNoReturn(void throwTypeErrorWithTrace(const char * s, const std::string & s2, const Pos & p2, const std::string_view s3))
 {
-    throw TypeError(ErrorInfo {
+    auto e = TypeError(ErrorInfo {
         .msg = hintfmt(s, s2),
-    }).addTrace(p2, s3);
+    });
+    e.addTrace(p2, s3);
+    throw e;
 }
 
 LocalNoInlineNoReturn(void throwEvalErrorWithTrace(const char * s, const std::string & s2, const Pos & p2, const std::string_view s3))
 {
-    throw EvalError(ErrorInfo {
+    auto e = EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
-    }).addTrace(p2, s3);
+    })
+    e.addTrace(p2, s3);
+    throw e;
 }
 
 LocalNoInlineNoReturn(void throwEvalErrorWithTrace(const char * s, const std::string_view & s2, const std::string_view & s3, const Pos & p2, const std::string_view s4))
 {
-    throw EvalError(ErrorInfo {
+    auto e = EvalError(ErrorInfo {
         .msg = hintfmt(s, s2, s3),
-    }).addTrace(p2, s4);
+    });
+    e.addTrace(p2, s4);
+    throw e;
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
@@ -1047,7 +1057,7 @@ void EvalState::eval(Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std::string_view & errorCtx)
+inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, std::string_view errorCtx)
 {
     try {
         Value v;
@@ -1062,7 +1072,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos, const std:
 }
 
 
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, const std::string_view & errorCtx)
+inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         e->eval(*this, env, v);
@@ -1144,7 +1154,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            Hence we need __overrides.) */
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
-            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); }, "While evaluating the `__overrides` attribute");
+            state.forceAttrs(*vOverrides, [&]() { return vOverrides->determinePos(noPos); }, "while evaluating the `__overrides` attribute");
             Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
             for (auto & i : *v.attrs)
                 newBnds->push_back(i);
@@ -1172,7 +1182,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(nameVal, i.pos);
         if (nameVal.type() == nNull)
             continue;
-        state.forceStringNoCtx(nameVal, i.pos, "While evaluating the name of a dynamic attribute");
+        state.forceStringNoCtx(nameVal, i.pos, "while evaluating the name of a dynamic attribute");
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
@@ -1262,7 +1272,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     return;
                 }
             } else {
-                state.forceAttrs(*vAttrs, pos, "While selecting an attribute");
+                state.forceAttrs(*vAttrs, pos, "while selecting an attribute");
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs)
@@ -1365,7 +1375,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             else {
                 try {
-                    forceAttrs(*args[0], lambda.pos, "While evaluating the value passed for this lambda parameter");
+                    forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
                 } catch (Error & e) {
                     e.addTrace(pos, "from call site");
                     throw;
@@ -1383,7 +1393,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     if (!j) {
                         if (!i.def) {
                             throwTypeErrorWithTrace(lambda.pos,
-                                    "Function '%1%' called without required argument '%2%'", prettyLambdaName(lambda), i.name,
+                                    "function '%1%' called without required argument '%2%'", prettyLambdaName(lambda), i.name,
                                     pos, "from call site");
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1405,7 +1415,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                 formalNames.insert(formal.name);
                             throwTypeErrorWithTrace(lambda.pos,
                                     Suggestions::bestMatches(formalNames, i.name),
-                                    "Function '%1%' called with unexpected argument '%2%'", prettyLambdaName(lambda), i.name,
+                                    "function '%1%' called with unexpected argument '%2%'", prettyLambdaName(lambda), i.name,
                                     pos, "from call site");
                         }
                     abort(); // can't happen
@@ -1420,7 +1430,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
-                    addErrorTrace(e, lambda.pos, "While evaluating the '%s' function", prettyLambdaName(lambda));
+                    addErrorTrace(e, lambda.pos, "while evaluating the '%s' function", prettyLambdaName(lambda));
                     if (pos) e.addTrace(pos, "from call site");
                 }
                 throw;
@@ -1448,7 +1458,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     vCur.primOp->fun(*this, pos, args, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "While calling the '%1%' builtin", name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
                 }
 
@@ -1492,7 +1502,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     primOp->primOp->fun(*this, noPos, vArgs, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "While calling the '%1%' builtin", name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
                 }
 
@@ -1510,7 +1520,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 callFunction(*functor->value, 2, args2, vCur, *functor->pos);
             } catch (Error & e) {
-                e.addTrace(pos, "While calling a functor (an attribute set with a 'functor' attribute)");
+                e.addTrace(pos, "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }
             nrArgs--;
@@ -1612,13 +1622,13 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
     // We cheat in the parser, an pass the position of the condition as the position of the if itself.
-    (state.evalBool(env, cond, pos, "While evaluating a branch condition") ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, pos, "while evaluating a branch condition") ? then : else_)->eval(state, env, v);
 }
 
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos, "In the condition of the assert statement")) {
+    if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(out);
         throwAssertionError(pos, "assertion '%1%' failed", out.str());
@@ -1629,7 +1639,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, noPos, "In the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, e, noPos, "in the argument of the not operator")); // XXX: FIXME: !
 }
 
 
@@ -1637,7 +1647,7 @@ void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    v.mkBool(state.eqValues(v1, v2, pos, "While testing two values for equality"));
+    v.mkBool(state.eqValues(v1, v2, pos, "while testing two values for equality"));
 }
 
 
@@ -1645,33 +1655,33 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    v.mkBool(!state.eqValues(v1, v2, pos, "While testing two values for inequality"));
+    v.mkBool(!state.eqValues(v1, v2, pos, "while testing two values for inequality"));
 }
 
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(state.evalBool(env, e1, pos, "In the left operand of the AND (&&) operator") && state.evalBool(env, e2, pos, "In the right operand of the AND (&&) operator"));
+    v.mkBool(state.evalBool(env, e1, pos, "in the left operand of the AND (&&) operator") && state.evalBool(env, e2, pos, "in the right operand of the AND (&&) operator"));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(state.evalBool(env, e1, pos, "In the left operand of the OR (||) operator") || state.evalBool(env, e2, pos, "In the right operand of the OR (||) operator"));
+    v.mkBool(state.evalBool(env, e1, pos, "in the left operand of the OR (||) operator") || state.evalBool(env, e2, pos, "in the right operand of the OR (||) operator"));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e1, pos, "In the left operand of the IMPL (->) operator") || state.evalBool(env, e2, pos, "In the right operand of the IMPL (->) operator"));
+    v.mkBool(!state.evalBool(env, e1, pos, "in the left operand of the IMPL (->) operator") || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
 }
 
 
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1, v2;
-    state.evalAttrs(env, e1, v1, pos, "In the left operand of the update (//) operator");
-    state.evalAttrs(env, e2, v2, pos, "In the right operand of the update (//) operator");
+    state.evalAttrs(env, e1, v1, pos, "in the left operand of the update (//) operator");
+    state.evalAttrs(env, e2, v2, pos, "in the right operand of the update (//) operator");
 
     state.nrOpUpdates++;
 
@@ -1710,11 +1720,11 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists, pos, "While evaluating one of the elements to concatenate");
+    state.concatLists(v, 2, lists, pos, "while evaluating one of the elements to concatenate");
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos, const std::string_view & errorCtx)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos, std::string_view errorCtx)
 {
     nrListConcats++;
 
@@ -1811,7 +1821,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
-            auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first, "While evaluating a path segment");
+            auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first, "while evaluating a path segment");
             sSize += part->size();
             s.emplace_back(std::move(part));
         }
@@ -1869,7 +1879,7 @@ void EvalState::forceValueDeep(Value & v)
 }
 
 
-NixInt EvalState::forceInt(Value & v, const Pos & pos, const std::string_view & errorCtx)
+NixInt EvalState::forceInt(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, pos);
@@ -1883,7 +1893,7 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos, const std::string_view & 
 }
 
 
-NixFloat EvalState::forceFloat(Value & v, const Pos & pos, const std::string_view & errorCtx)
+NixFloat EvalState::forceFloat(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, pos);
@@ -1899,7 +1909,7 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos, const std::string_vie
 }
 
 
-bool EvalState::forceBool(Value & v, const Pos & pos, const std::string_view & errorCtx)
+bool EvalState::forceBool(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, pos);
@@ -1919,7 +1929,7 @@ bool EvalState::isFunctor(Value & fun)
 }
 
 
-void EvalState::forceFunction(Value & v, const Pos & pos, const std::string_view & errorCtx)
+void EvalState::forceFunction(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, pos);
@@ -1932,7 +1942,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos, const std::string_view
 }
 
 
-std::string_view EvalState::forceString(Value & v, const Pos & pos, const std::string_view & errorCtx)
+std::string_view EvalState::forceString(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         forceValue(v, pos);
@@ -1977,7 +1987,7 @@ std::vector<std::pair<Path, std::string>> Value::getContext()
 }
 
 
-std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos & pos, const std::string_view & errorCtx)
+std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos & pos, std::string_view errorCtx)
 {
     auto s = forceString(v, pos, errorCtx);
     copyContext(v, context);
@@ -1985,7 +1995,7 @@ std::string_view EvalState::forceString(Value & v, PathSet & context, const Pos 
 }
 
 
-std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos, const std::string_view & errorCtx)
+std::string_view EvalState::forceStringNoCtx(Value & v, const Pos & pos, std::string_view errorCtx)
 {
     try {
         auto s = forceString(v, pos, errorCtx);
@@ -2022,14 +2032,14 @@ std::optional<std::string> EvalState::tryAttrsToString(const Pos & pos, Value & 
         Value v1;
         callFunction(*i->value, v, v1, pos);
         return coerceToString(pos, v1, context, coerceMore, copyToStore,
-                "While evaluating the result of the `toString` attribute").toOwned();
+                "while evaluating the result of the `toString` attribute").toOwned();
     }
 
     return {};
 }
 
 BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
-    bool coerceMore, bool copyToStore, bool canonicalizePath, const std::string_view & errorCtx)
+    bool coerceMore, bool copyToStore, bool canonicalizePath, std::string_view errorCtx)
 {
     forceValue(v, pos);
 
@@ -2075,7 +2085,7 @@ BackedStringView EvalState::coerceToString(const Pos & pos, Value & v, PathSet &
             for (auto [n, v2] : enumerate(v.listItems())) {
                 try {
                     result += *coerceToString(noPos, *v2, context, coerceMore, copyToStore, canonicalizePath,
-                            "While evaluating one element of the list");
+                            "while evaluating one element of the list");
                 } catch (Error & e) {
                     e.addTrace(pos, errorCtx);
                     throw;
@@ -2117,7 +2127,7 @@ std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
 }
 
 
-Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context, const std::string_view & errorCtx)
+Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context, std::string_view errorCtx)
 {
     auto path = coerceToString(pos, v, context, false, false, true, errorCtx).toOwned();
     if (path == "" || path[0] != '/')
@@ -2126,7 +2136,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context, cons
 }
 
 
-StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & context, const std::string_view & errorCtx)
+StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & context, std::string_view errorCtx)
 {
     auto path = coerceToString(pos, v, context, false, false, true, errorCtx).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
@@ -2135,7 +2145,7 @@ StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & con
 }
 
 
-bool EvalState::eqValues(Value & v1, Value & v2, const Pos & pos, const std::string_view & errorCtx)
+bool EvalState::eqValues(Value & v1, Value & v2, const Pos & pos, std::string_view errorCtx)
 {
     forceValue(v1, noPos);
     forceValue(v2, noPos);
@@ -2331,7 +2341,7 @@ void EvalState::printStats()
 }
 
 
-std::string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore, const std::string_view & errorCtx) const
+std::string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore, std::string_view errorCtx) const
 {
     throwTypeErrorWithTrace("cannot coerce %1% to a string", showType(), pos, errorCtx);
 }

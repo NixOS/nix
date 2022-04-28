@@ -50,7 +50,7 @@ std::string DrvInfo::queryName() const
     if (name == "" && attrs) {
         auto i = attrs->find(state->sName);
         if (i == attrs->end()) throw TypeError("derivation name missing");
-        name = state->forceStringNoCtx(*i->value, noPos, "While evaluating the name of a DrvInfo");
+        name = state->forceStringNoCtx(*i->value, noPos, "while evaluating the 'name' attribute of a derivation");
     }
     return name;
 }
@@ -60,7 +60,7 @@ std::string DrvInfo::querySystem() const
 {
     if (system == "" && attrs) {
         auto i = attrs->find(state->sSystem);
-        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos, "While evaluating the system of a DrvInfo");
+        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos, "while evaluating the 'system' attribute of a derivation");
     }
     return system;
 }
@@ -74,7 +74,7 @@ std::optional<StorePath> DrvInfo::queryDrvPath() const
         if (i == attrs->end())
             drvPath = {std::nullopt};
         else
-            drvPath = {state->coerceToStorePath(*i->pos, *i->value, context, "Whyle evaluating the drv path of a DrvInfo")};
+            drvPath = {state->coerceToStorePath(*i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation")};
     }
     return drvPath.value_or(std::nullopt);
 }
@@ -94,7 +94,7 @@ StorePath DrvInfo::queryOutPath() const
         Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
         if (i != attrs->end())
-            outPath = state->coerceToStorePath(*i->pos, *i->value, context, "While evaluating the output path of a DrvInfo");
+            outPath = state->coerceToStorePath(*i->pos, *i->value, context, "while evaluating the output path of a derivation");
     }
     if (!outPath)
         throw UnimplementedError("CA derivations are not yet supported");
@@ -108,23 +108,23 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
         /* Get the ‘outputs’ list. */
         Bindings::iterator i;
         if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
-            state->forceList(*i->value, *i->pos, "While evaluating the outputs of a DrvInfo");
+            state->forceList(*i->value, *i->pos, "while evaluating the 'outputs' attribute of a derivation");
 
             /* For each output... */
             for (auto elem : i->value->listItems()) {
-                std::string output(state->forceStringNoCtx(*elem, *i->pos, "While evaluating the name of one output of a DrvInfo"));
+                std::string output(state->forceStringNoCtx(*elem, *i->pos, "while evaluating the name of an output of a derivation"));
 
                 if (withPaths) {
                     /* Evaluate the corresponding set. */
                     Bindings::iterator out = attrs->find(state->symbols.create(output));
                     if (out == attrs->end()) continue; // FIXME: throw error?
-                    state->forceAttrs(*out->value, *i->pos, "While evaluating the description of a DrvInfo output");
+                    state->forceAttrs(*out->value, *i->pos, "while evaluating an output of a derivation");
 
                     /* And evaluate its ‘outPath’ attribute. */
                     Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                     if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
                     PathSet context;
-                    outputs.emplace(output, state->coerceToStorePath(*outPath->pos, *outPath->value, context, "While evaluating the outPath of an output path of a DrvInfo"));
+                    outputs.emplace(output, state->coerceToStorePath(*outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
                 } else
                     outputs.emplace(output, std::nullopt);
             }
@@ -155,7 +155,7 @@ std::string DrvInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutputName);
-        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value, noPos, "While evaluating the output name of a DrvInfo") : "";
+        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value, noPos, "while evaluating the output name of a derivation") : "";
     }
     return outputName;
 }
@@ -167,7 +167,7 @@ Bindings * DrvInfo::getMeta()
     if (!attrs) return 0;
     Bindings::iterator a = attrs->find(state->sMeta);
     if (a == attrs->end()) return 0;
-    state->forceAttrs(*a->value, *a->pos, "While evaluating the `meta` attribute of a DrvInfo");
+    state->forceAttrs(*a->value, *a->pos, "while evaluating the 'meta' attribute of a derivation");
     meta = a->value->attrs;
     return meta;
 }
@@ -368,7 +368,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                    `recurseForDerivations = true' attribute. */
                 if (i->value->type() == nAttrs) {
                     Bindings::iterator j = i->value->attrs->find(state.sRecurseForDerivations);
-                    if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos, "While evaluating the attribute `recurseForDerivations`"))
+                    if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos, "while evaluating the attribute `recurseForDerivations`"))
                         getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }
