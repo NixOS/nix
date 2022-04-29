@@ -14,3 +14,7 @@
 
 * `nix build` has a new `--print-out-paths` flag to print the resulting output paths.
   This matches the default behaviour of `nix-build`.
+
+* Error traces have been reworked to provide detailed explanations and more
+  accurate error locations. A short excerpt of the trace is now shown by
+  default when an error occurs.
