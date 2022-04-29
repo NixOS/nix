@@ -43,12 +43,12 @@ Nix stores have the *closure property*: for each store object in the store, all 
 
 Building, copying and deleting store objects must be done in a way that obeys this property:
 
+- Build results must only refer to store objects in the closure of the build inputs.
+
+- Store objects being copied must refer to objects already in the destination store.
+  Recursive copying must either proceed in dependency order or be atomic.
+
 - We can only safely delete unreferenced objects.
-
-- When copying, to maintain correctness, either the result must be "revealed" atomically to the destination store, or objects must be copied in reference-dependency order.
-
-- Newly built store objects must only refer to store objects in the closure of the build inputs.
-  This ensures the purity of the build.
 
 ### Reference scanning
 
