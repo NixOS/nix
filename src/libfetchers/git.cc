@@ -6,6 +6,7 @@
 #include "url-parts.hh"
 #include "pathlocks.hh"
 #include "util.hh"
+#include "git-utils.hh"
 
 #include "fetch-settings.hh"
 
@@ -69,27 +70,19 @@ std::optional<std::string> readHead(const Path & path)
         .args = {"ls-remote", "--symref", path},
     });
     if (exit_code != 0) {
-      return std::nullopt;
+        return std::nullopt;
     }
 
-    // Matches the common case when HEAD points to a branch, e.g.:
-    //   "ref: refs/heads/main  HEAD".
-    const static std::regex head_ref_regex("^ref:\\s*([^\\s]+)\\s*HEAD$");
-    // Matches when HEAD points directly at a commit, e.g.:
-    //   "71abcd...  HEAD".
-    const static std::regex head_rev_regex("^([^\\s]+)\\s*HEAD$");
-
-    for (const auto & line : tokenizeString<std::vector<std::string>>(output, "\n")) {
-        std::smatch match;
-        if (std::regex_match(line, match, head_ref_regex)) {
-            debug("resolved HEAD ref '%s' for repo '%s'", match[1], path);
-            return match[1];
-        } else if (std::regex_match(line, match, head_rev_regex)) {
-            debug("resolved HEAD ref '%s' for repo '%s'", match[1], path);
-            return match[1];
-        }
+    std::string_view line = output;
+    line = line.substr(0, line.find("\n"));
+    if (const auto ref = parseListReferenceHeadRef(line); ref) {
+        debug("resolved HEAD ref '%s' for repo '%s'", *ref, path);
+        return *ref;
     }
-
+    if (const auto rev = parseListReferenceForRev("HEAD", line); rev) {
+        debug("resolved HEAD rev '%s' for repo '%s'", *rev, path);
+        return *rev;
+    }
     return std::nullopt;
 }
 
