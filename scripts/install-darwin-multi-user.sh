@@ -6,7 +6,7 @@ set -o pipefail
 readonly NIX_DAEMON_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
 # create by default; set 0 to DIY, use a symlink, etc.
 readonly NIX_VOLUME_CREATE=${NIX_VOLUME_CREATE:-1} # now default
-NIX_FIRST_BUILD_UID="301"
+NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-301}"
 NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 # caution: may update times on / if not run as normal non-root user
