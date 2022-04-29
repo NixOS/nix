@@ -437,11 +437,11 @@ void ExprLambda::bindVars(const EvalState & es, const std::shared_ptr<const Stat
         new StaticEnv(
                 false, env.get(),
                 (hasFormals() ? formals->formals.size() : 0) +
-                (!arg ? 0 : 1));
+                (!arg ? 0 : 1)));
 
     Displacement displ = 0;
 
-    if (arg) newEnv.vars.emplace_back(arg, displ++);
+    if (arg) newEnv->vars.emplace_back(arg, displ++);
 
     if (hasFormals()) {
         for (auto & i : formals->formals)
@@ -506,7 +506,7 @@ void ExprWith::bindVars(const EvalState & es, const std::shared_ptr<const Static
         staticenv = env;
 
     attrs->bindVars(es, env);
-    StaticEnv newEnv(true, &env);
+    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(true, env.get()));
     body->bindVars(es, newEnv);
 }
 

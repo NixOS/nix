@@ -774,12 +774,14 @@ static RegisterPrimOp primop_break({
     .doc = R"(
       In debug mode, pause Nix expression evaluation and enter the repl.
     )",
-    .fun = [](EvalState & state, const Pos & pos, Value * * args, Value & v)
+    .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
+        PathSet context;
+        auto s = state.coerceToString(pos, *args[0], context).toOwned();
         auto error = Error(ErrorInfo{
             .level = lvlInfo,
-            .msg = hintfmt("breakpoint reached; value was %1%", *args[0]),
-            .errPos = pos,
+            .msg = hintfmt("breakpoint reached; value was %1%", s),
+            .errPos = state.positions[pos],
         });
         if (debuggerHook && !state.debugTraces.empty())
         {
@@ -791,7 +793,7 @@ static RegisterPrimOp primop_break({
                 throw Error(ErrorInfo{
                     .level = lvlInfo,
                     .msg = hintfmt("quit from debugger"),
-                    .errPos = noPos,
+                    .errPos = state.positions[noPos],
                 });
             }
 

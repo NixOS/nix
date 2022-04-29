@@ -126,7 +126,7 @@ ref<EvalState> EvalCommand::getEvalState()
                               new DebugTraceStacker(
                                   *evalState,
                                   DebugTrace 
-                                        {.pos = (error->info().errPos ? *error->info().errPos : *expr.getPos()),
+                                        {.pos = (error->info().errPos ? *error->info().errPos : evalState->positions[expr.getPos()]),
                                          .expr = expr,
                                          .env = env,
                                          .hint = error->info().msg,
@@ -139,7 +139,7 @@ ref<EvalState> EvalCommand::getEvalState()
 
                 if (expr.staticenv)
                 {
-                    std::unique_ptr<valmap> vm(mapStaticEnvBindings(*expr.staticenv.get(), env));
+                    std::unique_ptr<valmap> vm(mapStaticEnvBindings(evalState->symbols, *expr.staticenv.get(), env));
                     runRepl(evalState, expr, *vm);
                 }
             };

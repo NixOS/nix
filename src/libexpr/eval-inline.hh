@@ -103,7 +103,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
-        throwEvalError(getPos(), "infinite recursion encountered", *this);
+        throwEvalError(getPos(), "infinite recursion encountered");
 }
 
 
@@ -120,7 +120,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos)
 {
     forceValue(v, getPos);
     if (v.type() != nAttrs)
-        throwTypeError(getPos(), "value is %1% while a set was expected", v, *this);
+        throwTypeError(getPos(), "value is %1% while a set was expected", v);
 }
 
 
@@ -129,7 +129,7 @@ inline void EvalState::forceList(Value & v, const PosIdx pos)
 {
     forceValue(v, pos);
     if (!v.isList())
-        throwTypeError(pos, "value is %1% while a list was expected", v, *this);
+        throwTypeError(pos, "value is %1% while a list was expected", v);
 }
 
 

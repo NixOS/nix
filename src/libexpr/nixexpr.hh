@@ -278,7 +278,12 @@ struct ExprList : Expr
 {
     std::vector<Expr *> elems;
     ExprList() { };
-    const PosIdx getPos() const { return pos; }
+    const PosIdx getPos() const
+      { if (elems.empty())
+            return noPos;
+        else
+            return elems.front()->getPos();
+      }
     COMMON_METHODS
 };
 
@@ -389,7 +394,7 @@ struct ExprOpNot : Expr
 {
     Expr * e;
     ExprOpNot(Expr * e) : e(e) { };
-    const Pos* getPos() const { return 0; }
+    const PosIdx getPos() const { return noPos; }
     COMMON_METHODS
 };
 

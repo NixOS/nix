@@ -203,7 +203,7 @@ namespace {
     }
 }
 
-std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
+std::ostream& showDebugTrace(std::ostream &out, const PosTable &positions, const DebugTrace &dt)
 {
     if (dt.is_error)
         out << ANSI_RED "error: " << ANSI_NORMAL;
@@ -211,7 +211,7 @@ std::ostream& showDebugTrace(std::ostream &out, const DebugTrace &dt)
 
     // prefer direct pos, but if noPos then try the expr.
     auto pos = (*dt.pos ? *dt.pos :
-      (dt.expr.getPos() ? *dt.expr.getPos() : noPos));
+       positions[(dt.expr.getPos() ? dt.expr.getPos() : noPos)]);
 
     if (pos) {
         printAtPos(pos, out);
@@ -280,7 +280,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             // when that session returns the exception will land here.  No need to show it again;
             // show the error for this repl session instead.
             if (debuggerHook && !this->state->debugTraces.empty()) 
-                showDebugTrace(std::cout, this->state->debugTraces.front());
+                showDebugTrace(std::cout, this->state->positions, this->state->debugTraces.front());
             else
                 printMsg(lvlError, e.msg());
         } catch (Error & e) {
@@ -443,7 +443,7 @@ void NixRepl::loadDebugTraceEnv(DebugTrace &dt)
     {
         initEnv();
 
-        auto vm = std::make_unique<valmap>(*(mapStaticEnvBindings(*dt.expr.staticenv.get(), dt.env)));
+        auto vm = std::make_unique<valmap>(*(mapStaticEnvBindings(this->state->symbols, *dt.expr.staticenv.get(), dt.env)));
 
         // add staticenv vars.
         for (auto & [name, value] : *(vm.get())) {
@@ -514,7 +514,7 @@ bool NixRepl::processLine(std::string line)
                  iter !=  this->state->debugTraces.end(); 
                  ++iter, ++idx) {
                  std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                 showDebugTrace(std::cout, *iter);
+                 showDebugTrace(std::cout, this->state->positions, *iter);
             }
         } else if (arg == "env") {
             int idx = 0;
@@ -523,7 +523,7 @@ bool NixRepl::processLine(std::string line)
                  ++iter, ++idx) {
                  if (idx == this->debugTraceIndex)
                  {
-                     printEnvBindings(iter->expr, iter->env);
+                     printEnvBindings(state->symbols,iter->expr, iter->env);
                      break;
                  }
             }
@@ -544,9 +544,9 @@ bool NixRepl::processLine(std::string line)
                  if (idx == this->debugTraceIndex)
                  {
                      std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                     showDebugTrace(std::cout, *iter);
+                     showDebugTrace(std::cout, this->state->positions, *iter);
                      std::cout << std::endl;
-                     printEnvBindings(iter->expr, iter->env);
+                     printEnvBindings(state->symbols,iter->expr, iter->env);
                      loadDebugTraceEnv(*iter);
                      break;
                  }

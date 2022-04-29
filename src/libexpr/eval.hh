@@ -25,8 +25,8 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
-void printEnvBindings(const Expr &expr, const Env &env);
-void printEnvBindings(const StaticEnv &se, const Env &env, int lvl = 0);
+void printEnvBindings(const SymbolTable &st, const Expr &expr, const Env &env);
+void printEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env, int lvl = 0);
 
 struct PrimOp
 {
@@ -47,7 +47,7 @@ struct Env
     Value * values[0];
 };
 
-valmap * mapStaticEnvBindings(const StaticEnv &se, const Env &env);
+valmap * mapStaticEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env);
 
 void copyContext(const Value & v, PathSet & context);
 
@@ -123,7 +123,7 @@ public:
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
-    void debugLastTrace(Error & e);
+    void debugLastTrace(Error & e) const;
 
 private:
     SrcToStore srcToStore;
@@ -273,35 +273,66 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const PosIdx pos, const char * s) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const Value & v) const;
+    void throwEvalError(const PosIdx pos, const char * s,
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const char * s, const std::string & s2) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-        const std::string & s2) const;
-    [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
+    void throwEvalError(const char * s, const std::string & s2,
+        Env & env, Expr & expr) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
+        Env & env, Expr & expr) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const char * s, const std::string & s2, const std::string & s3,
+        Env & env, Expr & expr) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3,
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const;
+    void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s, const std::string & s2,
+        Env & env, Expr &expr) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2,
+        Env & env, Expr & expr) const;
+
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s, const Value & v) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s, const Value & v,
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwTypeError(const PosIdx pos, const char * s) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2) const;
+    void throwTypeError(const PosIdx pos, const char * s,
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-        const ExprLambda & fun, const Symbol s2) const;
+    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2,
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const char * s, const Value & v) const;
+    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol s2,
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1) const;
+    void throwTypeError(const char * s, const Value & v,
+        Env & env, Expr & expr) const;
+
     [[gnu::noinline, gnu::noreturn]]
-    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1) const;
+    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1,
+        Env & env, Expr & expr) const;
+
     [[gnu::noinline, gnu::noreturn]]
-    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1) const;
+    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1,
+        Env & env, Expr & expr) const;
+
+    [[gnu::noinline, gnu::noreturn]]
+    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1,
+        Env & env, Expr & expr) const;
 
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
@@ -480,7 +511,7 @@ private:
 class DebugTraceStacker {
     public:
         DebugTraceStacker(EvalState &evalState, DebugTrace t);
-        ~DebugTraceStacker() 
+        ~DebugTraceStacker()
         {
             // assert(evalState.debugTraces.front() == trace);
             evalState.debugTraces.pop_front();
