@@ -866,7 +866,7 @@ void EvalState::throwEvalError(const char * s, const std::string & s2) const
 void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
     const std::string & s2, Env & env, Expr &expr) const
 {
-    auto error = EvalError({
+    auto error = EvalError(ErrorInfo{
         .msg = hintfmt(s, s2),
         .errPos = positions[pos],
         .suggestions = suggestions,
@@ -943,32 +943,6 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
 
     throw error;
 }
-
-/*
-LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2, const std::string & s3, EvalState &evalState))
-{
-    auto error = EvalError({
-        .msg = hintfmt(s, s2, s3),
-        .errPos = positions[pos]
-    });
-
-    evalState.debugLastTrace(error);
-
-    throw error;
-}
-
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2, const std::string & s3, EvalState &evalState))
-{
-    auto error = EvalError({
-        .msg = hintfmt(s, s2, s3),
-        .errPos = noPos
-    });
-
-    evalState.debugLastTrace(error);
-
-    throw error;
-}
-*/
 
 void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr &expr) const
 {
