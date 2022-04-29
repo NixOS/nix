@@ -125,7 +125,7 @@ ref<EvalState> EvalCommand::getEvalState()
                           std::unique_ptr<DebugTraceStacker>(
                               new DebugTraceStacker(
                                   *evalState,
-                                  DebugTrace 
+                                  DebugTrace
                                         {.pos = (error->info().errPos ? *error->info().errPos : evalState->positions[expr.getPos()]),
                                          .expr = expr,
                                          .env = env,

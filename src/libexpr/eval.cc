@@ -730,7 +730,7 @@ void printWithBindings(const SymbolTable &st, const Env &env)
 {
     if (env.type == Env::HasWithAttrs)
     {
-        std::cout << "with: "; 
+        std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         Bindings::iterator j = env.values[0]->attrs->begin();
         while (j != env.values[0]->attrs->end()) {
@@ -747,13 +747,13 @@ void printEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env
     std::cout << "Env level " << lvl << std::endl;
 
     if (se.up && env.up) {
-        std::cout << "static: "; 
+        std::cout << "static: ";
         printStaticEnvBindings(st, se);
         printWithBindings(st, env);
         std::cout << std::endl;
         printEnvBindings(st, *se.up, *env.up, ++lvl);
     }
-    else 
+    else
     {
         std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones; they are in builtins.
@@ -784,7 +784,7 @@ void mapStaticEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env 
 {
   // add bindings for the next level up first, so that the bindings for this level
   // override the higher levels.
-  // The top level bindings (builtins) are skipped since they are added for us by initEnv() 
+  // The top level bindings (builtins) are skipped since they are added for us by initEnv()
   if (env.up && se.up) {
       mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
@@ -1086,13 +1086,13 @@ void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const
     e.addTrace(positions[pos], s, s2);
 }
 
-std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(EvalState &state, Expr &expr, Env &env, 
+std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(EvalState &state, Expr &expr, Env &env,
     std::optional<ErrPos> pos, const char * s, const std::string & s2)
 {
   return std::unique_ptr<DebugTraceStacker>(
       new DebugTraceStacker(
           state,
-          DebugTrace 
+          DebugTrace
                 {.pos = pos,
                  .expr = expr,
                  .env = env,

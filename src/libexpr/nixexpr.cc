@@ -352,7 +352,7 @@ void ExprVar::bindVars(const EvalState & es, const std::shared_ptr<const StaticE
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) 
+    if (withLevel == -1)
     {
         throw UndefinedVarError({
             .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
@@ -392,7 +392,7 @@ void ExprAttrs::bindVars(const EvalState & es, const std::shared_ptr<const Stati
         staticenv = env;
 
     if (recursive) {
-        auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get(), recursive ? attrs.size() : 0));  
+        auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get(), recursive ? attrs.size() : 0));
 
         Displacement displ = 0;
         for (auto & i : attrs)
