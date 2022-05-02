@@ -23,11 +23,7 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 
 static std::string getGitDir()
 {
-    auto gitDir = getEnv("GIT_DIR");
-    if (!gitDir) {
-        return ".git";
-    }
-    return *gitDir;
+    return getEnv("GIT_DIR").value_or(".git");
 }
 
 static std::string readHead(const Path & path)
