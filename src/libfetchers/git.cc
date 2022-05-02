@@ -28,14 +28,11 @@ const std::string gitInitialBranch = "__nix_dummy_branch";
 
 std::string getGitDir()
 {
-    auto gitDir = getEnv("GIT_DIR");
-    if (!gitDir) {
-        return ".git";
-    }
-    return *gitDir;
+    return getEnv("GIT_DIR").value_or(".git");
 }
 
-bool isCacheFileWithinTtl(const time_t now, const struct stat& st) {
+bool isCacheFileWithinTtl(const time_t now, const struct stat & st)
+{
     return st.st_mtime + settings.tarballTtl > now;
 }
 
