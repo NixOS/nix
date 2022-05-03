@@ -220,9 +220,19 @@ struct FossilInputScheme : InputScheme
 
         }
 
+        auto checkHashType = [&](const std::optional<Hash> & hash)
+        {
+            if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
+                throw Error("Hash '%s' is not supported by fossil. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+        };
+
+        checkHashType(input.getRev());
+
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "trunk");
 
         auto revOrRef = input.getRev() ? input.getRev()->to_string(Base16, false) : *input.getRef();
+
+        auto revHashType = input.getRev()->type;
 
         Attrs unlockedAttrs({
             {"type", "fsl"},
@@ -232,15 +242,15 @@ struct FossilInputScheme : InputScheme
         });
 
         if (auto res = getCache()->lookup(store, unlockedAttrs)) {
-            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA256);
+            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), revHashType);
             if (!input.getRev() || input.getRev() == rev2) {
                 input.attrs.insert_or_assign("rev", rev2.to_string(Base16, false));
                 return makeResult(res->first, std::move(res->second));
             }
         }
 
-        Path repo = fmt("%s/nix/fsl/repos/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
-        Path ckout = fmt("%s/nix/fsl/ckouts/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        Path repo = fmt("%s/nix/fsl/repos/%s", getCacheDir(), hashString(revHashType, actualUrl).to_string(Base32, false));
+        Path ckout = fmt("%s/nix/fsl/ckouts/%s", getCacheDir(), hashString(revHashType, actualUrl).to_string(Base32, false));
 
         Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Fossil repository '%s'", actualUrl));
 
@@ -253,7 +263,7 @@ struct FossilInputScheme : InputScheme
 
         auto json = nlohmann::json::parse(runFsl({ "--chdir", ckout, "json", "status"}));
         input.attrs.insert_or_assign("rev",
-            Hash::parseAny(std::string { json["payload"]["checkout"]["uuid"] }, htSHA256).to_string(Base16, false));
+            Hash::parseAny(std::string { json["payload"]["checkout"]["uuid"] }, revHashType).to_string(Base16, false));
 
         auto json2 = nlohmann::json::parse(runFsl({ "--chdir", ckout, "json", "branch", "list"}));
         input.attrs.insert_or_assign("ref", std::string { json2["payload"]["current"] });
