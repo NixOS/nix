@@ -101,3 +101,22 @@ printf Utrecht > $flake1Dir/who
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Utrecht" ]]
 [[ $(nix path-info --json $(realpath $TEST_HOME/.nix-profile/bin/hello) | jq -r .[].ca) =~ fixed:r:sha256: ]]
+
+# Override the outputs.
+nix profile remove 0 1
+nix profile install "$flake1Dir^*"
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Utrecht" ]]
+[ -e $TEST_HOME/.nix-profile/share/man ]
+[ -e $TEST_HOME/.nix-profile/include ]
+
+printf Nix > $flake1Dir/who
+nix profile upgrade 0
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Nix" ]]
+[ -e $TEST_HOME/.nix-profile/share/man ]
+[ -e $TEST_HOME/.nix-profile/include ]
+
+nix profile remove 0
+nix profile install "$flake1Dir^man"
+(! [ -e $TEST_HOME/.nix-profile/bin/hello ])
+[ -e $TEST_HOME/.nix-profile/share/man ]
+(! [ -e $TEST_HOME/.nix-profile/include ])
