@@ -558,6 +558,9 @@ typename T::mapped_type * get(T & map, const typename T::key_type & key)
     return &i->second;
 }
 
+const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
+nlohmann::json * get(nlohmann::json & map, const std::string & key);
+
 /* Get a value for the specified key from an associate container, or a default value if the key isn't present. */
 template <class T>
 const typename T::mapped_type & getOr(T & map,
