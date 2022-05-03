@@ -485,8 +485,12 @@ static void main_nix_build(int argc, char ** argv)
                 shellDrv = bashDrv;
 
             } catch (Error & e) {
-                logError(e.info());
-                notice("uses bash from your environment");
+                // in a shebang, it doesn't matter which bash we use since we immediately execute the interpreter
+                if (!inShebang) {
+                    logErrorInfo(lvlInfo, e.info());
+                    printInfo(
+                        "Cannot access '(import <nixpkgs> {}).bashInteractive'; falling back to bash from your environment.");
+                }
                 shell = "bash";
             }
         }
