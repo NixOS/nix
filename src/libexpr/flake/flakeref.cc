@@ -238,4 +238,15 @@ std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
     return {std::move(tree), FlakeRef(std::move(lockedInput), subdir)};
 }
 
+std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
+    const std::string & url,
+    const std::optional<Path> & baseDir,
+    bool allowMissing,
+    bool isFlake)
+{
+    auto [prefix, outputsSpec] = parseOutputsSpec(url);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(prefix, baseDir, allowMissing, isFlake);
+    return {std::move(flakeRef), fragment, outputsSpec};
+}
+
 }

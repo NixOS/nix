@@ -22,13 +22,13 @@ struct ProfileElementSource
     // FIXME: record original attrpath.
     FlakeRef resolvedRef;
     std::string attrPath;
-    // FIXME: output names
+    OutputsSpec outputs;
 
     bool operator < (const ProfileElementSource & other) const
     {
         return
-            std::pair(originalRef.to_string(), attrPath) <
-            std::pair(other.originalRef.to_string(), other.attrPath);
+            std::tuple(originalRef.to_string(), attrPath, outputs) <
+            std::tuple(other.originalRef.to_string(), other.attrPath, other.outputs);
     }
 };
 
@@ -42,7 +42,7 @@ struct ProfileElement
     std::string describe() const
     {
         if (source)
-            return fmt("%s#%s", source->originalRef, source->attrPath);
+            return fmt("%s#%s%s", source->originalRef, source->attrPath, printOutputsSpec(source->outputs));
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
@@ -98,7 +98,7 @@ struct ProfileManifest
             auto version = json.value("version", 0);
             std::string sUrl;
             std::string sOriginalUrl;
-            switch(version){
+            switch (version) {
                 case 1:
                     sUrl = "uri";
                     sOriginalUrl = "originalUri";
@@ -116,11 +116,12 @@ struct ProfileManifest
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
-                if (e.value(sUrl,"") != "") {
-                    element.source = ProfileElementSource{
+                if (e.value(sUrl, "") != "") {
+                    element.source = ProfileElementSource {
                         parseFlakeRef(e[sOriginalUrl]),
                         parseFlakeRef(e[sUrl]),
-                        e["attrPath"]
+                        e["attrPath"],
+                        e["outputs"].get<OutputsSpec>()
                     };
                 }
                 elements.emplace_back(std::move(element));
@@ -156,6 +157,7 @@ struct ProfileManifest
                 obj["originalUrl"] = element.source->originalRef.to_string();
                 obj["url"] = element.source->resolvedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
+                obj["outputs"] = element.source->outputs;
             }
             array.push_back(obj);
         }
@@ -283,10 +285,11 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 // FIXME: make build() return this?
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
-                element.source = ProfileElementSource{
+                element.source = ProfileElementSource {
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
+                    installable2->outputsSpec
                 };
             }
 
@@ -443,6 +446,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
                     "",
+                    element.source->outputs,
                     Strings{element.source->attrPath},
                     Strings{},
                     lockFlags);
@@ -454,10 +458,11 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                element.source = ProfileElementSource{
+                element.source = ProfileElementSource {
                     installable->flakeRef,
                     resolvedRef,
                     attrPath,
+                    installable->outputsSpec
                 };
 
                 installables.push_back(installable);
@@ -513,8 +518,8 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
+                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
+                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }
