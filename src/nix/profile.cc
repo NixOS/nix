@@ -67,7 +67,6 @@ struct ProfileElement
         ref<Store> store,
         const BuiltPaths & builtPaths)
     {
-        // FIXME: respect meta.outputsToInstall
         storePaths.clear();
         for (auto & buildable : builtPaths) {
             std::visit(overloaded {

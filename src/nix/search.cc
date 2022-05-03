@@ -93,10 +93,10 @@ struct CmdSearch : InstallableCommand, MixJSON
                 };
 
                 if (cursor.isDerivation()) {
-                    DrvName name(cursor.getAttr("name")->getString());
+                    DrvName name(cursor.getAttr(state->sName)->getString());
 
-                    auto aMeta = cursor.maybeGetAttr("meta");
-                    auto aDescription = aMeta ? aMeta->maybeGetAttr("description") : nullptr;
+                    auto aMeta = cursor.maybeGetAttr(state->sMeta);
+                    auto aDescription = aMeta ? aMeta->maybeGetAttr(state->sDescription) : nullptr;
                     auto description = aDescription ? aDescription->getString() : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
                     auto attrPath2 = concatStringsSep(".", attrPathS);

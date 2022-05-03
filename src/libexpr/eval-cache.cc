@@ -47,7 +47,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v2";
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v3";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
@@ -175,6 +175,24 @@ struct AttrDb
         });
     }
 
+    AttrId setListOfStrings(
+        AttrKey key,
+        const std::vector<std::string> & l)
+    {
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
+
+            state->insertAttribute.use()
+                (key.first)
+                (symbols[key.second])
+                (AttrType::ListOfStrings)
+                (concatStringsSep("\t", l)).exec();
+
+            return state->db.getLastInsertedRowId();
+        });
+    }
+
     AttrId setPlaceholder(AttrKey key)
     {
         return doSQLite([&]()
@@ -269,6 +287,8 @@ struct AttrDb
             }
             case AttrType::Bool:
                 return {{rowId, queryAttribute.getInt(2) != 0}};
+            case AttrType::ListOfStrings:
+                return {{rowId, tokenizeString<std::vector<std::string>>(queryAttribute.getStr(2), "\t")}};
             case AttrType::Missing:
                 return {{rowId, missing_t()}};
             case AttrType::Misc:
@@ -385,7 +405,7 @@ std::string AttrCursor::getAttrPathStr(Symbol name) const
 
 Value & AttrCursor::forceValue()
 {
-    debug("evaluating uncached attribute %s", getAttrPathStr());
+    debug("evaluating uncached attribute '%s'", getAttrPathStr());
 
     auto & v = getValue();
 
@@ -599,6 +619,38 @@ bool AttrCursor::getBool()
         throw TypeError("'%s' is not a Boolean", getAttrPathStr());
 
     return v.boolean;
+}
+
+std::vector<std::string> AttrCursor::getListOfStrings()
+{
+    if (root->db) {
+        if (!cachedValue)
+            cachedValue = root->db->getAttr(getKey());
+        if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
+            if (auto l = std::get_if<std::vector<std::string>>(&cachedValue->second)) {
+                debug("using cached list of strings attribute '%s'", getAttrPathStr());
+                return *l;
+            } else
+                throw TypeError("'%s' is not a list of strings", getAttrPathStr());
+        }
+    }
+
+    debug("evaluating uncached attribute '%s'", getAttrPathStr());
+
+    auto & v = getValue();
+    root->state.forceValue(v, noPos);
+
+    if (v.type() != nList)
+        throw TypeError("'%s' is not a list", getAttrPathStr());
+
+    std::vector<std::string> res;
+
+    for (auto & elem : v.listItems())
+        res.push_back(std::string(root->state.forceStringNoCtx(*elem)));
+
+    cachedValue = {root->db->setListOfStrings(getKey(), res), res};
+
+    return res;
 }
 
 std::vector<Symbol> AttrCursor::getAttrs()

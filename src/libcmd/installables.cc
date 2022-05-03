@@ -440,10 +440,8 @@ DerivedPaths InstallableValue::toDerivedPaths()
 
     // Group by derivation, helps with .all in particular
     for (auto & drv : toDerivations()) {
-        auto outputName = drv.outputName;
-        if (outputName == "")
-            throw Error("derivation '%s' lacks an 'outputName' attribute", state->store->printStorePath(drv.drvPath));
-        drvsToOutputs[drv.drvPath].insert(outputName);
+        for (auto & outputName : drv.outputsToInstall)
+            drvsToOutputs[drv.drvPath].insert(outputName);
         drvsToCopy.insert(drv.drvPath);
     }
 
@@ -497,7 +495,13 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
         auto drvPath = drvInfo.queryDrvPath();
         if (!drvPath)
             throw Error("'%s' is not a derivation", what());
-        res.push_back({ *drvPath, drvInfo.queryOutputName() });
+        std::set<std::string> outputsToInstall;
+        for (auto & output : drvInfo.queryOutputs(false, true))
+            outputsToInstall.insert(output.first);
+        res.push_back(DerivationInfo {
+            .drvPath = *drvPath,
+            .outputsToInstall = std::move(outputsToInstall)
+        });
     }
 
     return res;
@@ -598,9 +602,24 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
     auto drvPath = attr->forceDerivation();
 
+    std::set<std::string> outputsToInstall;
+
+    if (auto aMeta = attr->maybeGetAttr(state->sMeta))
+        if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
+            for (auto & s : aOutputsToInstall->getListOfStrings())
+                outputsToInstall.insert(s);
+
+    if (outputsToInstall.empty())
+        if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
+            for (auto & s : aOutputs->getListOfStrings())
+                outputsToInstall.insert(s);
+
+    if (outputsToInstall.empty())
+        outputsToInstall.insert("out");
+
     auto drvInfo = DerivationInfo {
-        std::move(drvPath),
-        attr->getAttr(state->sOutputName)->getString()
+        .drvPath = std::move(drvPath),
+        .outputsToInstall = std::move(outputsToInstall),
     };
 
     return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};

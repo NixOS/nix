@@ -89,7 +89,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
         auto outputName = cursor->getAttr(state.sOutputName)->getString();
         auto name = cursor->getAttr(state.sName)->getString();
         auto aPname = cursor->maybeGetAttr("pname");
-        auto aMeta = cursor->maybeGetAttr("meta");
+        auto aMeta = cursor->maybeGetAttr(state.sMeta);
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
         auto mainProgram =
             aMainProgram
