@@ -24,7 +24,6 @@
     - [Derivations](architecture/store/drvs/drvs.md)
       - [Input-Addressing](architecture/store/drvs/ia.md)
       - [Content-Addressing (Experimental)](architecture/store/drvs/ca.md)
-    - [Building](architecture/store/building.md)
     - [Advanced Topic: Store object relocatability](architecture/store/relocatability.md)
     - [Advanced Topic: Related work](architecture/store/related-work.md)
 - [Package Management](package-management/package-management.md)
