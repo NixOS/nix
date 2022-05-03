@@ -8,20 +8,20 @@ It should help users understand why Nix behaves as it does, and it should help d
 Nix consists of hierarchical [layers](https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers).
 
 ```
-               [ commmand line interface ]
-                            |
-                            | evaluates
-                            V
-               [ configuration language  ]
-                            |
-                            | evaluates to
-                            |
-              reference     V       build
-[ build inputs ] --> [ build plans ] --> [ build results ]
-          \                 |                 /
-            \               | persisted to  /
-              \             V             /
-              [           store           ]
+                   [ commmand line interface ]--------+
+                                |                     |
+                                | evaluates           | manages
+                                V                     |
+                   [ configuration language  ]        |
+                                |                     V
++-------------------------------|---------------------------------+
+| store                         |                                 |
+|                               | evaluates to                    |
+|                               |                                 |
+|                  references   V       builds                    |
+|     [ build input ] --> [ build plan ] --> [ build result ]     |
+|                                                                 |
++-----------------------------------------------------------------+
 ```
 
 At the top is the *command line interface*, translating from invocations of Nix executables to interactions with the underlying layers.
