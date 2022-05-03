@@ -377,8 +377,8 @@ static void main_nix_build(int argc, char * * argv)
                 shellDrv = bashDrv;
 
             } catch (Error & e) {
-                logError(e.info());
-                notice("will use bash from your environment");
+                logErrorInfo(lvlDebug, e.info());
+                printInfo("Canont access '(import <nixpkgs>).bashInteractive'; using bash from your environment%s.", (interactive ? "" : " for bootstrapping"));
                 shell = "bash";
             }
         }
