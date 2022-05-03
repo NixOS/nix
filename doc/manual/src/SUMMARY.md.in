@@ -19,7 +19,6 @@
   - [Store](architecture/store/store.md)
     - [Store Objects](architecture/store/objects.md)
     - [Store Paths](architecture/store/paths.md)
-    - [Nix Archives](architecture/store/nar.md)
     - [Derivations](architecture/store/drvs/drvs.md)
       - [Input-Addressing](architecture/store/drvs/ia.md)
       - [Content-Addressing (Experimental)](architecture/store/drvs/ca.md)
