@@ -20,8 +20,6 @@
     - [Store Objects](architecture/store/objects.md)
     - [Store Paths](architecture/store/paths.md)
     - [Derivations](architecture/store/drvs/drvs.md)
-      - [Input-Addressing](architecture/store/drvs/ia.md)
-      - [Content-Addressing (Experimental)](architecture/store/drvs/ca.md)
 - [Package Management](package-management/package-management.md)
   - [Basic Package Management](package-management/basic-package-mgmt.md)
   - [Profiles](package-management/profiles.md)
