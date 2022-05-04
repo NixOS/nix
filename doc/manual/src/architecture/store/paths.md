@@ -1,4 +1,4 @@
-# Store Paths
+# Store Path
 
 A store path is a pair of a 20-byte digest and a name.
 

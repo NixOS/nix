@@ -1,4 +1,4 @@
-# Derivations
+# Derivation
 
 Derivations are recipes to create store objects.
 
