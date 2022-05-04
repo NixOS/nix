@@ -350,7 +350,7 @@ void Worker::waitForInput()
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
     std::vector<struct pollfd> pollStatus;
-    std::map <int, int> fdToPollStatus;
+    std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
             pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });

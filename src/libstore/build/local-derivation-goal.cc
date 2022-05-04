@@ -14,6 +14,7 @@
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+#include "json-utils.hh"
 
 #include <regex>
 #include <queue>
@@ -55,8 +56,6 @@
 
 #include <pwd.h>
 #include <grp.h>
-
-#include <nlohmann/json.hpp>
 
 namespace nix {
 
