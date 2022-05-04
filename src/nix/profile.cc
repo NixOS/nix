@@ -655,10 +655,16 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
-            logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
-                concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
+            if (i) logger->cout("");
+            logger->cout("Index:              " ANSI_BOLD "%s" ANSI_NORMAL "%s",
+                i,
+                element.active ? "" : " " ANSI_RED "(inactive)" ANSI_NORMAL);
+            if (element.source) {
+                logger->cout("Flake attribute:    %s%s", element.source->attrPath, element.source->outputs.to_string());
+                logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
+                logger->cout("Locked flake URL:   %s", element.source->resolvedRef.to_string());
+            }
+            logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }
 };
