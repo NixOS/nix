@@ -37,6 +37,6 @@ In practice this amounts to a set of files in a file system.
 
 The command line and Nix language are what users interact with most.
 
-Underlying everything is the *Nix store*, a mechanism to keep track of build tasks, data, and references between them.
+Underlying everything is the [Nix store](./store/store.md), a mechanism to keep track of build plans, data, and references between them.
 It can also execute *build instructions*, captured in the build tasks, to produce new data.
 
