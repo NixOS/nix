@@ -692,10 +692,10 @@ struct curlFileTransfer : public FileTransfer
 #if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
-                std::string profile = get(params, "profile").value_or("");
-                std::string region = get(params, "region").value_or(Aws::Region::US_EAST_1);
-                std::string scheme = get(params, "scheme").value_or("");
-                std::string endpoint = get(params, "endpoint").value_or("");
+                std::string profile = getOr(params, "profile", "");
+                std::string region = getOr(params, "region", Aws::Region::US_EAST_1);
+                std::string scheme = getOr(params, "scheme", "");
+                std::string endpoint = getOr(params, "endpoint", "");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 

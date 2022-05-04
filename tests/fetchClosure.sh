@@ -7,7 +7,7 @@ clearStore
 clearCacheCache
 
 # Initialize binary cache.
-nonCaPath=$(nix build --json --file ./dependencies.nix | jq -r .[].outputs.out)
+nonCaPath=$(nix build --json --file ./dependencies.nix --no-link | jq -r .[].outputs.out)
 caPath=$(nix store make-content-addressed --json $nonCaPath | jq -r '.rewrites | map(.) | .[]')
 nix copy --to file://$cacheDir $nonCaPath
 

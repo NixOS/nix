@@ -1314,7 +1314,7 @@ static bool isNonUriPath(const std::string & spec) {
 std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
     if (uri == "" || uri == "auto") {
-        auto stateDir = get(params, "state").value_or(settings.nixStateDir);
+        auto stateDir = getOr(params, "state", settings.nixStateDir);
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
             return std::make_shared<LocalStore>(params);
         else if (pathExists(settings.nixDaemonSocketFile))

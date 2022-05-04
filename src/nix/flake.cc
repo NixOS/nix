@@ -724,7 +724,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef), templateName,
+            evalState, std::move(templateFlakeRef), templateName, DefaultOutputs(),
             defaultTemplateAttrPaths,
             defaultTemplateAttrPathsPrefixes,
             lockFlags);
@@ -1015,8 +1015,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     auto name = visitor.getAttr(state->sName)->getString();
                     if (json) {
                         std::optional<std::string> description;
-                        if (auto aMeta = visitor.maybeGetAttr("meta")) {
-                            if (auto aDescription = aMeta->maybeGetAttr("description"))
+                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
                         }
                         j.emplace("type", "derivation");

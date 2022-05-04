@@ -35,7 +35,9 @@ const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::str
 
 std::string_view showExperimentalFeature(const ExperimentalFeature feature)
 {
-    return stringifiedXpFeatures.at(feature);
+    const auto ret = get(stringifiedXpFeatures, feature);
+    assert(ret);
+    return *ret;
 }
 
 std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFeatures)
@@ -58,11 +60,13 @@ std::ostream & operator <<(std::ostream & str, const ExperimentalFeature & featu
     return str << showExperimentalFeature(feature);
 }
 
-void to_json(nlohmann::json& j, const ExperimentalFeature& feature) {
+void to_json(nlohmann::json & j, const ExperimentalFeature & feature)
+{
     j = showExperimentalFeature(feature);
 }
 
-void from_json(const nlohmann::json& j, ExperimentalFeature& feature) {
+void from_json(const nlohmann::json & j, ExperimentalFeature & feature)
+{
     const std::string input = j;
     const auto parsed = parseExperimentalFeature(input);
 

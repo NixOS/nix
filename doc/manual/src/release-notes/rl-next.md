@@ -14,3 +14,13 @@
 
 * `nix build` has a new `--print-out-paths` flag to print the resulting output paths.
   This matches the default behaviour of `nix-build`.
+
+* You can now specify which outputs of a derivation `nix` should
+  operate on using the syntax `installable^outputs`,
+  e.g. `nixpkgs#glibc^dev,static` or `nixpkgs#glibc^*`. By default,
+  `nix` will use the outputs specified by the derivation's
+  `meta.outputsToInstall` attribute if it exists, or all outputs
+  otherwise.
+
+  Selecting derivation outputs using the attribute selection syntax
+  (e.g. `nixpkgs#glibc.dev`) no longer works.

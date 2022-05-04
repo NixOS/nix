@@ -76,18 +76,18 @@ StringMap EvalState::realiseContext(const PathSet & context)
 
     /* Get all the output paths corresponding to the placeholders we had */
     for (auto & [drvPath, outputs] : drvs) {
-        auto outputPaths = store->queryDerivationOutputMap(drvPath);
+        const auto outputPaths = store->queryDerivationOutputMap(drvPath);
         for (auto & outputName : outputs) {
-            if (outputPaths.count(outputName) == 0)
-            {
+            auto outputPath = get(outputPaths, outputName);
+            if (!outputPath) {
                 auto e = Error("derivation '%s' does not have an output named '%s'",
-                        store->printStorePath(drvPath), outputName);
+                    store->printStorePath(drvPath), outputName);
                 debugLastTrace(e);
                 throw e;
             }
             res.insert_or_assign(
                 downstreamPlaceholder(*store, drvPath, outputName),
-                store->printStorePath(outputPaths.at(outputName))
+                store->printStorePath(*outputPath)
             );
         }
     }
@@ -1369,8 +1369,13 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
         switch (hashModulo.kind) {
         case DrvHash::Kind::Regular:
             for (auto & i : outputs) {
-                auto h = hashModulo.hashes.at(i);
-                auto outPath = state.store->makeOutputPath(i, h, drvName);
+                auto h = get(hashModulo.hashes, i);
+                if (!h)
+                    throw AssertionError({
+                        .msg = hintfmt("derivation produced no hash for output '%s'", i),
+                        .errPos = state.positions[posDrvName],
+                    });
+                auto outPath = state.store->makeOutputPath(i, *h, drvName);
                 drv.env[i] = state.store->printStorePath(outPath);
                 drv.outputs.insert_or_assign(
                     i,
