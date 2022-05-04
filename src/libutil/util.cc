@@ -18,6 +18,7 @@
 
 #include <fcntl.h>
 #include <grp.h>
+#include <nlohmann/json.hpp>
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
