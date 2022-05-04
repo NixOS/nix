@@ -6,26 +6,48 @@ R""(
 
   ```console
   # nix profile list
-  0 flake:nixpkgs#legacyPackages.x86_64-linux.spotify github:NixOS/nixpkgs/c23db78bbd474c4d0c5c3c551877523b4a50db06#legacyPackages.x86_64-linux.spotify /nix/store/akpdsid105phbbvknjsdh7hl4v3fhjkr-spotify-1.1.46.916.g416cacf1
-  1 flake:nixpkgs#legacyPackages.x86_64-linux.zoom-us github:NixOS/nixpkgs/c23db78bbd474c4d0c5c3c551877523b4a50db06#legacyPackages.x86_64-linux.zoom-us /nix/store/89pmjmbih5qpi7accgacd17ybpgp4xfm-zoom-us-5.4.53350.1027
-  2 flake:blender-bin#packages.x86_64-linux.default github:edolstra/nix-warez/d09d7eea893dcb162e89bc67f6dc1ced14abfc27?dir=blender#packages.x86_64-linux.default /nix/store/zfgralhqjnam662kqsgq6isjw8lhrflz-blender-bin-2.91.0
+  Index:              0
+  Flake attribute:    legacyPackages.x86_64-linux.gdb
+  Original flake URL: flake:nixpkgs
+  Locked flake URL:   github:NixOS/nixpkgs/7b38b03d76ab71bdc8dc325e3f6338d984cc35ca
+  Store paths:        /nix/store/indzcw5wvlhx6vwk7k4iq29q15chvr3d-gdb-11.1
+
+  Index:              1
+  Flake attribute:    packages.x86_64-linux.default
+  Original flake URL: flake:blender-bin
+  Locked flake URL:   github:edolstra/nix-warez/91f2ffee657bf834e4475865ae336e2379282d34?dir=blender
+  Store paths:        /nix/store/i798sxl3j40wpdi1rgf391id1b5klw7g-blender-bin-3.1.2
   ```
+
+  Note that you can unambiguously rebuild a package from a profile
+  through its locked flake URL and flake attribute, e.g.
+
+  ```console
+  # nix build github:edolstra/nix-warez/91f2ffee657bf834e4475865ae336e2379282d34?dir=blender#packages.x86_64-linux.default
+  ```
+
+  will build the package with index 1 shown above.
 
 # Description
 
 This command shows what packages are currently installed in a
-profile. The output consists of one line per package, with the
-following fields:
+profile. For each installed package, it shows the following
+information:
 
-* An integer that can be used to unambiguously identify the package in
-  invocations of `nix profile remove` and `nix profile upgrade`.
+* `Index`: An integer that can be used to unambiguously identify the
+  package in invocations of `nix profile remove` and `nix profile
+  upgrade`.
 
-* The original ("mutable") flake reference and output attribute path
-  used at installation time.
+* `Flake attribute`: The flake output attribute that provides the
+  package (e.g. `packages.x86_64-linux.hello`).
 
-* The immutable flake reference to which the mutable flake reference
-  was resolved.
+* `Original flake URL`: The original ("unlocked") flake reference
+  specified by the user when the package was first installed via `nix
+  profile install`.
 
-* The store path(s) of the package.
+* `Locked flake URL`: The locked flake reference to which the original
+  flake reference was resolved.
+
+* `Store paths`: The store path(s) of the package.
 
 )""
