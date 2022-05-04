@@ -20,7 +20,7 @@ struct ProfileElementSource
 {
     FlakeRef originalRef;
     // FIXME: record original attrpath.
-    FlakeRef resolvedRef;
+    FlakeRef lockedRef;
     std::string attrPath;
     OutputsSpec outputs;
 
@@ -155,7 +155,7 @@ struct ProfileManifest
             obj["active"] = element.active;
             if (element.source) {
                 obj["originalUrl"] = element.source->originalRef.to_string();
-                obj["url"] = element.source->resolvedRef.to_string();
+                obj["url"] = element.source->lockedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
                 obj["outputs"] = element.source->outputs;
             }
@@ -284,10 +284,10 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 // FIXME: make build() return this?
-                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+                auto [attrPath, lockedRef, drv] = installable2->toDerivation();
                 element.source = ProfileElementSource {
                     installable2->flakeRef,
-                    resolvedRef,
+                    lockedRef,
                     attrPath,
                     installable2->outputsSpec
                 };
@@ -451,16 +451,16 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
+                auto [attrPath, lockedRef, drv] = installable->toDerivation();
 
-                if (element.source->resolvedRef == resolvedRef) continue;
+                if (element.source->lockedRef == lockedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
-                    element.source->attrPath, element.source->resolvedRef, resolvedRef);
+                    element.source->attrPath, element.source->lockedRef, lockedRef);
 
                 element.source = ProfileElementSource {
                     installable->flakeRef,
-                    resolvedRef,
+                    lockedRef,
                     attrPath,
                     installable->outputsSpec
                 };
@@ -524,7 +524,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
             if (element.source) {
                 logger->cout("Flake attribute:    %s%s", element.source->attrPath, printOutputsSpec(element.source->outputs));
                 logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
-                logger->cout("Locked flake URL:   %s", element.source->resolvedRef.to_string());
+                logger->cout("Locked flake URL:   %s", element.source->lockedRef.to_string());
             }
             logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
