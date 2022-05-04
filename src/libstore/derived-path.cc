@@ -22,7 +22,9 @@ nlohmann::json DerivedPath::Built::toJSON(ref<Store> store) const {
     const auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
     for (const auto& output : outputs) {
         auto knownOutput = get(knownOutputs, output);
-        res["outputs"][output] = knownOutput ? store->printStorePath(*knownOutput) : nullptr;
+        res["outputs"][output] = (knownOutput && *knownOutput)
+          ? store->printStorePath(**knownOutput)
+          : nullptr;
     }
     return res;
 }
