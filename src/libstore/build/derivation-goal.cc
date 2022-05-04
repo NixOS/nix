@@ -988,13 +988,28 @@ void DerivationGoal::resolvedFinished()
             auto resolvedHash = get(resolvedHashes, wantedOutput);
             if ((!initialOutput) || (!resolvedHash))
                 throw Error(
-                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,resolve)",
+                    "derivation '%s' doesn't have expected output '%s'",
                     worker.store.printStorePath(drvPath), wantedOutput);
             auto realisation = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
-            if (!realisation)
+            if (!realisation) {
+                std::string builtStr = "\tbuiltOutputs:\n";
+                for (const auto &i : resolvedResult.builtOutputs) {
+                    builtStr += fmt("\t\t%s @ %s (key) = ",
+                            i.first.outputName, i.first.drvHash.to_string(Base32, true));
+                    if (i.first != i.second.id) {
+                        builtStr += fmt("%s @ %s (id) = ",
+                            i.second.id.outputName, i.second.id.drvHash.to_string(Base32, true));
+                    }
+                    builtStr += worker.store.printStorePath(i.second.outPath);
+                    builtStr += "\n";
+                }
                 throw Error(
-                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
-                    worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
+                    "derivation '%s' doesn't have expected output '%s @ %s'\n%s",
+                    worker.store.printStorePath(resolvedDrvGoal->drvPath),
+                    wantedOutput,
+                    resolvedHash->to_string(Base32, true),
+                    builtStr);
+            }
             if (drv->type().isPure()) {
                 auto newRealisation = *realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, wantedOutput };
