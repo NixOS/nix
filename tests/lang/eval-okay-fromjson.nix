@@ -2,35 +2,35 @@
 builtins.fromJSON
   ''
     {
-      "Image": {
-          "Width":  800,
-          "Height": 600,
-          "Title":  "View from 15th Floor",
-          "Thumbnail": {
+      "Video": {
+          "Title":  "The Penguin Chronicles",
+          "Width":  1920,
+          "Height": 1080,
+          "EmbeddedData": [3.1415927, 23493,null, true  ,false, -10],
+          "Thumb": {
               "Url":    "http://www.example.com/image/481989943",
-              "Height": 125,
-              "Width":  100
+              "Width":  200
+              "Height": 255,
           },
-          "Animated" : false,
-          "IDs": [116, 943, 234, 38793, true  ,false,null, -100],
-          "Latitude":  37.7668,
-          "Longitude": -122.3959
+          "Subtitle" : false,
+          "Latitude":  46.2051,
+          "Longitude": 6.0723
         }
     }
   ''
 ==
-  { Image =
-    { Width = 800;
-      Height = 600;
-      Title = "View from 15th Floor";
-      Thumbnail =
+  { Video =
+    { Title = "The Penguin Chronicles"; 
+      Width = 1920;
+      Height = 1080;
+      EmbeddedData = [ 3.1415927 23493 null true false (0-10) ];
+      Thumb =
         { Url = http://www.example.com/image/481989943;
-          Height = 125;
-          Width = 100;
+          Width = 200;
+          Height = 250;
         };
-      Animated = false;
-      IDs = [ 116 943 234 38793 true false null (0-100) ];
-      Latitude = 37.7668;
-      Longitude = -122.3959;
+      Subtitle = false;
+      Latitude = 46.2051;
+      Longitude = 6.0723;
     };
   }
