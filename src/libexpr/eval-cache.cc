@@ -648,7 +648,8 @@ std::vector<std::string> AttrCursor::getListOfStrings()
     for (auto & elem : v.listItems())
         res.push_back(std::string(root->state.forceStringNoCtx(*elem)));
 
-    cachedValue = {root->db->setListOfStrings(getKey(), res), res};
+    if (root->db)
+        cachedValue = {root->db->setListOfStrings(getKey(), res), res};
 
     return res;
 }
