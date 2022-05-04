@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "types.hh"
 #include "url-parts.hh"
-#include "git-utils.hh"
+#include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
 
@@ -383,11 +383,11 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             std::string line;
             getline(is, line);
 
-            auto r = parseListReferenceHeadRef(line);
-            if (!r) {
+            auto remoteLine = git::parseLsRemoteLine(line);
+            if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
-            ref_uri = *r;
+            ref_uri = remoteLine->target;
         } else {
             ref_uri = fmt("refs/(heads|tags)/%s", ref);
         }
@@ -399,7 +399,9 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string line;
         std::optional<std::string> id;
         while(!id && getline(is, line)) {
-            id = parseListReferenceForRev(ref_uri, line);
+            auto parsedLine = git::parseLsRemoteLine(line);
+            if (parsedLine && parsedLine->reference == ref_uri)
+                id = parsedLine->target;
         }
 
         if(!id)
