@@ -559,10 +559,11 @@ typename T::mapped_type * get(T & map, const typename T::key_type & key)
 }
 
 /* Get a value for the specified key from an associate container, or a default value if the key isn't present. */
-template <class T>
-const typename T::mapped_type & getOr(T & map,
+// NOTE: we restrict the value to string_views to make sure that use-after-free doesn't happen trivially
+template <class T, class CharT = typename T::mapped_type::value_type>
+std::basic_string_view<CharT> getOr(T & map,
     const typename T::key_type & key,
-    const typename T::mapped_type & defaultValue)
+    const std::basic_string_view<CharT> defaultValue = std::basic_string_view<CharT>())
 {
     auto i = map.find(key);
     if (i == map.end()) return defaultValue;

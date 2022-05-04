@@ -176,7 +176,7 @@ int main(int argc, char ** argv)
             impurePaths.insert(argv[2]);
         else {
             auto drv = store->derivationFromPath(store->parseStorePath(argv[1]));
-            impurePaths = tokenizeString<StringSet>(getOr(drv.env, "__impureHostDeps", ""));
+            impurePaths = tokenizeString<StringSet>(getOr(drv.env, "__impureHostDeps"));
             impurePaths.insert("/usr/lib/libSystem.dylib");
         }
 

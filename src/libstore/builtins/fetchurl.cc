@@ -24,7 +24,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     Path storePath = getAttr("out");
     auto mainUrl = getAttr("url");
-    bool unpack = getOr(drv.env, "unpack", "") == "1";
+    bool unpack = getOr(drv.env, "unpack") == "1";
 
     /* Note: have to use a fresh fileTransfer here because we're in
        a forked process. */

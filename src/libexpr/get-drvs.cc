@@ -34,8 +34,8 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
 
     outputName =
         selectedOutputs.empty()
-        ? getOr(drv.env, "outputName", "out")
-        : *selectedOutputs.begin();
+        ? getOr(drv.env, "outputName", std::string_view("out"))
+        : std::string_view(*selectedOutputs.begin());
 
     auto i = drv.outputs.find(outputName);
     if (i == drv.outputs.end())

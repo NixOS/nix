@@ -566,7 +566,7 @@ namespace nix {
         StringMap s = { };
         auto expected = "yi";
 
-        ASSERT_EQ(getOr(s, "one", "yi"), expected);
+        ASSERT_EQ(getOr(s, "one", std::string_view("yi")), expected);
     }
 
     TEST(getOr, getFromContainer) {
@@ -575,7 +575,7 @@ namespace nix {
         s["two"] = "er";
         auto expected = "yi";
 
-        ASSERT_EQ(getOr(s, "one", "nope"), expected);
+        ASSERT_EQ(getOr(s, "one", std::string_view("nope")), expected);
     }
 
     /* ----------------------------------------------------------------------------

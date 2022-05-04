@@ -440,7 +440,7 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
+        auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile"));
 
         bool keepTmp = false;
         int fileNr = 0;

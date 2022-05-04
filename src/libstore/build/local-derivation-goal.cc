@@ -481,7 +481,7 @@ void LocalDerivationGoal::startBuilder()
            temporary build directory.  The text files have the format used
            by `nix-store --register-validity'.  However, the deriver
            fields are left empty. */
-        auto s = getOr(drv->env, "exportReferencesGraph", "");
+        auto s = getOr(drv->env, "exportReferencesGraph");
         Strings ss = tokenizeString<Strings>(s);
         if (ss.size() % 2 != 0)
             throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
@@ -988,7 +988,7 @@ void LocalDerivationGoal::initTmpDir() {
        there is no size constraint). */
     if (!parsedDrv->getStructuredAttrs()) {
 
-        StringSet passAsFile = tokenizeString<StringSet>(getOr(drv->env, "passAsFile", ""));
+        StringSet passAsFile = tokenizeString<StringSet>(getOr(drv->env, "passAsFile"));
         for (auto & i : drv->env) {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
