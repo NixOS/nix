@@ -543,13 +543,34 @@ std::string stripIndentation(std::string_view s);
 
 /* Get a value for the specified key from an associate container. */
 template <class T>
-std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
+const typename T::mapped_type * get(const T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    if (i == map.end()) return {};
-    return std::optional<typename T::mapped_type>(i->second);
+    if (i == map.end()) return nullptr;
+    return &i->second;
 }
 
+template <class T>
+typename T::mapped_type * get(T & map, const typename T::key_type & key)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return nullptr;
+    return &i->second;
+}
+
+const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
+nlohmann::json * get(nlohmann::json & map, const std::string & key);
+
+/* Get a value for the specified key from an associate container, or a default value if the key isn't present. */
+template <class T>
+const typename T::mapped_type & getOr(T & map,
+    const typename T::key_type & key,
+    const typename T::mapped_type & defaultValue)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return defaultValue;
+    return i->second;
+}
 
 /* Remove and return the first item from a container. */
 template <class T>

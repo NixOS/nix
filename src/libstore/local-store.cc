@@ -718,7 +718,11 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                     // somewhat expensive so we do lazily
                     hashesModulo = hashDerivationModulo(*this, drv, true);
                 }
-                StorePath recomputed = makeOutputPath(i.first, hashesModulo->hashes.at(i.first), drvName);
+                auto currentOutputHash = get(hashesModulo->hashes, i.first);
+                if (!currentOutputHash)
+                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
+                        printStorePath(drvPath), printStorePath(doia.path), i.first);
+                StorePath recomputed = makeOutputPath(i.first, *currentOutputHash, drvName);
                 if (doia.path != recomputed)
                     throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
