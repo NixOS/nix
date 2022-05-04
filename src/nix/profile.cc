@@ -168,7 +168,7 @@ struct ProfileManifest
         }
     }
 
-    std::string toJSON(Store & store) const
+    nlohmann::json toJSON(Store & store) const
     {
         auto array = nlohmann::json::array();
         for (auto & element : elements) {
@@ -190,7 +190,7 @@ struct ProfileManifest
         nlohmann::json json;
         json["version"] = 2;
         json["elements"] = array;
-        return json.dump();
+        return json;
     }
 
     StorePath build(ref<Store> store)
@@ -210,7 +210,7 @@ struct ProfileManifest
 
         buildProfile(tempDir, std::move(pkgs));
 
-        writeFile(tempDir + "/manifest.json", toJSON(*store));
+        writeFile(tempDir + "/manifest.json", toJSON(*store).dump());
 
         /* Add the symlink tree to the store. */
         StringSink sink;
@@ -635,7 +635,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
     }
 };
 
-struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
+struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile, MixJSON
 {
     std::string description() override
     {
@@ -653,18 +653,22 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        for (size_t i = 0; i < manifest.elements.size(); ++i) {
-            auto & element(manifest.elements[i]);
-            if (i) logger->cout("");
-            logger->cout("Index:              " ANSI_BOLD "%s" ANSI_NORMAL "%s",
-                i,
-                element.active ? "" : " " ANSI_RED "(inactive)" ANSI_NORMAL);
-            if (element.source) {
-                logger->cout("Flake attribute:    %s%s", element.source->attrPath, element.source->outputs.to_string());
-                logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
-                logger->cout("Locked flake URL:   %s", element.source->lockedRef.to_string());
+        if (json) {
+            std::cout << manifest.toJSON(*store).dump() << "\n";
+        } else {
+            for (size_t i = 0; i < manifest.elements.size(); ++i) {
+                auto & element(manifest.elements[i]);
+                if (i) logger->cout("");
+                logger->cout("Index:              " ANSI_BOLD "%s" ANSI_NORMAL "%s",
+                    i,
+                    element.active ? "" : " " ANSI_RED "(inactive)" ANSI_NORMAL);
+                if (element.source) {
+                    logger->cout("Flake attribute:    %s%s", element.source->attrPath, element.source->outputs.to_string());
+                    logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
+                    logger->cout("Locked flake URL:   %s", element.source->lockedRef.to_string());
+                }
+                logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
             }
-            logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }
 };
