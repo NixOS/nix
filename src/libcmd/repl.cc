@@ -484,30 +484,38 @@ bool NixRepl::processLine(std::string line)
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
-             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
+             << "  :sh <expr>    Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
              << "  :doc <expr>   Show documentation of a builtin function\n"
              << "  :log <expr>   Show logs for a derivation\n"
-             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n"
-             << "  :d <cmd>      Debug mode commands\n"
-             << "  :d stack      Show trace stack\n"
-             << "  :d env        Show env stack\n"
-             << "  :d show       Show current trace\n"
-             << "  :d show <idx> Change to another trace in the stack\n"
-             << "  :d go         Go until end of program, exception, or builtins.break().\n"
-             << "  :d step       Go one step\n"
+             << "  :te [bool]    Enable, disable or toggle showing traces for errors\n"
              ;
+        if (debuggerHook) {
+             std::cout
+             << "\n"
+             << "        Debug mode commands\n"
+             << "  :env          Show env stack\n"
+             << "  :bt           Show trace stack\n"
+             << "  :st           Show current trace\n"
+             << "  :st <idx>     Change to another trace in the stack\n"
+             << "  :c            Go until end of program, exception, or builtins.break().\n"
+             << "  :s            Go one step\n"
+             ;
+        }
 
     }
 
-    else if (command == ":d" || command == ":debug") {
-        if (arg == "stack") {
+    else if (debuggerHook) {
+
+        if (command == ":bt" || command == ":backtrace") {
             for (const auto & [idx, i] : enumerate(state->debugTraces)) {
                 std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
                 showDebugTrace(std::cout, state->positions, i);
             }
-        } else if (arg == "env") {
+        }
+
+        else if (command == ":env") {
             for (const auto & [idx, i] : enumerate(state->debugTraces)) {
                 if (idx == debugTraceIndex) {
                     printEnvBindings(state->symbols, i.expr, i.env);
@@ -515,10 +523,11 @@ bool NixRepl::processLine(std::string line)
                 }
             }
         }
-        else if (arg.compare(0, 4, "show") == 0) {
+
+        else if (command == ":st") {
             try {
                 // change the DebugTrace index.
-                debugTraceIndex = stoi(arg.substr(4));
+                debugTraceIndex = stoi(arg);
             } catch (...) { }
 
             for (const auto & [idx, i] : enumerate(state->debugTraces)) {
@@ -532,12 +541,14 @@ bool NixRepl::processLine(std::string line)
                  }
             }
         }
-        else if (arg == "step") {
+
+        else if (command == ":s" || command == ":step") {
             // set flag to stop at next DebugTrace; exit repl.
             state->debugStop = true;
             return false;
         }
-        else if (arg == "go") {
+
+        else if (command == ":c" || command == ":continue") {
             // set flag to run to next breakpoint or end of program; exit repl.
             state->debugStop = false;
             return false;
@@ -613,7 +624,7 @@ bool NixRepl::processLine(std::string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":bl" || command == ":i" || command == ":s" || command == ":log") {
+    else if (command == ":b" || command == ":bl" || command == ":i" || command == ":sh" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
@@ -703,7 +714,7 @@ bool NixRepl::processLine(std::string line)
             throw Error("value does not have documentation");
     }
 
-    else if (command == ":st" || command == ":show-trace") {
+    else if (command == ":te" || command == ":trace-enable") {
         if (arg == "false" || (arg == "" && loggerSettings.showTrace)) {
             std::cout << "not showing error traces\n";
             loggerSettings.showTrace = false;
