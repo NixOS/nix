@@ -766,32 +766,35 @@ static RegisterPrimOp primop_break({
     .args = {"v"},
     .doc = R"(
       In debug mode (enabled using `--debugger`), pause Nix expression evaluation and enter the REPL.
+      Otherwise, return the argument `v`.
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        PathSet context;
-        auto s = state.coerceToString(pos, *args[0], context).toOwned();
-        auto error = Error(ErrorInfo{
-            .level = lvlInfo,
-            .msg = hintfmt("breakpoint reached; value was %1%", s),
-            .errPos = state.positions[pos],
-        });
         if (debuggerHook && !state.debugTraces.empty()) {
+            PathSet context;
+            auto s = state.coerceToString(pos, *args[0], context).toOwned();
+
+            auto error = Error(ErrorInfo {
+                .level = lvlInfo,
+                .msg = hintfmt("breakpoint reached; value was %1%", s),
+                .errPos = state.positions[pos],
+            });
+
             auto & dt = state.debugTraces.front();
             debuggerHook(&error, dt.env, dt.expr);
 
             if (state.debugQuit) {
-                // if the user elects to quit the repl, throw an exception.
+                // If the user elects to quit the repl, throw an exception.
                 throw Error(ErrorInfo{
                     .level = lvlInfo,
                     .msg = hintfmt("quit the debugger"),
                     .errPos = state.positions[noPos],
                 });
             }
-
-            // returning the value we were passed.
-            v = *args[0];
         }
+
+        // Return the value we were passed.
+        v = *args[0];
     }
 });
 
