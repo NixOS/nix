@@ -56,6 +56,13 @@ nix build -f multiple-outputs.nix --json 'e^*' --no-link | jq --exit-status '
     (.outputs | keys == ["a", "b", "c"]))
 '
 
+# Make sure that `--impure` works (regression test for https://github.com/NixOS/nix/issues/6488)
+nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*multiple-outputs-e.drv")) and
+    (.outputs | keys == ["a", "b"]))
+'
+
 testNormalization () {
     clearStore
     outPath=$(nix-build ./simple.nix --no-out-link)
