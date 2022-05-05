@@ -771,12 +771,9 @@ static RegisterPrimOp primop_break({
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
         if (debuggerHook && !state.debugTraces.empty()) {
-            PathSet context;
-            auto s = state.coerceToString(pos, *args[0], context).toOwned();
-
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
-                .msg = hintfmt("breakpoint reached; value was %1%", s),
+                .msg = hintfmt("breakpoint reached"),
                 .errPos = state.positions[pos],
             });
 
