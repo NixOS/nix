@@ -37,7 +37,7 @@ struct PrimOp
     const char * doc = nullptr;
 };
 
-typedef std::map<std::string, Value *> valmap;
+typedef std::map<std::string, Value *> ValMap;
 
 struct Env
 {
@@ -47,7 +47,7 @@ struct Env
     Value * values[0];
 };
 
-std::unique_ptr<valmap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
+std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
 void copyContext(const Value & v, PathSet & context);
 

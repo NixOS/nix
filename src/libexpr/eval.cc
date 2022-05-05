@@ -772,7 +772,7 @@ void printEnvBindings(const SymbolTable & st, const Expr & expr, const Env & env
         printEnvBindings(st, *expr.staticEnv.get(), env, 0);
 }
 
-void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, valmap & vm)
+void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, ValMap & vm)
 {
     // add bindings for the next level up first, so that the bindings for this level
     // override the higher levels.
@@ -795,9 +795,9 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     }
 }
 
-std::unique_ptr<valmap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env)
+std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env)
 {
-    auto vm = std::make_unique<valmap>();
+    auto vm = std::make_unique<ValMap>();
     mapStaticEnvBindings(st, se, env, *vm);
     return vm;
 }
