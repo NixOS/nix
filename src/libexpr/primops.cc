@@ -227,7 +227,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
-            auto staticEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, state.staticBaseEnv.get(), vScope->attrs->size()));
+            auto staticEnv = std::make_shared<StaticEnv>(false, state.staticBaseEnv.get(), vScope->attrs->size());
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
@@ -329,8 +329,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
     std::string sym(state.forceStringNoCtx(*args[1], pos));
 
     void *handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
-    if (!handle)
-    {
+    if (!handle) {
         auto e = EvalError("could not open '%1%': %2%", path, dlerror());
         state.debugLastTrace(e);
         throw e;
@@ -340,14 +339,11 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
     ValueInitializer func = (ValueInitializer) dlsym(handle, sym.c_str());
     if(!func) {
         char *message = dlerror();
-        if (message)
-        {
+        if (message) {
             auto e = EvalError("could not load symbol '%1%' from '%2%': %3%", sym, path, message);
             state.debugLastTrace(e);
             throw e;
-        }
-        else
-        {
+        } else {
             auto e = EvalError("symbol '%1%' from '%2%' resolved to NULL when a function pointer was expected",
                 sym, path);
             state.debugLastTrace(e);
@@ -573,8 +569,7 @@ struct CompareValues
             return v1->fpoint < v2->integer;
         if (v1->type() == nInt && v2->type() == nFloat)
             return v1->integer < v2->fpoint;
-        if (v1->type() != v2->type())
-        {
+        if (v1->type() != v2->type()) {
             auto e = EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
             state.debugLastTrace(e);
             throw e;
@@ -599,12 +594,11 @@ struct CompareValues
                         return (*this)(v1->listElems()[i], v2->listElems()[i]);
                     }
                 }
-            default:
-                {
-                    auto e = EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
-                    state.debugLastTrace(e);
-                    throw e;
-                }
+            default: {
+                auto e = EvalError("cannot compare %1% with %2%", showType(*v1), showType(*v2));
+                state.debugLastTrace(e);
+                throw e;
+            }
         }
     }
 };
@@ -703,8 +697,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
 
         Bindings::iterator key =
             e->attrs->find(state.sKey);
-        if (key == e->attrs->end())
-        {
+        if (key == e->attrs->end()) {
             auto e = EvalError({
                 .msg = hintfmt("attribute 'key' required"),
                 .errPos = state.positions[pos]
@@ -772,7 +765,7 @@ static RegisterPrimOp primop_break({
     .name = "break",
     .args = {"v"},
     .doc = R"(
-      In debug mode, pause Nix expression evaluation and enter the repl.
+      In debug mode (enabled using `--debugger`), pause Nix expression evaluation and enter the REPL.
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
@@ -783,16 +776,15 @@ static RegisterPrimOp primop_break({
             .msg = hintfmt("breakpoint reached; value was %1%", s),
             .errPos = state.positions[pos],
         });
-        if (debuggerHook && !state.debugTraces.empty())
-        {
-            auto &dt = state.debugTraces.front();
+        if (debuggerHook && !state.debugTraces.empty()) {
+            auto & dt = state.debugTraces.front();
             debuggerHook(&error, dt.env, dt.expr);
 
             if (state.debugQuit) {
                 // if the user elects to quit the repl, throw an exception.
                 throw Error(ErrorInfo{
                     .level = lvlInfo,
-                    .msg = hintfmt("quit from debugger"),
+                    .msg = hintfmt("quit the debugger"),
                     .errPos = state.positions[noPos],
                 });
             }
@@ -903,7 +895,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
 {
     auto attrs = state.buildBindings(2);
     auto saveDebuggerHook = debuggerHook;
-    debuggerHook = 0;
+    debuggerHook = nullptr;
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);

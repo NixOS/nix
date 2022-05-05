@@ -466,7 +466,7 @@ EvalState::EvalState(
     , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
-    , staticBaseEnv(new StaticEnv(false, 0))
+    , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
@@ -524,7 +524,7 @@ void EvalState::allowPath(const StorePath & storePath)
         allowedPaths->insert(store->toRealPath(storePath));
 }
 
-void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value & v)
+void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
 {
     allowPath(storePath);
 
@@ -714,22 +714,19 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 
 
 // just for the current level of StaticEnv, not the whole chain.
-void printStaticEnvBindings(const SymbolTable &st, const StaticEnv &se)
+void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 {
     std::cout << ANSI_MAGENTA;
-    for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
-    {
-      std::cout << st[i->first] << " ";
-    }
+    for (auto & i : se.vars)
+        std::cout << st[i.first] << " ";
     std::cout << ANSI_NORMAL;
     std::cout << std::endl;
 }
 
 // just for the current level of Env, not the whole chain.
-void printWithBindings(const SymbolTable &st, const Env &env)
+void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (env.type == Env::HasWithAttrs)
-    {
+    if (env.type == Env::HasWithAttrs) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         Bindings::iterator j = env.values[0]->attrs->begin();
@@ -742,7 +739,7 @@ void printWithBindings(const SymbolTable &st, const Env &env)
     }
 }
 
-void printEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env, int lvl)
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl)
 {
     std::cout << "Env level " << lvl << std::endl;
 
@@ -752,16 +749,13 @@ void printEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env
         printWithBindings(st, env);
         std::cout << std::endl;
         printEnvBindings(st, *se.up, *env.up, ++lvl);
-    }
-    else
-    {
+    } else {
         std::cout << ANSI_MAGENTA;
-        // for the top level, don't print the double underscore ones; they are in builtins.
-        for (auto i = se.vars.begin(); i != se.vars.end(); ++i)
-        {
-            if (((std::string)st[i->first]).substr(0,2) != "__")
-                std::cout << st[i->first] << " ";
-        }
+        // for the top level, don't print the double underscore ones;
+        // they are in builtins.
+        for (auto & i : se.vars)
+            if (!hasPrefix(st[i.first], "__"))
+                std::cout << st[i.first] << " ";
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
         printWithBindings(st, env);  // probably nothing there for the top level.
@@ -771,56 +765,50 @@ void printEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env
 }
 
 // TODO: add accompanying env for With stuff.
-void printEnvBindings(const SymbolTable &st, const Expr &expr, const Env &env)
+void printEnvBindings(const SymbolTable & st, const Expr & expr, const Env & env)
 {
     // just print the names for now
-    if (expr.staticenv)
-    {
-      printEnvBindings(st, *expr.staticenv.get(), env, 0);
+    if (expr.staticEnv)
+        printEnvBindings(st, *expr.staticEnv.get(), env, 0);
+}
+
+void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, valmap & vm)
+{
+    // add bindings for the next level up first, so that the bindings for this level
+    // override the higher levels.
+    // The top level bindings (builtins) are skipped since they are added for us by initEnv()
+    if (env.up && se.up) {
+        mapStaticEnvBindings(st, *se.up, *env.up, vm);
+
+        if (env.type == Env::HasWithAttrs) {
+            // add 'with' bindings.
+            Bindings::iterator j = env.values[0]->attrs->begin();
+            while (j != env.values[0]->attrs->end()) {
+                vm[st[j->name]] = j->value;
+                ++j;
+            }
+        } else {
+            // iterate through staticenv bindings and add them.
+            for (auto & i : se.vars)
+                vm[st[i.first]] = env.values[i.second];
+        }
     }
 }
 
-void mapStaticEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env, valmap & vm)
+std::unique_ptr<valmap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env)
 {
-  // add bindings for the next level up first, so that the bindings for this level
-  // override the higher levels.
-  // The top level bindings (builtins) are skipped since they are added for us by initEnv()
-  if (env.up && se.up) {
-      mapStaticEnvBindings(st, *se.up, *env.up, vm);
-
-      if (env.type == Env::HasWithAttrs)
-      {
-          // add 'with' bindings.
-          Bindings::iterator j = env.values[0]->attrs->begin();
-          while (j != env.values[0]->attrs->end()) {
-              vm[st[j->name]] = j->value;
-              ++j;
-          }
-      }
-      else
-      {
-          // iterate through staticenv bindings and add them.
-          for (auto iter = se.vars.begin(); iter != se.vars.end(); ++iter)
-          {
-              vm[st[iter->first]] = env.values[iter->second];
-          }
-      }
-  }
-}
-
-valmap * mapStaticEnvBindings(const SymbolTable &st,const StaticEnv &se, const Env &env)
-{
-    auto vm = new valmap();
+    auto vm = std::make_unique<valmap>();
     mapStaticEnvBindings(st, se, env, *vm);
     return vm;
 }
 
-
-void EvalState::debugLastTrace(Error & e) const {
-    // call this in the situation where Expr and Env are inaccessible.  The debugger will start in the last context
-    // that's in the DebugTrace stack.
+void EvalState::debugLastTrace(Error & e) const
+{
+    // Call this in the situation where Expr and Env are inaccessible.
+    // The debugger will start in the last context that's in the
+    // DebugTrace stack.
     if (debuggerHook && !debugTraces.empty()) {
-        const DebugTrace &last = debugTraces.front();
+        const DebugTrace & last = debugTraces.front();
         debuggerHook(&e, last.env, last.expr);
     }
 }
@@ -829,7 +817,7 @@ void EvalState::debugLastTrace(Error & e) const {
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
    exceptions. */
-void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr &expr) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr & expr) const
 {
     auto error = EvalError({
         .msg = hintfmt(s),
@@ -864,7 +852,7 @@ void EvalState::throwEvalError(const char * s, const std::string & s2) const
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const std::string & s2, Env & env, Expr &expr) const
+    const std::string & s2, Env & env, Expr & expr) const
 {
     auto error = EvalError(ErrorInfo{
         .msg = hintfmt(s, s2),
@@ -890,7 +878,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     throw error;
 }
 
-void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr &expr) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr & expr) const
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -899,7 +887,6 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
 
     if (debuggerHook)
         debuggerHook(&error, env, expr);
-
 
     throw error;
 }
@@ -931,7 +918,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
-    const std::string & s3, Env & env, Expr &expr) const
+    const std::string & s3, Env & env, Expr & expr) const
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -944,7 +931,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     throw error;
 }
 
-void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr &expr) const
+void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr & expr) const
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     auto error = EvalError({
@@ -970,7 +957,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v
     throw error;
 }
 
-void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr &expr) const
+void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr & expr) const
 {
     auto error = TypeError({
         .msg = hintfmt(s, showType(v)),
@@ -1086,27 +1073,31 @@ void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const
     e.addTrace(positions[pos], s, s2);
 }
 
-std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(EvalState &state, Expr &expr, Env &env,
-    std::optional<ErrPos> pos, const char * s, const std::string & s2)
+static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
+    EvalState & state,
+    Expr & expr,
+    Env & env,
+    std::optional<ErrPos> pos,
+    const char * s,
+    const std::string & s2)
 {
-  return std::unique_ptr<DebugTraceStacker>(
-      new DebugTraceStacker(
-          state,
-          DebugTrace
-                {.pos = pos,
-                 .expr = expr,
-                 .env = env,
-                 .hint = hintfmt(s, s2),
-                 .is_error = false
-                }));
+    return std::make_unique<DebugTraceStacker>(state,
+        DebugTrace {
+            .pos = pos,
+            .expr = expr,
+            .env = env,
+            .hint = hintfmt(s, s2),
+            .isError = false
+        });
 }
 
-DebugTraceStacker::DebugTraceStacker(EvalState &evalState, DebugTrace t)
-:evalState(evalState), trace(t)
+DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
+    : evalState(evalState)
+    , trace(std::move(t))
 {
-    evalState.debugTraces.push_front(t);
+    evalState.debugTraces.push_front(trace);
     if (evalState.debugStop && debuggerHook)
-        debuggerHook(0, t.env, t.expr);
+        debuggerHook(nullptr, trace.env, trace.expr);
 }
 
 void Value::mkString(std::string_view s)
@@ -1303,15 +1294,14 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
-        auto dts =
-            debuggerHook ?
-                makeDebugTraceStacker(
-                    *this,
-                    *e,
-                    this->baseEnv,
-                    (e->getPos() ? std::optional(ErrPos(positions[e->getPos()])) : std::nullopt),
-                    "while evaluating the file '%1%':", resolvedPath)
-                : nullptr;
+        auto dts = debuggerHook
+            ? makeDebugTraceStacker(
+                *this,
+                *e,
+                this->baseEnv,
+                e->getPos() ? std::optional(ErrPos(positions[e->getPos()])) : std::nullopt,
+                "while evaluating the file '%1%':", resolvedPath)
+            : nullptr;
 
         // Enforce that 'flake.nix' is a direct attrset, not a
         // computation.
@@ -1538,15 +1528,14 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
-        auto dts =
-            debuggerHook ?
-                makeDebugTraceStacker(
-                    state,
-                    *this,
-                    env,
-                    state.positions[pos2],
-                    "while evaluating the attribute '%1%'",
-                    showAttrPath(state, env, attrPath))
+        auto dts = debuggerHook
+            ? makeDebugTraceStacker(
+                state,
+                *this,
+                env,
+                state.positions[pos2],
+                "while evaluating the attribute '%1%'",
+                showAttrPath(state, env, attrPath))
             : nullptr;
 
         for (auto & i : attrPath) {
@@ -1708,14 +1697,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             /* Evaluate the body. */
             try {
-                auto dts =
-                    debuggerHook ?
-                        makeDebugTraceStacker(*this, *lambda.body, env2, positions[lambda.pos],
-                                           "while evaluating %s",
-                                           (lambda.name
-                                               ? concatStrings("'", symbols[lambda.name], "'")
-                                               : "anonymous lambda"))
-                        : nullptr;
+                auto dts = debuggerHook
+                    ? makeDebugTraceStacker(
+                        *this, *lambda.body, env2, positions[lambda.pos],
+                        "while evaluating %s",
+                        lambda.name
+                        ? concatStrings("'", symbols[lambda.name], "'")
+                        : "anonymous lambda")
+                    : nullptr;
 
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
@@ -2135,14 +2124,10 @@ void EvalState::forceValueDeep(Value & v)
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
                 try {
-
-                    auto dts =
-                        debuggerHook ?
-                            // if the value is a thunk, we're evaling.  otherwise no trace necessary.
-                            (i.value->isThunk() ?
-                                makeDebugTraceStacker(*this, *v.thunk.expr, *v.thunk.env, positions[i.pos],
-                                                  "while evaluating the attribute '%1%'", symbols[i.name])
-                                : nullptr)
+                    // If the value is a thunk, we're evaling. Otherwise no trace necessary.
+                    auto dts = debuggerHook && i.value->isThunk()
+                        ? makeDebugTraceStacker(*this, *v.thunk.expr, *v.thunk.env, positions[i.pos],
+                            "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
                     recurse(*i.value);

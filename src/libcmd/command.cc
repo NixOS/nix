@@ -121,25 +121,23 @@ ref<EvalState> EvalCommand::getEvalState()
         if (startReplOnEvalErrors)
             debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
                 auto dts =
-                    error && expr.getPos() ?
-                          std::unique_ptr<DebugTraceStacker>(
-                              new DebugTraceStacker(
-                                  *evalState,
-                                  DebugTrace
-                                        {.pos = (error->info().errPos ? *error->info().errPos : evalState->positions[expr.getPos()]),
-                                         .expr = expr,
-                                         .env = env,
-                                         .hint = error->info().msg,
-                                         .is_error = true
-                                        }))
-                          : nullptr;
+                    error && expr.getPos()
+                    ? std::make_unique<DebugTraceStacker>(
+                        *evalState,
+                        DebugTrace {
+                            .pos = error->info().errPos ? *error->info().errPos : evalState->positions[expr.getPos()],
+                            .expr = expr,
+                            .env = env,
+                            .hint = error->info().msg,
+                            .isError = true
+                        })
+                    : nullptr;
 
                 if (error)
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
 
-                if (expr.staticenv)
-                {
-                    std::unique_ptr<valmap> vm(mapStaticEnvBindings(evalState->symbols, *expr.staticenv.get(), env));
+                if (expr.staticEnv) {
+                    auto vm = mapStaticEnvBindings(evalState->symbols, *expr.staticEnv.get(), env);
                     runRepl(evalState, expr, *vm);
                 }
             };

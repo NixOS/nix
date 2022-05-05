@@ -25,8 +25,8 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
-void printEnvBindings(const SymbolTable &st, const Expr &expr, const Env &env);
-void printEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env, int lvl = 0);
+void printEnvBindings(const SymbolTable & st, const Expr & expr, const Env & env);
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
 
 struct PrimOp
 {
@@ -47,7 +47,7 @@ struct Env
     Value * values[0];
 };
 
-valmap * mapStaticEnvBindings(const SymbolTable &st, const StaticEnv &se, const Env &env);
+std::unique_ptr<valmap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
 void copyContext(const Value & v, PathSet & context);
 
@@ -75,10 +75,10 @@ std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
     std::optional<ErrPos> pos;
-    const Expr &expr;
-    const Env &env;
+    const Expr & expr;
+    const Env & env;
     hintformat hint;
-    bool is_error;
+    bool isError;
 };
 
 class EvalState
@@ -297,7 +297,7 @@ public:
     void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s, const std::string & s2,
-        Env & env, Expr &expr) const;
+        Env & env, Expr & expr) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2,
         Env & env, Expr & expr) const;
@@ -508,16 +508,15 @@ private:
     friend struct Value;
 };
 
-class DebugTraceStacker {
-    public:
-        DebugTraceStacker(EvalState &evalState, DebugTrace t);
-        ~DebugTraceStacker()
-        {
-            // assert(evalState.debugTraces.front() == trace);
-            evalState.debugTraces.pop_front();
-        }
-        EvalState &evalState;
-        DebugTrace trace;
+struct DebugTraceStacker {
+    DebugTraceStacker(EvalState & evalState, DebugTrace t);
+    ~DebugTraceStacker()
+    {
+        // assert(evalState.debugTraces.front() == trace);
+        evalState.debugTraces.pop_front();
+    }
+    EvalState & evalState;
+    DebugTrace trace;
 };
 
 /* Return a string representing the type of the value `v'. */

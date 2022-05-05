@@ -275,6 +275,7 @@ void printClosureDiff(
 
 void runRepl(
     ref<EvalState> evalState,
-    const Expr &expr,
+    const Expr & expr,
     const std::map<std::string, Value *> & extraEnv);
+
 }

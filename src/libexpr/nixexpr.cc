@@ -296,39 +296,38 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 /* Computing levels/displacements for variables. */
 
-void Expr::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void Expr::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     abort();
 }
 
-void ExprInt::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprInt::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;}
+
+void ExprFloat::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
+{
+    if (debuggerHook)
+        staticEnv = env;
 }
 
-void ExprFloat::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprString::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 }
 
-void ExprString::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprPath::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 }
 
-void ExprPath::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprVar::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
-}
-
-void ExprVar::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
-{
-    if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
@@ -353,20 +352,18 @@ void ExprVar::bindVars(const EvalState & es, const std::shared_ptr<const StaticE
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
     if (withLevel == -1)
-    {
         throw UndefinedVarError({
             .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
             .errPos = es.positions[pos]
         });
-    }
     fromWith = true;
     this->level = withLevel;
 }
 
-void ExprSelect::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprSelect::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     e->bindVars(es, env);
     if (def) def->bindVars(es, env);
@@ -375,10 +372,10 @@ void ExprSelect::bindVars(const EvalState & es, const std::shared_ptr<const Stat
             i.expr->bindVars(es, env);
 }
 
-void ExprOpHasAttr::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprOpHasAttr::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     e->bindVars(es, env);
     for (auto & i : attrPath)
@@ -386,13 +383,13 @@ void ExprOpHasAttr::bindVars(const EvalState & es, const std::shared_ptr<const S
             i.expr->bindVars(es, env);
 }
 
-void ExprAttrs::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprAttrs::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     if (recursive) {
-        auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get(), recursive ? attrs.size() : 0));
+        auto newEnv = std::make_shared<StaticEnv>(false, env.get(), recursive ? attrs.size() : 0);
 
         Displacement displ = 0;
         for (auto & i : attrs)
@@ -419,25 +416,24 @@ void ExprAttrs::bindVars(const EvalState & es, const std::shared_ptr<const Stati
     }
 }
 
-void ExprList::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprList::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     for (auto & i : elems)
         i->bindVars(es, env);
 }
 
-void ExprLambda::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprLambda::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
-    auto newEnv = std::shared_ptr<StaticEnv>(
-        new StaticEnv(
-                false, env.get(),
-                (hasFormals() ? formals->formals.size() : 0) +
-                (!arg ? 0 : 1)));
+    auto newEnv = std::make_shared<StaticEnv>(
+        false, env.get(),
+        (hasFormals() ? formals->formals.size() : 0) +
+        (!arg ? 0 : 1));
 
     Displacement displ = 0;
 
@@ -456,22 +452,22 @@ void ExprLambda::bindVars(const EvalState & es, const std::shared_ptr<const Stat
     body->bindVars(es, newEnv);
 }
 
-void ExprCall::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprCall::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     fun->bindVars(es, env);
     for (auto e : args)
         e->bindVars(es, env);
 }
 
-void ExprLet::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprLet::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
-    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(false, env.get(), attrs->attrs.size()));
+    auto newEnv = std::make_shared<StaticEnv>(false, env.get(), attrs->attrs.size());
 
     Displacement displ = 0;
     for (auto & i : attrs->attrs)
@@ -485,10 +481,10 @@ void ExprLet::bindVars(const EvalState & es, const std::shared_ptr<const StaticE
     body->bindVars(es, newEnv);
 }
 
-void ExprWith::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprWith::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
@@ -503,54 +499,53 @@ void ExprWith::bindVars(const EvalState & es, const std::shared_ptr<const Static
         }
 
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     attrs->bindVars(es, env);
-    auto newEnv = std::shared_ptr<StaticEnv>(new StaticEnv(true, env.get()));
+    auto newEnv = std::make_shared<StaticEnv>(true, env.get());
     body->bindVars(es, newEnv);
 }
 
-void ExprIf::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprIf::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     cond->bindVars(es, env);
     then->bindVars(es, env);
     else_->bindVars(es, env);
 }
 
-void ExprAssert::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprAssert::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     cond->bindVars(es, env);
     body->bindVars(es, env);
 }
 
-void ExprOpNot::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprOpNot::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     e->bindVars(es, env);
 }
 
-void ExprConcatStrings::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprConcatStrings::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
+        staticEnv = env;
 
     for (auto & i : *this->es)
         i.second->bindVars(es, env);
 }
 
-void ExprPos::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> &env)
+void ExprPos::bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     if (debuggerHook)
-        staticenv = env;
-
+        staticEnv = env;
 }
 
 

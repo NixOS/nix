@@ -51,7 +51,7 @@ struct NixRepl
     ref<EvalState> state;
     Bindings * autoArgs;
 
-    int debugTraceIndex;
+    size_t debugTraceIndex;
 
     Strings loadedFiles;
 
@@ -79,7 +79,7 @@ struct NixRepl
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
     void evalString(std::string s, Value & v);
-    void loadDebugTraceEnv(DebugTrace &dt);
+    void loadDebugTraceEnv(DebugTrace & dt);
 
     typedef std::set<Value *> ValuesSeen;
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
@@ -203,15 +203,16 @@ namespace {
     }
 }
 
-std::ostream& showDebugTrace(std::ostream &out, const PosTable &positions, const DebugTrace &dt)
+static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
 {
-    if (dt.is_error)
+    if (dt.isError)
         out << ANSI_RED "error: " << ANSI_NORMAL;
     out << dt.hint.str() << "\n";
 
     // prefer direct pos, but if noPos then try the expr.
-    auto pos = (*dt.pos ? *dt.pos :
-       positions[(dt.expr.getPos() ? dt.expr.getPos() : noPos)]);
+    auto pos = *dt.pos
+        ? *dt.pos
+        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
         printAtPos(pos, out);
@@ -258,8 +259,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     while (true) {
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
-        if (!getLine(input, input.empty() ? "nix-repl> " : "          "))
-        {
+        if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
             // ctrl-D should exit the debugger.
             state->debugStop = false;
             state->debugQuit = true;
@@ -279,8 +279,8 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             // in debugger mode, an EvalError should trigger another repl session.
             // when that session returns the exception will land here.  No need to show it again;
             // show the error for this repl session instead.
-            if (debuggerHook && !this->state->debugTraces.empty())
-                showDebugTrace(std::cout, this->state->positions, this->state->debugTraces.front());
+            if (debuggerHook && !state->debugTraces.empty())
+                showDebugTrace(std::cout, state->positions, state->debugTraces.front());
             else
                 printMsg(lvlError, e.msg());
         } catch (Error & e) {
@@ -437,22 +437,16 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     return *drvPath;
 }
 
-void NixRepl::loadDebugTraceEnv(DebugTrace &dt)
+void NixRepl::loadDebugTraceEnv(DebugTrace & dt)
 {
-    if (dt.expr.staticenv)
-    {
-        initEnv();
+    initEnv();
 
-        auto vm = std::make_unique<valmap>(*(mapStaticEnvBindings(this->state->symbols, *dt.expr.staticenv.get(), dt.env)));
+    if (dt.expr.staticEnv) {
+        auto vm = mapStaticEnvBindings(state->symbols, *dt.expr.staticEnv.get(), dt.env);
 
         // add staticenv vars.
-        for (auto & [name, value] : *(vm.get())) {
-            this->addVarToScope(this->state->symbols.create(name), *value);
-        }
-    }
-    else
-    {
-        initEnv();
+        for (auto & [name, value] : *(vm.get()))
+            addVarToScope(state->symbols.create(name), *value);
     }
 }
 
@@ -509,45 +503,31 @@ bool NixRepl::processLine(std::string line)
 
     else if (command == ":d" || command == ":debug") {
         if (arg == "stack") {
-            int idx = 0;
-            for (auto iter = this->state->debugTraces.begin();
-                 iter !=  this->state->debugTraces.end();
-                 ++iter, ++idx) {
-                 std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                 showDebugTrace(std::cout, this->state->positions, *iter);
+            for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+                std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                showDebugTrace(std::cout, state->positions, i);
             }
         } else if (arg == "env") {
-            int idx = 0;
-            for (auto iter = this->state->debugTraces.begin();
-                 iter !=  this->state->debugTraces.end();
-                 ++iter, ++idx) {
-                 if (idx == this->debugTraceIndex)
-                 {
-                     printEnvBindings(state->symbols,iter->expr, iter->env);
-                     break;
-                 }
+            for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+                if (idx == debugTraceIndex) {
+                    printEnvBindings(state->symbols, i.expr, i.env);
+                    break;
+                }
             }
         }
-        else if (arg.compare(0,4,"show") == 0) {
+        else if (arg.compare(0, 4, "show") == 0) {
             try {
                 // change the DebugTrace index.
                 debugTraceIndex = stoi(arg.substr(4));
-            }
-            catch (...)
-            {
-            }
+            } catch (...) { }
 
-            int idx = 0;
-            for (auto iter = this->state->debugTraces.begin();
-                 iter !=  this->state->debugTraces.end();
-                 ++iter, ++idx) {
-                 if (idx == this->debugTraceIndex)
-                 {
+            for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+                 if (idx == debugTraceIndex) {
                      std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                     showDebugTrace(std::cout, this->state->positions, *iter);
+                     showDebugTrace(std::cout, state->positions, i);
                      std::cout << std::endl;
-                     printEnvBindings(state->symbols,iter->expr, iter->env);
-                     loadDebugTraceEnv(*iter);
+                     printEnvBindings(state->symbols, i.expr, i.env);
+                     loadDebugTraceEnv(i);
                      break;
                  }
             }
@@ -1032,9 +1012,8 @@ void runRepl(
     repl->initEnv();
 
     // add 'extra' vars.
-    for (auto & [name, value] : extraEnv) {
+    for (auto & [name, value] : extraEnv)
         repl->addVarToScope(repl->state->symbols.create(name), *value);
-    }
 
     repl->mainLoop({});
 }
