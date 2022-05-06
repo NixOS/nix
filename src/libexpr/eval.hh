@@ -37,7 +37,11 @@ struct PrimOp
     const char * doc = nullptr;
 };
 
-typedef std::map<std::string, Value *> ValMap;
+#if HAVE_BOEHMGC
+    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+#else
+    typedef std::map<std::string, Value *> ValMap;
+#endif
 
 struct Env
 {
