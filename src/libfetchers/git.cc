@@ -6,7 +6,7 @@
 #include "url-parts.hh"
 #include "pathlocks.hh"
 #include "util.hh"
-#include "git-utils.hh"
+#include "git.hh"
 
 #include "fetch-settings.hh"
 
@@ -72,13 +72,16 @@ std::optional<std::string> readHead(const Path & path)
 
     std::string_view line = output;
     line = line.substr(0, line.find("\n"));
-    if (const auto ref = parseListReferenceHeadRef(line); ref) {
-        debug("resolved HEAD ref '%s' for repo '%s'", *ref, path);
-        return *ref;
-    }
-    if (const auto rev = parseListReferenceForRev("HEAD", line); rev) {
-        debug("resolved HEAD rev '%s' for repo '%s'", *rev, path);
-        return *rev;
+    if (const auto parseResult = git::parseLsRemoteLine(line)) {
+        switch (parseResult->kind) {
+            case git::LsRemoteRefLine::Kind::Symbolic:
+                debug("resolved HEAD ref '%s' for repo '%s'", parseResult->target, path);
+                break;
+            case git::LsRemoteRefLine::Kind::Object:
+                debug("resolved HEAD rev '%s' for repo '%s'", parseResult->target, path);
+                break;
+        }
+        return parseResult->target;
     }
     return std::nullopt;
 }
