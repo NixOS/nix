@@ -85,6 +85,8 @@ struct DebugTrace {
     bool isError;
 };
 
+void debugError(Error * e, Env & env, Expr & expr);
+
 class EvalState
 {
 public:

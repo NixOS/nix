@@ -813,6 +813,13 @@ void EvalState::debugLastTrace(Error & e) const
     }
 }
 
+void debugError(Error * e, Env & env, Expr & expr)
+{
+    if (debuggerHook)
+        debuggerHook(e, env, expr);
+}
+
+
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
@@ -824,8 +831,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -860,8 +866,7 @@ void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions
         .suggestions = suggestions,
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -885,8 +890,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -925,8 +929,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -939,8 +942,7 @@ void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym
         .errPos = positions[p1]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -964,8 +966,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -990,8 +991,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambd
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -1005,8 +1005,7 @@ void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions
         .suggestions = suggestions,
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -1018,8 +1017,7 @@ void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr 
         .errPos = positions[expr.getPos()],
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -1031,8 +1029,7 @@ void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std:
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -1044,8 +1041,7 @@ void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const s
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
@@ -1057,8 +1053,7 @@ void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, cons
         .errPos = positions[pos]
     });
 
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
+    debugError(&error, env, expr);
 
     throw error;
 }
