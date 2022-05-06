@@ -127,7 +127,11 @@ public:
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
-    void debugLastTrace(Error & e) const;
+
+    [[gnu::noinline, gnu::noreturn]]
+    void debugThrow(const Error &error, const Env & env, const Expr & expr) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void debugThrowLastTrace(Error & e) const;
 
 private:
     SrcToStore srcToStore;

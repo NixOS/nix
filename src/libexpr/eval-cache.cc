@@ -556,8 +556,7 @@ std::string AttrCursor::getString()
             } else
             {
                 auto e = TypeError("'%s' is not a string", getAttrPathStr());
-                root->state.debugLastTrace(e);
-                throw e;
+                root->state.debugThrowLastTrace(e);
             }
         }
     }
@@ -567,8 +566,7 @@ std::string AttrCursor::getString()
     if (v.type() != nString && v.type() != nPath)
     {
         auto e = TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
-        root->state.debugLastTrace(e);
-        throw e;
+        root->state.debugThrowLastTrace(e);
     }
 
     return v.type() == nString ? v.string.s : v.path;
@@ -595,8 +593,7 @@ string_t AttrCursor::getStringWithContext()
             } else
             {
                 auto e = TypeError("'%s' is not a string", getAttrPathStr());
-                root->state.debugLastTrace(e);
-                throw e;
+                root->state.debugThrowLastTrace(e);
             }
         }
     }
@@ -610,9 +607,7 @@ string_t AttrCursor::getStringWithContext()
     else
     {
         auto e = TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type()));
-        root->state.debugLastTrace(e);
-        throw e;
-        return {v.path, {}}; // should never execute
+        root->state.debugThrowLastTrace(e);
     }
 }
 
@@ -628,8 +623,7 @@ bool AttrCursor::getBool()
             } else
             {
                 auto e = TypeError("'%s' is not a Boolean", getAttrPathStr());
-                root->state.debugLastTrace(e);
-                throw e;
+                root->state.debugThrowLastTrace(e);
             }
         }
     }
@@ -639,8 +633,7 @@ bool AttrCursor::getBool()
     if (v.type() != nBool)
     {
         auto e = TypeError("'%s' is not a Boolean", getAttrPathStr());
-        root->state.debugLastTrace(e);
-        throw e;
+        root->state.debugThrowLastTrace(e);
     }
 
     return v.boolean;
@@ -691,8 +684,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
             } else
             {
                 auto e = TypeError("'%s' is not an attribute set", getAttrPathStr());
-                root->state.debugLastTrace(e);
-                throw e;
+                root->state.debugThrowLastTrace(e);
             }
         }
     }
@@ -702,8 +694,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     if (v.type() != nAttrs)
     {
         auto e = TypeError("'%s' is not an attribute set", getAttrPathStr());
-        root->state.debugLastTrace(e);
-        throw e;
+        root->state.debugThrowLastTrace(e);
     }
 
     std::vector<Symbol> attrs;

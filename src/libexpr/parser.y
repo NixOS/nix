@@ -789,8 +789,7 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
             path),
         .errPos = positions[pos]
     });
-    debugLastTrace(e);
-    throw e;
+    debugThrowLastTrace(e);
 }
 
 
