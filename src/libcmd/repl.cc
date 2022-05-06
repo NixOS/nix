@@ -506,53 +506,50 @@ bool NixRepl::processLine(std::string line)
 
     }
 
-    else if (debuggerHook) {
+    else if (debuggerHook && (command == ":bt" || command == ":backtrace")) {
+        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+            std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+            showDebugTrace(std::cout, state->positions, i);
+        }
+    }
 
-        if (command == ":bt" || command == ":backtrace") {
-            for (const auto & [idx, i] : enumerate(state->debugTraces)) {
-                std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                showDebugTrace(std::cout, state->positions, i);
+    else if (debuggerHook && (command == ":env")) {
+        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+            if (idx == debugTraceIndex) {
+                printEnvBindings(state->symbols, i.expr, i.env);
+                break;
             }
         }
+    }
 
-        else if (command == ":env") {
-            for (const auto & [idx, i] : enumerate(state->debugTraces)) {
-                if (idx == debugTraceIndex) {
-                    printEnvBindings(state->symbols, i.expr, i.env);
-                    break;
-                }
-            }
+    else if (debuggerHook && (command == ":st")) {
+        try {
+            // change the DebugTrace index.
+            debugTraceIndex = stoi(arg);
+        } catch (...) { }
+
+        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+             if (idx == debugTraceIndex) {
+                 std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                 showDebugTrace(std::cout, state->positions, i);
+                 std::cout << std::endl;
+                 printEnvBindings(state->symbols, i.expr, i.env);
+                 loadDebugTraceEnv(i);
+                 break;
+             }
         }
+    }
 
-        else if (command == ":st") {
-            try {
-                // change the DebugTrace index.
-                debugTraceIndex = stoi(arg);
-            } catch (...) { }
+    else if (debuggerHook && (command == ":s" || command == ":step")) {
+        // set flag to stop at next DebugTrace; exit repl.
+        state->debugStop = true;
+        return false;
+    }
 
-            for (const auto & [idx, i] : enumerate(state->debugTraces)) {
-                 if (idx == debugTraceIndex) {
-                     std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                     showDebugTrace(std::cout, state->positions, i);
-                     std::cout << std::endl;
-                     printEnvBindings(state->symbols, i.expr, i.env);
-                     loadDebugTraceEnv(i);
-                     break;
-                 }
-            }
-        }
-
-        else if (command == ":s" || command == ":step") {
-            // set flag to stop at next DebugTrace; exit repl.
-            state->debugStop = true;
-            return false;
-        }
-
-        else if (command == ":c" || command == ":continue") {
-            // set flag to run to next breakpoint or end of program; exit repl.
-            state->debugStop = false;
-            return false;
-        }
+    else if (debuggerHook && (command == ":c" || command == ":continue")) {
+        // set flag to run to next breakpoint or end of program; exit repl.
+        state->debugStop = false;
+        return false;
     }
 
     else if (command == ":a" || command == ":add") {
