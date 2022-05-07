@@ -507,7 +507,7 @@ struct CmdDevelop : Common, MixEnvironment
                 state,
                 installable->nixpkgsFlakeRef(),
                 "bashInteractive",
-                DefaultOutputs(),
+                OutputNames{"out"},
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
