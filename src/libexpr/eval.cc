@@ -2027,13 +2027,10 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
     }
 
     if (v.type() == nPath) {
-        auto path = v.path().to_string();
-        if (canonicalizePath)
-            // FIXME: unnecessary?
-            path = canonPath(path);
-        if (copyToStore)
-            path = copyPathToStore(context, path);
-        return path;
+        auto path = v.path();
+        return copyToStore
+            ? store->printStorePath(copyPathToStore(context, path))
+            : path.path;
     }
 
     if (v.type() == nAttrs) {
@@ -2075,39 +2072,34 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
 }
 
 
-std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
+StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
 {
-    #if 0
-    if (nix::isDerivation(path))
-        throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
+    if (nix::isDerivation(path.path))
+        throw EvalError("file names are not allowed to end in '%s'", drvExtension);
 
-    Path dstPath;
     auto i = srcToStore.find(path);
-    if (i != srcToStore.end())
-        dstPath = store->printStorePath(i->second);
-    else {
-        // FIXME: use SourcePath
-        auto path2 = unpackPath(path);
-        #if 0
-        auto p = settings.readOnlyMode
-            ? store->computeStorePathForPath(path2.baseName(), canonPath(path)).first
-            : store->addToStore(path2.baseName(), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
-        #endif
-        auto source = sinkToSource([&](Sink & sink) {
-            path2.dumpPath(sink);
-        });
-        // FIXME: readOnlyMode
-        auto p = store->addToStoreFromDump(*source, path2.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
-        dstPath = store->printStorePath(p);
-        allowPath(p);
-        srcToStore.insert_or_assign(path, std::move(p));
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
-    }
 
-    context.insert(dstPath);
+    auto dstPath = i != srcToStore.end()
+        ? i->second
+        : [&]() {
+            #if 0
+            auto p = settings.readOnlyMode
+                ? store->computeStorePathForPath(path2.baseName(), canonPath(path)).first
+                : store->addToStore(path2.baseName(), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
+            #endif
+            auto source = sinkToSource([&](Sink & sink) {
+                path.dumpPath(sink);
+            });
+            // FIXME: readOnlyMode
+            auto dstPath = store->addToStoreFromDump(*source, path.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
+            allowPath(dstPath);
+            srcToStore.insert_or_assign(path, dstPath);
+            printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+            return dstPath;
+        }();
+
+    context.insert(store->printStorePath(dstPath));
     return dstPath;
-    #endif
-    abort();
 }
 
 

@@ -2,6 +2,7 @@
 #include "json.hh"
 #include "eval-inline.hh"
 #include "util.hh"
+#include "store-api.hh"
 
 #include <cstdlib>
 #include <iomanip>
@@ -33,7 +34,9 @@ void printValueAsJSON(EvalState & state, bool strict,
 
         case nPath:
             // FIXME: handle accessors
-            out.write(state.copyPathToStore(context, v.path().path));
+            out.write(
+                state.store->printStorePath(
+                    state.copyPathToStore(context, v.path())));
             break;
 
         case nNull:

@@ -42,6 +42,16 @@ struct InputAccessor
         const Path & path,
         Sink & sink,
         PathFilter & filter = defaultPathFilter);
+
+    bool operator == (const InputAccessor & x) const
+    {
+        return number == x.number;
+    }
+
+    bool operator < (const InputAccessor & x) const
+    {
+        return number < x.number;
+    }
 };
 
 struct FSInputAccessor : InputAccessor
@@ -94,6 +104,16 @@ struct SourcePath
     std::string to_string() const;
 
     SourcePath append(std::string_view s) const;
+
+    bool operator == (const SourcePath & x) const
+    {
+        return std::tie(accessor, path) == std::tie(x.accessor, x.path);
+    }
+
+    bool operator < (const SourcePath & x) const
+    {
+        return std::tie(accessor, path) < std::tie(x.accessor, x.path);
+    }
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);

@@ -50,11 +50,6 @@ struct Env
 void copyContext(const Value & v, PathSet & context);
 
 
-/* Cache for calls to addToStore(); maps source paths to the store
-   paths. */
-typedef std::map<Path, StorePath> SrcToStore;
-
-
 std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
 
@@ -112,7 +107,10 @@ public:
     RootValue vImportedDrvToDerivation = nullptr;
 
 private:
-    SrcToStore srcToStore;
+
+    /* Cache for calls to addToStore(); maps source paths to the store
+       paths. */
+    std::map<SourcePath, StorePath> srcToStore;
 
     /* A cache from path names to parse trees. */
 #if HAVE_BOEHMGC
@@ -308,7 +306,7 @@ public:
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
-    std::string copyPathToStore(PathSet & context, const Path & path);
+    StorePath copyPathToStore(PathSet & context, const SourcePath & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute

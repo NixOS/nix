@@ -1549,7 +1549,8 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
     // FIXME: checkSourcePath?
     v.mkPath(state.findFile(searchPath, path, pos));
     #endif
-    abort();
+
+    throw ThrownError("findFile('%s'): not implemented", path);
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
