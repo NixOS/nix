@@ -2,10 +2,10 @@
 
 A Nix store is a collection of [store objects](objects.md) with associated operations.
 
-These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build rules.
+These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build tasks.
 
 A Nix store allows adding, retrieving, and deleting store objects.
-It can perform builds, that is, transform build inputs using instructions from the build rules into build outputs.
+It can perform builds, that is, transform build inputs using instructions from the build tasks into build outputs.
 It also keeps track of *references* between data and can therefore garbage-collect unused store objects.
 
 There exist different types of stores, which all follow this model.
@@ -28,7 +28,7 @@ generic build system | Nix | [Bazel](https://bazel.build/start/bazel-intro) | [B
 -- | -- | -- | -- | --
 data (build input, build result) | store object | [artifact](https://bazel.build/reference/glossary#artifact) | value | value
 build instructions | builder | ([depends on action type](https://docs.bazel.build/versions/main/skylark/lib/actions.html)) | function | function
-build rule | derivation | [action](https://bazel.build/reference/glossary#action) | `Task` | [thunk](https://en.m.wikipedia.org/wiki/Thunk)
+build task | derivation | [action](https://bazel.build/reference/glossary#action) | `Task` | [thunk](https://en.m.wikipedia.org/wiki/Thunk)
 build plan | derivation graph | [action graph](https://bazel.build/reference/glossary#action-graph), [build graph](https://bazel.build/reference/glossary#build-graph) | `Tasks` | [call graph](https://en.m.wikipedia.org/wiki/Call_graph)
 build | build | build | application of `Build` | evaluation
 persistence layer | store | [action cache](https://bazel.build/reference/glossary#action-cache) | `Store` | heap
