@@ -92,6 +92,8 @@ struct SourcePath
     { return accessor.dumpPath(path, sink, filter); }
 
     std::string to_string() const;
+
+    SourcePath append(std::string_view s) const;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);

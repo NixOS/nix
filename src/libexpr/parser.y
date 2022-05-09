@@ -699,11 +699,8 @@ SourcePath resolveExprPath(const SourcePath & path)
     #endif
 
     // FIXME
-    auto path2 = path.path + "/default.nix";
-    if (path.pathExists())
-        return {path.accessor, path2};
-
-    return path;
+    auto path2 = path.append("/default.nix");
+    return path2.pathExists() ? path2 : path;
 }
 
 

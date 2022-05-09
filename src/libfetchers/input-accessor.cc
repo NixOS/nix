@@ -227,6 +227,12 @@ std::ostream & operator << (std::ostream & str, const SourcePath & path)
     return str;
 }
 
+SourcePath SourcePath::append(std::string_view s) const
+{
+    // FIXME: canonicalize?
+    return {accessor, path + s};
+}
+
 struct MemoryInputAccessorImpl : MemoryInputAccessor
 {
     std::map<Path, std::string> files;
