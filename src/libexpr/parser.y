@@ -32,12 +32,12 @@ namespace nix {
         SymbolTable & symbols;
         Expr * result;
         Path basePath;
-        Symbol file;
-        FileOrigin origin;
+        PosTable::Origin origin;
         std::optional<ErrorInfo> error;
-        ParseData(EvalState & state)
+        ParseData(EvalState & state, PosTable::Origin origin)
             : state(state)
             , symbols(state.symbols)
+            , origin(std::move(origin))
             { };
     };
 
@@ -77,26 +77,26 @@ using namespace nix;
 namespace nix {
 
 
-static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
+static void dupAttr(const EvalState & state, const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
          .msg = hintfmt("attribute '%1%' already defined at %2%",
-             showAttrPath(attrPath), prevPos),
-         .errPos = pos
+             showAttrPath(state.symbols, attrPath), state.positions[prevPos]),
+         .errPos = state.positions[pos]
     });
 }
 
-static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
+static void dupAttr(const EvalState & state, Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-        .msg = hintfmt("attribute '%1%' already defined at %2%", attr, prevPos),
-        .errPos = pos
+        .msg = hintfmt("attribute '%1%' already defined at %2%", state.symbols[attr], state.positions[prevPos]),
+        .errPos = state.positions[pos]
     });
 }
 
 
 static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
-    Expr * e, const Pos & pos)
+    Expr * e, const PosIdx pos, const nix::EvalState & state)
 {
     AttrPath::iterator i;
     // All attrpaths have at least one attr
@@ -104,15 +104,15 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     // Checking attrPath validity.
     // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
-        if (i->symbol.set()) {
+        if (i->symbol) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
                 if (!j->second.inherited) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                    if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
+                    if (!attrs2) dupAttr(state, attrPath, pos, j->second.pos);
                     attrs = attrs2;
                 } else
-                    dupAttr(attrPath, pos, j->second.pos);
+                    dupAttr(state, attrPath, pos, j->second.pos);
             } else {
                 ExprAttrs * nested = new ExprAttrs;
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
@@ -126,7 +126,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     }
     // Expr insertion.
     // ==========================
-    if (i->symbol.set()) {
+    if (i->symbol) {
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
             // This attr path is already defined. However, if both
@@ -139,11 +139,11 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                 for (auto & ad : ae->attrs) {
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
-                        dupAttr(ad.first, j2->second.pos, ad.second.pos);
+                        dupAttr(state, ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
                 }
             } else {
-                dupAttr(attrPath, pos, j->second.pos);
+                dupAttr(state, attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
@@ -157,14 +157,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 
 
 static Formals * toFormals(ParseData & data, ParserFormals * formals,
-    Pos pos = noPos, Symbol arg = {})
+    PosIdx pos = noPos, Symbol arg = {})
 {
     std::sort(formals->formals.begin(), formals->formals.end(),
         [] (const auto & a, const auto & b) {
             return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
         });
 
-    std::optional<std::pair<Symbol, Pos>> duplicate;
+    std::optional<std::pair<Symbol, PosIdx>> duplicate;
     for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
         if (formals->formals[i].name != formals->formals[i + 1].name)
             continue;
@@ -173,18 +173,18 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
     }
     if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", duplicate->first),
-            .errPos = duplicate->second
+            .msg = hintfmt("duplicate formal function argument '%1%'", data.symbols[duplicate->first]),
+            .errPos = data.state.positions[duplicate->second]
         });
 
     Formals result;
     result.ellipsis = formals->ellipsis;
     result.formals = std::move(formals->formals);
 
-    if (arg.set() && result.has(arg))
+    if (arg && result.has(arg))
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", arg),
-            .errPos = pos
+            .msg = hintfmt("duplicate formal function argument '%1%'", data.symbols[arg]),
+            .errPos = data.state.positions[pos]
         });
 
     delete formals;
@@ -192,8 +192,8 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
 }
 
 
-static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
-    std::vector<std::pair<Pos, std::variant<Expr *, StringToken> > > & es)
+static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
+    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken> > > & es)
 {
     if (es.empty()) return new ExprString("");
 
@@ -233,7 +233,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
     }
 
     /* Strip spaces from each line. */
-    std::vector<std::pair<Pos, Expr *> > * es2 = new std::vector<std::pair<Pos, Expr *> >;
+    auto * es2 = new std::vector<std::pair<PosIdx, Expr *> >;
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -284,9 +284,9 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
 }
 
 
-static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
+static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
-    return Pos(data->origin, data->file, loc.first_line, loc.first_column);
+    return data->state.positions.add(data->origin, loc.first_line, loc.first_column);
 }
 
 #define CUR_POS makeCurPos(*yylocp, data)
@@ -299,7 +299,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 {
     data->error = {
         .msg = hintfmt(error),
-        .errPos = makeCurPos(*loc, data)
+        .errPos = data->state.positions[makeCurPos(*loc, data)]
     };
 }
 
@@ -320,8 +320,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   StringToken uri;
   StringToken str;
   std::vector<nix::AttrName> * attrNames;
-  std::vector<std::pair<nix::Pos, nix::Expr *> > * string_parts;
-  std::vector<std::pair<nix::Pos, std::variant<nix::Expr *, StringToken> > > * ind_string_parts;
+  std::vector<std::pair<nix::PosIdx, nix::Expr *> > * string_parts;
+  std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, StringToken> > > * ind_string_parts;
 }
 
 %type <e> start expr expr_function expr_if expr_op
@@ -369,15 +369,15 @@ expr_function
   : ID ':' expr_function
     { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), toFormals(*data, $2), $5); }
+    { $$ = new ExprLambda(CUR_POS, toFormals(*data, $2), $5); }
   | '{' formals '}' '@' ID ':' expr_function
     {
-      Symbol arg = data->symbols.create($5);
+      auto arg = data->symbols.create($5);
       $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $2, CUR_POS, arg), $7);
     }
   | ID '@' '{' formals '}' ':' expr_function
     {
-      Symbol arg = data->symbols.create($1);
+      auto arg = data->symbols.create($1);
       $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $4, CUR_POS, arg), $7);
     }
   | ASSERT expr ';' expr_function
@@ -388,7 +388,7 @@ expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
             .msg = hintfmt("dynamic attributes not allowed in let"),
-            .errPos = CUR_POS
+            .errPos = data->state.positions[CUR_POS]
         });
       $$ = new ExprLet($2, $4);
     }
@@ -415,7 +415,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<Pos, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
+    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<PosIdx, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
   | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
   | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
@@ -477,7 +477,7 @@ expr_simple
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
-              .errPos = CUR_POS
+              .errPos = data->state.positions[CUR_POS]
           });
       $$ = new ExprString(std::string($1));
   }
@@ -503,9 +503,9 @@ string_parts_interpolated
   : string_parts_interpolated STR
   { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(std::string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$ = new std::vector<std::pair<Pos, Expr *> >;
+      $$ = new std::vector<std::pair<PosIdx, Expr *> >;
       $$->emplace_back(makeCurPos(@1, data), new ExprString(std::string($1)));
       $$->emplace_back(makeCurPos(@2, data), $3);
     }
@@ -528,17 +528,17 @@ path_start
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | { $$ = new std::vector<std::pair<Pos, std::variant<Expr *, StringToken> > >; }
+  | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken> > >; }
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data), data->state); }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              dupAttr(i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
-          Pos pos = makeCurPos(@3, data);
+              dupAttr(data->state, i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
+          auto pos = makeCurPos(@3, data);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
     }
@@ -547,7 +547,7 @@ binds
       /* !!! Should ensure sharing of the expression in $4. */
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              dupAttr(i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
+              dupAttr(data->state, i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
     }
@@ -565,7 +565,7 @@ attrs
       } else
           throw ParseError({
               .msg = hintfmt("dynamic attributes not allowed in inherit"),
-              .errPos = makeCurPos(@2, data)
+              .errPos = data->state.positions[makeCurPos(@2, data)]
           });
     }
   | { $$ = new AttrPath; }
@@ -621,8 +621,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal(CUR_POS, data->symbols.create($1), 0); }
-  | ID '?' expr { $$ = new Formal(CUR_POS, data->symbols.create($1), $3); }
+  : ID { $$ = new Formal{CUR_POS, data->symbols.create($1), 0}; }
+  | ID '?' expr { $$ = new Formal{CUR_POS, data->symbols.create($1), $3}; }
   ;
 
 %%
@@ -646,19 +646,19 @@ Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
     const PathView path, const PathView basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
-    ParseData data(*this);
-    data.origin = origin;
+    std::string file;
     switch (origin) {
         case foFile:
-            data.file = data.symbols.create(path);
+            file = path;
             break;
         case foStdin:
         case foString:
-            data.file = data.symbols.create(text);
+            file = text;
             break;
         default:
             assert(false);
     }
+    ParseData data(*this, {file, origin});
     data.basePath = basePath;
 
     yylex_init(&scanner);
@@ -668,7 +668,7 @@ Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
 
     if (res) throw ParseError(data.error.value());
 
-    data.result->bindVars(staticEnv);
+    data.result->bindVars(*this, staticEnv);
 
     return data.result;
 }
@@ -768,7 +768,7 @@ Path EvalState::findFile(const std::string_view path)
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos)
+Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos)
 {
     for (auto & i : searchPath) {
         std::string suffix;
@@ -796,7 +796,7 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
-        .errPos = pos
+        .errPos = positions[pos]
     });
 }
 

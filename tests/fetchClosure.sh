@@ -7,7 +7,7 @@ clearStore
 clearCacheCache
 
 # Initialize binary cache.
-nonCaPath=$(nix build --json --file ./dependencies.nix | jq -r .[].outputs.out)
+nonCaPath=$(nix build --json --file ./dependencies.nix --no-link | jq -r .[].outputs.out)
 caPath=$(nix store make-content-addressed --json $nonCaPath | jq -r '.rewrites | map(.) | .[]')
 nix copy --to file://$cacheDir $nonCaPath
 
@@ -56,3 +56,15 @@ nix copy --to file://$cacheDir $caPath
     fromPath = $caPath;
   }
 ") = $caPath ]]
+
+# Check that URL query parameters aren't allowed.
+clearStore
+narCache=$TEST_ROOT/nar-cache
+rm -rf $narCache
+(! nix eval -v --raw --expr "
+  builtins.fetchClosure {
+    fromStore = \"file://$cacheDir?local-nar-cache=$narCache\";
+    fromPath = $caPath;
+  }
+")
+(! [ -e $narCache ])

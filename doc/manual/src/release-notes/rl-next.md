@@ -1,16 +1,26 @@
 # Release X.Y (202?-??-??)
 
-* Various nix commands can now read expressions from stdin with `--file -`.
+* Nix now provides better integration with zsh's run-help feature. It is now
+  included in the Nix installation in the form of an autoloadable shell
+  function, run-help-nix. It picks up Nix subcommands from the currently typed
+  in command and directs the user to the associated man pages.
 
-* `nix store make-content-addressable` has been renamed to `nix store
-  make-content-addressed`.
+* `nix repl` has a new build-'n-link (`:bl`) command that builds a derivation
+  while creating GC root symlinks.
 
-* New experimental builtin function `builtins.fetchClosure` that
-  copies a closure from a binary cache at evaluation time and rewrites
-  it to content-addressed form (if it isn't already). Like
-  `builtins.storePath`, this allows importing pre-built store paths;
-  the difference is that it doesn't require the user to configure
-  binary caches and trusted public keys.
+* The path produced by `builtins.toFile` is now allowed to be imported or read
+  even with restricted evaluation. Note that this will not work with a
+  read-only store.
 
-  This function is only available if you enable the experimental
-  feature `fetch-closure`.
+* `nix build` has a new `--print-out-paths` flag to print the resulting output paths.
+  This matches the default behaviour of `nix-build`.
+
+* You can now specify which outputs of a derivation `nix` should
+  operate on using the syntax `installable^outputs`,
+  e.g. `nixpkgs#glibc^dev,static` or `nixpkgs#glibc^*`. By default,
+  `nix` will use the outputs specified by the derivation's
+  `meta.outputsToInstall` attribute if it exists, or all outputs
+  otherwise.
+
+  Selecting derivation outputs using the attribute selection syntax
+  (e.g. `nixpkgs#glibc.dev`) no longer works.

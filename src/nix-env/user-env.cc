@@ -106,7 +106,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        the store; we need it for future modifications of the
        environment. */
     std::ostringstream str;
-    manifest.print(str, true);
+    manifest.print(state.symbols, str, true);
     auto manifestFile = state.store->addTextToStore("env-manifest.nix",
         str.str(), references);
 
@@ -134,9 +134,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
     PathSet context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
-    auto topLevelDrv = state.coerceToStorePath(*aDrvPath.pos, *aDrvPath.value, context);
+    auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context);
     Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
-    auto topLevelOut = state.coerceToStorePath(*aOutPath.pos, *aOutPath.value, context);
+    auto topLevelOut = state.coerceToStorePath(aOutPath.pos, *aOutPath.value, context);
 
     /* Realise the resulting store expression. */
     debug("building user environment");

@@ -303,7 +303,7 @@ void mainWrapped(int argc, char * * argv)
             b["arity"] = primOp->arity;
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(primOp->doc));
-            res[(std::string) builtin.name] = std::move(b);
+            res[state.symbols[builtin.name]] = std::move(b);
         }
         std::cout << res.dump() << "\n";
         return;

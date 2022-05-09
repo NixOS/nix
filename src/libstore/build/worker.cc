@@ -350,7 +350,7 @@ void Worker::waitForInput()
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
     std::vector<struct pollfd> pollStatus;
-    std::map <int, int> fdToPollStatus;
+    std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
             pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
@@ -380,7 +380,10 @@ void Worker::waitForInput()
         std::set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
+            const auto fdPollStatusId = get(fdToPollStatus, k);
+            assert(fdPollStatusId);
+            assert(*fdPollStatusId < pollStatus.size());
+            if (pollStatus.at(*fdPollStatusId).revents) {
                 ssize_t rd = ::read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?

@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
+#include "progress-bar.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -12,6 +13,7 @@ using namespace nix;
 struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
+    bool printOutputPaths = false;
     BuildMode buildMode = bmNormal;
 
     CmdBuild()
@@ -29,6 +31,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             .longName = "no-link",
             .description = "Do not create symlinks to the build results.",
             .handler = {&outLink, Path("")},
+        });
+
+        addFlag({
+            .longName = "print-out-paths",
+            .description = "Print the resulting output paths",
+            .handler = {&printOutputPaths, true},
         });
 
         addFlag({
@@ -92,6 +100,22 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                         },
                     }, buildable.raw());
                 }
+
+        if (printOutputPaths) {
+            stopProgressBar();
+            for (auto & buildable : buildables) {
+                std::visit(overloaded {
+                    [&](const BuiltPath::Opaque & bo) {
+                        std::cout << store->printStorePath(bo.path) << std::endl;
+                    },
+                    [&](const BuiltPath::Built & bfd) {
+                        for (auto & output : bfd.outputs) {
+                            std::cout << store->printStorePath(output.second) << std::endl;
+                        }
+                    },
+                }, buildable.raw());
+            }
+        }
 
         updateProfile(buildables);
     }

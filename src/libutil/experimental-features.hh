@@ -16,6 +16,7 @@ namespace nix {
 enum struct ExperimentalFeature
 {
     CaDerivations,
+    ImpureDerivations,
     Flakes,
     NixCommand,
     RecursiveNix,
@@ -48,10 +49,13 @@ public:
     ExperimentalFeature missingFeature;
 
     MissingExperimentalFeature(ExperimentalFeature);
-    virtual const char * sname() const override
-    {
-        return "MissingExperimentalFeature";
-    }
 };
+
+/**
+ * Semi-magic conversion to and from json.
+ * See the nlohmann/json readme for more details.
+ */
+void to_json(nlohmann::json &, const ExperimentalFeature &);
+void from_json(const nlohmann::json &, ExperimentalFeature &);
 
 }

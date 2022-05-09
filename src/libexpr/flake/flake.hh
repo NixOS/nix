@@ -61,7 +61,7 @@ struct Flake
     FlakeRef originalRef; // the original flake specification (by the user)
     FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
     FlakeRef lockedRef; // the specific local store result of invoking the fetcher
-    ptr<InputAccessor> accessor;
+    InputAccessor * accessor; // FIXME: must be non-null
     Path flakePath;
     bool forceDirty = false; // pretend that 'lockedRef' is dirty
     std::optional<std::string> description;

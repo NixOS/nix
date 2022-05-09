@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "types.hh"
 #include "url-parts.hh"
-
+#include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
 
@@ -395,35 +395,31 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             std::string line;
             getline(is, line);
 
-            auto ref_index = line.find("ref: ");
-            if (ref_index == std::string::npos) {
+            auto remoteLine = git::parseLsRemoteLine(line);
+            if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
-
-            ref_uri = line.substr(ref_index+5, line.length()-1);
-        } else
+            ref_uri = remoteLine->target;
+        } else {
             ref_uri = fmt("refs/(heads|tags)/%s", ref);
+        }
 
         auto file = store->toRealPath(
             downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
         std::ifstream is(file);
 
         std::string line;
-        std::string id;
-        while(getline(is, line)) {
-            // Append $ to avoid partial name matches
-            std::regex pattern(fmt("%s$", ref_uri));
-
-            if (std::regex_search(line, pattern)) {
-                id = line.substr(0, line.find('\t'));
-                break;
-            }
+        std::optional<std::string> id;
+        while(!id && getline(is, line)) {
+            auto parsedLine = git::parseLsRemoteLine(line);
+            if (parsedLine && parsedLine->reference == ref_uri)
+                id = parsedLine->target;
         }
 
-        if(id.empty())
+        if(!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
-        auto rev = Hash::parseAny(id, htSHA1);
+        auto rev = Hash::parseAny(*id, htSHA1);
         debug("HEAD revision for '%s' is %s", fmt("%s/%s", base_url, ref), rev.gitRev());
         return rev;
     }

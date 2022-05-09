@@ -10,7 +10,7 @@
 namespace nix {
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, const Pos & pos, JSONPlaceholder & out, PathSet & context)
+    Value & v, const PosIdx pos, JSONPlaceholder & out, PathSet & context)
 {
     checkInterrupt();
 
@@ -51,14 +51,14 @@ void printValueAsJSON(EvalState & state, bool strict,
                 auto obj(out.object());
                 StringSet names;
                 for (auto & j : *v.attrs)
-                    names.insert(j.name);
+                    names.emplace(state.symbols[j.name]);
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
                     auto placeholder(obj.placeholder(j));
-                    printValueAsJSON(state, strict, *a.value, *a.pos, placeholder, context);
+                    printValueAsJSON(state, strict, *a.value, a.pos, placeholder, context);
                 }
             } else
-                printValueAsJSON(state, strict, *i->value, *i->pos, out, context);
+                printValueAsJSON(state, strict, *i->value, i->pos, out, context);
             break;
         }
 
@@ -83,14 +83,15 @@ void printValueAsJSON(EvalState & state, bool strict,
         case nFunction:
             auto e = TypeError({
                 .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
-                .errPos = v.determinePos(pos)
+                .errPos = state.positions[v.determinePos(pos)]
             });
-            throw e.addTrace(pos, hintfmt("message for the trace"));
+            e.addTrace(state.positions[pos], hintfmt("message for the trace"));
+            throw e;
     }
 }
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, const Pos & pos, std::ostream & str, PathSet & context)
+    Value & v, const PosIdx pos, std::ostream & str, PathSet & context)
 {
     JSONPlaceholder out(str);
     printValueAsJSON(state, strict, v, pos, out, context);

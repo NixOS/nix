@@ -14,6 +14,7 @@
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
+#include "json-utils.hh"
 
 #include <regex>
 #include <queue>
@@ -55,8 +56,6 @@
 
 #include <pwd.h>
 #include <grp.h>
-
-#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -395,7 +394,7 @@ void LocalDerivationGoal::startBuilder()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = !(derivationType.isImpure()) && !noChroot;
+            useChroot = derivationType.isSandboxed() && !noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -482,7 +481,7 @@ void LocalDerivationGoal::startBuilder()
            temporary build directory.  The text files have the format used
            by `nix-store --register-validity'.  However, the deriver
            fields are left empty. */
-        auto s = get(drv->env, "exportReferencesGraph").value_or("");
+        auto s = getOr(drv->env, "exportReferencesGraph", "");
         Strings ss = tokenizeString<Strings>(s);
         if (ss.size() % 2 != 0)
             throw BuildError("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
@@ -608,7 +607,7 @@ void LocalDerivationGoal::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (!(derivationType.isImpure()))
+        if (derivationType.isSandboxed())
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -704,6 +703,9 @@ void LocalDerivationGoal::startBuilder()
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
+    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
+    for (auto & i : drv->env)
+        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -796,7 +798,7 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (!(derivationType.isImpure()))
+        if (derivationType.isSandboxed())
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -986,7 +988,7 @@ void LocalDerivationGoal::initTmpDir() {
        there is no size constraint). */
     if (!parsedDrv->getStructuredAttrs()) {
 
-        StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile").value_or(""));
+        StringSet passAsFile = tokenizeString<StringSet>(getOr(drv->env, "passAsFile", ""));
         for (auto & i : drv->env) {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
@@ -1060,7 +1062,7 @@ void LocalDerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (derivationType.isImpure()) {
+    if (!derivationType.isSandboxed()) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -1674,7 +1676,7 @@ void LocalDerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (derivationType.isImpure()) {
+            if (!derivationType.isSandboxed()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
@@ -1918,7 +1920,7 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
-                if (derivationType.isImpure())
+                if (!derivationType.isSandboxed())
                     sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Add the output paths we'll use at build-time to the chroot */
@@ -2125,12 +2127,22 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
     std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
     std::map<std::string, struct stat> outputStats;
     for (auto & [outputName, _] : drv->outputs) {
-        auto actualPath = toRealPathChroot(worker.store.printStorePath(scratchOutputs.at(outputName)));
+        auto scratchOutput = get(scratchOutputs, outputName);
+        if (!scratchOutput)
+            throw BuildError(
+                "builder for '%s' has no scratch output for '%s'",
+                worker.store.printStorePath(drvPath), outputName);
+        auto actualPath = toRealPathChroot(worker.store.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
         /* Updated wanted info to remove the outputs we definitely don't need to register */
-        auto & initialInfo = initialOutputs.at(outputName);
+        auto initialOutput = get(initialOutputs, outputName);
+        if (!initialOutput)
+            throw BuildError(
+                "builder for '%s' has no initial output for '%s'",
+                worker.store.printStorePath(drvPath), outputName);
+        auto & initialInfo = *initialOutput;
 
         /* Don't register if already valid, and not checking */
         initialInfo.wanted = buildMode == bmCheck
@@ -2182,6 +2194,11 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
     auto sortedOutputNames = topoSort(outputsToSort,
         {[&](const std::string & name) {
+            auto orifu = get(outputReferencesIfUnregistered, name);
+            if (!orifu)
+                throw BuildError(
+                    "no output reference for '%s' in build of '%s'",
+                    name, worker.store.printStorePath(drvPath));
             return std::visit(overloaded {
                 /* Since we'll use the already installed versions of these, we
                    can treat them as leaves and ignore any references they
@@ -2196,7 +2213,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                                 referencedOutputs.insert(o);
                     return referencedOutputs;
                 },
-            }, outputReferencesIfUnregistered.at(name));
+            }, *orifu);
         }},
         {[&](const std::string & path, const std::string & parent) {
             // TODO with more -vvvv also show the temporary paths for manual inspection.
@@ -2210,9 +2227,10 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
     OutputPathMap finalOutputs;
 
     for (auto & outputName : sortedOutputNames) {
-        auto output = drv->outputs.at(outputName);
-        auto & scratchPath = scratchOutputs.at(outputName);
-        auto actualPath = toRealPathChroot(worker.store.printStorePath(scratchPath));
+        auto output = get(drv->outputs, outputName);
+        auto scratchPath = get(scratchOutputs, outputName);
+        assert(output && scratchPath);
+        auto actualPath = toRealPathChroot(worker.store.printStorePath(*scratchPath));
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
@@ -2220,9 +2238,12 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             /* The rewrite rule will be used in downstream outputs that refer to
                use. This is why the topological sort is essential to do first
                before this for loop. */
-            if (scratchPath != finalStorePath)
-                outputRewrites[std::string { scratchPath.hashPart() }] = std::string { finalStorePath.hashPart() };
+            if (*scratchPath != finalStorePath)
+                outputRewrites[std::string { scratchPath->hashPart() }] = std::string { finalStorePath.hashPart() };
         };
+
+        auto orifu = get(outputReferencesIfUnregistered, outputName);
+        assert(orifu);
 
         std::optional<StorePathSet> referencesOpt = std::visit(overloaded {
             [&](const AlreadyRegistered & skippedFinalPath) -> std::optional<StorePathSet> {
@@ -2232,7 +2253,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             [&](const PerhapsNeedToRegister & r) -> std::optional<StorePathSet> {
                 return r.refs;
             },
-        }, outputReferencesIfUnregistered.at(outputName));
+        }, *orifu);
 
         if (!referencesOpt)
             continue;
@@ -2265,25 +2286,29 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             for (auto & r : references) {
                 auto name = r.name();
                 auto origHash = std::string { r.hashPart() };
-                if (r == scratchPath)
+                if (r == *scratchPath) {
                     res.first = true;
-                else if (outputRewrites.count(origHash) == 0)
-                    res.second.insert(r);
-                else {
-                    std::string newRef = outputRewrites.at(origHash);
+                } else if (auto outputRewrite = get(outputRewrites, origHash)) {
+                    std::string newRef = *outputRewrite;
                     newRef += '-';
                     newRef += name;
                     res.second.insert(StorePath { newRef });
+                } else {
+                    res.second.insert(r);
                 }
             }
             return res;
         };
 
         auto newInfoFromCA = [&](const DerivationOutput::CAFloating outputHash) -> ValidPathInfo {
-            auto & st = outputStats.at(outputName);
+            auto st = get(outputStats, outputName);
+            if (!st)
+                throw BuildError(
+                    "output path %1% without valid stats info",
+                    actualPath);
             if (outputHash.method == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
-                if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
+                if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         "output path '%1%' should be a non-executable regular file "
                         "since recursive hashing is not enabled (outputHashMode=flat)",
@@ -2291,7 +2316,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             }
             rewriteOutput();
             /* FIXME optimize and deduplicate with addToStore */
-            std::string oldHashPart { scratchPath.hashPart() };
+            std::string oldHashPart { scratchPath->hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
             switch (outputHash.method) {
             case FileIngestionMethod::Recursive:
@@ -2310,7 +2335,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                     outputPathName(drv->name, outputName),
                     refs.second,
                     refs.first);
-            if (scratchPath != finalPath) {
+            if (*scratchPath != finalPath) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
                     StringSink sink;
@@ -2351,9 +2376,9 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 auto requiredFinalPath = output.path;
                 /* Preemptively add rewrite rule for final hash, as that is
                    what the NAR hash will use rather than normalized-self references */
-                if (scratchPath != requiredFinalPath)
+                if (*scratchPath != requiredFinalPath)
                     outputRewrites.insert_or_assign(
-                        std::string { scratchPath.hashPart() },
+                        std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput();
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
@@ -2399,7 +2424,14 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 assert(false);
             },
 
-        }, output.raw());
+            [&](const DerivationOutput::Impure & doi) {
+                return newInfoFromCA(DerivationOutput::CAFloating {
+                    .method = doi.method,
+                    .hashType = doi.hashType,
+                });
+            },
+
+        }, output->raw());
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
@@ -2415,7 +2447,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
            derivations. */
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output.path(worker.store, drv->name, outputName);
+        auto optFixedPath = output->path(worker.store, drv->name, outputName);
         if (!optFixedPath ||
             worker.store.printStorePath(*optFixedPath) != finalDestPath)
         {
@@ -2481,11 +2513,10 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
         /* For debugging, print out the referenced and unreferenced paths. */
         for (auto & i : inputPaths) {
-            auto j = references.find(i);
-            if (j == references.end())
-                debug("unreferenced input: '%1%'", worker.store.printStorePath(i));
-            else
+            if (references.count(i))
                 debug("referenced input: '%1%'", worker.store.printStorePath(i));
+            else
+                debug("unreferenced input: '%1%'", worker.store.printStorePath(i));
         }
 
         if (curRound == nrRounds) {
@@ -2602,14 +2633,18 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
     DrvOutputs builtOutputs;
 
     for (auto & [outputName, newInfo] : infos) {
+        auto oldinfo = get(initialOutputs, outputName);
+        assert(oldinfo);
         auto thisRealisation = Realisation {
             .id = DrvOutput {
-                initialOutputs.at(outputName).outputHash,
+                oldinfo->outputHash,
                 outputName
             },
             .outPath = newInfo.path
         };
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)
+            && drv->type().isPure())
+        {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
@@ -2698,9 +2733,10 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                 for (auto & i : *value) {
                     if (worker.store.isStorePath(i))
                         spec.insert(worker.store.parseStorePath(i));
-                    else if (outputs.count(i))
-                        spec.insert(outputs.at(i).path);
-                    else throw BuildError("derivation contains an illegal reference specifier '%s'", i);
+                    else if (auto output = get(outputs, i))
+                        spec.insert(output->path);
+                    else
+                        throw BuildError("derivation contains an illegal reference specifier '%s'", i);
                 }
 
                 auto used = recursive
@@ -2739,24 +2775,18 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         };
 
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
-            auto outputChecks = structuredAttrs->find("outputChecks");
-            if (outputChecks != structuredAttrs->end()) {
-                auto output = outputChecks->find(outputName);
-
-                if (output != outputChecks->end()) {
+            if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
+                if (auto output = get(*outputChecks, outputName)) {
                     Checks checks;
 
-                    auto maxSize = output->find("maxSize");
-                    if (maxSize != output->end())
+                    if (auto maxSize = get(*output, "maxSize"))
                         checks.maxSize = maxSize->get<uint64_t>();
 
-                    auto maxClosureSize = output->find("maxClosureSize");
-                    if (maxClosureSize != output->end())
+                    if (auto maxClosureSize = get(*output, "maxClosureSize"))
                         checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
-                    auto get = [&](const std::string & name) -> std::optional<Strings> {
-                        auto i = output->find(name);
-                        if (i != output->end()) {
+                    auto get_ = [&](const std::string & name) -> std::optional<Strings> {
+                        if (auto i = get(*output, name)) {
                             Strings res;
                             for (auto j = i->begin(); j != i->end(); ++j) {
                                 if (!j->is_string())
@@ -2769,10 +2799,10 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                         return {};
                     };
 
-                    checks.allowedReferences = get("allowedReferences");
-                    checks.allowedRequisites = get("allowedRequisites");
-                    checks.disallowedReferences = get("disallowedReferences");
-                    checks.disallowedRequisites = get("disallowedRequisites");
+                    checks.allowedReferences = get_("allowedReferences");
+                    checks.allowedRequisites = get_("allowedRequisites");
+                    checks.disallowedReferences = get_("disallowedReferences");
+                    checks.disallowedRequisites = get_("disallowedRequisites");
 
                     applyChecks(checks);
                 }

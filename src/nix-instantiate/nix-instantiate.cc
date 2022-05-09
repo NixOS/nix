@@ -31,7 +31,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
-        std::cout << format("%1%\n") % *e;
+        e->show(state.symbols, std::cout);
+        std::cout << "\n";
         return;
     }
 
@@ -55,7 +56,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
             else {
                 if (strict) state.forceValueDeep(vRes);
-                std::cout << vRes << std::endl;
+                vRes.print(state.symbols, std::cout);
+                std::cout << std::endl;
             }
         } else {
             DrvInfos drvs;

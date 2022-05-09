@@ -7,7 +7,9 @@ fi
 
 clearStore
 
-repo=$TEST_ROOT/git
+# Intentionally not in a canonical form
+# See https://github.com/NixOS/nix/issues/6195
+repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
@@ -158,6 +160,14 @@ git -C $repo commit -m 'Bla5' -a
 path4=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [[ $(cat $path4/hello) = dev ]]
 [[ $path3 = $path4 ]]
+
+# Using remote path with branch other than 'master' should fetch the HEAD revision.
+# (--tarball-ttl 0 to prevent using the cached repo above)
+export _NIX_FORCE_HTTP=1
+path4=$(nix eval --tarball-ttl 0 --impure --raw --expr "(builtins.fetchGit $repo).outPath")
+[[ $(cat $path4/hello) = dev ]]
+[[ $path3 = $path4 ]]
+unset _NIX_FORCE_HTTP
 
 # Confirm same as 'dev' branch
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")

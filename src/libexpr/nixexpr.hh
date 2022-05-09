@@ -1,8 +1,12 @@
 #pragma once
 
+#include <map>
+#include <vector>
+
 #include "value.hh"
 #include "symbol-table.hh"
 #include "error.hh"
+#include "chunked-vector.hh"
 
 
 namespace nix {
@@ -23,32 +27,92 @@ MakeError(RestrictedPathError, Error);
 
 struct Pos
 {
-    Symbol file;
+    std::string file;
+    FileOrigin origin;
     uint32_t line;
-    FileOrigin origin:2;
-    uint32_t column:30;
-    Pos() : line(0), origin(foString), column(0) { };
-    Pos(FileOrigin origin, const Symbol & file, uint32_t line, uint32_t column)
-        : file(file), line(line), origin(origin), column(column) { };
-    operator bool() const
+    uint32_t column;
+
+    explicit operator bool() const { return line > 0; }
+};
+
+class PosIdx {
+    friend class PosTable;
+
+private:
+    uint32_t id;
+
+    explicit PosIdx(uint32_t id): id(id) {}
+
+public:
+    PosIdx() : id(0) {}
+
+    explicit operator bool() const { return id > 0; }
+
+    bool operator<(const PosIdx other) const { return id < other.id; }
+};
+
+class PosTable
+{
+public:
+    class Origin {
+        friend PosTable;
+    private:
+        // must always be invalid by default, add() replaces this with the actual value.
+        // subsequent add() calls use this index as a token to quickly check whether the
+        // current origins.back() can be reused or not.
+        mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
+
+        explicit Origin(uint32_t idx): idx(idx), file{}, origin{} {}
+
+    public:
+        const std::string file;
+        const FileOrigin origin;
+
+        Origin(std::string file, FileOrigin origin): file(std::move(file)), origin(origin) {}
+    };
+
+    struct Offset {
+        uint32_t line, column;
+    };
+
+private:
+    std::vector<Origin> origins;
+    ChunkedVector<Offset, 8192> offsets;
+
+public:
+    PosTable(): offsets(1024)
     {
-        return line != 0;
+        origins.reserve(1024);
     }
 
-    bool operator < (const Pos & p2) const
+    PosIdx add(const Origin & origin, uint32_t line, uint32_t column)
     {
-        if (!line) return p2.line;
-        if (!p2.line) return false;
-        int d = ((const std::string &) file).compare((const std::string &) p2.file);
-        if (d < 0) return true;
-        if (d > 0) return false;
-        if (line < p2.line) return true;
-        if (line > p2.line) return false;
-        return column < p2.column;
+        const auto idx = offsets.add({line, column}).second;
+        if (origins.empty() || origins.back().idx != origin.idx) {
+            origin.idx = idx;
+            origins.push_back(origin);
+        }
+        return PosIdx(idx + 1);
+    }
+
+    Pos operator[](PosIdx p) const
+    {
+        if (p.id == 0 || p.id > offsets.size())
+            return {};
+        const auto idx = p.id - 1;
+        /* we want the last key <= idx, so we'll take prev(first key > idx).
+           this is guaranteed to never rewind origin.begin because the first
+           key is always 0. */
+        const auto pastOrigin = std::upper_bound(
+            origins.begin(), origins.end(), Origin(idx),
+            [] (const auto & a, const auto & b) { return a.idx < b.idx; });
+        const auto origin = *std::prev(pastOrigin);
+        const auto offset = offsets[idx];
+        return {origin.file, origin.origin, offset.line, offset.column};
     }
 };
 
-extern Pos noPos;
+inline PosIdx noPos = {};
 
 std::ostream & operator << (std::ostream & str, const Pos & pos);
 
@@ -64,13 +128,13 @@ struct AttrName
 {
     Symbol symbol;
     Expr * expr;
-    AttrName(const Symbol & s) : symbol(s) {};
+    AttrName(Symbol s) : symbol(s) {};
     AttrName(Expr * e) : expr(e) {};
 };
 
 typedef std::vector<AttrName> AttrPath;
 
-std::string showAttrPath(const AttrPath & attrPath);
+std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
 
 
 /* Abstract syntax of Nix expressions. */
@@ -78,19 +142,17 @@ std::string showAttrPath(const AttrPath & attrPath);
 struct Expr
 {
     virtual ~Expr() { };
-    virtual void show(std::ostream & str) const;
-    virtual void bindVars(const StaticEnv & env);
+    virtual void show(const SymbolTable & symbols, std::ostream & str) const;
+    virtual void bindVars(const EvalState & es, const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
-    virtual void setName(Symbol & name);
+    virtual void setName(Symbol name);
 };
 
-std::ostream & operator << (std::ostream & str, const Expr & e);
-
 #define COMMON_METHODS \
-    void show(std::ostream & str) const; \
+    void show(const SymbolTable & symbols, std::ostream & str) const;    \
     void eval(EvalState & state, Env & env, Value & v); \
-    void bindVars(const StaticEnv & env);
+    void bindVars(const EvalState & es, const StaticEnv & env);
 
 struct ExprInt : Expr
 {
@@ -137,7 +199,7 @@ typedef uint32_t Displacement;
 
 struct ExprVar : Expr
 {
-    Pos pos;
+    PosIdx pos;
     Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
@@ -153,19 +215,19 @@ struct ExprVar : Expr
     Level level;
     Displacement displ;
 
-    ExprVar(const Symbol & name) : name(name) { };
-    ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
+    ExprVar(Symbol name) : name(name) { };
+    ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprSelect : Expr
 {
-    Pos pos;
+    PosIdx pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
+    ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
 };
 
@@ -180,13 +242,13 @@ struct ExprOpHasAttr : Expr
 struct ExprAttrs : Expr
 {
     bool recursive;
-    Pos pos;
+    PosIdx pos;
     struct AttrDef {
         bool inherited;
         Expr * e;
-        Pos pos;
+        PosIdx pos;
         Displacement displ; // displacement
-        AttrDef(Expr * e, const Pos & pos, bool inherited=false)
+        AttrDef(Expr * e, const PosIdx & pos, bool inherited=false)
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
@@ -194,14 +256,14 @@ struct ExprAttrs : Expr
     AttrDefs attrs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
-        Pos pos;
-        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const Pos & pos)
+        PosIdx pos;
+        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const PosIdx & pos)
             : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
     };
     typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
-    ExprAttrs(const Pos &pos) : recursive(false), pos(pos) { };
-    ExprAttrs() : recursive(false), pos(noPos) { };
+    ExprAttrs(const PosIdx &pos) : recursive(false), pos(pos) { };
+    ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
 
@@ -214,10 +276,9 @@ struct ExprList : Expr
 
 struct Formal
 {
-    Pos pos;
+    PosIdx pos;
     Symbol name;
     Expr * def;
-    Formal(const Pos & pos, const Symbol & name, Expr * def) : pos(pos), name(name), def(def) { };
 };
 
 struct Formals
@@ -226,18 +287,20 @@ struct Formals
     Formals_ formals;
     bool ellipsis;
 
-    bool has(Symbol arg) const {
+    bool has(Symbol arg) const
+    {
         auto it = std::lower_bound(formals.begin(), formals.end(), arg,
             [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
         return it != formals.end() && it->name == arg;
     }
 
-    std::vector<Formal> lexicographicOrder() const
+    std::vector<Formal> lexicographicOrder(const SymbolTable & symbols) const
     {
         std::vector<Formal> result(formals.begin(), formals.end());
         std::sort(result.begin(), result.end(),
-            [] (const Formal & a, const Formal & b) {
-                return std::string_view(a.name) < std::string_view(b.name);
+            [&] (const Formal & a, const Formal & b) {
+                std::string_view sa = symbols[a.name], sb = symbols[b.name];
+                return sa < sb;
             });
         return result;
     }
@@ -245,17 +308,21 @@ struct Formals
 
 struct ExprLambda : Expr
 {
-    Pos pos;
+    PosIdx pos;
     Symbol name;
     Symbol arg;
     Formals * formals;
     Expr * body;
-    ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
+    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
     };
-    void setName(Symbol & name);
-    std::string showNamePos() const;
+    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
+        : pos(pos), formals(formals), body(body)
+    {
+    }
+    void setName(Symbol name);
+    std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
     COMMON_METHODS
 };
@@ -264,8 +331,8 @@ struct ExprCall : Expr
 {
     Expr * fun;
     std::vector<Expr *> args;
-    Pos pos;
-    ExprCall(const Pos & pos, Expr * fun, std::vector<Expr *> && args)
+    PosIdx pos;
+    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
         : fun(fun), args(args), pos(pos)
     { }
     COMMON_METHODS
@@ -281,26 +348,26 @@ struct ExprLet : Expr
 
 struct ExprWith : Expr
 {
-    Pos pos;
+    PosIdx pos;
     Expr * attrs, * body;
     size_t prevWith;
-    ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
+    ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     COMMON_METHODS
 };
 
 struct ExprIf : Expr
 {
-    Pos pos;
+    PosIdx pos;
     Expr * cond, * then, * else_;
-    ExprIf(const Pos & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
+    ExprIf(const PosIdx & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
     COMMON_METHODS
 };
 
 struct ExprAssert : Expr
 {
-    Pos pos;
+    PosIdx pos;
     Expr * cond, * body;
-    ExprAssert(const Pos & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
+    ExprAssert(const PosIdx & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
     COMMON_METHODS
 };
 
@@ -314,17 +381,17 @@ struct ExprOpNot : Expr
 #define MakeBinOp(name, s) \
     struct name : Expr \
     { \
-        Pos pos; \
+        PosIdx pos; \
         Expr * e1, * e2; \
         name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
-        name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
-        void show(std::ostream & str) const \
+        name(const PosIdx & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
+        void show(const SymbolTable & symbols, std::ostream & str) const \
         { \
-            str << "(" << *e1 << " " s " " << *e2 << ")";   \
+            str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
         } \
-        void bindVars(const StaticEnv & env) \
+        void bindVars(const EvalState & es, const StaticEnv & env)    \
         { \
-            e1->bindVars(env); e2->bindVars(env); \
+            e1->bindVars(es, env); e2->bindVars(es, env);    \
         } \
         void eval(EvalState & state, Env & env, Value & v); \
     };
@@ -339,18 +406,18 @@ MakeBinOp(ExprOpConcatLists, "++")
 
 struct ExprConcatStrings : Expr
 {
-    Pos pos;
+    PosIdx pos;
     bool forceString;
-    std::vector<std::pair<Pos, Expr *> > * es;
-    ExprConcatStrings(const Pos & pos, bool forceString, std::vector<std::pair<Pos, Expr *> > * es)
+    std::vector<std::pair<PosIdx, Expr *> > * es;
+    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *> > * es)
         : pos(pos), forceString(forceString), es(es) { };
     COMMON_METHODS
 };
 
 struct ExprPos : Expr
 {
-    Pos pos;
-    ExprPos(const Pos & pos) : pos(pos) { };
+    PosIdx pos;
+    ExprPos(const PosIdx & pos) : pos(pos) { };
     COMMON_METHODS
 };
 
@@ -388,7 +455,7 @@ struct StaticEnv
         vars.erase(it, end);
     }
 
-    Vars::const_iterator find(const Symbol & name) const
+    Vars::const_iterator find(Symbol name) const
     {
         Vars::value_type key(name, 0);
         auto i = std::lower_bound(vars.begin(), vars.end(), key);

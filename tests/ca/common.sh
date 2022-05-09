@@ -1,5 +1,5 @@
 source ../common.sh
 
-enableFeatures "ca-derivations ca-references"
+enableFeatures "ca-derivations"
 
 restartDaemon

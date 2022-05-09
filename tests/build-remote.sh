@@ -34,6 +34,14 @@ outPath=$(readlink -f $TEST_ROOT/result)
 
 grep 'FOO BAR BAZ' $TEST_ROOT/machine0/$outPath
 
+testPrintOutPath=$(nix build -L -v -f $file --no-link --print-out-paths --max-jobs 0 \
+  --arg busybox $busybox \
+  --store $TEST_ROOT/machine0 \
+  --builders "$(join_by '; ' "${builders[@]}")"
+)
+
+[[ $testPrintOutPath =~ store.*build-remote ]]
+
 set -o pipefail
 
 # Ensure that input1 was built on store1 due to the required feature.
@@ -64,6 +72,7 @@ fi
 
 # Behavior of keep-failed
 out="$(nix-build 2>&1 failing.nix \
+  --no-out-link \
   --builders "$(join_by '; ' "${builders[@]}")"  \
   --keep-failed \
   --store $TEST_ROOT/machine0 \
