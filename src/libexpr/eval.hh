@@ -63,6 +63,7 @@ typedef std::map<Path, StorePath> SrcToStore;
 
 std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
+std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
 typedef std::pair<std::string, std::string> SearchPathElem;
