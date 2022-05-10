@@ -18,8 +18,8 @@ Nix consists of hierarchical [layers](https://en.m.wikipedia.org/wiki/Multitier_
 | store                         |                                 |
 |                               | evaluates to                    |
 |                               |                                 |
-|                  references   V       builds                    |
-|     [ build input ] --> [ build plan ] --> [ build result ]     |
+|               referenced by   V       builds                    |
+|   [ build input ] ----> [ build plan ] ----> [ build result ]   |
 |                                                                 |
 +-----------------------------------------------------------------+
 ```
