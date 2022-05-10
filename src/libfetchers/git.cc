@@ -21,9 +21,14 @@ namespace nix::fetchers {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
+static std::string getGitDir()
+{
+    return getEnv("GIT_DIR").value_or(".git");
+}
+
 static std::string readHead(const Path & path)
 {
-    return chomp(runProgram("git", true, { "-C", path, "rev-parse", "--abbrev-ref", "HEAD" }));
+    return chomp(runProgram("git", true, { "-C", path, "--git-dir", ".git", "rev-parse", "--abbrev-ref", "HEAD" }));
 }
 
 static bool isNotDotGitDirectory(const Path & path)
@@ -150,13 +155,14 @@ struct GitInputScheme : InputScheme
     {
         auto sourcePath = getSourcePath(input);
         assert(sourcePath);
+        auto gitDir = getGitDir();
 
         runProgram("git", true,
-            { "-C", *sourcePath, "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -175,6 +181,7 @@ struct GitInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
+        auto gitDir = getGitDir();
 
         std::string name = input.getName();
 
@@ -237,7 +244,7 @@ struct GitInputScheme : InputScheme
                since that is the refrence we want to use later on. */
             auto result = runProgram(RunOptions {
                 .program = "git",
-                .args = { "-C", actualUrl, "--git-dir=.git", "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+                .args = { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
                 .environment = env,
                 .mergeStderrToStdout = true
             });
@@ -259,7 +266,7 @@ struct GitInputScheme : InputScheme
                 if (hasHead) {
                     // Using git diff is preferrable over lower-level operations here,
                     // because its conceptually simpler and we only need the exit code anyways.
-                    auto gitDiffOpts = Strings({ "-C", actualUrl, "diff", "HEAD", "--quiet"});
+                    auto gitDiffOpts = Strings({ "-C", actualUrl, "--git-dir", gitDir, "diff", "HEAD", "--quiet"});
                     if (!submodules) {
                         // Changes in submodules should only make the tree dirty
                         // when those submodules will be copied as well.
@@ -284,7 +291,7 @@ struct GitInputScheme : InputScheme
                 if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
-                auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
+                auto gitOpts = Strings({ "-C", actualUrl, "--git-dir", gitDir, "ls-files", "-z" });
                 if (submodules)
                     gitOpts.emplace_back("--recurse-submodules");
 
@@ -314,7 +321,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePath), input};
             }
@@ -335,7 +342,7 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", *input.getRef() })), htSHA1).gitRev());
+                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev());
 
             repoDir = actualUrl;
 
@@ -351,6 +358,7 @@ struct GitInputScheme : InputScheme
 
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
+            gitDir = ".";
 
             createDirs(dirOf(cacheDir));
             PathLocks cacheDirLock({cacheDir + ".lock"});
@@ -371,7 +379,7 @@ struct GitInputScheme : InputScheme
                repo. */
             if (input.getRev()) {
                 try {
-                    runProgram("git", true, { "-C", repoDir, "cat-file", "-e", input.getRev()->gitRev() });
+                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "cat-file", "-e", input.getRev()->gitRev() });
                     doFetch = false;
                 } catch (ExecError & e) {
                     if (WIFEXITED(e.status)) {
@@ -406,7 +414,7 @@ struct GitInputScheme : InputScheme
                             : ref == "HEAD"
                                 ? *ref
                                 : "refs/heads/" + *ref;
-                    runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
+                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
@@ -427,7 +435,7 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";
+        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
         if (isShallow && !shallow)
             throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", actualUrl);
@@ -447,7 +455,7 @@ struct GitInputScheme : InputScheme
 
         auto result = runProgram(RunOptions {
             .program = "git",
-            .args = { "-C", repoDir, "cat-file", "commit", input.getRev()->gitRev() },
+            .args = { "-C", repoDir, "--git-dir", gitDir, "cat-file", "commit", input.getRev()->gitRev() },
             .mergeStderrToStdout = true
         });
         if (WEXITSTATUS(result.first) == 128
@@ -486,7 +494,7 @@ struct GitInputScheme : InputScheme
             auto source = sinkToSource([&](Sink & sink) {
                 runProgram2({
                     .program = "git",
-                    .args = { "-C", repoDir, "archive", input.getRev()->gitRev() },
+                    .args = { "-C", repoDir, "--git-dir", gitDir, "archive", input.getRev()->gitRev() },
                     .standardOut = &sink
                 });
             });
@@ -496,7 +504,7 @@ struct GitInputScheme : InputScheme
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
-        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
@@ -505,7 +513,7 @@ struct GitInputScheme : InputScheme
 
         if (!shallow)
             infoAttrs.insert_or_assign("revCount",
-                std::stoull(runProgram("git", true, { "-C", repoDir, "rev-list", "--count", input.getRev()->gitRev() })));
+                std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--count", input.getRev()->gitRev() })));
 
         if (!_input.getRev())
             getCache()->add(
