@@ -485,22 +485,22 @@ EvalState::EvalState(
 
     if (rootFS->hasAccessControl()) {
         for (auto & i : searchPath) {
-            auto r = resolveSearchPathElem(i);
-            if (!r.first) continue;
-
-            auto path = r.second;
-
-            if (store->isInStore(r.second)) {
-                try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
-                    for (auto & path : closure)
-                        allowPath(path);
-                } catch (InvalidPath &) {
-                    allowPath(r.second);
-                }
-            } else
-                allowPath(r.second);
+            if (auto path = resolveSearchPathElem(i)) {
+                // FIXME
+                #if 0
+                if (store->isInStore(*path)) {
+                    try {
+                        StorePathSet closure;
+                        store->computeFSClosure(store->toStorePath(*path).first, closure);
+                        for (auto & p : closure)
+                            allowPath(p);
+                    } catch (InvalidPath &) {
+                        allowPath(*r);
+                    }
+                } else
+                    allowPath(*r);
+                #endif
+            }
         }
     }
 
@@ -1812,10 +1812,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 state.throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
         } else {
             if (s.empty()) s.reserve(es->size());
-            /* Skip canonization of first path, which would only be
-               non-canonical in the first place if it's coming from a
-               ./${foo} type path. */
-            auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString, !first);
+            auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString);
             sSize += part->size();
             s.emplace_back(std::move(part));
         }
@@ -2017,7 +2014,7 @@ std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value &
 }
 
 BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet & context,
-    bool coerceMore, bool copyToStore, bool canonicalizePath)
+    bool coerceMore, bool copyToStore)
 {
     forceValue(v, pos);
 
@@ -2105,11 +2102,28 @@ StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & context)
 {
-    auto path = coerceToString(pos, v, context, false, false).toOwned();
-    if (path == "" || path[0] != '/')
-        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
-    // FIXME
-    return rootPath(path);
+    forceValue(v, pos);
+
+    if (v.type() == nString) {
+        copyContext(v, context);
+        return {*rootFS, v.string.s};
+    }
+
+    if (v.type() == nPath)
+        return v.path();
+
+    #if 0
+    if (v.type() == nAttrs) {
+        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
+        if (maybeString)
+            return std::move(*maybeString);
+        auto i = v.attrs->find(sOutPath);
+        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
+        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
+    }
+    #endif
+
+    throwTypeError(pos, "cannot coerce %1% to a path", v);
 }
 
 

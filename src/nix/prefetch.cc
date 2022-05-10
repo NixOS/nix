@@ -195,7 +195,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             Value vRoot;
             state->evalFile(
                 resolveExprPath(
-                    state->rootPath(lookupFileArg(*state, args.empty() ? "." : args[0]))),
+                    lookupFileArg(*state, args.empty() ? "." : args[0])),
                 vRoot);
             Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
             state->forceAttrs(v, noPos);

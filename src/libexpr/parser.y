@@ -759,13 +759,13 @@ void EvalState::addToSearchPath(const std::string & s)
 }
 
 
-Path EvalState::findFile(const std::string_view path)
+SourcePath EvalState::findFile(const std::string_view path)
 {
     return findFile(searchPath, path);
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos)
+SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos)
 {
     for (auto & i : searchPath) {
         std::string suffix;
@@ -778,15 +778,14 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
                 continue;
             suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
         }
-        auto r = resolveSearchPathElem(i);
-        if (!r.first) continue;
-        Path res = r.second + suffix;
-        if (pathExists(res)) return canonPath(res);
+        if (auto path = resolveSearchPathElem(i)) {
+            auto res = path->append("/" + suffix);
+            if (res.pathExists()) return res;
+        }
     }
 
     if (hasPrefix(path, "nix/"))
-        abort();
-        //return packPath(SourcePath {corepkgsFS, (std::string) path.substr(3)});
+        return {*corepkgsFS, (std::string) path.substr(3)};
 
     throw ThrownError({
         .msg = hintfmt(evalSettings.pureEval
@@ -798,38 +797,39 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
 }
 
 
-std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
+std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
 {
     auto i = searchPathResolved.find(elem.second);
     if (i != searchPathResolved.end()) return i->second;
 
-    std::pair<bool, std::string> res;
+    std::optional<SourcePath> res;
 
     if (isUri(elem.second)) {
         try {
-            res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).first.storePath) };
+            auto storePath = fetchers::downloadTarball(
+                store, resolveUri(elem.second), "source", false).first.storePath;
+            auto & accessor = registerAccessor(makeFSInputAccessor(store->toRealPath(storePath)));
+            res.emplace(SourcePath {accessor, "/"});
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
-            res = { false, "" };
         }
     } else {
-        auto path = absPath(elem.second);
-        if (pathExists(path))
-            res = { true, path };
+        auto path = rootPath(absPath(elem.second));
+        if (path.pathExists())
+            res.emplace(path);
         else {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
-            res = { false, "" };
         }
     }
 
-    debug(format("resolved search path element '%s' to '%s'") % elem.second % res.second);
+    if (res)
+        debug("resolved search path element '%s' to '%s'", elem.second, *res);
 
-    searchPathResolved[elem.second] = res;
+    searchPathResolved.emplace(elem.second, res);
     return res;
 }
 

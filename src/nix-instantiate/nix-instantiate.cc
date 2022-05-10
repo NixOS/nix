@@ -167,9 +167,8 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         if (findFile) {
             for (auto & i : files) {
-                Path p = state->findFile(i);
-                if (p == "") throw Error("unable to find '%1%'", i);
-                std::cout << p << std::endl;
+                auto p = state->findFile(i);
+                std::cout << p.readFile() << std::endl;
             }
             return 0;
         }
@@ -184,7 +183,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         for (auto & i : files) {
             Expr * e = fromArgs
                 ? state->parseExprFromString(i, absPath("."))
-                : state->parseExprFromFile(resolveExprPath(state->rootPath(lookupFileArg(*state, i))));
+                : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }

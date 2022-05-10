@@ -307,9 +307,8 @@ static void main_nix_build(int argc, char * * argv)
                     exprs.push_back(
                         state->parseExprFromFile(
                             resolveExprPath(
-                                state->rootPath(
-                                    lookupFileArg(*state,
-                                        inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+                                lookupFileArg(*state,
+                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
             }
         }
 

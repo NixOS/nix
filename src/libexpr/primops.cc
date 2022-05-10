@@ -113,6 +113,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     }();
 
     try {
+        #if 0
         if (!context.empty()) {
             auto rewrites = state.realiseContext(context);
             // FIXME: check that path.accessor == rootFS?
@@ -120,6 +121,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
             // FIXME: return store accessor
             return state.rootPath(realPath);
         } else
+        #endif
             return path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
@@ -1545,12 +1547,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto path = state.forceStringNoCtx(*args[1], pos);
 
-    #if 0
-    // FIXME: checkSourcePath?
     v.mkPath(state.findFile(searchPath, path, pos));
-    #endif
-
-    throw ThrownError("findFile('%s'): not implemented", path);
 }
 
 static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {

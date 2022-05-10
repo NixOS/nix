@@ -50,12 +50,13 @@ struct Env
 void copyContext(const Value & v, PathSet & context);
 
 
-std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
-std::string printValue(const EvalState & state, const Value & v);
-
-
+// FIXME: maybe change this to an std::variant<SourcePath, URL>.
 typedef std::pair<std::string, std::string> SearchPathElem;
 typedef std::list<SearchPathElem> SearchPath;
+
+
+std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
+std::string printValue(const EvalState & state, const Value & v);
 
 
 /* Initialise the Boehm GC, if applicable. */
@@ -130,7 +131,7 @@ private:
 
     SearchPath searchPath;
 
-    std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+    std::map<std::string, std::optional<SourcePath>> searchPathResolved;
 
     /* Cache used by checkSourcePath(). */
     std::unordered_map<Path, Path> resolvedPaths;
@@ -209,11 +210,11 @@ public:
     void resetFileCache();
 
     /* Look up a file in the search path. */
-    Path findFile(const std::string_view path);
-    Path findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const std::string_view path);
+    SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
-    std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
+    std::optional<SourcePath> resolveSearchPathElem(const SearchPathElem & elem);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
@@ -303,8 +304,7 @@ public:
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
     BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
-        bool coerceMore = false, bool copyToStore = true,
-        bool canonicalizePath = true);
+        bool coerceMore = false, bool copyToStore = true);
 
     StorePath copyPathToStore(PathSet & context, const SourcePath & path);
 
