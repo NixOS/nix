@@ -2117,16 +2117,11 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & contex
     if (v.type() == nPath)
         return v.path();
 
-    #if 0
     if (v.type() == nAttrs) {
-        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
-        if (maybeString)
-            return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
-        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
+        if (i != v.attrs->end())
+            return coerceToPath(pos, *i->value, context);
     }
-    #endif
 
     throwTypeError(pos, "cannot coerce %1% to a path", v);
 }
