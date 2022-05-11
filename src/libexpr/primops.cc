@@ -3647,7 +3647,7 @@ static RegisterPrimOp primop_split({
       Evaluates to `[ "" [ "a" null ] "b" [ null "c" ] "" ]`.
 
       ```nix
-      builtins.split "([[:upper:]]+)" "  FOO   "
+      builtins.split "([[:upper:]]+)" " FOO "
       ```
 
       Evaluates to `[ " " [ "FOO" ] " " ]`.

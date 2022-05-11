@@ -147,7 +147,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         else {
             str << "[ ";
             for (auto v2 : listItems()) {
-                v2->print(symbols, str, seen);
+                if (v2)
+                    v2->print(symbols, str, seen);
+                else
+                    str << "(nullptr)";
                 str << " ";
             }
             str << "]";
@@ -184,6 +187,11 @@ void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepe
     print(symbols, str, showRepeated ? nullptr : &seen);
 }
 
+// Pretty print types for assertion errors
+std::ostream & operator << (std::ostream & os, const ValueType t) {
+    os << showType(t);
+    return os;
+}
 
 std::string printValue(const EvalState & state, const Value & v)
 {
@@ -1592,7 +1600,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", symbols[i.name]);
+https://nixos.org/manual/nix/stable/expressions/language-constructs.html#functions.)", symbols[i.name]);
 
             }
         }

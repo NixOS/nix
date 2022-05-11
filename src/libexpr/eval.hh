@@ -57,6 +57,7 @@ typedef std::list<SearchPathElem> SearchPath;
 
 std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
+std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
 /* Initialise the Boehm GC, if applicable. */
