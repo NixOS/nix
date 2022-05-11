@@ -93,6 +93,9 @@ struct SourcePath
     bool pathExists() const
     { return accessor.pathExists(path); }
 
+    InputAccessor::Stat lstat() const
+    {  return accessor.lstat(path); }
+
     InputAccessor::DirEntries readDirectory() const
     {  return accessor.readDirectory(path); }
 

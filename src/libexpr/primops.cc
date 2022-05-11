@@ -1587,6 +1587,15 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
+static std::string_view fileTypeToString(InputAccessor::Type type)
+{
+    return
+        type == InputAccessor::Type::tRegular ? "regular" :
+        type == InputAccessor::Type::tDirectory ? "directory" :
+        type == InputAccessor::Type::tSymlink ? "symlink" :
+        "unknown";
+}
+
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
@@ -1599,13 +1608,9 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
         #if 0
         // FIXME?
         if (type == InputAccessor::Type::Misc)
-            ent.type = getFileType(path + "/" + name);
+            type = getFileType(path + "/" + name);
         #endif
-        attrs.alloc(name).mkString(
-            type == InputAccessor::Type::tRegular ? "regular" :
-            type == InputAccessor::Type::tDirectory ? "directory" :
-            type == InputAccessor::Type::tSymlink ? "symlink" :
-            "unknown");
+        attrs.alloc(name).mkString(fileTypeToString(type.value_or(InputAccessor::Type::tMisc)));
     }
 
     v.mkAttrs(attrs);
@@ -1912,7 +1917,7 @@ static void addPath(
     EvalState & state,
     const PosIdx pos,
     std::string_view name,
-    Path path,
+    const SourcePath & path,
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
@@ -1920,13 +1925,18 @@ static void addPath(
     const PathSet & context)
 {
     try {
+        // FIXME
+        #if 0
         // FIXME: handle CA derivation outputs (where path needs to
         // be rewritten to the actual output).
         auto rewrites = state.realiseContext(context);
         path = state.toRealPath(rewriteStrings(path, rewrites), context);
+        #endif
 
         StorePathSet refs;
 
+        // FIXME
+        #if 0
         if (state.store->isInStore(path)) {
             try {
                 auto [storePath, subPath] = state.store->toStorePath(path);
@@ -1936,28 +1946,21 @@ static void addPath(
             } catch (Error &) { // FIXME: should be InvalidPathError
             }
         }
-
-        // FIXME
-        #if 0
-        path = evalSettings.pureEval && expectedHash
-            ? path
-            : state.checkSourcePath(path);
         #endif
 
-        PathFilter filter = filterFun ? ([&](const Path & path) {
-            auto st = lstat(path);
+        PathFilter filter = filterFun ? ([&](const Path & p) {
+            SourcePath path2{path.accessor, canonPath(p)};
+
+            auto st = path2.lstat();
 
             /* Call the filter function.  The first argument is the path,
                the second is a string indicating the type of the file. */
             Value arg1;
-            arg1.mkString(path);
+            arg1.mkString(path2.path);
 
             Value arg2;
-            arg2.mkString(
-                S_ISREG(st.st_mode) ? "regular" :
-                S_ISDIR(st.st_mode) ? "directory" :
-                S_ISLNK(st.st_mode) ? "symlink" :
-                "unknown" /* not supported, will fail! */);
+            // assert that type is not "unknown"
+            arg2.mkString(fileTypeToString(st.type));
 
             Value * args []{&arg1, &arg2};
             Value res;
@@ -1970,10 +1973,18 @@ static void addPath(
         if (expectedHash)
             expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
 
+        // FIXME: instead of a store path, we could return a
+        // SourcePath that applies the filter lazily and copies to the
+        // store on-demand.
+
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            StorePath dstPath = settings.readOnlyMode
-                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs);
+            auto source = sinkToSource([&](Sink & sink) {
+                path.dumpPath(sink, filter);
+            });
+            auto dstPath =
+                settings.readOnlyMode
+                ? state.store->computeStorePathFromDump(*source, name, method, htSHA256, refs).first
+                : state.store->addToStoreFromDump(*source, name, method, htSHA256, state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 throw Error("store path mismatch in (possibly filtered) path added from '%s'", path);
             state.allowAndSetStorePathString(dstPath, v);
@@ -2000,8 +2011,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
             .errPos = state.positions[pos]
         });
 
-    // FIXME: use SourcePath
-    addPath(state, pos, path.baseName(), path.path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2096,8 +2106,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     if (name.empty())
         name = path->baseName();
 
-    // FIXME: use SourcePath
-    addPath(state, pos, name, path->path, filterFun, method, expectedHash, v, context);
+    addPath(state, pos, name, *path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({

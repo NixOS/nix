@@ -220,26 +220,17 @@ StorePath Store::makeTextPath(std::string_view name, const Hash & hash,
 }
 
 
-std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
-{
-    Hash h = method == FileIngestionMethod::Recursive
-        ? hashPath(hashAlgo, srcPath, filter).first
-        : hashFile(hashAlgo, srcPath);
-    return std::make_pair(makeFixedOutputPath(method, h, name), h);
-}
-
-
 std::pair<StorePath, Hash> Store::computeStorePathFromDump(
     Source & dump,
     std::string_view name,
     FileIngestionMethod method,
-    HashType hashAlgo) const
+    HashType hashAlgo,
+    const StorePathSet & references) const
 {
     HashSink sink(hashAlgo);
     dump.drainInto(sink);
     auto hash = sink.finish().first;
-    return {makeFixedOutputPath(method, hash, name), hash};
+    return {makeFixedOutputPath(method, hash, name, references), hash};
 }
 
 
