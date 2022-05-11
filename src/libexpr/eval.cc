@@ -2087,16 +2087,13 @@ StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            #if 0
-            auto p = settings.readOnlyMode
-                ? store->computeStorePathForPath(path2.baseName(), canonPath(path)).first
-                : store->addToStore(path2.baseName(), canonPath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
-            #endif
             auto source = sinkToSource([&](Sink & sink) {
                 path.dumpPath(sink);
             });
-            // FIXME: readOnlyMode
-            auto dstPath = store->addToStoreFromDump(*source, path.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
+            auto dstPath =
+                settings.readOnlyMode
+                ? store->computeStorePathFromDump(*source, path.baseName()).first
+                : store->addToStoreFromDump(*source, path.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));

@@ -230,6 +230,19 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
 }
 
 
+std::pair<StorePath, Hash> Store::computeStorePathFromDump(
+    Source & dump,
+    std::string_view name,
+    FileIngestionMethod method,
+    HashType hashAlgo) const
+{
+    HashSink sink(hashAlgo);
+    dump.drainInto(sink);
+    auto hash = sink.finish().first;
+    return {makeFixedOutputPath(method, hash, name), hash};
+}
+
+
 StorePath Store::computeStorePathForText(
     std::string_view name,
     std::string_view s,

@@ -219,9 +219,16 @@ public:
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
        path and the cryptographic hash of the contents of srcPath. */
+    // FIXME: remove
     std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
         const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
         HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
+
+    std::pair<StorePath, Hash> computeStorePathFromDump(
+        Source & dump,
+        std::string_view name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        HashType hashAlgo = htSHA256) const;
 
     /* Preparatory part of addTextToStore().
 
