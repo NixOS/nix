@@ -1,12 +1,59 @@
 # Store
 
-A Nix store is a collection of [store objects](objects.md) with associated operations.
+A Nix store is a collection of *store objects*.
 
-These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build tasks.
+Store objects can hold arbitrary *data* and *references* to one another.
+Nix makes no distinction if they are used as build inputs, build results, or build tasks.
 
-A Nix store allows adding, retrieving, and deleting store objects.
-It can perform builds, that is, transform build inputs using instructions from the build tasks into build outputs.
-It also keeps track of *references* between data and can therefore garbage-collect unused store objects.
+```haskell
+data Store = Set StoreObject
+
+data StoreObject = StoreObject {
+  data       :: Data
+, references :: Set Reference
+}
+```
+
+A Nix store can *add*, *retrieve*, and *delete* store objects.
+
+It can *perform builds*, that is, create new store objects by transforming build inputs, using instructions from the build tasks, into build outputs.
+
+As it keeps track of references, it can [garbage-collect](https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)) unused store objects.
+
+```haskell
+add    :: Store -> Data -> (Store, Reference)
+get    :: Store -> Reference -> StoreObject
+delete :: Store -> Reference -> Store
+
+build  :: Store -> Reference -> Maybe (Store, Reference)
+
+collectGarbage :: Store -> Store
+```
+
+Store objects are [immutable](https://en.m.wikipedia.org/wiki/Immutable_object): once created, they do not change until they are deleted.
+
+References are [opaque](https://en.m.wikipedia.org/wiki/Opaque_data_type), [unique identifiers](https://en.m.wikipedia.org/wiki/Unique_identifier):
+The only way to obtain references is by adding or building store objects.
+A reference will always point to exactly one store object.
+
+An added store object cannot have references, unless it is a build task.
+
+Building a store object will add appropriate references, according to provided build instructions.
+These references can only come from declared build inputs, and are not known by build instructions a priori.
+
+```haskell
+data Data = Data | Task BuildTask
+
+data BuildTask = BuildTask {
+  instructions ::  Reference
+, inputs       :: [Reference]
+}
+```
+
+A store object cannot be deleted as long as it is reachable from a reference still in use.
+Garbage collection will delete all store objects that cannot be reached from any reference in use.
+
+<!-- more details in section on garbage collection, link to it once it exists -->
 
 There exist different types of stores, which all follow this model.
 Examples:
