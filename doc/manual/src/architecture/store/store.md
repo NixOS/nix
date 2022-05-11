@@ -39,7 +39,7 @@ A reference will always point to exactly one store object.
 An added store object cannot have references, unless it is a build task.
 
 Building a store object will add appropriate references, according to provided build instructions.
-These references can only come from declared build inputs, and are not known by build instructions a priori.
+These references can only come from declared build inputs, and are not known to build instructions a priori.
 
 ```haskell
 data Data = Data | Task BuildTask
@@ -55,14 +55,59 @@ Garbage collection will delete all store objects that cannot be reached from any
 
 <!-- more details in section on garbage collection, link to it once it exists -->
 
+## Files and Processes
+
+Nix provides a mapping between its store model and the [Unix paradigm](https://en.m.wikipedia.org/wiki/Everything_is_a_file) on the interplay of [files and processes](https://en.m.wikipedia.org/wiki/File_descriptor).
+
+Nix encodes immutable store objects and opaque identifiers as file system primitives: files, directories, and paths.
+That allows processes to resolve references contained in files and thus access the contents of store objects.
+
+```
++-----------------------------------------------------------------+
+| Nix                                                             |
+|                  [ commmand line interface ]------,             |
+|                               |                   |             |
+|                           evaluates               |             |
+|                               |                manages          |
+|                               V                   |             |
+|                  [ configuration language  ]      |             |
+|                               |                   |             |
+| +-----------------------------|-------------------V-----------+ |
+| | store                  evaluates to                         | |
+| |                             |                               | |
+| |             referenced by   V       builds                  | |
+| |  [ build input ] ---> [ build plan ] ---> [ build result ]  | |
+| |         ^                                        |          | |
+| +---------|----------------------------------------|----------+ |
++-----------|----------------------------------------|------------+
+            |                                        |
+    file system object                          store path
+            |                                        |
++-----------|----------------------------------------|------------+
+| operating system        +------------+             |            |
+|           '------------ |            | <-----------'            |
+|                         |    file    |                          |
+|                     ,-- |            | <-,                      |
+|                     |   +------------+   |                      |
+|          execute as |                    | read, write, execute |
+|                     |   +------------+   |                      |
+|                     '-> |  process   | --'                      |
+|                         +------------+                          |
++-----------------------------------------------------------------+
+```
+
+Store objects are therefore implemented as the pair of
+
+  - a *file system object* for data
+  - a set of *store paths* for references.
+
 There exist different types of stores, which all follow this model.
 Examples:
 - store on the local file system
 - remote store accessible via SSH
 - binary cache store accessible via HTTP
 
-Every store with a file system representation has a *store directory*, which contains that store’s objects accessible through [store paths](paths.md).
-The store directory defaults to `/nix/store`, but is in principle arbitrary.
+Every store ultimately has to make store objects accessible to processes through the file system.
 
 ## A [Rosetta stone][rosetta-stone] for build system terminology
 
