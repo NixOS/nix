@@ -8,7 +8,7 @@ libexpr-tests_INSTALL_DIR :=
 
 libexpr-tests_SOURCES := $(wildcard $(d)/*.cc)
 
-libexpr-tests_CXXFLAGS += -I src/libexpr -I src/libutil -I src/libstore -I src/libexpr/tests
+libexpr-tests_CXXFLAGS += -I src/libexpr -I src/libutil -I src/libstore -I src/libexpr/tests -I src/libfetchers
 
 libexpr-tests_LIBS = libexpr libutil libstore libfetchers
 

@@ -57,6 +57,7 @@ namespace nix {
         ASSERT_EQ(getJSONValue(v), "\"test\\\"\"");
     }
 
+    #if 0
     // The dummy store doesn't support writing files. Fails with this exception message:
     // C++ exception with description "error: operation 'addToStoreFromDump' is
     // not supported by store 'dummy'" thrown in the test body.
@@ -65,4 +66,5 @@ namespace nix {
         v.mkPath("test");
         ASSERT_EQ(getJSONValue(v), "\"/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x\"");
     }
+    #endif
 } /* namespace nix */

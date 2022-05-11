@@ -1461,12 +1461,15 @@ static RegisterPrimOp primop_baseNameOf({
 static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto path = state.coerceToString(pos, *args[0], context, false, false);
-    auto dir = dirOf(*path);
-    abort();
-    #if 0
-    if (args[0]->type() == nPath) v.mkPath(dir); else v.mkString(dir, context);
-    #endif
+    state.forceValue(*args[0], pos);
+    if (args[0]->type() == nPath) {
+        auto path = args[0]->path();
+        v.mkPath({path.accessor, dirOf(path.path)});
+    } else {
+        auto path = state.coerceToString(pos, *args[0], context, false, false);
+        auto dir = dirOf(*path);
+        v.mkString(dir, context);
+    }
 }
 
 static RegisterPrimOp primop_dirOf({
