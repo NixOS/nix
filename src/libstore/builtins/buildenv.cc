@@ -93,8 +93,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
                         throw Error(
-                                "packages '%1%' and '%2%' have the same priority %3%; "
+                                "files '%1%' and '%2%' have the same priority %3%; "
                                 "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
+                                "or 'nix profile --priority NUMBER INSTALLED_PKGNAME' "
                                 "to change the priority of one of the conflicting packages"
                                 " (0 being the highest priority)",
                                 srcFile, readLink(dstFile), priority);
