@@ -222,8 +222,7 @@ static Flake readFlake(
         .originalRef = lockedRef,
         .resolvedRef = lockedRef,
         .lockedRef = lockedRef,
-        .accessor = &accessor,
-        .flakePath = dirOf(flakePath.path),
+        .path = flakePath,
     };
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
@@ -332,7 +331,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 
 static LockFile readLockFile(const Flake & flake)
 {
-    SourcePath lockFilePath{*flake.accessor, canonPath(flake.flakePath + "/flake.lock")};
+    auto lockFilePath = flake.path.parent().append("/flake.lock");
     return lockFilePath.pathExists()
         ? LockFile(lockFilePath.readFile(), fmt("%s", lockFilePath))
         : LockFile();
@@ -351,16 +350,16 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
-    auto flake = getFlake(state, topRef, useRegistries, flakeCache, {});
+    auto flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, flakeCache, {}));
 
     if (lockFlags.applyNixConfig) {
-        flake.config.apply();
+        flake->config.apply();
         state.store->setOptions();
     }
 
     try {
 
-        auto oldLockFile = readLockFile(flake);
+        auto oldLockFile = readLockFile(*flake);
 
         debug("old lock file: %s", oldLockFile);
 
@@ -381,7 +380,7 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const InputPath & lockRootPath,
-            const Path & parentPath,
+            const SourcePath & parentPath,
             bool trustLock)>
             computeLocks;
 
@@ -391,7 +390,7 @@ LockedFlake lockFlake(
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const InputPath & lockRootPath,
-            const Path & parentPath,
+            const SourcePath & parentPath,
             bool trustLock)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
@@ -518,10 +517,12 @@ LockedFlake lockFlake(
                         }
 
                         auto localPath(parentPath);
+                        #if 0
                         // If this input is a path, recurse it down.
                         // This allows us to resolve path inputs relative to the current flake.
                         if ((*input.ref).input.getType() == "path")
                             localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
+                        #endif
                         computeLocks(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath).inputs
@@ -537,13 +538,15 @@ LockedFlake lockFlake(
                             throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
                         if (input.isFlake) {
-                            Path localPath = parentPath;
+                            auto localPath(parentPath);
                             FlakeRef localRef = *input.ref;
 
+                            #if 0
                             // If this input is a path, recurse it down.
                             // This allows us to resolve path inputs relative to the current flake.
                             if (localRef.input.getType() == "path")
                                 localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
+                            #endif
 
                             auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache, inputPath);
 
@@ -594,8 +597,8 @@ LockedFlake lockFlake(
         };
 
         computeLocks(
-            flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, flake.flakePath, false);
+            flake->inputs, newLockFile.root, {},
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, flake->path, false);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
@@ -664,35 +667,36 @@ LockedFlake lockFlake(
                         /* Rewriting the lockfile changed the top-level
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
-                        auto prevLockedRef = flake.lockedRef;
+                        auto prevLockedRef = flake->lockedRef;
                         FlakeCache dummyCache;
-                        flake = getFlake(state, topRef, useRegistries, dummyCache);
+                        flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, dummyCache));
 
                         if (lockFlags.commitLockFile &&
-                            flake.lockedRef.input.getRev() &&
-                            prevLockedRef.input.getRev() != flake.lockedRef.input.getRev())
-                            warn("committed new revision '%s'", flake.lockedRef.input.getRev()->gitRev());
+                            flake->lockedRef.input.getRev() &&
+                            prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
+                            warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
 
                         /* Make sure that we picked up the change,
                            i.e. the tree should usually be dirty
                            now. Corner case: we could have reverted from a
                            dirty to a clean tree! */
-                        if (flake.lockedRef.input == prevLockedRef.input
-                            && !flake.lockedRef.input.isLocked())
-                            throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake.originalRef);
+                        if (flake->lockedRef.input == prevLockedRef.input
+                            && !flake->lockedRef.input.isLocked())
+                            throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake->originalRef);
                     }
                 } else
                     throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
             } else {
                 warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
-                flake.forceDirty = true;
+                flake->forceDirty = true;
             }
         }
 
-        return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
+        return LockedFlake { .flake = std::move(*flake), .lockFile = std::move(newLockFile) };
 
     } catch (Error & e) {
-        e.addTrace({}, "while updating the lock file of flake '%s'", flake.lockedRef.to_string());
+        if (flake)
+            e.addTrace({}, "while updating the lock file of flake '%s'", flake->lockedRef.to_string());
         throw;
     }
 }
@@ -711,7 +715,7 @@ void callFlake(EvalState & state,
 
     emitTreeAttrs(
         state,
-        {*lockedFlake.flake.accessor, lockedFlake.flake.flakePath},
+        {lockedFlake.flake.path.accessor, "/"},
         lockedFlake.flake.lockedRef.input,
         *vRootSrc,
         false,
