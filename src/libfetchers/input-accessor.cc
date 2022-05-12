@@ -183,6 +183,7 @@ struct FSInputAccessorImpl : FSInputAccessor
             return false;
 
         if (allowedPaths) {
+            #if 0
             // FIXME: this can be done more efficiently.
             auto p = (std::string) absPath.substr(root.size());
             if (p == "") p = "/";
@@ -193,6 +194,7 @@ struct FSInputAccessorImpl : FSInputAccessor
                     return false;
                 p = dirOf(p);
             }
+            #endif
         }
 
         return true;

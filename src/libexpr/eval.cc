@@ -1010,17 +1010,14 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    // FIXME: use SourcePath as cache key
-    auto pathKey = path.to_string();
     FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(pathKey)) != fileEvalCache.end()) {
+    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
     auto resolvedPath = resolveExprPath(path);
-    auto resolvedPathKey = resolvedPath.to_string();
-    if ((i = fileEvalCache.find(resolvedPathKey)) != fileEvalCache.end()) {
+    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
@@ -1028,7 +1025,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    auto j = fileParseCache.find(resolvedPathKey);
+    auto j = fileParseCache.find(resolvedPath);
     if (j != fileParseCache.end())
         e = j->second;
 
@@ -1038,24 +1035,6 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         e = parseExprFromFile(checkSourcePath(resolvedPath));
         #endif
 
-    cacheFile(pathKey, resolvedPathKey, e, v, mustBeTrivial);
-}
-
-
-void EvalState::resetFileCache()
-{
-    fileEvalCache.clear();
-    fileParseCache.clear();
-}
-
-
-void EvalState::cacheFile(
-    const Path & path,
-    const Path & resolvedPath,
-    Expr * e,
-    Value & v,
-    bool mustBeTrivial)
-{
     fileParseCache[resolvedPath] = e;
 
     try {
@@ -1066,12 +1045,19 @@ void EvalState::cacheFile(
             throw EvalError("file '%s' must be an attribute set", path);
         eval(e, v);
     } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
+        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
         throw;
     }
 
     fileEvalCache[resolvedPath] = v;
     if (path != resolvedPath) fileEvalCache[path] = v;
+}
+
+
+void EvalState::resetFileCache()
+{
+    fileEvalCache.clear();
+    fileParseCache.clear();
 }
 
 

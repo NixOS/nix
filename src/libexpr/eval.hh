@@ -116,17 +116,17 @@ private:
 
     /* A cache from path names to parse trees. */
 #if HAVE_BOEHMGC
-    typedef std::map<Path, Expr *, std::less<Path>, traceable_allocator<std::pair<const Path, Expr *> > > FileParseCache;
+    typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
 #else
-    typedef std::map<Path, Expr *> FileParseCache;
+    typedef std::map<SourcePath, Expr *> FileParseCache;
 #endif
     FileParseCache fileParseCache;
 
     /* A cache from path names to values. */
 #if HAVE_BOEHMGC
-    typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
+    typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value> >> FileEvalCache;
 #else
-    typedef std::map<Path, Value> FileEvalCache;
+    typedef std::map<SourcePath, Value> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
 
@@ -199,14 +199,6 @@ public:
        form. Optionally enforce that the top-level expression is
        trivial (i.e. doesn't require arbitrary computation). */
     void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
-
-    /* Like `cacheFile`, but with an already parsed expression. */
-    void cacheFile(
-        const Path & path,
-        const Path & resolvedPath,
-        Expr * e,
-        Value & v,
-        bool mustBeTrivial = false);
 
     void resetFileCache();
 

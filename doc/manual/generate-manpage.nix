@@ -1,7 +1,7 @@
 { command, renderLinks ? false }:
 
 with builtins;
-with import ./utils.nix;
+with import <nix/utils.nix>;
 
 let
 

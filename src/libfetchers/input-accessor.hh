@@ -113,6 +113,11 @@ struct SourcePath
         return std::tie(accessor, path) == std::tie(x.accessor, x.path);
     }
 
+    bool operator != (const SourcePath & x) const
+    {
+        return std::tie(accessor, path) != std::tie(x.accessor, x.path);
+    }
+
     bool operator < (const SourcePath & x) const
     {
         return std::tie(accessor, path) < std::tie(x.accessor, x.path);

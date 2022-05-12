@@ -20,7 +20,7 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix=doc/manual --store dummy:// --impure --raw
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
