@@ -410,7 +410,7 @@ static void queryInstSources(EvalState & state,
             loadSourceExpr(state, instSource.nixExprPath, vArg);
 
             for (auto & i : args) {
-                Expr * eFun = state.parseExprFromString(i, absPath("."));
+                Expr * eFun = state.parseExprFromString(i, state.rootPath(absPath(".")));
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
                 vTmp.mkApp(&vFun, &vArg);

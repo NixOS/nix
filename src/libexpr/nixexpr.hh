@@ -185,10 +185,10 @@ struct ExprPath : Expr
 {
     std::string s; // FIXME: remove
     Value v;
-    ExprPath(InputAccessor & accessor, std::string s)
-        : s(std::move(s))
+    ExprPath(SourcePath && path)
+        : s(path.path)
     {
-        v.mkPath({accessor, this->s});
+        v.mkPath(std::move(path));
     }
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);

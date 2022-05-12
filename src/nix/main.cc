@@ -176,7 +176,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
         #include "generate-manpage.nix.gen.hh"
-        , "/"), *vGenerateManpage);
+        , state.rootPath("/")), *vGenerateManpage);
 
     state.corepkgsFS->addFile(
         "/utils.nix",

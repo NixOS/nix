@@ -723,7 +723,7 @@ void callFlake(EvalState & state,
         state.vCallFlake = allocRootValue(state.allocValue());
         state.eval(state.parseExprFromString(
             #include "call-flake.nix.gen.hh"
-            , "/"), **state.vCallFlake);
+            , state.rootPath("/")), **state.vCallFlake);
     }
 
     state.callFunction(**state.vCallFlake, *vLocks, *vTmp1, noPos);

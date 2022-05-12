@@ -87,6 +87,11 @@ void InputAccessor::dumpPath(
     dump(path);
 }
 
+std::string InputAccessor::showPath(PathView path)
+{
+    return "/virtual/" + std::to_string(number) + path;
+}
+
 struct FSInputAccessorImpl : FSInputAccessor
 {
     Path root;
@@ -210,6 +215,11 @@ struct FSInputAccessorImpl : FSInputAccessor
     {
         return (bool) allowedPaths;
     }
+
+    std::string showPath(PathView path) override
+    {
+        return root + path;
+    }
 };
 
 ref<FSInputAccessor> makeFSInputAccessor(
@@ -217,11 +227,6 @@ ref<FSInputAccessor> makeFSInputAccessor(
     std::optional<PathSet> && allowedPaths)
 {
     return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths));
-}
-
-std::string SourcePath::to_string() const
-{
-    return path; // FIXME
 }
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
@@ -284,6 +289,12 @@ std::string_view SourcePath::baseName() const
 {
     // FIXME
     return path == "" || path == "/" ? "source" : baseNameOf(path);
+}
+
+SourcePath SourcePath::parent() const
+{
+    // FIXME:
+    return {accessor, dirOf(path)};
 }
 
 }

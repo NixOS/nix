@@ -65,7 +65,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(absPath("."))), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;

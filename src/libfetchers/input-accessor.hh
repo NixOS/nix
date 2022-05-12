@@ -52,6 +52,8 @@ struct InputAccessor
     {
         return number < x.number;
     }
+
+    virtual std::string showPath(PathView path);
 };
 
 struct FSInputAccessor : InputAccessor
@@ -87,6 +89,8 @@ struct SourcePath
 
     std::string_view baseName() const;
 
+    SourcePath parent() const;
+
     std::string readFile() const
     { return accessor.readFile(path); }
 
@@ -104,7 +108,8 @@ struct SourcePath
         PathFilter & filter = defaultPathFilter) const
     { return accessor.dumpPath(path, sink, filter); }
 
-    std::string to_string() const;
+    std::string to_string() const
+    { return accessor.showPath(path); }
 
     SourcePath append(std::string_view s) const;
 

@@ -375,7 +375,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
     Expr * parsed;
     try {
         auto base = state.positions[pos];
-        parsed = state.parseExprFromString(std::move(output), base.file);
+        parsed = state.parseExprFromString(std::move(output), state.rootPath(base.file));
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "While parsing the output from '%1%'", program);
         throw;
@@ -1464,7 +1464,7 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Valu
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nPath) {
         auto path = args[0]->path();
-        v.mkPath({path.accessor, dirOf(path.path)});
+        v.mkPath(path.parent());
     } else {
         auto path = state.coerceToString(pos, *args[0], context, false, false);
         auto dir = dirOf(*path);
@@ -3967,7 +3967,7 @@ void EvalState::createBaseEnv()
         // the parser needs two NUL bytes as terminators; one of them
         // is implied by being a C string.
         "\0";
-    eval(parse(code, sizeof(code), foFile, derivationNixPath, "/", staticBaseEnv), *vDerivation);
+    eval(parse(code, sizeof(code), foFile, derivationNixPath, rootPath("/"), staticBaseEnv), *vDerivation);
 }
 
 

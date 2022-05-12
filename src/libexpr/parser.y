@@ -31,14 +31,9 @@ namespace nix {
         EvalState & state;
         SymbolTable & symbols;
         Expr * result;
-        Path basePath;
+        SourcePath basePath;
         PosTable::Origin origin;
         std::optional<ErrorInfo> error;
-        ParseData(EvalState & state, PosTable::Origin origin)
-            : state(state)
-            , symbols(state.symbols)
-            , origin(std::move(origin))
-            { };
     };
 
     struct ParserFormals {
@@ -513,15 +508,15 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    Path path(absPath({$1.p, $1.l}, data->basePath));
+    SourcePath path { data->basePath.accessor, absPath({$1.p, $1.l}, data->basePath.path) };
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
-      path += "/";
-    $$ = new ExprPath(*data->state.rootFS, path);
+      path.path += "/";
+    $$ = new ExprPath(std::move(path));
   }
   | HPATH {
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(*data->state.rootFS, path);
+    $$ = new ExprPath(data->state.rootPath(path));
   }
   ;
 
@@ -643,12 +638,13 @@ namespace nix {
 
 
 Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const PathView path, const PathView basePath, StaticEnv & staticEnv)
+    const PathView path, const SourcePath & basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     std::string file;
     switch (origin) {
         case foFile:
+            // FIXME: change this to a SourcePath.
             file = path;
             break;
         case foStdin:
@@ -658,8 +654,12 @@ Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
         default:
             assert(false);
     }
-    ParseData data(*this, {file, origin});
-    data.basePath = basePath;
+    ParseData data {
+        .state = *this,
+        .symbols = symbols,
+        .basePath = basePath,
+        .origin = {file, origin},
+    };
 
     yylex_init(&scanner);
     yy_scan_buffer(text, length, scanner);
@@ -716,18 +716,18 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticE
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     // FIXME: pass SourcePaths
-    return parse(buffer.data(), buffer.size(), foFile, path.path, dirOf(path.path), staticEnv);
+    return parse(buffer.data(), buffer.size(), foFile, path.path, path.parent(), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath, StaticEnv & staticEnv)
 {
     s.append("\0\0", 2);
     return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath)
 {
     return parseExprFromString(std::move(s), basePath, staticBaseEnv);
 }
@@ -739,7 +739,7 @@ Expr * EvalState::parseStdin()
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
+    return parse(buffer.data(), buffer.size(), foStdin, "", rootPath(absPath(".")), staticBaseEnv);
 }
 
 
