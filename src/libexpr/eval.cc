@@ -810,24 +810,6 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
-void EvalState::debugLastTrace(Error & e) const
-{
-    // Call this in the situation where Expr and Env are inaccessible.
-    // The debugger will start in the last context that's in the
-    // DebugTrace stack.
-    if (debuggerHook && !debugTraces.empty()) {
-        const DebugTrace & last = debugTraces.front();
-        debuggerHook(&e, last.env, last.expr);
-    }
-}
-
-void debugError(Error * e, Env & env, Expr & expr)
-{
-    if (debuggerHook)
-        debuggerHook(e, env, expr);
-}
-
-
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
@@ -839,9 +821,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s) const
@@ -851,18 +831,14 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s) const
         .errPos = positions[pos]
     });
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwEvalError(const char * s, const std::string & s2) const
 {
     auto error = EvalError(s, s2);
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
@@ -874,9 +850,7 @@ void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions
         .suggestions = suggestions,
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const
@@ -886,9 +860,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
         .errPos = positions[pos]
     });
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr & expr) const
@@ -898,9 +870,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwEvalError(const char * s, const std::string & s2,
@@ -911,9 +881,7 @@ void EvalState::throwEvalError(const char * s, const std::string & s2,
         .errPos = positions[noPos]
     });
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
@@ -924,9 +892,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
         .errPos = positions[pos]
     });
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
@@ -937,9 +903,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr & expr) const
@@ -950,9 +914,7 @@ void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym
         .errPos = positions[p1]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v) const
@@ -962,9 +924,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v
         .errPos = positions[pos]
     });
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr & expr) const
@@ -974,9 +934,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s) const
@@ -986,9 +944,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s) const
         .errPos = positions[pos]
     });
 
-    debugLastTrace(error);
-
-    throw error;
+    debugThrowLastTrace(error);
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun,
@@ -999,9 +955,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambd
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
@@ -1013,9 +967,7 @@ void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions
         .suggestions = suggestions,
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr &expr) const
@@ -1025,9 +977,7 @@ void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr 
         .errPos = positions[expr.getPos()],
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr) const
@@ -1037,9 +987,7 @@ void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std:
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr) const
@@ -1049,9 +997,7 @@ void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const s
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr) const
@@ -1061,9 +1007,7 @@ void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, cons
         .errPos = positions[pos]
     });
 
-    debugError(&error, env, expr);
-
-    throw error;
+    debugThrow(error, env, expr);
 }
 
 void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
