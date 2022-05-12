@@ -1491,8 +1491,6 @@ static int main_nix_env(int argc, char * * argv)
 
         globals.state->printStats();
 
-        logger->stop();
-
         return 0;
     }
 }
