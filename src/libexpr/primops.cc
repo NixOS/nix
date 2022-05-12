@@ -878,7 +878,6 @@ static RegisterPrimOp primop_floor({
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    std::cout << "priatraynasdf0" << std::endl;
     auto attrs = state.buildBindings(2);
     auto saveDebuggerHook = debuggerHook;
     debuggerHook = nullptr;
@@ -886,15 +885,10 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
         attrs.alloc("success").mkBool(true);
-        std::cout << "priatraynasdf0000" << std::endl;
     } catch (AssertionError & e) {
-        std::cout << "priatraynasdf" << std::endl;
-                                  
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
     } catch (Error & e) {
-        std::cout << "priatraERASERynasdf" << std::endl;
-                                  
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
     }
