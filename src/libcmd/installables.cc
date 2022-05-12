@@ -557,9 +557,12 @@ ref<eval_cache::EvalCache> openEvalCache(
 {
     auto fingerprint = lockedFlake->getFingerprint();
     return make_ref<nix::eval_cache::EvalCache>(
+        #if 0
         evalSettings.useEvalCache && evalSettings.pureEval
             ? std::optional { std::cref(fingerprint) }
-            : std::nullopt,
+            :
+        #endif
+        std::nullopt,
         state,
         [&state, lockedFlake]()
         {
