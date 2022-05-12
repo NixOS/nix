@@ -93,12 +93,9 @@ DerivedPath::Opaque DerivedPath::Opaque::parse(const Store & store, std::string_
     return {store.parseStorePath(s)};
 }
 
-DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_view s)
+DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_view drvS, std::string_view outputsS)
 {
-    size_t n = s.find("!");
-    assert(n != s.npos);
-    auto drvPath = store.parseStorePath(s.substr(0, n));
-    auto outputsS = s.substr(n + 1);
+    auto drvPath = store.parseStorePath(drvS);
     std::set<std::string> outputs;
     if (outputsS != "*")
         outputs = tokenizeString<std::set<std::string>>(outputsS, ",");
@@ -107,10 +104,10 @@ DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_vi
 
 DerivedPath DerivedPath::parse(const Store & store, std::string_view s)
 {
-    size_t n = s.find("!");
+    size_t n = s.rfind("!");
     return n == s.npos
         ? (DerivedPath) DerivedPath::Opaque::parse(store, s)
-        : (DerivedPath) DerivedPath::Built::parse(store, s);
+        : (DerivedPath) DerivedPath::Built::parse(store, s.substr(0, n), s.substr(n + 1));
 }
 
 RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const

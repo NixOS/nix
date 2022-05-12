@@ -130,7 +130,7 @@ the Nix store. Here are the recognised types of installables:
   If you want to operate on the store derivation itself, pass the
   `--derivation` flag.
 
-* **Indexed store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv!out`
+* **Indexed store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^out`
 
   *(Experimental, part of by the `computed-derivations` experimental feature.)*
 

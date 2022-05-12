@@ -799,11 +799,12 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
             std::exception_ptr ex;
 
-            if (s.rfind('!') != std::string::npos) {
+            auto found = s.rfind('^');
+            if (found != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableIndexedStorePath>(
                         store,
-                        DerivedPath::Built::parse(*store, s)));
+                        DerivedPath::Built::parse(*store, s.substr(0, found), s.substr(found + 1))));
                     settings.requireExperimentalFeature(Xp::ComputedDerivations);
                     continue;
                 } catch (BadStorePath &) {
@@ -813,7 +814,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                 }
             }
 
-            if (s.find('/') != std::string::npos) {
+            found = s.find('/');
+            if (found != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
