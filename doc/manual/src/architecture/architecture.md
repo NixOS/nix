@@ -13,21 +13,21 @@ Nix consists of hierarchical [layers](https://en.m.wikipedia.org/wiki/Multitier_
                                 | evaluates           | manages
                                 V                     |
                    [ configuration language  ]        |
-                                |                     V
-+-------------------------------|---------------------------------+
-| store                         |                                 |
-|                               | evaluates to                    |
-|                               |                                 |
-|               referenced by   V       builds                    |
-|     [ build input ] --> [ build task ] --> [ build result ]     |
-|                                                                 |
+                                |                     |
++-------------------------------|---------------------V-----------+
+| store                         | evaluates to                    |
+|  .............................V...............................  |
+|  : build plan                                                :  |
+|  :            referenced by           builds                 :  |
+|  :  [ build input ] --> [ build task ] --> [ build result ]  :  |
+|  :...........................................................:  |
 +-----------------------------------------------------------------+
 ```
 
 At the top is the *command line interface*, translating from invocations of Nix executables to interactions with the underlying layers.
 
 Below that is the *Nix language*, a [purely functional](https://en.m.wikipedia.org/wiki/Purely_functional_programming) configuration language.
-It is used to compose expressions which ultimately evaluate to self-contained *build tasks*, used to derive *build results* from referenced *build inputs*.
+It is used to compose expressions which ultimately evaluate to self-contained *build plans*, made up *build tasks* used to derive *build results* from referenced *build inputs*.
 
 ::: {.note}
 The Nix language itself does not have a notion of *packages* or *configurations*.
@@ -40,4 +40,3 @@ The command line and Nix language are what users interact with most.
 Underlying everything is the *Nix store*, a mechanism to keep track of build tasks, data, and references between them.
 It can also execute *build instructions*, captured in the build tasks, to produce new data.
 
-A series of build tasks is a *build plan*.
