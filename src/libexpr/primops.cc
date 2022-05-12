@@ -888,9 +888,6 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     } catch (AssertionError & e) {
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
-    } catch (Error & e) {
-        attrs.alloc(state.sValue).mkBool(false);
-        attrs.alloc("success").mkBool(false);
     }
     debuggerHook = saveDebuggerHook;
     v.mkAttrs(attrs);
