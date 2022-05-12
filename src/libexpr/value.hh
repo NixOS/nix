@@ -263,6 +263,14 @@ public:
 
     void mkPath(const SourcePath & path);
 
+    inline void mkPath(InputAccessor * accessor, const char * path)
+    {
+        clearValue();
+        internalType = tPath;
+        _path.accessor = accessor;
+        _path.path = path;
+    }
+
     inline void mkNull()
     {
         clearValue();

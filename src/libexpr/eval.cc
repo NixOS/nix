@@ -890,10 +890,7 @@ void Value::mkStringMove(const char * s, const PathSet & context)
 
 void Value::mkPath(const SourcePath & path)
 {
-    clearValue();
-    internalType = tPath;
-    _path.accessor = &path.accessor;
-    _path.path = makeImmutableString(path.path);
+    mkPath(&path.accessor, makeImmutableString(path.path));
 }
 
 

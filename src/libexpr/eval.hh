@@ -50,14 +50,14 @@ struct Env
 void copyContext(const Value & v, PathSet & context);
 
 
-// FIXME: maybe change this to an std::variant<SourcePath, URL>.
-typedef std::pair<std::string, std::string> SearchPathElem;
-typedef std::list<SearchPathElem> SearchPath;
-
-
 std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
+
+
+// FIXME: maybe change this to an std::variant<SourcePath, URL>.
+typedef std::pair<std::string, std::string> SearchPathElem;
+typedef std::list<SearchPathElem> SearchPath;
 
 
 /* Initialise the Boehm GC, if applicable. */

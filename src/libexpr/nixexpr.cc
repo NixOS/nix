@@ -73,7 +73,7 @@ void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << s;
+    str << path;
 }
 
 void ExprVar::show(const SymbolTable & symbols, std::ostream & str) const
