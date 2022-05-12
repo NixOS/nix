@@ -87,9 +87,6 @@ $ nix develop
 
 Nix comes with three different flavors of tests: unit, functional and integration.
 
-Most tests are currently written as functional tests.
-**However**, it is preferable (as much as it makes sense) to primarily test new code with unit tests.
-
 ### Unit-tests
 
 The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
