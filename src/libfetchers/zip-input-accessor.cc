@@ -58,10 +58,8 @@ struct ZipInputAccessor : InputAccessor
         if (zipFile) zip_close(zipFile);
     }
 
-    std::string readFile(PathView _path) override
+    std::string _readFile(PathView path)
     {
-        auto path = canonPath(_path);
-
         auto i = members.find(((std::string) path).c_str());
         if (i == members.end())
             throw Error("file '%s' does not exist", path);
@@ -76,6 +74,16 @@ struct ZipInputAccessor : InputAccessor
             throw Error("couldn't read archive member '%s' in '%s'", path, zipPath);
 
         return buf;
+    }
+
+    std::string readFile(PathView _path) override
+    {
+        auto path = canonPath(_path);
+
+        if (lstat(path).type != tRegular)
+            throw Error("file '%s' is not a regular file");
+
+        return _readFile(path);
     }
 
     bool pathExists(PathView _path) override
@@ -104,6 +112,7 @@ struct ZipInputAccessor : InputAccessor
         if (i == members.end())
             throw Error("file '%s' does not exist", path);
 
+        // FIXME: cache this
         zip_uint8_t opsys;
         zip_uint32_t attributes;
         if (zip_file_get_external_attributes(zipFile, i->second.index, ZIP_FL_UNCHANGED, &opsys, &attributes) == -1)
@@ -112,8 +121,8 @@ struct ZipInputAccessor : InputAccessor
 
         switch (opsys) {
         case ZIP_OPSYS_UNIX:
-            auto type = (attributes >> 16) & 0770000;
-            switch (type) {
+            auto t = (attributes >> 16) & 0770000;
+            switch (t) {
             case 0040000: type = tDirectory; break;
             case 0100000:
                 type = tRegular;
@@ -121,7 +130,7 @@ struct ZipInputAccessor : InputAccessor
                 break;
             case 0120000: type = tSymlink; break;
             default:
-                throw Error("file '%s' in '%s' has unsupported type %o", path, zipPath, type);
+                throw Error("file '%s' in '%s' has unsupported type %o", path, zipPath, t);
             }
             break;
         }
@@ -153,9 +162,14 @@ struct ZipInputAccessor : InputAccessor
         return entries;
     }
 
-    std::string readLink(PathView path) override
+    std::string readLink(PathView _path) override
     {
-        throw UnimplementedError("ZipInputAccessor::readLink");
+        auto path = canonPath(_path);
+
+        if (lstat(path).type != tSymlink)
+            throw Error("file '%s' is not a symlink");
+
+        return _readFile(canonPath(_path));
     }
 };
 
