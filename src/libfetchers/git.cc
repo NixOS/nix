@@ -401,8 +401,13 @@ struct GitInputScheme : InputScheme
         if (repoInfo.submodules)
             gitOpts.emplace_back("--recurse-submodules");
 
-        return tokenizeString<std::set<std::string>>(
-            runProgram("git", true, gitOpts), "\0"s);
+        std::set<std::string> res;
+
+        for (auto & p : tokenizeString<std::set<std::string>>(
+                runProgram("git", true, gitOpts), "\0"s))
+            res.insert(canonPath("/" + p));
+
+        return res;
     }
 
     std::string getDefaultRef(const RepoInfo & repoInfo)

@@ -1788,39 +1788,48 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
     Value values[es->size()];
     Value * vTmpP = values;
+    InputAccessor * accessor = nullptr;
 
     for (auto & [i_pos, i] : *es) {
-        Value & vTmp = *vTmpP++;
-        i->eval(state, env, vTmp);
+        Value * vTmp = vTmpP++;
+        i->eval(state, env, *vTmp);
+
+        if (vTmp->type() == nAttrs) {
+            auto j = vTmp->attrs->find(state.sOutPath);
+            if (j != vTmp->attrs->end())
+                vTmp = j->value;
+        }
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            firstType = vTmp.type();
+            firstType = vTmp->type();
+            if (vTmp->type() == nPath)
+                accessor = &vTmp->path().accessor;
         }
 
         if (firstType == nInt) {
-            if (vTmp.type() == nInt) {
-                n += vTmp.integer;
-            } else if (vTmp.type() == nFloat) {
+            if (vTmp->type() == nInt) {
+                n += vTmp->integer;
+            } else if (vTmp->type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
                 nf = n;
-                nf += vTmp.fpoint;
+                nf += vTmp->fpoint;
             } else
-                state.throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp));
+                state.throwEvalError(i_pos, "cannot add %1% to an integer", showType(*vTmp));
         } else if (firstType == nFloat) {
-            if (vTmp.type() == nInt) {
-                nf += vTmp.integer;
-            } else if (vTmp.type() == nFloat) {
-                nf += vTmp.fpoint;
+            if (vTmp->type() == nInt) {
+                nf += vTmp->integer;
+            } else if (vTmp->type() == nFloat) {
+                nf += vTmp->fpoint;
             } else
-                state.throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
+                state.throwEvalError(i_pos, "cannot add %1% to a float", showType(*vTmp));
         } else {
             if (s.empty()) s.reserve(es->size());
-            auto part = state.coerceToString(i_pos, vTmp, context, false, firstType == nString);
+            auto part = state.coerceToString(i_pos, *vTmp, context, false, firstType == nString);
             sSize += part->size();
             s.emplace_back(std::move(part));
         }
@@ -1835,7 +1844,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
-        v.mkPath({.accessor = *values[0]._path.accessor, .path = canonPath(str())});
+        v.mkPath({.accessor = *accessor, .path = canonPath(str())});
     } else
         v.mkStringMove(c_str(), context);
 }
