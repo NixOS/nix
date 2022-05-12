@@ -128,10 +128,30 @@ public:
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
 
+    template<class E>
     [[gnu::noinline, gnu::noreturn]]
-    void debugThrow(const Error &error, const Env & env, const Expr & expr) const;
+    void debugThrow(const E &error, const Env & env, const Expr & expr) const
+    {
+        if (debuggerHook)
+            debuggerHook(&error, env, expr);
+
+        throw error;
+    }
+
+    template<class E>
     [[gnu::noinline, gnu::noreturn]]
-    void debugThrowLastTrace(Error & e) const;
+    void debugThrowLastTrace(E & e) const
+    {
+        // Call this in the situation where Expr and Env are inaccessible.
+        // The debugger will start in the last context that's in the
+        // DebugTrace stack.
+        if (debuggerHook && !debugTraces.empty()) {
+            const DebugTrace & last = debugTraces.front();
+            debuggerHook(&e, last.env, last.expr);
+        }
+
+        throw e;
+    }
 
 private:
     SrcToStore srcToStore;

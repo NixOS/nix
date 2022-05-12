@@ -802,30 +802,6 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
-void EvalState::debugThrowLastTrace(Error & e) const
-{
-    std::cout << "debugThrowLastTrace(Error & e) const" << (debuggerHook == nullptr) << std::endl;
-    // Call this in the situation where Expr and Env are inaccessible.
-    // The debugger will start in the last context that's in the
-    // DebugTrace stack.
-    if (debuggerHook && !debugTraces.empty()) {
-        const DebugTrace & last = debugTraces.front();
-        debuggerHook(&e, last.env, last.expr);
-    }
-
-    throw e;
-}
-
-
-void EvalState::debugThrow(const Error &error, const Env & env, const Expr & expr) const
-{
-    std::cout << "debugThrow" << (debuggerHook == nullptr) << std::endl;
-    if (debuggerHook)
-        debuggerHook(&error, env, expr);
-
-    throw error;
-}
-
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
