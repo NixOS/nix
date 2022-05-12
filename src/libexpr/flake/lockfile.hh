@@ -50,7 +50,6 @@ struct LockFile
     std::shared_ptr<Node> root = std::make_shared<Node>();
 
     LockFile() {};
-    LockFile(const nlohmann::json & json, std::string_view path);
     LockFile(std::string_view contents, std::string_view path);
 
     nlohmann::json toJSON() const;
