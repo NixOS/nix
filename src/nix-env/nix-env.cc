@@ -1241,7 +1241,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                     Attr & a(*attrs.find(i.name));
                                     if(a.value->type() != nString) continue;
                                     XMLAttrs attrs3;
-                                    attrs3["type"] = i.name;
+                                    attrs3["type"] = globals.state->symbols[i.name];
                                     attrs3["value"] = a.value->string.s;
                                     xml.writeEmptyElement("string", attrs3);
                             }
@@ -1488,8 +1488,6 @@ static int main_nix_env(int argc, char * * argv)
         op(globals, opFlags, opArgs);
 
         globals.state->printStats();
-
-        logger->stop();
 
         return 0;
     }

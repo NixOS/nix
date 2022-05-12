@@ -93,6 +93,7 @@ nix_tests = \
   build.sh \
   build-explicit-output.sh \
   ca/nix-run.sh \
+  selfref-gc.sh ca/selfref-gc.sh \
   db-migration.sh \
   bash-profile.sh \
   pass-as-file.sh \

@@ -153,13 +153,18 @@ Currently the `type` attribute can be one of the following:
   git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
-  The `ref` attribute defaults to `master`.
+  The `ref` attribute defaults to resolving the `HEAD` reference.
 
   The `rev` attribute must denote a commit that exists in the branch
   or tag specified by the `ref` attribute, since Nix doesn't do a full
   clone of the remote repository by default (and the Git protocol
   doesn't allow fetching a `rev` without a known `ref`). The default
   is the commit currently pointed to by `ref`.
+
+  When `git+file` is used without specifying `ref` or `rev`, files are
+  fetched directly from the local `path` as long as they have been added
+  to the Git repository. If there are uncommitted changes, the reference
+  is treated as dirty and a warning is printed.
 
   For example, the following are valid Git flake references:
 

@@ -1095,8 +1095,6 @@ static int main_nix_store(int argc, char * * argv)
 
         op(opFlags, opArgs);
 
-        logger->stop();
-
         return 0;
     }
 }

@@ -443,14 +443,13 @@ struct curlFileTransfer : public FileTransfer
                     : httpStatus != 0
                     ? FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': HTTP error %d ('%s')",
-                            request.verb(), request.uri, httpStatus, statusMsg)
-                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                        )
+                        "unable to %s '%s': HTTP error %d%s",
+                        request.verb(), request.uri, httpStatus,
+                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': %s (%d)",
-                            request.verb(), request.uri, curl_easy_strerror(code), code));
+                        "unable to %s '%s': %s (%d)",
+                        request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -693,10 +692,10 @@ struct curlFileTransfer : public FileTransfer
 #if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
-                std::string profile = get(params, "profile").value_or("");
-                std::string region = get(params, "region").value_or(Aws::Region::US_EAST_1);
-                std::string scheme = get(params, "scheme").value_or("");
-                std::string endpoint = get(params, "endpoint").value_or("");
+                std::string profile = getOr(params, "profile", "");
+                std::string region = getOr(params, "region", Aws::Region::US_EAST_1);
+                std::string scheme = getOr(params, "scheme", "");
+                std::string endpoint = getOr(params, "endpoint", "");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
@@ -704,7 +703,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else

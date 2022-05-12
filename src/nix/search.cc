@@ -9,7 +9,7 @@
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
-#include "fmt.hh"
+#include "hilite.hh"
 
 #include <regex>
 #include <fstream>
@@ -77,13 +77,15 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
+            auto attrPathS = state->symbols.resolve(attrPath);
+
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
+                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]()
                 {
                     for (const auto & attr : cursor.getAttrs()) {
-                        auto cursor2 = cursor.getAttr(attr);
+                        auto cursor2 = cursor.getAttr(state->symbols[attr]);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
                         visit(*cursor2, attrPath2, false);
@@ -91,13 +93,13 @@ struct CmdSearch : InstallableCommand, MixJSON
                 };
 
                 if (cursor.isDerivation()) {
-                    DrvName name(cursor.getAttr("name")->getString());
+                    DrvName name(cursor.getAttr(state->sName)->getString());
 
-                    auto aMeta = cursor.maybeGetAttr("meta");
-                    auto aDescription = aMeta ? aMeta->maybeGetAttr("description") : nullptr;
+                    auto aMeta = cursor.maybeGetAttr(state->sMeta);
+                    auto aDescription = aMeta ? aMeta->maybeGetAttr(state->sDescription) : nullptr;
                     auto description = aDescription ? aDescription->getString() : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
-                    auto attrPath2 = concatStringsSep(".", attrPath);
+                    auto attrPath2 = concatStringsSep(".", attrPathS);
 
                     std::vector<std::smatch> attrPathMatches;
                     std::vector<std::smatch> descriptionMatches;
@@ -146,21 +148,21 @@ struct CmdSearch : InstallableCommand, MixJSON
 
                 else if (
                     attrPath.size() == 0
-                    || (attrPath[0] == "legacyPackages" && attrPath.size() <= 2)
-                    || (attrPath[0] == "packages" && attrPath.size() <= 2))
+                    || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
+                    || (attrPathS[0] == "packages" && attrPath.size() <= 2))
                     recurse();
 
                 else if (initialRecurse)
                     recurse();
 
-                else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
+                else if (attrPathS[0] == "legacyPackages" && attrPath.size() > 2) {
                     auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
                     if (attr && attr->getBool())
                         recurse();
                 }
 
             } catch (EvalError & e) {
-                if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
+                if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
                     throw;
             }
         };

@@ -44,6 +44,7 @@ enum AttrType {
     Misc = 4,
     Failed = 5,
     Bool = 6,
+    ListOfStrings = 7,
 };
 
 struct placeholder_t {};
@@ -61,7 +62,8 @@ typedef std::variant<
     missing_t,
     misc_t,
     failed_t,
-    bool
+    bool,
+    std::vector<std::string>
     > AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
@@ -113,6 +115,8 @@ public:
     string_t getStringWithContext();
 
     bool getBool();
+
+    std::vector<std::string> getListOfStrings();
 
     std::vector<Symbol> getAttrs();
 

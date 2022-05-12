@@ -440,7 +440,7 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile").value_or(""));
+        auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
 
         bool keepTmp = false;
         int fileNr = 0;
@@ -543,8 +543,6 @@ static void main_nix_build(int argc, char * * argv)
 
         restoreProcessContext();
 
-        logger->stop();
-
         execvp(shell->c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", *shell);
@@ -602,8 +600,6 @@ static void main_nix_build(int argc, char * * argv)
 
             outPaths.push_back(outputPath);
         }
-
-        logger->stop();
 
         for (auto & path : outPaths)
             std::cout << store->printStorePath(path) << '\n';

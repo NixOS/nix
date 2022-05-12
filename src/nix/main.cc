@@ -261,6 +261,8 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
+    Finally f([] { logger->stop(); });
+
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
 
@@ -278,8 +280,6 @@ void mainWrapped(int argc, char * * argv)
     } else {
         verbosity = lvlInfo;
     }
-
-    Finally f([] { logger->stop(); });
 
     NixArgs args;
 
@@ -302,7 +302,7 @@ void mainWrapped(int argc, char * * argv)
             b["arity"] = primOp->arity;
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(primOp->doc));
-            res[(std::string) builtin.name] = std::move(b);
+            res[state.symbols[builtin.name]] = std::move(b);
         }
         std::cout << res.dump() << "\n";
         return;
