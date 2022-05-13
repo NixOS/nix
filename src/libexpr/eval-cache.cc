@@ -621,6 +621,28 @@ bool AttrCursor::getBool()
     return v.boolean;
 }
 
+NixInt AttrCursor::getInt()
+{
+    if (root->db) {
+        if (!cachedValue)
+            cachedValue = root->db->getAttr(getKey());
+        if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
+            if (auto i = std::get_if<NixInt>(&cachedValue->second)) {
+                debug("using cached Integer attribute '%s'", getAttrPathStr());
+                return *i;
+            } else
+                throw TypeError("'%s' is not an Integer", getAttrPathStr());
+        }
+    }
+
+    auto & v = forceValue();
+
+    if (v.type() != nInt)
+        throw TypeError("'%s' is not an Integer", getAttrPathStr());
+
+    return v.integer;
+}
+
 std::vector<std::string> AttrCursor::getListOfStrings()
 {
     if (root->db) {

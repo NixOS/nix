@@ -136,3 +136,5 @@ nix profile install $flake2Dir --priority 100
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 nix profile install $flake2Dir --priority 0
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World2" ]]
+# nix profile install $flake1Dir --priority 100
+# [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]

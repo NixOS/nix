@@ -609,7 +609,7 @@ InstallableFlake::InstallableFlake(
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
 
-std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
+std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo, std::optional<NixInt>> InstallableFlake::toDerivation()
 {
     auto attr = getCursor(*state);
 
@@ -621,11 +621,15 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto drvPath = attr->forceDerivation();
 
     std::set<std::string> outputsToInstall;
+    std::optional<NixInt> priority;
 
-    if (auto aMeta = attr->maybeGetAttr(state->sMeta))
+    if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
         if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
             for (auto & s : aOutputsToInstall->getListOfStrings())
                 outputsToInstall.insert(s);
+        if (auto aPriority = aMeta->maybeGetAttr("priority"))
+            priority = aPriority->getInt();
+    }
 
     if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
         outputsToInstall.clear();
@@ -643,9 +647,10 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto drvInfo = DerivationInfo {
         .drvPath = std::move(drvPath),
         .outputsToInstall = std::move(outputsToInstall),
+        .priority = priority,
     };
 
-    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
+    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo), priority};
 }
 
 std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()

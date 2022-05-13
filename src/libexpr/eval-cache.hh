@@ -63,6 +63,7 @@ typedef std::variant<
     misc_t,
     failed_t,
     bool,
+    NixInt,
     std::vector<std::string>
     > AttrValue;
 
@@ -115,6 +116,8 @@ public:
     string_t getStringWithContext();
 
     bool getBool();
+
+    NixInt getInt();
 
     std::vector<std::string> getListOfStrings();
 

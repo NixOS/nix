@@ -142,6 +142,7 @@ struct InstallableValue : Installable
     {
         StorePath drvPath;
         std::set<std::string> outputsToInstall;
+        std::optional<NixInt> priority;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
@@ -176,7 +177,7 @@ struct InstallableFlake : InstallableValue
 
     Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
 
-    std::tuple<std::string, FlakeRef, DerivationInfo> toDerivation();
+    std::tuple<std::string, FlakeRef, DerivationInfo, std::optional<NixInt>> toDerivation();
 
     std::vector<DerivationInfo> toDerivations() override;
 

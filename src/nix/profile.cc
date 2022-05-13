@@ -269,14 +269,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             .longName = "priority",
             .description = "The priority of the package to install.",
             .labels = {"priority"},
-            .handler = {[&](std::string s) { 
-                try{
-                    priority = std::stoi(s);
-                } catch (std::invalid_argument & e) {
-                    throw ParseError("invalid priority '%s'", s);
-                }
-            }},
-            // .completer = // no completer since number
+            .handler = {&priority},
         });
     };
 
@@ -303,20 +296,26 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
-            if(priority) {
-                element.priority = *priority;
-            };
+
 
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 // FIXME: make build() return this?
-                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+                auto [attrPath, resolvedRef, drv, priority] = installable2->toDerivation();
                 element.source = ProfileElementSource {
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
                     installable2->outputsSpec
                 };
+
+                if(drv.priority) {
+                    element.priority = *drv.priority;
+                }
             }
+
+            if(priority) { // if --priority was specified we want to override the priority of the installable
+                element.priority = *priority;
+            };
 
             element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
 
@@ -476,7 +475,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
+                auto [attrPath, resolvedRef, drv, priority] = installable->toDerivation();
 
                 if (element.source->resolvedRef == resolvedRef) continue;
 
