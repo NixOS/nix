@@ -18,6 +18,9 @@ struct DevelopSettings : Config
     Setting<std::string> bashPrompt{this, "", "bash-prompt",
         "The bash prompt (`PS1`) in `nix develop` shells."};
 
+    Setting<std::string> bashPromptPrefix{this, "", "bash-prompt-prefix",
+        "Prefix prepended to the `PS1` environment variable in `nix develop` shells."};
+
     Setting<std::string> bashPromptSuffix{this, "", "bash-prompt-suffix",
         "Suffix appended to the `PS1` environment variable in `nix develop` shells."};
 };
@@ -482,6 +485,9 @@ struct CmdDevelop : Common, MixEnvironment
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
                     shellEscape(developSettings.bashPrompt.get()));
+            if (developSettings.bashPromptPrefix != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
+                    shellEscape(developSettings.bashPromptPrefix.get()));
             if (developSettings.bashPromptSuffix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
                     shellEscape(developSettings.bashPromptSuffix.get()));
