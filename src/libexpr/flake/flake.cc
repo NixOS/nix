@@ -78,7 +78,6 @@ static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos
         state.forceValue(value, pos);
 }
 
-
 static void expectType(EvalState & state, ValueType type,
     Value & value, const PosIdx pos)
 {
@@ -202,15 +201,16 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 
 static Flake readFlake(
     EvalState & state,
-    const FlakeRef & lockedRef,
+    const FlakeRef & originalRef,
+    const FlakeRef & resolvedRef,
     InputAccessor & accessor,
     const InputPath & lockRootPath)
 {
-    auto flakeDir = canonPath("/" + lockedRef.subdir);
+    auto flakeDir = canonPath("/" + resolvedRef.subdir);
     SourcePath flakePath{accessor, canonPath(flakeDir + "/flake.nix")};
 
     if (!flakePath.pathExists())
-        throw Error("source tree referenced by '%s' does not contain a file named '%s'", lockedRef, flakePath.path);
+        throw Error("source tree referenced by '%s' does not contain a file named '%s'", resolvedRef, flakePath.path);
 
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
@@ -218,10 +218,9 @@ static Flake readFlake(
     expectType(state, nAttrs, vInfo, state.positions.add({flakePath.to_string(), foFile}, 0, 0));
 
     Flake flake {
-        // FIXME
-        .originalRef = lockedRef,
-        .resolvedRef = lockedRef,
-        .lockedRef = lockedRef,
+        .originalRef = originalRef,
+        .resolvedRef = resolvedRef,
+        .lockedRef = resolvedRef, // FIXME
         .path = flakePath,
     };
 
@@ -250,7 +249,7 @@ static Flake readFlake(
         }
 
     } else
-        throw Error("flake '%s' lacks attribute 'outputs'", lockedRef);
+        throw Error("flake '%s' lacks attribute 'outputs'", resolvedRef);
 
     auto sNixConfig = state.symbols.create("nixConfig");
 
@@ -299,7 +298,7 @@ static Flake readFlake(
             attr.name != sOutputs &&
             attr.name != sNixConfig)
             throw Error("flake '%s' has an unsupported attribute '%s', at %s",
-                lockedRef, state.symbols[attr.name], state.positions[attr.pos]);
+                resolvedRef, state.symbols[attr.name], state.positions[attr.pos]);
     }
 
     return flake;
@@ -312,10 +311,17 @@ static Flake getFlake(
     FlakeCache & flakeCache,
     const InputPath & lockRootPath)
 {
-    // FIXME: resolve
-    auto [accessor, input] = originalRef.input.lazyFetch(state.store);
+    auto resolvedRef = originalRef;
 
-    return readFlake(state, originalRef, state.registerAccessor(accessor), lockRootPath);
+    if (!originalRef.input.isDirect()) {
+        if (!allowLookup)
+            throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
+        resolvedRef = originalRef.resolve(state.store);
+    }
+
+    auto [accessor, input] = resolvedRef.input.lazyFetch(state.store);
+
+    return readFlake(state, originalRef, resolvedRef, state.registerAccessor(accessor), lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
