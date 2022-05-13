@@ -1076,9 +1076,13 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
                     if (attrPath.size() == 1)
                         recurse();
-                    else if (!showLegacy)
-                        logger->warn(fmt("%s: " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
-                    else {
+                    else if (!showLegacy){
+                        if (!json)
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
+                        else {
+                            logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
+                        }
+                    } else {
                         if (visitor.isDerivation())
                             showDerivation();
                         else if (attrPath.size() <= 2)
