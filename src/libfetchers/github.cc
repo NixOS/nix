@@ -267,8 +267,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         auto url = fmt(
             host == "github.com"
-            ? "https://api.%s/repos/%s/%s/commits/%s"
-            : "https://%s/api/v3/repos/%s/%s/commits/%s",
+            ? "https://api.%s/repos/%s/%s/tarball/%s"
+            : "https://%s/api/v3/repos/%s/%s/tarball/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
