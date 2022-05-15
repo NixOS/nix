@@ -2073,7 +2073,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debuggerHook && i.value->isThunk()
-                        ? makeDebugTraceStacker(*this, *v.thunk.expr, *v.thunk.env, positions[i.pos],
+                        ? makeDebugTraceStacker(*this, *i.value->thunk.expr, *i.value->thunk.env, positions[i.pos],
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
