@@ -7,6 +7,7 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
+#include "registry.hh"
 
 namespace nix {
 
@@ -104,6 +105,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sRegister = state.symbols.create("register");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -124,7 +126,11 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 auto follows(parseInputPath(attr.value->string.s));
                 follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
                 input.follows = follows;
-            } else {
+            } else if (attr.name == sRegister) {
+                expectType(state, nBool, *attr.value, attr.pos);
+                input.registered = attr.value;
+            }
+            else {
                 switch (attr.value->type()) {
                     case nString:
                         attrs.emplace(state.symbols[attr.name], attr.value->string.s);
@@ -166,6 +172,15 @@ static FlakeInput parseFlakeInput(EvalState & state,
     if (!input.follows && !input.ref)
         input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
 
+    if (input.registered)
+    {
+        debug("Registering url: %s", parseFlakeRef(*url, baseDir, true, input.isFlake).to_string());
+        fetchers::overrideRegistry(
+            fetchers::Input::fromAttrs({{"type", "indirect"}, {"id", inputName}}),
+            parseFlakeRef(*url, baseDir, true, input.isFlake).input,
+            parseFlakeRef(*url, baseDir, true, input.isFlake).toAttrs());
+    }
+    
     return input;
 }
 

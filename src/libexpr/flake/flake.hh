@@ -42,6 +42,7 @@ struct FlakeInput
 {
     std::optional<FlakeRef> ref;
     bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
+    bool registered = false;
     std::optional<InputPath> follows;
     FlakeInputs overrides;
 };
