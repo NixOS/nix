@@ -138,7 +138,7 @@ ref<EvalState> EvalCommand::getEvalState()
 
                 if (expr.staticEnv) {
                     auto vm = mapStaticEnvBindings(evalState->symbols, *expr.staticEnv.get(), env);
-                    runRepl(evalState, expr, *vm);
+                    runRepl(evalState, *vm);
                 }
             };
     }

@@ -1012,7 +1012,6 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 void runRepl(
     ref<EvalState> evalState,
-    const Expr &expr,
     const ValMap & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
