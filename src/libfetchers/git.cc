@@ -548,8 +548,8 @@ struct GitInputScheme : InputScheme
                                 : "refs/heads/" + ref;
                     runProgram("git", true,
                         { "-C", repoDir,
+                          "--git-dir", gitDir,
                           "fetch",
-                          "--git-dir", getGitDir(),
                           "--quiet",
                           "--force",
                           "--",
