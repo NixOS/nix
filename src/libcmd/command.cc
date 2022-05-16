@@ -119,13 +119,14 @@ ref<EvalState> EvalCommand::getEvalState()
             #endif
             ;
         if (startReplOnEvalErrors)
-            debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
+            // debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
+            debuggerHook = [](const EvalState & evalState, const Error * error, const Env & env, const Expr & expr) {
                 auto dts =
                     error && expr.getPos()
                     ? std::make_unique<DebugTraceStacker>(
-                        *evalState,
+                        evalState,
                         DebugTrace {
-                            .pos = error->info().errPos ? *error->info().errPos : evalState->positions[expr.getPos()],
+                            .pos = error->info().errPos ? *error->info().errPos : evalState.positions[expr.getPos()],
                             .expr = expr,
                             .env = env,
                             .hint = error->info().msg,
@@ -137,8 +138,8 @@ ref<EvalState> EvalCommand::getEvalState()
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
 
                 if (expr.staticEnv) {
-                    auto vm = mapStaticEnvBindings(evalState->symbols, *expr.staticEnv.get(), env);
-                    runRepl(evalState, *vm);
+                    auto vm = mapStaticEnvBindings(evalState.symbols, *expr.staticEnv.get(), env);
+                    runRepl(*const_cast<EvalState*>(&evalState), *vm);
                 }
             };
     }

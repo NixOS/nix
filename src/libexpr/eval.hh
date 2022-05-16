@@ -136,7 +136,7 @@ public:
     void debugThrow(const E &error, const Env & env, const Expr & expr) const
     {
         if (debuggerHook)
-            debuggerHook(&error, env, expr);
+            debuggerHook(*this, &error, env, expr);
 
         throw error;
     }
@@ -150,7 +150,7 @@ public:
         // DebugTrace stack.
         if (debuggerHook && !debugTraces.empty()) {
             const DebugTrace & last = debugTraces.front();
-            debuggerHook(&e, last.env, last.expr);
+            debuggerHook(*this, &e, last.env, last.expr);
         }
 
         throw e;

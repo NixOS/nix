@@ -1044,7 +1044,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 {
     evalState.debugTraces.push_front(trace);
     if (evalState.debugStop && debuggerHook)
-        debuggerHook(nullptr, trace.env, trace.expr);
+        debuggerHook(evalState, nullptr, trace.env, trace.expr);
 }
 
 void Value::mkString(std::string_view s)
