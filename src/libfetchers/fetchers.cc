@@ -315,7 +315,7 @@ std::pair<ref<InputAccessor>, Input> InputScheme::lazyFetch(ref<Store> store, co
 {
     auto [storePath, input2] = fetch(store, input);
 
-    return {makeFSInputAccessor(store->toRealPath(storePath)), input2};
+    return {makeFSInputAccessor(CanonPath(store->toRealPath(storePath))), input2};
 }
 
 }

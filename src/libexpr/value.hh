@@ -415,7 +415,13 @@ public:
     SourcePath path() const
     {
         assert(internalType == tPath);
-        return SourcePath { .accessor = *_path.accessor, .path = _path.path };
+        return SourcePath { .accessor = *_path.accessor, .path = CanonPath(CanonPath::unchecked_t(), _path.path) };
+    }
+
+    std::string_view str() const
+    {
+        assert(internalType == tString);
+        return std::string_view(string.s);
     }
 };
 

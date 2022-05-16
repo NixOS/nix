@@ -3,6 +3,7 @@
 #include "ref.hh"
 #include "types.hh"
 #include "archive.hh"
+#include "canon-path.hh"
 
 namespace nix {
 
@@ -15,9 +16,9 @@ struct InputAccessor
     virtual ~InputAccessor()
     { }
 
-    virtual std::string readFile(PathView path) = 0;
+    virtual std::string readFile(const CanonPath & path) = 0;
 
-    virtual bool pathExists(PathView path) = 0;
+    virtual bool pathExists(const CanonPath & path) = 0;
 
     enum Type { tRegular, tSymlink, tDirectory, tMisc };
 
@@ -28,18 +29,18 @@ struct InputAccessor
         bool isExecutable = false; // regular files only
     };
 
-    virtual Stat lstat(PathView path) = 0;
+    virtual Stat lstat(const CanonPath & path) = 0;
 
     typedef std::optional<Type> DirEntry;
 
     typedef std::map<std::string, DirEntry> DirEntries;
 
-    virtual DirEntries readDirectory(PathView path) = 0;
+    virtual DirEntries readDirectory(const CanonPath & path) = 0;
 
-    virtual std::string readLink(PathView path) = 0;
+    virtual std::string readLink(const CanonPath & path) = 0;
 
     virtual void dumpPath(
-        const Path & path,
+        const CanonPath & path,
         Sink & sink,
         PathFilter & filter = defaultPathFilter);
 
@@ -53,30 +54,30 @@ struct InputAccessor
         return number < x.number;
     }
 
-    virtual std::string showPath(PathView path);
+    virtual std::string showPath(const CanonPath & path);
 };
 
 struct FSInputAccessor : InputAccessor
 {
-    virtual void checkAllowed(PathView absPath) = 0;
+    virtual void checkAllowed(const CanonPath & absPath) = 0;
 
-    virtual void allowPath(Path path) = 0;
+    virtual void allowPath(CanonPath path) = 0;
 
     virtual bool hasAccessControl() = 0;
 };
 
 ref<FSInputAccessor> makeFSInputAccessor(
-    const Path & root,
-    std::optional<PathSet> && allowedPaths = {});
+    const CanonPath & root,
+    std::optional<std::set<CanonPath>> && allowedPaths = {});
 
 struct MemoryInputAccessor : InputAccessor
 {
-    virtual void addFile(PathView path, std::string && contents) = 0;
+    virtual void addFile(CanonPath path, std::string && contents) = 0;
 };
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();
 
-ref<InputAccessor> makeZipInputAccessor(PathView path);
+ref<InputAccessor> makeZipInputAccessor(const CanonPath & path);
 
 ref<InputAccessor> makePatchingInputAccessor(
     ref<InputAccessor> next,
@@ -85,7 +86,7 @@ ref<InputAccessor> makePatchingInputAccessor(
 struct SourcePath
 {
     InputAccessor & accessor;
-    Path path;
+    CanonPath path;
 
     std::string_view baseName() const;
 
@@ -111,7 +112,11 @@ struct SourcePath
     std::string to_string() const
     { return accessor.showPath(path); }
 
-    SourcePath append(std::string_view s) const;
+    SourcePath operator + (const CanonPath & x) const
+    { return {accessor, path + x}; }
+
+    SourcePath operator + (std::string_view c) const
+    {  return {accessor, path + c}; }
 
     bool operator == (const SourcePath & x) const
     {

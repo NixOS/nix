@@ -3,9 +3,9 @@
 
 namespace nix {
 
-SourcePath EvalState::rootPath(Path path)
+SourcePath EvalState::rootPath(const Path & path)
 {
-    return {*rootFS, std::move(path)};
+    return {*rootFS, CanonPath(path)};
 }
 
 InputAccessor & EvalState::registerAccessor(ref<InputAccessor> accessor)

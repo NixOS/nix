@@ -179,7 +179,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
         , state.rootPath("/")), *vGenerateManpage);
 
     state.corepkgsFS->addFile(
-        "/utils.nix",
+        CanonPath("utils.nix"),
         #include "utils.nix.gen.hh"
         );
 

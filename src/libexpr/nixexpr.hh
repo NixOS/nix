@@ -188,7 +188,7 @@ struct ExprPath : Expr
     ExprPath(SourcePath && _path)
         : path(_path)
     {
-        v.mkPath(&path.accessor, path.path.c_str());
+        v.mkPath(&path.accessor, path.path.abs().data());
     }
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);

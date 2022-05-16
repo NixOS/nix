@@ -17,11 +17,11 @@ const std::string narVersionMagic1 = "nix-archive-1";
 static std::string caseHackSuffix = "~nix~case~hack~";
 
 void InputAccessor::dumpPath(
-    const Path & path,
+    const CanonPath & path,
     Sink & sink,
     PathFilter & filter)
 {
-    auto dumpContents = [&](PathView path)
+    auto dumpContents = [&](const CanonPath & path)
     {
         // FIXME: pipe
         auto s = readFile(path);
@@ -30,9 +30,9 @@ void InputAccessor::dumpPath(
         writePadding(s.size(), sink);
     };
 
-    std::function<void(const std::string & path)> dump;
+    std::function<void(const CanonPath & path)> dump;
 
-    dump = [&](const std::string & path) {
+    dump = [&](const CanonPath & path) {
         checkInterrupt();
 
         auto st = lstat(path);
@@ -57,20 +57,20 @@ void InputAccessor::dumpPath(
                     std::string name(i.first);
                     size_t pos = i.first.find(caseHackSuffix);
                     if (pos != std::string::npos) {
-                        debug(format("removing case hack suffix from '%s'") % (path + "/" + i.first));
+                        debug("removing case hack suffix from '%s'", path + i.first);
                         name.erase(pos);
                     }
                     if (!unhacked.emplace(name, i.first).second)
                         throw Error("file name collision in between '%s' and '%s'",
-                            (path + "/" + unhacked[name]),
-                            (path + "/" + i.first));
+                            (path + unhacked[name]),
+                            (path + i.first));
                 } else
                     unhacked.emplace(i.first, i.first);
 
             for (auto & i : unhacked)
-                if (filter(path + "/" + i.first)) {
+                if (filter((path + i.first).abs())) {
                     sink << "entry" << "(" << "name" << i.first << "node";
-                    dump(path + "/" + i.second);
+                    dump(path + i.second);
                     sink << ")";
                 }
         }
@@ -87,46 +87,39 @@ void InputAccessor::dumpPath(
     dump(path);
 }
 
-std::string InputAccessor::showPath(PathView path)
+std::string InputAccessor::showPath(const CanonPath & path)
 {
-    return "/virtual/" + std::to_string(number) + path;
+    return "/virtual/" + std::to_string(number) + path.abs();
 }
 
 struct FSInputAccessorImpl : FSInputAccessor
 {
-    Path root;
-    std::optional<PathSet> allowedPaths;
+    CanonPath root;
+    std::optional<std::set<CanonPath>> allowedPaths;
 
-    FSInputAccessorImpl(const Path & root, std::optional<PathSet> && allowedPaths)
+    FSInputAccessorImpl(const CanonPath & root, std::optional<std::set<CanonPath>> && allowedPaths)
         : root(root)
         , allowedPaths(allowedPaths)
-    {
-        if (allowedPaths) {
-            for (auto & p : *allowedPaths) {
-                assert(hasPrefix(p, "/"));
-                assert(!hasSuffix(p, "/"));
-            }
-        }
-    }
+    { }
 
-    std::string readFile(PathView path) override
+    std::string readFile(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        return nix::readFile(absPath);
+        return nix::readFile(absPath.abs());
     }
 
-    bool pathExists(PathView path) override
+    bool pathExists(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
-        return isAllowed(absPath) && nix::pathExists(absPath);
+        return isAllowed(absPath) && nix::pathExists(absPath.abs());
     }
 
-    Stat lstat(PathView path) override
+    Stat lstat(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        auto st = nix::lstat(absPath);
+        auto st = nix::lstat(absPath.abs());
         return Stat {
             .type =
                 S_ISREG(st.st_mode) ? tRegular :
@@ -137,44 +130,44 @@ struct FSInputAccessorImpl : FSInputAccessor
         };
     }
 
-    DirEntries readDirectory(PathView path) override
+    DirEntries readDirectory(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
         DirEntries res;
-        for (auto & entry : nix::readDirectory(absPath)) {
+        for (auto & entry : nix::readDirectory(absPath.abs())) {
             std::optional<Type> type;
             switch (entry.type) {
             case DT_REG: type = Type::tRegular; break;
             case DT_LNK: type = Type::tSymlink; break;
             case DT_DIR: type = Type::tDirectory; break;
             }
-            if (isAllowed(absPath + "/" + entry.name))
+            if (isAllowed(absPath + entry.name))
                 res.emplace(entry.name, type);
         }
         return res;
     }
 
-    std::string readLink(PathView path) override
+    std::string readLink(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        return nix::readLink(absPath);
+        return nix::readLink(absPath.abs());
     }
 
-    Path makeAbsPath(PathView path)
+    CanonPath makeAbsPath(const CanonPath & path)
     {
         // FIXME: resolve symlinks in 'path' and check that any
         // intermediate path is allowed.
-        assert(hasPrefix(path, "/"));
+        auto p = root + path;
         try {
-            return canonPath(root + std::string(path), true);
+            return p.resolveSymlinks();
         } catch (Error &) {
-            return canonPath(root + std::string(path));
+            return p;
         }
     }
 
-    void checkAllowed(PathView absPath) override
+    void checkAllowed(const CanonPath & absPath) override
     {
         if (!isAllowed(absPath))
             // FIXME: for Git trees, show a custom error message like
@@ -182,9 +175,9 @@ struct FSInputAccessorImpl : FSInputAccessor
             throw Error("access to path '%s' is forbidden", absPath);
     }
 
-    bool isAllowed(PathView absPath)
+    bool isAllowed(const CanonPath & absPath)
     {
-        if (!isDirOrInDir(absPath, root))
+        if (!absPath.isWithin(root))
             return false;
 
         if (allowedPaths) {
@@ -205,7 +198,7 @@ struct FSInputAccessorImpl : FSInputAccessor
         return true;
     }
 
-    void allowPath(Path path) override
+    void allowPath(CanonPath path) override
     {
         if (allowedPaths)
             allowedPaths->insert(std::move(path));
@@ -216,15 +209,15 @@ struct FSInputAccessorImpl : FSInputAccessor
         return (bool) allowedPaths;
     }
 
-    std::string showPath(PathView path) override
+    std::string showPath(const CanonPath & path) override
     {
-        return root + path;
+        return (root + path).abs();
     }
 };
 
 ref<FSInputAccessor> makeFSInputAccessor(
-    const Path & root,
-    std::optional<PathSet> && allowedPaths)
+    const CanonPath & root,
+    std::optional<std::set<CanonPath>> && allowedPaths)
 {
     return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths));
 }
@@ -235,48 +228,42 @@ std::ostream & operator << (std::ostream & str, const SourcePath & path)
     return str;
 }
 
-SourcePath SourcePath::append(std::string_view s) const
-{
-    // FIXME: canonicalize?
-    return {accessor, path + s};
-}
-
 struct MemoryInputAccessorImpl : MemoryInputAccessor
 {
-    std::map<Path, std::string> files;
+    std::map<CanonPath, std::string> files;
 
-    std::string readFile(PathView path) override
+    std::string readFile(const CanonPath & path) override
     {
-        auto i = files.find((Path) path);
+        auto i = files.find(path);
         if (i == files.end())
             throw Error("file '%s' does not exist", path);
         return i->second;
     }
 
-    bool pathExists(PathView path) override
+    bool pathExists(const CanonPath & path) override
     {
-        auto i = files.find((Path) path);
+        auto i = files.find(path);
         return i != files.end();
     }
 
-    Stat lstat(PathView path) override
+    Stat lstat(const CanonPath & path) override
     {
         throw UnimplementedError("MemoryInputAccessor::lstat");
     }
 
-    DirEntries readDirectory(PathView path) override
+    DirEntries readDirectory(const CanonPath & path) override
     {
         return {};
     }
 
-    std::string readLink(PathView path) override
+    std::string readLink(const CanonPath & path) override
     {
         throw UnimplementedError("MemoryInputAccessor::readLink");
     }
 
-    void addFile(PathView path, std::string && contents) override
+    void addFile(CanonPath path, std::string && contents) override
     {
-        files.emplace(path, std::move(contents));
+        files.emplace(std::move(path), std::move(contents));
     }
 };
 
@@ -287,14 +274,14 @@ ref<MemoryInputAccessor> makeMemoryInputAccessor()
 
 std::string_view SourcePath::baseName() const
 {
-    // FIXME
-    return path == "" || path == "/" ? "source" : baseNameOf(path);
+    return path.baseName().value_or("source");
 }
 
 SourcePath SourcePath::parent() const
 {
-    // FIXME:
-    return {accessor, dirOf(path)};
+    auto p = path.parent();
+    assert(p);
+    return {accessor, std::move(*p)};
 }
 
 }

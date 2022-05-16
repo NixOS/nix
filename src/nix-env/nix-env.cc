@@ -1477,7 +1477,7 @@ static int main_nix_env(int argc, char * * argv)
         if (file != "")
             // FIXME: check that the accessor returned by
             // lookupFileArg() is the root FS.
-            globals.instSource.nixExprPath = lookupFileArg(*globals.state, file).path;
+            globals.instSource.nixExprPath = lookupFileArg(*globals.state, file).path.abs();
 
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 

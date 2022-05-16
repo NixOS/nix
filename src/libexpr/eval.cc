@@ -461,9 +461,9 @@ EvalState::EvalState(
     , sPrefix(symbols.create("prefix"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , rootFS(makeFSInputAccessor("",
+    , rootFS(makeFSInputAccessor(CanonPath::root,
             evalSettings.restrictEval || evalSettings.pureEval
-            ? std::optional<PathSet>(PathSet())
+            ? std::optional<std::set<CanonPath>>(std::set<CanonPath>())
             : std::nullopt))
     , corepkgsFS(makeMemoryInputAccessor())
     , store(store)
@@ -515,7 +515,7 @@ EvalState::EvalState(
     createBaseEnv();
 
     corepkgsFS->addFile(
-        "/fetchurl.nix",
+        CanonPath("fetchurl.nix"),
         #include "fetchurl.nix.gen.hh"
     );
 }
@@ -528,15 +528,15 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    rootFS->allowPath(path);
+    rootFS->allowPath(CanonPath(path)); // FIXME
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    rootFS->allowPath(store->toRealPath(storePath));
+    rootFS->allowPath(CanonPath(store->toRealPath(storePath))); // FIXME
 }
 
-void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value & v)
+void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
 {
     allowPath(storePath);
 
@@ -612,12 +612,12 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        rootFS->checkAllowed(uri);
+        rootFS->checkAllowed(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        rootFS->checkAllowed(uri.substr(7));
+        rootFS->checkAllowed(CanonPath(uri.substr(7)));
         return;
     }
 
@@ -758,7 +758,7 @@ void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions
     });
 }
 
-void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, std::string_view s2) const
 {
     throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
@@ -890,7 +890,7 @@ void Value::mkStringMove(const char * s, const PathSet & context)
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(&path.accessor, makeImmutableString(path.path));
+    mkPath(&path.accessor, makeImmutableString(path.path.abs()));
 }
 
 
@@ -1827,7 +1827,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
-        v.mkPath({.accessor = *accessor, .path = canonPath(str())});
+        v.mkPath({.accessor = *accessor, .path = CanonPath(str())});
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2027,7 +2027,7 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
         auto path = v.path();
         return copyToStore
             ? store->printStorePath(copyPathToStore(context, path))
-            : path.path;
+            : BackedStringView((Path) path.path.abs());
     }
 
     if (v.type() == nAttrs) {
@@ -2071,7 +2071,7 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
 
 StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
 {
-    if (nix::isDerivation(path.path))
+    if (nix::isDerivation(path.path.abs()))
         throw EvalError("file names are not allowed to end in '%s'", drvExtension);
 
     auto i = srcToStore.find(path);
@@ -2103,7 +2103,10 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & contex
 
     if (v.type() == nString) {
         copyContext(v, context);
-        return {*rootFS, v.string.s};
+        auto path = v.str();
+        if (path == "" || path[0] != '/')
+            throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
+        return {*rootFS, CanonPath(path)};
     }
 
     if (v.type() == nPath)

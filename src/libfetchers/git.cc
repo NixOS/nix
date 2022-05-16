@@ -395,17 +395,17 @@ struct GitInputScheme : InputScheme
         return repoInfo;
     }
 
-    std::set<std::string> listFiles(const RepoInfo & repoInfo)
+    std::set<CanonPath> listFiles(const RepoInfo & repoInfo)
     {
         auto gitOpts = Strings({ "-C", repoInfo.url, "ls-files", "-z" });
         if (repoInfo.submodules)
             gitOpts.emplace_back("--recurse-submodules");
 
-        std::set<std::string> res;
+        std::set<CanonPath> res;
 
         for (auto & p : tokenizeString<std::set<std::string>>(
                 runProgram("git", true, gitOpts), "\0"s))
-            res.insert(canonPath("/" + p));
+            res.insert(CanonPath(p));
 
         return res;
     }
@@ -683,6 +683,8 @@ struct GitInputScheme : InputScheme
         auto files = listFiles(repoInfo);
 
         PathFilter filter = [&](const Path & p) -> bool {
+            abort();
+#if 0
             assert(hasPrefix(p, repoInfo.url));
             std::string file(p, repoInfo.url.size() + 1);
 
@@ -695,6 +697,7 @@ struct GitInputScheme : InputScheme
             }
 
             return files.count(file);
+#endif
         };
 
         auto storePath = store->addToStore(input.getName(), repoInfo.url, FileIngestionMethod::Recursive, htSHA256, filter);
@@ -724,7 +727,7 @@ struct GitInputScheme : InputScheme
 
         // FIXME: return updated input.
 
-        return {makeFSInputAccessor(repoInfo.url, listFiles(repoInfo)), input};
+        return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo)), input};
     }
 };
 

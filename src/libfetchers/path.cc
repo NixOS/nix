@@ -81,25 +81,25 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    Path getAbsPath(ref<Store> store, const Input & input)
+    CanonPath getAbsPath(ref<Store> store, const Input & input)
     {
         auto path = getStrAttr(input.attrs, "path");
 
         if (path[0] == '/')
-            return path;
+            return CanonPath(path);
 
         if (!input.parent)
             throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
 
-        auto parent = canonPath(*input.parent);
+        CanonPath parent(*input.parent);
 
         // the path isn't relative, prefix it
-        auto absPath = nix::absPath(path, parent);
+        auto absPath = CanonPath(path, parent);
 
         // for security, ensure that if the parent is a store path, it's inside it
-        if (store->isInStore(parent)) {
-            auto storePath = store->printStorePath(store->toStorePath(parent).first);
-            if (!isDirOrInDir(absPath, storePath))
+        if (store->isInStore(parent.abs())) {
+            auto storePath = store->printStorePath(store->toStorePath(parent.abs()).first);
+            if (!absPath.isWithin(CanonPath(storePath)))
                 throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
         }
 
@@ -115,7 +115,7 @@ struct PathInputScheme : InputScheme
         Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
 
         // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath);
+        auto storePath = store->maybeParseStorePath(absPath.abs());
 
         if (storePath)
             store->addTempRoot(*storePath);
@@ -124,7 +124,7 @@ struct PathInputScheme : InputScheme
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
             auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
+                mtime = dumpPathAndGetMtime(absPath.abs(), sink, defaultPathFilter);
             });
             storePath = store->addToStoreFromDump(*src, "source");
         }
@@ -137,7 +137,7 @@ struct PathInputScheme : InputScheme
     {
         auto absPath = getAbsPath(store, input);
         auto input2(input);
-        input2.attrs.emplace("path", absPath);
+        input2.attrs.emplace("path", (std::string) absPath.abs());
         return {makeFSInputAccessor(absPath), std::move(input2)};
     }
 };

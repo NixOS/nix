@@ -508,10 +508,12 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    SourcePath path { data->basePath.accessor, absPath({$1.p, $1.l}, data->basePath.path) };
+    SourcePath path { data->basePath.accessor, CanonPath({$1.p, $1.l}, data->basePath.path) };
+    #if 0
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path.path += "/";
+    #endif
     $$ = new ExprPath(std::move(path));
   }
   | HPATH {
@@ -699,7 +701,7 @@ SourcePath resolveExprPath(const SourcePath & path)
     #endif
 
     // FIXME
-    auto path2 = path.append("/default.nix");
+    auto path2 = path + "default.nix";
     return path2.pathExists() ? path2 : path;
 }
 
@@ -716,7 +718,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticE
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     // FIXME: pass SourcePaths
-    return parse(buffer.data(), buffer.size(), foFile, path.path, path.parent(), staticEnv);
+    return parse(buffer.data(), buffer.size(), foFile, path.path.abs(), path.parent(), staticEnv);
 }
 
 
@@ -779,13 +781,13 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
             suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
         }
         if (auto path = resolveSearchPathElem(i)) {
-            auto res = path->append("/" + suffix);
+            auto res = *path + CanonPath(suffix);
             if (res.pathExists()) return res;
         }
     }
 
     if (hasPrefix(path, "nix/"))
-        return {*corepkgsFS, (std::string) path.substr(3)};
+        return {*corepkgsFS, CanonPath(path.substr(3))};
 
     throw ThrownError({
         .msg = hintfmt(evalSettings.pureEval
@@ -808,8 +810,8 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
         try {
             auto storePath = fetchers::downloadTarball(
                 store, resolveUri(elem.second), "source", false).first.storePath;
-            auto & accessor = registerAccessor(makeFSInputAccessor(store->toRealPath(storePath)));
-            res.emplace(SourcePath {accessor, "/"});
+            auto & accessor = registerAccessor(makeFSInputAccessor(CanonPath(store->toRealPath(storePath))));
+            res.emplace(SourcePath {accessor, CanonPath::root});
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)

@@ -425,7 +425,7 @@ Value & AttrCursor::forceValue()
         else if (v.type() == nPath) {
             // FIXME: take accessor into account?
             auto path = v.path().path;
-            cachedValue = {root->db->setString(getKey(), path), string_t{path, {}}};
+            cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
         }
         else if (v.type() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};

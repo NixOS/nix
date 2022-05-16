@@ -721,4 +721,11 @@ inline std::string operator + (std::string && s, std::string_view s2)
     return s;
 }
 
+inline std::string operator + (std::string_view s1, const char * s2)
+{
+    std::string s(s1);
+    s.append(s2);
+    return s;
+}
+
 }

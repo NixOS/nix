@@ -195,7 +195,7 @@ static void fetchTree(
 
     emitTreeAttrs(
         state,
-        {state.registerAccessor(accessor), "/"},
+        {state.registerAccessor(accessor), CanonPath::root},
         input2,
         v,
         params.emptyRevFallback,

@@ -22,13 +22,13 @@ struct ZipMember
 
 struct ZipInputAccessor : InputAccessor
 {
-    Path zipPath;
+    CanonPath zipPath;
     struct zip * zipFile = nullptr;
 
     typedef std::map<const char *, struct zip_stat, cmp_str> Members;
     Members members;
 
-    ZipInputAccessor(PathView _zipPath)
+    ZipInputAccessor(const CanonPath & _zipPath)
         : zipPath(_zipPath)
     {
         int error;
@@ -58,9 +58,9 @@ struct ZipInputAccessor : InputAccessor
         if (zipFile) zip_close(zipFile);
     }
 
-    std::string _readFile(PathView path)
+    std::string _readFile(const CanonPath & path)
     {
-        auto i = members.find(((std::string) path).c_str());
+        auto i = members.find(((std::string) path.abs()).c_str());
         if (i == members.end())
             throw Error("file '%s' does not exist", path);
 
@@ -76,37 +76,32 @@ struct ZipInputAccessor : InputAccessor
         return buf;
     }
 
-    std::string readFile(PathView _path) override
+    std::string readFile(const CanonPath & path) override
     {
-        auto path = canonPath(_path);
-
         if (lstat(path).type != tRegular)
             throw Error("file '%s' is not a regular file");
 
         return _readFile(path);
     }
 
-    bool pathExists(PathView _path) override
+    bool pathExists(const CanonPath & path) override
     {
-        auto path = canonPath(_path);
         return
-            members.find(((std::string) path).c_str()) != members.end()
-            || members.find(((std::string) path + "/").c_str()) != members.end();
+            members.find(path.c_str()) != members.end()
+            || members.find(((std::string) path.abs() + "/").c_str()) != members.end();
     }
 
-    Stat lstat(PathView _path) override
+    Stat lstat(const CanonPath & path) override
     {
-        auto path = canonPath(_path);
-
-        if (path == "/")
+        if (path.isRoot())
             return Stat { .type = tDirectory };
 
         Type type = tRegular;
         bool isExecutable = false;
 
-        auto i = members.find(((std::string) path).c_str());
+        auto i = members.find(path.c_str());
         if (i == members.end()) {
-            i = members.find(((std::string) path + "/").c_str());
+            i = members.find(((std::string) path.abs() + "/").c_str());
             type = tDirectory;
         }
         if (i == members.end())
@@ -138,12 +133,12 @@ struct ZipInputAccessor : InputAccessor
         return Stat { .type = type, .isExecutable = isExecutable };
     }
 
-    DirEntries readDirectory(PathView _path) override
+    DirEntries readDirectory(const CanonPath & _path) override
     {
-        auto path = canonPath(_path);
+        std::string path(_path.abs());
         if (path != "/") path += "/";
 
-        auto i = members.find(((std::string) path).c_str());
+        auto i = members.find(path.c_str());
         if (i == members.end())
             throw Error("directory '%s' does not exist", path);
 
@@ -162,18 +157,16 @@ struct ZipInputAccessor : InputAccessor
         return entries;
     }
 
-    std::string readLink(PathView _path) override
+    std::string readLink(const CanonPath & path) override
     {
-        auto path = canonPath(_path);
-
         if (lstat(path).type != tSymlink)
             throw Error("file '%s' is not a symlink");
 
-        return _readFile(canonPath(_path));
+        return _readFile(path);
     }
 };
 
-ref<InputAccessor> makeZipInputAccessor(PathView path)
+ref<InputAccessor> makeZipInputAccessor(const CanonPath & path)
 {
     return make_ref<ZipInputAccessor>(path);
 }

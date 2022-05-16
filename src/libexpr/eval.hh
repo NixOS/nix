@@ -160,7 +160,7 @@ public:
 
     SearchPath getSearchPath() { return searchPath; }
 
-    SourcePath rootPath(Path path);
+    SourcePath rootPath(const Path & path);
 
     InputAccessor & registerAccessor(ref<InputAccessor> accessor);
 
@@ -256,7 +256,7 @@ public:
     void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
         const std::string & s2) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const;
+    void throwEvalError(const PosIdx pos, const char * s, std::string_view s2) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
     [[gnu::noinline, gnu::noreturn]]

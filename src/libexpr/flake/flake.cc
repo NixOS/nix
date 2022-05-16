@@ -206,8 +206,8 @@ static Flake readFlake(
     InputAccessor & accessor,
     const InputPath & lockRootPath)
 {
-    auto flakeDir = canonPath("/" + resolvedRef.subdir);
-    SourcePath flakePath{accessor, canonPath(flakeDir + "/flake.nix")};
+    CanonPath flakeDir(resolvedRef.subdir);
+    SourcePath flakePath{accessor, flakeDir + CanonPath("flake.nix")};
 
     if (!flakePath.pathExists())
         throw Error("source tree referenced by '%s' does not contain a file named '%s'", resolvedRef, flakePath.path);
@@ -232,7 +232,7 @@ static Flake readFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakeDir, lockRootPath);
+        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakeDir.abs(), lockRootPath);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -337,7 +337,7 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
 
 static LockFile readLockFile(const Flake & flake)
 {
-    auto lockFilePath = flake.path.parent().append("/flake.lock");
+    auto lockFilePath = flake.path.parent() + "flake.lock";
     return lockFilePath.pathExists()
         ? LockFile(lockFilePath.readFile(), fmt("%s", lockFilePath))
         : LockFile();
@@ -721,7 +721,7 @@ void callFlake(EvalState & state,
 
     emitTreeAttrs(
         state,
-        {lockedFlake.flake.path.accessor, "/"},
+        {lockedFlake.flake.path.accessor, CanonPath::root},
         lockedFlake.flake.lockedRef.input,
         *vRootSrc,
         false,

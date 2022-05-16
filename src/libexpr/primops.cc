@@ -1335,12 +1335,13 @@ static RegisterPrimOp primop_placeholder({
  *************************************************************/
 
 
-/* Convert the argument to a path.  !!! obsolete? */
+/* Convert the argument to a path and then to a string (confusing,
+   eh?).  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     PathSet context;
     auto path = state.coerceToPath(pos, *args[0], context);
-    v.mkString(canonPath(path.path), context);
+    v.mkString(path.path.abs(), context);
 }
 
 static RegisterPrimOp primop_toPath({
@@ -1375,17 +1376,17 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
-    if (!state.store->isStorePath(path)) path = canonPath(path, true);
-    if (!state.store->isInStore(path))
+    if (!state.store->isStorePath(path.abs())) path = path.resolveSymlinks();
+    if (!state.store->isInStore(path.abs()))
         throw EvalError({
             .msg = hintfmt("path '%1%' is not in the Nix store", path),
             .errPos = state.positions[pos]
         });
-    auto path2 = state.store->toStorePath(path).first;
+    auto path2 = state.store->toStorePath(path.abs()).first;
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(state.store->printStorePath(path2));
-    v.mkString(path, context);
+    v.mkString(path.abs(), context);
 }
 
 static RegisterPrimOp primop_storePath({
@@ -1492,8 +1493,8 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
     // FIXME: only do queryPathInfo if path.accessor is the store accessor
     auto refs =
-        state.store->isInStore(path.path) ?
-        state.store->queryPathInfo(state.store->toStorePath(path.path).first)->references :
+        state.store->isInStore(path.path.abs()) ?
+        state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references :
         StorePathSet{};
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
@@ -1949,14 +1950,14 @@ static void addPath(
         #endif
 
         PathFilter filter = filterFun ? ([&](const Path & p) {
-            SourcePath path2{path.accessor, canonPath(p)};
+            SourcePath path2{path.accessor, CanonPath(p)};
 
             auto st = path2.lstat();
 
             /* Call the filter function.  The first argument is the path,
                the second is a string indicating the type of the file. */
             Value arg1;
-            arg1.mkString(path2.path);
+            arg1.mkString(path2.path.abs());
 
             Value arg2;
             // assert that type is not "unknown"
