@@ -52,7 +52,7 @@ struct placeholder_t {};
 struct missing_t {};
 struct misc_t {};
 struct failed_t {};
-struct int_t { NixInt x; int_t(NixInt x) : x(x) {}; };
+struct int_t { NixInt x; };
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
