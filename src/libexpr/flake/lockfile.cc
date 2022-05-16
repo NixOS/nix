@@ -239,6 +239,8 @@ InputPath parseInputPath(std::string_view s)
     for (auto & elem : tokenizeString<std::vector<std::string>>(s, "/")) {
         if (!std::regex_match(elem, flakeIdRegex))
             throw UsageError("invalid flake input path element '%s'", elem);
+        if (elem == "self")
+            continue;
         path.push_back(elem);
     }
 

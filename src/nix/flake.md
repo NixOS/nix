@@ -579,7 +579,7 @@ other:
 {
   inputs.b = ... location of flake B ...;
   # Tell the 'b' flake not to fetch 'a' again, to ensure its 'a' is
-  # *this* 'a'.
+  # *this* 'a'. Also spelled "self".
   inputs.b.inputs.a.follows = "";
   outputs = { self, b }: {
     foo = 123 + b.bar;
