@@ -47,7 +47,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v3";
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v4";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
@@ -175,6 +175,24 @@ struct AttrDb
         });
     }
 
+    AttrId setInt(
+        AttrKey key,
+        int n)
+    {
+        return doSQLite([&]()
+        {
+            auto state(_state->lock());
+
+            state->insertAttribute.use()
+                (key.first)
+                (symbols[key.second])
+                (AttrType::Int)
+                (n).exec();
+
+            return state->db.getLastInsertedRowId();
+        });
+    }
+
     AttrId setListOfStrings(
         AttrKey key,
         const std::vector<std::string> & l)
@@ -287,6 +305,8 @@ struct AttrDb
             }
             case AttrType::Bool:
                 return {{rowId, queryAttribute.getInt(2) != 0}};
+            case AttrType::Int:
+                return {{rowId, queryAttribute.getInt(2)}};
             case AttrType::ListOfStrings:
                 return {{rowId, tokenizeString<std::vector<std::string>>(queryAttribute.getStr(2), "\t")}};
             case AttrType::Missing:
@@ -426,6 +446,8 @@ Value & AttrCursor::forceValue()
             cachedValue = {root->db->setString(getKey(), v.path), string_t{v.path, {}}};
         else if (v.type() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
+        else if (v.type() == nInt)
+            cachedValue = {root->db->setInt(getKey(), v.integer), v.integer};
         else if (v.type() == nAttrs)
             ; // FIXME: do something?
         else

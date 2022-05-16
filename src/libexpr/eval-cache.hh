@@ -45,6 +45,7 @@ enum AttrType {
     Failed = 5,
     Bool = 6,
     ListOfStrings = 7,
+    Int = 8,
 };
 
 struct placeholder_t {};
