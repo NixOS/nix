@@ -306,7 +306,7 @@ struct AttrDb
             case AttrType::Bool:
                 return {{rowId, queryAttribute.getInt(2) != 0}};
             case AttrType::Int:
-                return {{rowId, queryAttribute.getInt(2)}};
+                return {{rowId, (int_t) queryAttribute.getInt(2)}};
             case AttrType::ListOfStrings:
                 return {{rowId, tokenizeString<std::vector<std::string>>(queryAttribute.getStr(2), "\t")}};
             case AttrType::Missing:
@@ -649,9 +649,9 @@ NixInt AttrCursor::getInt()
         if (!cachedValue)
             cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
-            if (auto i = std::get_if<NixInt>(&cachedValue->second)) {
+            if (auto i = std::get_if<int_t>(&cachedValue->second)) {
                 debug("using cached Integer attribute '%s'", getAttrPathStr());
-                return *i;
+                return (*i).x;
             } else
                 throw TypeError("'%s' is not an Integer", getAttrPathStr());
         }

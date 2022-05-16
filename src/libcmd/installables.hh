@@ -177,7 +177,7 @@ struct InstallableFlake : InstallableValue
 
     Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
 
-    std::tuple<std::string, FlakeRef, DerivationInfo, std::optional<NixInt>> toDerivation();
+    std::tuple<std::string, FlakeRef, DerivationInfo> toDerivation();
 
     std::vector<DerivationInfo> toDerivations() override;
 

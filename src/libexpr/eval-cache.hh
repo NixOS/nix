@@ -52,6 +52,7 @@ struct placeholder_t {};
 struct missing_t {};
 struct misc_t {};
 struct failed_t {};
+struct int_t { NixInt x; int_t(NixInt x) : x(x) {}; };
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
@@ -64,7 +65,7 @@ typedef std::variant<
     misc_t,
     failed_t,
     bool,
-    NixInt,
+    int_t,
     std::vector<std::string>
     > AttrValue;
 

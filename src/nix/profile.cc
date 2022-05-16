@@ -300,7 +300,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 // FIXME: make build() return this?
-                auto [attrPath, resolvedRef, drv, priority] = installable2->toDerivation();
+                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
                 element.source = ProfileElementSource {
                     installable2->flakeRef,
                     resolvedRef,
@@ -475,7 +475,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv, priority] = installable->toDerivation();
+                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
 
                 if (element.source->resolvedRef == resolvedRef) continue;
 

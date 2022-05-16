@@ -609,7 +609,7 @@ InstallableFlake::InstallableFlake(
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
 
-std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo, std::optional<NixInt>> InstallableFlake::toDerivation()
+std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
     auto attr = getCursor(*state);
 
@@ -650,7 +650,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo, std::optiona
         .priority = priority,
     };
 
-    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo), priority};
+    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
 }
 
 std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
