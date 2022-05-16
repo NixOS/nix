@@ -370,7 +370,7 @@ LockedFlake lockFlake(
             const InputPath &lockRootPath,
             const Path &parentPath,
             bool trustLock,
-            std::map<Path, std::shared_ptr<LockedNode>> registered)>
+            std::map<Path, InputPath> registered)>
             computeLocks;
 
         computeLocks = [&](
@@ -381,9 +381,11 @@ LockedFlake lockFlake(
             const InputPath & lockRootPath,
             const Path & parentPath,
             bool trustLock,
-            std::map<Path, std::shared_ptr<LockedNode>> registered)
+            std::map<Path, InputPath> registered)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
+
+            std::set<Path> registeredChilds;
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
@@ -393,6 +395,16 @@ LockedFlake lockFlake(
                     inputPath.push_back(id);
                     inputPath.push_back(idOverride);
                     overrides.insert_or_assign(inputPath, inputOverride);
+                }
+                if (input.registered) {
+                    // This is a stub node that is overriden in the input
+                    // auto childNode = std::make_shared<LockedNode>(
+                    //     *input.ref, *input.ref, input.isFlake);
+                    auto inputPath(inputPathPrefix);
+                    inputPath.push_back(id);
+                    debug("preregistering %s", id.c_str());
+                    registeredChilds.insert(id);
+                    registered.insert_or_assign(id, inputPath);
                 }
             }
 
@@ -431,12 +443,15 @@ LockedFlake lockFlake(
                         continue;
                     }
 
-                    auto registeredInput = registered.find(id);
-                    if (registeredInput != registered.end()) {
+                    auto registeredInputID = registered.find(id);
+                    if (registeredInputID != registered.end()
+                    && (registeredChilds.find(id) == registeredChilds.end())
+                    && (input.ref->to_string() == "flake:" + id))
+                    {
                         debug("Using already registered node for %s", id);
-                        // InputPath target;
-                        // target.insert(target.end(), input.registered->begin(), input.registered->end());
-                        node->inputs.insert_or_assign(id, registeredInput->second);
+                        InputPath target;
+                        target.insert(target.end(), registeredInputID->second.begin(), registeredInputID->second.end());
+                        node->inputs.insert_or_assign(id, target);
                         continue;
                     }
 
@@ -559,8 +574,6 @@ LockedFlake lockFlake(
 
                             if (input.registered)
                             {
-                                debug("Registering: %s: %s", id.c_str(), input.ref->to_string());
-                                registered.insert_or_assign(id, childNode);
                             }
 
 
@@ -603,7 +616,7 @@ LockedFlake lockFlake(
 
         // Bring in the current ref for relative path resolution if we have it
         auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
-        std::map<Path, std::shared_ptr<LockedNode>> registered;
+        std::map<Path, InputPath> registered;
 
         computeLocks(
             flake.inputs, newLockFile.root, {},
