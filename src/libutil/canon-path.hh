@@ -91,8 +91,8 @@ public:
         }
     };
 
-    Iterator begin() { return Iterator(rel()); }
-    Iterator end() { return Iterator(rel().substr(path.size() - 1)); }
+    Iterator begin() const { return Iterator(rel()); }
+    Iterator end() const { return Iterator(rel().substr(path.size() - 1)); }
 
     std::optional<CanonPath> parent() const;
 
@@ -135,8 +135,6 @@ public:
         }
         return i == path.end() && j != x.path.end();
     }
-
-    CanonPath resolveSymlinks() const;
 
     /* Return true if `this` is equal to `parent` or a child of
        `parent`. */

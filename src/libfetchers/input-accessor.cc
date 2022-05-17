@@ -87,6 +87,14 @@ void InputAccessor::dumpPath(
     dump(path);
 }
 
+std::optional<InputAccessor::Stat> InputAccessor::maybeLstat(const CanonPath & path)
+{
+    // FIXME: merge these into one operation.
+    if (!pathExists(path))
+        return {};
+    return lstat(path);
+}
+
 std::string InputAccessor::showPath(const CanonPath & path)
 {
     return "/virtual/" + std::to_string(number) + path.abs();
@@ -157,14 +165,7 @@ struct FSInputAccessorImpl : FSInputAccessor
 
     CanonPath makeAbsPath(const CanonPath & path)
     {
-        // FIXME: resolve symlinks in 'path' and check that any
-        // intermediate path is allowed.
-        auto p = root + path;
-        try {
-            return p.resolveSymlinks();
-        } catch (Error &) {
-            return p;
-        }
+        return root + path;
     }
 
     void checkAllowed(const CanonPath & absPath) override
@@ -239,7 +240,10 @@ struct MemoryInputAccessorImpl : MemoryInputAccessor
 
     Stat lstat(const CanonPath & path) override
     {
-        throw UnimplementedError("MemoryInputAccessor::lstat");
+        auto i = files.find(path);
+        if (i != files.end())
+            return Stat { .type = tRegular, .isExecutable = false };
+        throw Error("file '%s' does not exist", path);
     }
 
     DirEntries readDirectory(const CanonPath & path) override
@@ -273,6 +277,30 @@ SourcePath SourcePath::parent() const
     auto p = path.parent();
     assert(p);
     return {accessor, std::move(*p)};
+}
+
+SourcePath SourcePath::resolveSymlinks() const
+{
+    CanonPath res("/");
+
+    for (auto & component : path) {
+        res.push(component);
+        while (true) {
+            if (auto st = accessor.maybeLstat(res)) {
+                if (st->type != InputAccessor::tSymlink) break;
+                auto target = accessor.readLink(res);
+                if (hasPrefix(target, "/"))
+                    res = CanonPath(target);
+                else {
+                    res.pop();
+                    res.extend(CanonPath(target));
+                }
+            } else
+                break;
+        }
+    }
+
+    return {accessor, res};
 }
 
 }

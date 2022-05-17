@@ -31,6 +31,8 @@ struct InputAccessor
 
     virtual Stat lstat(const CanonPath & path) = 0;
 
+    std::optional<Stat> maybeLstat(const CanonPath & path);
+
     typedef std::optional<Type> DirEntry;
 
     typedef std::map<std::string, DirEntry> DirEntries;
@@ -101,6 +103,9 @@ struct SourcePath
     InputAccessor::Stat lstat() const
     {  return accessor.lstat(path); }
 
+    std::optional<InputAccessor::Stat> maybeLstat() const
+    {  return accessor.maybeLstat(path); }
+
     InputAccessor::DirEntries readDirectory() const
     {  return accessor.readDirectory(path); }
 
@@ -132,6 +137,8 @@ struct SourcePath
     {
         return std::tie(accessor, path) < std::tie(x.accessor, x.path);
     }
+
+    SourcePath resolveSymlinks() const;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);

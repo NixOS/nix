@@ -680,7 +680,7 @@ SourcePath resolveExprPath(const SourcePath & path)
 {
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    SourcePath path2 { path.accessor, path.path.resolveSymlinks() };
+    auto path2 = path.resolveSymlinks();
 
     /* If `path' refers to a directory, append `/default.nix'. */
     if (path2.lstat().type == InputAccessor::tDirectory)

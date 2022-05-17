@@ -26,11 +26,6 @@ void CanonPath::pop()
     path.resize(std::max((size_t) 1, slash));
 }
 
-CanonPath CanonPath::resolveSymlinks() const
-{
-    return CanonPath(unchecked_t(), canonPath(abs(), true));
-}
-
 bool CanonPath::isWithin(const CanonPath & parent) const
 {
     return !(

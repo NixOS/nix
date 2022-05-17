@@ -1376,7 +1376,8 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
-    if (!state.store->isStorePath(path.abs())) path = path.resolveSymlinks();
+    if (!state.store->isStorePath(path.abs()))
+        path = CanonPath(canonPath(path.abs(), true));
     if (!state.store->isInStore(path.abs()))
         throw EvalError({
             .msg = hintfmt("path '%1%' is not in the Nix store", path),
