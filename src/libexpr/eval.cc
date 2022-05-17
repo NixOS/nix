@@ -528,54 +528,6 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     v.mkString(path, PathSet({path}));
 }
 
-#if 0
-Path EvalState::checkSourcePath(const Path & path_)
-{
-    if (!allowedPaths) return path_;
-
-    auto i = resolvedPaths.find(path_);
-    if (i != resolvedPaths.end())
-        return i->second;
-
-    bool found = false;
-
-    /* First canonicalize the path without symlinks, so we make sure an
-     * attacker can't append ../../... to a path that would be in allowedPaths
-     * and thus leak symlink targets.
-     */
-    Path abspath = canonPath(path_);
-
-    if (hasPrefix(abspath, corepkgsPrefix)) return abspath;
-
-    for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(abspath, i)) {
-            found = true;
-            break;
-        }
-    }
-
-    if (!found) {
-        auto modeInformation = evalSettings.pureEval
-            ? "in pure eval mode (use '--impure' to override)"
-            : "in restricted mode";
-        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", abspath, modeInformation);
-    }
-
-    /* Resolve symlinks. */
-    debug(format("checking access to '%s'") % abspath);
-    Path path = canonPath(abspath, true);
-
-    for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(path, i)) {
-            resolvedPaths[path_] = path;
-            return path;
-        }
-    }
-
-    throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
-}
-#endif
-
 
 void EvalState::checkURI(const std::string & uri)
 {
@@ -1012,9 +964,6 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 
     if (!e)
         e = parseExprFromFile(resolvedPath);
-        #if 0
-        e = parseExprFromFile(checkSourcePath(resolvedPath));
-        #endif
 
     fileParseCache[resolvedPath] = e;
 
