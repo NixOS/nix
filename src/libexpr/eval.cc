@@ -491,26 +491,10 @@ EvalState::EvalState(
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
 
-    if (rootFS->hasAccessControl()) {
-        for (auto & i : searchPath) {
-            if (auto path = resolveSearchPathElem(i)) {
-                // FIXME
-                #if 0
-                if (store->isInStore(*path)) {
-                    try {
-                        StorePathSet closure;
-                        store->computeFSClosure(store->toStorePath(*path).first, closure);
-                        for (auto & p : closure)
-                            allowPath(p);
-                    } catch (InvalidPath &) {
-                        allowPath(*r);
-                    }
-                } else
-                    allowPath(*r);
-                #endif
-            }
-        }
-    }
+    /* Allow access to all paths in the search path. */
+    if (rootFS->hasAccessControl())
+        for (auto & i : searchPath)
+            resolveSearchPathElem(i, true);
 
     createBaseEnv();
 

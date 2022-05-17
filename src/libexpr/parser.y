@@ -783,7 +783,7 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 }
 
 
-std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
+ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem, bool initAccessControl)
 {
     auto i = searchPathResolved.find(elem.second);
     if (i != searchPathResolved.end()) return i->second;
@@ -803,6 +803,20 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
         }
     } else {
         auto path = rootPath(absPath(elem.second));
+
+        /* Allow access to paths in the search path. */
+        if (initAccessControl) {
+            allowPath(path.path.abs());
+            if (store->isInStore(path.path.abs())) {
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(path.path.abs()).first, closure);
+                    for (auto & p : closure)
+                        allowPath(p);
+                } catch (InvalidPath &) { }
+            }
+        }
+
         if (path.pathExists())
             res.emplace(path);
         else {

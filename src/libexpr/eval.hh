@@ -207,7 +207,9 @@ public:
     SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
-    std::optional<SourcePath> resolveSearchPathElem(const SearchPathElem & elem);
+    std::optional<SourcePath> resolveSearchPathElem(
+        const SearchPathElem & elem,
+        bool initAccessControl = false);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
