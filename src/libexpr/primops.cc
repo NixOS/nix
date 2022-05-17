@@ -113,15 +113,11 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     }();
 
     try {
-        #if 0
         if (!context.empty()) {
             auto rewrites = state.realiseContext(context);
-            // FIXME: check that path.accessor == rootFS?
-            auto realPath = state.toRealPath(rewriteStrings(path.path, rewrites), context);
-            // FIXME: return store accessor
-            return state.rootPath(realPath);
+            auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
+            return {path.accessor, CanonPath(realPath)};
         } else
-        #endif
             return path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
