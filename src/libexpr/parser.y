@@ -678,31 +678,15 @@ Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
 
 SourcePath resolveExprPath(const SourcePath & path)
 {
-    #if 0
-    unsigned int followCount = 0, maxFollow = 1024;
-
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    struct stat st;
-    while (true) {
-        // Basic cycle/depth limit to avoid infinite loops.
-        if (++followCount >= maxFollow)
-            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
-        st = lstat(path);
-        if (!S_ISLNK(st.st_mode)) break;
-        path = absPath(readLink(path), dirOf(path));
-    }
+    SourcePath path2 { path.accessor, path.path.resolveSymlinks() };
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (S_ISDIR(st.st_mode))
-        path = canonPath(path + "/default.nix");
+    if (path2.lstat().type == InputAccessor::tDirectory)
+        return path2 + "default.nix";
 
-    return path;
-    #endif
-
-    // FIXME
-    auto path2 = path + "default.nix";
-    return path2.pathExists() ? path2 : path;
+    return path2;
 }
 
 
