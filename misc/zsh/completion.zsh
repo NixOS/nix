@@ -1,8 +1,10 @@
+#compdef nix
+
 function _nix() {
   local ifs_bk="$IFS"
   local input=("${(Q)words[@]}")
   IFS=$'\n'
-  local res=($(NIX_GET_COMPLETIONS=$((CURRENT - 1)) "$input[@]"))
+  local res=($(NIX_GET_COMPLETIONS=$((CURRENT - 1)) "$input[@]" 2>/dev/null))
   IFS="$ifs_bk"
   local tpe="${${res[1]}%%>	*}"
   local -a suggestions
@@ -18,4 +20,4 @@ function _nix() {
   _describe 'nix' suggestions
 }
 
-compdef _nix nix
+_nix "$@"

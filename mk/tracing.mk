@@ -8,8 +8,6 @@ ifeq ($(V), 0)
   trace-ld      = @echo "  LD    " $@;
   trace-ar      = @echo "  AR    " $@;
   trace-install = @echo "  INST  " $@;
-  trace-javac   = @echo "  JAVAC " $@;
-  trace-jar     = @echo "  JAR   " $@;
   trace-mkdir   = @echo "  MKDIR " $@;
   trace-test    = @echo "  TEST  " $@;
 

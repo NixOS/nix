@@ -20,7 +20,7 @@ const int sha512HashSize = 64;
 
 extern std::set<std::string> hashTypes;
 
-extern const string base32Chars;
+extern const std::string base32Chars;
 
 enum Base : int { Base64, Base32, Base16, SRI };
 
@@ -93,13 +93,11 @@ public:
 
     std::string gitRev() const
     {
-        assert(type == htSHA1);
         return to_string(Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        assert(type == htSHA1);
         return std::string(to_string(Base16, false), 0, 7);
     }
 
@@ -107,10 +105,10 @@ public:
 };
 
 /* Helper that defaults empty hashes to the 0 hash. */
-Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht);
+Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashType> ht);
 
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
-string printHash16or32(const Hash & hash);
+std::string printHash16or32(const Hash & hash);
 
 /* Compute the hash of the given string. */
 Hash hashString(HashType ht, std::string_view s);
@@ -135,7 +133,7 @@ HashType parseHashType(std::string_view s);
 std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
-string printHashType(HashType ht);
+std::string printHashType(HashType ht);
 
 
 union Ctx;
@@ -156,7 +154,7 @@ public:
     HashSink(HashType ht);
     HashSink(const HashSink & h);
     ~HashSink();
-    void write(const unsigned char * data, size_t len) override;
+    void write(std::string_view data) override;
     HashResult finish() override;
     HashResult currentHash();
 };

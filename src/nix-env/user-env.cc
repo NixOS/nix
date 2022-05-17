@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
@@ -31,81 +32,83 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 
 bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
-    const string & lockToken)
+    const std::string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
     std::vector<StorePathWithOutputs> drvsToBuild;
     for (auto & i : elems)
-        if (i.queryDrvPath() != "")
-            drvsToBuild.push_back({state.store->parseStorePath(i.queryDrvPath())});
+        if (auto drvPath = i.queryDrvPath())
+            drvsToBuild.push_back({*drvPath});
 
     debug(format("building user environment dependencies"));
-    state.store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(
+        toDerivedPaths(drvsToBuild),
+        state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
     Value manifest;
     state.mkList(manifest, elems.size());
-    unsigned int n = 0;
+    size_t n = 0;
     for (auto & i : elems) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
-        Path drvPath = keepDerivations ? i.queryDrvPath() : "";
+        std::optional<StorePath> drvPath = keepDerivations ? i.queryDrvPath() : std::nullopt;
+        DrvInfo::Outputs outputs = i.queryOutputs(true, true);
+        StringSet metaNames = i.queryMetaNames();
 
-        Value & v(*state.allocValue());
-        manifest.listElems()[n++] = &v;
-        state.mkAttrs(v, 16);
+        auto attrs = state.buildBindings(7 + outputs.size());
 
-        mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.queryName());
+        attrs.alloc(state.sType).mkString("derivation");
+        attrs.alloc(state.sName).mkString(i.queryName());
         auto system = i.querySystem();
         if (!system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), system);
-        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
-        if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
+            attrs.alloc(state.sSystem).mkString(system);
+        attrs.alloc(state.sOutPath).mkString(state.store->printStorePath(i.queryOutPath()));
+        if (drvPath)
+            attrs.alloc(state.sDrvPath).mkString(state.store->printStorePath(*drvPath));
 
         // Copy each output meant for installation.
-        DrvInfo::Outputs outputs = i.queryOutputs(true);
-        Value & vOutputs = *state.allocAttr(v, state.sOutputs);
+        auto & vOutputs = attrs.alloc(state.sOutputs);
         state.mkList(vOutputs, outputs.size());
-        unsigned int m = 0;
-        for (auto & j : outputs) {
-            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
-            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
-            state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
+        for (const auto & [m, j] : enumerate(outputs)) {
+            (vOutputs.listElems()[m] = state.allocValue())->mkString(j.first);
+            auto outputAttrs = state.buildBindings(2);
+            outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
+            attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            state.store->addTempRoot(state.store->parseStorePath(j.second));
-            state.store->ensurePath(state.store->parseStorePath(j.second));
+            state.store->addTempRoot(*j.second);
+            state.store->ensurePath(*j.second);
 
-            references.insert(state.store->parseStorePath(j.second));
+            references.insert(*j.second);
         }
 
         // Copy the meta attributes.
-        Value & vMeta = *state.allocAttr(v, state.sMeta);
-        state.mkAttrs(vMeta, 16);
-        StringSet metaNames = i.queryMetaNames();
+        auto meta = state.buildBindings(metaNames.size());
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            meta.insert(state.symbols.create(j), v);
         }
-        vMeta.attrs->sort();
-        v.attrs->sort();
 
-        if (drvPath != "") references.insert(state.store->parseStorePath(drvPath));
+        attrs.alloc(state.sMeta).mkAttrs(meta);
+
+        (manifest.listElems()[n++] = state.allocValue())->mkAttrs(attrs);
+
+        if (drvPath) references.insert(*drvPath);
     }
 
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
+    std::ostringstream str;
+    manifest.print(state.symbols, str, true);
     auto manifestFile = state.store->addTextToStore("env-manifest.nix",
-        fmt("%s", manifest), references);
+        str.str(), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
@@ -115,28 +118,33 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
-    Value args, topLevel;
-    state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
-        state.store->printStorePath(manifestFile), {state.store->printStorePath(manifestFile)});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
-    args.attrs->sort();
-    mkApp(topLevel, envBuilder, args);
+    auto attrs = state.buildBindings(3);
+    attrs.alloc("manifest").mkString(
+        state.store->printStorePath(manifestFile),
+        {state.store->printStorePath(manifestFile)});
+    attrs.insert(state.symbols.create("derivations"), &manifest);
+    Value args;
+    args.mkAttrs(attrs);
+
+    Value topLevel;
+    topLevel.mkApp(&envBuilder, &args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel);
+    state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
     PathSet context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
-    auto topLevelDrv = state.store->parseStorePath(state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context));
+    auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context);
     Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
-    Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
+    auto topLevelOut = state.coerceToStorePath(aOutPath.pos, *aOutPath.value, context);
 
     /* Realise the resulting store expression. */
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
-    state.store->buildPaths(topLevelDrvs, state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(
+        toDerivedPaths(topLevelDrvs),
+        state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
@@ -152,8 +160,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         debug(format("switching to new user environment"));
-        Path generation = createGeneration(ref<LocalFSStore>(store2), profile,
-            store2->parseStorePath(topLevelOut));
+        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
         switchLink(profile, generation);
     }
 

@@ -4,10 +4,17 @@
 
 namespace nix {
 
-struct MixCommonArgs : virtual Args
+//static constexpr auto commonArgsCategory = "Miscellaneous common options";
+static constexpr auto loggingCategory = "Logging-related options";
+
+class MixCommonArgs : public virtual Args
 {
-    string programName;
-    MixCommonArgs(const string & programName);
+    void initialFlagsProcessed() override;
+public:
+    std::string programName;
+    MixCommonArgs(const std::string & programName);
+protected:
+    virtual void pluginsInited() {}
 };
 
 struct MixDryRun : virtual Args
@@ -16,7 +23,12 @@ struct MixDryRun : virtual Args
 
     MixDryRun()
     {
-        mkFlag(0, "dry-run", "show what this command would do without doing it", &dryRun);
+        addFlag({
+            .longName = "dry-run",
+            .description = "Show what this command would do without doing it.",
+            //.category = commonArgsCategory,
+            .handler = {&dryRun, true},
+        });
     }
 };
 
@@ -26,7 +38,12 @@ struct MixJSON : virtual Args
 
     MixJSON()
     {
-        mkFlag(0, "json", "produce JSON output", &json);
+        addFlag({
+            .longName = "json",
+            .description = "Produce output in JSON format, suitable for consumption by another program.",
+            //.category = commonArgsCategory,
+            .handler = {&json, true},
+        });
     }
 };
 

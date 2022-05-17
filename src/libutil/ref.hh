@@ -17,7 +17,7 @@ private:
 
 public:
 
-    ref<T>(const ref<T> & r)
+    ref(const ref<T> & r)
         : p(r.p)
     { }
 
@@ -71,6 +71,16 @@ public:
     operator ref<T2> () const
     {
         return ref<T2>((std::shared_ptr<T2>) p);
+    }
+
+    bool operator == (const ref<T> & other) const
+    {
+        return p == other.p;
+    }
+
+    bool operator != (const ref<T> & other) const
+    {
+        return p != other.p;
     }
 
 private:

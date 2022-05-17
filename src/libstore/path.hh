@@ -58,26 +58,18 @@ public:
     }
 
     static StorePath dummy;
+
+    static StorePath random(std::string_view name);
 };
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
-typedef std::map<string, StorePath> OutputPathMap;
+typedef std::map<std::string, StorePath> OutputPathMap;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";
-
-struct StorePathWithOutputs
-{
-    StorePath path;
-    std::set<std::string> outputs;
-
-    std::string to_string(const Store & store) const;
-};
-
-std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 
 }
 

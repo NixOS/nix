@@ -4,6 +4,8 @@
 #include "error.hh"
 #include "config.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 typedef enum {
@@ -40,7 +42,7 @@ struct LoggerSettings : Config
     Setting<bool> showTrace{
         this, false, "show-trace",
         R"(
-          Where Nix should print out a stack trace in case of Nix
+          Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
 };
@@ -100,12 +102,15 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void stdout(const std::string & fs, const Args & ... args)
+    inline void cout(const std::string & fs, const Args & ... args)
     {
         boost::format f(fs);
         formatHelper(f, args...);
         writeToStdout(f.str());
     }
+
+    virtual std::optional<char> ask(std::string_view s)
+    { return {}; }
 };
 
 ActivityId getCurActivity();
@@ -163,6 +168,12 @@ Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 
+std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
+
+bool handleJSONLogMessage(nlohmann::json & json,
+    const Activity & act, std::map<ActivityId, Activity> & activities,
+    bool trusted);
+
 bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted);
@@ -175,8 +186,8 @@ extern Verbosity verbosity; /* suppress msgs > this */
    lightweight status messages. */
 #define logErrorInfo(level, errorInfo...) \
     do { \
-        if (level <= nix::verbosity) { \
-            logger->logEI(level, errorInfo); \
+        if ((level) <= nix::verbosity) {     \
+            logger->logEI((level), errorInfo);  \
         } \
     } while (0)
 
@@ -186,14 +197,17 @@ extern Verbosity verbosity; /* suppress msgs > this */
 /* Print a string message if the current log level is at least the specified
    level. Note that this has to be implemented as a macro to ensure that the
    arguments are evaluated lazily. */
-#define printMsg(level, args...) \
+#define printMsgUsing(loggerParam, level, args...) \
     do { \
-        if (level <= nix::verbosity) { \
-            logger->log(level, fmt(args)); \
+        auto __lvl = level; \
+        if (__lvl <= nix::verbosity) { \
+            loggerParam->log(__lvl, fmt(args)); \
         } \
     } while (0)
+#define printMsg(level, args...) printMsgUsing(logger, level, args)
 
 #define printError(args...) printMsg(lvlError, args)
+#define notice(args...) printMsg(lvlNotice, args)
 #define printInfo(args...) printMsg(lvlInfo, args)
 #define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)
@@ -210,6 +224,6 @@ inline void warn(const std::string & fs, const Args & ... args)
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
-void writeToStderr(const string & s);
+void writeToStderr(std::string_view s);
 
 }

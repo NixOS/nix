@@ -37,22 +37,22 @@ Nix store is also printed.
 
 # Options
 
-  - `--type` *hashAlgo*  
+  - `--type` *hashAlgo*\
     Use the specified cryptographic hash algorithm, which can be one of
-    `md5`, `sha1`, and `sha256`.
+    `md5`, `sha1`, `sha256`, and `sha512`.
 
-  - `--print-path`  
+  - `--print-path`\
     Print the store path of the downloaded file on standard output.
 
-  - `--unpack`  
+  - `--unpack`\
     Unpack the archive (which must be a tarball or zip file) and add the
     result to the Nix store. The resulting hash can be used with
     functions such as Nixpkgs’s `fetchzip` or `fetchFromGitHub`.
 
-  - `--executable`  
+  - `--executable`\
     Set the executable bit on the downloaded file.
 
-  - `--name` *name*  
+  - `--name` *name*\
     Override the name of the file in the Nix store. By default, this is
     `hash-basename`, where *basename* is the last component of *url*.
     Overriding the name is necessary when *basename* contains characters

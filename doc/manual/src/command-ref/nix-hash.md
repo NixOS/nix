@@ -29,29 +29,29 @@ md5sum`.
 
 # Options
 
-  - `--flat`  
+  - `--flat`\
     Print the cryptographic hash of the contents of each regular file
     *path*. That is, do not compute the hash over the dump of *path*.
     The result is identical to that produced by the GNU commands
     `md5sum` and `sha1sum`.
 
-  - `--base32`  
+  - `--base32`\
     Print the hash in a base-32 representation rather than hexadecimal.
     This base-32 representation is more compact and can be used in Nix
     expressions (such as in calls to `fetchurl`).
 
-  - `--truncate`  
+  - `--truncate`\
     Truncate hashes longer than 160 bits (such as SHA-256) to 160 bits.
 
-  - `--type` *hashAlgo*  
+  - `--type` *hashAlgo*\
     Use the specified cryptographic hash algorithm, which can be one of
-    `md5`, `sha1`, and `sha256`.
+    `md5`, `sha1`, `sha256`, and `sha512`.
 
-  - `--to-base16`  
+  - `--to-base16`\
     Don’t hash anything, but convert the base-32 hash representation
     *hash* to hexadecimal.
 
-  - `--to-base32`  
+  - `--to-base32`\
     Don’t hash anything, but convert the hexadecimal hash representation
     *hash* to base-32.
 

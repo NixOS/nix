@@ -19,14 +19,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         addFlag({
             .longName = "profile",
             .shortName = 'p',
-            .description = "the Nix profile to upgrade",
+            .description = "The path to the Nix profile to upgrade.",
             .labels = {"profile-dir"},
             .handler = {&profileDir}
         });
 
         addFlag({
             .longName = "nix-store-paths-url",
-            .description = "URL of the file that contains the store paths of the latest Nix release",
+            .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
             .handler = {&storePathsUrl}
         });
@@ -37,18 +37,11 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         return "upgrade Nix to the latest stable version";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To upgrade Nix to the latest stable version:",
-                "nix upgrade-nix"
-            },
-            Example{
-                "To upgrade Nix in a specific profile:",
-                "nix upgrade-nix -p /nix/var/nix/profiles/per-user/alice/profile"
-            },
-        };
+        return
+          #include "upgrade-nix.md"
+          ;
     }
 
     Category category() override { return catNixInstallation; }
@@ -68,10 +61,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         if (dryRun) {
             stopProgressBar();
-            logWarning({
-                .name = "Version update",
-                .hint = hintfmt("would upgrade to version %s", version)
-            });
+            warn("would upgrade to version %s", version);
             return;
         }
 
@@ -150,7 +140,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         auto state = std::make_unique<EvalState>(Strings(), store);
         auto v = state->allocValue();
-        state->eval(state->parseExprFromString(*res.data, "/no-such-path"), *v);
+        state->eval(state->parseExprFromString(res.data, "/no-such-path"), *v);
         Bindings & bindings(*state->allocBindings(0));
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 

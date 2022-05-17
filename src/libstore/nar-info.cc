@@ -11,7 +11,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         return Error("NAR info file '%1%' is corrupt", whence);
     };
 
-    auto parseHashField = [&](const string & s) {
+    auto parseHashField = [&](const std::string & s) {
         try {
             return Hash::parseAnyPrefixed(s);
         } catch (BadHash &) {
@@ -46,14 +46,18 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         else if (name == "FileHash")
             fileHash = parseHashField(value);
         else if (name == "FileSize") {
-            if (!string2Int(value, fileSize)) throw corrupt();
+            auto n = string2Int<decltype(fileSize)>(value);
+            if (!n) throw corrupt();
+            fileSize = *n;
         }
         else if (name == "NarHash") {
             narHash = parseHashField(value);
             haveNarHash = true;
         }
         else if (name == "NarSize") {
-            if (!string2Int(value, narSize)) throw corrupt();
+            auto n = string2Int<decltype(narSize)>(value);
+            if (!n) throw corrupt();
+            narSize = *n;
         }
         else if (name == "References") {
             auto refs = tokenizeString<Strings>(value, " ");

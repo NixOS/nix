@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -20,12 +21,29 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<unsigned int>(def, name, description, aliases)
+        : BaseSetting<unsigned int>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
+};
+
+struct PluginFilesSetting : public BaseSetting<Paths>
+{
+    bool pluginsLoaded = false;
+
+    PluginFilesSetting(Config * options,
+        const Paths & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<Paths>(def, true, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str, bool append = false) override;
 };
 
 class Settings : public Config {
@@ -33,6 +51,8 @@ class Settings : public Config {
     unsigned int getDefaultCores();
 
     StringSet getDefaultSystemFeatures();
+
+    StringSet getDefaultExtraPlatforms();
 
     bool isWSL1();
 
@@ -93,7 +113,7 @@ public:
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
-        "If `verbose-build` is false, the number of lines of the tail of "
+        "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
@@ -110,7 +130,9 @@ public:
         {"build-max-jobs"}};
 
     Setting<unsigned int> buildCores{
-        this, getDefaultCores(), "cores",
+        this,
+        getDefaultCores(),
+        "cores",
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the
           invocation of builders. Builders can use this variable at their
@@ -121,7 +143,7 @@ public:
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
         )",
-        {"build-cores"}};
+        {"build-cores"}, false};
 
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
@@ -178,7 +200,10 @@ public:
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
-        "A semicolon-separated list of build machines, in the format of `nix.machines`."};
+        R"(
+          A semicolon-separated list of build machines.
+          For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
+        )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
@@ -413,14 +438,6 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<PathSet> extraSandboxPaths{
-        this, {}, "extra-sandbox-paths",
-        R"(
-          A list of additional paths appended to `sandbox-paths`. Useful if
-          you want to extend its default value.
-        )",
-        {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
-
     Setting<size_t> buildRepeat{
         this, 0, "repeat",
         R"(
@@ -553,7 +570,7 @@ public:
 
     Setting<StringSet> extraPlatforms{
         this,
-        std::string{SYSTEM} == "x86_64-linux" && !isWSL1() ? StringSet{"i686-linux"} : StringSet{},
+        getDefaultExtraPlatforms(),
         "extra-platforms",
         R"(
           Platforms other than the native one which this machine is capable of
@@ -568,10 +585,11 @@ public:
           platform and generate incompatible code, so you may wish to
           cross-check the results of using this option against proper
           natively-built versions of your derivations.
-        )"};
+        )", {}, false};
 
     Setting<StringSet> systemFeatures{
-        this, getDefaultSystemFeatures(),
+        this,
+        getDefaultSystemFeatures(),
         "system-features",
         R"(
           A set of system “features” supported by this machine, e.g. `kvm`.
@@ -587,28 +605,19 @@ public:
           This setting by default includes `kvm` if `/dev/kvm` is accessible,
           and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
           that are used in Nixpkgs to route builds to specific machines.
-        )"};
+        )", {}, false};
 
     Setting<Strings> substituters{
         this,
-        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. The default
-          is `https://cache.nixos.org`.
+          A list of URLs of substituters, separated by whitespace. Substituters
+          are tried based on their Priority value, which each substituter can set
+          independently. Lower value means higher priority.
+          The default is `https://cache.nixos.org`, with a Priority of 40.
         )",
         {"binary-caches"}};
-
-    // FIXME: provide a way to add to option values.
-    Setting<Strings> extraSubstituters{
-        this, {}, "extra-substituters",
-        R"(
-          Additional binary caches appended to those specified in
-          `substituters`. When used by unprivileged users, untrusted
-          substituters (i.e. those not listed in `trusted-substituters`) are
-          silently ignored.
-        )",
-        {"extra-binary-caches"}};
 
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
@@ -632,7 +641,7 @@ public:
           is `root`.
 
           > **Warning**
-          > 
+          >
           > Adding a user to `trusted-users` is essentially equivalent to
           > giving that user root access to the system. For example, the user
           > can set `sandbox-paths` and thereby obtain read access to
@@ -689,7 +698,7 @@ public:
           send a series of commands to modify various settings to stdout. The
           currently recognized commands are:
 
-            - `extra-sandbox-paths`  
+            - `extra-sandbox-paths`\
               Pass a list of files and directories to be included in the
               sandbox for this build. One entry per line, terminated by an
               empty line. Entries have the same format as `sandbox-paths`.
@@ -722,13 +731,13 @@ public:
           The program executes with no arguments. The program's environment
           contains the following environment variables:
 
-            - `DRV_PATH`  
+            - `DRV_PATH`
               The derivation for the built paths.
 
               Example:
               `/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv`
 
-            - `OUT_PATHS`  
+            - `OUT_PATHS`
               Output paths of the built derivation, separated by a space
               character.
 
@@ -759,7 +768,7 @@ public:
           documentation](https://ec.haxx.se/usingcurl-netrc.html).
 
           > **Note**
-          > 
+          >
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.
@@ -790,6 +799,15 @@ public:
           enabling this option. This is impure and usually undesirable, but
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
+        )"};
+
+    Setting<StringSet> ignoredAcls{
+        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        R"(
+          A list of ACLs that should be ignored, normally Nix attempts to
+          remove all ACLs from files and directories in the Nix store, but
+          some ACLs like `security.selinux` or `system.nfs4_acl` can't be
+          removed even by root. Therefore it's best to just ignore them.
         )"};
 #endif
 
@@ -836,7 +854,7 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
-    Setting<Paths> pluginFiles{
+    PluginFilesSetting pluginFiles{
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
@@ -847,6 +865,9 @@ public:
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
+
+          Warning! These APIs are inherently unstable and may change from
+          release to release.
 
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix
@@ -859,73 +880,15 @@ public:
           are loaded as plugins (non-recursively).
         )"};
 
-    Setting<StringMap> accessTokens{this, {}, "access-tokens",
-        R"(
-          Access tokens used to access protected GitHub, GitLab, or
-          other locations requiring token-based authentication.
-
-          Access tokens are specified as a string made up of
-          space-separated `host=token` values.  The specific token
-          used is selected by matching the `host` portion against the
-          "host" specification of the input. The actual use of the
-          `token` value is determined by the type of resource being
-          accessed:
-
-          * Github: the token value is the OAUTH-TOKEN string obtained
-            as the Personal Access Token from the Github server (see
-            https://docs.github.com/en/developers/apps/authorizing-oath-apps).
-
-          * Gitlab: the token value is either the OAuth2 token or the
-            Personal Access Token (these are different types tokens
-            for gitlab, see
-            https://docs.gitlab.com/12.10/ee/api/README.html#authentication).
-            The `token` value should be `type:tokenstring` where
-            `type` is either `OAuth2` or `PAT` to indicate which type
-            of token is being specified.
-
-          Example `~/.config/nix/nix.conf`:
-
-          ```
-          access-tokens = "github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk"
-          ```
-
-          Example `~/code/flake.nix`:
-
-          ```nix
-          input.foo = {
-            type = "gitlab";
-            host = "gitlab.mycompany.com";
-            owner = "mycompany";
-            repo = "pro";
-          };
-          ```
-
-          This example specifies three tokens, one each for accessing
-          github.com, gitlab.mycompany.com, and sourceforge.net.
-
-          The `input.foo` uses the "gitlab" fetcher, which might
-          requires specifying the token type along with the token
-          value.
-          )"};
-
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
-    void requireExperimentalFeature(const std::string & name);
-
-    Setting<bool> allowDirty{this, true, "allow-dirty",
-        "Whether to allow dirty Git/Mercurial trees."};
-
-    Setting<bool> warnDirty{this, true, "warn-dirty",
-        "Whether to warn about dirty Git/Mercurial trees."};
+    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};
-
-    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
 
     Setting<bool> allowSymlinkedStore{
         this, false, "allow-symlinked-store",
@@ -954,6 +917,6 @@ void loadConfFile();
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const string nixVersion;
+extern const std::string nixVersion;
 
 }

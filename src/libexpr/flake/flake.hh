@@ -17,23 +17,55 @@ struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 
+/* FlakeInput is the 'Flake'-level parsed form of the "input" entries
+ * in the flake file.
+ *
+ * A FlakeInput is normally constructed by the 'parseFlakeInput'
+ * function which parses the input specification in the '.flake' file
+ * to create a 'FlakeRef' (a fetcher, the fetcher-specific
+ * representation of the input specification, and possibly the fetched
+ * local store path result) and then creating this FlakeInput to hold
+ * that FlakeRef, along with anything that might override that
+ * FlakeRef (like command-line overrides or "follows" specifications).
+ *
+ * A FlakeInput is also sometimes constructed directly from a FlakeRef
+ * instead of starting at the flake-file input specification
+ * (e.g. overrides, follows, and implicit inputs).
+ *
+ * A FlakeInput will usually have one of either "ref" or "follows"
+ * set.  If not otherwise specified, a "ref" will be generated to a
+ * 'type="indirect"' flake, which is treated as simply the name of a
+ * flake to be resolved in the registry.
+ */
+
 struct FlakeInput
 {
     std::optional<FlakeRef> ref;
-    bool isFlake = true;
+    bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
-    bool absolute = false; // whether 'follows' is relative to the flake root
     FlakeInputs overrides;
 };
 
+struct ConfigFile
+{
+    using ConfigValue = std::variant<std::string, int64_t, Explicit<bool>, std::vector<std::string>>;
+
+    std::map<std::string, ConfigValue> settings;
+
+    void apply();
+};
+
+/* The contents of a flake.nix file. */
 struct Flake
 {
-    FlakeRef originalRef;
-    FlakeRef resolvedRef;
-    FlakeRef lockedRef;
+    FlakeRef originalRef; // the original flake specification (by the user)
+    FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
+    FlakeRef lockedRef; // the specific local store result of invoking the fetcher
+    bool forceDirty = false; // pretend that 'lockedRef' is dirty
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
+    ConfigFile config; // 'nixConfig' attribute
     ~Flake();
 };
 
@@ -70,7 +102,11 @@ struct LockFlags
 
     /* Whether to use the registries to lookup indirect flake
        references like 'nixpkgs'. */
-    bool useRegistries = true;
+    std::optional<bool> useRegistries = std::nullopt;
+
+    /* Whether to apply flake's nixConfig attribute to the configuration */
+
+    bool applyNixConfig = false;
 
     /* Whether mutable flake references (i.e. those without a Git
        revision or similar) without a corresponding lock are
@@ -81,7 +117,7 @@ struct LockFlags
     /* Whether to commit changes to flake.lock. */
     bool commitLockFile = false;
 
-    /* Flake inputs to be overriden. */
+    /* Flake inputs to be overridden. */
     std::map<InputPath, FlakeRef> inputOverrides;
 
     /* Flake inputs to be updated. This means that any existing lock
@@ -105,6 +141,8 @@ void emitTreeAttrs(
     EvalState & state,
     const fetchers::Tree & tree,
     const fetchers::Input & input,
-    Value & v, bool emptyRevFallback = false);
+    Value & v,
+    bool emptyRevFallback = false,
+    bool forceDirty = false);
 
 }

@@ -1,10 +1,8 @@
 ifeq ($(doc_generate),yes)
 
-MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
-
 # Generate man pages.
 man-pages := $(foreach n, \
-  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 nix.1 \
+  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
   nix-collect-garbage.1 \
   nix-prefetch-url.1 nix-channel.1 \
   nix-hash.1 nix-copy-closure.1 \
@@ -13,59 +11,93 @@ man-pages := $(foreach n, \
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
-dist-files += $(man-pages)
+# Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
+# Set cores to 0 because otherwise nix show-config resolves the cores based on the current machine
+dummy-env = env -i \
+	HOME=/dummy \
+	NIX_CONF_DIR=/dummy \
+	NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt \
+	NIX_STATE_DIR=/dummy \
+	NIX_CONFIG='cores = 0'
 
-nix-eval = $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw --expr
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=1 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/%.8: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=8 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/command-ref/nix.md: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
-	$(trace-gen) $(nix-eval) 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))' > $@.tmp
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
+	$(trace-gen) cat doc/manual/src/SUMMARY.md.in | while IFS= read line; do if [[ $$line = @manpages@ ]]; then cat doc/manual/src/command-ref/new-cli/SUMMARY.md; else echo "$$line"; fi; done > $@.tmp
 	@mv $@.tmp $@
+
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+	@rm -rf $@
+	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix { command = builtins.readFile $<; renderLinks = true; }'
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
-	$(trace-gen) $(bindir)/nix __dump-args > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-args > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) env -i NIX_CONF_DIR=/dummy HOME=/dummy NIX_SSL_CERT_FILE=/dummy/no-ca-bundle.crt $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
 	@cat doc/manual/src/expressions/builtins-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@cat doc/manual/src/expressions/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/builtins.json: $(bindir)/nix
-	$(trace-gen) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
-	mv $@.tmp $@
+	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
+	@mv $@.tmp $@
 
 # Generate the HTML manual.
+html: $(docdir)/manual/index.html
 install: $(docdir)/manual/index.html
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/command-ref/nix.md $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
-	$(trace-gen) mdbook build doc/manual -d $(docdir)/manual
-	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
+# Generate 'nix' manpages.
+install: $(mandir)/man1/nix3-manpages
+man: doc/manual/generated/man1/nix3-manpages
+all: doc/manual/generated/man1/nix3-manpages
+
+$(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-manpages
+	@mkdir -p $(DESTDIR)$$(dirname $@)
+	$(trace-install) install -m 0644 $$(dirname $<)/* $(DESTDIR)$$(dirname $@)
+
+doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
+	@mkdir -p $(DESTDIR)$$(dirname $@)
+	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
+	  name=$$(basename $$i .md); \
+	  tmpFile=$$(mktemp); \
+	  if [[ $$name = SUMMARY ]]; then continue; fi; \
+	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
+	  cat $$i >> $$tmpFile; \
+	  lowdown -sT man -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
+	  rm $$tmpFile; \
+	done
+	@touch $@
+
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md $(call rwildcard, $(d)/src, *.md)
+	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual
 
 endif

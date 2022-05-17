@@ -9,7 +9,6 @@ clearProfiles
 # Query installed: should be empty.
 test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 0
 
-mkdir -p $TEST_HOME
 nix-env --switch-profile $profiles/test
 
 # Query available: should contain several.
@@ -17,6 +16,16 @@ test "$(nix-env -f ./user-envs.nix -qa '*' | wc -l)" -eq 6
 outPath10=$(nix-env -f ./user-envs.nix -qa --out-path --no-name '*' | grep foo-1.0)
 drvPath10=$(nix-env -f ./user-envs.nix -qa --drv-path --no-name '*' | grep foo-1.0)
 [ -n "$outPath10" -a -n "$drvPath10" ]
+
+# Query with json
+nix-env -f ./user-envs.nix -qa --json | jq -e '.[] | select(.name == "bar-0.1") | [
+    .outputName == "out",
+    .outputs.out == null
+] | all'
+nix-env -f ./user-envs.nix -qa --json --out-path | jq -e '.[] | select(.name == "bar-0.1") | [
+    .outputName == "out",
+    (.outputs.out | test("'$NIX_STORE_DIR'.*-0\\.1"))
+] | all'
 
 # Query descriptions.
 nix-env -f ./user-envs.nix -qa '*' --description | grep -q silly

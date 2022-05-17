@@ -7,13 +7,15 @@ function _complete_nix {
         local completion=${line%%	*}
         if [[ -z $have_type ]]; then
             have_type=1
-            if [[ $completion = filenames ]]; then
+            if [[ $completion == filenames ]]; then
                 compopt -o filenames
+            elif [[ $completion == attrs ]]; then
+                compopt -o nospace
             fi
         else
             COMPREPLY+=("$completion")
         fi
-    done < <(NIX_GET_COMPLETIONS=$cword "${words[@]}")
+    done < <(NIX_GET_COMPLETIONS=$cword "${words[@]}" 2>/dev/null)
     __ltrim_colon_completions "$cur"
 }
 

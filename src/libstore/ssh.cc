@@ -2,24 +2,37 @@
 
 namespace nix {
 
-SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD)
+SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD)
     : host(host)
     , fakeSSH(host == "localhost")
     , keyFile(keyFile)
+    , sshPublicHostKey(sshPublicHostKey)
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
     , logFD(logFD)
 {
     if (host == "" || hasPrefix(host, "-"))
         throw Error("invalid SSH host name '%s'", host);
+
+    auto state(state_.lock());
+    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true, 0700));
 }
 
 void SSHMaster::addCommonSSHOpts(Strings & args)
 {
+    auto state(state_.lock());
+
     for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
         args.push_back(i);
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
+    if (!sshPublicHostKey.empty()) {
+        Path fileName = (Path) *state->tmpDir + "/host-key";
+        auto p = host.rfind("@");
+        std::string thost = p != std::string::npos ? std::string(host, p + 1) : host;
+        writeFile(fileName, thost + " " + base64Decode(sshPublicHostKey) + "\n");
+        args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName});
+    }
     if (compress)
         args.push_back("-C");
 }
@@ -37,7 +50,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
     options.dieWithParent = false;
 
     conn->sshPid = startProcess([&]() {
-        restoreSignals();
+        restoreProcessContext();
 
         close(in.writeSide.get());
         close(out.readSide.get());
@@ -87,7 +100,6 @@ Path SSHMaster::startMaster()
 
     if (state->sshMaster != -1) return state->socketPath;
 
-    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true, 0700));
 
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
 
@@ -98,7 +110,7 @@ Path SSHMaster::startMaster()
     options.dieWithParent = false;
 
     state->sshMaster = startProcess([&]() {
-        restoreSignals();
+        restoreProcessContext();
 
         close(out.readSide.get());
 

@@ -19,8 +19,11 @@ keep-derivations = false
 sandbox = false
 experimental-features = nix-command flakes
 gc-reserved-space = 0
+substituters =
 flake-registry = $TEST_ROOT/registry.json
+show-trace = true
 include nix.conf.extra
+trusted-users = $(whoami)
 EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
@@ -33,5 +36,3 @@ nix-store --init
 
 # Did anything happen?
 test -e "$NIX_STATE_DIR"/db/db.sqlite
-
-echo 'Hello World' > ./dummy

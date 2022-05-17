@@ -25,25 +25,72 @@ require_util() {
 }
 
 case "$(uname -s).$(uname -m)" in
-    Linux.x86_64) system=x86_64-linux; hash=@binaryTarball_x86_64-linux@;;
-    Linux.i?86) system=i686-linux; hash=@binaryTarball_i686-linux@;;
-    Linux.aarch64) system=aarch64-linux; hash=@binaryTarball_aarch64-linux@;;
-    Darwin.x86_64) system=x86_64-darwin; hash=@binaryTarball_x86_64-darwin@;;
+    Linux.x86_64)
+        hash=@tarballHash_x86_64-linux@
+        path=@tarballPath_x86_64-linux@
+        system=x86_64-linux
+        ;;
+    Linux.i?86)
+        hash=@tarballHash_i686-linux@
+        path=@tarballPath_i686-linux@
+        system=i686-linux
+        ;;
+    Linux.aarch64)
+        hash=@tarballHash_aarch64-linux@
+        path=@tarballPath_aarch64-linux@
+        system=aarch64-linux
+        ;;
+    Linux.armv6l_linux)
+        hash=@tarballHash_armv6l-linux@
+        path=@tarballPath_armv6l-linux@
+        system=armv6l-linux
+        ;;
+    Linux.armv7l_linux)
+        hash=@tarballHash_armv7l-linux@
+        path=@tarballPath_armv7l-linux@
+        system=armv7l-linux
+        ;;
+    Darwin.x86_64)
+        hash=@tarballHash_x86_64-darwin@
+        path=@tarballPath_x86_64-darwin@
+        system=x86_64-darwin
+        ;;
+    Darwin.arm64|Darwin.aarch64)
+        hash=@tarballHash_aarch64-darwin@
+        path=@tarballPath_aarch64-darwin@
+        system=aarch64-darwin
+        ;;
     *) oops "sorry, there is no binary distribution of Nix for your platform";;
 esac
 
-url="https://releases.nixos.org/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz"
+# Use this command-line option to fetch the tarballs using nar-serve or Cachix
+if [ "${1:-}" = "--tarball-url-prefix" ]; then
+    if [ -z "${2:-}" ]; then
+        oops "missing argument for --tarball-url-prefix"
+    fi
+    url=${2}/${path}
+    shift 2
+else
+    url=https://releases.nixos.org/nix/nix-@nixVersion@/nix-@nixVersion@-$system.tar.xz
+fi
 
-tarball="$tmpDir/$(basename "$tmpDir/nix-@nixVersion@-$system.tar.xz")"
+tarball=$tmpDir/nix-@nixVersion@-$system.tar.xz
 
-require_util curl "download the binary tarball"
 require_util tar "unpack the binary tarball"
 if [ "$(uname -s)" != "Darwin" ]; then
     require_util xz "unpack the binary tarball"
 fi
 
+if command -v curl > /dev/null 2>&1; then
+    fetch() { curl --fail -L "$1" -o "$2"; }
+elif command -v wget > /dev/null 2>&1; then
+    fetch() { wget "$1" -O "$2"; }
+else
+    oops "you don't have wget or curl installed, which I need to download the binary tarball"
+fi
+
 echo "downloading Nix @nixVersion@ binary tarball for $system from '$url' to '$tmpDir'..."
-curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
+fetch "$url" "$tarball" || oops "failed to download '$url'"
 
 if command -v sha256sum > /dev/null 2>&1; then
     hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
@@ -66,6 +113,7 @@ tar -xJf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
 script=$(echo "$unpack"/*/install)
 
 [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
+export INVOKED_FROM_INSTALL_IN=1
 "$script" "$@"
 
 } # End of wrapping

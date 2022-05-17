@@ -1,4 +1,5 @@
 // FIXME: integrate this with nix path-info?
+// FIXME: rename to 'nix store show-derivation' or 'nix debug show-derivation'?
 
 #include "command.hh"
 #include "common-args.hh"
@@ -18,7 +19,7 @@ struct CmdShowDerivation : InstallablesCommand
         addFlag({
             .longName = "recursive",
             .shortName = 'r',
-            .description = "include the dependencies of the specified derivations",
+            .description = "Include the dependencies of the specified derivations.",
             .handler = {&recursive, true}
         });
     }
@@ -28,25 +29,18 @@ struct CmdShowDerivation : InstallablesCommand
         return "show the contents of a store derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show the store derivation that results from evaluating the Hello package:",
-                "nix show-derivation nixpkgs#hello"
-            },
-            Example{
-                "To show the full derivation graph (if available) that produced your NixOS system:",
-                "nix show-derivation -r /run/current-system"
-            },
-        };
+        return
+          #include "show-derivation.md"
+          ;
     }
 
     Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
-        auto drvPaths = toDerivations(store, installables, true);
+        auto drvPaths = Installable::toDerivations(store, installables, true);
 
         if (recursive) {
             StorePathSet closure;
@@ -71,18 +65,23 @@ struct CmdShowDerivation : InstallablesCommand
                     auto & outputName = _outputName; // work around clang bug
                     auto outputObj { outputsObj.object(outputName) };
                     std::visit(overloaded {
-                        [&](DerivationOutputInputAddressed doi) {
+                        [&](const DerivationOutput::InputAddressed & doi) {
                             outputObj.attr("path", store->printStorePath(doi.path));
                         },
-                        [&](DerivationOutputCAFixed dof) {
+                        [&](const DerivationOutput::CAFixed & dof) {
                             outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
                             outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
                             outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
                         },
-                        [&](DerivationOutputCAFloating dof) {
+                        [&](const DerivationOutput::CAFloating & dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
-                    }, output.output);
+                        [&](const DerivationOutput::Deferred &) {},
+                        [&](const DerivationOutput::Impure & doi) {
+                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(doi.method) + printHashType(doi.hashType));
+                            outputObj.attr("impure", true);
+                        },
+                    }, output.raw());
                 }
             }
 
@@ -101,7 +100,7 @@ struct CmdShowDerivation : InstallablesCommand
                 }
             }
 
-            drvObj.attr("platform", drv.platform);
+            drvObj.attr("system", drv.platform);
             drvObj.attr("builder", drv.builder);
 
             {

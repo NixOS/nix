@@ -26,30 +26,51 @@ fi
 
 # macOS support for 10.12.6 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
-    macos_major=$(sw_vers -productVersion | cut -d '.' -f 2)
-    macos_minor=$(sw_vers -productVersion | cut -d '.' -f 3)
-    if [ "$macos_major" -lt 12 ] || { [ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]; }; then
+    IFS='.' read -r macos_major macos_minor macos_patch << EOF
+$(sw_vers -productVersion)
+EOF
+    if [ "$macos_major" -lt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -lt 12 ]; } || { [ "$macos_minor" -eq 12 ] && [ "$macos_patch" -lt 6 ]; }; then
+        # patch may not be present; command substitution for simplicity
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
         exit 1
     fi
 fi
 
 # Determine if we could use the multi-user installer or not
-if [ "$(uname -s)" = "Darwin" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-elif [ "$(uname -s)" = "Linux" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
+if [ "$(uname -s)" = "Linux" ]; then
+    echo "Note: a multi-user installation is possible. See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
 fi
 
-INSTALL_MODE=no-daemon
-CREATE_DARWIN_VOLUME=0
+case "$(uname -s)" in
+    "Darwin")
+        INSTALL_MODE=daemon;;
+    *)
+        INSTALL_MODE=no-daemon;;
+esac
+
+# space-separated string
+ACTIONS=
+
 # handle the command line flags
 while [ $# -gt 0 ]; do
     case $1 in
         --daemon)
-            INSTALL_MODE=daemon;;
+            INSTALL_MODE=daemon
+            ACTIONS="${ACTIONS}install "
+            ;;
         --no-daemon)
-            INSTALL_MODE=no-daemon;;
+            if [ "$(uname -s)" = "Darwin" ]; then
+                printf '\e[1;31mError: --no-daemon installs are no-longer supported on Darwin/macOS!\e[0m\n' >&2
+                exit 1
+            fi
+            INSTALL_MODE=no-daemon
+            # intentional tail space
+            ACTIONS="${ACTIONS}install "
+            ;;
+        # --uninstall)
+        #     # intentional tail space
+        #     ACTIONS="${ACTIONS}uninstall "
+        #     ;;
         --no-channel-add)
             export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
         --daemon-user-count)
@@ -58,13 +79,18 @@ while [ $# -gt 0 ]; do
         --no-modify-profile)
             NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
-            CREATE_DARWIN_VOLUME=1;;
+            {
+                echo "Warning: the flag --darwin-use-unencrypted-nix-store-volume"
+                echo "         is no longer needed and will be removed in the future."
+                echo ""
+            } >&2;;
         --nix-extra-conf-file)
-            export NIX_EXTRA_CONF="$(cat $2)"
+            # shellcheck disable=SC2155
+            export NIX_EXTRA_CONF="$(cat "$2")"
             shift;;
         *)
-            (
-                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--darwin-use-unencrypted-nix-store-volume] [--nix-extra-conf-file FILE]"
+            {
+                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--nix-extra-conf-file FILE]"
 
                 echo "Choose installation method."
                 echo ""
@@ -72,7 +98,7 @@ while [ $# -gt 0 ]; do
                 echo "              providing multi-user support and better isolation for local builds."
                 echo "              Both for security and reproducibility, this method is recommended if"
                 echo "              supported on your platform."
-                echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
+                echo "              See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation"
                 echo ""
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
@@ -80,52 +106,25 @@ while [ $# -gt 0 ]; do
                 echo ""
                 echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
                 echo ""
-                echo " --no-modify-profile: Skip channel installation. When not provided nixpkgs-unstable"
-                echo "                      is installed by default."
+                echo " --no-modify-profile: Don't modify the user profile to automatically load nix."
                 echo ""
                 echo " --daemon-user-count: Number of build users to create. Defaults to 32."
                 echo ""
-                echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix.conf"
+                echo " --nix-extra-conf-file: Path to nix.conf to prepend when installing /etc/nix/nix.conf"
                 echo ""
-            ) >&2
+                if [ -n "${INVOKED_FROM_INSTALL_IN:-}" ]; then
+                    echo " --tarball-url-prefix URL: Base URL to download the Nix tarball from."
+                fi
+            } >&2
 
-            # darwin and Catalina+
-            if [ "$(uname -s)" = "Darwin" ] && [ "$macos_major" -gt 14 ]; then
-                (
-                    echo " --darwin-use-unencrypted-nix-store-volume: Create an APFS volume for the Nix"
-                    echo "              store and mount it at /nix. This is the recommended way to create"
-                    echo "              /nix with a read-only / on macOS >=10.15."
-                    echo "              See: https://nixos.org/nix/manual/#sect-macos-installation"
-                    echo ""
-                ) >&2
-            fi
             exit;;
     esac
     shift
 done
 
-if [ "$(uname -s)" = "Darwin" ]; then
-    if [ "$CREATE_DARWIN_VOLUME" = 1 ]; then
-        printf '\e[1;31mCreating volume and mountpoint /nix.\e[0m\n'
-        "$self/create-darwin-volume.sh"
-    fi
-
-    info=$(diskutil info -plist / | xpath "/plist/dict/key[text()='Writable']/following-sibling::true[1]" 2> /dev/null)
-    if ! [ -e $dest ] && [ -n "$info" ] && [ "$macos_major" -gt 14 ]; then
-        (
-            echo ""
-            echo "Installing on macOS >=10.15 requires relocating the store to an apfs volume."
-            echo "Use sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume or run the preparation steps manually."
-            echo "See https://nixos.org/nix/manual/#sect-macos-installation"
-            echo ""
-        ) >&2
-        exit 1
-    fi
-fi
-
 if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
-    exec "$self/install-multi-user"
+    exec "$self/install-multi-user" $ACTIONS # let ACTIONS split
     exit 0
 fi
 
@@ -135,7 +134,7 @@ fi
 
 echo "performing a single-user installation of Nix..." >&2
 
-if ! [ -e $dest ]; then
+if ! [ -e "$dest" ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
@@ -144,17 +143,23 @@ if ! [ -e $dest ]; then
     fi
 fi
 
-if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
+if ! [ -w "$dest" ]; then
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/manual/nix/stable/installation/multi-user.html. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 
-mkdir -p $dest/store
+mkdir -p "$dest/store"
 
 printf "copying Nix to %s..." "${dest}/store" >&2
+# Insert a newline if no progress is shown.
+if [ ! -t 0 ]; then
+  echo ""
+fi
 
 for i in $(cd "$self/store" >/dev/null && echo ./*); do
-    printf "." >&2
+    if [ -t 0 ]; then
+      printf "." >&2
+    fi
     i_tmp="$dest/store/$i.$$"
     if [ -e "$i_tmp" ]; then
         rm -rf "$i_tmp"
@@ -174,6 +179,7 @@ if ! "$nix/bin/nix-store" --load-db < "$self/.reginfo"; then
     exit 1
 fi
 
+# shellcheck source=./nix-profile.sh.in
 . "$nix/etc/profile.d/nix.sh"
 
 if ! "$nix/bin/nix-env" -i "$nix"; then
@@ -183,17 +189,17 @@ fi
 
 # Install an SSL certificate bundle.
 if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
-    $nix/bin/nix-env -i "$cacert"
+    "$nix/bin/nix-env" -i "$cacert"
     export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
 if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
-    if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-        $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+    if ! "$nix/bin/nix-channel" --list | grep -q "^nixpkgs "; then
+        "$nix/bin/nix-channel" --add https://nixos.org/channels/nixpkgs-unstable
     fi
     if [ -z "$_NIX_INSTALLER_TEST" ]; then
-        if ! $nix/bin/nix-channel --update nixpkgs; then
+        if ! "$nix/bin/nix-channel" --update nixpkgs; then
             echo "Fetching the nixpkgs channel failed. (Are you offline?)"
             echo "To try again later, run \"nix-channel --update nixpkgs\"."
         fi
@@ -209,7 +215,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
             fi
             added=1
             break
@@ -220,7 +226,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
             fi
             added=1
             break

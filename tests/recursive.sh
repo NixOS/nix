@@ -1,17 +1,20 @@
 source common.sh
 
+sed -i 's/experimental-features .*/& recursive-nix/' "$NIX_CONF_DIR"/nix.conf
+restartDaemon
+
 # FIXME
-if [[ $(uname) != Linux ]]; then exit; fi
+if [[ $(uname) != Linux ]]; then exit 99; fi
 
 clearStore
 
 rm -f $TEST_ROOT/result
 
-export unreachable=$(nix add-to-store ./recursive.sh)
+export unreachable=$(nix store add-path ./recursive.sh)
 
-NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L --impure --expr '
+NIX_BIN_DIR=$(dirname $(type -p nix)) nix --extra-experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L --impure --expr '
   with import ./config.nix;
-  mkDerivation {
+  mkDerivation rec {
     name = "recursive";
     dummy = builtins.toFile "dummy" "bla bla";
     SHELL = shell;
@@ -19,11 +22,13 @@ NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command r
     # Note: this is a string without context.
     unreachable = builtins.getEnv "unreachable";
 
+    NIX_TESTS_CA_BY_DEFAULT = builtins.getEnv "NIX_TESTS_CA_BY_DEFAULT";
+
     requiredSystemFeatures = [ "recursive-nix" ];
 
     buildCommand = '\'\''
       mkdir $out
-      opts="--experimental-features nix-command"
+      opts="--experimental-features nix-command ${if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""}"
 
       PATH=${builtins.getEnv "NIX_BIN_DIR"}:$PATH
 
@@ -38,7 +43,7 @@ NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command r
 
       # Add something to the store.
       echo foobar > foobar
-      foobar=$(nix $opts add-to-store ./foobar)
+      foobar=$(nix $opts store add-path ./foobar)
 
       nix $opts path-info $foobar
       nix $opts build $foobar
@@ -46,16 +51,15 @@ NIX_BIN_DIR=$(dirname $(type -p nix)) nix --experimental-features 'nix-command r
       # Add it to our closure.
       ln -s $foobar $out/foobar
 
-      [[ $(nix $opts path-info --all | wc -l) -eq 3 ]]
+      [[ $(nix $opts path-info --all | wc -l) -eq 4 ]]
 
       # Build a derivation.
       nix $opts build -L --impure --expr '\''
-        derivation {
+        with import ${./config.nix};
+        mkDerivation {
           name = "inner1";
-          builder = builtins.getEnv "SHELL";
-          system = builtins.getEnv "system";
+          buildCommand = "echo $fnord blaat > $out";
           fnord = builtins.toFile "fnord" "fnord";
-          args = [ "-c" "echo $fnord blaat > $out" ];
         }
       '\''
 

@@ -1,4 +1,4 @@
-ifeq ($(OS), Darwin)
+ifdef HOST_DARWIN
   programs += resolve-system-dependencies
 endif
 

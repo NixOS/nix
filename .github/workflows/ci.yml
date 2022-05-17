@@ -1,0 +1,108 @@
+name: "CI"
+
+on:
+  pull_request:
+  push:
+
+jobs:
+
+  tests:
+    needs: [check_cachix]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v17
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - uses: cachix/cachix-action@v10
+      if: needs.check_cachix.outputs.secret == 'true'
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: nix --experimental-features 'nix-command flakes' flake check -L
+
+  check_cachix:
+    name: Cachix secret present for installer tests
+    runs-on: ubuntu-latest
+    outputs:
+      secret: ${{ steps.secret.outputs.secret }}
+    steps:
+      - name: Check for Cachix secret
+        id: secret
+        env:
+          _CACHIX_SECRETS: ${{ secrets.CACHIX_SIGNING_KEY }}${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: echo "::set-output name=secret::${{ env._CACHIX_SECRETS != '' }}"
+
+  installer:
+    needs: [tests, check_cachix]
+    if: github.event_name == 'push' && needs.check_cachix.outputs.secret == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - uses: cachix/install-nix-action@v17
+    - uses: cachix/cachix-action@v10
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - id: prepare-installer
+      run: scripts/prepare-installer-for-github-actions
+
+  installer_test:
+    needs: [installer, check_cachix]
+    if: github.event_name == 'push' && needs.check_cachix.outputs.secret == 'true'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - uses: cachix/install-nix-action@v17
+      with:
+        install_url: '${{needs.installer.outputs.installerURL}}'
+        install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
+    - run: nix-instantiate -E 'builtins.currentTime' --eval
+
+  docker_push_image:
+    needs: [check_cachix, tests]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name == 'master' &&
+      needs.check_cachix.outputs.secret == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v17
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - run: echo NIX_VERSION="$(nix-instantiate --eval -E '(import ./default.nix).defaultPackage.${builtins.currentSystem}.version' | tr -d \")" >> $GITHUB_ENV
+    - uses: cachix/cachix-action@v10
+      if: needs.check_cachix.outputs.secret == 'true'
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
+    - run: docker load -i ./result/image.tar.gz
+    - run: docker tag nix:$NIX_VERSION nixos/nix:$NIX_VERSION
+    - run: docker tag nix:$NIX_VERSION nixos/nix:master
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - run: docker push nixos/nix:$NIX_VERSION
+    - run: docker push nixos/nix:master

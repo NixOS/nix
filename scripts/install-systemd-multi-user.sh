@@ -9,13 +9,15 @@ readonly SERVICE_DEST=/etc/systemd/system/nix-daemon.service
 readonly SOCKET_SRC=/lib/systemd/system/nix-daemon.socket
 readonly SOCKET_DEST=/etc/systemd/system/nix-daemon.socket
 
+readonly TMPFILES_SRC=/lib/tmpfiles.d/nix-daemon.conf
+readonly TMPFILES_DEST=/etc/tmpfiles.d/nix-daemon.conf
 
 # Path for the systemd override unit file to contain the proxy settings
 readonly SERVICE_OVERRIDE=${SERVICE_DEST}.d/override.conf
 
 create_systemd_override() {
      header "Configuring proxy for the nix-daemon service"
-    _sudo "create directory for systemd unit override" mkdir -p "$(dirname $SERVICE_OVERRIDE)"
+    _sudo "create directory for systemd unit override" mkdir -p "$(dirname "$SERVICE_OVERRIDE")"
     cat <<EOF | _sudo "create systemd unit override" tee "$SERVICE_OVERRIDE"
 [Service]
 $1
@@ -41,10 +43,8 @@ handle_network_proxy() {
     fi
 }
 
-poly_validate_assumptions() {
-    if [ "$(uname -s)" != "Linux" ]; then
-        failure "This script is for use with Linux!"
-    fi
+poly_cure_artifacts() {
+    :
 }
 
 poly_service_installed_check() {
@@ -72,24 +72,45 @@ poly_service_setup_note() {
 EOF
 }
 
+poly_extra_try_me_commands() {
+    if [ -e /run/systemd/system ]; then
+        :
+    else
+        cat <<EOF
+  $ sudo nix-daemon
+EOF
+    fi
+}
+
 poly_configure_nix_daemon_service() {
-    _sudo "to set up the nix-daemon service" \
-          systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
+    if [ -e /run/systemd/system ]; then
+        task "Setting up the nix-daemon systemd service"
 
-    _sudo "to set up the nix-daemon socket service" \
-          systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
+        _sudo "to create the nix-daemon tmpfiles config" \
+              ln -sfn /nix/var/nix/profiles/default/$TMPFILES_SRC $TMPFILES_DEST
 
-    handle_network_proxy
+        _sudo "to run systemd-tmpfiles once to pick that path up" \
+             systemd-tmpfiles --create --prefix=/nix/var/nix
 
-    _sudo "to load the systemd unit for nix-daemon" \
-          systemctl daemon-reload
+        _sudo "to set up the nix-daemon service" \
+              systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
 
-    _sudo "to start the nix-daemon.socket" \
-          systemctl start nix-daemon.socket
+        _sudo "to set up the nix-daemon socket service" \
+              systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
 
-    _sudo "to start the nix-daemon.service" \
-          systemctl restart nix-daemon.service
+        handle_network_proxy
 
+        _sudo "to load the systemd unit for nix-daemon" \
+              systemctl daemon-reload
+
+        _sudo "to start the nix-daemon.socket" \
+              systemctl start nix-daemon.socket
+
+        _sudo "to start the nix-daemon.service" \
+              systemctl restart nix-daemon.service
+    else
+        reminder "I don't support your init system yet; you may want to add nix-daemon manually."
+    fi
 }
 
 poly_group_exists() {
@@ -185,4 +206,8 @@ poly_create_build_user() {
           --uid "$uid" \
           --password "!" \
           "$username"
+}
+
+poly_prepare_to_install() {
+    :
 }

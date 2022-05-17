@@ -48,7 +48,11 @@ namespace nix {
 void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
-void dumpString(const std::string & s, Sink & sink);
+/* Same as `void dumpPath()`, but returns the last modified date of the path */
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink,
+    PathFilter & filter = defaultPathFilter);
+
+void dumpString(std::string_view s, Sink & sink);
 
 /* FIXME: fix this API, it sucks. */
 struct ParseSink
@@ -58,9 +62,9 @@ struct ParseSink
     virtual void createRegularFile(const Path & path) { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
-    virtual void receiveContents(unsigned char * data, size_t len) { };
+    virtual void receiveContents(std::string_view data) { };
 
-    virtual void createSymlink(const Path & path, const string & target) { };
+    virtual void createSymlink(const Path & path, const std::string & target) { };
 };
 
 /* If the NAR archive contains a single file at top-level, then save
@@ -72,17 +76,17 @@ struct RetrieveRegularNARSink : ParseSink
 
     RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
 
-    void createDirectory(const Path & path)
+    void createDirectory(const Path & path) override
     {
         regular = false;
     }
 
-    void receiveContents(unsigned char * data, size_t len)
+    void receiveContents(std::string_view data) override
     {
-        sink(data, len);
+        sink(data);
     }
 
-    void createSymlink(const Path & path, const string & target)
+    void createSymlink(const Path & path, const std::string & target) override
     {
         regular = false;
     }

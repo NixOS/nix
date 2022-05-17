@@ -1,7 +1,10 @@
 #include "util.hh"
 #include "types.hh"
 
+#include <limits.h>
 #include <gtest/gtest.h>
+
+#include <numeric>
 
 namespace nix {
 
@@ -281,6 +284,17 @@ namespace nix {
         ASSERT_EQ(decoded, s);
     }
 
+    TEST(base64Encode, encodeAndDecodeNonPrintable) {
+        char s[256];
+        std::iota(std::rbegin(s), std::rend(s), 0);
+
+        auto encoded = base64Encode(s);
+        auto decoded = base64Decode(encoded);
+
+        EXPECT_EQ(decoded.length(), 255);
+        ASSERT_EQ(decoded, s);
+    }
+
     /* ----------------------------------------------------------------------------
      * base64Decode
      * --------------------------------------------------------------------------*/
@@ -291,6 +305,10 @@ namespace nix {
 
     TEST(base64Decode, decodeAString) {
         ASSERT_EQ(base64Decode("cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0="), "quod erat demonstrandum");
+    }
+
+    TEST(base64Decode, decodeThrowsOnInvalidChar) {
+        ASSERT_THROW(base64Decode("cXVvZCBlcm_0IGRlbW9uc3RyYW5kdW0="), Error);
     }
 
     /* ----------------------------------------------------------------------------
@@ -319,20 +337,15 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(string2Float, emptyString) {
-        double n;
-        ASSERT_EQ(string2Float("", n), false);
+        ASSERT_EQ(string2Float<double>(""), std::nullopt);
     }
 
     TEST(string2Float, trivialConversions) {
-        double n;
-        ASSERT_EQ(string2Float("1.0", n), true);
-        ASSERT_EQ(n, 1.0);
+        ASSERT_EQ(string2Float<double>("1.0"), 1.0);
 
-        ASSERT_EQ(string2Float("0.0", n), true);
-        ASSERT_EQ(n, 0.0);
+        ASSERT_EQ(string2Float<double>("0.0"), 0.0);
 
-        ASSERT_EQ(string2Float("-100.25", n), true);
-        ASSERT_EQ(n, (-100.25));
+        ASSERT_EQ(string2Float<double>("-100.25"), -100.25);
     }
 
     /* ----------------------------------------------------------------------------
@@ -340,20 +353,15 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(string2Int, emptyString) {
-        double n;
-        ASSERT_EQ(string2Int("", n), false);
+        ASSERT_EQ(string2Int<int>(""), std::nullopt);
     }
 
     TEST(string2Int, trivialConversions) {
-        double n;
-        ASSERT_EQ(string2Int("1", n), true);
-        ASSERT_EQ(n, 1);
+        ASSERT_EQ(string2Int<int>("1"), 1);
 
-        ASSERT_EQ(string2Int("0", n), true);
-        ASSERT_EQ(n, 0);
+        ASSERT_EQ(string2Int<int>("0"), 0);
 
-        ASSERT_EQ(string2Int("-100", n), true);
-        ASSERT_EQ(n, (-100));
+        ASSERT_EQ(string2Int<int>("-100"), -100);
     }
 
     /* ----------------------------------------------------------------------------
@@ -540,7 +548,7 @@ namespace nix {
 
     TEST(get, emptyContainer) {
         StringMap s = { };
-        auto expected = std::nullopt;
+        auto expected = nullptr;
 
         ASSERT_EQ(get(s, "one"), expected);
     }
@@ -551,7 +559,23 @@ namespace nix {
         s["two"] = "er";
         auto expected = "yi";
 
-        ASSERT_EQ(get(s, "one"), expected);
+        ASSERT_EQ(*get(s, "one"), expected);
+    }
+
+    TEST(getOr, emptyContainer) {
+        StringMap s = { };
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "yi"), expected);
+    }
+
+    TEST(getOr, getFromContainer) {
+        StringMap s;
+        s["one"] = "yi";
+        s["two"] = "er";
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "nope"), expected);
     }
 
     /* ----------------------------------------------------------------------------
@@ -586,4 +610,14 @@ namespace nix {
 
         ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz" );
     }
+
+    TEST(filterANSIEscapes, utf8) {
+        ASSERT_EQ(filterANSIEscapes("foobar", true, 5), "fooba");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 6), "fóóbär");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 5), "fóóbä");
+        ASSERT_EQ(filterANSIEscapes("fóóbär", true, 3), "fóó");
+        ASSERT_EQ(filterANSIEscapes("f€€bär", true, 4), "f€€b");
+        ASSERT_EQ(filterANSIEscapes("f𐍈𐍈bär", true, 4), "f𐍈𐍈b");
+    }
+
 }

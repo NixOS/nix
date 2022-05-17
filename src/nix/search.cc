@@ -9,6 +9,7 @@
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
+#include "hilite.hh"
 
 #include <regex>
 #include <fstream>
@@ -18,16 +19,6 @@ using namespace nix;
 std::string wrap(std::string prefix, std::string s)
 {
     return prefix + s + ANSI_NORMAL;
-}
-
-std::string hilite(const std::string & s, const std::smatch & m, std::string postfix)
-{
-    return
-        m.empty()
-        ? s
-        : std::string(m.prefix())
-          + ANSI_GREEN + std::string(m.str()) + postfix
-          + std::string(m.suffix());
 }
 
 struct CmdSearch : InstallableCommand, MixJSON
@@ -41,29 +32,14 @@ struct CmdSearch : InstallableCommand, MixJSON
 
     std::string description() override
     {
-        return "query available packages";
+        return "search for packages";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show all packages in the flake in the current directory:",
-                "nix search"
-            },
-            Example{
-                "To show packages in the 'nixpkgs' flake containing 'blender' in its name or description:",
-                "nix search nixpkgs blender"
-            },
-            Example{
-                "To search for Firefox or Chromium:",
-                "nix search nixpkgs 'firefox|chromium'"
-            },
-            Example{
-                "To search for packages containing 'git' and either 'frontend' or 'gui':",
-                "nix search nixpkgs git 'frontend|gui'"
-            }
-        };
+        return
+          #include "search.md"
+          ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -77,6 +53,7 @@ struct CmdSearch : InstallableCommand, MixJSON
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;
+        evalSettings.enableImportFromDerivation.setDefault(false);
 
         // Empty search string should match all packages
         // Use "^" here instead of ".*" due to differences in resulting highlighting
@@ -96,49 +73,59 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath)
+        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
+            auto attrPathS = state->symbols.resolve(attrPath);
+
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPath)));
+                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]()
                 {
                     for (const auto & attr : cursor.getAttrs()) {
-                        auto cursor2 = cursor.getAttr(attr);
+                        auto cursor2 = cursor.getAttr(state->symbols[attr]);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*cursor2, attrPath2);
+                        visit(*cursor2, attrPath2, false);
                     }
                 };
 
                 if (cursor.isDerivation()) {
-                    size_t found = 0;
+                    DrvName name(cursor.getAttr(state->sName)->getString());
 
-                    DrvName name(cursor.getAttr("name")->getString());
-
-                    auto aMeta = cursor.maybeGetAttr("meta");
-                    auto aDescription = aMeta ? aMeta->maybeGetAttr("description") : nullptr;
+                    auto aMeta = cursor.maybeGetAttr(state->sMeta);
+                    auto aDescription = aMeta ? aMeta->maybeGetAttr(state->sDescription) : nullptr;
                     auto description = aDescription ? aDescription->getString() : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
-                    auto attrPath2 = concatStringsSep(".", attrPath);
+                    auto attrPath2 = concatStringsSep(".", attrPathS);
 
-                    std::smatch attrPathMatch;
-                    std::smatch descriptionMatch;
-                    std::smatch nameMatch;
+                    std::vector<std::smatch> attrPathMatches;
+                    std::vector<std::smatch> descriptionMatches;
+                    std::vector<std::smatch> nameMatches;
+                    bool found = false;
 
                     for (auto & regex : regexes) {
-                        std::regex_search(attrPath2, attrPathMatch, regex);
-                        std::regex_search(name.name, nameMatch, regex);
-                        std::regex_search(description, descriptionMatch, regex);
-                        if (!attrPathMatch.empty()
-                            || !nameMatch.empty()
-                            || !descriptionMatch.empty())
-                            found++;
+                        found = false;
+                        auto addAll = [&found](std::sregex_iterator it, std::vector<std::smatch> & vec) {
+                            const auto end = std::sregex_iterator();
+                            while (it != end) {
+                                vec.push_back(*it++);
+                                found = true;
+                            }
+                        };
+
+                        addAll(std::sregex_iterator(attrPath2.begin(), attrPath2.end(), regex), attrPathMatches);
+                        addAll(std::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
+                        addAll(std::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
+
+                        if (!found)
+                            break;
                     }
 
-                    if (found == res.size()) {
+                    if (found)
+                    {
                         results++;
                         if (json) {
                             auto jsonElem = jsonOut->object(attrPath2);
@@ -146,39 +133,42 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hilite(name.name, nameMatch, "\e[0;2m");
-                            if (results > 1) logger->stdout("");
-                            logger->stdout(
+                            auto name2 = hiliteMatches(name.name, std::move(nameMatches), ANSI_GREEN, "\e[0;2m");
+                            if (results > 1) logger->cout("");
+                            logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hilite(attrPath2, attrPathMatch, "\e[0;1m")),
+                                wrap("\e[0;1m", hiliteMatches(attrPath2, std::move(attrPathMatches), ANSI_GREEN, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
-                                logger->stdout(
-                                    "  %s", hilite(description, descriptionMatch, ANSI_NORMAL));
+                                logger->cout(
+                                    "  %s", hiliteMatches(description, std::move(descriptionMatches), ANSI_GREEN, ANSI_NORMAL));
                         }
                     }
                 }
 
                 else if (
                     attrPath.size() == 0
-                    || (attrPath[0] == "legacyPackages" && attrPath.size() <= 2)
-                    || (attrPath[0] == "packages" && attrPath.size() <= 2))
+                    || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
+                    || (attrPathS[0] == "packages" && attrPath.size() <= 2))
                     recurse();
 
-                else if (attrPath[0] == "legacyPackages" && attrPath.size() > 2) {
+                else if (initialRecurse)
+                    recurse();
+
+                else if (attrPathS[0] == "legacyPackages" && attrPath.size() > 2) {
                     auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
                     if (attr && attr->getBool())
                         recurse();
                 }
 
             } catch (EvalError & e) {
-                if (!(attrPath.size() > 0 && attrPath[0] == "legacyPackages"))
+                if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
                     throw;
             }
         };
 
-        for (auto & [cursor, prefix] : installable->getCursors(*state))
-            visit(*cursor, parseAttrPath(*state, prefix));
+        for (auto & cursor : installable->getCursors(*state))
+            visit(*cursor, cursor->getAttrPath(), true);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

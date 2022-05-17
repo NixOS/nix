@@ -2,7 +2,8 @@
 
 #include "parsed-derivations.hh"
 #include "lock.hh"
-#include "local-store.hh"
+#include "store-api.hh"
+#include "pathlocks.hh"
 #include "goal.hh"
 
 namespace nix {
@@ -37,31 +38,43 @@ struct InitialOutputStatus {
 
 struct InitialOutput {
     bool wanted;
+    Hash outputHash;
     std::optional<InitialOutputStatus> known;
 };
 
-class DerivationGoal : public Goal
+struct DerivationGoal : public Goal
 {
-private:
     /* Whether to use an on-disk .drv file. */
     bool useDerivation;
 
     /* The path of the derivation. */
     StorePath drvPath;
 
+    /* The goal for the corresponding resolved derivation */
+    std::shared_ptr<DerivationGoal> resolvedDrvGoal;
+
     /* The specific outputs that we need to build.  Empty means all of
        them. */
     StringSet wantedOutputs;
+
+    /* Mapping from input derivations + output names to actual store
+       paths. This is filled in by waiteeDone() as each dependency
+       finishes, before inputsRealised() is reached, */
+    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
     /* Whether additional wanted outputs have been added. */
     bool needRestart = false;
 
     /* Whether to retry substituting the outputs after building the
-       inputs. */
-    bool retrySubstitution;
+       inputs. This is done in case of an incomplete closure. */
+    bool retrySubstitution = false;
+
+    /* Whether we've retried substitution, in which case we won't try
+       again. */
+    bool retriedSubstitution = false;
 
     /* The derivation stored at drvPath. */
-    std::unique_ptr<BasicDerivation> drv;
+    std::unique_ptr<Derivation> drv;
 
     std::unique_ptr<ParsedDerivation> parsedDrv;
 
@@ -75,18 +88,6 @@ private:
     StorePathSet inputPaths;
 
     std::map<std::string, InitialOutput> initialOutputs;
-
-    /* User selected for running the builder. */
-    std::unique_ptr<UserLock> buildUser;
-
-    /* The process ID of the builder. */
-    Pid pid;
-
-    /* The temporary directory. */
-    Path tmpDir;
-
-    /* The path of the temporary directory in the sandbox. */
-    Path tmpDirInSandbox;
 
     /* File descriptor for the log file. */
     AutoCloseFD fdLogFile;
@@ -103,113 +104,21 @@ private:
 
     std::string currentHookLine;
 
-    /* Pipe for the builder's standard output/error. */
-    Pipe builderOut;
-
-    /* Pipe for synchronising updates to the builder namespaces. */
-    Pipe userNamespaceSync;
-
-    /* The mount namespace of the builder, used to add additional
-       paths to the sandbox as a result of recursive Nix calls. */
-    AutoCloseFD sandboxMountNamespace;
-
-    /* On Linux, whether we're doing the build in its own user
-       namespace. */
-    bool usingUserNamespace = true;
-
     /* The build hook. */
     std::unique_ptr<HookInstance> hook;
-
-    /* Whether we're currently doing a chroot build. */
-    bool useChroot = false;
-
-    Path chrootRootDir;
-
-    /* RAII object to delete the chroot directory. */
-    std::shared_ptr<AutoDelete> autoDelChroot;
 
     /* The sort of derivation we are building. */
     DerivationType derivationType;
 
-    /* Whether to run the build in a private network namespace. */
-    bool privateNetwork = false;
-
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
 
-    /* Stuff we need to pass to initChild(). */
-    struct ChrootPath {
-        Path source;
-        bool optional;
-        ChrootPath(Path source = "", bool optional = false)
-            : source(source), optional(optional)
-        { }
-    };
-    typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
-    DirsInChroot dirsInChroot;
-
-    typedef map<string, string> Environment;
-    Environment env;
-
-#if __APPLE__
-    typedef string SandboxProfile;
-    SandboxProfile additionalSandboxProfile;
-#endif
-
-    /* Hash rewriting. */
-    StringMap inputRewrites, outputRewrites;
-    typedef map<StorePath, StorePath> RedirectedOutputs;
-    RedirectedOutputs redirectedOutputs;
-
-    /* The outputs paths used during the build.
-
-       - Input-addressed derivations or fixed content-addressed outputs are
-         sometimes built when some of their outputs already exist, and can not
-         be hidden via sandboxing. We use temporary locations instead and
-         rewrite after the build. Otherwise the regular predetermined paths are
-         put here.
-
-       - Floating content-addressed derivations do not know their final build
-         output paths until the outputs are hashed, so random locations are
-         used, and then renamed. The randomness helps guard against hidden
-         self-references.
-     */
-    OutputPathMap scratchOutputs;
-
-    /* The final output paths of the build.
-
-       - For input-addressed derivations, always the precomputed paths
-
-       - For content-addressed derivations, calcuated from whatever the hash
-         ends up being. (Note that fixed outputs derivations that produce the
-         "wrong" output still install that data under its true content-address.)
-     */
-    OutputPathMap finalOutputs;
-
     BuildMode buildMode;
-
-    /* If we're repairing without a chroot, there may be outputs that
-       are valid but corrupt.  So we redirect these outputs to
-       temporary paths. */
-    StorePathSet redirectedBadOutputs;
-
-    BuildResult result;
 
     /* The current round, if we're building multiple times. */
     size_t curRound = 1;
 
     size_t nrRounds;
-
-    /* Path registration info from the previous round, if we're
-       building multiple times. Since this contains the hash, it
-       allows us to compare whether two rounds produced the same
-       result. */
-    std::map<Path, ValidPathInfo> prevInfos;
-
-    uid_t sandboxUid() { return usingUserNamespace ? 1000 : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ?  100 : buildUser->getGID(); }
-
-    const static Path homeDir;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
 
@@ -223,58 +132,23 @@ private:
     /* The remote machine on which we're building. */
     std::string machineName;
 
-    /* The recursive Nix daemon socket. */
-    AutoCloseFD daemonSocket;
-
-    /* The daemon main thread. */
-    std::thread daemonThread;
-
-    /* The daemon worker threads. */
-    std::vector<std::thread> daemonWorkerThreads;
-
-    /* Paths that were added via recursive Nix calls. */
-    StorePathSet addedPaths;
-
-    /* Recursive Nix calls are only allowed to build or realize paths
-       in the original input closure or added via a recursive Nix call
-       (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
-       /nix/store/<bla> is some arbitrary path in a binary cache). */
-    bool isAllowed(const StorePath & path)
-    {
-        return inputPaths.count(path) || addedPaths.count(path);
-    }
-
-    friend struct RestrictedStore;
-
-public:
     DerivationGoal(const StorePath & drvPath,
         const StringSet & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
         const StringSet & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
-    ~DerivationGoal();
-
-    /* Whether we need to perform hash rewriting if there are valid output paths. */
-    bool needsHashRewrite();
+    virtual ~DerivationGoal();
 
     void timedOut(Error && ex) override;
 
-    string key() override;
+    std::string key() override;
 
     void work() override;
-
-    StorePath getDrvPath()
-    {
-        return drvPath;
-    }
 
     /* Add wanted outputs to an already existing derivation goal. */
     void addWantedOutputs(const StringSet & outputs);
 
-    BuildResult getResult() { return result; }
-
-private:
     /* The states. */
     void getDerivation();
     void loadDerivation();
@@ -284,7 +158,7 @@ private:
     void closureRepaired();
     void inputsRealised();
     void tryToBuild();
-    void tryLocalBuild();
+    virtual void tryLocalBuild();
     void buildDone();
 
     void resolvedFinished();
@@ -292,54 +166,36 @@ private:
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
 
-    /* Start building a derivation. */
-    void startBuilder();
-
-    /* Fill in the environment for the builder. */
-    void initEnv();
-
-    /* Setup tmp dir location. */
-    void initTmpDir();
-
-    /* Write a JSON file containing the derivation attributes. */
-    void writeStructuredAttrs();
-
-    void startDaemon();
-
-    void stopDaemon();
-
-    /* Add 'path' to the set of paths that may be referenced by the
-       outputs, and make it appear in the sandbox. */
-    void addDependency(const StorePath & path);
-
-    /* Make a file owned by the builder. */
-    void chownToBuilder(const Path & path);
-
-    /* Run the builder's process. */
-    void runChild();
-
-    friend int childEntry(void *);
+    virtual int getChildStatus();
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    void registerOutputs();
-
-    /* Check that an output meets the requirements specified by the
-       'outputChecks' attribute (or the legacy
-       '{allowed,disallowed}{References,Requisites}' attributes). */
-    void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
+    virtual DrvOutputs registerOutputs();
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
 
+    /* Sign the newly built realisation if the store allows it */
+    virtual void signRealisation(Realisation&) {}
+
     /* Close the log file. */
     void closeLogFile();
 
-    /* Delete the temporary directory, if we have one. */
-    void deleteTmpDir(bool force);
+    /* Close the read side of the logger pipe. */
+    virtual void closeReadPipes();
+
+    /* Cleanup hooks for buildDone() */
+    virtual void cleanupHookFinally();
+    virtual void cleanupPreChildKill();
+    virtual void cleanupPostChildKill();
+    virtual bool cleanupDecideWhetherDiskFull();
+    virtual void cleanupPostOutputsRegisteredModeCheck();
+    virtual void cleanupPostOutputsRegisteredModeNonCheck();
+
+    virtual bool isReadDesc(int fd);
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data) override;
+    void handleChildOutput(int fd, std::string_view data) override;
     void handleEOF(int fd) override;
     void flushLine();
 
@@ -349,21 +205,20 @@ private:
     std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
     OutputPathMap queryDerivationOutputMap();
 
-    /* Return the set of (in)valid paths. */
-    void checkPathValidity();
+    /* Update 'initialOutputs' to determine the current status of the
+       outputs of the derivation. Also returns a Boolean denoting
+       whether all outputs are valid and non-corrupt, and a
+       'DrvOutputs' structure containing the valid and wanted
+       outputs. */
+    std::pair<bool, DrvOutputs> checkPathValidity();
+
+    /* Aborts if any output is not valid or corrupt, and otherwise
+       returns a 'DrvOutputs' structure containing the wanted
+       outputs. */
+    DrvOutputs assertPathValidity();
 
     /* Forcibly kill the child process, if any. */
-    void killChild();
-
-    /* Create alternative path calculated from but distinct from the
-       input, so we can avoid overwriting outputs (or other store paths)
-       that already exist. */
-    StorePath makeFallbackPath(const StorePath & path);
-    /* Make a path to another based on the output name along with the
-       derivation hash. */
-    /* FIXME add option to randomize, so we can audit whether our
-       rewrites caught everything */
-    StorePath makeFallbackPath(std::string_view outputName);
+    virtual void killChild();
 
     void repairClosure();
 
@@ -371,9 +226,14 @@ private:
 
     void done(
         BuildResult::Status status,
+        DrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
+
+    void waiteeDone(GoalPtr waitee, ExitCode result) override;
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 };
+
+MakeError(NotDeterministic, BuildError);
 
 }

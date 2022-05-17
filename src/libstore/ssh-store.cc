@@ -13,6 +13,7 @@ struct SSHStoreConfig : virtual RemoteStoreConfig
     using RemoteStoreConfig::RemoteStoreConfig;
 
     const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
     const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
@@ -20,18 +21,21 @@ struct SSHStoreConfig : virtual RemoteStoreConfig
     const std::string name() override { return "SSH Store"; }
 };
 
-class SSHStore : public virtual RemoteStore, public virtual SSHStoreConfig
+class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
 
     SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
+        , RemoteStoreConfig(params)
+        , SSHStoreConfig(params)
         , Store(params)
         , RemoteStore(params)
         , host(host)
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress)
@@ -48,11 +52,20 @@ public:
     bool sameMachine() override
     { return false; }
 
+    // FIXME extend daemon protocol, move implementation to RemoteStore
+    std::optional<std::string> getBuildLog(const StorePath & path) override
+    { unsupported("getBuildLog"); }
+
 private:
 
     struct Connection : RemoteStore::Connection
     {
         std::unique_ptr<SSHMaster::Connection> sshConn;
+
+        void closeWrite() override
+        {
+            sshConn->in.close();
+        }
     };
 
     ref<RemoteStore::Connection> openConnection() override;

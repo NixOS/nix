@@ -15,14 +15,11 @@ struct CmdEdit : InstallableCommand
         return "open the Nix expression of a Nix package in $EDITOR";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To open the Nix expression of the GNU Hello package:",
-                "nix edit nixpkgs#hello"
-            },
-        };
+        return
+          #include "edit.md"
+          ;
     }
 
     Category category() override { return catSecondary; }
@@ -31,21 +28,22 @@ struct CmdEdit : InstallableCommand
     {
         auto state = getEvalState();
 
-        auto [v, pos] = installable->toValue(*state);
+        const auto [file, line] = [&] {
+            auto [v, pos] = installable->toValue(*state);
 
-        try {
-            pos = findDerivationFilename(*state, *v, installable->what());
-        } catch (NoPositionInfo &) {
-        }
-
-        if (pos == noPos)
-            throw Error("cannot find position information for '%s", installable->what());
+            try {
+                return findPackageFilename(*state, *v, installable->what());
+            } catch (NoPositionInfo &) {
+                throw Error("cannot find position information for '%s", installable->what());
+            }
+        }();
 
         stopProgressBar();
 
-        auto args = editorFor(pos);
+        auto args = editorFor(file, line);
 
-        restoreSignals();
+        restoreProcessContext();
+
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
         std::string command;

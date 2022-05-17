@@ -1,6 +1,8 @@
 #pragma once
 
 #include "store-api.hh"
+#include "gc-store.hh"
+#include "log-store.hh"
 
 namespace nix {
 
@@ -18,13 +20,19 @@ struct LocalFSStoreConfig : virtual StoreConfig
     const PathSetting logDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
         "log", "directory where Nix will store state"};
+    const PathSetting realStoreDir{(StoreConfig*) this, false,
+        rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
+        "physical path to the Nix store"};
 };
 
-class LocalFSStore : public virtual Store, public virtual LocalFSStoreConfig
+class LocalFSStore : public virtual LocalFSStoreConfig,
+    public virtual Store,
+    public virtual GcStore,
+    public virtual LogStore
 {
 public:
 
-    const static string drvsLogDir;
+    const static std::string drvsLogDir;
 
     LocalFSStore(const Params & params);
 
@@ -34,7 +42,7 @@ public:
     /* Register a permanent GC root. */
     Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
 
-    virtual Path getRealStoreDir() { return storeDir; }
+    virtual Path getRealStoreDir() { return realStoreDir; }
 
     Path toRealPath(const Path & storePath) override
     {
@@ -42,7 +50,8 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
-    std::shared_ptr<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLog(const StorePath & path) override;
+
 };
 
 }

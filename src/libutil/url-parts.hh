@@ -8,7 +8,8 @@ namespace nix {
 // URI stuff.
 const static std::string pctEncoded = "(?:%[0-9a-fA-F][0-9a-fA-F])";
 const static std::string schemeRegex = "(?:[a-z][a-z0-9+.-]*)";
-const static std::string ipv6AddressRegex = "(?:\\[[0-9a-fA-F:]+\\])";
+const static std::string ipv6AddressSegmentRegex = "[0-9a-fA-F:]+(?:%\\w+)?";
+const static std::string ipv6AddressRegex = "(?:\\[" + ipv6AddressSegmentRegex + "\\]|" + ipv6AddressSegmentRegex + ")";
 const static std::string unreservedRegex = "(?:[a-zA-Z0-9-._~])";
 const static std::string subdelimsRegex = "(?:[!$&'\"()*+,;=])";
 const static std::string hostnameRegex = "(?:(?:" + unreservedRegex + "|" + pctEncoded + "|" + subdelimsRegex + ")*)";
@@ -17,12 +18,12 @@ const static std::string userRegex = "(?:(?:" + unreservedRegex + "|" + pctEncod
 const static std::string authorityRegex = "(?:" + userRegex + "@)?" + hostRegex + "(?::[0-9]+)?";
 const static std::string pcharRegex = "(?:" + unreservedRegex + "|" + pctEncoded + "|" + subdelimsRegex + "|[:@])";
 const static std::string queryRegex = "(?:" + pcharRegex + "|[/? \"])*";
-const static std::string segmentRegex = "(?:" + pcharRegex + "+)";
+const static std::string segmentRegex = "(?:" + pcharRegex + "*)";
 const static std::string absPathRegex = "(?:(?:/" + segmentRegex + ")*/?)";
 const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRegex + ")*/?)";
 
 // A Git ref (i.e. branch or tag name).
-const static std::string refRegexS = "[a-zA-Z0-9][a-zA-Z0-9_.-]*"; // FIXME: check
+const static std::string refRegexS = "[a-zA-Z0-9][a-zA-Z0-9_.\\/-]*"; // FIXME: check
 extern std::regex refRegex;
 
 // Instead of defining what a good Git Ref is, we define what a bad Git Ref is

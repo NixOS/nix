@@ -23,15 +23,17 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="30000"
+readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
-readonly NIX_FIRST_BUILD_UID="30001"
+# darwin installer needs to override these
+NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
+NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
 readonly NIX_ROOT="/nix"
 readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
-readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshenv")
+readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
@@ -41,7 +43,7 @@ readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
 readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
-readonly ROOT_HOME=$(echo ~root)
+readonly ROOT_HOME=~root
 
 if [ -t 0 ]; then
     readonly IS_HEADLESS='no'
@@ -57,25 +59,28 @@ headless() {
     fi
 }
 
-contactme() {
+contact_us() {
+    echo "You can open an issue at https://github.com/nixos/nix/issues"
+    echo ""
+    echo "Or feel free to contact the team:"
+    echo " - Matrix: #nix:nixos.org"
+    echo " - IRC: in #nixos on irc.libera.chat"
+    echo " - twitter: @nixos_org"
+    echo " - forum: https://discourse.nixos.org"
+}
+get_help() {
     echo "We'd love to help if you need it."
     echo ""
-    echo "If you can, open an issue at https://github.com/nixos/nix/issues"
-    echo ""
-    echo "Or feel free to contact the team,"
-    echo " - on IRC #nixos on irc.freenode.net"
-    echo " - on twitter @nixos_org"
+    contact_us
 }
 
 uninstall_directions() {
     subheader "Uninstalling nix:"
     local step=0
 
-    if [ -e /run/systemd/system ] && poly_service_installed_check; then
+    if poly_service_installed_check; then
         step=$((step + 1))
         poly_service_uninstall_directions "$step"
-    else
-        step=$((step + 1))
     fi
 
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -102,11 +107,10 @@ $step. Delete the files Nix added to your system:
 and that is it.
 
 EOF
-
 }
 
 nix_user_for_core() {
-    printf "nixbld%d" "$1"
+    printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
 }
 
 nix_uid_for_core() {
@@ -170,7 +174,7 @@ failure() {
     header "oh no!"
     _textout "$RED" "$@"
     echo ""
-    _textout "$RED" "$(contactme)"
+    _textout "$RED" "$(get_help)"
     trap finish_cleanup EXIT
     exit 1
 }
@@ -201,6 +205,95 @@ ui_confirm() {
     return 1
 }
 
+printf -v _UNCHANGED_GRP_FMT "%b" $'\033[2m%='"$ESC" # "dim"
+# bold+invert+red and bold+invert+green just for the +/- below
+# red/green foreground for rest of the line
+printf -v _OLD_LINE_FMT "%b" $'\033[1;7;31m-'"$ESC ${RED}%L${ESC}"
+printf -v _NEW_LINE_FMT "%b" $'\033[1;7;32m+'"$ESC ${GREEN}%L${ESC}"
+
+_diff() {
+    # simple colorized diff comatible w/ pre `--color` versions
+    diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
+}
+
+confirm_rm() {
+    local path="$1"
+    if ui_confirm "Can I remove $path?"; then
+        _sudo "to remove $path" rm "$path"
+    fi
+}
+
+confirm_edit() {
+    local path="$1"
+    local edit_path="$2"
+    cat <<EOF
+
+Nix isn't the only thing in $path,
+but I think I know how to edit it out.
+Here's the diff:
+EOF
+
+    # could technically test the diff, but caller should do it
+    _diff "$path" "$edit_path"
+    if ui_confirm "Does the change above look right?"; then
+        _sudo "remove nix from $path" cp "$edit_path" "$path"
+    fi
+}
+
+_SERIOUS_BUSINESS="${RED}%s:${ESC} "
+password_confirm() {
+    local do_something_consequential="$1"
+    if ui_confirm "Can I $do_something_consequential?"; then
+        # shellcheck disable=SC2059
+        sudo -kv --prompt="$(printf "${_SERIOUS_BUSINESS}" "Enter your password to $do_something_consequential")"
+    else
+        return 1
+    fi
+}
+
+# Support accumulating reminders over the course of a run and showing
+# them at the end. An example where this helps: the installer changes
+# something, but it won't work without a reboot. If you tell the user
+# when you do it, they may miss it in the stream. The value of the
+# setting isn't enough to decide whether to message because you only
+# need to message if you *changed* it.
+
+# reminders stored in array delimited by empty entry; if ! headless,
+# user is asked to confirm after each delimiter.
+_reminders=()
+((_remind_num=1))
+
+remind() {
+    # (( arithmetic expression ))
+    if (( _remind_num > 1 )); then
+        header "Reminders"
+        for line in "${_reminders[@]}"; do
+            echo "$line"
+            if ! headless && [ "${#line}" = 0 ]; then
+                if read -r -p "Press enter/return to acknowledge."; then
+                    printf $'\033[A\33[2K\r'
+                fi
+            fi
+        done
+    fi
+}
+
+reminder() {
+    printf -v label "${BLUE}[ %d ]${ESC}" "$_remind_num"
+    _reminders+=("$label")
+    if [[ "$*" = "" ]]; then
+        while read -r line; do
+            _reminders+=("$line")
+        done
+    else
+        # this expands each arg to an array entry (and each entry will
+        # ultimately be a separate line in the output)
+        _reminders+=("$@")
+    fi
+    _reminders+=("")
+    ((_remind_num++))
+}
+
 __sudo() {
     local expl="$1"
     local cmd="$2"
@@ -221,18 +314,18 @@ _sudo() {
     local expl="$1"
     shift
     if ! headless; then
-        __sudo "$expl" "$*"
+        __sudo "$expl" "$*" >&2
     fi
     sudo "$@"
 }
 
 
-readonly SCRATCH=$(mktemp -d -t tmp.XXXXXXXXXX)
-function finish_cleanup {
+readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
+finish_cleanup() {
     rm -rf "$SCRATCH"
 }
 
-function finish_fail {
+finish_fail() {
     finish_cleanup
 
     failure <<EOF
@@ -244,65 +337,51 @@ EOF
 }
 trap finish_fail EXIT
 
-channel_update_failed=0
-function finish_success {
-    finish_cleanup
-
+finish_success() {
     ok "Alright! We're done!"
-    if [ "x$channel_update_failed" = x1 ]; then
-        echo ""
-        echo "But fetching the nixpkgs channel failed. (Are you offline?)"
-        echo "To try again later, run \"sudo -i nix-channel --update nixpkgs\"."
-    fi
 
-    if [ -e /run/systemd/system ]; then
-        cat <<EOF
-
-Before Nix will work in your existing shells, you'll need to close
-them and open them again. Other than that, you should be ready to go.
-
+    cat <<EOF
 Try it! Open a new terminal, and type:
-
+$(poly_extra_try_me_commands)
   $ nix-shell -p nix-info --run "nix-info -m"
 
-Thank you for using this installer. If you have any feedback, don't
-hesitate:
+Thank you for using this installer. If you have any feedback or need
+help, don't hesitate:
 
-$(contactme)
+$(contact_us)
 EOF
-    else
-        cat <<EOF
-
-Before Nix will work in your existing shells, you'll need to close
-them and open them again. Other than that, you should be ready to go.
-
-Try it! Open a new terminal, and type:
-
-  $ sudo nix-daemon
-  $ nix-shell -p nix-info --run "nix-info -m"
-
-Additionally, you may want to add nix-daemon to your init-system.
-
-Thank you for using this installer. If you have any feedback, don't
-hesitate:
-
-$(contactme)
-EOF
-   fi
-
+    remind
+    finish_cleanup
 }
 
+finish_uninstall_success() {
+    ok "Alright! Nix should be removed!"
+
+    cat <<EOF
+If you spot anything this uninstaller missed or have feedback,
+don't hesitate:
+
+$(contact_us)
+EOF
+    remind
+    finish_cleanup
+}
+
+remove_nix_artifacts() {
+    failure "Not implemented yet"
+}
+
+cure_artifacts() {
+    poly_cure_artifacts
+    # remove_nix_artifacts (LATER)
+}
 
 validate_starting_assumptions() {
-    poly_validate_assumptions
-
-    if [ $EUID -eq 0 ]; then
-        failure <<EOF
-Please do not run this script with root privileges. We will call sudo
-when we need to.
+    task "Checking for artifacts of previous installs"
+    cat <<EOF
+Before I try to install, I'll check for signs Nix already is or has
+been installed on this system.
 EOF
-    fi
-
     if type nix-env 2> /dev/null >&2; then
         warning <<EOF
 Nix already appears to be installed. This installer may run into issues.
@@ -312,24 +391,50 @@ $(uninstall_directions)
 EOF
     fi
 
+    # TODO: I think it would be good for this step to accumulate more
+    #       knowledge of older obsolete artifacts, if there are any.
+    #       We could issue a "reminder" here that the user might want
+    #       to clean them up?
+
     for profile_target in "${PROFILE_TARGETS[@]}"; do
+        # TODO: I think it would be good to accumulate a list of all
+        #       of the copies so that people don't hit this 2 or 3x in
+        #       a row for different files.
         if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+            # this backup process first released in Nix 2.1
             failure <<EOF
-When this script runs, it backs up the current $profile_target to
-$profile_target$PROFILE_BACKUP_SUFFIX. This backup file already exists, though.
+I back up shell profile/rc scripts before I add Nix to them.
+I need to back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX,
+but the latter already exists.
 
-Please follow these instructions to clean up the old backup file:
+Here's how to clean up the old backup file:
 
-1. Copy $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX to another place, just
-in case.
+1. Back up (copy) $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX
+   to another location, just in case.
 
-2. Take care to make sure that $profile_target$PROFILE_BACKUP_SUFFIX doesn't look like
-it has anything nix-related in it. If it does, something is probably
-quite wrong. Please open an issue or get in touch immediately.
+2. Ensure $profile_target$PROFILE_BACKUP_SUFFIX does not have anything
+   Nix-related in it. If it does, something is probably quite
+   wrong. Please open an issue or get in touch immediately.
+
+3. Once you confirm $profile_target is backed up and
+   $profile_target$PROFILE_BACKUP_SUFFIX doesn't mention Nix, run:
+   mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 EOF
         fi
     done
 
+    if [ "$(uname -s)" = "Linux" ] && [ ! -e /run/systemd/system ]; then
+        warning <<EOF
+We did not detect systemd on your system. With a multi-user install
+without systemd you will have to manually configure your init system to
+launch the Nix daemon after installation.
+EOF
+        if ! ui_confirm "Do you want to proceed with a multi-user installation?"; then
+            failure <<EOF
+You have aborted the installation.
+EOF
+        fi
+    fi
 }
 
 setup_report() {
@@ -464,18 +569,65 @@ create_build_users() {
 
 create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
+    task "Setting up the basic directory structure"
+    if [ -d "$NIX_ROOT" ]; then
+        # if /nix already exists, take ownership
+        #
+        # Caution: notes below are macOS-y
+        # This is a bit of a goldilocks zone for taking ownership
+        # if there are already files on the volume; the volume is
+        # now mounted, but we haven't added a bunch of new files
 
+        # this is probably a bit slow; I've been seeing 3.3-4s even
+        # when promptly installed over a fresh single-user install.
+        # In case anyone's aware of a shortcut.
+        # `|| true`: .Trashes errors w/o full disk perm
+
+        # rumor per #4488 that macOS 11.2 may not have
+        # sbin on path, and that's where chown is, but
+        # since this bit is cross-platform:
+        # - first try with `command -vp` to try and find
+        #   chown in the usual places
+        #   * to work around some sort of deficiency in
+        #     `command -p` in macOS bash 3.2, we also add
+        #     PATH="$(getconf PATH 2>/dev/null)". As long as
+        #     getconf is found, this should set a sane PATH
+        #     which `command -p` in bash 3.2 appears to use.
+        #     A bash with a properly-working `command -p`
+        #     should ignore this hard-set PATH in favor of
+        #     whatever it obtains internally. See
+        #     github.com/NixOS/nix/issues/5768
+        # - fall back on `command -v` which would find
+        #   any chown on path
+        # if we don't find one, the command is already
+        # hiding behind || true, and the general state
+        # should be one the user can repair once they
+        # figure out where chown is...
+        local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
+        if [[ -z "$get_chr_own" ]]; then
+            get_chr_own="$(command -v chown)"
+        fi
+
+        if [[ -z "$get_chr_own" ]]; then
+            reminder <<EOF
+I wanted to take root ownership of existing Nix store files,
+but I couldn't locate 'chown'. (You may need to fix your PATH.)
+To manually change file ownership, you can run:
+    sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT'
+EOF
+        else
+            _sudo "to take root ownership of existing Nix store files" \
+                  "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+        fi
+    fi
     _sudo "to make the basic directory structure of Nix (part 1)" \
-          mkdir -pv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool} /nix/var/nix/{gcroots,profiles}/per-user
+          install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool,/daemon-socket} /nix/var/nix/{gcroots,profiles}/per-user
 
     _sudo "to make the basic directory structure of Nix (part 2)" \
-          mkdir -pv -m 1775 /nix/store
-
-    _sudo "to make the basic directory structure of Nix (part 3)" \
-          chgrp "$NIX_BUILD_GROUP_NAME" /nix/store
+          install -dv -g "$NIX_BUILD_GROUP_NAME" -m 1775 /nix/store
 
     _sudo "to place the default nix daemon configuration (part 1)" \
-          mkdir -pv -m 0555 /etc/nix
+          install -dv -m 0555 /etc/nix
 }
 
 place_channel_configuration() {
@@ -495,9 +647,9 @@ This installation tool will set up your computer with the Nix package
 manager. This will happen in a few stages:
 
 1. Make sure your computer doesn't already have Nix. If it does, I
-   will show you instructions on how to clean up your old one.
+   will show you instructions on how to clean up your old install.
 
-2. Show you what we are going to install and where. Then we will ask
+2. Show you what I am going to install and where. Then I will ask
    if you are ready to continue.
 
 3. Create the system users and groups that the Nix daemon uses to run
@@ -512,14 +664,14 @@ manager. This will happen in a few stages:
 
 EOF
 
-    if ui_confirm "Would you like to see a more detailed list of what we will do?"; then
+    if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
         cat <<EOF
 
-We will:
+I will:
 
  - make sure your computer doesn't already have Nix files
    (if it does, I will tell you how to clean them up.)
- - create local users (see the list above for the users we'll make)
+ - create local users (see the list above for the users I'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT
  - create a configuration file in /etc/nix
@@ -554,7 +706,7 @@ run in a headless fashion, like this:
 
   $ curl -L https://nixos.org/nix/install | sh
 
-or maybe in a CI pipeline. Because of that, we're going to skip the
+or maybe in a CI pipeline. Because of that, I'm going to skip the
 verbose output in the interest of brevity.
 
 If you would like to
@@ -568,7 +720,7 @@ EOF
     fi
 
     cat <<EOF
-This script is going to call sudo a lot. Every time we do, it'll
+This script is going to call sudo a lot. Every time I do, it'll
 output exactly what it'll do, and why.
 
 Just like this:
@@ -580,25 +732,29 @@ EOF
     cat <<EOF
 
 This might look scary, but everything can be undone by running just a
-few commands. We used to ask you to confirm each time sudo ran, but it
+few commands. I used to ask you to confirm each time sudo ran, but it
 was too many times. Instead, I'll just ask you this one time:
 
 EOF
-    if ui_confirm "Can we use sudo?"; then
+    if ui_confirm "Can I use sudo?"; then
         ok "Yay! Thanks! Let's get going!"
     else
         failure <<EOF
-That is okay, but we can't install.
+That is okay, but I can't install.
 EOF
     fi
 }
 
 install_from_extracted_nix() {
+    task "Installing Nix"
     (
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              rsync -rlpt --chmod=-w ./store/* "$NIX_ROOT/store/"
+              cp -RPp ./store/* "$NIX_ROOT/store/"
+
+        _sudo "to make the new store non-writable at $NIX_ROOT/store" \
+              chmod -R ugo-w "$NIX_ROOT/store/"
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
@@ -609,9 +765,8 @@ $NIX_INSTALLED_NIX.
 EOF
         fi
 
-        cat ./.reginfo \
-            | _sudo "to load data for the first time in to the Nix Database" \
-                   "$NIX_INSTALLED_NIX/bin/nix-store" --load-db
+        _sudo "to load data for the first time in to the Nix Database" \
+              "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
         echo "      Just finished getting the nix database ready."
     )
@@ -630,37 +785,47 @@ EOF
 }
 
 configure_shell_profile() {
-    # If there is an /etc/profile.d directory, we want to ensure there
-    # is a nix.sh within it, so we can use the following loop to add
-    # the source lines to it. Note that I'm _not_ adding the source
-    # lines here, because we want to be using the regular machinery.
-    #
-    # If we go around that machinery, it becomes more complicated and
-    # adds complications to the uninstall instruction generator and
-    # old instruction sniffer as well.
-    if [ -d /etc/profile.d ]; then
-        _sudo "create a stub /etc/profile.d/nix.sh which will be updated" \
-              touch /etc/profile.d/nix.sh
-    fi
-
+    task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
             _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
                   cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+        else
+            # try to create the file if its directory exists
+            target_dir="$(dirname "$profile_target")"
+            if [ -d "$target_dir" ]; then
+                _sudo "to create a stub $profile_target which will be updated" \
+                    touch "$profile_target"
+            fi
+        fi
 
+        if [ -e "$profile_target" ]; then
             shell_source_lines \
                 | _sudo "extend your $profile_target with nix-daemon settings" \
                         tee -a "$profile_target"
         fi
     done
+    # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
+    # their way less disruptively, but a counter-argument is that they won't
+    # immediately notice if something didn't get set up right?
+    reminder "Nix won't work in active shell sessions until you restart them."
+}
+
+cert_in_store() {
+    # in a subshell
+    # - change into the cert-file dir
+    # - get the phyiscal pwd
+    # and test if this path is in the Nix store
+    [[ "$(cd -- "$(dirname "$NIX_SSL_CERT_FILE")" && exec pwd -P)" == "$NIX_ROOT/store/"* ]]
 }
 
 setup_default_profile() {
-    _sudo "to installing a bootstrapping Nix in to the default Profile" \
+    task "Setting up the default profile"
+    _sudo "to install a bootstrapping Nix in to the default profile" \
           HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
 
-    if [ -z "${NIX_SSL_CERT_FILE:-}" ] || ! [ -f "${NIX_SSL_CERT_FILE:-}" ]; then
-        _sudo "to installing a bootstrapping SSL certificate just for Nix in to the default Profile" \
+    if [ -z "${NIX_SSL_CERT_FILE:-}" ] || ! [ -f "${NIX_SSL_CERT_FILE:-}" ] || cert_in_store; then
+        _sudo "to install a bootstrapping SSL certificate just for Nix in to the default profile" \
               HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
         export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
     fi
@@ -669,9 +834,13 @@ setup_default_profile() {
         # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
         # otherwise it will be lost in environments where sudo doesn't pass
         # all the environment variables by default.
-        _sudo "to update the default channel in the default profile" \
-            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs \
-            || channel_update_failed=1
+        if ! _sudo "to update the default channel in the default profile" \
+            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs; then
+            reminder <<EOF
+I had trouble fetching the nixpkgs channel (are you offline?)
+To try again later, run: sudo -i nix-channel --update nixpkgs
+EOF
+        fi
     fi
 }
 
@@ -686,6 +855,17 @@ EOF
 }
 
 main() {
+    # TODO: I've moved this out of validate_starting_assumptions so we
+    # can fail faster in this case. Sourcing install-darwin... now runs
+    # `touch /` to detect Read-only root, but it could update times on
+    # pre-Catalina macOS if run as root user.
+    if [ "$EUID" -eq 0 ]; then
+        failure <<EOF
+Please do not run this script with root privileges. I will call sudo
+when I need to.
+EOF
+    fi
+
     if [ "$(uname -s)" = "Darwin" ]; then
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
@@ -699,16 +879,23 @@ main() {
     welcome_to_nix
     chat_about_sudo
 
+    cure_artifacts
+    # TODO: there's a tension between cure and validate. I moved the
+    # the sudo/root check out of validate to the head of this func.
+    # Cure is *intended* to subsume the validate-and-abort approach,
+    # so it may eventually obsolete it.
     validate_starting_assumptions
 
     setup_report
 
     if ! ui_confirm "Ready to continue?"; then
         ok "Alright, no changes have been made :)"
-        contactme
+        get_help
         trap finish_cleanup EXIT
         exit 1
     fi
+
+    poly_prepare_to_install
 
     create_build_group
     create_build_users
@@ -719,18 +906,32 @@ main() {
     configure_shell_profile
 
     set +eu
+    # shellcheck disable=SC1091
     . /etc/profile
     set -eu
 
     setup_default_profile
     place_nix_configuration
 
-    if [ -e /run/systemd/system ]; then
-        poly_configure_nix_daemon_service
-    fi
+    poly_configure_nix_daemon_service
 
     trap finish_success EXIT
 }
 
+# set an empty initial arg for bare invocations in case we need to
+# disambiguate someone directly invoking this later.
+if [ "${#@}" = 0 ]; then
+    set ""
+fi
 
-main
+# ACTION for override
+case "${1-}" in
+    # uninstall)
+    #     shift
+    #     uninstall "$@";;
+    # install == same as the no-arg condition for now (but, explicit)
+    ""|install)
+        main;;
+    *) # holding space for future options (like uninstall + install?)
+        failure "install-multi-user: invalid argument";;
+esac

@@ -1,5 +1,7 @@
 #include "store-api.hh"
 
+#include <sodium.h>
+
 namespace nix {
 
 static void checkName(std::string_view path, std::string_view name)
@@ -41,6 +43,13 @@ bool StorePath::isDerivation() const
 
 StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
+StorePath StorePath::random(std::string_view name)
+{
+    Hash hash(htSHA1);
+    randombytes_buf(hash.hash, hash.hashSize);
+    return StorePath(hash, name);
+}
+
 StorePath Store::parseStorePath(std::string_view path) const
 {
     auto p = canonPath(std::string(path));
@@ -80,21 +89,6 @@ PathSet Store::printStorePathSet(const StorePathSet & paths) const
     PathSet res;
     for (auto & i : paths) res.insert(printStorePath(i));
     return res;
-}
-
-std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
-{
-    size_t n = s.find("!");
-    return n == s.npos
-        ? std::make_pair(s, std::set<string>())
-        : std::make_pair(((std::string_view) s).substr(0, n),
-            tokenizeString<std::set<string>>(((std::string_view) s).substr(n + 1), ","));
-}
-
-StorePathWithOutputs Store::parsePathWithOutputs(const std::string & s)
-{
-    auto [path, outputs] = nix::parsePathWithOutputs(s);
-    return {parseStorePath(path), std::move(outputs)};
 }
 
 }

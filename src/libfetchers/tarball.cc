@@ -13,7 +13,7 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers)
 {
     // FIXME: check store
@@ -64,22 +64,21 @@ DownloadFileResult downloadFile(
 
     if (res.cached) {
         assert(cached);
-        assert(request.expectedETag == res.etag);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
-        dumpString(*res.data, sink);
-        auto hash = hashString(htSHA256, *res.data);
+        dumpString(res.data, sink);
+        auto hash = hashString(htSHA256, res.data);
         ValidPathInfo info {
             store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name),
-            hashString(htSHA256, *sink.s),
+            hashString(htSHA256, sink.s),
         };
-        info.narSize = sink.s->size();
+        info.narSize = sink.s.size();
         info.ca = FixedOutputHash {
             .method = FileIngestionMethod::Flat,
             .hash = hash,
         };
-        auto source = StringSource { *sink.s };
+        auto source = StringSource(sink.s);
         store->addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
@@ -89,7 +88,7 @@ DownloadFileResult downloadFile(
         inAttrs,
         infoAttrs,
         *storePath,
-        immutable);
+        locked);
 
     if (url != res.effectiveUri)
         getCache()->add(
@@ -101,7 +100,7 @@ DownloadFileResult downloadFile(
             },
             infoAttrs,
             *storePath,
-            immutable);
+            locked);
 
     return {
         .storePath = std::move(*storePath),
@@ -114,7 +113,7 @@ std::pair<Tree, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers)
 {
     Attrs inAttrs({
@@ -127,11 +126,11 @@ std::pair<Tree, time_t> downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            Tree(store->toRealPath(cached->storePath), std::move(cached->storePath)),
+            Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
-    auto res = downloadFile(store, url, name, immutable, headers);
+    auto res = downloadFile(store, url, name, locked, headers);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -152,7 +151,7 @@ std::pair<Tree, time_t> downloadTarball(
     }
 
     Attrs infoAttrs({
-        {"lastModified", lastModified},
+        {"lastModified", uint64_t(lastModified)},
         {"etag", res.etag},
     });
 
@@ -161,10 +160,10 @@ std::pair<Tree, time_t> downloadTarball(
         inAttrs,
         infoAttrs,
         *unpackedStorePath,
-        immutable);
+        locked);
 
     return {
-        Tree(store->toRealPath(*unpackedStorePath), std::move(*unpackedStorePath)),
+        Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
         lastModified,
     };
 }
@@ -177,9 +176,11 @@ struct TarballInputScheme : InputScheme
 
         if (!hasSuffix(url.path, ".zip")
             && !hasSuffix(url.path, ".tar")
+            && !hasSuffix(url.path, ".tgz")
             && !hasSuffix(url.path, ".tar.gz")
             && !hasSuffix(url.path, ".tar.xz")
-            && !hasSuffix(url.path, ".tar.bz2"))
+            && !hasSuffix(url.path, ".tar.bz2")
+            && !hasSuffix(url.path, ".tar.zst"))
             return {};
 
         Input input;
@@ -197,12 +198,12 @@ struct TarballInputScheme : InputScheme
         if (type != "tarball" && type != "file") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash")
+            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash" && name != "name")
                 throw Error("unsupported %s input attribute '%s'", *type, name);
 
         Input input;
         input.attrs = attrs;
-        //input.immutable = (bool) maybeGetStrAttr(input.attrs, "hash");
+        //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
         return input;
     }
 
@@ -225,16 +226,21 @@ struct TarballInputScheme : InputScheme
         return true;
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
-        std::optional<Tree> tree;
-        if (getStrAttr(input.attrs, "type") == "tarball")
-            tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
-        else {
-            auto file = downloadFile(store, getStrAttr(input.attrs, "url"), "source", false);
-            tree = Tree(store->toRealPath(file.storePath), std::move(file.storePath));
-        }
-        return {std::move(*tree), input};
+        StorePath outPath = [&]() {
+            auto inputType = getStrAttr(input.attrs, "type");
+            if (inputType == "tarball") {
+                auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first;
+                return tree.storePath;
+            } else if (inputType == "file") {
+                auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+                return file.storePath;
+            } else {
+                throw Error("Invalid input type %s", inputType);
+            }
+        }();
+        return {std::move(outPath), input};
     }
 };
 

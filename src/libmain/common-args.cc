@@ -4,31 +4,34 @@
 
 namespace nix {
 
-MixCommonArgs::MixCommonArgs(const string & programName)
+MixCommonArgs::MixCommonArgs(const std::string & programName)
     : programName(programName)
 {
     addFlag({
         .longName = "verbose",
         .shortName = 'v',
-        .description = "increase verbosity level",
+        .description = "Increase the logging verbosity level.",
+        .category = loggingCategory,
         .handler = {[]() { verbosity = (Verbosity) (verbosity + 1); }},
     });
 
     addFlag({
         .longName = "quiet",
-        .description = "decrease verbosity level",
+        .description = "Decrease the logging verbosity level.",
+        .category = loggingCategory,
         .handler = {[]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; }},
     });
 
     addFlag({
         .longName = "debug",
-        .description = "enable debug output",
+        .description = "Set the logging verbosity level to 'debug'.",
+        .category = loggingCategory,
         .handler = {[]() { verbosity = lvlDebug; }},
     });
 
     addFlag({
         .longName = "option",
-        .description = "set a Nix configuration option (overriding `nix.conf`)",
+        .description = "Set the Nix configuration setting *name* to *value* (overriding `nix.conf`).",
         .labels = {"name", "value"},
         .handler = {[](std::string name, std::string value) {
             try {
@@ -44,15 +47,15 @@ MixCommonArgs::MixCommonArgs(const string & programName)
                 globalConfig.getSettings(settings);
                 for (auto & s : settings)
                     if (hasPrefix(s.first, prefix))
-                        completions->add(s.first, s.second.description);
+                        completions->add(s.first, fmt("Set the `%s` setting.", s.first));
             }
         }
     });
 
     addFlag({
         .longName = "log-format",
-        .description = "format of log output; `raw`, `internal-json`, `bar` "
-                        "or `bar-with-logs`",
+        .description = "Set the format of log output; one of `raw`, `internal-json`, `bar` or `bar-with-logs`.",
+        .category = loggingCategory,
         .labels = {"format"},
         .handler = {[](std::string format) { setLogFormat(format); }},
     });
@@ -60,14 +63,14 @@ MixCommonArgs::MixCommonArgs(const string & programName)
     addFlag({
         .longName = "max-jobs",
         .shortName = 'j',
-        .description = "maximum number of parallel builds",
+        .description = "The maximum number of parallel builds.",
         .labels = Strings{"jobs"},
         .handler = {[=](std::string s) {
             settings.set("max-jobs", s);
         }}
     });
 
-    std::string cat = "config";
+    std::string cat = "Options to override configuration settings";
     globalConfig.convertToArgs(*this, cat);
 
     // Backward compatibility hack: nix-env already had a --system flag.
@@ -75,5 +78,12 @@ MixCommonArgs::MixCommonArgs(const string & programName)
 
     hiddenCategories.insert(cat);
 }
+
+void MixCommonArgs::initialFlagsProcessed()
+{
+    initPlugins();
+    pluginsInited();
+}
+
 
 }

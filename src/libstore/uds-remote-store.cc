@@ -15,6 +15,9 @@ namespace nix {
 
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
+    , LocalFSStoreConfig(params)
+    , RemoteStoreConfig(params)
+    , UDSRemoteStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
@@ -42,30 +45,20 @@ std::string UDSRemoteStore::getUri()
 }
 
 
+void UDSRemoteStore::Connection::closeWrite()
+{
+    shutdown(fd.get(), SHUT_WR);
+}
+
+
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
 
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0);
-    if (!conn->fd)
-        throw SysError("cannot create Unix domain socket");
-    closeOnExec(conn->fd.get());
+    conn->fd = createUnixDomainSocket();
 
-    string socketPath = path ? *path : settings.nixDaemonSocketFile;
-
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", socketPath);
-    strcpy(addr.sun_path, socketPath.c_str());
-
-    if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot connect to daemon at '%1%'", socketPath);
+    nix::connect(conn->fd.get(), path ? *path : settings.nixDaemonSocketFile);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();

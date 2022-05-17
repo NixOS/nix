@@ -5,27 +5,29 @@
 
 #include <map>
 #include <cstdlib>
+#include <mutex>
 
 
 namespace nix {
 
 
-static unsigned int refLength = 32; /* characters */
+static size_t refLength = 32; /* characters */
 
 
-static void search(const unsigned char * s, size_t len,
-    StringSet & hashes, StringSet & seen)
+static void search(
+    std::string_view s,
+    StringSet & hashes,
+    StringSet & seen)
 {
-    static bool initialised = false;
+    static std::once_flag initialised;
     static bool isBase32[256];
-    if (!initialised) {
+    std::call_once(initialised, [](){
         for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
         for (unsigned int i = 0; i < base32Chars.size(); ++i)
             isBase32[(unsigned char) base32Chars[i]] = true;
-        initialised = true;
-    }
+    });
 
-    for (size_t i = 0; i + refLength <= len; ) {
+    for (size_t i = 0; i + refLength <= s.size(); ) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -35,7 +37,7 @@ static void search(const unsigned char * s, size_t len,
                 break;
             }
         if (!match) continue;
-        string ref((const char *) s + i, refLength);
+        std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
             debug(format("found reference to '%1%' at offset '%2%'")
                   % ref % i);
@@ -46,76 +48,60 @@ static void search(const unsigned char * s, size_t len,
 }
 
 
-struct RefScanSink : Sink
-{
-    StringSet hashes;
-    StringSet seen;
-
-    string tail;
-
-    RefScanSink() { }
-
-    void operator () (const unsigned char * data, size_t len);
-};
-
-
-void RefScanSink::operator () (const unsigned char * data, size_t len)
+void RefScanSink::operator () (std::string_view data)
 {
     /* It's possible that a reference spans the previous and current
        fragment, so search in the concatenation of the tail of the
        previous fragment and the start of the current fragment. */
-    string s = tail + string((const char *) data, len > refLength ? refLength : len);
-    search((const unsigned char *) s.data(), s.size(), hashes, seen);
+    auto s = tail;
+    auto tailLen = std::min(data.size(), refLength);
+    s.append(data.data(), tailLen);
+    search(s, hashes, seen);
 
-    search(data, len, hashes, seen);
+    search(data, hashes, seen);
 
-    size_t tailLen = len <= refLength ? len : refLength;
-    tail =
-        string(tail, tail.size() < refLength - tailLen ? 0 : tail.size() - (refLength - tailLen)) +
-        string((const char *) data + len - tailLen, tailLen);
+    auto rest = refLength - tailLen;
+    if (rest < tail.size())
+        tail = tail.substr(tail.size() - rest);
+    tail.append(data.data() + data.size() - tailLen, tailLen);
 }
 
 
-std::pair<PathSet, HashResult> scanForReferences(const string & path,
-    const PathSet & refs)
+std::pair<StorePathSet, HashResult> scanForReferences(
+    const std::string & path,
+    const StorePathSet & refs)
 {
     HashSink hashSink { htSHA256 };
     auto found = scanForReferences(hashSink, path, refs);
     auto hash = hashSink.finish();
-    return std::pair<PathSet, HashResult>(found, hash);
+    return std::pair<StorePathSet, HashResult>(found, hash);
 }
 
-PathSet scanForReferences(Sink & toTee,
-    const string & path, const PathSet & refs)
+StorePathSet scanForReferences(
+    Sink & toTee,
+    const Path & path,
+    const StorePathSet & refs)
 {
-    RefScanSink refsSink;
-    TeeSink sink { refsSink, toTee };
-    std::map<string, Path> backMap;
+    StringSet hashes;
+    std::map<std::string, StorePath> backMap;
 
-    /* For efficiency (and a higher hit rate), just search for the
-       hash part of the file name.  (This assumes that all references
-       have the form `HASH-bla'). */
     for (auto & i : refs) {
-        auto baseName = std::string(baseNameOf(i));
-        string::size_type pos = baseName.find('-');
-        if (pos == string::npos)
-            throw Error("bad reference '%1%'", i);
-        string s = string(baseName, 0, pos);
-        assert(s.size() == refLength);
-        assert(backMap.find(s) == backMap.end());
-        // parseHash(htSHA256, s);
-        refsSink.hashes.insert(s);
-        backMap[s] = i;
+        std::string hashPart(i.hashPart());
+        auto inserted = backMap.emplace(hashPart, i).second;
+        assert(inserted);
+        hashes.insert(hashPart);
     }
 
     /* Look for the hashes in the NAR dump of the path. */
+    RefScanSink refsSink(std::move(hashes));
+    TeeSink sink { refsSink, toTee };
     dumpPath(path, sink);
 
     /* Map the hashes found back to their store paths. */
-    PathSet found;
-    for (auto & i : refsSink.seen) {
-        std::map<string, Path>::iterator j;
-        if ((j = backMap.find(i)) == backMap.end()) abort();
+    StorePathSet found;
+    for (auto & i : refsSink.getResult()) {
+        auto j = backMap.find(i);
+        assert(j != backMap.end());
         found.insert(j->second);
     }
 
@@ -129,13 +115,13 @@ RewritingSink::RewritingSink(const std::string & from, const std::string & to, S
     assert(from.size() == to.size());
 }
 
-void RewritingSink::operator () (const unsigned char * data, size_t len)
+void RewritingSink::operator () (std::string_view data)
 {
     std::string s(prev);
-    s.append((const char *) data, len);
+    s.append(data);
 
     size_t j = 0;
-    while ((j = s.find(from, j)) != string::npos) {
+    while ((j = s.find(from, j)) != std::string::npos) {
         matches.push_back(pos + j);
         s.replace(j, from.size(), to);
     }
@@ -146,14 +132,14 @@ void RewritingSink::operator () (const unsigned char * data, size_t len)
 
     pos += consumed;
 
-    if (consumed) nextSink((unsigned char *) s.data(), consumed);
+    if (consumed) nextSink(s.substr(0, consumed));
 }
 
 void RewritingSink::flush()
 {
     if (prev.empty()) return;
     pos += prev.size();
-    nextSink((unsigned char *) prev.data(), prev.size());
+    nextSink(prev);
     prev.clear();
 }
 
@@ -163,9 +149,9 @@ HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
 {
 }
 
-void HashModuloSink::operator () (const unsigned char * data, size_t len)
+void HashModuloSink::operator () (std::string_view data)
 {
-    rewritingSink(data, len);
+    rewritingSink(data);
 }
 
 HashResult HashModuloSink::finish()
@@ -176,10 +162,8 @@ HashResult HashModuloSink::finish()
        NAR with self-references and a NAR with some of the
        self-references already zeroed out do not produce a hash
        collision. FIXME: proof. */
-    for (auto & pos : rewritingSink.matches) {
-        auto s = fmt("|%d", pos);
-        hashSink((unsigned char *) s.data(), s.size());
-    }
+    for (auto & pos : rewritingSink.matches)
+        hashSink(fmt("|%d", pos));
 
     auto h = hashSink.finish();
     return {h.first, rewritingSink.pos};

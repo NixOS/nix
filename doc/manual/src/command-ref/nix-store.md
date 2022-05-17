@@ -22,7 +22,7 @@ This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
 have an effect.
 
-  - `--add-root` *path*  
+  - `--add-root` *path*\
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
     collector. *path* will be created as a symlink to the resulting
@@ -79,22 +79,22 @@ paths. Realisation is a somewhat overloaded term:
     system). If the path is already valid, we are done immediately.
     Otherwise, the path and any missing paths in its closure may be
     produced through substitutes. If there are no (successful)
-    subsitutes, realisation fails.
+    substitutes, realisation fails.
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
 
 The following flags are available:
 
-  - `--dry-run`  
+  - `--dry-run`\
     Print on standard error a description of what packages would be
     built or downloaded, without actually performing the operation.
 
-  - `--ignore-unknown`  
+  - `--ignore-unknown`\
     If a non-derivation path does not have a substitute, then silently
     ignore it.
 
-  - `--check`  
+  - `--check`\
     This option allows you to check whether a derivation is
     deterministic. It rebuilds the specified derivation and checks
     whether the result is bitwise-identical with the existing outputs,
@@ -110,22 +110,22 @@ The following flags are available:
 
 Special exit codes:
 
-  - `100`  
+  - `100`\
     Generic build failure, the builder process returned with a non-zero
     exit code.
 
-  - `101`  
+  - `101`\
     Build timeout, the build was aborted because it did not complete
     within the specified `timeout`.
 
-  - `102`  
+  - `102`\
     Hash mismatch, the build output was rejected because it does not
     match the [`outputHash` attribute of the
     derivation](../expressions/advanced-attributes.md).
 
-  - `104`  
+  - `104`\
     Not deterministic, the build succeeded in check mode but the
-    resulting output is not binary reproducable.
+    resulting output is not binary reproducible.
 
 With the `--keep-going` flag it's possible for multiple failures to
 occur, in this case the 1xx status codes are or combined using binary
@@ -170,7 +170,7 @@ access to a restricted ssh user.
 
 The following flags are available:
 
-  - `--write`  
+  - `--write`\
     Allow the connected client to request the realization of
     derivations. In effect, this can be used to make the host act as a
     remote builder.
@@ -200,18 +200,18 @@ reachable via file system references from a set of “roots”, are deleted.
 
 The following suboperations may be specified:
 
-  - `--print-roots`  
+  - `--print-roots`\
     This operation prints on standard output the set of roots used by
     the garbage collector.
 
-  - `--print-live`  
+  - `--print-live`\
     This operation prints on standard output the set of “live” store
     paths, which are all the store paths reachable from the roots. Live
     paths should never be deleted, since that would break consistency —
     it would become possible that applications are installed that
     reference things that are no longer present in the store.
 
-  - `--print-dead`  
+  - `--print-dead`\
     This operation prints out on standard output the set of “dead” store
     paths, which is just the opposite of the set of live paths: any path
     in the store that is not live (with respect to the roots) is dead.
@@ -219,14 +219,14 @@ The following suboperations may be specified:
 By default, all unreachable paths are deleted. The following options
 control what gets deleted and in what order:
 
-  - `--max-freed` *bytes*  
+  - `--max-freed` *bytes*\
     Keep deleting paths until at least *bytes* bytes have been deleted,
     then stop. The argument *bytes* can be followed by the
     multiplicative suffix `K`, `M`, `G` or `T`, denoting KiB, MiB, GiB
     or TiB units.
 
 The behaviour of the collector is also influenced by the
-`keep-outputs` and `keep-derivations` variables in the Nix
+`keep-outputs` and `keep-derivations` settings in the Nix
 configuration file.
 
 By default, the collector prints the total number of freed bytes when it
@@ -300,29 +300,29 @@ symlink.
 
 ## Common query options
 
-  - `--use-output`; `-u`  
+  - `--use-output`; `-u`\
     For each argument to the query that is a store derivation, apply the
     query to the output path of the derivation instead.
 
-  - `--force-realise`; `-f`  
+  - `--force-realise`; `-f`\
     Realise each argument to the query first (see [`nix-store
     --realise`](#operation---realise)).
 
 ## Queries
 
-  - `--outputs`  
+  - `--outputs`\
     Prints out the [output paths](../glossary.md) of the store
     derivations *paths*. These are the paths that will be produced when
     the derivation is built.
 
-  - `--requisites`; `-R`  
+  - `--requisites`; `-R`\
     Prints out the [closure](../glossary.md) of the store path *paths*.
 
     This query has one option:
 
       - `--include-outputs`
-        Also include the output path of store derivations, and their
-        closures.
+        Also include the existing output paths of store derivations,
+        and their closures.
 
     This query can be used to implement various kinds of deployment. A
     *source deployment* is obtained by distributing the closure of a
@@ -332,31 +332,31 @@ symlink.
     dependencies) is obtained by distributing the closure of a store
     derivation and specifying the option `--include-outputs`.
 
-  - `--references`  
+  - `--references`\
     Prints the set of [references](../glossary.md) of the store paths
     *paths*, that is, their immediate dependencies. (For *all*
     dependencies, use `--requisites`.)
 
-  - `--referrers`  
+  - `--referrers`\
     Prints the set of *referrers* of the store paths *paths*, that is,
     the store paths currently existing in the Nix store that refer to
     one of *paths*. Note that contrary to the references, the set of
     referrers is not constant; it can change as store paths are added or
     removed.
 
-  - `--referrers-closure`  
+  - `--referrers-closure`\
     Prints the closure of the set of store paths *paths* under the
     referrers relation; that is, all store paths that directly or
     indirectly refer to one of *paths*. These are all the path currently
     in the Nix store that are dependent on *paths*.
 
-  - `--deriver`; `-d`  
+  - `--deriver`; `-d`\
     Prints the [deriver](../glossary.md) of the store paths *paths*. If
     the path has no deriver (e.g., if it is a source file), or if the
     deriver is not known (e.g., in the case of a binary-only
     deployment), the string `unknown-deriver` is printed.
 
-  - `--graph`  
+  - `--graph`\
     Prints the references graph of the store paths *paths* in the format
     of the `dot` tool of AT\&T's [Graphviz
     package](http://www.graphviz.org/). This can be used to visualise
@@ -364,39 +364,39 @@ symlink.
     this to a store derivation. To obtain a runtime dependency graph,
     apply it to an output path.
 
-  - `--tree`  
+  - `--tree`\
     Prints the references graph of the store paths *paths* as a nested
     ASCII tree. References are ordered by descending closure size; this
     tends to flatten the tree, making it more readable. The query only
     recurses into a store path when it is first encountered; this
     prevents a blowup of the tree representation of the graph.
 
-  - `--graphml`  
+  - `--graphml`\
     Prints the references graph of the store paths *paths* in the
     [GraphML](http://graphml.graphdrawing.org/) file format. This can be
     used to visualise dependency graphs. To obtain a build-time
     dependency graph, apply this to a store derivation. To obtain a
     runtime dependency graph, apply it to an output path.
 
-  - `--binding` *name*; `-b` *name*  
+  - `--binding` *name*; `-b` *name*\
     Prints the value of the attribute *name* (i.e., environment
     variable) of the store derivations *paths*. It is an error for a
     derivation to not have the specified attribute.
 
-  - `--hash`  
+  - `--hash`\
     Prints the SHA-256 hash of the contents of the store paths *paths*
     (that is, the hash of the output of `nix-store --dump` on the given
     paths). Since the hash is stored in the Nix database, this is a fast
     operation.
 
-  - `--size`  
+  - `--size`\
     Prints the size in bytes of the contents of the store paths *paths*
     — to be precise, the size of the output of `nix-store --dump` on
     the given paths. Note that the actual disk space required by the
     store paths may be higher, especially on filesystems with large
     cluster sizes.
 
-  - `--roots`  
+  - `--roots`\
     Prints the garbage collector roots that point, directly or
     indirectly, at the store paths *paths*.
 
@@ -513,7 +513,7 @@ public url or broke since the download expression was written.
 
 This operation has the following options:
 
-  - `--recursive`  
+  - `--recursive`\
     Use recursive instead of flat hashing mode, used when adding
     directories to the store.
 
@@ -540,14 +540,14 @@ being modified by non-Nix tools, or of bugs in Nix itself.
 
 This operation has the following options:
 
-  - `--check-contents`  
+  - `--check-contents`\
     Checks that the contents of every valid store path has not been
     altered by computing a SHA-256 hash of the contents and comparing it
     with the hash stored in the Nix database at build time. Paths that
     have been modified are printed out. For large stores,
     `--check-contents` is obviously quite slow.
 
-  - `--repair`  
+  - `--repair`\
     If any valid path is missing from the store, or (if
     `--check-contents` is given) the contents of a valid path has been
     modified, then try to repair the path by redownloading it. See

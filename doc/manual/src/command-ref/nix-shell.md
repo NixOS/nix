@@ -11,8 +11,8 @@
   [`--command` *cmd*]
   [`--run` *cmd*]
   [`--exclude` *regexp*]
-  [--pure]
-  [--keep *name*]
+  [`--pure`]
+  [`--keep` *name*]
   {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
 # Description
@@ -32,7 +32,7 @@ URL of a tarball that will be downloaded and unpacked to a temporary
 location. The tarball must include a single top-level directory
 containing at least a file named `default.nix`.
 
-If the derivation defines the variable `shellHook`, it will be evaluated
+If the derivation defines the variable `shellHook`, it will be run
 after `$stdenv/setup` has been sourced. Since this hook is not executed
 by regular Nix builds, it allows you to perform initialisation specific
 to `nix-shell`. For example, the derivation attribute
@@ -41,10 +41,12 @@ to `nix-shell`. For example, the derivation attribute
 shellHook =
   ''
     echo "Hello shell"
+    export SOME_API_TOKEN="$(cat ~/.config/some-app/api-token)"
   '';
 ```
 
-will cause `nix-shell` to print `Hello shell`.
+will cause `nix-shell` to print `Hello shell` and set the `SOME_API_TOKEN`
+environment variable to a user-configured value.
 
 # Options
 
@@ -52,7 +54,7 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`.
 
-  - `--command` *cmd*  
+  - `--command` *cmd*\
     In the environment of the derivation, run the shell command *cmd*.
     This command is executed in an interactive shell. (Use `--run` to
     use a non-interactive shell instead.) However, a call to `exit` is
@@ -62,36 +64,34 @@ All options not listed here are passed to `nix-store
     drop you into the interactive shell. This can be useful for doing
     any additional initialisation.
 
-  - `--run` *cmd*  
+  - `--run` *cmd*\
     Like `--command`, but executes the command in a non-interactive
     shell. This means (among other things) that if you hit Ctrl-C while
     the command is running, the shell exits.
 
-  - `--exclude` *regexp*  
+  - `--exclude` *regexp*\
     Do not build any dependencies whose store path matches the regular
     expression *regexp*. This option may be specified multiple times.
 
-  - `--pure`  
+  - `--pure`\
     If this flag is specified, the environment is almost entirely
     cleared before the interactive shell is started, so you get an
     environment that more closely corresponds to the “real” Nix build. A
     few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained. Note that `~/.bashrc` and (depending on your Bash
-    installation) `/etc/bashrc` are still sourced, so any variables set
-    there will affect the interactive shell.
+    retained.
 
-  - `--packages` / `-p` *packages*…  
+  - `--packages` / `-p` *packages*…\
     Set up an environment in which the specified packages are present.
     The command line arguments are interpreted as attribute names inside
     the Nix Packages collection. Thus, `nix-shell -p libjpeg openjdk`
     will start a shell in which the packages denoted by the attribute
     names `libjpeg` and `openjdk` are present.
 
-  - `-i` *interpreter*  
+  - `-i` *interpreter*\
     The chained script interpreter to be invoked by `nix-shell`. Only
     applicable in `#!`-scripts (described below).
 
-  - `--keep` *name*  
+  - `--keep` *name*\
     When a `--pure` shell is started, keep the listed environment
     variables.
 
@@ -99,9 +99,10 @@ The following common options are supported:
 
 # Environment variables
 
-  - `NIX_BUILD_SHELL`  
+  - `NIX_BUILD_SHELL`\
     Shell used to start the interactive environment. Defaults to the
-    `bash` found in `PATH`.
+    `bash` found in `<nixpkgs>`, falling back to the `bash` found in
+    `PATH` if not found.
 
 # Examples
 
@@ -110,12 +111,18 @@ shell in which to build it:
 
 ```console
 $ nix-shell '<nixpkgs>' -A pan
-[nix-shell]$ unpackPhase
+[nix-shell]$ eval ${unpackPhase:-unpackPhase}
 [nix-shell]$ cd pan-*
-[nix-shell]$ configurePhase
-[nix-shell]$ buildPhase
+[nix-shell]$ eval ${configurePhase:-configurePhase}
+[nix-shell]$ eval ${buildPhase:-buildPhase}
 [nix-shell]$ ./pan/gui/pan
 ```
+
+The reason we use form `eval ${configurePhase:-configurePhase}` here is because
+those packages that override these phases do so by exporting the overridden
+values in the environment variable of the same name.
+Here bash is being told to either evaluate the contents of 'configurePhase',
+if it exists as a variable, otherwise evaluate the configurePhase function.
 
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
@@ -230,22 +237,23 @@ terraform apply
 > in a nix-shell shebang.
 
 Finally, using the merging of multiple nix-shell shebangs the following
-Haskell script uses a specific branch of Nixpkgs/NixOS (the 18.03 stable
+Haskell script uses a specific branch of Nixpkgs/NixOS (the 20.03 stable
 branch):
 
 ```haskell
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.HTTP ps.tagsoup])"
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-18.03.tar.gz
+#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])"
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-20.03.tar.gz
 
-import Network.HTTP
+import Network.Curl.Download
 import Text.HTML.TagSoup
+import Data.Either
+import Data.ByteString.Char8 (unpack)
 
 -- Fetch nixos.org and print all hrefs.
 main = do
-  resp <- Network.HTTP.simpleHTTP (getRequest "http://nixos.org/")
-  body <- getResponseBody resp
-  let tags = filter (isTagOpenName "a") $ parseTags body
+  resp <- openURI "https://nixos.org/"
+  let tags = filter (isTagOpenName "a") $ parseTags $ unpack $ fromRight undefined resp
   let tags' = map (fromAttrib "href") tags
   mapM_ putStrLn $ filter (/= "") tags'
 ```

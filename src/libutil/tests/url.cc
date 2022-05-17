@@ -5,9 +5,9 @@ namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
 
-    string print_map(std::map<string, string> m) {
-        std::map<string, string>::iterator it;
-        string s = "{ ";
+    std::string print_map(std::map<std::string, std::string> m) {
+        std::map<std::string, std::string>::iterator it;
+        std::string s = "{ ";
         for (it = m.begin(); it != m.end(); ++it) {
             s += "{ ";
             s += it->first;
@@ -117,6 +117,24 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
+    TEST(parseURL, parseScopedRFC4007IPv6Address) {
+        auto s = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080";
+        auto parsed = parseURL(s);
+
+        ParsedURL expected {
+            .url = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .base = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .scheme = "http",
+            .authority = "[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .path = "",
+            .query = (StringMap) { },
+            .fragment = "",
+        };
+
+        ASSERT_EQ(parsed, expected);
+
+    }
+
     TEST(parseURL, parseIPv6Address) {
         auto s = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080";
         auto parsed = parseURL(s);
@@ -160,7 +178,7 @@ namespace nix {
     }
 
     TEST(parseURL, parseFileURLWithQueryAndFragment) {
-        auto s = "file:///none/of/your/business";
+        auto s = "file:///none/of//your/business";
         auto parsed = parseURL(s);
 
         ParsedURL expected {
@@ -168,7 +186,7 @@ namespace nix {
             .base = "",
             .scheme = "file",
             .authority = "",
-            .path = "/none/of/your/business",
+            .path = "/none/of//your/business",
             .query = (StringMap) { },
             .fragment = "",
         };
@@ -244,21 +262,21 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(percentDecode, decodesUrlEncodedString) {
-        string s = "==@==";
-        string d = percentDecode("%3D%3D%40%3D%3D");
+        std::string s = "==@==";
+        std::string d = percentDecode("%3D%3D%40%3D%3D");
         ASSERT_EQ(d, s);
     }
 
     TEST(percentDecode, multipleDecodesAreIdempotent) {
-        string once = percentDecode("%3D%3D%40%3D%3D");
-        string twice = percentDecode(once);
+        std::string once = percentDecode("%3D%3D%40%3D%3D");
+        std::string twice = percentDecode(once);
 
         ASSERT_EQ(once, twice);
     }
 
     TEST(percentDecode, trailingPercent) {
-        string s = "==@==%";
-        string d = percentDecode("%3D%3D%40%3D%3D%25");
+        std::string s = "==@==%";
+        std::string d = percentDecode("%3D%3D%40%3D%3D%25");
 
         ASSERT_EQ(d, s);
     }

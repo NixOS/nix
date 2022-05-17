@@ -66,31 +66,31 @@ bool Hash::operator < (const Hash & h) const
 }
 
 
-const string base16Chars = "0123456789abcdef";
+const std::string base16Chars = "0123456789abcdef";
 
 
-static string printHash16(const Hash & hash)
+static std::string printHash16(const Hash & hash)
 {
     char buf[hash.hashSize * 2];
     for (unsigned int i = 0; i < hash.hashSize; i++) {
         buf[i * 2] = base16Chars[hash.hash[i] >> 4];
         buf[i * 2 + 1] = base16Chars[hash.hash[i] & 0x0f];
     }
-    return string(buf, hash.hashSize * 2);
+    return std::string(buf, hash.hashSize * 2);
 }
 
 
 // omitted: E O U T
-const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
+const std::string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 
-static string printHash32(const Hash & hash)
+static std::string printHash32(const Hash & hash)
 {
     assert(hash.hashSize);
     size_t len = hash.base32Len();
     assert(len);
 
-    string s;
+    std::string s;
     s.reserve(len);
 
     for (int n = (int) len - 1; n >= 0; n--) {
@@ -107,7 +107,7 @@ static string printHash32(const Hash & hash)
 }
 
 
-string printHash16or32(const Hash & hash)
+std::string printHash16or32(const Hash & hash)
 {
     assert(hash.type);
     return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
@@ -151,10 +151,11 @@ Hash Hash::parseSRI(std::string_view original) {
 }
 
 // Mutates the string to eliminate the prefixes when found
-static std::pair<std::optional<HashType>, bool> getParsedTypeAndSRI(std::string_view & rest) {
+static std::pair<std::optional<HashType>, bool> getParsedTypeAndSRI(std::string_view & rest)
+{
     bool isSRI = false;
 
-    // Parse the has type before the separater, if there was one.
+    // Parse the hash type before the separator, if there was one.
     std::optional<HashType> optParsedType;
     {
         auto hashRaw = splitPrefixTo(rest, ':');
@@ -192,7 +193,7 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
     // Either the string or user must provide the type, if they both do they
     // must agree.
     if (!optParsedType && !optType)
-        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", rest);
+        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", rest);
     else if (optParsedType && optType && *optParsedType != *optType)
         throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
 
@@ -259,7 +260,7 @@ Hash::Hash(std::string_view rest, HashType type, bool isSRI)
         throw BadHash("hash '%s' has wrong length for hash type '%s'", rest, printHashType(this->type));
 }
 
-Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
+Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashType> ht)
 {
     if (hashStr.empty()) {
         if (!ht)
@@ -291,12 +292,12 @@ static void start(HashType ht, Ctx & ctx)
 
 
 static void update(HashType ht, Ctx & ctx,
-    const unsigned char * bytes, size_t len)
+    std::string_view data)
 {
-    if (ht == htMD5) MD5_Update(&ctx.md5, bytes, len);
-    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, bytes, len);
-    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, bytes, len);
-    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, bytes, len);
+    if (ht == htMD5) MD5_Update(&ctx.md5, data.data(), data.size());
+    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
+    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
+    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, data.data(), data.size());
 }
 
 
@@ -314,7 +315,7 @@ Hash hashString(HashType ht, std::string_view s)
     Ctx ctx;
     Hash hash(ht);
     start(ht, ctx);
-    update(ht, ctx, (const unsigned char *) s.data(), s.length());
+    update(ht, ctx, s);
     finish(ht, ctx, hash.hash);
     return hash;
 }
@@ -341,10 +342,10 @@ HashSink::~HashSink()
     delete ctx;
 }
 
-void HashSink::write(const unsigned char * data, size_t len)
+void HashSink::write(std::string_view data)
 {
-    bytes += len;
-    update(ht, *ctx, data, len);
+    bytes += data.size();
+    update(ht, *ctx, data);
 }
 
 HashResult HashSink::finish()
@@ -402,7 +403,7 @@ HashType parseHashType(std::string_view s)
         throw UsageError("unknown hash algorithm '%1%'", s);
 }
 
-string printHashType(HashType ht)
+std::string printHashType(HashType ht)
 {
     switch (ht) {
     case htMD5: return "md5";

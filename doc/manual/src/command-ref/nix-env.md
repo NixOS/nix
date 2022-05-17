@@ -36,27 +36,27 @@ case-sensitive. The regular expression can optionally be followed by a
 dash and a version number; if omitted, any version of the package will
 match. Here are some examples:
 
-  - `firefox`  
+  - `firefox`\
     Matches the package name `firefox` and any version.
 
-  - `firefox-32.0`  
+  - `firefox-32.0`\
     Matches the package name `firefox` and version `32.0`.
 
-  - `gtk\\+`  
+  - `gtk\\+`\
     Matches the package name `gtk+`. The `+` character must be escaped
     using a backslash to prevent it from being interpreted as a
     quantifier, and the backslash must be escaped in turn with another
     backslash to ensure that the shell passes it on.
 
-  - `.\*`  
+  - `.\*`\
     Matches any package name. This is the default for most commands.
 
-  - `'.*zip.*'`  
+  - `'.*zip.*'`\
     Matches any package name containing the string `zip`. Note the dots:
     `'*zip*'` does not work, because in a regular expression, the
     character `*` is interpreted as a quantifier.
 
-  - `'.*(firefox|chromium).*'`  
+  - `'.*(firefox|chromium).*'`\
     Matches any package name containing the strings `firefox` or
     `chromium`.
 
@@ -66,7 +66,7 @@ This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
 have an effect.
 
-  - `--file` / `-f` *path*  
+  - `--file` / `-f` *path*\
     Specifies the Nix expression (designated below as the *active Nix
     expression*) used by the `--install`, `--upgrade`, and `--query
     --available` operations to obtain derivations. The default is
@@ -77,13 +77,13 @@ have an effect.
     unpacked to a temporary location. The tarball must include a single
     top-level directory containing at least a file named `default.nix`.
 
-  - `--profile` / `-p` *path*  
+  - `--profile` / `-p` *path*\
     Specifies the profile to be used by those operations that operate on
     a profile (designated below as the *active profile*). A profile is a
     sequence of user environments called *generations*, one of which is
     the *current generation*.
 
-  - `--dry-run`  
+  - `--dry-run`\
     For the `--install`, `--upgrade`, `--uninstall`,
     `--switch-generation`, `--delete-generations` and `--rollback`
     operations, this flag will cause `nix-env` to print what *would* be
@@ -93,7 +93,7 @@ have an effect.
     [substituted](../glossary.md) (i.e., downloaded) and which paths
     will be built from source (because no substitute is available).
 
-  - `--system-filter` *system*  
+  - `--system-filter` *system*\
     By default, operations such as `--query
                     --available` show derivations matching any platform. This option
     allows you to use derivations for the specified platform *system*.
@@ -102,7 +102,7 @@ have an effect.
 
 # Files
 
-  - `~/.nix-defexpr`  
+  - `~/.nix-defexpr`\
     The source for the default Nix expressions used by the
     `--install`, `--upgrade`, and `--query --available` operations to
     obtain derivations. The `--file` option may be used to override
@@ -140,7 +140,7 @@ have an effect.
     The command `nix-channel` places symlinks to the downloaded Nix
     expressions from each subscribed channel in this directory.
 
-  - `~/.nix-profile`  
+  - `~/.nix-profile`\
     A symbolic link to the user's current profile. By default, this
     symlink points to `prefix/var/nix/profiles/default`. The `PATH`
     environment variable should include `~/.nix-profile/bin` for the
@@ -217,13 +217,13 @@ a number of possible ways:
 
 ## Flags
 
-  - `--prebuilt-only` / `-b`  
+  - `--prebuilt-only` / `-b`\
     Use only derivations for which a substitute is registered, i.e.,
     there is a pre-built binary available that can be downloaded in lieu
     of building the derivation. Thus, no packages will be built from
     source.
 
-  - `--preserve-installed`; `-P`  
+  - `--preserve-installed`; `-P`\
     Do not remove derivations with a name matching one of the
     derivations being installed. Usually, trying to have two versions of
     the same package installed in the same generation of a profile will
@@ -231,20 +231,32 @@ a number of possible ways:
     clashes between the two versions. However, this is not the case for
     all packages.
 
-  - `--remove-all`; `-r`  
+  - `--remove-all`; `-r`\
     Remove all previously installed packages first. This is equivalent
     to running `nix-env -e '.*'` first, except that everything happens
     in a single transaction.
 
 ## Examples
 
-To install a specific version of `gcc` from the active Nix expression:
+To install a package using a specific attribute path from the active Nix expression:
+
+```console
+$ nix-env -iA gcc40mips
+installing `gcc-4.0.2'
+$ nix-env -iA xorg.xorgserver
+installing `xorg-server-1.2.0'
+```
+
+To install a specific version of `gcc` using the derivation name:
 
 ```console
 $ nix-env --install gcc-3.3.2
 installing `gcc-3.3.2'
 uninstalling `gcc-3.1'
 ```
+
+Using attribute path for selecting a package is preferred,
+as it is much faster and there will not be multiple matches.
 
 Note the previously installed version is removed, since
 `--preserve-installed` was not specified.
@@ -254,13 +266,6 @@ To install an arbitrary version:
 ```console
 $ nix-env --install gcc
 installing `gcc-3.3.2'
-```
-
-To install using a specific attribute:
-
-```console
-$ nix-env -i -A gcc40mips
-$ nix-env -i -A xorg.xorgserver
 ```
 
 To install all derivations in the Nix expression `foo.nix`:
@@ -346,24 +351,24 @@ version is installed.
 
 ## Flags
 
-  - `--lt`  
+  - `--lt`\
     Only upgrade a derivation to newer versions. This is the default.
 
-  - `--leq`  
+  - `--leq`\
     In addition to upgrading to newer versions, also “upgrade” to
     derivations that have the same version. Version are not a unique
     identification of a derivation, so there may be many derivations
     that have the same version. This flag may be useful to force
     “synchronisation” between the installed and available derivations.
 
-  - `--eq`  
+  - `--eq`\
     *Only* “upgrade” to derivations that have the same version. This may
     not seem very useful, but it actually is, e.g., when there is a new
     release of Nixpkgs and you want to replace installed applications
     with the same versions built against newer dependencies (to reduce
     the number of dependencies floating around on your system).
 
-  - `--always`  
+  - `--always`\
     In addition to upgrading to newer versions, also “upgrade” to
     derivations that have the same or a lower version. I.e., derivations
     may actually be downgraded depending on what is available in the
@@ -374,22 +379,29 @@ For the other flags, see `--install`.
 ## Examples
 
 ```console
-$ nix-env --upgrade gcc
+$ nix-env --upgrade -A nixpkgs.gcc
 upgrading `gcc-3.3.1' to `gcc-3.4'
 ```
 
+When there are no updates available, nothing will happen:
+
 ```console
-$ nix-env -u gcc-3.3.2 --always (switch to a specific version)
+$ nix-env --upgrade -A nixpkgs.pan
+```
+
+Using `-A` is preferred when possible, as it is faster and unambiguous but
+it is also possible to upgrade to a specific version by matching the derivation name:
+
+```console
+$ nix-env -u gcc-3.3.2 --always
 upgrading `gcc-3.4' to `gcc-3.3.2'
 ```
 
-```console
-$ nix-env --upgrade pan
-(no upgrades available, so nothing happens)
-```
+To try to upgrade everything
+(matching packages based on the part of the derivation name without version):
 
 ```console
-$ nix-env -u (try to upgrade everything)
+$ nix-env -u
 upgrading `hello-2.1.2' to `hello-2.1.3'
 upgrading `mozilla-1.2' to `mozilla-1.4'
 ```
@@ -401,7 +413,7 @@ of a derivation `x` by looking at their respective `name` attributes.
 The names (e.g., `gcc-3.3.1` are split into two parts: the package name
 (`gcc`), and the version (`3.3.1`). The version part starts after the
 first dash not followed by a letter. `x` is considered an upgrade of `y`
-if their package names match, and the version of `y` is higher that that
+if their package names match, and the version of `y` is higher than that
 of `x`.
 
 The versions are compared by splitting them into contiguous components
@@ -578,11 +590,11 @@ The derivations are sorted by their `name` attributes.
 The following flags specify the set of things on which the query
 operates.
 
-  - `--installed`  
+  - `--installed`\
     The query operates on the store paths that are installed in the
     current generation of the active profile. This is the default.
 
-  - `--available`; `-a`  
+  - `--available`; `-a`\
     The query operates on the derivations that are available in the
     active Nix expression.
 
@@ -593,24 +605,24 @@ selected derivations. Multiple flags may be specified, in which case the
 information is shown in the order given here. Note that the name of the
 derivation is shown unless `--no-name` is specified.
 
-  - `--xml`  
+  - `--xml`\
     Print the result in an XML representation suitable for automatic
     processing by other tools. The root element is called `items`, which
     contains a `item` element for each available or installed
     derivation. The fields discussed below are all stored in attributes
     of the `item` elements.
 
-  - `--json`  
+  - `--json`\
     Print the result in a JSON representation suitable for automatic
     processing by other tools.
 
-  - `--prebuilt-only` / `-b`  
+  - `--prebuilt-only` / `-b`\
     Show only derivations for which a substitute is registered, i.e.,
     there is a pre-built binary available that can be downloaded in lieu
     of building the derivation. Thus, this shows all packages that
     probably can be installed quickly.
 
-  - `--status`; `-s`  
+  - `--status`; `-s`\
     Print the *status* of the derivation. The status consists of three
     characters. The first is `I` or `-`, indicating whether the
     derivation is currently installed in the current generation of the
@@ -621,49 +633,49 @@ derivation is shown unless `--no-name` is specified.
     derivation to be built. The third is `S` or `-`, indicating whether
     a substitute is available for the derivation.
 
-  - `--attr-path`; `-P`  
+  - `--attr-path`; `-P`\
     Print the *attribute path* of the derivation, which can be used to
     unambiguously select it using the `--attr` option available in
     commands that install derivations like `nix-env --install`. This
     option only works together with `--available`
 
-  - `--no-name`  
+  - `--no-name`\
     Suppress printing of the `name` attribute of each derivation.
 
-  - `--compare-versions` / `-c`  
+  - `--compare-versions` / `-c`\
     Compare installed versions to available versions, or vice versa (if
     `--available` is given). This is useful for quickly seeing whether
     upgrades for installed packages are available in a Nix expression. A
     column is added with the following meaning:
 
-      - `<` *version*  
+      - `<` *version*\
         A newer version of the package is available or installed.
 
-      - `=` *version*  
+      - `=` *version*\
         At most the same version of the package is available or
         installed.
 
-      - `>` *version*  
+      - `>` *version*\
         Only older versions of the package are available or installed.
 
-      - `- ?`  
+      - `- ?`\
         No version of the package is available or installed.
 
-  - `--system`  
+  - `--system`\
     Print the `system` attribute of the derivation.
 
-  - `--drv-path`  
+  - `--drv-path`\
     Print the path of the store derivation.
 
-  - `--out-path`  
+  - `--out-path`\
     Print the output path of the derivation.
 
-  - `--description`  
+  - `--description`\
     Print a short (one-line) description of the derivation, if
     available. The description is taken from the `meta.description`
     attribute of the derivation.
 
-  - `--meta`  
+  - `--meta`\
     Print all of the meta-attributes of the derivation. This option is
     only available with `--xml` or `--json`.
 
@@ -874,7 +886,7 @@ error: no generation older than the current (91) exists
 
 # Environment variables
 
-  - `NIX_PROFILE`  
+  - `NIX_PROFILE`\
     Location of the Nix profile. Defaults to the target of the symlink
     `~/.nix-profile`, if it exists, or `/nix/var/nix/profiles/default`
     otherwise.

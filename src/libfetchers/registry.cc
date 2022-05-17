@@ -5,6 +5,8 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 
+#include "fetch-settings.hh"
+
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
@@ -60,10 +62,10 @@ void Registry::write(const Path & path)
     nlohmann::json arr;
     for (auto & entry : entries) {
         nlohmann::json obj;
-        obj["from"] = attrsToJson(entry.from.toAttrs());
-        obj["to"] = attrsToJson(entry.to.toAttrs());
+        obj["from"] = attrsToJSON(entry.from.toAttrs());
+        obj["to"] = attrsToJSON(entry.to.toAttrs());
         if (!entry.extraAttrs.empty())
-            obj["to"].update(attrsToJson(entry.extraAttrs));
+            obj["to"].update(attrsToJSON(entry.extraAttrs));
         if (entry.exact)
             obj["exact"] = true;
         arr.emplace_back(std::move(obj));
@@ -114,7 +116,7 @@ static std::shared_ptr<Registry> getSystemRegistry()
 
 Path getUserRegistryPath()
 {
-    return getHome() + "/.config/nix/registry.json";
+    return getConfigDir() + "/nix/registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry()
@@ -122,6 +124,13 @@ std::shared_ptr<Registry> getUserRegistry()
     static auto userRegistry =
         Registry::read(getUserRegistryPath(), Registry::User);
     return userRegistry;
+}
+
+std::shared_ptr<Registry> getCustomRegistry(const Path & p)
+{
+    static auto customRegistry =
+        Registry::read(p, Registry::Custom);
+    return customRegistry;
 }
 
 static std::shared_ptr<Registry> flagRegistry =
@@ -143,7 +152,7 @@ void overrideRegistry(
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
-        auto path = settings.flakeRegistry.get();
+        auto path = fetchSettings.flakeRegistry.get();
 
         if (!hasPrefix(path, "/")) {
             auto storePath = downloadFile(store, path, "flake-registry.json", false).storePath;

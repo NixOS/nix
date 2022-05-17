@@ -44,7 +44,7 @@ collector as follows:
 $ nix-store --gc
 ```
 
-The behaviour of the gargage collector is affected by the
+The behaviour of the garbage collector is affected by the
 `keep-derivations` (default: true) and `keep-outputs` (default: false)
 options in the Nix configuration file. The defaults will ensure that all
 derivations that are build-time dependencies of garbage collector roots

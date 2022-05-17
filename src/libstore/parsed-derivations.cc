@@ -1,6 +1,8 @@
 #include "parsed-derivations.hh"
 
 #include <nlohmann/json.hpp>
+#include <regex>
+#include "json.hh"
 
 namespace nix {
 
@@ -91,6 +93,8 @@ StringSet ParsedDerivation::getRequiredSystemFeatures() const
     StringSet res;
     for (auto & i : getStringsAttr("requiredSystemFeatures").value_or(Strings()))
         res.insert(i);
+    if (!drv.type().hasKnownOutputPaths())
+        res.insert("ca-derivations");
     return res;
 }
 
@@ -98,6 +102,10 @@ bool ParsedDerivation::canBuildLocally(Store & localStore) const
 {
     if (drv.platform != settings.thisSystem.get()
         && !settings.extraPlatforms.get().count(drv.platform)
+        && !drv.isBuiltin())
+        return false;
+
+    if (settings.maxBuildJobs.get() == 0
         && !drv.isBuiltin())
         return false;
 
@@ -117,4 +125,107 @@ bool ParsedDerivation::substitutesAllowed() const
     return getBoolAttr("allowSubstitutes", true);
 }
 
+static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+
+std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
+{
+    auto structuredAttrs = getStructuredAttrs();
+    if (!structuredAttrs) return std::nullopt;
+
+    auto json = *structuredAttrs;
+
+    /* Add an "outputs" object containing the output paths. */
+    nlohmann::json outputs;
+    for (auto & i : drv.outputs)
+        outputs[i.first] = hashPlaceholder(i.first);
+    json["outputs"] = outputs;
+
+    /* Handle exportReferencesGraph. */
+    auto e = json.find("exportReferencesGraph");
+    if (e != json.end() && e->is_object()) {
+        for (auto i = e->begin(); i != e->end(); ++i) {
+            std::ostringstream str;
+            {
+                JSONPlaceholder jsonRoot(str, true);
+                StorePathSet storePaths;
+                for (auto & p : *i)
+                    storePaths.insert(store.parseStorePath(p.get<std::string>()));
+                store.pathInfoToJSON(jsonRoot,
+                    store.exportReferences(storePaths, inputPaths), false, true);
+            }
+            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
+        }
+    }
+
+    return json;
+}
+
+/* As a convenience to bash scripts, write a shell file that
+   maps all attributes that are representable in bash -
+   namely, strings, integers, nulls, Booleans, and arrays and
+   objects consisting entirely of those values. (So nested
+   arrays or objects are not supported.) */
+std::string writeStructuredAttrsShell(const nlohmann::json & json)
+{
+
+    auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
+        if (value.is_string())
+            return shellEscape(value.get<std::string_view>());
+
+        if (value.is_number()) {
+            auto f = value.get<float>();
+            if (std::ceil(f) == f)
+                return std::to_string(value.get<int>());
+        }
+
+        if (value.is_null())
+            return std::string("''");
+
+        if (value.is_boolean())
+            return value.get<bool>() ? std::string("1") : std::string("");
+
+        return {};
+    };
+
+    std::string jsonSh;
+
+    for (auto & [key, value] : json.items()) {
+
+        if (!std::regex_match(key, shVarName)) continue;
+
+        auto s = handleSimpleType(value);
+        if (s)
+            jsonSh += fmt("declare %s=%s\n", key, *s);
+
+        else if (value.is_array()) {
+            std::string s2;
+            bool good = true;
+
+            for (auto & value2 : value) {
+                auto s3 = handleSimpleType(value2);
+                if (!s3) { good = false; break; }
+                s2 += *s3; s2 += ' ';
+            }
+
+            if (good)
+                jsonSh += fmt("declare -a %s=(%s)\n", key, s2);
+        }
+
+        else if (value.is_object()) {
+            std::string s2;
+            bool good = true;
+
+            for (auto & [key2, value2] : value.items()) {
+                auto s3 = handleSimpleType(value2);
+                if (!s3) { good = false; break; }
+                s2 += fmt("[%s]=%s ", shellEscape(key2), *s3);
+            }
+
+            if (good)
+                jsonSh += fmt("declare -A %s=(%s)\n", key, s2);
+        }
+    }
+
+    return jsonSh;
+}
 }

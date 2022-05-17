@@ -7,13 +7,18 @@ fi
 
 clearStore
 
-repo=$TEST_ROOT/hg
+# Intentionally not in a canonical form
+# See https://github.com/NixOS/nix/issues/6195
+repo=$TEST_ROOT/./hg
 
 rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix
 
 hg init $repo
 echo '[ui]' >> $repo/.hg/hgrc
 echo 'username = Foobar <foobar@example.org>' >> $repo/.hg/hgrc
+
+# Set ui.tweakdefaults to ensure HGPLAIN is being set.
+echo 'tweakdefaults = True' >> $repo/.hg/hgrc
 
 echo utrecht > $repo/hello
 touch $repo/.hgignore
@@ -24,6 +29,12 @@ rev1=$(hg log --cwd $repo -r tip --template '{node}')
 echo world > $repo/hello
 hg commit --cwd $repo -m 'Bla2'
 rev2=$(hg log --cwd $repo -r tip --template '{node}')
+
+# Fetch an unclean branch.
+echo unclean > $repo/hello
+path=$(nix eval --impure --raw --expr "(builtins.fetchMercurial file://$repo).outPath")
+[[ $(cat $path/hello) = unclean ]]
+hg revert --cwd $repo --all
 
 # Fetch the default branch.
 path=$(nix eval --impure --raw --expr "(builtins.fetchMercurial file://$repo).outPath")
@@ -91,3 +102,8 @@ hg commit --cwd $repo -m 'Bla3'
 
 path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchMercurial file://$repo).outPath")
 [[ $path2 = $path4 ]]
+
+echo paris > $repo/hello
+# Passing a `name` argument should be reflected in the output path
+path5=$(nix eval -vvvvv --impure --refresh --raw --expr "(builtins.fetchMercurial { url = \"file://$repo\"; name = \"foo\"; } ).outPath")
+[[ $path5 =~ -foo$ ]]
