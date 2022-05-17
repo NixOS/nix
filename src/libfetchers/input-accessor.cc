@@ -181,18 +181,9 @@ struct FSInputAccessorImpl : FSInputAccessor
             return false;
 
         if (allowedPaths) {
-            #if 0
-            // FIXME: this can be done more efficiently.
-            auto p = (std::string) absPath.substr(root.size());
-            if (p == "") p = "/";
-            while (true) {
-                if (allowedPaths->find(p) != allowedPaths->end())
-                    break;
-                if (p == "/")
-                    return false;
-                p = dirOf(p);
-            }
-            #endif
+            auto p = absPath.removePrefix(root);
+            if (!p.isAllowed(*allowedPaths))
+                return false;
         }
 
         return true;

@@ -4,6 +4,7 @@
 #include <optional>
 #include <cassert>
 #include <iostream>
+#include <set>
 
 namespace nix {
 
@@ -95,6 +96,9 @@ public:
 
     std::optional<CanonPath> parent() const;
 
+    /* Remove the last component. Panics if this path is the root.  */
+    void pop();
+
     std::optional<std::string_view> dirOf() const
     {
         if (isRoot()) return std::nullopt;
@@ -113,14 +117,32 @@ public:
     bool operator != (const CanonPath & x) const
     { return path != x.path; }
 
+    /* Compare paths lexicographically except that path separators
+       are sorted before any other character. That is, in the sorted order
+       a directory is always followed directly by its children. For
+       instance, 'foo' < 'foo/bar' < 'foo!'. */
     bool operator < (const CanonPath & x) const
-    { return path < x.path; }
+    {
+        auto i = path.begin();
+        auto j = x.path.begin();
+        for ( ; i != path.end() && j != x.path.end(); ++i, ++j) {
+            auto c_i = *i;
+            if (c_i == '/') c_i = 0;
+            auto c_j = *j;
+            if (c_j == '/') c_j = 0;
+            if (c_i < c_j) return true;
+            if (c_i > c_j) return false;
+        }
+        return i == path.end() && j != x.path.end();
+    }
 
     CanonPath resolveSymlinks() const;
 
     /* Return true if `this` is equal to `parent` or a child of
        `parent`. */
     bool isWithin(const CanonPath & parent) const;
+
+    CanonPath removePrefix(const CanonPath & prefix) const;
 
     /* Append another path to this one. */
     void extend(const CanonPath & x);
@@ -132,6 +154,12 @@ public:
     void push(std::string_view c);
 
     CanonPath operator + (std::string_view c) const;
+
+    /* Check whether access to this path is allowed, which is the case
+       if 1) `this` is within any of the `allowed` paths; or 2) any of
+       the `allowed` paths are within `this`. (The latter condition
+       ensures access to the parents of allowed paths.) */
+    bool isAllowed(const std::set<CanonPath> & allowed) const;
 };
 
 std::ostream & operator << (std::ostream & stream, const CanonPath & path);

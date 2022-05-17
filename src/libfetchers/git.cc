@@ -682,22 +682,10 @@ struct GitInputScheme : InputScheme
 
         auto files = listFiles(repoInfo);
 
+        CanonPath repoDir(repoInfo.url);
+
         PathFilter filter = [&](const Path & p) -> bool {
-            abort();
-#if 0
-            assert(hasPrefix(p, repoInfo.url));
-            std::string file(p, repoInfo.url.size() + 1);
-
-            auto st = lstat(p);
-
-            if (S_ISDIR(st.st_mode)) {
-                auto prefix = file + "/";
-                auto i = files.lower_bound(prefix);
-                return i != files.end() && hasPrefix(*i, prefix);
-            }
-
-            return files.count(file);
-#endif
+            return CanonPath(p).removePrefix(repoDir).isAllowed(files);
         };
 
         auto storePath = store->addToStore(input.getName(), repoInfo.url, FileIngestionMethod::Recursive, htSHA256, filter);

@@ -38,6 +38,25 @@ namespace nix {
         }
     }
 
+    TEST(CanonPath, pop) {
+        CanonPath p("foo/bar/x");
+        ASSERT_EQ(p.abs(), "/foo/bar/x");
+        p.pop();
+        ASSERT_EQ(p.abs(), "/foo/bar");
+        p.pop();
+        ASSERT_EQ(p.abs(), "/foo");
+        p.pop();
+        ASSERT_EQ(p.abs(), "/");
+    }
+
+    TEST(CanonPath, removePrefix) {
+        CanonPath p1("foo/bar");
+        CanonPath p2("foo/bar/a/b/c");
+        ASSERT_EQ(p2.removePrefix(p1).abs(), "/a/b/c");
+        ASSERT_EQ(p1.removePrefix(p1).abs(), "/");
+        ASSERT_EQ(p1.removePrefix(CanonPath("/")).abs(), "/foo/bar");
+    }
+
     TEST(CanonPath, iter) {
         {
             CanonPath p("a//foo/bar//");
@@ -93,6 +112,41 @@ namespace nix {
             ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("foo/bar")));
             ASSERT_TRUE(CanonPath("/foo/bar/default.nix").isWithin(CanonPath("/")));
             ASSERT_TRUE(CanonPath("/").isWithin(CanonPath("/")));
+        }
+    }
+
+    TEST(CanonPath, sort) {
+        ASSERT_FALSE(CanonPath("foo") < CanonPath("foo"));
+        ASSERT_TRUE (CanonPath("foo") < CanonPath("foo/bar"));
+        ASSERT_TRUE (CanonPath("foo/bar") < CanonPath("foo!"));
+        ASSERT_FALSE(CanonPath("foo!") < CanonPath("foo"));
+        ASSERT_TRUE (CanonPath("foo") < CanonPath("foo!"));
+    }
+
+    TEST(CanonPath, allowed) {
+        {
+            std::set<CanonPath> allowed {
+                CanonPath("foo/bar"),
+                CanonPath("foo!"),
+                CanonPath("xyzzy"),
+                CanonPath("a/b/c"),
+            };
+
+            ASSERT_TRUE (CanonPath("foo/bar").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("foo/bar/bla").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("foo").isAllowed(allowed));
+            ASSERT_FALSE(CanonPath("bar").isAllowed(allowed));
+            ASSERT_FALSE(CanonPath("bar/a").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("a").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("a/b").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("a/b/c").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("a/b/c/d").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("a/b/c/d/e").isAllowed(allowed));
+            ASSERT_FALSE(CanonPath("a/b/a").isAllowed(allowed));
+            ASSERT_FALSE(CanonPath("a/b/d").isAllowed(allowed));
+            ASSERT_FALSE(CanonPath("aaa").isAllowed(allowed));
+            ASSERT_FALSE(CanonPath("zzz").isAllowed(allowed));
+            ASSERT_TRUE (CanonPath("/").isAllowed(allowed));
         }
     }
 }
