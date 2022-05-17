@@ -172,10 +172,6 @@ static FlakeInput parseFlakeInput(EvalState & state,
     if (!input.follows && !input.ref)
         input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
 
-    if (input.registered)
-    {
-    }
-    
     return input;
 }
 
@@ -363,12 +359,12 @@ LockedFlake lockFlake(
         std::vector<FlakeRef> parents;
 
         std::function<void(
-            const FlakeInputs &flakeInputs,
+            const FlakeInputs & flakeInputs,
             std::shared_ptr<Node> node,
-            const InputPath &inputPathPrefix,
+            const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
-            const InputPath &lockRootPath,
-            const Path &parentPath,
+            const InputPath & lockRootPath,
+            const Path & parentPath,
             bool trustLock,
             std::map<Path, InputPath> registered)>
             computeLocks;
@@ -397,9 +393,9 @@ LockedFlake lockFlake(
                     overrides.insert_or_assign(inputPath, inputOverride);
                 }
                 if (input.registered) {
-                    // This is a stub node that is overriden in the input
-                    // auto childNode = std::make_shared<LockedNode>(
-                    //     *input.ref, *input.ref, input.isFlake);
+                    /* Record the name and the eventual path of
+                       registered inputs.  Registered inputs are set to follow the recorded input path.
+                       Only in the defining flake the registered input is handled explicitly to catch transistive inputs */
                     auto inputPath(inputPathPrefix);
                     inputPath.push_back(id);
                     debug("preregistering %s", id.c_str());
@@ -445,8 +441,9 @@ LockedFlake lockFlake(
 
                     auto registeredInputID = registered.find(id);
                     if (registeredInputID != registered.end()
-                    && (registeredChilds.find(id) == registeredChilds.end())
-                    && (input.ref->to_string() == "flake:" + id))
+                        && (registeredChilds.find(id) == registeredChilds.end()) // do not substitute original input
+                        && (input.ref->to_string() == "flake:" + id) // check that the input is not explicitly defined
+                    )
                     {
                         debug("Using already registered node for %s", id);
                         InputPath target;
@@ -455,7 +452,7 @@ LockedFlake lockFlake(
                         continue;
                     }
 
-                        assert(input.ref);
+                    assert(input.ref);
 
                     /* Do we have an entry in the existing lock file? And we
                        don't have a --update-input flag for this input? */
@@ -569,13 +566,6 @@ LockedFlake lockFlake(
                                use --no-write-lock-file. */
                             auto childNode = std::make_shared<LockedNode>(
                                 inputFlake.lockedRef, input2.ref ? *input2.ref : *input.ref);
-
-                            /* Get the registered flakes (e.g. 'inputs.nixpkgs.register = true;') */
-
-                            if (input.registered)
-                            {
-                            }
-
 
                             node->inputs.insert_or_assign(id, childNode);
 
