@@ -7,6 +7,8 @@
 
 namespace nix {
 
+MakeError(RestrictedPathError, Error);
+
 struct InputAccessor
 {
     const size_t number;
@@ -68,9 +70,12 @@ struct FSInputAccessor : InputAccessor
     virtual bool hasAccessControl() = 0;
 };
 
+typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
+
 ref<FSInputAccessor> makeFSInputAccessor(
     const CanonPath & root,
-    std::optional<std::set<CanonPath>> && allowedPaths = {});
+    std::optional<std::set<CanonPath>> && allowedPaths = {},
+    MakeNotAllowedError && makeNotAllowedError = {});
 
 struct MemoryInputAccessor : InputAccessor
 {

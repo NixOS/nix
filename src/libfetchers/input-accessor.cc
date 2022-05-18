@@ -104,10 +104,15 @@ struct FSInputAccessorImpl : FSInputAccessor
 {
     CanonPath root;
     std::optional<std::set<CanonPath>> allowedPaths;
+    MakeNotAllowedError makeNotAllowedError;
 
-    FSInputAccessorImpl(const CanonPath & root, std::optional<std::set<CanonPath>> && allowedPaths)
+    FSInputAccessorImpl(
+        const CanonPath & root,
+        std::optional<std::set<CanonPath>> && allowedPaths,
+        MakeNotAllowedError && makeNotAllowedError)
         : root(root)
-        , allowedPaths(allowedPaths)
+        , allowedPaths(std::move(allowedPaths))
+        , makeNotAllowedError(std::move(makeNotAllowedError))
     { }
 
     std::string readFile(const CanonPath & path) override
@@ -171,9 +176,9 @@ struct FSInputAccessorImpl : FSInputAccessor
     void checkAllowed(const CanonPath & absPath) override
     {
         if (!isAllowed(absPath))
-            // FIXME: for Git trees, show a custom error message like
-            // "file is not under version control or does not exist"
-            throw Error("access to path '%s' is forbidden", absPath);
+            throw makeNotAllowedError
+                ? makeNotAllowedError(absPath)
+                : RestrictedPathError("access to path '%s' is forbidden", absPath);
     }
 
     bool isAllowed(const CanonPath & absPath)
@@ -209,9 +214,10 @@ struct FSInputAccessorImpl : FSInputAccessor
 
 ref<FSInputAccessor> makeFSInputAccessor(
     const CanonPath & root,
-    std::optional<std::set<CanonPath>> && allowedPaths)
+    std::optional<std::set<CanonPath>> && allowedPaths,
+    MakeNotAllowedError && makeNotAllowedError)
 {
-    return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths));
+    return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths), std::move(makeNotAllowedError));
 }
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path)

@@ -461,10 +461,18 @@ EvalState::EvalState(
     , sPrefix(symbols.create("prefix"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , rootFS(makeFSInputAccessor(CanonPath::root,
+    , rootFS(
+        makeFSInputAccessor(
+            CanonPath::root,
             evalSettings.restrictEval || evalSettings.pureEval
             ? std::optional<std::set<CanonPath>>(std::set<CanonPath>())
-            : std::nullopt))
+            : std::nullopt,
+            [](const CanonPath & path) -> RestrictedPathError {
+                auto modeInformation = evalSettings.pureEval
+                    ? "in pure eval mode (use '--impure' to override)"
+                    : "in restricted mode";
+                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+            }))
     , corepkgsFS(makeMemoryInputAccessor())
     , store(store)
     , buildStore(buildStore ? buildStore : store)
