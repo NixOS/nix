@@ -3529,7 +3529,7 @@ static RegisterPrimOp primop_match({
       builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
       ```
 
-      Evaluates to `[ "foo" ]`.
+      Evaluates to `[ "FOO" ]`.
     )s",
     .fun = prim_match,
 });
