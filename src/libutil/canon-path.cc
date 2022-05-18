@@ -16,14 +16,13 @@ CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
 std::optional<CanonPath> CanonPath::parent() const
 {
     if (isRoot()) return std::nullopt;
-    return CanonPath(unchecked_t(), path.substr(0, path.rfind('/')));
+    return CanonPath(unchecked_t(), path.substr(0, std::max((size_t) 1, path.rfind('/'))));
 }
 
 void CanonPath::pop()
 {
     assert(!isRoot());
-    auto slash = path.rfind('/');
-    path.resize(std::max((size_t) 1, slash));
+    path.resize(std::max((size_t) 1, path.rfind('/')));
 }
 
 bool CanonPath::isWithin(const CanonPath & parent) const

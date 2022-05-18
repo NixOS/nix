@@ -11,6 +11,7 @@ namespace nix {
             ASSERT_EQ(p.rel(), "");
             ASSERT_EQ(p.baseName(), std::nullopt);
             ASSERT_EQ(p.dirOf(), std::nullopt);
+            ASSERT_FALSE(p.parent());
         }
 
         {
@@ -19,6 +20,7 @@ namespace nix {
             ASSERT_EQ(p.rel(), "foo");
             ASSERT_EQ(*p.baseName(), "foo");
             ASSERT_EQ(*p.dirOf(), ""); // FIXME: do we want this?
+            ASSERT_EQ(p.parent()->abs(), "/");
         }
 
         {
@@ -27,6 +29,7 @@ namespace nix {
             ASSERT_EQ(p.rel(), "foo/bar");
             ASSERT_EQ(*p.baseName(), "bar");
             ASSERT_EQ(*p.dirOf(), "/foo");
+            ASSERT_EQ(p.parent()->abs(), "/foo");
         }
 
         {
