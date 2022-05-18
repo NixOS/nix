@@ -289,10 +289,14 @@ SourcePath SourcePath::resolveSymlinks() const
 {
     CanonPath res("/");
 
+    int linksAllowed = 1024;
+
     for (auto & component : path) {
         res.push(component);
         while (true) {
             if (auto st = accessor.maybeLstat(res)) {
+                if (!linksAllowed--)
+                    throw Error("infinite symlink recursion in path '%s'", path);
                 if (st->type != InputAccessor::tSymlink) break;
                 auto target = accessor.readLink(res);
                 if (hasPrefix(target, "/"))
