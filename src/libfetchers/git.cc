@@ -715,7 +715,15 @@ struct GitInputScheme : InputScheme
 
         // FIXME: return updated input.
 
-        return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo)), input};
+        auto makeNotAllowedError = [url{repoInfo.url}](const CanonPath & path) -> RestrictedPathError
+        {
+            if (nix::pathExists(path.abs()))
+                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
+            else
+                return RestrictedPathError("path '%s' does not exist in Git reposity '%s'", path, url);
+        };
+
+        return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), std::move(makeNotAllowedError)), input};
     }
 };
 
