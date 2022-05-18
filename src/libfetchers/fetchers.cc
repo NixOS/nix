@@ -311,6 +311,19 @@ void InputScheme::clone(const Input & input, const Path & destDir)
     throw Error("do not know how to clone input '%s'", input.to_string());
 }
 
+std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
+{
+    auto [accessor, input2] = lazyFetch(store, input);
+
+    auto source = sinkToSource([&](Sink & sink) {
+        accessor->dumpPath(CanonPath::root, sink);
+    });
+
+    auto storePath = store->addToStoreFromDump(*source, "source");
+
+    return {storePath, input2};
+}
+
 std::pair<ref<InputAccessor>, Input> InputScheme::lazyFetch(ref<Store> store, const Input & input)
 {
     auto [storePath, input2] = fetch(store, input);

@@ -134,7 +134,9 @@ struct GitArchiveInputScheme : InputScheme
 
     bool hasAllInfo(const Input & input) override
     {
-        return input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
+        return input.getRev() &&
+            true; // FIXME
+            //maybeGetIntAttr(input.attrs, "lastModified");
     }
 
     Input applyOverrides(
@@ -222,11 +224,6 @@ struct GitArchiveInputScheme : InputScheme
             true);
 
         return {res.storePath, input};
-    }
-
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
-    {
-        throw UnimplementedError("GitArchive::fetch()");
     }
 
     std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input) override
