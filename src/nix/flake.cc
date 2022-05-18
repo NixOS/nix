@@ -758,7 +758,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     if (pathExists(to2)) {
                         auto contents2 = readFile(to2);
                         if (contents != contents2)
-                            throw Error("refusing to overwrite existing file '%s'", to2);
+                            throw Error("refusing to overwrite existing file '%s' - please merge manually with '%s'", to2, from2);
                     } else
                         writeFile(to2, contents);
                 }
@@ -766,7 +766,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     auto target = readLink(from2);
                     if (pathExists(to2)) {
                         if (readLink(to2) != target)
-                            throw Error("refusing to overwrite existing symlink '%s'", to2);
+                            throw Error("refusing to overwrite existing symlink '%s' - please merge manually with '%s'", to2, from2);
                     } else
                           createSymlink(target, to2);
                 }
