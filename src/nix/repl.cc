@@ -897,17 +897,14 @@ struct CmdRepl : InstallablesCommand
     }
     void prepare()
     {
-        if (!settings.isExperimentalFeatureEnabled(Xp::Flakes) && !(file)) {
+        if (!settings.isExperimentalFeatureEnabled(Xp::Flakes) && !(file) && this->_installables.size() >= 1) {
             warn("future versions of Nix will require using `--file` to load a file");
-            if (this->_installables.size() > 1) {
+            if (this->_installables.size() > 1)
                 warn("more than one input file is not currently supported");
-            }
-            if (this->_installables.size() >= 1) {
-                file = std::optional(
-                    this->_installables[0].data()
-                );
-            }
-            _installables.clear();
+            auto filePath = this->_installables[0].data();
+            file = std::optional(filePath);
+            _installables.front() = _installables.back();
+            _installables.pop_back();
         }
         installables = InstallablesCommand::load();
     }
@@ -940,9 +937,20 @@ struct CmdRepl : InstallablesCommand
             auto installables = load();
             NixRepl::AnnotatedValues values;
             for (auto & installable: installables){
-                auto [val, pos] = installable->toValue(*state);
                 auto what = installable->what();
-                values.push_back( {val,what} );
+                if (!settings.isExperimentalFeatureEnabled(Xp::Flakes) && file){
+                    auto [val, pos] = installable->toValue(*state);
+                    auto what = installable->what();
+                    state->forceValue(*val, pos);
+                    auto autoArgs = getAutoArgs(*state);
+                    Value *valPost = state->allocValue();
+                    state->autoCallFunction(*autoArgs, *val, *valPost);
+                    state->forceValue(*valPost, pos);
+                    values.push_back( {valPost, what });
+                } else {
+                    auto [val, pos] = installable->toValue(*state);
+                    values.push_back( {val,what} );
+                }
             }
             return values;
         };
