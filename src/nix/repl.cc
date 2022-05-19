@@ -896,11 +896,12 @@ struct CmdRepl : InstallablesCommand
         evalSettings.pureEval = false;
     }
     std::vector<std::string> files;
-    Strings getDefaultFlakeAttrPaths()
-    override {
+    Strings getDefaultFlakeAttrPaths() override
+    {
         return {""};
     }
-    virtual bool useDefaultInstallables() {
+    virtual bool useDefaultInstallables() override
+    {
         return file.has_value() or expr.has_value();
     }
 
