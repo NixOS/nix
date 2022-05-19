@@ -463,6 +463,7 @@ EvalState::EvalState(
     , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
+    , debugMode(false)
     , debugStop(false)
     , debugQuit(false)
     , regexCache(makeRegexCache())
@@ -810,6 +811,31 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
+void EvalState::debugRepl(const Error * error, const Env & env, const Expr & expr)
+{
+    auto dts =
+        error && expr.getPos()
+        ? std::make_unique<DebugTraceStacker>(
+            *this,
+            DebugTrace {
+                .pos = error->info().errPos ? *error->info().errPos : positions[expr.getPos()],
+                .expr = expr,
+                .env = env,
+                .hint = error->info().msg,
+                .isError = true
+            })
+        : nullptr;
+
+    if (error)
+        printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
+
+    auto se = getStaticEnv(expr);
+    if (se) {
+        auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
+        runRepl(*this, *vm);
+    }
+}
+
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
@@ -1043,8 +1069,8 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
     , trace(std::move(t))
 {
     evalState.debugTraces.push_front(trace);
-    if (evalState.debugStop && debuggerHook)
-        debuggerHook(evalState, nullptr, trace.env, trace.expr);
+    if (evalState.debugStop && evalState.debugMode)
+        evalState.debugRepl(nullptr, trace.env, trace.expr);
 }
 
 void Value::mkString(std::string_view s)
@@ -1241,7 +1267,7 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
-        auto dts = debuggerHook
+        auto dts = debugMode
             ? makeDebugTraceStacker(
                 *this,
                 *e,
@@ -1475,7 +1501,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
-        auto dts = debuggerHook
+        auto dts = state.debugMode
             ? makeDebugTraceStacker(
                 state,
                 *this,
@@ -1644,7 +1670,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             /* Evaluate the body. */
             try {
-                auto dts = debuggerHook
+                auto dts = debugMode
                     ? makeDebugTraceStacker(
                         *this, *lambda.body, env2, positions[lambda.pos],
                         "while evaluating %s",
@@ -2072,7 +2098,7 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debuggerHook && i.value->isThunk()
+                    auto dts = debugMode && i.value->isThunk()
                         ? makeDebugTraceStacker(*this, *i.value->thunk.expr, *i.value->thunk.env, positions[i.pos],
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;

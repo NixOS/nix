@@ -757,7 +757,7 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        if (debuggerHook && !state.debugTraces.empty()) {
+        if (state.debugMode && !state.debugTraces.empty()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
                 .msg = hintfmt("breakpoint reached"),
@@ -765,7 +765,7 @@ static RegisterPrimOp primop_break({
             });
 
             auto & dt = state.debugTraces.front();
-            debuggerHook(state, &error, dt.env, dt.expr);
+            state.debugRepl(&error, dt.env, dt.expr);
 
             if (state.debugQuit) {
                 // If the user elects to quit the repl, throw an exception.
@@ -879,8 +879,8 @@ static RegisterPrimOp primop_floor({
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto attrs = state.buildBindings(2);
-    auto saveDebuggerHook = debuggerHook;
-    debuggerHook = nullptr;
+    auto saveDebugMode = state.debugMode;
+    state.debugMode = false;
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
@@ -889,7 +889,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
     }
-    debuggerHook = saveDebuggerHook;
+    state.debugMode = saveDebugMode;
     v.mkAttrs(attrs);
 }
 

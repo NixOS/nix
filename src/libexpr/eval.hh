@@ -25,9 +25,6 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
-void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
-void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
-
 struct PrimOp
 {
     PrimOpFun fun;
@@ -50,6 +47,11 @@ struct Env
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
+
+extern void runRepl(ref<EvalState> evalState, const ValMap & extraEnv);
+
+void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
 
 std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
@@ -127,6 +129,7 @@ public:
     RootValue vImportedDrvToDerivation = nullptr;
 
     /* Debugger */
+    bool debugMode;
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
@@ -140,13 +143,14 @@ public:
             return std::shared_ptr<const StaticEnv>();;
     }
 
+    void debugRepl(const Error * error, const Env & env, const Expr & expr);
 
     template<class E>
     [[gnu::noinline, gnu::noreturn]]
     void debugThrow(const E &error, const Env & env, const Expr & expr)
     {
-        if (debuggerHook)
-            debuggerHook(*this, &error, env, expr);
+        if (debugMode)
+            debugRepl(&error, env, expr);
 
         throw error;
     }
@@ -158,13 +162,14 @@ public:
         // Call this in the situation where Expr and Env are inaccessible.
         // The debugger will start in the last context that's in the
         // DebugTrace stack.
-        if (debuggerHook && !debugTraces.empty()) {
+        if (debugMode && !debugTraces.empty()) {
             const DebugTrace & last = debugTraces.front();
-            debuggerHook(*this, &e, last.env, last.expr);
+            debugRepl(&e, last.env, last.expr);
         }
 
         throw e;
     }
+
 
 private:
     SrcToStore srcToStore;

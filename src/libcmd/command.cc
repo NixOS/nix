@@ -118,32 +118,35 @@ ref<EvalState> EvalCommand::getEvalState()
                 searchPath, getEvalStore(), getStore())
             #endif
             ;
+
+        evalState->debugMode = startReplOnEvalErrors; 
         // TODO move this somewhere else.  Its only here to get the evalState ptr!
-        if (startReplOnEvalErrors)
-            // debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
-            debuggerHook = [](EvalState & evalState, const Error * error, const Env & env, const Expr & expr) {
-                auto dts =
-                    error && expr.getPos()
-                    ? std::make_unique<DebugTraceStacker>(
-                        evalState,
-                        DebugTrace {
-                            .pos = error->info().errPos ? *error->info().errPos : evalState.positions[expr.getPos()],
-                            .expr = expr,
-                            .env = env,
-                            .hint = error->info().msg,
-                            .isError = true
-                        })
-                    : nullptr;
+        // if (startReplOnEvalErrors)
+          
+        //     // debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
+        //     debuggerHook = [](EvalState & evalState, const Error * error, const Env & env, const Expr & expr) {
+        //         auto dts =
+        //             error && expr.getPos()
+        //             ? std::make_unique<DebugTraceStacker>(
+        //                 evalState,
+        //                 DebugTrace {
+        //                     .pos = error->info().errPos ? *error->info().errPos : evalState.positions[expr.getPos()],
+        //                     .expr = expr,
+        //                     .env = env,
+        //                     .hint = error->info().msg,
+        //                     .isError = true
+        //                 })
+        //             : nullptr;
 
-                if (error)
-                    printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
+        //         if (error)
+        //             printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
 
-                auto se = evalState.getStaticEnv(expr);
-                if (se) {
-                    auto vm = mapStaticEnvBindings(evalState.symbols, *se.get(), env);
-                    runRepl(evalState, *vm);
-                }
-            };
+        //         auto se = evalState.getStaticEnv(expr);
+        //         if (se) {
+        //             auto vm = mapStaticEnvBindings(evalState.symbols, *se.get(), env);
+        //             runRepl(evalState, *vm);
+        //         }
+        //     };
     }
     return ref<EvalState>(evalState);
 }

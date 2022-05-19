@@ -280,7 +280,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             // in debugger mode, an EvalError should trigger another repl session.
             // when that session returns the exception will land here.  No need to show it again;
             // show the error for this repl session instead.
-            if (debuggerHook && !state->debugTraces.empty())
+            if (state->debugMode && !state->debugTraces.empty())
                 showDebugTrace(std::cout, state->positions, state->debugTraces.front());
             else
                 printMsg(lvlError, e.msg());
@@ -493,7 +493,7 @@ bool NixRepl::processLine(std::string line)
              << "  :log <expr>   Show logs for a derivation\n"
              << "  :te [bool]    Enable, disable or toggle showing traces for errors\n"
              ;
-        if (debuggerHook) {
+        if (state->debugMode) {
              std::cout
              << "\n"
              << "        Debug mode commands\n"
@@ -508,14 +508,14 @@ bool NixRepl::processLine(std::string line)
 
     }
 
-    else if (debuggerHook && (command == ":bt" || command == ":backtrace")) {
+    else if (state->debugMode && (command == ":bt" || command == ":backtrace")) {
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
             std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
             showDebugTrace(std::cout, state->positions, i);
         }
     }
 
-    else if (debuggerHook && (command == ":env")) {
+    else if (state->debugMode && (command == ":env")) {
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
             if (idx == debugTraceIndex) {
                 printEnvBindings(*state, i.expr, i.env);
@@ -524,7 +524,7 @@ bool NixRepl::processLine(std::string line)
         }
     }
 
-    else if (debuggerHook && (command == ":st")) {
+    else if (state->debugMode && (command == ":st")) {
         try {
             // change the DebugTrace index.
             debugTraceIndex = stoi(arg);
@@ -542,13 +542,13 @@ bool NixRepl::processLine(std::string line)
         }
     }
 
-    else if (debuggerHook && (command == ":s" || command == ":step")) {
+    else if (state->debugMode && (command == ":s" || command == ":step")) {
         // set flag to stop at next DebugTrace; exit repl.
         state->debugStop = true;
         return false;
     }
 
-    else if (debuggerHook && (command == ":c" || command == ":continue")) {
+    else if (state->debugMode && (command == ":c" || command == ":continue")) {
         // set flag to run to next breakpoint or end of program; exit repl.
         state->debugStop = false;
         return false;
