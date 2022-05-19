@@ -441,8 +441,9 @@ void NixRepl::loadDebugTraceEnv(DebugTrace & dt)
 {
     initEnv();
 
-    if (dt.expr.staticEnv) {
-        auto vm = mapStaticEnvBindings(state->symbols, *dt.expr.staticEnv.get(), dt.env);
+    auto se = state->getStaticEnv(dt.expr);
+    if (se) {
+        auto vm = mapStaticEnvBindings(state->symbols, *se.get(), dt.env);
 
         // add staticenv vars.
         for (auto & [name, value] : *(vm.get()))
@@ -516,7 +517,7 @@ bool NixRepl::processLine(std::string line)
     else if (debuggerHook && (command == ":env")) {
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
             if (idx == debugTraceIndex) {
-                printEnvBindings(state->symbols, i.expr, i.env);
+                printEnvBindings(*state, i.expr, i.env);
                 break;
             }
         }
@@ -533,7 +534,7 @@ bool NixRepl::processLine(std::string line)
                  std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
                  showDebugTrace(std::cout, state->positions, i);
                  std::cout << std::endl;
-                 printEnvBindings(state->symbols, i.expr, i.env);
+                 printEnvBindings(*state, i.expr, i.env);
                  loadDebugTraceEnv(i);
                  break;
              }

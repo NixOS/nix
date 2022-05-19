@@ -772,12 +772,12 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
     }
 }
 
-// TODO: add accompanying env for With stuff.
-void printEnvBindings(const SymbolTable & st, const Expr & expr, const Env & env)
+void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env)
 {
     // just print the names for now
-    if (expr.staticEnv)
-        printEnvBindings(st, *expr.staticEnv.get(), env, 0);
+    auto se = es.getStaticEnv(expr);
+    if (se)
+        printEnvBindings(es.symbols, *se, env, 0);
 }
 
 void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, ValMap & vm)

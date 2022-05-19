@@ -144,18 +144,17 @@ struct Expr
 {
     virtual ~Expr() { };
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
-    virtual void bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol name);
-    std::shared_ptr<const StaticEnv> staticEnv;
     virtual PosIdx getPos() const { return noPos; }
 };
 
 #define COMMON_METHODS \
     void show(const SymbolTable & symbols, std::ostream & str) const;    \
     void eval(EvalState & state, Env & env, Value & v); \
-    void bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
 
 struct ExprInt : Expr
 {
@@ -402,7 +401,7 @@ struct ExprOpNot : Expr
         { \
             str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
         } \
-        void bindVars(const EvalState & es, const std::shared_ptr<const StaticEnv> & env)    \
+        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)    \
         { \
             e1->bindVars(es, env); e2->bindVars(es, env);    \
         } \

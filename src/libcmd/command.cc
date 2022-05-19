@@ -137,9 +137,10 @@ ref<EvalState> EvalCommand::getEvalState()
                 if (error)
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
 
-                if (expr.staticEnv) {
-                    auto vm = mapStaticEnvBindings(evalState.symbols, *expr.staticEnv.get(), env);
-                    runRepl(*const_cast<EvalState*>(&evalState), *vm);
+                auto se = evalState->getStaticEnv(expr);
+                if (se) {
+                    auto vm = mapStaticEnvBindings(evalState->symbols, *se.get(), env);
+                    runRepl(evalState, *vm);
                 }
             };
     }
