@@ -920,18 +920,22 @@ struct CmdRepl : InstallablesCommand
     void run(ref<Store> store) override
     {
         auto state = getEvalState();
-        auto repl = std::make_unique<NixRepl>(searchPath, openStore(),state
-                ,[&]()->NixRepl::AnnotatedValues{
-                   auto installables = load();
-                   NixRepl::AnnotatedValues values;
-                   for (auto & installable: installables){
-                       auto [val, pos] = installable->toValue(*state);
-                       auto what = installable->what();
-                       values.push_back( {val,what} );
-                   }
-                   return values;
-                }
-            );
+        auto getValues = [&]()->NixRepl::AnnotatedValues{
+            auto installables = load();
+            NixRepl::AnnotatedValues values;
+            for (auto & installable: installables){
+                auto [val, pos] = installable->toValue(*state);
+                auto what = installable->what();
+                values.push_back( {val,what} );
+            }
+            return values;
+        };
+        auto repl = std::make_unique<NixRepl>(
+            searchPath,
+            openStore(),
+            state,
+            getValues
+        );
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->mainLoop();
     }
