@@ -120,7 +120,7 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
     std::optional<FlakeRef> getFlakeRefForCompletion() override;
 
-private:
+protected:
 
     std::vector<std::string> _installables;
 };

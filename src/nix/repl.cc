@@ -895,6 +895,22 @@ struct CmdRepl : InstallablesCommand
     CmdRepl(){
         evalSettings.pureEval = false;
     }
+    void prepare()
+    {
+        if (!settings.isExperimentalFeatureEnabled(Xp::Flakes) && !(file)) {
+            warn("future versions of Nix will require using `--file` to load a file");
+            if (this->_installables.size() > 1) {
+                warn("more than one input file is not currently supported");
+            }
+            if (this->_installables.size() >= 1) {
+                file = std::optional(
+                    this->_installables[0].data()
+                );
+            }
+            _installables.clear();
+        }
+        installables = InstallablesCommand::load();
+    }
     std::vector<std::string> files;
     Strings getDefaultFlakeAttrPaths() override
     {
