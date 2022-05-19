@@ -71,7 +71,8 @@ std::optional<std::string> readHead(const Path & path)
     });
     if (status != 0) return std::nullopt;
 
-    std::string_view line = output.substr(0, line.find("\n"));
+    std::string_view line = output;
+    line = line.substr(0, line.find("\n"));
     if (const auto parseResult = git::parseLsRemoteLine(line)) {
         switch (parseResult->kind) {
             case git::LsRemoteRefLine::Kind::Symbolic:

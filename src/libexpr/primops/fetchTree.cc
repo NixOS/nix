@@ -225,7 +225,7 @@ static void fetchTree(
             params.emptyRevFallback,
             false);
 
-        //state.allowPath(tree.storePath);
+        state.allowPath(tree.storePath);
     }
 }
 
