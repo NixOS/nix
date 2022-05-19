@@ -11,28 +11,22 @@
 
 namespace nix {
 
-void emitTreeAttrs(
+static void emitTreeAttrs(
     EvalState & state,
-    const SourcePath & path,
     const fetchers::Input & input,
     Value & v,
+    std::function<void(Value &)> setOutPath,
     bool emptyRevFallback,
     bool forceDirty)
 {
-    // FIXME?
-    //assert(input.isLocked());
-
     auto attrs = state.buildBindings(8);
 
-    attrs.alloc(state.sOutPath).mkPath(path);
+    setOutPath(attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
-    #if 0
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(SRI, true));
-    #endif
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -66,6 +60,22 @@ void emitTreeAttrs(
     v.mkAttrs(attrs);
 }
 
+void emitTreeAttrs(
+    EvalState & state,
+    const SourcePath & path,
+    const fetchers::Input & input,
+    Value & v,
+    bool emptyRevFallback,
+    bool forceDirty)
+{
+    emitTreeAttrs(state, input, v,
+        [&](Value & vOutPath) {
+            vOutPath.mkPath(path);
+        },
+        emptyRevFallback,
+        forceDirty);
+}
+
 std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
@@ -87,6 +97,7 @@ std::string fixURIForGit(std::string uri, EvalState & state)
 struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
+    bool returnPath = true; // whether to return a lazily fetched SourcePath or a StorePath
 };
 
 static void fetchTree(
@@ -186,20 +197,36 @@ static void fetchTree(
     if (evalSettings.pureEval && !input.isLocked())
         throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]);
 
-    auto [accessor, input2] = input.lazyFetch(state.store);
+    if (params.returnPath) {
+        auto [accessor, input2] = input.lazyFetch(state.store);
 
-    if (!patches.empty())
-        accessor = makePatchingInputAccessor(accessor, patches);
+        if (!patches.empty())
+            accessor = makePatchingInputAccessor(accessor, patches);
 
-    //state.allowPath(tree.storePath);
+        emitTreeAttrs(
+            state,
+            { state.registerAccessor(accessor), CanonPath::root },
+            input2,
+            v,
+            params.emptyRevFallback,
+            false);
+    } else {
+        assert(patches.empty());
 
-    emitTreeAttrs(
-        state,
-        {state.registerAccessor(accessor), CanonPath::root},
-        input2,
-        v,
-        params.emptyRevFallback,
-        false);
+        auto [tree, input2] = input.fetch(state.store);
+
+        auto storePath = state.store->printStorePath(tree.storePath);
+
+        emitTreeAttrs(
+            state, input2, v,
+            [&](Value & vOutPath) {
+                vOutPath.mkString(storePath, {storePath});
+            },
+            params.emptyRevFallback,
+            false);
+
+        //state.allowPath(tree.storePath);
+    }
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -357,7 +384,13 @@ static RegisterPrimOp primop_fetchTarball({
 
 static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
+    fetchTree(
+        state, pos, args, v, "git",
+        FetchTreeParams {
+            .emptyRevFallback = true,
+            .allowNameArgument = true,
+            .returnPath = false,
+        });
 }
 
 static RegisterPrimOp primop_fetchGit({
