@@ -118,9 +118,10 @@ ref<EvalState> EvalCommand::getEvalState()
                 searchPath, getEvalStore(), getStore())
             #endif
             ;
+        // TODO move this somewhere else.  Its only here to get the evalState ptr!
         if (startReplOnEvalErrors)
             // debuggerHook = [evalState{ref<EvalState>(evalState)}](const Error * error, const Env & env, const Expr & expr) {
-            debuggerHook = [](const EvalState & evalState, const Error * error, const Env & env, const Expr & expr) {
+            debuggerHook = [](EvalState & evalState, const Error * error, const Env & env, const Expr & expr) {
                 auto dts =
                     error && expr.getPos()
                     ? std::make_unique<DebugTraceStacker>(
@@ -137,9 +138,9 @@ ref<EvalState> EvalCommand::getEvalState()
                 if (error)
                     printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
 
-                auto se = evalState->getStaticEnv(expr);
+                auto se = evalState.getStaticEnv(expr);
                 if (se) {
-                    auto vm = mapStaticEnvBindings(evalState->symbols, *se.get(), env);
+                    auto vm = mapStaticEnvBindings(evalState.symbols, *se.get(), env);
                     runRepl(evalState, *vm);
                 }
             };

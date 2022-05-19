@@ -814,7 +814,7 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
    exceptions. */
-void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr & expr) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr & expr)
 {
     auto error = EvalError({
         .msg = hintfmt(s),
@@ -824,7 +824,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwEvalError(const PosIdx pos, const char * s) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s)
 {
     auto error = EvalError({
         .msg = hintfmt(s),
@@ -834,7 +834,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s) const
     debugThrowLastTrace(error);
 }
 
-void EvalState::throwEvalError(const char * s, const std::string & s2) const
+void EvalState::throwEvalError(const char * s, const std::string & s2)
 {
     auto error = EvalError(s, s2);
 
@@ -842,7 +842,7 @@ void EvalState::throwEvalError(const char * s, const std::string & s2) const
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const std::string & s2, Env & env, Expr & expr) const
+    const std::string & s2, Env & env, Expr & expr)
 {
     auto error = EvalError(ErrorInfo{
         .msg = hintfmt(s, s2),
@@ -853,7 +853,7 @@ void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2)
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -863,7 +863,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     debugThrowLastTrace(error);
 }
 
-void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr & expr) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr & expr)
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -874,7 +874,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
 }
 
 void EvalState::throwEvalError(const char * s, const std::string & s2,
-    const std::string & s3) const
+    const std::string & s3)
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -885,7 +885,7 @@ void EvalState::throwEvalError(const char * s, const std::string & s2,
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
-    const std::string & s3) const
+    const std::string & s3)
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -896,7 +896,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
-    const std::string & s3, Env & env, Expr & expr) const
+    const std::string & s3, Env & env, Expr & expr)
 {
     auto error = EvalError({
         .msg = hintfmt(s, s2),
@@ -906,7 +906,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr & expr) const
+void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr & expr)
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     auto error = EvalError({
@@ -917,7 +917,7 @@ void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v) const
+void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v)
 {
     auto error = TypeError({
         .msg = hintfmt(s, showType(v)),
@@ -927,7 +927,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v
     debugThrowLastTrace(error);
 }
 
-void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr & expr) const
+void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr & expr)
 {
     auto error = TypeError({
         .msg = hintfmt(s, showType(v)),
@@ -937,7 +937,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwTypeError(const PosIdx pos, const char * s) const
+void EvalState::throwTypeError(const PosIdx pos, const char * s)
 {
     auto error = TypeError({
         .msg = hintfmt(s),
@@ -948,7 +948,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s) const
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun,
-    const Symbol s2, Env & env, Expr &expr) const
+    const Symbol s2, Env & env, Expr &expr)
 {
     auto error = TypeError({
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
@@ -959,7 +959,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambd
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const ExprLambda & fun, const Symbol s2, Env & env, Expr &expr) const
+    const ExprLambda & fun, const Symbol s2, Env & env, Expr &expr)
 {
     auto error = TypeError(ErrorInfo {
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
@@ -970,7 +970,7 @@ void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr &expr) const
+void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr &expr)
 {
     auto error = TypeError({
         .msg = hintfmt(s, showType(v)),
@@ -980,7 +980,7 @@ void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr 
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr) const
+void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr)
 {
     auto error = AssertionError({
         .msg = hintfmt(s, s1),
@@ -990,7 +990,7 @@ void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std:
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr) const
+void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr)
 {
     auto error = UndefinedVarError({
         .msg = hintfmt(s, s1),
@@ -1000,7 +1000,7 @@ void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const s
     debugThrow(error, env, expr);
 }
 
-void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr) const
+void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr)
 {
     auto error = MissingArgumentError({
         .msg = hintfmt(s, s1),

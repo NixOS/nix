@@ -96,6 +96,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
+// NixRepl::NixRepl(ref<EvalState> state)
 NixRepl::NixRepl(ref<EvalState> state)
     : state(state)
     , debugTraceIndex(0)
@@ -1012,7 +1013,8 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 void runRepl(
-    EvalState& evalState,
+    ref<EvalState> evalState,
+    // EvalState& evalState,
     const ValMap & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
