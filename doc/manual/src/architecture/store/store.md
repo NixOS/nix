@@ -16,7 +16,7 @@ data StoreObject = StoreObject {
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 
-It can *perform builds*, that is, create new store objects by transforming build inputs, using instructions from the build tasks, into build outputs.
+It can *perform builds*, that is, create new store objects by transforming build inputs into build outputs, using instructions from the build tasks.
 
 As it keeps track of references, it can [garbage-collect](https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)) unused store objects.
 
@@ -57,9 +57,9 @@ Garbage collection will delete all store objects that cannot be reached from any
 
 ## Files and Processes
 
-Nix provides a mapping between its store model and the [Unix paradigm](https://en.m.wikipedia.org/wiki/Everything_is_a_file) on the interplay of [files and processes](https://en.m.wikipedia.org/wiki/File_descriptor).
+Nix provides a mapping between its store model and the [Unix paradigm](https://en.m.wikipedia.org/wiki/Everything_is_a_file) that governs the interplay of [files and processes](https://en.m.wikipedia.org/wiki/File_descriptor).
 
-Nix encodes immutable store objects and opaque identifiers as file system primitives: files, directories, and paths.
+Nix encodes immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.
 
 ```
