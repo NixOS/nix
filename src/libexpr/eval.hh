@@ -25,7 +25,7 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
-void printEnvBindings(const SymbolTable & st, const Expr & expr, const Env & env);
+void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
 void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
 
 struct PrimOp
@@ -130,6 +130,16 @@ public:
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
+    std::map<const Expr*, const std::shared_ptr<const StaticEnv> > exprEnvs;
+    const std::shared_ptr<const StaticEnv>  getStaticEnv(const Expr &expr) const
+    {
+        auto i = exprEnvs.find(&expr);
+        if (i != exprEnvs.end()) 
+            return i->second;
+        else
+            return std::shared_ptr<const StaticEnv>();;
+    }
+
 
     template<class E>
     [[gnu::noinline, gnu::noreturn]]
