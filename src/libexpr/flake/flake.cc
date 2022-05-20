@@ -203,6 +203,7 @@ static Flake readFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     const FlakeRef & resolvedRef,
+    const FlakeRef & lockedRef,
     InputAccessor & accessor,
     const InputPath & lockRootPath)
 {
@@ -220,7 +221,7 @@ static Flake readFlake(
     Flake flake {
         .originalRef = originalRef,
         .resolvedRef = resolvedRef,
-        .lockedRef = resolvedRef, // FIXME
+        .lockedRef = lockedRef,
         .path = flakePath,
     };
 
@@ -319,9 +320,9 @@ static Flake getFlake(
         resolvedRef = originalRef.resolve(state.store);
     }
 
-    auto [accessor, input] = resolvedRef.input.lazyFetch(state.store);
+    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
-    return readFlake(state, originalRef, resolvedRef, state.registerAccessor(accessor), lockRootPath);
+    return readFlake(state, originalRef, resolvedRef, lockedRef, state.registerAccessor(accessor), lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
