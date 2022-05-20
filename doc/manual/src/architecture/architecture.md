@@ -30,7 +30,9 @@ Nix consists of [hierarchical layers][layer-architecture].
 At the top is the [command line interface](../command-ref/command-ref.md), translating from invocations of Nix executables to interactions with the underlying layers.
 
 Below that is the [Nix expression language](../expressions/expression-language.md), a [purely functional][purely-functional-programming] configuration language.
-It is used to compose expressions which ultimately evaluate to self-contained *build plans*, made up *build tasks* used to derive *build results* from referenced *build inputs*.
+It is used to compose expressions which ultimately evaluate to self-contained *build plans*, used to derive *build results* from referenced *build inputs*.
+
+The command line and Nix language are what users interact with most.
 
 ::: {.note}
 The Nix language itself does not have a notion of *packages* or *configurations*.
@@ -38,10 +40,8 @@ As far as we are concerned here, the inputs and results of a derivation are just
 In practice this amounts to a set of files in a file system.
 :::
 
-The command line and Nix language are what users interact with most.
-
 Underlying these is the [Nix store](./store/store.md), a mechanism to keep track of build plans, data, and references between them.
-It can also execute *build instructions*, captured in the build tasks, to produce new data.
+It can also execute build plans to produce new data.
 
 [layer-architecture]: https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers
 [purely-functional-programming]: https://en.m.wikipedia.org/wiki/Purely_functional_programming
