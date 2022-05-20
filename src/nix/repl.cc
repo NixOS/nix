@@ -97,7 +97,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
+NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
     : state(state)
     , getValues(getValues)
@@ -691,8 +691,8 @@ void NixRepl::reloadFiles()
         loadFile(i);
     }
 
-    for (auto & [i,what] : getValues()) {
-        notice("Loading Installable '%1%'...", what);
+    for (auto & [i, what] : getValues()) {
+        notice("Loading installable '%1%'...", what);
         addAttrsToScope(*i);
     }
 }
@@ -943,13 +943,13 @@ struct CmdRepl : InstallablesCommand
                     auto what = installable->what();
                     state->forceValue(*val, pos);
                     auto autoArgs = getAutoArgs(*state);
-                    Value *valPost = state->allocValue();
+                    auto valPost = state->allocValue();
                     state->autoCallFunction(*autoArgs, *val, *valPost);
                     state->forceValue(*valPost, pos);
                     values.push_back( {valPost, what });
                 } else {
                     auto [val, pos] = installable->toValue(*state);
-                    values.push_back( {val,what} );
+                    values.push_back( {val, what} );
                 }
             }
             return values;
