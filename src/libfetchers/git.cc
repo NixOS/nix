@@ -303,6 +303,8 @@ struct GitInputScheme : InputScheme
                     warn("Git tree '%s' is dirty", url);
             }
         }
+
+        std::string gitDir = getGitDir();
     };
 
     RepoInfo getRepoInfo(const Input & input)
@@ -411,6 +413,34 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
+    void updateRev(Input & input, const RepoInfo & repoInfo, const std::string & ref)
+    {
+        if (!input.getRev())
+            input.attrs.insert_or_assign("rev",
+                Hash::parseAny(chomp(runProgram("git", true, { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", ref })), htSHA1).gitRev());
+    }
+
+    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const std::string & ref)
+    {
+        return
+            repoInfo.hasHead
+            ? std::stoull(
+                runProgram("git", true,
+                    { "-C", repoDir, "--git-dir", repoInfo.gitDir, "log", "-1", "--format=%ct", "--no-show-signature", ref }))
+            : 0;
+    }
+
+    uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev)
+    {
+        // FIXME: cache this.
+        return
+            repoInfo.hasHead
+            ? std::stoull(
+                runProgram("git", true,
+                    { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-list", "--count", rev.gitRev() }))
+            : 0;
+    }
+
     std::string getDefaultRef(const RepoInfo & repoInfo)
     {
         auto head = repoInfo.isLocal
@@ -426,7 +456,6 @@ struct GitInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
-        auto gitDir = getGitDir(); // FIXME: move into RepoInfo
 
         auto repoInfo = getRepoInfo(input);
 
@@ -474,13 +503,8 @@ struct GitInputScheme : InputScheme
         Path repoDir;
 
         if (repoInfo.isLocal) {
-
-            if (!input.getRev())
-                input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", repoInfo.url, "--git-dir", getGitDir(), "rev-parse", ref })), htSHA1).gitRev());
-
+            updateRev(input, repoInfo, ref);
             repoDir = repoInfo.url;
-
         } else {
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
@@ -492,7 +516,7 @@ struct GitInputScheme : InputScheme
 
             Path cacheDir = getCachePath(repoInfo.url);
             repoDir = cacheDir;
-            gitDir = ".";
+            repoInfo.gitDir = ".";
 
             createDirs(dirOf(cacheDir));
             PathLocks cacheDirLock({cacheDir + ".lock"});
@@ -513,7 +537,7 @@ struct GitInputScheme : InputScheme
                repo. */
             if (input.getRev()) {
                 try {
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "cat-file", "-e", input.getRev()->gitRev() });
+                    runProgram("git", true, { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "-e", input.getRev()->gitRev() });
                     doFetch = false;
                 } catch (ExecError & e) {
                     if (WIFEXITED(e.status)) {
@@ -549,7 +573,7 @@ struct GitInputScheme : InputScheme
                                 : "refs/heads/" + ref;
                     runProgram("git", true,
                         { "-C", repoDir,
-                          "--git-dir", gitDir,
+                          "--git-dir", repoInfo.gitDir,
                           "fetch",
                           "--quiet",
                           "--force",
@@ -574,7 +598,7 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
+        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
         if (isShallow && !repoInfo.shallow)
             throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", repoInfo.url);
@@ -594,7 +618,7 @@ struct GitInputScheme : InputScheme
 
         auto result = runProgram(RunOptions {
             .program = "git",
-            .args = { "-C", repoDir, "--git-dir", gitDir, "cat-file", "commit", input.getRev()->gitRev() },
+            .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "commit", input.getRev()->gitRev() },
             .mergeStderrToStdout = true
         });
         if (WEXITSTATUS(result.first) == 128
@@ -633,7 +657,7 @@ struct GitInputScheme : InputScheme
             auto source = sinkToSource([&](Sink & sink) {
                 runProgram2({
                     .program = "git",
-                    .args = { "-C", repoDir, "--git-dir", gitDir, "archive", input.getRev()->gitRev() },
+                    .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "archive", input.getRev()->gitRev() },
                     .standardOut = &sink
                 });
             });
@@ -643,16 +667,16 @@ struct GitInputScheme : InputScheme
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
-        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+        auto rev = *input.getRev();
 
         Attrs infoAttrs({
-            {"rev", input.getRev()->gitRev()},
-            {"lastModified", lastModified},
+            {"rev", rev.gitRev()},
+            {"lastModified", getLastModified(repoInfo, repoDir, rev.gitRev())},
         });
 
         if (!repoInfo.shallow)
             infoAttrs.insert_or_assign("revCount",
-                std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--count", input.getRev()->gitRev() })));
+                getRevCount(repoInfo, repoDir, rev));
 
         if (!_input.getRev())
             getCache()->add(
@@ -695,15 +719,15 @@ struct GitInputScheme : InputScheme
         // modified dirty file?
         input.attrs.insert_or_assign(
             "lastModified",
-            repoInfo.hasHead
-            ? std::stoull(runProgram("git", true, { "-C", repoInfo.url, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" }))
-            : 0);
+            getLastModified(repoInfo, repoInfo.url, "HEAD"));
 
         return {std::move(storePath), input};
     }
 
-    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & _input) override
     {
+        Input input(_input);
+
         auto repoInfo = getRepoInfo(input);
 
         /* Unless we're using the working tree, copy the tree into the
@@ -714,7 +738,22 @@ struct GitInputScheme : InputScheme
 
         repoInfo.checkDirty();
 
-        // FIXME: return updated input.
+        auto ref = getDefaultRef(repoInfo);
+        input.attrs.insert_or_assign("ref", ref);
+
+        if (!repoInfo.isDirty) {
+            updateRev(input, repoInfo, ref);
+
+            input.attrs.insert_or_assign(
+                "revCount",
+                getRevCount(repoInfo, repoInfo.url, *input.getRev()));
+        }
+
+        // FIXME: maybe we should use the timestamp of the last
+        // modified dirty file?
+        input.attrs.insert_or_assign(
+            "lastModified",
+            getLastModified(repoInfo, repoInfo.url, ref));
 
         auto makeNotAllowedError = [url{repoInfo.url}](const CanonPath & path) -> RestrictedPathError
         {

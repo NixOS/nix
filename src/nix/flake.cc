@@ -182,9 +182,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            #if 0
-            j["path"] = store->printStorePath(flake.sourceInfo->storePath);
-            #endif
             j["locks"] = lockedFlake.lockFile.toJSON();
             logger->cout("%s", j.dump());
         } else {
@@ -198,11 +195,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
                     *flake.description);
-            #if 0
-            logger->cout(
-                ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
-                store->printStorePath(flake.sourceInfo->storePath));
-            #endif
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
