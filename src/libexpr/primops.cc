@@ -879,8 +879,6 @@ static RegisterPrimOp primop_floor({
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto attrs = state.buildBindings(2);
-    auto saveDebuggerHook = debuggerHook;
-    debuggerHook = nullptr;
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
@@ -889,7 +887,6 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
     }
-    debuggerHook = saveDebuggerHook;
     v.mkAttrs(attrs);
 }
 
