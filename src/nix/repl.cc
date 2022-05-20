@@ -938,7 +938,7 @@ struct CmdRepl : InstallablesCommand
             NixRepl::AnnotatedValues values;
             for (auto & installable: installables){
                 auto what = installable->what();
-                if (!settings.isExperimentalFeatureEnabled(Xp::Flakes) && file){
+                if (file){
                     auto [val, pos] = installable->toValue(*state);
                     auto what = installable->what();
                     state->forceValue(*val, pos);
