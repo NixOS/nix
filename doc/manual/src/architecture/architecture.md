@@ -8,19 +8,22 @@ It should help users understand why Nix behaves as it does, and it should help d
 Nix consists of hierarchical [layers](https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers).
 
 ```
-                   [ commmand line interface ]--------+
-                                |                     |
-                                | evaluates           | manages
-                                V                     |
-                   [ configuration language  ]        |
-                                |                     |
-+-------------------------------|---------------------V-----------+
-| store                         | evaluates to                    |
-|  .............................V...............................  |
-|  : build plan                                                :  |
-|  :            referenced by           builds                 :  |
-|  :  [ build input ] --> [ build task ] --> [ build result ]  :  |
-|  :...........................................................:  |
++-----------------------------------------------------------------+
+| Nix                                                             |
+|                  [ commmand line interface ]------,             |
+|                               |                   |             |
+|                           evaluates               |             |
+|                               |                manages          |
+|                               V                   |             |
+|                  [ configuration language  ]      |             |
+|                               |                   |             |
+| +-----------------------------|-------------------V-----------+ |
+| | store                  evaluates to                         | |
+| |                             |                               | |
+| |             referenced by   V       builds                  | |
+| |  [ build input ] ---> [ build plan ] ---> [ build result ]  | |
+| |                                                             | |
+| +-------------------------------------------------------------+ |
 +-----------------------------------------------------------------+
 ```
 
