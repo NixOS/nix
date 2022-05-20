@@ -76,17 +76,17 @@ testReplResponse '
 
 testReplResponse '
 drvPath
-' '"/tmp/nix-test/default/store/qlksh7k4a72107vc054ilywq4rcmy9if-simple.drv"' \
+' '".*-simple.drv"' \
 $testDir/simple.nix --experimental-features ''
 
 testReplResponse '
 drvPath
-' '"/tmp/nix-test/default/store/qlksh7k4a72107vc054ilywq4rcmy9if-simple.drv"' \
+' '".*-simple.drv"' \
 --file $testDir/simple.nix --experimental-features ''
 
 testReplResponse '
 drvPath
-' '"/tmp/nix-test/default/store/qlksh7k4a72107vc054ilywq4rcmy9if-simple.drv"' \
+' '".*-simple.drv"' \
 --file $testDir/simple.nix --experimental-features 'flakes'
 
 mkdir -p flake && cat <<EOF > flake/flake.nix
