@@ -87,7 +87,7 @@ drvPath
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \
---file $testDir/simple.nix --experimental-features 'flakes'
+--file $testDir/simple.nix --experimental-features 'repl-flake'
 
 mkdir -p flake && cat <<EOF > flake/flake.nix
 {
@@ -102,7 +102,7 @@ EOF
 testReplResponse '
 foo + baz
 ' "3" \
-    ./flake ./flake\#bar
+    ./flake ./flake\#bar --experimental-features 'flakes repl-flake'
 
 # Test the `:reload` mechansim with flakes:
 # - Eval `./flake#changingThing`
@@ -115,6 +115,6 @@ sleep 1 # Leave the repl the time to eval 'foo'
 sed -i 's/beforeChange/afterChange/' flake/flake.nix
 echo ":reload"
 echo "changingThing"
-) | nix repl ./flake)
+) | nix repl ./flake --experimental-features 'flakes repl-flake')
 echo "$replResult" | grep -qs beforeChange
 echo "$replResult" | grep -qs afterChange

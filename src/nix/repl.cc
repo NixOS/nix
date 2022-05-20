@@ -897,7 +897,7 @@ struct CmdRepl : InstallablesCommand
     }
     void prepare()
     {
-        if (!settings.isExperimentalFeatureEnabled(Xp::Flakes) && !(file) && this->_installables.size() >= 1) {
+        if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
             warn("future versions of Nix will require using `--file` to load a file");
             if (this->_installables.size() > 1)
                 warn("more than one input file is not currently supported");
