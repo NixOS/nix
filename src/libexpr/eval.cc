@@ -463,7 +463,7 @@ EvalState::EvalState(
     , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
-    , debugMode(false)
+    , debugRepl(0)
     , debugStop(false)
     , debugQuit(false)
     , regexCache(makeRegexCache())
@@ -811,8 +811,12 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
-void EvalState::debugRepl(const Error * error, const Env & env, const Expr & expr)
+void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
+    // double check we've got the debugRepl ftn pointer.
+    if (!debugRepl)
+        return;
+  
     auto dts =
         error && expr.getPos()
         ? std::make_unique<DebugTraceStacker>(
@@ -832,7 +836,7 @@ void EvalState::debugRepl(const Error * error, const Env & env, const Expr & exp
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
-        runRepl(*this, *vm);
+        (debugRepl)(*this, *vm);
     }
 }
 
@@ -1070,7 +1074,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 {
     evalState.debugTraces.push_front(trace);
     if (evalState.debugStop && evalState.debugMode)
-        evalState.debugRepl(nullptr, trace.env, trace.expr);
+        evalState.runDebugRepl(nullptr, trace.env, trace.expr);
 }
 
 void Value::mkString(std::string_view s)

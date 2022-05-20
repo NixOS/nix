@@ -48,8 +48,6 @@ struct Env
     Value * values[0];
 };
 
-extern void runRepl(ref<EvalState> evalState, const ValMap & extraEnv);
-
 void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
 void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
 
@@ -129,6 +127,8 @@ public:
     RootValue vImportedDrvToDerivation = nullptr;
 
     /* Debugger */
+    void (* debugRepl)(EvalState & es, const ValMap & extraEnv);
+
     bool debugMode;
     bool debugStop;
     bool debugQuit;
@@ -143,14 +143,14 @@ public:
             return std::shared_ptr<const StaticEnv>();;
     }
 
-    void debugRepl(const Error * error, const Env & env, const Expr & expr);
+    void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
     template<class E>
     [[gnu::noinline, gnu::noreturn]]
     void debugThrow(const E &error, const Env & env, const Expr & expr)
     {
         if (debugMode)
-            debugRepl(&error, env, expr);
+            runDebugRepl(&error, env, expr);
 
         throw error;
     }
@@ -164,7 +164,7 @@ public:
         // DebugTrace stack.
         if (debugMode && !debugTraces.empty()) {
             const DebugTrace & last = debugTraces.front();
-            debugRepl(&e, last.env, last.expr);
+            runDebugRepl(&e, last.env, last.expr);
         }
 
         throw e;
