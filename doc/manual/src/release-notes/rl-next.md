@@ -28,4 +28,4 @@
 * `nix repl` now takes installables on the command line, unifying the usage
   with other commands that use `--file` and `--expr`. Primary breaking change
   is for the common usage of `nix repl '<nixpkgs>'` which can be recovered with
-  `nix repl nixpkgs` or `nix repl --expr 'import <nixpkgs>{}'`
+  `nix repl --file '<nixpkgs>'` or `nix repl --expr 'import <nixpkgs>{}'`
