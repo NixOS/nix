@@ -1,0 +1,7 @@
+#!/sbin/openrc-run
+
+name=$RC_SVCNAME
+description="Nix Daemon"
+command_args_background="--daemon"
+pidfile="/var/run/nix-daemon.pid"
+command="/nix/var/nix/profiles/default/bin/nix-daemon"
