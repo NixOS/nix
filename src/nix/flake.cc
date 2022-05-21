@@ -509,7 +509,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                         std::string_view replacement =
                             name == "defaultPackage" ? "packages.<system>.default" :
-                            name == "defaultApps" ? "apps.<system>.default" :
+                            name == "defaultApp" ? "apps.<system>.default" :
                             name == "defaultTemplate" ? "templates.default" :
                             name == "defaultBundler" ? "bundlers.<system>.default" :
                             name == "overlay" ? "overlays.default" :
