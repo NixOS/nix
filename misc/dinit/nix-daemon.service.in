@@ -1,0 +1,4 @@
+type      		= process
+command     	= /nix/var/nix/profiles/default/bin/nix-daemon --daemon
+smooth-recovery = true
+logfile      	= /var/run/nix-daemon.log
