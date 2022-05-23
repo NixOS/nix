@@ -48,7 +48,8 @@ struct NixRepl
     #endif
 {
     std::string curDir;
-    ref<EvalState> state;
+    EvalState &state;
+    // ref<EvalState> state;
     Bindings * autoArgs;
 
     size_t debugTraceIndex;
@@ -63,7 +64,7 @@ struct NixRepl
 
     const Path historyFile;
 
-    NixRepl(ref<EvalState> state);
+    NixRepl(EvalState &state);
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(const std::string & prefix);
@@ -96,11 +97,10 @@ std::string removeWhitespace(std::string s)
 }
 
 
-// NixRepl::NixRepl(ref<EvalState> state)
-NixRepl::NixRepl(ref<EvalState> state)
+NixRepl::NixRepl(EvalState &state)
     : state(state)
     , debugTraceIndex(0)
-    , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
+    , staticEnv(new StaticEnv(false, state.staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
@@ -262,8 +262,8 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
             // ctrl-D should exit the debugger.
-            state->debugStop = false;
-            state->debugQuit = true;
+            state.debugStop = false;
+            state.debugQuit = true;
             break;
         }
         try {
@@ -280,8 +280,8 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             // in debugger mode, an EvalError should trigger another repl session.
             // when that session returns the exception will land here.  No need to show it again;
             // show the error for this repl session instead.
-            if (state->debugMode && !state->debugTraces.empty())
-                showDebugTrace(std::cout, state->positions, state->debugTraces.front());
+            if (state.debugMode && !state.debugTraces.empty())
+                showDebugTrace(std::cout, state.positions, state.debugTraces.front());
             else
                 printMsg(lvlError, e.msg());
         } catch (Error & e) {
@@ -387,11 +387,11 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 
             Expr * e = parseString(expr);
             Value v;
-            e->eval(*state, *env, v);
-            state->forceAttrs(v, noPos);
+            e->eval(state, *env, v);
+            state.forceAttrs(v, noPos);
 
             for (auto & i : *v.attrs) {
-                std::string_view name = state->symbols[i.name];
+                std::string_view name = state.symbols[i.name];
                 if (name.substr(0, cur2.size()) != cur2) continue;
                 completions.insert(concatStrings(prev, expr, ".", name));
             }
@@ -427,14 +427,14 @@ static bool isVarName(std::string_view s)
 
 
 StorePath NixRepl::getDerivationPath(Value & v) {
-    auto drvInfo = getDerivation(*state, v, false);
+    auto drvInfo = getDerivation(state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
     auto drvPath = drvInfo->queryDrvPath();
     if (!drvPath)
         throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
-    if (!state->store->isValidPath(*drvPath))
-        throw Error("expression evaluated to invalid derivation '%s'", state->store->printStorePath(*drvPath));
+    if (!state.store->isValidPath(*drvPath))
+        throw Error("expression evaluated to invalid derivation '%s'", state.store->printStorePath(*drvPath));
     return *drvPath;
 }
 
@@ -442,13 +442,13 @@ void NixRepl::loadDebugTraceEnv(DebugTrace & dt)
 {
     initEnv();
 
-    auto se = state->getStaticEnv(dt.expr);
+    auto se = state.getStaticEnv(dt.expr);
     if (se) {
-        auto vm = mapStaticEnvBindings(state->symbols, *se.get(), dt.env);
+        auto vm = mapStaticEnvBindings(state.symbols, *se.get(), dt.env);
 
         // add staticenv vars.
         for (auto & [name, value] : *(vm.get()))
-            addVarToScope(state->symbols.create(name), *value);
+            addVarToScope(state.symbols.create(name), *value);
     }
 }
 
@@ -493,7 +493,7 @@ bool NixRepl::processLine(std::string line)
              << "  :log <expr>   Show logs for a derivation\n"
              << "  :te [bool]    Enable, disable or toggle showing traces for errors\n"
              ;
-        if (state->debugMode) {
+        if (state.debugMode) {
              std::cout
              << "\n"
              << "        Debug mode commands\n"
@@ -508,49 +508,49 @@ bool NixRepl::processLine(std::string line)
 
     }
 
-    else if (state->debugMode && (command == ":bt" || command == ":backtrace")) {
-        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+    else if (state.debugMode && (command == ":bt" || command == ":backtrace")) {
+        for (const auto & [idx, i] : enumerate(state.debugTraces)) {
             std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-            showDebugTrace(std::cout, state->positions, i);
+            showDebugTrace(std::cout, state.positions, i);
         }
     }
 
-    else if (state->debugMode && (command == ":env")) {
-        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+    else if (state.debugMode && (command == ":env")) {
+        for (const auto & [idx, i] : enumerate(state.debugTraces)) {
             if (idx == debugTraceIndex) {
-                printEnvBindings(*state, i.expr, i.env);
+                printEnvBindings(state, i.expr, i.env);
                 break;
             }
         }
     }
 
-    else if (state->debugMode && (command == ":st")) {
+    else if (state.debugMode && (command == ":st")) {
         try {
             // change the DebugTrace index.
             debugTraceIndex = stoi(arg);
         } catch (...) { }
 
-        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+        for (const auto & [idx, i] : enumerate(state.debugTraces)) {
              if (idx == debugTraceIndex) {
                  std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                 showDebugTrace(std::cout, state->positions, i);
+                 showDebugTrace(std::cout, state.positions, i);
                  std::cout << std::endl;
-                 printEnvBindings(*state, i.expr, i.env);
+                 printEnvBindings(state, i.expr, i.env);
                  loadDebugTraceEnv(i);
                  break;
              }
         }
     }
 
-    else if (state->debugMode && (command == ":s" || command == ":step")) {
+    else if (state.debugMode && (command == ":s" || command == ":step")) {
         // set flag to stop at next DebugTrace; exit repl.
-        state->debugStop = true;
+        state.debugStop = true;
         return false;
     }
 
-    else if (state->debugMode && (command == ":c" || command == ":continue")) {
+    else if (state.debugMode && (command == ":c" || command == ":continue")) {
         // set flag to run to next breakpoint or end of program; exit repl.
-        state->debugStop = false;
+        state.debugStop = false;
         return false;
     }
 
@@ -561,7 +561,7 @@ bool NixRepl::processLine(std::string line)
     }
 
     else if (command == ":l" || command == ":load") {
-        state->resetFileCache();
+        state.resetFileCache();
         loadFile(arg);
     }
 
@@ -570,7 +570,7 @@ bool NixRepl::processLine(std::string line)
     }
 
     else if (command == ":r" || command == ":reload") {
-        state->resetFileCache();
+        state.resetFileCache();
         reloadFiles();
     }
 
@@ -581,15 +581,15 @@ bool NixRepl::processLine(std::string line)
         const auto [file, line] = [&] () -> std::pair<std::string, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 PathSet context;
-                auto filename = state->coerceToString(noPos, v, context).toOwned();
-                state->symbols.create(filename);
+                auto filename = state.coerceToString(noPos, v, context).toOwned();
+                state.symbols.create(filename);
                 return {filename, 0};
             } else if (v.isLambda()) {
-                auto pos = state->positions[v.lambda.fun->pos];
+                auto pos = state.positions[v.lambda.fun->pos];
                 return {pos.file, pos.line};
             } else {
                 // assume it's a derivation
-                return findPackageFilename(*state, v, arg);
+                return findPackageFilename(state, v, arg);
             }
         }();
 
@@ -603,7 +603,7 @@ bool NixRepl::processLine(std::string line)
         runProgram2(RunOptions { .program = editor, .searchPath = true, .args = args });
 
         // Reload right after exiting the editor
-        state->resetFileCache();
+        state.resetFileCache();
         reloadFiles();
     }
 
@@ -617,30 +617,30 @@ bool NixRepl::processLine(std::string line)
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
-        state->callFunction(f, v, result, PosIdx());
+        state.callFunction(f, v, result, PosIdx());
 
         StorePath drvPath = getDerivationPath(result);
-        runNix("nix-shell", {state->store->printStorePath(drvPath)});
+        runNix("nix-shell", {state.store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":bl" || command == ":i" || command == ":sh" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
-        Path drvPathRaw = state->store->printStorePath(drvPath);
+        Path drvPathRaw = state.store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
-            state->store->buildPaths({DerivedPath::Built{drvPath}});
-            auto drv = state->store->readDerivation(drvPath);
+            state.store->buildPaths({DerivedPath::Built{drvPath}});
+            auto drv = state.store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
-                auto localStore = state->store.dynamic_pointer_cast<LocalFSStore>();
+            for (auto & [outputName, outputPath] : state.store->queryDerivationOutputMap(drvPath)) {
+                auto localStore = state.store.dynamic_pointer_cast<LocalFSStore>();
                 if (localStore && command == ":bl") {
                     std::string symlink = "repl-result-" + outputName;
                     localStore->addPermRoot(outputPath, absPath(symlink));
-                    logger->cout("  ./%s -> %s", symlink, state->store->printStorePath(outputPath));
+                    logger->cout("  ./%s -> %s", symlink, state.store->printStorePath(outputPath));
                 } else {
-                    logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
+                    logger->cout("  %s -> %s", outputName, state.store->printStorePath(outputPath));
                 }
             }
         } else if (command == ":i") {
@@ -652,7 +652,7 @@ bool NixRepl::processLine(std::string line)
             });
             auto subs = getDefaultSubstituters();
 
-            subs.push_front(state->store);
+            subs.push_front(state.store);
 
             bool foundLog = false;
             RunPager pager;
@@ -685,15 +685,15 @@ bool NixRepl::processLine(std::string line)
     }
 
     else if (command == ":q" || command == ":quit") {
-        state->debugStop = false;
-        state->debugQuit = true;
+        state.debugStop = false;
+        state.debugQuit = true;
         return false;
     }
 
     else if (command == ":doc") {
         Value v;
         evalString(arg, v);
-        if (auto doc = state->getDoc(v)) {
+        if (auto doc = state.getDoc(v)) {
             std::string markdown;
 
             if (!doc->args.empty() && doc->name) {
@@ -737,9 +737,9 @@ bool NixRepl::processLine(std::string line)
             isVarName(name = removeWhitespace(line.substr(0, p))))
         {
             Expr * e = parseString(line.substr(p + 1));
-            Value & v(*state->allocValue());
+            Value & v(*state.allocValue());
             v.mkThunk(env, e);
-            addVarToScope(state->symbols.create(name), v);
+            addVarToScope(state.symbols.create(name), v);
         } else {
             Value v;
             evalString(line, v);
@@ -756,8 +756,8 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.remove(path);
     loadedFiles.push_back(path);
     Value v, v2;
-    state->evalFile(lookupFileArg(*state, path), v);
-    state->autoCallFunction(*autoArgs, v, v2);
+    state.evalFile(lookupFileArg(state, path), v);
+    state.autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }
 
@@ -772,8 +772,8 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 
     Value v;
 
-    flake::callFlake(*state,
-        flake::lockFlake(*state, flakeRef,
+    flake::callFlake(state,
+        flake::lockFlake(state, flakeRef,
             flake::LockFlags {
                 .updateLockFile = false,
                 .useRegistries = !evalSettings.pureEval,
@@ -786,14 +786,14 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 
 void NixRepl::initEnv()
 {
-    env = &state->allocEnv(envSize);
-    env->up = &state->baseEnv;
+    env = &state.allocEnv(envSize);
+    env->up = &state.baseEnv;
     displ = 0;
     staticEnv->vars.clear();
 
     varNames.clear();
-    for (auto & i : state->staticBaseEnv->vars)
-        varNames.emplace(state->symbols[i.first]);
+    for (auto & i : state.staticBaseEnv->vars)
+        varNames.emplace(state.symbols[i.first]);
 }
 
 
@@ -822,14 +822,14 @@ void NixRepl::loadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
+    state.forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
     for (auto & i : *attrs.attrs) {
         staticEnv->vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
-        varNames.emplace(state->symbols[i.name]);
+        varNames.emplace(state.symbols[i.name]);
     }
     staticEnv->sort();
     staticEnv->deduplicate();
@@ -846,13 +846,13 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
     staticEnv->vars.emplace_back(name, displ);
     staticEnv->sort();
     env->values[displ++] = &v;
-    varNames.emplace(state->symbols[name]);
+    varNames.emplace(state.symbols[name]);
 }
 
 
 Expr * NixRepl::parseString(std::string s)
 {
-    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
+    Expr * e = state.parseExprFromString(std::move(s), curDir, staticEnv);
     return e;
 }
 
@@ -860,8 +860,8 @@ Expr * NixRepl::parseString(std::string s)
 void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
-    e->eval(*state, *env, v);
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    e->eval(state, *env, v);
+    state.forceValue(v, [&]() { return v.determinePos(noPos); });
 }
 
 
@@ -891,7 +891,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    state.forceValue(v, [&]() { return v.determinePos(noPos); });
 
     switch (v.type()) {
 
@@ -920,14 +920,14 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case nAttrs: {
         seen.insert(&v);
 
-        bool isDrv = state->isDerivation(v);
+        bool isDrv = state.isDerivation(v);
 
         if (isDrv) {
             str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state->sDrvPath);
+            Bindings::iterator i = v.attrs->find(state.sDrvPath);
             PathSet context;
             if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context));
+                str << state.store->printStorePath(state.coerceToStorePath(i->pos, *i->value, context));
             else
                 str << "???";
             str << "»";
@@ -939,7 +939,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             typedef std::map<std::string, Value *> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
-                sorted.emplace(state->symbols[i.name], i.value);
+                sorted.emplace(state.symbols[i.name], i.value);
 
             for (auto & i : sorted) {
                 if (isVarName(i.first))
@@ -989,7 +989,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     case nFunction:
         if (v.isLambda()) {
             std::ostringstream s;
-            s << state->positions[v.lambda.fun->pos];
+            s << state.positions[v.lambda.fun->pos];
             str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
         } else if (v.isPrimOp()) {
             str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
@@ -1013,8 +1013,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 void runRepl(
-    ref<EvalState> evalState,
-    // EvalState& evalState,
+    EvalState &evalState,
     const ValMap & extraEnv)
 {
     auto repl = std::make_unique<NixRepl>(evalState);
@@ -1023,7 +1022,7 @@ void runRepl(
 
     // add 'extra' vars.
     for (auto & [name, value] : extraEnv)
-        repl->addVarToScope(repl->state->symbols.create(name), *value);
+        repl->addVarToScope(repl->state.symbols.create(name), *value);
 
     repl->mainLoop({});
 }
@@ -1059,8 +1058,8 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
         auto evalState = make_ref<EvalState>(searchPath, store);
 
-        auto repl = std::make_unique<NixRepl>(evalState);
-        repl->autoArgs = getAutoArgs(*repl->state);
+        auto repl = std::make_unique<NixRepl>(*evalState);
+        repl->autoArgs = getAutoArgs(repl->state);
         repl->initEnv();
         repl->mainLoop(files);
     }
