@@ -49,7 +49,6 @@ struct NixRepl
 {
     std::string curDir;
     EvalState &state;
-    // ref<EvalState> state;
     Bindings * autoArgs;
 
     size_t debugTraceIndex;
