@@ -813,7 +813,7 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
 
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
-    // double check we've got the debugRepl ftn pointer.
+    // double check we've got the debugRepl function pointer.
     if (!debugRepl)
         return;
   
@@ -1073,7 +1073,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
     , trace(std::move(t))
 {
     evalState.debugTraces.push_front(trace);
-    if (evalState.debugStop && evalState.debugMode)
+    if (evalState.debugStop && evalState.debugRepl)
         evalState.runDebugRepl(nullptr, trace.env, trace.expr);
 }
 
@@ -1271,7 +1271,7 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
-        auto dts = debugMode
+        auto dts = debugRepl
             ? makeDebugTraceStacker(
                 *this,
                 *e,
@@ -1505,7 +1505,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
-        auto dts = state.debugMode
+        auto dts = state.debugRepl
             ? makeDebugTraceStacker(
                 state,
                 *this,
@@ -1674,7 +1674,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             /* Evaluate the body. */
             try {
-                auto dts = debugMode
+                auto dts = debugRepl
                     ? makeDebugTraceStacker(
                         *this, *lambda.body, env2, positions[lambda.pos],
                         "while evaluating %s",
@@ -2102,7 +2102,7 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs)
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debugMode && i.value->isThunk()
+                    auto dts = debugRepl && i.value->isThunk()
                         ? makeDebugTraceStacker(*this, *i.value->thunk.expr, *i.value->thunk.env, positions[i.pos],
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;

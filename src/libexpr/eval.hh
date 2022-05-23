@@ -128,8 +128,6 @@ public:
 
     /* Debugger */
     void (* debugRepl)(EvalState & es, const ValMap & extraEnv);
-
-    bool debugMode;
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
@@ -149,7 +147,7 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void debugThrow(const E &error, const Env & env, const Expr & expr)
     {
-        if (debugMode)
+        if (debugRepl)
             runDebugRepl(&error, env, expr);
 
         throw error;
@@ -162,7 +160,7 @@ public:
         // Call this in the situation where Expr and Env are inaccessible.
         // The debugger will start in the last context that's in the
         // DebugTrace stack.
-        if (debugMode && !debugTraces.empty()) {
+        if (debugRepl && !debugTraces.empty()) {
             const DebugTrace & last = debugTraces.front();
             runDebugRepl(&e, last.env, last.expr);
         }

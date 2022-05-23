@@ -757,7 +757,7 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        if (state.debugMode && !state.debugTraces.empty()) {
+        if (state.debugRepl && !state.debugTraces.empty()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
                 .msg = hintfmt("breakpoint reached"),

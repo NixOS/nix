@@ -119,8 +119,6 @@ ref<EvalState> EvalCommand::getEvalState()
             #endif
             ;
 
-        evalState->debugMode = startReplOnEvalErrors; 
-
         if (startReplOnEvalErrors) {
             evalState->debugRepl = &runRepl;        
         };
