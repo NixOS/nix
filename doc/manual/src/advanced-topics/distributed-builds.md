@@ -22,6 +22,8 @@ specify an SSH identity file as part of the remote store URI, e.g.
 $ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
 ```
 
+(For more store URI arguments, please consult the [source code](https://github.com/NixOS/nix/blob/master/src/libstore/ssh-store.cc))
+
 Since builds should be non-interactive, the key should not have a
 passphrase. Alternatively, you can load identities ahead of time into
 `ssh-agent` or `gpg-agent`.
