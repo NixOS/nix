@@ -442,9 +442,13 @@ add_nix_vol_fstab_line() {
     local escaped_mountpoint="${NIX_ROOT/ /'\\\'040}"
     shift
 
-    # wrap `ex` to work around a problem with vim plugins breaking exit codes;
-    # (see https://github.com/NixOS/nix/issues/5468)
-    # we'd prefer EDITOR="/usr/bin/ex --noplugin" but vifs doesn't word-split
+    # wrap `ex` to work around a problem with vim plugins breaking exit codes
+    # (see github.com/NixOS/nix/issues/5468)
+    #
+    # the first draft used `--noplugin`, but github.com/NixOS/nix/issues/6462
+    # suggests we need the less-semantic `-u NONE`
+    #
+    # we'd prefer EDITOR="/usr/bin/ex -u NONE" but vifs doesn't word-split
     # the EDITOR env.
     #
     # TODO: at some point we should switch to `--clean`, but it wasn't added
@@ -452,7 +456,7 @@ add_nix_vol_fstab_line() {
     # minver 10.12.6 seems to have released with vim 7.4
     cat > "$SCRATCH/ex_cleanroom_wrapper" <<EOF
 #!/bin/sh
-/usr/bin/ex --noplugin "\$@"
+/usr/bin/ex -u NONE "\$@"
 EOF
     chmod 755 "$SCRATCH/ex_cleanroom_wrapper"
 
@@ -646,8 +650,9 @@ EOF
         task "Configuring /etc/synthetic.conf to make a mount-point at $NIX_ROOT" >&2
         # technically /etc/synthetic.d/nix is supported in Big Sur+
         # but handling both takes even more code...
+        # Note: `-u NONE` disables vim plugins/rc; see note on --clean earlier
         _sudo "to add Nix to /etc/synthetic.conf" \
-            /usr/bin/ex --noplugin /etc/synthetic.conf <<EOF
+            /usr/bin/ex -u NONE /etc/synthetic.conf <<EOF
 :a
 ${NIX_ROOT:1}
 .
@@ -815,7 +820,8 @@ setup_volume_daemon() {
     local volume_uuid="$2"
     if ! test_voldaemon; then
         task "Configuring LaunchDaemon to mount '$NIX_VOLUME_LABEL'" >&2
-        _sudo "to install the Nix volume mounter" /usr/bin/ex --noplugin "$NIX_VOLUME_MOUNTD_DEST" <<EOF
+        # Note: `-u NONE` disables vim plugins/rc; see note on --clean earlier
+        _sudo "to install the Nix volume mounter" /usr/bin/ex -u NONE "$NIX_VOLUME_MOUNTD_DEST" <<EOF
 :a
 $(generate_mount_daemon "$cmd_type" "$volume_uuid")
 .
