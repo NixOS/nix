@@ -8,10 +8,6 @@
 
 namespace nix {
 
-/* Launch the nix debugger */
-
-// std::function<void(EvalState & evalState,const Error * error, const Env & env, const Expr & expr)> debuggerHook;
-
 /* Displaying abstract syntax trees. */
 
 static void showString(std::ostream & str, std::string_view s)

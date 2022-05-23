@@ -22,8 +22,6 @@ MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 MakeError(RestrictedPathError, Error);
 
-// extern std::function<void(EvalState & evalState, const Error * error, const Env & env, const Expr & expr)> debuggerHook;
-
 /* Position objects. */
 
 struct Pos
