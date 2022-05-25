@@ -48,7 +48,7 @@ struct NixRepl
     #endif
 {
     std::string curDir;
-    EvalState &state;
+    EvalState & state;
     Bindings * autoArgs;
 
     size_t debugTraceIndex;
@@ -63,11 +63,11 @@ struct NixRepl
 
     const Path historyFile;
 
-    NixRepl(EvalState &state);
+    NixRepl(EvalState & state);
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(const std::string & prefix);
-    bool getLine(std::string & input, const std::string &prompt);
+    bool getLine(std::string & input, const std::string & prompt);
     StorePath getDerivationPath(Value & v);
     bool processLine(std::string line);
     void loadFile(const Path & path);
@@ -96,7 +96,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(EvalState &state)
+NixRepl::NixRepl(EvalState & state)
     : state(state)
     , debugTraceIndex(0)
     , staticEnv(new StaticEnv(false, state.staticBaseEnv.get()))

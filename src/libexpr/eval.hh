@@ -131,11 +131,11 @@ public:
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
-    std::map<const Expr*, const std::shared_ptr<const StaticEnv> > exprEnvs;
-    const std::shared_ptr<const StaticEnv>  getStaticEnv(const Expr &expr) const
+    std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
+    const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
     {
         auto i = exprEnvs.find(&expr);
-        if (i != exprEnvs.end()) 
+        if (i != exprEnvs.end())
             return i->second;
         else
             return std::shared_ptr<const StaticEnv>();;
@@ -145,7 +145,7 @@ public:
 
     template<class E>
     [[gnu::noinline, gnu::noreturn]]
-    void debugThrow(const E &error, const Env & env, const Expr & expr)
+    void debugThrow(E && error, const Env & env, const Expr & expr)
     {
         if (debugRepl)
             runDebugRepl(&error, env, expr);
@@ -155,7 +155,7 @@ public:
 
     template<class E>
     [[gnu::noinline, gnu::noreturn]]
-    void debugThrowLastTrace(E & e)
+    void debugThrowLastTrace(E && e)
     {
         // Call this in the situation where Expr and Env are inaccessible.
         // The debugger will start in the last context that's in the

@@ -100,8 +100,7 @@ void printValueAsJSON(EvalState & state, bool strict,
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
     JSONPlaceholder & out, PathSet & context) const
 {
-    auto e = TypeError("cannot convert %1% to JSON", showType());
-    state.debugThrowLastTrace(e);
+    state.debugThrowLastTrace(TypeError("cannot convert %1% to JSON", showType()));
 }
 
 
