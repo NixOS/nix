@@ -23,7 +23,7 @@ rec {
   };
   rootCA = mkCADerivation {
     name = "rootCA";
-    outputs = [ "out" "dev" "foo"];
+    outputs = [ "out" "dev" "foo" ];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"

@@ -31,7 +31,14 @@ flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA; do
     rm -rf $repo $repo.tmp
     mkdir -p $repo
-    git -C $repo init
+
+    # Give one repo a non-master initial branch.
+    extraArgs=
+    if [[ $repo == $flake2Dir ]]; then
+      extraArgs="--initial-branch=main"
+    fi
+
+    git -C $repo init $extraArgs
     git -C $repo config user.email "foobar@example.com"
     git -C $repo config user.name "Foobar"
 done
@@ -156,6 +163,7 @@ nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Di
 # But should succeed in impure mode.
 (! nix build -o $TEST_ROOT/result flake2#bar --impure)
 nix build -o $TEST_ROOT/result flake2#bar --impure --no-write-lock-file
+nix eval --expr "builtins.getFlake \"$flake2Dir\"" --impure
 
 # Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'

@@ -55,6 +55,7 @@ typedef std::map<Path, StorePath> SrcToStore;
 
 std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
+std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
 typedef std::pair<std::string, std::string> SearchPathElem;
@@ -78,7 +79,7 @@ public:
 
     static inline std::string derivationNixPath = "//builtin/derivation.nix";
 
-    const SymbolIdx sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
+    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
@@ -87,7 +88,7 @@ public:
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
         sPrefix;
-    SymbolIdx sDerivationNix;
+    Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
        already exist there. */
@@ -269,14 +270,14 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx p1, const char * s, const SymbolIdx sym, const PosIdx p2) const;
+    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwTypeError(const PosIdx pos, const char * s) const;
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const SymbolIdx s2) const;
+    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-        const ExprLambda & fun, const SymbolIdx s2) const;
+        const ExprLambda & fun, const Symbol s2) const;
     [[gnu::noinline, gnu::noreturn]]
     void throwTypeError(const char * s, const Value & v) const;
     [[gnu::noinline, gnu::noreturn]]
@@ -392,7 +393,7 @@ public:
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
-    Value * allocAttr(Value & vAttrs, const SymbolIdx & name);
+    Value * allocAttr(Value & vAttrs, Symbol name);
     Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);

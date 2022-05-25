@@ -68,14 +68,15 @@ StringMap EvalState::realiseContext(const PathSet & context)
 
     /* Get all the output paths corresponding to the placeholders we had */
     for (auto & [drvPath, outputs] : drvs) {
-        auto outputPaths = store->queryDerivationOutputMap(drvPath);
+        const auto outputPaths = store->queryDerivationOutputMap(drvPath);
         for (auto & outputName : outputs) {
-            if (outputPaths.count(outputName) == 0)
+            auto outputPath = get(outputPaths, outputName);
+            if (!outputPath)
                 throw Error("derivation '%s' does not have an output named '%s'",
                         store->printStorePath(drvPath), outputName);
             res.insert_or_assign(
                 downstreamPlaceholder(*store, drvPath, outputName),
-                store->printStorePath(outputPaths.at(outputName))
+                store->printStorePath(*outputPath)
             );
         }
     }
@@ -584,7 +585,7 @@ typedef std::list<Value *> ValueList;
 static Bindings::iterator getAttr(
     EvalState & state,
     std::string_view funcName,
-    SymbolIdx attrSym,
+    Symbol attrSym,
     Bindings * attrSet,
     const PosIdx pos)
 {
@@ -1249,8 +1250,13 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
         switch (hashModulo.kind) {
         case DrvHash::Kind::Regular:
             for (auto & i : outputs) {
-                auto h = hashModulo.hashes.at(i);
-                auto outPath = state.store->makeOutputPath(i, h, drvName);
+                auto h = get(hashModulo.hashes, i);
+                if (!h)
+                    throw AssertionError({
+                        .msg = hintfmt("derivation produced no hash for output '%s'", i),
+                        .errPos = state.positions[posDrvName],
+                    });
+                auto outPath = state.store->makeOutputPath(i, *h, drvName);
                 drv.env[i] = state.store->printStorePath(outPath);
                 drv.outputs.insert_or_assign(
                     i,
@@ -2047,7 +2053,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     PathSet context;
 
     for (auto & attr : *args[0]->attrs) {
-        auto & n(state.symbols[attr.name]);
+        auto n = state.symbols[attr.name];
         if (n == "path")
             path = state.coerceToPath(attr.pos, *attr.value, context);
         else if (attr.name == state.sName)
@@ -2314,7 +2320,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
     auto attrs = state.buildBindings(args[0]->listSize());
 
-    std::set<SymbolIdx> seen;
+    std::set<Symbol> seen;
 
     for (auto v2 : args[0]->listItems()) {
         state.forceAttrs(*v2, pos);
@@ -2517,7 +2523,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
     // attribute with the merge function application. this way we need not
     // use (slightly slower) temporary storage the GC does not know about.
 
-    std::map<SymbolIdx, std::pair<size_t, Value * *>> attrsSeen;
+    std::map<Symbol, std::pair<size_t, Value * *>> attrsSeen;
 
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
@@ -3523,7 +3529,7 @@ static RegisterPrimOp primop_match({
       builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
       ```
 
-      Evaluates to `[ "foo" ]`.
+      Evaluates to `[ "FOO" ]`.
     )s",
     .fun = prim_match,
 });
@@ -3626,7 +3632,7 @@ static RegisterPrimOp primop_split({
       Evaluates to `[ "" [ "a" null ] "b" [ null "c" ] "" ]`.
 
       ```nix
-      builtins.split "([[:upper:]]+)" "  FOO   "
+      builtins.split "([[:upper:]]+)" " FOO "
       ```
 
       Evaluates to `[ " " [ "FOO" ] " " ]`.

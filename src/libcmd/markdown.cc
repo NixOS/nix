@@ -9,10 +9,12 @@ namespace nix {
 
 std::string renderMarkdownToTerminal(std::string_view markdown)
 {
+    int windowWidth = getWindowSize().second;
+
     struct lowdown_opts opts {
         .type = LOWDOWN_TERM,
         .maxdepth = 20,
-        .cols = std::max(getWindowSize().second, (unsigned short) 80),
+        .cols = (size_t) std::max(windowWidth - 5, 60),
         .hmargin = 0,
         .vmargin = 0,
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,

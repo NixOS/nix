@@ -22,13 +22,13 @@ struct ProfileElementSource
     // FIXME: record original attrpath.
     FlakeRef resolvedRef;
     std::string attrPath;
-    // FIXME: output names
+    OutputsSpec outputs;
 
     bool operator < (const ProfileElementSource & other) const
     {
         return
-            std::pair(originalRef.to_string(), attrPath) <
-            std::pair(other.originalRef.to_string(), other.attrPath);
+            std::tuple(originalRef.to_string(), attrPath, outputs) <
+            std::tuple(other.originalRef.to_string(), other.attrPath, other.outputs);
     }
 };
 
@@ -37,12 +37,12 @@ struct ProfileElement
     StorePathSet storePaths;
     std::optional<ProfileElementSource> source;
     bool active = true;
-    // FIXME: priority
+    int priority = 5;
 
     std::string describe() const
     {
         if (source)
-            return fmt("%s#%s", source->originalRef, source->attrPath);
+            return fmt("%s#%s%s", source->originalRef, source->attrPath, printOutputsSpec(source->outputs));
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
@@ -67,7 +67,6 @@ struct ProfileElement
         ref<Store> store,
         const BuiltPaths & builtPaths)
     {
-        // FIXME: respect meta.outputsToInstall
         storePaths.clear();
         for (auto & buildable : builtPaths) {
             std::visit(overloaded {
@@ -99,7 +98,7 @@ struct ProfileManifest
             auto version = json.value("version", 0);
             std::string sUrl;
             std::string sOriginalUrl;
-            switch(version){
+            switch (version) {
                 case 1:
                     sUrl = "uri";
                     sOriginalUrl = "originalUri";
@@ -117,11 +116,15 @@ struct ProfileManifest
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
-                if (e.value(sUrl,"") != "") {
-                    element.source = ProfileElementSource{
+                if(e.contains("priority")) {
+                    element.priority = e["priority"];
+                }
+                if (e.value(sUrl, "") != "") {
+                    element.source = ProfileElementSource {
                         parseFlakeRef(e[sOriginalUrl]),
                         parseFlakeRef(e[sUrl]),
-                        e["attrPath"]
+                        e["attrPath"],
+                        e["outputs"].get<OutputsSpec>()
                     };
                 }
                 elements.emplace_back(std::move(element));
@@ -153,10 +156,12 @@ struct ProfileManifest
             nlohmann::json obj;
             obj["storePaths"] = paths;
             obj["active"] = element.active;
+            obj["priority"] = element.priority;
             if (element.source) {
                 obj["originalUrl"] = element.source->originalRef.to_string();
                 obj["url"] = element.source->resolvedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
+                obj["outputs"] = element.source->outputs;
             }
             array.push_back(obj);
         }
@@ -176,7 +181,7 @@ struct ProfileManifest
         for (auto & element : elements) {
             for (auto & path : element.storePaths) {
                 if (element.active)
-                    pkgs.emplace_back(store->printStorePath(path), true, 5);
+                    pkgs.emplace_back(store->printStorePath(path), true, element.priority);
                 references.insert(path);
             }
         }
@@ -258,6 +263,16 @@ builtPathsPerInstallable(
 
 struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 {
+    std::optional<int> priority;
+    CmdProfileInstall() {
+        addFlag({
+            .longName = "priority",
+            .description = "The priority of the package to install.",
+            .labels = {"priority"},
+            .handler = {&priority},
+        });
+    };
+
     std::string description() override
     {
         return "install a package into a profile";
@@ -281,15 +296,26 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
+
+
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 // FIXME: make build() return this?
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
-                element.source = ProfileElementSource{
+                element.source = ProfileElementSource {
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
+                    installable2->outputsSpec
                 };
+
+                if(drv.priority) {
+                    element.priority = *drv.priority;
+                }
             }
+
+            if(priority) { // if --priority was specified we want to override the priority of the installable
+                element.priority = *priority;
+            };
 
             element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
 
@@ -444,6 +470,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
                     "",
+                    element.source->outputs,
                     Strings{element.source->attrPath},
                     Strings{},
                     lockFlags);
@@ -455,10 +482,11 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                element.source = ProfileElementSource{
+                element.source = ProfileElementSource {
                     installable->flakeRef,
                     resolvedRef,
                     attrPath,
+                    installable->outputsSpec
                 };
 
                 installables.push_back(installable);
@@ -514,8 +542,8 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
+                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
+                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }

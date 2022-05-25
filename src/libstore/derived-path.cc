@@ -4,6 +4,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <optional>
+
 namespace nix {
 
 nlohmann::json DerivedPath::Opaque::toJSON(ref<Store> store) const {
@@ -17,12 +19,12 @@ nlohmann::json DerivedPath::Built::toJSON(ref<Store> store) const {
     res["drvPath"] = store->printStorePath(drvPath);
     // Fallback for the input-addressed derivation case: We expect to always be
     // able to print the output paths, so let’s do it
-    auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
+    const auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
     for (const auto& output : outputs) {
-        if (knownOutputs.at(output))
-            res["outputs"][output] = store->printStorePath(knownOutputs.at(output).value());
-        else
-            res["outputs"][output] = nullptr;
+        auto knownOutput = get(knownOutputs, output);
+        res["outputs"][output] = (knownOutput && *knownOutput)
+          ? store->printStorePath(**knownOutput)
+          : nullptr;
     }
     return res;
 }
@@ -123,10 +125,15 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                 for (auto& [outputName, outputPath] : p.outputs) {
                     if (settings.isExperimentalFeatureEnabled(
                                 Xp::CaDerivations)) {
+                        auto drvOutput = get(drvHashes, outputName);
+                        if (!drvOutput)
+                            throw Error(
+                                "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
+                                store.printStorePath(p.drvPath), outputName);
                         auto thisRealisation = store.queryRealisation(
-                            DrvOutput{drvHashes.at(outputName), outputName});
-                        assert(thisRealisation);  // We’ve built it, so we must h
-                                                  // ve the realisation
+                            DrvOutput{*drvOutput, outputName});
+                        assert(thisRealisation);  // We’ve built it, so we must
+                                                  // have the realisation
                         res.insert(*thisRealisation);
                     } else {
                         res.insert(outputPath);

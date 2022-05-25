@@ -1588,7 +1588,6 @@ std::string stripIndentation(std::string_view s)
 
 //////////////////////////////////////////////////////////////////////
 
-
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
 

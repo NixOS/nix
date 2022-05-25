@@ -147,7 +147,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         else {
             str << "[ ";
             for (auto v2 : listItems()) {
-                v2->print(symbols, str, seen);
+                if (v2)
+                    v2->print(symbols, str, seen);
+                else
+                    str << "(nullptr)";
                 str << " ";
             }
             str << "]";
@@ -184,6 +187,11 @@ void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepe
     print(symbols, str, showRepeated ? nullptr : &seen);
 }
 
+// Pretty print types for assertion errors
+std::ostream & operator << (std::ostream & os, const ValueType t) {
+    os << showType(t);
+    return os;
+}
 
 std::string printValue(const EvalState & state, const Value & v)
 {
@@ -308,7 +316,7 @@ static BoehmGCStackAllocator boehmGCStackAllocator;
 #endif
 
 
-static SymbolIdx getName(const AttrName & name, EvalState & state, Env & env)
+static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 {
     if (name.symbol) {
         return name.symbol;
@@ -769,7 +777,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     });
 }
 
-void EvalState::throwEvalError(const PosIdx p1, const char * s, const SymbolIdx sym, const PosIdx p2) const
+void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
     throw EvalError({
@@ -787,7 +795,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s) const
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun,
-    const SymbolIdx s2) const
+    const Symbol s2) const
 {
     throw TypeError({
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
@@ -796,7 +804,7 @@ void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambd
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const ExprLambda & fun, const SymbolIdx s2) const
+    const ExprLambda & fun, const Symbol s2) const
 {
     throw TypeError(ErrorInfo {
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
@@ -1582,7 +1590,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", symbols[i.name]);
+https://nixos.org/manual/nix/stable/expressions/language-constructs.html#functions.)", symbols[i.name]);
 
             }
         }
