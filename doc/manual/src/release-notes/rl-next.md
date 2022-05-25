@@ -24,3 +24,16 @@
 
   Selecting derivation outputs using the attribute selection syntax
   (e.g. `nixpkgs#glibc.dev`) no longer works.
+
+* Running nix with the new `--debugger` flag will cause it to start a repl session if
+  there is an exception thrown during eval, or if `builtins.break` is called.  From
+  there one can inspect symbol values and evaluate nix expressions.  In debug mode
+  the following new repl commands are available:
+  ```
+  :env          Show env stack
+  :bt           Show trace stack
+  :st           Show current trace
+  :st <idx>     Change to another trace in the stack
+  :c            Go until end of program, exception, or builtins.break().
+  :s            Go one step
+  ```
