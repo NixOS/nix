@@ -80,8 +80,8 @@ initialised by `stdenv` and exits. This build environment can be
 recorded into a profile using `--profile`.
 
 The prompt used by the `bash` shell can be customised by setting the
-`bash-prompt` and `bash-prompt-suffix` settings in `nix.conf` or in
-the flake's `nixConfig` attribute.
+`bash-prompt`, `bash-prompt-prefix`, and `bash-prompt-suffix` settings in
+`nix.conf` or in the flake's `nixConfig` attribute.
 
 # Flake output attributes
 

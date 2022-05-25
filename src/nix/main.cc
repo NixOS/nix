@@ -261,6 +261,8 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
+    Finally f([] { logger->stop(); });
+
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
 
@@ -278,8 +280,6 @@ void mainWrapped(int argc, char * * argv)
     } else {
         verbosity = lvlInfo;
     }
-
-    Finally f([] { logger->stop(); });
 
     NixArgs args;
 

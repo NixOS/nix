@@ -1,6 +1,7 @@
 #include "url.hh"
 #include "url-parts.hh"
 #include "util.hh"
+#include "split.hh"
 
 namespace nix {
 
@@ -134,6 +135,23 @@ bool ParsedURL::operator ==(const ParsedURL & other) const
         && path == other.path
         && query == other.query
         && fragment == other.fragment;
+}
+
+/**
+ * Parse a URL scheme of the form '(applicationScheme\+)?transportScheme'
+ * into a tuple '(applicationScheme, transportScheme)'
+ *
+ * > parseUrlScheme("http") == ParsedUrlScheme{ {}, "http"}
+ * > parseUrlScheme("tarball+http") == ParsedUrlScheme{ {"tarball"}, "http"}
+ */
+ParsedUrlScheme parseUrlScheme(std::string_view scheme)
+{
+    auto application = splitPrefixTo(scheme, '+');
+    auto transport = scheme;
+    return ParsedUrlScheme {
+        .application = application,
+        .transport = transport,
+    };
 }
 
 }

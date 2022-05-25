@@ -45,12 +45,14 @@ enum AttrType {
     Failed = 5,
     Bool = 6,
     ListOfStrings = 7,
+    Int = 8,
 };
 
 struct placeholder_t {};
 struct missing_t {};
 struct misc_t {};
 struct failed_t {};
+struct int_t { NixInt x; };
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
@@ -63,6 +65,7 @@ typedef std::variant<
     misc_t,
     failed_t,
     bool,
+    int_t,
     std::vector<std::string>
     > AttrValue;
 
@@ -115,6 +118,8 @@ public:
     string_t getStringWithContext();
 
     bool getBool();
+
+    NixInt getInt();
 
     std::vector<std::string> getListOfStrings();
 

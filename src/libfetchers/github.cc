@@ -243,7 +243,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
+        auto url = fmt(
+            host == "github.com"
+            ? "https://api.%s/repos/%s/%s/commits/%s"
+            : "https://%s/api/v3/repos/%s/%s/commits/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
@@ -262,7 +265,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
+        auto url = fmt(
+            host == "github.com"
+            ? "https://api.%s/repos/%s/%s/tarball/%s"
+            : "https://%s/api/v3/repos/%s/%s/tarball/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
