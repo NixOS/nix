@@ -836,7 +836,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
-        (debugRepl)(*this, *vm);
+        (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
     }
 }
 

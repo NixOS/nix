@@ -274,6 +274,6 @@ void printClosureDiff(
 
 
 void runRepl(
-    EvalState & evalState,
+    ref<EvalState> evalState,
     const ValMap & extraEnv);
 }

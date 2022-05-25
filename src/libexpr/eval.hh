@@ -13,7 +13,6 @@
 #include <unordered_map>
 #include <mutex>
 
-
 namespace nix {
 
 
@@ -88,7 +87,7 @@ struct DebugTrace {
 
 void debugError(Error * e, Env & env, Expr & expr);
 
-class EvalState
+class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
     SymbolTable symbols;
@@ -127,7 +126,7 @@ public:
     RootValue vImportedDrvToDerivation = nullptr;
 
     /* Debugger */
-    void (* debugRepl)(EvalState & es, const ValMap & extraEnv);
+    void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
