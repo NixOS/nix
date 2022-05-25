@@ -500,7 +500,7 @@ bool NixRepl::processLine(std::string line)
              << "  :bt           Show trace stack\n"
              << "  :st           Show current trace\n"
              << "  :st <idx>     Change to another trace in the stack\n"
-             << "  :c            Go until end of program, exception, or builtins.break().\n"
+             << "  :c            Go until end of program, exception, or builtins.break\n"
              << "  :s            Go one step\n"
              ;
         }
