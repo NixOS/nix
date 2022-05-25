@@ -4,7 +4,7 @@ Most Nix commands interpret the following environment variables:
 
   - `IN_NIX_SHELL`\
     Indicator that tells if the current environment was set up by
-    `nix-shell`. Since Nix 2.0 the values are `"pure"` and `"impure"`
+    `nix-shell`. It can have the values `pure` or `impure`.
 
   - `NIX_PATH`\
     A colon-separated list of directories used to look up Nix
