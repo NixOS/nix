@@ -169,7 +169,7 @@ std::pair<Tree, time_t> downloadTarball(
     };
 }
 
-// An input scheme corresponding to a curable ressource
+// An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
     virtual const std::string inputType() const = 0;
