@@ -1,2 +1,5 @@
 [output.html]
 additional-css = ["custom.css"]
+
+[preprocessor.anchors]
+command = "python3 doc/manual/anchors.py"
