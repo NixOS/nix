@@ -1,5 +1,6 @@
 [output.html]
 additional-css = ["custom.css"]
+additional-js = ["redirects.js"]
 
 [preprocessor.anchors]
 renderers = ["html"]
