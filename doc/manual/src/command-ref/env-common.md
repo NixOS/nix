@@ -2,11 +2,11 @@
 
 Most Nix commands interpret the following environment variables:
 
-  - `IN_NIX_SHELL`\
+  - [`IN_NIX_SHELL`]{#env-IN_NIX_SHELL}\
     Indicator that tells if the current environment was set up by
     `nix-shell`. Since Nix 2.0 the values are `"pure"` and `"impure"`
 
-  - `NIX_PATH`\
+  - [`NIX_PATH`]{#env-NIX_PATH}\
     A colon-separated list of directories used to look up Nix
     expressions enclosed in angle brackets (i.e., `<path>`). For
     instance, the value
@@ -44,7 +44,7 @@ Most Nix commands interpret the following environment variables:
     The Nix search path can also be extended using the `-I` option to
     many Nix commands, which takes precedence over `NIX_PATH`.
 
-  - `NIX_IGNORE_SYMLINK_STORE`\
+  - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
     allowed to contain any symlink components. This is to prevent
     “impure” builds. Builders sometimes “canonicalise” paths by
@@ -66,41 +66,41 @@ Most Nix commands interpret the following environment variables:
 
     Consult the mount 8 manual page for details.
 
-  - `NIX_STORE_DIR`\
+  - [`NIX_STORE_DIR`]{#env-NIX_STORE_DIR}\
     Overrides the location of the Nix store (default `prefix/store`).
 
-  - `NIX_DATA_DIR`\
+  - [`NIX_DATA_DIR`]{#env-NIX_DATA_DIR}\
     Overrides the location of the Nix static data directory (default
     `prefix/share`).
 
-  - `NIX_LOG_DIR`\
+  - [`NIX_LOG_DIR`]{#env-NIX_LOG_DIR}\
     Overrides the location of the Nix log directory (default
     `prefix/var/log/nix`).
 
-  - `NIX_STATE_DIR`\
+  - [`NIX_STATE_DIR`]{#env-NIX_STATE_DIR}\
     Overrides the location of the Nix state directory (default
     `prefix/var/nix`).
 
-  - `NIX_CONF_DIR`\
+  - [`NIX_CONF_DIR`]{#env-NIX_CONF_DIR}\
     Overrides the location of the system Nix configuration directory
     (default `prefix/etc/nix`).
 
-  - `NIX_CONFIG`\
+  - [`NIX_CONFIG`]{#env-NIX_CONFIG}\
     Applies settings from Nix configuration from the environment.
     The content is treated as if it was read from a Nix configuration file.
     Settings are separated by the newline character.
 
-  - `NIX_USER_CONF_FILES`\
+  - [`NIX_USER_CONF_FILES`]{#env-NIX_USER_CONF_FILES}\
     Overrides the location of the user Nix configuration files to load
     from (defaults to the XDG spec locations). The variable is treated
     as a list separated by the `:` token.
 
-  - `TMPDIR`\
+  - [`TMPDIR`]{#env-TMPDIR}\
     Use the specified directory to store temporary files. In particular,
     this includes temporary build directories; these can take up
     substantial amounts of disk space. The default is `/tmp`.
 
-  - `NIX_REMOTE`\
+  - [`NIX_REMOTE`]{#env-NIX_REMOTE}\
     This variable should be set to `daemon` if you want to use the Nix
     daemon to execute Nix operations. This is necessary in [multi-user
     Nix installations](../installation/multi-user.md). If the Nix
@@ -108,16 +108,16 @@ Most Nix commands interpret the following environment variables:
     should be set to `unix://path/to/socket`. Otherwise, it should be
     left unset.
 
-  - `NIX_SHOW_STATS`\
+  - [`NIX_SHOW_STATS`]{#env-NIX_SHOW_STATS}\
     If set to `1`, Nix will print some evaluation statistics, such as
     the number of values allocated.
 
-  - `NIX_COUNT_CALLS`\
+  - [`NIX_COUNT_CALLS`]{#env-NIX_COUNT_CALLS}\
     If set to `1`, Nix will print how often functions were called during
     Nix expression evaluation. This is useful for profiling your Nix
     expressions.
 
-  - `GC_INITIAL_HEAP_SIZE`\
+  - [`GC_INITIAL_HEAP_SIZE`]{#env-GC_INITIAL_HEAP_SIZE}\
     If Nix has been configured to use the Boehm garbage collector, this
     variable sets the initial size of the heap in bytes. It defaults to
     384 MiB. Setting it to a low value reduces memory consumption, but
