@@ -24,14 +24,14 @@ Usage of terms is, for historic reasons, not entirely consistent within the Nix 
 
 The following translation table points out similarities and equivalent terms, to help clarify their meaning and inform consistent use in the future.
 
-generic build system | Nix | [Bazel][bazel] | [Build Systems à la Carte][bsalc] | programming language
--- | -- | -- | -- | --
-data (build input, build result) | store object | [artifact][bazel-artifact] | value | value
-build instructions | builder | ([depends on action type][bazel-actions]) | function | function
-build task | derivation | [action][bazel-action] | `Task` | [thunk][thunk]
-build plan | derivation graph | [action graph][bazel-action-graph], [build graph][bazel-build-graph] | `Tasks` | [call graph][call-graph]
-build | build | build | application of `Build` | evaluation
-persistence layer | store | [action cache][bazel-action-cache] | `Store` | heap
+| generic build system             | Nix              | [Bazel][bazel]                                                       | [Build Systems à la Carte][bsalc] | programming language     |
+| -------------------------------- | ---------------- | -------------------------------------------------------------------- | --------------------------------- | ------------------------ |
+| data (build input, build result) | store object     | [artifact][bazel-artifact]                                           | value                             | value                    |
+| build instructions               | builder          | ([depends on action type][bazel-actions])                            | function                          | function                 |
+| build task                       | derivation       | [action][bazel-action]                                               | `Task`                            | [thunk][thunk]           |
+| build plan                       | derivation graph | [action graph][bazel-action-graph], [build graph][bazel-build-graph] | `Tasks`                           | [call graph][call-graph] |
+| build                            | build            | build                                                                | application of `Build`            | evaluation               |
+| persistence layer                | store            | [action cache][bazel-action-cache]                                   | `Store`                           | heap                     |
 
 All of these systems share features of [declarative programming][declarative-programming] languages, a key insight first put forward by Eelco Dolstra et al. in [Imposing a Memory Management Discipline on Software Deployment][immdsd] (2004), elaborated in his PhD thesis [The Purely Functional Software Deployment Model][phd-thesis] (2006), and further refined by Andrey Mokhov et al. in [Build Systems à la Carte][bsalc] (2018).
 
