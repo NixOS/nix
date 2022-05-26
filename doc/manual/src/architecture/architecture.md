@@ -43,5 +43,37 @@ In practice this amounts to a set of files in a file system.
 Underlying these is the [Nix store](./store/store.md), a mechanism to keep track of build plans, data, and references between them.
 It can also execute build plans to produce new data.
 
+A build plan is a series of *build tasks*.
+Each build task has a special build input which is used as *build instructions*.
+The result of a build task can be input to another build task.
+
+```
++-----------------------------------------------------------------------------------------+
+| store                                                                                   |
+|                   .................................................                     |
+|                   :  build plan                                   :                     |
+|                   :                                               :                     |
+|  [ build input ]-----instructions-,                               :                     |
+|                   :               |                               :                     |
+|                   :               v                               :                     |
+|  [ build input ]----------->[ build task ]--instructions-,        :                     |
+|                   :                                      |        :                     |
+|                   :                                      |        :                     |
+|                   :                                      v        :                     |
+|                   :                               [ build task ]----->[ build result ]  |
+|  [ build input ]-----instructions-,                      ^        :                     |
+|                   :               |                      |        :                     |
+|                   :               v                      |        :                     |
+|  [ build input ]----------->[ build task ]---------------'        :                     |
+|                   :               ^                               :                     |
+|                   :               |                               :                     |
+|  [ build input ]------------------'                               :                     |
+|                   :                                               :                     |
+|                   :                                               :                     |
+|                   :...............................................:                     |
+|                                                                                         |
++-----------------------------------------------------------------------------------------+
+```
+
 [layer-architecture]: https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers
 [purely-functional-programming]: https://en.m.wikipedia.org/wiki/Purely_functional_programming
