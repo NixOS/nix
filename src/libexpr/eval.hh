@@ -13,7 +13,6 @@
 #include <unordered_map>
 #include <mutex>
 
-
 namespace nix {
 
 
@@ -25,7 +24,6 @@ enum RepairFlag : bool;
 
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
-
 struct PrimOp
 {
     PrimOpFun fun;
@@ -35,6 +33,11 @@ struct PrimOp
     const char * doc = nullptr;
 };
 
+#if HAVE_BOEHMGC
+    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+#else
+    typedef std::map<std::string, Value *> ValMap;
+#endif
 
 struct Env
 {
@@ -44,6 +47,10 @@ struct Env
     Value * values[0];
 };
 
+void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
+
+std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
 void copyContext(const Value & v, PathSet & context);
 
@@ -70,8 +77,17 @@ struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
 
+struct DebugTrace {
+    std::optional<ErrPos> pos;
+    const Expr & expr;
+    const Env & env;
+    hintformat hint;
+    bool isError;
+};
 
-class EvalState
+void debugError(Error * e, Env & env, Expr & expr);
+
+class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
     SymbolTable symbols;
@@ -108,6 +124,49 @@ public:
 
     RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
+
+    /* Debugger */
+    void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
+    bool debugStop;
+    bool debugQuit;
+    std::list<DebugTrace> debugTraces;
+    std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
+    const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
+    {
+        auto i = exprEnvs.find(&expr);
+        if (i != exprEnvs.end())
+            return i->second;
+        else
+            return std::shared_ptr<const StaticEnv>();;
+    }
+
+    void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
+
+    template<class E>
+    [[gnu::noinline, gnu::noreturn]]
+    void debugThrow(E && error, const Env & env, const Expr & expr)
+    {
+        if (debugRepl)
+            runDebugRepl(&error, env, expr);
+
+        throw error;
+    }
+
+    template<class E>
+    [[gnu::noinline, gnu::noreturn]]
+    void debugThrowLastTrace(E && e)
+    {
+        // Call this in the situation where Expr and Env are inaccessible.
+        // The debugger will start in the last context that's in the
+        // DebugTrace stack.
+        if (debugRepl && !debugTraces.empty()) {
+            const DebugTrace & last = debugTraces.front();
+            runDebugRepl(&e, last.env, last.expr);
+        }
+
+        throw e;
+    }
+
 
 private:
     SrcToStore srcToStore;
@@ -185,10 +244,10 @@ public:
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
-    Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
+    Expr * parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
-    Expr * parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv);
+    Expr * parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string s, const Path & basePath);
 
     Expr * parseStdin();
@@ -198,7 +257,7 @@ public:
        trivial (i.e. doesn't require arbitrary computation). */
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
-    /* Like `cacheFile`, but with an already parsed expression. */
+    /* Like `evalFile`, but with an already parsed expression. */
     void cacheFile(
         const Path & path,
         const Path & resolvedPath,
@@ -255,37 +314,68 @@ public:
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos = noPos);
 
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s) const;
+    void throwEvalError(const PosIdx pos, const char * s);
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const Value & v) const;
+    void throwEvalError(const PosIdx pos, const char * s,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2) const;
+    void throwEvalError(const char * s, const std::string & s2);
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-        const std::string & s2) const;
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2);
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const;
+    void throwEvalError(const char * s, const std::string & s2,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3) const;
+    void throwEvalError(const char * s, const std::string & s2, const std::string & s3,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const;
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s) const;
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3);
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2) const;
+    void throwEvalError(const char * s, const std::string & s2, const std::string & s3);
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-        const ExprLambda & fun, const Symbol s2) const;
+    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s, const std::string & s2,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const char * s, const Value & v) const;
+    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2,
+        Env & env, Expr & expr);
+
     [[gnu::noinline, gnu::noreturn]]
-    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1) const;
+    void throwTypeError(const PosIdx pos, const char * s, const Value & v);
     [[gnu::noinline, gnu::noreturn]]
-    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1) const;
+    void throwTypeError(const PosIdx pos, const char * s, const Value & v,
+        Env & env, Expr & expr);
     [[gnu::noinline, gnu::noreturn]]
-    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1) const;
+    void throwTypeError(const PosIdx pos, const char * s);
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s,
+        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2,
+        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol s2,
+        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const char * s, const Value & v,
+        Env & env, Expr & expr);
+
+    [[gnu::noinline, gnu::noreturn]]
+    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1,
+        Env & env, Expr & expr);
+
+    [[gnu::noinline, gnu::noreturn]]
+    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1,
+        Env & env, Expr & expr);
+
+    [[gnu::noinline, gnu::noreturn]]
+    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1,
+        Env & env, Expr & expr);
 
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
@@ -325,7 +415,7 @@ public:
     Env & baseEnv;
 
     /* The same, but used during parsing to resolve variables. */
-    StaticEnv staticBaseEnv; // !!! should be private
+    std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
 private:
 
@@ -366,7 +456,7 @@ private:
     friend struct ExprLet;
 
     Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
-        const PathView basePath, StaticEnv & staticEnv);
+        const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
 
@@ -461,6 +551,16 @@ private:
     friend struct Value;
 };
 
+struct DebugTraceStacker {
+    DebugTraceStacker(EvalState & evalState, DebugTrace t);
+    ~DebugTraceStacker()
+    {
+        // assert(evalState.debugTraces.front() == trace);
+        evalState.debugTraces.pop_front();
+    }
+    EvalState & evalState;
+    DebugTrace trace;
+};
 
 /* Return a string representing the type of the value `v'. */
 std::string_view showType(ValueType type);

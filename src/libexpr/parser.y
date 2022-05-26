@@ -643,7 +643,7 @@ namespace nix {
 
 
 Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const PathView path, const PathView basePath, StaticEnv & staticEnv)
+    const PathView path, const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
     std::string file;
@@ -706,7 +706,7 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 }
 
 
-Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto buffer = readFile(path);
     // readFile should have left some extra space for terminators
@@ -715,7 +715,7 @@ Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     s.append("\0\0", 2);
     return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
@@ -782,13 +782,13 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     if (hasPrefix(path, "nix/"))
         return concatStrings(corepkgsPrefix, path.substr(4));
 
-    throw ThrownError({
+    debugThrowLastTrace(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
         .errPos = positions[pos]
-    });
+    }));
 }
 
 
