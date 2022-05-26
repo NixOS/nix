@@ -7,7 +7,7 @@
 namespace nix {
 
 /* A simple non-nullable reference-counted pointer. Actually a wrapper
-   around std::shared_ptr that prevents non-null constructions. */
+   around std::shared_ptr that prevents null constructions. */
 template<typename T>
 class ref
 {

@@ -188,7 +188,7 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
 
 
 static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
-    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken> > > & es)
+    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> & es)
 {
     if (es.empty()) return new ExprString("");
 
@@ -228,7 +228,7 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
     }
 
     /* Strip spaces from each line. */
-    auto * es2 = new std::vector<std::pair<PosIdx, Expr *> >;
+    auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -315,8 +315,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   StringToken uri;
   StringToken str;
   std::vector<nix::AttrName> * attrNames;
-  std::vector<std::pair<nix::PosIdx, nix::Expr *> > * string_parts;
-  std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, StringToken> > > * ind_string_parts;
+  std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
+  std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, StringToken>>> * ind_string_parts;
 }
 
 %type <e> start expr expr_function expr_if expr_op
@@ -410,7 +410,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<PosIdx, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
+    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<PosIdx, Expr *>>({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
   | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
   | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
@@ -498,9 +498,9 @@ string_parts_interpolated
   : string_parts_interpolated STR
   { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(std::string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$ = new std::vector<std::pair<PosIdx, Expr *> >;
+      $$ = new std::vector<std::pair<PosIdx, Expr *>>;
       $$->emplace_back(makeCurPos(@1, data), new ExprString(std::string($1)));
       $$->emplace_back(makeCurPos(@2, data), $3);
     }
@@ -525,7 +525,7 @@ path_start
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken> > >; }
+  | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>; }
   ;
 
 binds
@@ -639,8 +639,13 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const PathView path, const SourcePath & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parse(
+    char * text,
+    size_t length,
+    FileOrigin origin,
+    const PathView path,
+    const SourcePath & basePath,
+    std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
     std::string file;
@@ -696,7 +701,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 }
 
 
-Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto buffer = path.readFile();
     // readFile hopefully have left some extra space for terminators
@@ -706,7 +711,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, StaticEnv & staticE
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     s.append("\0\0", 2);
     return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
@@ -773,13 +778,13 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
     if (hasPrefix(path, "nix/"))
         return {*corepkgsFS, CanonPath(path.substr(3))};
 
-    throw ThrownError({
+    debugThrowLastTrace(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
         .errPos = positions[pos]
-    });
+    }));
 }
 
 

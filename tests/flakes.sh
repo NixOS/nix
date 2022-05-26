@@ -163,6 +163,7 @@ nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Di
 # But should succeed in impure mode.
 (! nix build -o $TEST_ROOT/result flake2#bar --impure)
 nix build -o $TEST_ROOT/result flake2#bar --impure --no-write-lock-file
+nix eval --expr "builtins.getFlake \"$flake2Dir\"" --impure
 
 # Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'

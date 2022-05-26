@@ -27,12 +27,6 @@ namespace {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
-std::string getGitDir()
-{
-    // FIXME: respecting GIT_DIR globally seems wrong.
-    return getEnv("GIT_DIR").value_or(".git");
-}
-
 bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 {
     return st.st_mtime + settings.tarballTtl > now;
@@ -263,7 +257,7 @@ struct GitInputScheme : InputScheme
     {
         auto sourcePath = getSourcePath(input);
         assert(sourcePath);
-        auto gitDir = getGitDir();
+        auto gitDir = ".git";
 
         runProgram("git", true,
             { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
@@ -304,7 +298,7 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        std::string gitDir = getGitDir();
+        std::string gitDir = ".git";
     };
 
     RepoInfo getRepoInfo(const Input & input)
@@ -356,7 +350,7 @@ struct GitInputScheme : InputScheme
                on. */
             auto result = runProgram(RunOptions {
                 .program = "git",
-                .args = { "-C", repoInfo.url, "--git-dir", getGitDir(), "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+                .args = { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
                 .environment = env,
                 .mergeStderrToStdout = true
             });

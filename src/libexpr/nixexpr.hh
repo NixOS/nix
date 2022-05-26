@@ -21,7 +21,6 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 
-
 /* Position objects. */
 
 struct Pos
@@ -142,24 +141,25 @@ struct Expr
 {
     virtual ~Expr() { };
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
-    virtual void bindVars(const EvalState & es, const StaticEnv & env);
+    virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol name);
+    virtual PosIdx getPos() const { return noPos; }
 };
 
 #define COMMON_METHODS \
     void show(const SymbolTable & symbols, std::ostream & str) const;    \
     void eval(EvalState & state, Env & env, Value & v); \
-    void bindVars(const EvalState & es, const StaticEnv & env);
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
 
 struct ExprInt : Expr
 {
     NixInt n;
     Value v;
     ExprInt(NixInt n) : n(n) { v.mkInt(n); };
-    COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
+    COMMON_METHODS
 };
 
 struct ExprFloat : Expr
@@ -167,8 +167,8 @@ struct ExprFloat : Expr
     NixFloat nf;
     Value v;
     ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
-    COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
+    COMMON_METHODS
 };
 
 struct ExprString : Expr
@@ -176,8 +176,8 @@ struct ExprString : Expr
     std::string s;
     Value v;
     ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
-    COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
+    COMMON_METHODS
 };
 
 struct ExprPath : Expr
@@ -189,8 +189,8 @@ struct ExprPath : Expr
     {
         v.mkPath(&path.accessor, path.path.abs().data());
     }
-    COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
+    COMMON_METHODS
 };
 
 typedef uint32_t Level;
@@ -216,8 +216,9 @@ struct ExprVar : Expr
 
     ExprVar(Symbol name) : name(name) { };
     ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
-    COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
+    PosIdx getPos() const override { return pos; }
+    COMMON_METHODS
 };
 
 struct ExprSelect : Expr
@@ -227,6 +228,7 @@ struct ExprSelect : Expr
     AttrPath attrPath;
     ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -235,6 +237,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     AttrPath attrPath;
     ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
 
@@ -263,6 +266,7 @@ struct ExprAttrs : Expr
     DynamicAttrDefs dynamicAttrs;
     ExprAttrs(const PosIdx &pos) : recursive(false), pos(pos) { };
     ExprAttrs() : recursive(false) { };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -271,6 +275,11 @@ struct ExprList : Expr
     std::vector<Expr *> elems;
     ExprList() { };
     COMMON_METHODS
+
+    PosIdx getPos() const override
+    {
+        return elems.empty() ? noPos : elems.front()->getPos();
+    }
 };
 
 struct Formal
@@ -323,6 +332,7 @@ struct ExprLambda : Expr
     void setName(Symbol name);
     std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -334,6 +344,7 @@ struct ExprCall : Expr
     ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
         : fun(fun), args(args), pos(pos)
     { }
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -351,6 +362,7 @@ struct ExprWith : Expr
     Expr * attrs, * body;
     size_t prevWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -359,6 +371,7 @@ struct ExprIf : Expr
     PosIdx pos;
     Expr * cond, * then, * else_;
     ExprIf(const PosIdx & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -367,6 +380,7 @@ struct ExprAssert : Expr
     PosIdx pos;
     Expr * cond, * body;
     ExprAssert(const PosIdx & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -388,11 +402,12 @@ struct ExprOpNot : Expr
         { \
             str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
         } \
-        void bindVars(const EvalState & es, const StaticEnv & env)    \
+        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)    \
         { \
             e1->bindVars(es, env); e2->bindVars(es, env);    \
         } \
         void eval(EvalState & state, Env & env, Value & v); \
+        PosIdx getPos() const override { return pos; } \
     };
 
 MakeBinOp(ExprOpEq, "==")
@@ -407,9 +422,10 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *> > * es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *> > * es)
+    std::vector<std::pair<PosIdx, Expr *>> * es;
+    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
         : pos(pos), forceString(forceString), es(es) { };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
@@ -417,6 +433,7 @@ struct ExprPos : Expr
 {
     PosIdx pos;
     ExprPos(const PosIdx & pos) : pos(pos) { };
+    PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 

@@ -37,7 +37,7 @@ struct ProfileElement
     StorePathSet storePaths;
     std::optional<ProfileElementSource> source;
     bool active = true;
-    // FIXME: priority
+    int priority = 5;
 
     std::string describe() const
     {
@@ -116,6 +116,9 @@ struct ProfileManifest
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
+                if(e.contains("priority")) {
+                    element.priority = e["priority"];
+                }
                 if (e.value(sUrl, "") != "") {
                     element.source = ProfileElementSource {
                         parseFlakeRef(e[sOriginalUrl]),
@@ -153,6 +156,7 @@ struct ProfileManifest
             nlohmann::json obj;
             obj["storePaths"] = paths;
             obj["active"] = element.active;
+            obj["priority"] = element.priority;
             if (element.source) {
                 obj["originalUrl"] = element.source->originalRef.to_string();
                 obj["url"] = element.source->resolvedRef.to_string();
@@ -177,7 +181,7 @@ struct ProfileManifest
         for (auto & element : elements) {
             for (auto & path : element.storePaths) {
                 if (element.active)
-                    pkgs.emplace_back(store->printStorePath(path), true, 5);
+                    pkgs.emplace_back(store->printStorePath(path), true, element.priority);
                 references.insert(path);
             }
         }
@@ -259,6 +263,17 @@ builtPathsPerInstallable(
 
 struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 {
+    std::optional<int64_t> priority;
+
+    CmdProfileInstall() {
+        addFlag({
+            .longName = "priority",
+            .description = "The priority of the package to install.",
+            .labels = {"priority"},
+            .handler = {&priority},
+        });
+    };
+
     std::string description() override
     {
         return "install a package into a profile";
@@ -282,6 +297,8 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
+
+
             if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
                 // FIXME: make build() return this?
                 auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
@@ -291,7 +308,15 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     attrPath,
                     installable2->outputsSpec
                 };
+
+                if(drv.priority) {
+                    element.priority = *drv.priority;
+                }
             }
+
+            if(priority) { // if --priority was specified we want to override the priority of the installable
+                element.priority = *priority;
+            };
 
             element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
 
