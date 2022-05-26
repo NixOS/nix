@@ -135,11 +135,6 @@
             }))
             nlohmann_json
           ];
-
-        perlDeps =
-          [ perl
-            perlPackages.DBDSQLite
-          ];
       };
 
       installScriptFor = systems:
@@ -673,7 +668,7 @@
           outputs = [ "out" "dev" "doc" ];
 
           nativeBuildInputs = nativeBuildDeps;
-          buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ perlDeps;
+          buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
 
           inherit configureFlags;
 
