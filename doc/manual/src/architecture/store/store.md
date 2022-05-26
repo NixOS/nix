@@ -18,7 +18,7 @@ A Nix store can *add*, *retrieve*, and *delete* store objects.
 
 It can *perform builds*, that is, create new store objects by transforming build inputs into build outputs, using instructions from the build tasks.
 
-As it keeps track of references, it can [garbage-collect](https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)) unused store objects.
+As it keeps track of references, it can [garbage-collect][garbage-collection] unused store objects.
 
 ```haskell
 add    :: Store -> Data -> (Store, Reference)
@@ -30,9 +30,9 @@ build  :: Store -> Reference -> Maybe (Store, Reference)
 collectGarbage :: Store -> Store
 ```
 
-Store objects are [immutable](https://en.m.wikipedia.org/wiki/Immutable_object): once created, they do not change until they are deleted.
+Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
 
-References are [opaque](https://en.m.wikipedia.org/wiki/Opaque_data_type), [unique identifiers](https://en.m.wikipedia.org/wiki/Unique_identifier):
+References are [opaque][opaque-data-type], [unique identifiers][unique-identifier]:
 The only way to obtain references is by adding or building store objects.
 A reference will always point to exactly one store object.
 
@@ -54,6 +54,11 @@ A store object cannot be deleted as long as it is reachable from a reference sti
 Garbage collection will delete all store objects that cannot be reached from any reference in use.
 
 <!-- more details in section on garbage collection, link to it once it exists -->
+
+[garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
+[immutable-object]: https://en.m.wikipedia.org/wiki/Immutable_object
+[opaque-data-type]: https://en.m.wikipedia.org/wiki/Opaque_data_type
+[unique-identifier]: https://en.m.wikipedia.org/wiki/Unique_identifier
 
 ## Files and Processes
 
