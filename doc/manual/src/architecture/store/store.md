@@ -2,12 +2,24 @@
 
 A Nix store is a collection of *store objects*.
 
+## Store Object
+
 A store object can hold
 
 - arbitrary *data*
 - *references* to other store objects.
 
 Nix makes no distinction if store objects are build inputs, build results, or build tasks.
+
+Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
+
+## Reference
+
+References to store objects are [opaque][opaque-data-type], [unique identifiers][unique-identifier]:
+The only way to obtain references is by adding or building store objects.
+A reference will always point to exactly one store object.
+
+## Operations
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 
@@ -46,11 +58,7 @@ As it keeps track of references, it can [garbage-collect][garbage-collection] un
     [ store ] --> collect garbage --> [ store' ]
 
 
-Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
-
-References are [opaque][opaque-data-type], [unique identifiers][unique-identifier]:
-The only way to obtain references is by adding or building store objects.
-A reference will always point to exactly one store object.
+## Closure
 
 Nix stores have the *closure property*: for each store object in the store, all the store objects it references must also be in the store.
 
