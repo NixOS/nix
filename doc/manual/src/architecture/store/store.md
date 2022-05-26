@@ -2,33 +2,49 @@
 
 A Nix store is a collection of *store objects*.
 
-A store object can hold arbitrary *data* and *references* to other store objects.
-Nix makes no distinction if store objects are used as build inputs, build results, or build tasks.
+A store object can hold
 
-```haskell
-data Store = Set StoreObject
+- arbitrary *data*
+- *references* to other store objects.
 
-data StoreObject = StoreObject {
-  data       :: Data
-, references :: Set Reference
-}
-```
+Nix makes no distinction if store objects are build inputs, build results, or build tasks.
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 
+                [ data ]
+                    |
+                    V
+    [ store ] ---> add ----> [ store' ] [ reference ]
+
+<!-- -->
+
+              [ reference ]
+                    |
+                    V
+    [ store ] ---> get ----> [ store object ]
+
+<!-- -->
+
+              [ reference ]
+                    |
+                    V
+    [ store ] --> delete --> [ store' ]
+
+
 It can *perform builds*, that is, create new store objects by transforming build inputs into build outputs, using instructions from the build tasks.
+
+
+              [ reference ]
+                    |
+                    V
+    [ store ] --> build --(maybe)--> [ store' ] [ reference' ]
+
 
 As it keeps track of references, it can [garbage-collect][garbage-collection] unused store objects.
 
-```haskell
-add    :: Store -> Data -> (Store, Reference)
-get    :: Store -> Reference -> StoreObject
-delete :: Store -> Reference -> Store
 
-build  :: Store -> Reference -> Maybe (Store, Reference)
+    [ store ] --> collect garbage --> [ store' ]
 
-collectGarbage :: Store -> Store
-```
 
 Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
 
@@ -40,15 +56,6 @@ An added store object cannot have references, unless it is a build task.
 
 Building a store object will add appropriate references, according to provided build instructions.
 These references can only come from declared build inputs, and are not known to build instructions a priori.
-
-```haskell
-data Data = Data | Task BuildTask
-
-data BuildTask = BuildTask {
-  instructions ::  Reference
-, inputs       :: [Reference]
-}
-```
 
 A store object cannot be deleted as long as it is reachable from a reference still in use.
 Garbage collection will delete all store objects that cannot be reached from any reference in use.
