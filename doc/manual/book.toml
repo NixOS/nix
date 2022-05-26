@@ -2,4 +2,5 @@
 additional-css = ["custom.css"]
 
 [preprocessor.anchors]
-command = "python3 doc/manual/anchors.py"
+renderers = ["html"]
+command = "jq --from-file doc/manual/anchors.jq"
