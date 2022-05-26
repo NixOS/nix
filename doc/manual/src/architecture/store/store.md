@@ -88,10 +88,11 @@ Adding, building, copying and deleting store objects must be done in a way that 
 
 ## Files and Processes
 
-Nix provides a mapping between its store model and the [Unix paradigm](https://en.m.wikipedia.org/wiki/Everything_is_a_file) that governs the interplay of [files and processes](https://en.m.wikipedia.org/wiki/File_descriptor).
-
-Nix encodes immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
+Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.
+
+[unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file
+[file-descriptor]: https://en.m.wikipedia.org/wiki/File_descriptor
 
 ```
 +-----------------------------------------------------------------+
