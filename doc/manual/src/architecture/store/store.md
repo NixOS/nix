@@ -15,7 +15,7 @@ Store objects are [immutable][immutable-object]: once created, they do not chang
 
 ## Reference
 
-References to store objects are [opaque][opaque-data-type], [unique identifiers][unique-identifier]:
+A store object reference is an [opaque][opaque-data-type], [unique identifier][unique-identifier]:
 The only way to obtain references is by adding or building store objects.
 A reference will always point to exactly one store object.
 
