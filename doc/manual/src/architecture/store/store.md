@@ -2,8 +2,8 @@
 
 A Nix store is a collection of *store objects*.
 
-Store objects can hold arbitrary *data* and *references* to one another.
-Nix makes no distinction if they are used as build inputs, build results, or build tasks.
+A store object can hold arbitrary *data* and *references* to other store objects.
+Nix makes no distinction if store objects are used as build inputs, build results, or build tasks.
 
 ```haskell
 data Store = Set StoreObject
