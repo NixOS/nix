@@ -35,21 +35,6 @@ A bare file or symlink can be a root file system object.
 
 Symlinks pointing outside of their own root, or to a store object without a matching reference, are allowed, but might not function as intended.
 
-## Reference {#reference}
-
-A store object can reference other store objects.
-
-Nix stores have the *closure property*: for each store object in the store, all the store objects it references must also be in the store.
-
-Building, copying and deleting store objects must be done in a way that obeys this property:
-
-- Build results must only refer to store objects in the closure of the build inputs.
-
-- Store objects being copied must refer to objects already in the destination store.
-  Recursive copying must either proceed in dependency order or be atomic.
-
-- We can only safely delete unreferenced objects.
-
 ### Reference scanning
 
 While references could be arbitrary paths, Nix requires them to be store paths to ensure correctness.

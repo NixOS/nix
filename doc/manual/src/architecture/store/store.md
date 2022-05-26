@@ -52,15 +52,26 @@ References are [opaque][opaque-data-type], [unique identifiers][unique-identifie
 The only way to obtain references is by adding or building store objects.
 A reference will always point to exactly one store object.
 
-An added store object cannot have references, unless it is a build task.
+Nix stores have the *closure property*: for each store object in the store, all the store objects it references must also be in the store.
 
-Building a store object will add appropriate references, according to provided build instructions.
-These references can only come from declared build inputs, and are not known to build instructions a priori.
+Adding, building, copying and deleting store objects must be done in a way that obeys this property:
 
-A store object cannot be deleted as long as it is reachable from a reference still in use.
-Garbage collection will delete all store objects that cannot be reached from any reference in use.
+- A newly added store object cannot have references, unless it is a build task.
 
-<!-- more details in section on garbage collection, link to it once it exists -->
+- Build results must only refer to store objects in the closure of the build inputs.
+
+  Building a store object will add appropriate references, according to provided build instructions.
+  These references can only come from declared build inputs.
+
+- Store objects being copied must refer to objects already in the destination store.
+
+  Recursive copying must either proceed in dependency order or be atomic.
+
+- We can only safely delete store objects which are not reachable from any reference still in use.
+
+  Garbage collection will delete all store objects that cannot be reached from any reference in use.
+
+  <!-- more details in section on garbage collection, link to it once it exists -->
 
 [garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
 [immutable-object]: https://en.m.wikipedia.org/wiki/Immutable_object
