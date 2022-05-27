@@ -107,6 +107,8 @@ void printCodeLines(std::ostream & out,
 
 void printAtPos(const ErrPos & pos, std::ostream & out);
 
+std::string indent(std::string_view indentFirst, std::string_view indentRest, std::string_view s);
+
 struct Trace {
     std::optional<ErrPos> pos;
     hintformat hint;

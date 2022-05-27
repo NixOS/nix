@@ -198,7 +198,7 @@ void printAtPos(const ErrPos & pos, std::ostream & out)
     }
 }
 
-static std::string indent(std::string_view indentFirst, std::string_view indentRest, std::string_view s)
+std::string indent(std::string_view indentFirst, std::string_view indentRest, std::string_view s)
 {
     std::string res;
     bool first = true;
