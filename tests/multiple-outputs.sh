@@ -4,6 +4,19 @@ clearStore
 
 rm -f $TEST_ROOT/result*
 
+echo "test cyclic (verbose) ..."
+# fixme: why need --builders ''
+nix-build multiple-outputs.nix -A cyclic --no-out-link -vvvv || true
+echo test cyclic done
+
+echo "test cyclic (not verbose) ..."
+# fixme: why need --builders ''
+nix-build multiple-outputs.nix -A cyclic --no-out-link || true
+echo test cyclic done
+# debug: run only this test
+# TODO run all tests
+exit 0
+
 # Test whether the output names match our expectations
 outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.out.outPath)
 [ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a" ]

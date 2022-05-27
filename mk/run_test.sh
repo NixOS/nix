@@ -18,6 +18,8 @@ fi
 run_test () {
     (cd tests && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
     log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)"
+    # debug: show output of test
+    echo "$log"
     status=$?
 }
 

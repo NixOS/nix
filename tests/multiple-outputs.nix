@@ -68,15 +68,32 @@ rec {
       '';
   };
 
+  # cycle: a -> c -> b -> a
   cyclic = (mkDerivation {
     name = "cyclic-outputs";
     outputs = [ "a" "b" "c" ];
     builder = builtins.toFile "builder.sh"
       ''
-        mkdir $a $b $c
-        echo $a > $b/foo
-        echo $b > $c/bar
-        echo $c > $a/baz
+        mkdir -p $a/opt $b/opt $c/opt
+
+        # a b c a
+        ab=$a/opt/from-a-to-b.txt
+        bc=$b/opt/from-b-to-c.txt
+        ca=$c/opt/from-c-to-a.txt
+        echo $bc > $ab
+        echo $ca > $bc
+        echo $ab > $ca
+        echo "common prefix path" >$a/opt/from
+        echo "common prefix path" >$b/opt/from
+        echo "common prefix path" >$c/opt/from
+
+        # a c b a
+        ac=$a/opt/from-a-to-c.2.txt
+        cb=$c/opt/from-c-to-b.2.txt
+        ba=$b/opt/from-b-to-a.2.txt
+        echo $cb > $ac
+        echo $ba > $cb
+        echo $ac > $ba
       '';
   }).a;
 
