@@ -2,7 +2,6 @@
 %option noyywrap
 %option never-interactive
 %option stack
-%option nodefault
 %option nounput noyy_top_state
 
 
