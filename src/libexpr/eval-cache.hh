@@ -109,6 +109,8 @@ public:
 
     ref<AttrCursor> getAttr(std::string_view name);
 
+    std::optional<std::string> maybeGetStringAttr(Symbol name);
+
     /* Get an attribute along a chain of attrsets. Note that this does
        not auto-call functors or functions. */
     OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);

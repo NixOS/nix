@@ -552,6 +552,13 @@ ref<AttrCursor> AttrCursor::getAttr(std::string_view name)
     return getAttr(root->state.symbols.create(name));
 }
 
+std::optional<std::string> AttrCursor::maybeGetStringAttr(Symbol name)
+{
+    auto cursor = maybeGetAttr(name);
+    if (!cursor) return std::nullopt;
+    return cursor->getString();
+}
+
 OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force)
 {
     auto res = shared_from_this();
