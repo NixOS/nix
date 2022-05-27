@@ -2192,7 +2192,15 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
-    auto sortedOutputNames = topoSort(outputsToSort,
+    debug("calling topoSort");
+
+    std::vector<std::string> sortedOutputNames;
+
+    try {
+    // TODO indent
+    sortedOutputNames = topoSort(
+    //auto sortedOutputNames = topoSortCycles(
+        outputsToSort,
         {[&](const std::string & name) {
             auto orifu = get(outputReferencesIfUnregistered, name);
             if (!orifu)
@@ -2221,6 +2229,41 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
                 worker.store.printStorePath(drvPath), path, parent);
         }});
+    // TODO indent end
+    }
+    catch (Error & e) {
+        debug(format("catching cycle error: %1%") % e.what());
+
+        for (auto & sp : referenceablePaths) {
+            debug(format("analyze cycle: referenceablePaths[] = %1%") % sp.to_string());
+        }
+
+        // analyze cycle
+        StoreCycleEdgeVec edges;
+        for (auto & [outputName, _] : drv->outputs) {
+            debug(format("analyze cycle: outputName = %1%") % outputName);
+            auto actualPath = toRealPathChroot(worker.store.printStorePath(scratchOutputs.at(outputName)));
+            debug(format("analyze cycle: actualPath = %1%") % actualPath);
+            debug(format("analyze cycle: scanForCycleEdges"));
+            scanForCycleEdges(actualPath, referenceablePaths, edges);
+        }
+
+        std::cout << "error: cycles detected. found " << edges.size() << " cycle edges:\n";
+        // output in yaml format for visualization
+        // TODO code fencing?
+        // ```yaml
+        // -
+        //  - a
+        //  - b
+        // ```
+        for (auto edge : edges) {
+            std::cout << "-\n - " << edge.first << "\n - " << edge.second << "\n";
+        }
+
+        throw e; // BuildError: cycle
+    }
+
+    debug(format("no cycles -> continue"));
 
     std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
 

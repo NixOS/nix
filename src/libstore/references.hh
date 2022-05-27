@@ -5,9 +5,22 @@
 
 namespace nix {
 
-std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
+typedef std::pair<std::string, std::string> StoreCycleEdge;
+typedef std::vector<StoreCycleEdge> StoreCycleEdgeVec;
 
+// first pass: fast on success
+std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
 StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
+
+// second pass: get exact file paths of cycles
+void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleEdgeVec & edges);
+
+void scanForCycleEdges2(
+    std::string path,
+    const StringSet & hashes,
+    StoreCycleEdgeVec & seen,
+    std::string storePrefix
+);
 
 class RefScanSink : public Sink
 {
