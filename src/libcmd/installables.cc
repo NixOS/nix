@@ -599,14 +599,17 @@ InstallableFlake::InstallableFlake(
     Strings prefixes,
     const flake::LockFlags & lockFlags)
     : InstallableValue(state),
+      cmd(cmd),
       flakeRef(flakeRef),
       attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
       prefixes(fragment == "" ? Strings{} : prefixes),
       outputsSpec(std::move(outputsSpec)),
       lockFlags(lockFlags)
 {
+    #if 0
     if (cmd && cmd->getAutoArgs(*state)->size())
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
+    #endif
 }
 
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
@@ -615,42 +618,118 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
     auto attrPath = attr->getAttrPathStr();
 
-    if (!attr->isDerivation())
+    auto type = attr->maybeGetStringAttr(state->sType).value_or("");
+
+    if (type == "derivation") {
+
+        auto drvPath = attr->forceDerivation();
+
+        std::set<std::string> outputsToInstall;
+        std::optional<NixInt> priority;
+
+        if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
+            if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
+                for (auto & s : aOutputsToInstall->getListOfStrings())
+                    outputsToInstall.insert(s);
+            if (auto aPriority = aMeta->maybeGetAttr("priority"))
+                priority = aPriority->getInt();
+        }
+
+        if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
+            outputsToInstall.clear();
+            if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
+                for (auto & s : aOutputs->getListOfStrings())
+                    outputsToInstall.insert(s);
+        }
+
+        if (outputsToInstall.empty())
+            outputsToInstall.insert("out");
+
+        if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+            outputsToInstall = *outputNames;
+
+        auto drvInfo = DerivationInfo {
+            .drvPath = std::move(drvPath),
+            .outputsToInstall = std::move(outputsToInstall),
+            .priority = priority,
+        };
+
+        return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
+    }
+
+    else if (type == "configurable") {
+
+        // FIXME: use eval cache
+
+        auto & build = attr->getAttr("build")->forceValue();
+
+        struct ValueTree
+        {
+            std::map<std::string, std::variant<Value *, ValueTree>> children;
+        };
+
+        ValueTree tree;
+
+        if (cmd) {
+            auto autoArgs = cmd->getAutoArgs(*state);
+
+            for (auto & attr : *autoArgs) {
+                auto ss = tokenizeString<std::vector<std::string>>(state->symbols[attr.name], ".");
+                auto * pos = &tree;
+                for (const auto & [n, s] : enumerate(ss)) {
+                    if (n + 1 == ss.size()) {
+                        if (pos->children.find(s) != pos->children.end())
+                            throw Error("definition of '%s' clashes with a previous definition", state->symbols[attr.name]);
+                        pos->children.emplace(s, attr.value);
+                    } else {
+                        auto i = pos->children.emplace(s, ValueTree()).first;
+                        if (auto pos2 = std::get_if<ValueTree>(&i->second))
+                            pos = pos2;
+                        else
+                            throw Error("definition of '%s' clashes with a previous definition", state->symbols[attr.name]);
+                    }
+                }
+            }
+        }
+
+        std::function<Value * (const ValueTree & tree)> buildAttrs;
+        buildAttrs = [&](const ValueTree & tree)
+        {
+            auto attrs = state->buildBindings(tree.children.size());
+            for (auto & [name, child] : tree.children) {
+                if (auto tree2 = std::get_if<ValueTree>(&child))
+                    attrs.insert(state->symbols.create(name), buildAttrs(*tree2));
+                else if (auto v = std::get_if<Value *>(&child))
+                    attrs.insert(state->symbols.create(name), *v);
+            }
+            auto vAttrs = state->allocValue();
+            vAttrs->mkAttrs(attrs);
+            return vAttrs;
+        };
+
+        auto vArgs = buildAttrs(tree);
+
+        auto vRes = state->allocValue();
+        state->callFunction(build, *vArgs, *vRes, noPos);
+
+        state->forceAttrs(*vRes, noPos);
+
+        auto aDrvPath = vRes->attrs->get(state->sDrvPath);
+        assert(aDrvPath);
+        PathSet context;
+        auto drvPath = state->coerceToStorePath(aDrvPath->pos, *aDrvPath->value, context);
+
+        auto drvInfo = DerivationInfo {
+            .drvPath = std::move(drvPath),
+            .outputsToInstall = {"out"},
+            //.priority = priority,
+        };
+
+        return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
+    }
+
+    else
         throw Error("flake output attribute '%s' is not a derivation", attrPath);
-
-    auto drvPath = attr->forceDerivation();
-
-    std::set<std::string> outputsToInstall;
-    std::optional<NixInt> priority;
-
-    if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
-        if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
-            for (auto & s : aOutputsToInstall->getListOfStrings())
-                outputsToInstall.insert(s);
-        if (auto aPriority = aMeta->maybeGetAttr("priority"))
-            priority = aPriority->getInt();
-    }
-
-    if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
-        outputsToInstall.clear();
-        if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
-            for (auto & s : aOutputs->getListOfStrings())
-                outputsToInstall.insert(s);
-    }
-
-    if (outputsToInstall.empty())
-        outputsToInstall.insert("out");
-
-    if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
-        outputsToInstall = *outputNames;
-
-    auto drvInfo = DerivationInfo {
-        .drvPath = std::move(drvPath),
-        .outputsToInstall = std::move(outputsToInstall),
-        .priority = priority,
-    };
-
-    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
 }
 
 std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()

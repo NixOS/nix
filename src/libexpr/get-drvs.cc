@@ -70,12 +70,11 @@ std::string DrvInfo::querySystem() const
 std::optional<StorePath> DrvInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
-        Bindings::iterator i = attrs->find(state->sDrvPath);
-        PathSet context;
-        if (i == attrs->end())
-            drvPath = {std::nullopt};
-        else
+        if (auto i = attrs->get(state->sDrvPath)) {
+            PathSet context;
             drvPath = {state->coerceToStorePath(i->pos, *i->value, context)};
+        } else
+            drvPath = {std::nullopt};
     }
     return drvPath.value_or(std::nullopt);
 }
