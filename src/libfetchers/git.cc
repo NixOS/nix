@@ -449,11 +449,10 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        const Attrs unlockedAttrs({
+        Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
-            {"ref", *input.getRef()},
         });
 
         Path repoDir;
@@ -466,6 +465,7 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
+                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (!input.getRev())
@@ -482,6 +482,7 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
+                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
