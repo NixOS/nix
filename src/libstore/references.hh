@@ -3,17 +3,28 @@
 #include "hash.hh"
 #include "path.hh"
 
-namespace nix {
+#include <deque>
 
-typedef std::pair<std::string, std::string> StoreCycleEdge;
-typedef std::vector<StoreCycleEdge> StoreCycleEdgeVec;
+namespace nix {
 
 // first pass: fast on success
 std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
 StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
 
+// moved to nix/src/libstore/build/find-cycles.hh
+/*
+
+//typedef std::pair<std::string, std::string> StoreCycleEdge;
+// need deque to join edges
+typedef std::deque<std::string> StoreCycleEdge;
+typedef std::vector<StoreCycleEdge> StoreCycleEdgeVec;
+
 // second pass: get exact file paths of cycles
-void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleEdgeVec & edges);
+void scanForCycleEdges(
+    const Path & path,
+    const StorePathSet & refs,
+    StoreCycleEdgeVec & edges
+);
 
 void scanForCycleEdges2(
     std::string path,
@@ -21,6 +32,8 @@ void scanForCycleEdges2(
     StoreCycleEdgeVec & seen,
     std::string storePrefix
 );
+
+*/
 
 class RefScanSink : public Sink
 {

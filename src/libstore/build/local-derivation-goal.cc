@@ -15,6 +15,7 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
+#include "find-cycles.hh" // scanForCycleEdges transformEdgesToMultiedges
 
 #include <regex>
 #include <queue>
@@ -2248,17 +2249,31 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             scanForCycleEdges(actualPath, referenceablePaths, edges);
         }
 
-        std::cout << "error: cycles detected. found " << edges.size() << " cycle edges:\n";
-        // output in yaml format for visualization
-        // TODO code fencing?
-        // ```yaml
-        // -
-        //  - a
-        //  - b
-        // ```
+        debug(format("error: cycles detected. found %i cycle edges:") % edges.size());
         for (auto edge : edges) {
-            std::cout << "-\n - " << edge.first << "\n - " << edge.second << "\n";
+            debug(format("-"));
+            for (auto file : edge) {
+                debug(format(" - %s") % file);
+            }
         }
+        // find paths in directed graph
+        // = connect adjacent edges to multiedges
+        // = transform edges to multiedges
+        // simple implementation with string compare
+        StoreCycleEdgeVec multiedges;
+        debug(format("transforming edges to multiedges"));
+        transformEdgesToMultiedges(edges, multiedges);
+        std::cout << "error: cycle detected. found " << multiedges.size() << " cycle edges:\n";
+        //for (auto multiedge : multiedges) {
+        for (size_t i = 0; i < multiedges.size(); i++) {
+            auto multiedge = multiedges[i];
+            //std::cout << "-\n";
+            std::cout << (i + 1) << ":\n";
+            for (auto file : multiedge) {
+                std::cout << " - " << file << "\n";
+            }
+        }
+        std::cout << std::flush; // "\n" does not flush like std::endl
 
         throw e; // BuildError: cycle
     }
