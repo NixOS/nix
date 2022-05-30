@@ -380,6 +380,7 @@
               postUnpack = "sourceRoot=$sourceRoot/perl";
             };
 
+            meta.platforms = systems;
           };
 
           lowdown-nix = with final; currentStdenv.mkDerivation rec {
