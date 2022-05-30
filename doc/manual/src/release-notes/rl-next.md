@@ -22,9 +22,6 @@
   `meta.outputsToInstall` attribute if it exists, or all outputs
   otherwise.
 
-  Selecting derivation outputs using the attribute selection syntax
-  (e.g. `nixpkgs#glibc.dev`) no longer works.
-
 * Running nix with the new `--debugger` flag will cause it to start a repl session if
   there is an exception thrown during eval, or if `builtins.break` is called.  From
   there one can inspect symbol values and evaluate nix expressions.  In debug mode
