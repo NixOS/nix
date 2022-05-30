@@ -459,6 +459,7 @@ EvalState::EvalState(
     , sKey(symbols.create("key"))
     , sPath(symbols.create("path"))
     , sPrefix(symbols.create("prefix"))
+    , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
     , store(store)
