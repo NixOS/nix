@@ -348,7 +348,7 @@
 
             strictDeps = true;
 
-            passthru.perl-bindings = with final; currentStdenv.mkDerivation {
+            passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
               name = "nix-perl-${version}";
 
               src = self;
@@ -378,7 +378,7 @@
               enableParallelBuilding = true;
 
               postUnpack = "sourceRoot=$sourceRoot/perl";
-            };
+            });
 
             meta.platforms = systems;
           };
