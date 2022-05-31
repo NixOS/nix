@@ -1297,11 +1297,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             auto hashResult = hashSink.finish();
 
             if (hashResult.first != info.narHash)
-                throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                throw Error("hash mismatch importing path '%s';\n  expected: %s\n  got:      %s",
                     printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
 
             if (hashResult.second != info.narSize)
-                throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                throw Error("size mismatch importing path '%s';\n  expected: %s\n  got:      %s",
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
@@ -1312,7 +1312,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                         info.path
                     );
                     if (foHash->hash != actualFoHash.hash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                        throw Error("ca hash mismatch importing path '%s';\n  expected: %s\n  got:      %s",
                             printStorePath(info.path),
                             foHash->hash.to_string(Base32, true),
                             actualFoHash.hash.to_string(Base32, true));
@@ -1321,7 +1321,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 if (auto textHash = std::get_if<TextHash>(&*info.ca)) {
                     auto actualTextHash = hashString(htSHA256, readFile(realPath));
                     if (textHash->hash != actualTextHash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                        throw Error("ca hash mismatch importing path '%s';\n  expected: %s\n  got:      %s",
                             printStorePath(info.path),
                             textHash->hash.to_string(Base32, true),
                             actualTextHash.to_string(Base32, true));
