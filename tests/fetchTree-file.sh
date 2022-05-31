@@ -58,7 +58,7 @@ EOF
     nix eval --file - <<EOF
     with (builtins.fromJSON (builtins.readFile ./flake.lock));
 
-    # Url inputs whose extension doesn’t match a know archive format should
+    # Url inputs whose extension doesn’t match a known archive format should
     # not be unpacked by default
     assert (nodes.no_ext_default_no_unpack.locked.type == "file");
     assert (nodes.no_ext_default_no_unpack.locked.unpack or false == false);
