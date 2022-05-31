@@ -524,10 +524,9 @@ public:
         "trusted-public-keys",
         R"(
           A whitespace-separated list of public keys. When paths are
-          copied from another Nix store (such as a binary cache), and
-          are not part of a fixed-output derivation (such as a
-          fetcher), they must be signed with one of these keys. For
-          example:
+          copied from another Nix store (such as a binary cache), they must be
+          signed with one of these keys, unless they are content-addressed (like
+          the outputs of fixed-output derivations). For example:
           `cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=`.
         )",
