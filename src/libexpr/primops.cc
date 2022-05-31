@@ -3540,7 +3540,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
-    } catch (std::regex_error &e) {
+    } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
@@ -3644,7 +3644,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         assert(idx == 2 * len + 1);
 
-    } catch (std::regex_error &e) {
+    } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({

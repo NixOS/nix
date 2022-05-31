@@ -101,7 +101,8 @@ public:
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
-        sPrefix;
+        sPrefix,
+        sOutputSpecified;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
