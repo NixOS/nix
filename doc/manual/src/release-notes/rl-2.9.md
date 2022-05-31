@@ -1,7 +1,7 @@
 # Release 2.9 (2022-05-30)
 
 * Running Nix with the new `--debugger` flag will cause it to start a
-  repl session if if an exception is thrown during evaluation, or if
+  repl session if an exception is thrown during evaluation, or if
   `builtins.break` is called.  From there you can inspect the values
   of variables and evaluate Nix expressions.  In debug mode, the
   following new repl commands are available:
