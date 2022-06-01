@@ -2,7 +2,7 @@
 
 Derivations can declare some infrequently used optional attributes.
 
-  - `allowedReferences`\
+  - [`allowedReferences`]{#adv-attr-allowedReferences}\
     The optional attribute `allowedReferences` specifies a list of legal
     references (dependencies) of the output of the builder. For example,
 
@@ -17,7 +17,7 @@ Derivations can declare some infrequently used optional attributes.
     booting Linux don’t have accidental dependencies on other paths in
     the Nix store.
 
-  - `allowedRequisites`\
+  - [`allowedRequisites`]{#adv-attr-allowedRequisites}\
     This attribute is similar to `allowedReferences`, but it specifies
     the legal requisites of the whole closure, so all the dependencies
     recursively. For example,
@@ -30,7 +30,7 @@ Derivations can declare some infrequently used optional attributes.
     runtime dependency than `foobar`, and in addition it enforces that
     `foobar` itself doesn't introduce any other dependency itself.
 
-  - `disallowedReferences`\
+  - [`disallowedReferences`]{#adv-attr-disallowedReferences}\
     The optional attribute `disallowedReferences` specifies a list of
     illegal references (dependencies) of the output of the builder. For
     example,
@@ -42,7 +42,7 @@ Derivations can declare some infrequently used optional attributes.
     enforces that the output of a derivation cannot have a direct
     runtime dependencies on the derivation `foo`.
 
-  - `disallowedRequisites`\
+  - [`disallowedRequisites`]{#adv-attr-disallowedRequisites}\
     This attribute is similar to `disallowedReferences`, but it
     specifies illegal requisites for the whole closure, so all the
     dependencies recursively. For example,
@@ -55,7 +55,7 @@ Derivations can declare some infrequently used optional attributes.
     dependency on `foobar` or any other derivation depending recursively
     on `foobar`.
 
-  - `exportReferencesGraph`\
+  - [`exportReferencesGraph`]{#adv-attr-exportReferencesGraph}\
     This attribute allows builders access to the references graph of
     their inputs. The attribute is a list of inputs in the Nix store
     whose references graph the builder needs to know. The value of
@@ -84,7 +84,7 @@ Derivations can declare some infrequently used optional attributes.
     with a Nix store containing the closure of a bootable NixOS
     configuration).
 
-  - `impureEnvVars`\
+  - [`impureEnvVars`]{#adv-attr-impureEnvVars}\
     This attribute allows you to specify a list of environment variables
     that should be passed from the environment of the calling user to
     the builder. Usually, the environment is cleared completely when the
@@ -112,7 +112,7 @@ Derivations can declare some infrequently used optional attributes.
     > environmental variables come from the environment of the
     > `nix-build`.
 
-  - `outputHash`; `outputHashAlgo`; `outputHashMode`\
+  - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
     These attributes declare that the derivation is a so-called
     *fixed-output derivation*, which means that a cryptographic hash of
     the output is already known in advance. When the build of a
@@ -208,7 +208,7 @@ Derivations can declare some infrequently used optional attributes.
     [`nix-hash` command](../command-ref/nix-hash.md) for information
     about converting to and from base-32 notation.)
     
-  - `__contentAddressed`
+  - [`__contentAddressed`]{#adv-attr-__contentAddressed}
     If this **experimental** attribute is set to true, then the derivation
     outputs will be stored in a content-addressed location rather than the
     traditional input-addressed one.
@@ -216,7 +216,7 @@ Derivations can declare some infrequently used optional attributes.
     
     Setting this attribute also requires setting `outputHashMode` and `outputHashAlgo` like for *fixed-output derivations* (see above).
 
-  - `passAsFile`\
+  - [`passAsFile`]{#adv-attr-passAsFile}\
     A list of names of attributes that should be passed via files rather
     than environment variables. For example, if you have
 
@@ -234,7 +234,7 @@ Derivations can declare some infrequently used optional attributes.
     builder, since most operating systems impose a limit on the size
     of the environment (typically, a few hundred kilobyte).
 
-  - `preferLocalBuild`\
+  - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
     If this attribute is set to `true` and [distributed building is
     enabled](../advanced-topics/distributed-builds.md), then, if
     possible, the derivation will be built locally instead of forwarded
@@ -242,7 +242,7 @@ Derivations can declare some infrequently used optional attributes.
     where the cost of doing a download or remote build would exceed
     the cost of building locally.
 
-  - `allowSubstitutes`\
+  - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
     If this attribute is set to `false`, then Nix will always build this
     derivation; it will not try to substitute its outputs. This is
     useful for very trivial derivations (such as `writeText` in Nixpkgs)

@@ -23,6 +23,7 @@ nix_tests = \
   fetchGit.sh \
   fetchurl.sh \
   fetchPath.sh \
+  fetchTree-file.sh \
   simple.sh \
   referrers.sh \
   optimise-store.sh \
