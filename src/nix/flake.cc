@@ -727,44 +727,39 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto cursor = installable.getCursor(*evalState);
 
-        auto templateDirAttr = cursor->getAttr("path");
-        auto templateDir = templateDirAttr->getString();
+        auto templateDirAttr = cursor->getAttr("path")->forceValue();
+        PathSet context;
+        auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context);
 
-        if (!store->isInStore(templateDir))
-            throw TypeError(
-                "'%s' was not found in the Nix store\n"
-                "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr());
+        std::vector<CanonPath> files;
 
-        std::vector<Path> files;
-
-        std::function<void(const Path & from, const Path & to)> copyDir;
-        copyDir = [&](const Path & from, const Path & to)
+        std::function<void(const SourcePath & from, const CanonPath & to)> copyDir;
+        copyDir = [&](const SourcePath & from, const CanonPath & to)
         {
-            createDirs(to);
+            createDirs(to.abs());
 
-            for (auto & entry : readDirectory(from)) {
-                auto from2 = from + "/" + entry.name;
-                auto to2 = to + "/" + entry.name;
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+            for (auto & [name, entry] : from.readDirectory()) {
+                auto from2 = from + name;
+                auto to2 = to + name;
+                auto st = from2.lstat();
+                if (st.type == InputAccessor::tDirectory)
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
-                    auto contents = readFile(from2);
-                    if (pathExists(to2)) {
-                        auto contents2 = readFile(to2);
+                else if (st.type == InputAccessor::tRegular) {
+                    auto contents = from2.readFile();
+                    if (pathExists(to2.abs())) {
+                        auto contents2 = readFile(to2.abs());
                         if (contents != contents2)
                             throw Error("refusing to overwrite existing file '%s'", to2);
                     } else
-                        writeFile(to2, contents);
+                        writeFile(to2.abs(), contents);
                 }
-                else if (S_ISLNK(st.st_mode)) {
-                    auto target = readLink(from2);
-                    if (pathExists(to2)) {
-                        if (readLink(to2) != target)
+                else if (st.type == InputAccessor::tSymlink) {
+                    auto target = from2.readLink();
+                    if (pathExists(to2.abs())) {
+                        if (readLink(to2.abs()) != target)
                             throw Error("refusing to overwrite existing symlink '%s'", to2);
                     } else
-                          createSymlink(target, to2);
+                        createSymlink(target, to2.abs());
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);
@@ -773,15 +768,15 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             }
         };
 
-        copyDir(templateDir, flakeDir);
+        copyDir(templateDir, CanonPath(flakeDir));
 
         if (pathExists(flakeDir + "/.git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : files) args.push_back(s);
+            for (auto & s : files) args.push_back(s.abs());
             runProgram("git", true, args);
         }
-        auto welcomeText = cursor->maybeGetAttr("welcomeText");
-        if (welcomeText) {
+
+        if (auto welcomeText = cursor->maybeGetAttr("welcomeText")) {
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }

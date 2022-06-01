@@ -106,13 +106,16 @@ struct SourcePath
     { return accessor.pathExists(path); }
 
     InputAccessor::Stat lstat() const
-    {  return accessor.lstat(path); }
+    { return accessor.lstat(path); }
 
     std::optional<InputAccessor::Stat> maybeLstat() const
-    {  return accessor.maybeLstat(path); }
+    { return accessor.maybeLstat(path); }
 
     InputAccessor::DirEntries readDirectory() const
-    {  return accessor.readDirectory(path); }
+    { return accessor.readDirectory(path); }
+
+    std::string readLink() const
+    { return accessor.readLink(path); }
 
     void dumpPath(
         Sink & sink,
