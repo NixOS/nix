@@ -36,7 +36,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
     if (!lockedRef.input.isLocked())
-        throw Error("lockfile contains mutable lock '%s'",
+        throw Error("lock file contains unlocked input '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
@@ -197,7 +197,7 @@ void LockFile::write(const Path & path) const
     writeFile(path, fmt("%s\n", *this));
 }
 
-bool LockFile::isImmutable() const
+bool LockFile::isLocked() const
 {
     std::unordered_set<std::shared_ptr<const Node>> nodes;
 

@@ -541,8 +541,8 @@ LockedFlake lockFlake(
                            this input. */
                         debug("creating new input '%s'", inputPathS);
 
-                        if (!lockFlags.allowMutable && !input.ref->input.isLocked())
-                            throw Error("cannot update flake input '%s' in pure mode", inputPathS);
+                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked())
+                            throw Error("cannot update unlocked flake input '%s' in pure mode", inputPathS);
 
                         if (input.isFlake) {
                             auto localPath(parentPath);
@@ -628,9 +628,9 @@ LockedFlake lockFlake(
 
             if (lockFlags.writeLockFile) {
                 if (auto sourcePath = topRef.input.getSourcePath()) {
-                    if (!newLockFile.isImmutable()) {
+                    if (!newLockFile.isLocked()) {
                         if (fetchSettings.warnDirty)
-                            warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
+                            warn("will not write lock file of flake '%s' because it has an unlocked input", topRef);
                     } else {
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
@@ -755,7 +755,7 @@ static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, V
                 .updateLockFile = false,
                 .writeLockFile = false,
                 .useRegistries = !evalSettings.pureEval && fetchSettings.useRegistries,
-                .allowMutable  = !evalSettings.pureEval,
+                .allowUnlocked = !evalSettings.pureEval,
             }),
         v);
 }

@@ -148,11 +148,12 @@ nix build -o $TEST_ROOT/result git+file://$flake1Dir
 nix build -o $flake1Dir/result git+file://$flake1Dir
 nix path-info $flake1Dir/result
 
-# 'getFlake' on a mutable flakeref should fail in pure mode, but succeed in impure mode.
+# 'getFlake' on an unlocked flakeref should fail in pure mode, but
+# succeed in impure mode.
 (! nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"$flake1Dir\").packages.$system.default")
 nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"$flake1Dir\").packages.$system.default" --impure
 
-# 'getFlake' on an immutable flakeref should succeed even in pure mode.
+# 'getFlake' on a locked flakeref should succeed even in pure mode.
 nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
 
 # Building a flake with an unlocked dependency should fail in pure mode.

@@ -16,7 +16,7 @@ R""(
 # Description
 
 This command recreates the lock file of a flake (`flake.lock`), thus
-updating the lock for every mutable input (like `nixpkgs`) to its
+updating the lock for every unlocked input (like `nixpkgs`) to its
 current version. This is equivalent to passing `--recreate-lock-file`
 to any command that operates on a flake. That is,
 

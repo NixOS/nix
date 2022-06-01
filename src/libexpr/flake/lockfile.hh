@@ -60,7 +60,7 @@ struct LockFile
 
     void write(const Path & path) const;
 
-    bool isImmutable() const;
+    bool isLocked() const;
 
     bool operator ==(const LockFile & other) const;
 

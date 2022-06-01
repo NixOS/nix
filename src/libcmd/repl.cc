@@ -776,7 +776,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
             flake::LockFlags {
                 .updateLockFile = false,
                 .useRegistries = !evalSettings.pureEval,
-                .allowMutable  = !evalSettings.pureEval,
+                .allowUnlocked = !evalSettings.pureEval,
             }),
         v);
     addAttrsToScope(v);

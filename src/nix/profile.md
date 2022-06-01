@@ -88,8 +88,7 @@ has the following fields:
   the user at the time of installation (e.g. `nixpkgs`). This is also
   the flake reference that will be used by `nix profile upgrade`.
 
-* `uri`: The immutable flake reference to which `originalUrl`
-  resolved.
+* `uri`: The locked flake reference to which `originalUrl` resolved.
 
 * `attrPath`: The flake output attribute that provided this
   package. Note that this is not necessarily the attribute that the
