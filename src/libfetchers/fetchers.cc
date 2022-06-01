@@ -144,13 +144,20 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         .storePath = storePath,
     };
 
-    auto narHash = store->queryPathInfo(tree.storePath)->narHash;
+    checkLocked(*store, storePath, input);
+
+    return {std::move(tree), input};
+}
+
+void Input::checkLocked(Store & store, const StorePath & storePath, Input & input) const
+{
+    auto narHash = store.queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
 
     if (auto prevNarHash = getNarHash()) {
         if (narHash != *prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
+                to_string(), store.printStorePath(storePath), prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {
@@ -168,8 +175,6 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     input.locked = true;
 
     assert(input.hasAllInfo());
-
-    return {std::move(tree), input};
 }
 
 std::pair<ref<InputAccessor>, Input> Input::lazyFetch(ref<Store> store) const
@@ -327,6 +332,8 @@ std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & i
 std::pair<ref<InputAccessor>, Input> InputScheme::lazyFetch(ref<Store> store, const Input & input)
 {
     auto [storePath, input2] = fetch(store, input);
+
+    input.checkLocked(*store, storePath, input2);
 
     return {makeFSInputAccessor(CanonPath(store->toRealPath(storePath))), input2};
 }

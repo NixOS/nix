@@ -223,7 +223,8 @@ struct CurlInputScheme : InputScheme
     ParsedURL toURL(const Input & input) override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        // NAR hashes are preferred over file hashes since tar/zip files        // don't have a canonical representation.
+        // NAR hashes are preferred over file hashes since tar/zip
+        // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
         return url;

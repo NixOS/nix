@@ -101,6 +101,10 @@ public:
     std::optional<Hash> getRev() const;
     std::optional<uint64_t> getRevCount() const;
     std::optional<time_t> getLastModified() const;
+
+private:
+
+    void checkLocked(Store & store, const StorePath & storePath, Input & input) const;
 };
 
 /* The InputScheme represents a type of fetcher.  Each fetcher
