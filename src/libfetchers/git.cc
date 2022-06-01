@@ -741,6 +741,8 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign(
                 "revCount",
                 getRevCount(repoInfo, repoInfo.url, *input.getRev()));
+
+            input.locked = true;
         }
 
         // FIXME: maybe we should use the timestamp of the last

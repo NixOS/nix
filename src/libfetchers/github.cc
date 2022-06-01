@@ -192,6 +192,8 @@ struct GitArchiveInputScheme : InputScheme
         auto rev = input.getRev();
         if (!rev) rev = getRevFromRef(store, input);
 
+        input.locked = true;
+
         input.attrs.erase("ref");
         input.attrs.insert_or_assign("rev", rev->gitRev());
 

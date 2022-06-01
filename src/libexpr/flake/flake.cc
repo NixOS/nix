@@ -682,14 +682,6 @@ LockedFlake lockFlake(
                             flake->lockedRef.input.getRev() &&
                             prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
                             warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
-
-                        /* Make sure that we picked up the change,
-                           i.e. the tree should usually be dirty
-                           now. Corner case: we could have reverted from a
-                           dirty to a clean tree! */
-                        if (flake->lockedRef.input == prevLockedRef.input
-                            && !flake->lockedRef.input.isLocked())
-                            throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake->originalRef);
                     }
                 } else
                     throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
