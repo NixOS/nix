@@ -478,7 +478,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
                 auto [attrPath, resolvedRef, drv] = installable->toDerivation();
 
-                if (element.source->resolvedRef == resolvedRef) continue;
+                if (resolvedRef.input.isLocked() && element.source->resolvedRef == resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
