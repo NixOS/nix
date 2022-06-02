@@ -863,6 +863,7 @@ struct CmdFlakeClone : FlakeCommand
     }
 };
 
+#if 0
 struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 {
     std::string dstUri;
@@ -897,8 +898,6 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        throw UnimplementedError("flake archive");
-        #if 0
         sources.insert(flake.flake.sourceInfo->storePath);
         if (jsonRoot)
             jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
@@ -929,9 +928,9 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
             copyPaths(*store, *dstStore, sources);
         }
-        #endif
     }
 };
+#endif
 
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
@@ -1193,7 +1192,7 @@ struct CmdFlake : NixMultiCommand
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"new", []() { return make_ref<CmdFlakeNew>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
-                {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
+                //{"archive", []() { return make_ref<CmdFlakeArchive>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
                 {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
             })
