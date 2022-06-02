@@ -102,6 +102,11 @@ Adding, building, copying and deleting store objects must be done in a way that 
 Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.
 
+Store objects are therefore implemented as the pair of
+
+  - a *file system object* for data
+  - a set of *store paths* for references.
+
 [unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file
 [file-descriptor]: https://en.m.wikipedia.org/wiki/File_descriptor
 
@@ -138,11 +143,6 @@ That allows processes to resolve references contained in files and thus access t
 |                         +------------+                          |
 +-----------------------------------------------------------------+
 ```
-
-Store objects are therefore implemented as the pair of
-
-  - a *file system object* for data
-  - a set of *store paths* for references.
 
 There exist different types of stores, which all follow this model.
 Examples:
