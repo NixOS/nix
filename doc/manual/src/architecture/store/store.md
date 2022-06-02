@@ -79,7 +79,7 @@ Adding, building, copying and deleting store objects must be done in a way that 
 
 - Build results must only refer to store objects in the closure of the build inputs.
 
-  Building a store object will add appropriate references, according to provided build instructions.
+  Building a store object will add appropriate references, according to the build task.
   These references can only come from declared build inputs.
 
 - Store objects being copied must refer to objects already in the destination store.
