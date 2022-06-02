@@ -88,7 +88,7 @@ Adding, building, copying and deleting store objects must be done in a way that 
 
 - We can only safely delete store objects which are not reachable from any reference still in use.
 
-  Garbage collection will delete all store objects that cannot be reached from any reference in use.
+  Garbage collection will delete those store objects that cannot be reached from any reference in use.
 
   <!-- more details in section on garbage collection, link to it once it exists -->
 
