@@ -464,10 +464,11 @@ EvalState::EvalState(
     , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
-    , debugRepl(0)
+    , debugRepl(nullptr)
     , debugStop(false)
     , debugQuit(false)
     , ignoreTry(false)
+    , trylevel(0)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
@@ -833,7 +834,14 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         : nullptr;
 
     if (error)
-        printError("%s\n\n" ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
+    {
+        printError("%s\n\n", error->what());
+
+        if (trylevel > 0 && error->info().level != lvlInfo)
+            printError("This exception occurred in a try clause. use " ANSI_GREEN "--ignore-try" ANSI_NORMAL " to skip these.\n");
+
+        printError(ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL, error->what());
+    }
 
     auto se = getStaticEnv(expr);
     if (se) {

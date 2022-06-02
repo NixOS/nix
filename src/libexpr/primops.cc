@@ -853,11 +853,15 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     auto attrs = state.buildBindings(2);
 
     void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
-    if (state.debugRepl && state.ignoreTry)
+    if (state.debugRepl)
     {
-        // to prevent starting the repl from exceptions withing a tryEval, null it.
-        savedDebugRepl = state.debugRepl;
-        state.debugRepl = nullptr;
+        state.trylevel++;
+        if (state.ignoreTry)
+        {
+            // to prevent starting the repl from exceptions withing a tryEval, null it.
+            savedDebugRepl = state.debugRepl;
+            state.debugRepl = nullptr;
+        }
     }
 
     try {
@@ -872,6 +876,9 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     // restore the debugRepl pointer if we saved it earlier.
     if (savedDebugRepl)
         state.debugRepl = savedDebugRepl;
+
+    if (state.debugRepl)
+        state.trylevel--;
 
     v.mkAttrs(attrs);
 }

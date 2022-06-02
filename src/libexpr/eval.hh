@@ -131,6 +131,7 @@ public:
     bool debugStop;
     bool debugQuit;
     bool ignoreTry;
+    int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
