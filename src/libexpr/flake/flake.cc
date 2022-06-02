@@ -630,9 +630,9 @@ LockedFlake lockFlake(
 
             if (lockFlags.writeLockFile) {
                 if (auto sourcePath = topRef.input.getSourcePath()) {
-                    if (!newLockFile.isLocked()) {
+                    if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
-                            warn("will not write lock file of flake '%s' because it has an unlocked input", topRef);
+                            warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                     } else {
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);

@@ -197,7 +197,7 @@ void LockFile::write(const Path & path) const
     writeFile(path, fmt("%s\n", *this));
 }
 
-bool LockFile::isLocked() const
+std::optional<FlakeRef> LockFile::isUnlocked() const
 {
     std::unordered_set<std::shared_ptr<const Node>> nodes;
 
@@ -219,10 +219,10 @@ bool LockFile::isLocked() const
         if (node
             && !node->lockedRef.input.isLocked()
             && !node->lockedRef.input.isRelative())
-            return false;
+            return node->lockedRef;
     }
 
-    return true;
+    return {};
 }
 
 bool LockFile::operator ==(const LockFile & other) const

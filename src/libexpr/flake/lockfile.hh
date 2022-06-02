@@ -60,7 +60,9 @@ struct LockFile
 
     void write(const Path & path) const;
 
-    bool isLocked() const;
+    /* Check whether this lock file has any unlocked inputs. If so,
+       return one. */
+    std::optional<FlakeRef> isUnlocked() const;
 
     bool operator ==(const LockFile & other) const;
 
