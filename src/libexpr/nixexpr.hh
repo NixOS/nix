@@ -149,16 +149,16 @@ struct Expr
 };
 
 #define COMMON_METHODS \
-    void show(const SymbolTable & symbols, std::ostream & str) const;    \
-    void eval(EvalState & state, Env & env, Value & v); \
-    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    void show(const SymbolTable & symbols, std::ostream & str) const override; \
+    void eval(EvalState & state, Env & env, Value & v) override; \
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override;
 
 struct ExprInt : Expr
 {
     NixInt n;
     Value v;
     ExprInt(NixInt n) : n(n) { v.mkInt(n); };
-    Value * maybeThunk(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
@@ -167,7 +167,7 @@ struct ExprFloat : Expr
     NixFloat nf;
     Value v;
     ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
-    Value * maybeThunk(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
@@ -176,7 +176,7 @@ struct ExprString : Expr
     std::string s;
     Value v;
     ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
-    Value * maybeThunk(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
@@ -189,7 +189,7 @@ struct ExprPath : Expr
     {
         v.mkPath(&path.accessor, path.path.abs().data());
     }
-    Value * maybeThunk(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
@@ -216,7 +216,7 @@ struct ExprVar : Expr
 
     ExprVar(Symbol name) : name(name) { };
     ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
-    Value * maybeThunk(EvalState & state, Env & env);
+    Value * maybeThunk(EvalState & state, Env & env) override;
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
@@ -329,7 +329,7 @@ struct ExprLambda : Expr
         : pos(pos), formals(formals), body(body)
     {
     }
-    void setName(Symbol name);
+    void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
     PosIdx getPos() const override { return pos; }
@@ -398,15 +398,15 @@ struct ExprOpNot : Expr
         Expr * e1, * e2; \
         name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
         name(const PosIdx & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
-        void show(const SymbolTable & symbols, std::ostream & str) const \
+        void show(const SymbolTable & symbols, std::ostream & str) const override \
         { \
             str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
         } \
-        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)    \
+        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override \
         { \
             e1->bindVars(es, env); e2->bindVars(es, env);    \
         } \
-        void eval(EvalState & state, Env & env, Value & v); \
+        void eval(EvalState & state, Env & env, Value & v) override; \
         PosIdx getPos() const override { return pos; } \
     };
 
