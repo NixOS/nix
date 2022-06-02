@@ -26,11 +26,6 @@ namespace {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
-std::string getGitDir()
-{
-    return getEnv("GIT_DIR").value_or(".git");
-}
-
 bool isCacheFileWithinTtl(const time_t now, const struct stat & st)
 {
     return st.st_mtime + settings.tarballTtl > now;
@@ -152,7 +147,7 @@ struct WorkdirInfo
 WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
 {
     const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
-    auto gitDir = getGitDir();
+    std::string gitDir(".git");
 
     auto env = getEnv();
     // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
@@ -370,7 +365,7 @@ struct GitInputScheme : InputScheme
     {
         auto sourcePath = getSourcePath(input);
         assert(sourcePath);
-        auto gitDir = getGitDir();
+        auto gitDir = ".git";
 
         runProgram("git", true,
             { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
@@ -396,7 +391,7 @@ struct GitInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
-        auto gitDir = getGitDir();
+        auto gitDir = ".git";
 
         std::string name = input.getName();
 
@@ -454,11 +449,10 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        const Attrs unlockedAttrs({
+        Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
-            {"ref", *input.getRef()},
         });
 
         Path repoDir;
@@ -471,6 +465,7 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
+                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (!input.getRev())
@@ -487,6 +482,7 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
+                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {

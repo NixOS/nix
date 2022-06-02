@@ -718,36 +718,34 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
-    auto conn(getConnection());
-
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
-        warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
-        try {
-            callback(nullptr);
-        } catch (...) { return callback.rethrow(); }
-    }
-
-    conn->to << wopQueryRealisation;
-    conn->to << id.to_string();
-    conn.processStderr();
-
-    auto real = [&]() -> std::shared_ptr<const Realisation> {
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
-            auto outPaths = worker_proto::read(
-                *this, conn->from, Phantom<std::set<StorePath>> {});
-            if (outPaths.empty())
-                return nullptr;
-            return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
-        } else {
-            auto realisations = worker_proto::read(
-                *this, conn->from, Phantom<std::set<Realisation>> {});
-            if (realisations.empty())
-                return nullptr;
-            return std::make_shared<const Realisation>(*realisations.begin());
-        }
-    }();
-
     try {
+        auto conn(getConnection());
+
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+            warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
+            return callback(nullptr);
+        }
+
+        conn->to << wopQueryRealisation;
+        conn->to << id.to_string();
+        conn.processStderr();
+
+        auto real = [&]() -> std::shared_ptr<const Realisation> {
+            if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+                auto outPaths = worker_proto::read(
+                    *this, conn->from, Phantom<std::set<StorePath>> {});
+                if (outPaths.empty())
+                    return nullptr;
+                return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
+            } else {
+                auto realisations = worker_proto::read(
+                    *this, conn->from, Phantom<std::set<Realisation>> {});
+                if (realisations.empty())
+                    return nullptr;
+                return std::make_shared<const Realisation>(*realisations.begin());
+            }
+        }();
+
         callback(std::shared_ptr<const Realisation>(real));
     } catch (...) { return callback.rethrow(); }
 }
