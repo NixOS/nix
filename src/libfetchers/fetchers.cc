@@ -325,7 +325,7 @@ std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & i
 {
     auto [accessor, input2] = lazyFetch(store, input);
 
-    auto source = sinkToSource([&](Sink & sink) {
+    auto source = sinkToSource([&, accessor{accessor}](Sink & sink) {
         accessor->dumpPath(CanonPath::root, sink);
     });
 
