@@ -27,4 +27,19 @@ std::map<std::string, std::string> decodeQuery(const std::string & query);
 
 ParsedURL parseURL(const std::string & url);
 
+/*
+ * Although that’s not really standardized anywhere, an number of tools
+ * use a scheme of the form 'x+y' in urls, where y is the “transport layer”
+ * scheme, and x is the “application layer” scheme.
+ *
+ * For example git uses `git+https` to designate remotes using a Git
+ * protocol over http.
+ */
+struct ParsedUrlScheme {
+    std::optional<std::string_view> application;
+    std::string_view transport;
+};
+
+ParsedUrlScheme parseUrlScheme(std::string_view scheme);
+
 }

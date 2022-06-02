@@ -181,9 +181,17 @@ Currently the `type` attribute can be one of the following:
 * `tarball`: Tarballs. The location of the tarball is specified by the
   attribute `url`.
 
-  In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tgz`, `.tar.gz`,
-  `.tar.xz`, `.tar.bz2` or `.tar.zst`.
+  In URL form, the schema must be `tarball+http://`, `tarball+https://` or `tarball+file://`.
+  If the extension corresponds to a known archive format (`.zip`, `.tar`,
+  `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
+  can be dropped.
+
+* `file`: Plain files or directory tarballs, either over http(s) or from the local
+  disk.
+
+  In URL form, the schema must be `file+http://`, `file+https://` or `file+file://`.
+  If the extension doesn’t correspond to a known archive format (as defined by the
+  `tarball` fetcher), then the `file+` prefix can be dropped.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -331,9 +339,10 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
-  and `flake-registry`) are allowed to be set without confirmation so long as
-  `accept-flake-config` is not set in the global configuration.
+  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
+  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
+  confirmation so long as `accept-flake-config` is not set in the global
+  configuration.
 
 ## Flake inputs
 

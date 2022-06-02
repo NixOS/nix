@@ -86,6 +86,11 @@ ref<Store> CopyCommand::getDstStore()
 
 EvalCommand::EvalCommand()
 {
+    addFlag({
+        .longName = "debugger",
+        .description = "start an interactive environment if evaluation fails",
+        .handler = {&startReplOnEvalErrors, true},
+    });
 }
 
 EvalCommand::~EvalCommand()
@@ -103,7 +108,7 @@ ref<Store> EvalCommand::getEvalStore()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState)
+    if (!evalState) {
         evalState =
             #if HAVE_BOEHMGC
             std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
@@ -113,6 +118,11 @@ ref<EvalState> EvalCommand::getEvalState()
                 searchPath, getEvalStore(), getStore())
             #endif
             ;
+
+        if (startReplOnEvalErrors) {
+            evalState->debugRepl = &runRepl;        
+        };
+    }
     return ref<EvalState>(evalState);
 }
 

@@ -198,7 +198,7 @@ or          { return OR_KW; }
                    (...|\$[^\{\"\\]|\\.|\$\\.)+ would have triggered.
                    This is technically invalid, but we leave the problem to the
                    parser who fails with exact location. */
-                return STR;
+                return EOF;
               }
 
 \'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }

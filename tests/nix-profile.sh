@@ -120,3 +120,21 @@ nix profile install "$flake1Dir^man"
 (! [ -e $TEST_HOME/.nix-profile/bin/hello ])
 [ -e $TEST_HOME/.nix-profile/share/man ]
 (! [ -e $TEST_HOME/.nix-profile/include ])
+
+# test priority
+nix profile remove 0
+
+# Make another flake.
+flake2Dir=$TEST_ROOT/flake2
+printf World > $flake1Dir/who
+cp -r $flake1Dir $flake2Dir
+printf World2 > $flake2Dir/who
+
+nix profile install $flake1Dir
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+nix profile install $flake2Dir --priority 100
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+nix profile install $flake2Dir --priority 0
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World2" ]]
+# nix profile install $flake1Dir --priority 100
+# [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]

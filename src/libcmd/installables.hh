@@ -142,6 +142,7 @@ struct InstallableValue : Installable
     {
         StorePath drvPath;
         std::set<std::string> outputsToInstall;
+        std::optional<NixInt> priority;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
