@@ -26,7 +26,7 @@ A Nix store can *add*, *retrieve*, and *delete* store objects.
                 [ data ]
                     |
                     V
-    [ store ] ---> add ----> [ store' ] [ reference ]
+    [ store ] ---> add ----> [ store' ], [ reference ]
 
 <!-- -->
 
@@ -49,7 +49,7 @@ It can *perform builds*, that is, create new store objects by transforming build
               [ reference ]
                     |
                     V
-    [ store ] --> build --(maybe)--> [ store' ] [ reference' ]
+    [ store ] --> build --(maybe)--> [ store' ], [ reference' ]
 
 
 As it keeps track of references, it can [garbage-collect][garbage-collection] unused store objects.
