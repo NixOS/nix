@@ -846,22 +846,30 @@ static RegisterPrimOp primop_floor({
     .fun = prim_floor,
 });
 
+class Counter
+{
+    private:
+        int &counter;
+    public:
+        Counter(int &counter) :counter(counter) { counter++; }
+        ~Counter() { counter--; }
+};
+
 /* Try evaluating the argument. Success => {success=true; value=something;},
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto attrs = state.buildBindings(2);
 
+    /* increment state.trylevel, and decrement it when this function returns. */
+    Counter trylevel(state.trylevel);
+
     void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
-    if (state.debugRepl)
+    if (state.debugRepl && state.ignoreTry)
     {
-        state.trylevel++;
-        if (state.ignoreTry)
-        {
-            // to prevent starting the repl from exceptions withing a tryEval, null it.
-            savedDebugRepl = state.debugRepl;
-            state.debugRepl = nullptr;
-        }
+        /* to prevent starting the repl from exceptions withing a tryEval, null it. */
+        savedDebugRepl = state.debugRepl;
+        state.debugRepl = nullptr;
     }
 
     try {
@@ -876,9 +884,6 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     // restore the debugRepl pointer if we saved it earlier.
     if (savedDebugRepl)
         state.debugRepl = savedDebugRepl;
-
-    if (state.debugRepl)
-        state.trylevel--;
 
     v.mkAttrs(attrs);
 }
