@@ -733,7 +733,9 @@ cat > $flakeFollowsA/flake.nix <<EOF
             inputs.foobar.follows = "foobar";
         };
 
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        # FIXME: currently absolute path: flakes cannot be locked.
+        #foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "git+file://$flake1Dir";
     };
     outputs = { ... }: {};
 }
@@ -743,7 +745,8 @@ cat > $flakeFollowsB/flake.nix <<EOF
 {
     description = "Flake B";
     inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        #foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "git+file://$flake1Dir";
         goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
@@ -758,7 +761,8 @@ cat > $flakeFollowsC/flake.nix <<EOF
 {
     description = "Flake C";
     inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        #foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "git+file://$flake1Dir";
         goodoo.follows = "foobar";
     };
     outputs = { ... }: {};
@@ -823,7 +827,7 @@ nix flake lock $flakeFollowsA
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
 jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
 
-# Ensure a relative path is not allowed to go outside the store path
+# Check that subflakes are allowed to access flakes in the parent.
 cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
@@ -836,7 +840,7 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
+nix flake lock $flakeFollowsA
 
 # Test flake in store does not evaluate
 rm -rf $badFlakeDir

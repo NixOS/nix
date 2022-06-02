@@ -87,6 +87,11 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
+bool Input::isRelative() const
+{
+    return scheme->isRelative(*this);
+}
+
 bool Input::hasAllInfo() const
 {
     return getNarHash() && scheme && scheme->hasAllInfo(*this);

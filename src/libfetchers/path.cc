@@ -66,6 +66,11 @@ struct PathInputScheme : InputScheme
         };
     }
 
+    bool isRelative(const Input & input) const override
+    {
+        return !hasPrefix(*input.getSourcePath(), "/");
+    }
+
     bool hasAllInfo(const Input & input) override
     {
         return true;

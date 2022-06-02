@@ -35,7 +35,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , originalRef(getFlakeRef(json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
-    if (!lockedRef.input.isLocked())
+    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative())
         throw Error("lock file contains unlocked input '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
@@ -215,8 +215,11 @@ bool LockFile::isLocked() const
 
     for (auto & i : nodes) {
         if (i == root) continue;
-        auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(i);
-        if (lockedNode && !lockedNode->lockedRef.input.isLocked()) return false;
+        auto node = std::dynamic_pointer_cast<const LockedNode>(i);
+        if (node
+            && !node->lockedRef.input.isLocked()
+            && !node->lockedRef.input.isRelative())
+            return false;
     }
 
     return true;

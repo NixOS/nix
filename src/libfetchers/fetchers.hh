@@ -63,6 +63,8 @@ public:
        one that contains a commit hash or content hash. */
     bool isLocked() const { return locked; }
 
+    bool isRelative() const;
+
     bool hasAllInfo() const;
 
     bool operator ==(const Input & other) const;
@@ -151,6 +153,9 @@ struct InputScheme
     {
         throw UnimplementedError("getAccessor");
     }
+
+    virtual bool isRelative(const Input & input) const
+    { return false; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

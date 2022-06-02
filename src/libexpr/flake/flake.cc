@@ -91,7 +91,6 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    const std::optional<Path> & baseDir,
     const InputPath & lockRootPath);
 
 static FlakeInput parseFlakeInput(
@@ -99,7 +98,6 @@ static FlakeInput parseFlakeInput(
     const std::string & inputName,
     Value * value,
     const PosIdx pos,
-    const std::optional<Path> & baseDir,
     const InputPath & lockRootPath)
 {
     expectType(state, nAttrs, *value, pos);
@@ -124,7 +122,7 @@ static FlakeInput parseFlakeInput(
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean;
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootPath);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputPath(attr.value->string.s));
@@ -166,7 +164,7 @@ static FlakeInput parseFlakeInput(
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, state.positions[pos]);
         if (url)
-            input.ref = parseFlakeRef(*url, baseDir, true, input.isFlake);
+            input.ref = parseFlakeRef(*url, {}, true, input.isFlake);
     }
 
     if (!input.follows && !input.ref)
@@ -179,7 +177,6 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    const std::optional<Path> & baseDir,
     const InputPath & lockRootPath)
 {
     std::map<FlakeId, FlakeInput> inputs;
@@ -192,7 +189,6 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
                 state.symbols[inputAttr.name],
                 inputAttr.value,
                 inputAttr.pos,
-                baseDir,
                 lockRootPath));
     }
 
@@ -204,11 +200,11 @@ static Flake readFlake(
     const FlakeRef & originalRef,
     const FlakeRef & resolvedRef,
     const FlakeRef & lockedRef,
-    InputAccessor & accessor,
+    const SourcePath & rootDir,
     const InputPath & lockRootPath)
 {
     CanonPath flakeDir(resolvedRef.subdir);
-    SourcePath flakePath{accessor, flakeDir + CanonPath("flake.nix")};
+    auto flakePath = rootDir + flakeDir + "flake.nix";
 
     if (!flakePath.pathExists())
         throw Error("source tree referenced by '%s' does not contain a file named '%s'", resolvedRef, flakePath.path);
@@ -233,7 +229,7 @@ static Flake readFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakeDir.abs(), lockRootPath);
+        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootPath);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -322,7 +318,9 @@ static Flake getFlake(
 
     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.registerAccessor(accessor), lockRootPath);
+    ;
+
+    return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {state.registerAccessor(accessor), CanonPath::root}, lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
@@ -450,6 +448,22 @@ LockedFlake lockFlake(
 
                     assert(input.ref);
 
+                    /* Get the input flake, resolve 'path:./...'
+                       flakerefs relative to the parent flake. */
+                    auto getInputFlake = [&]()
+                    {
+                        if (input.ref->input.isRelative()) {
+                            SourcePath inputSourcePath {
+                                parentPath.accessor,
+                                CanonPath(*input.ref->input.getSourcePath(), *parentPath.path.parent())
+                            };
+                            // FIXME: we need to record in the lock
+                            // file what the parent flake is.
+                            return readFlake(state, *input.ref, *input.ref, *input.ref, inputSourcePath, inputPath);
+                        } else
+                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputPath);
+                    };
+
                     /* Do we have an entry in the existing lock file? And we
                        don't have a --update-input flag for this input? */
                     std::shared_ptr<LockedNode> oldLock;
@@ -523,39 +537,27 @@ LockedFlake lockFlake(
                             }
                         }
 
-                        auto localPath(parentPath);
-                        #if 0
-                        // If this input is a path, recurse it down.
-                        // This allows us to resolve path inputs relative to the current flake.
-                        if ((*input.ref).input.getType() == "path")
-                            localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
-                        #endif
-                        computeLocks(
-                            mustRefetch
-                            ? getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath).inputs
-                            : fakeInputs,
-                            childNode, inputPath, oldLock, lockRootPath, parentPath, !mustRefetch);
+                        if (mustRefetch) {
+                            auto inputFlake = getInputFlake();
+                            computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, lockRootPath, inputFlake.path, !mustRefetch);
+                        } else {
+                             // FIXME: parentPath is wrong here, we
+                             // should pass a lambda that lazily
+                             // fetches the parent flake if needed
+                             // (i.e. getInputFlake()).
+                            computeLocks(fakeInputs, childNode, inputPath, oldLock, lockRootPath, parentPath, !mustRefetch);
+                        }
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
                            this input. */
                         debug("creating new input '%s'", inputPathS);
 
-                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked())
+                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked() && !input.ref->input.isRelative())
                             throw Error("cannot update unlocked flake input '%s' in pure mode", inputPathS);
 
                         if (input.isFlake) {
-                            auto localPath(parentPath);
-                            FlakeRef localRef = *input.ref;
-
-                            #if 0
-                            // If this input is a path, recurse it down.
-                            // This allows us to resolve path inputs relative to the current flake.
-                            if (localRef.input.getType() == "path")
-                                localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
-                            #endif
-
-                            auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache, inputPath);
+                            auto inputFlake = getInputFlake();
 
                             /* Note: in case of an --override-input, we use
                                the *original* ref (input2.ref) for the
@@ -585,7 +587,9 @@ LockedFlake lockFlake(
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : readLockFile(inputFlake).root,
-                                oldLock ? lockRootPath : inputPath, localPath, false);
+                                oldLock ? lockRootPath : inputPath,
+                                inputFlake.path,
+                                false);
                         }
 
                         else {
