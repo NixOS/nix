@@ -150,7 +150,7 @@ public:
         if (debugRepl)
             runDebugRepl(&error, env, expr);
 
-        throw error;
+        throw std::move(error);
     }
 
     template<class E>
@@ -165,7 +165,7 @@ public:
             runDebugRepl(&e, last.env, last.expr);
         }
 
-        throw e;
+        throw std::move(e);
     }
 
 
