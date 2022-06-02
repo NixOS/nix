@@ -14,64 +14,6 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<fetchers::Tree, FlakeRef> FetchedFlake;
-typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
-
-static std::optional<FetchedFlake> lookupInFlakeCache(
-    const FlakeCache & flakeCache,
-    const FlakeRef & flakeRef)
-{
-    // FIXME: inefficient.
-    for (auto & i : flakeCache) {
-        if (flakeRef == i.first) {
-            debug("mapping '%s' to previously seen input '%s' -> '%s",
-                flakeRef, i.first, i.second.second);
-            return i.second;
-        }
-    }
-
-    return std::nullopt;
-}
-
-static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
-    EvalState & state,
-    const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache)
-{
-    auto fetched = lookupInFlakeCache(flakeCache, originalRef);
-    FlakeRef resolvedRef = originalRef;
-
-    if (!fetched) {
-        if (originalRef.input.isDirect()) {
-            fetched.emplace(originalRef.fetchTree(state.store));
-        } else {
-            if (allowLookup) {
-                resolvedRef = originalRef.resolve(state.store);
-                auto fetchedResolved = lookupInFlakeCache(flakeCache, originalRef);
-                if (!fetchedResolved) fetchedResolved.emplace(resolvedRef.fetchTree(state.store));
-                flakeCache.push_back({resolvedRef, *fetchedResolved});
-                fetched.emplace(*fetchedResolved);
-            }
-            else {
-                throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
-            }
-        }
-        flakeCache.push_back({originalRef, *fetched});
-    }
-
-    auto [tree, lockedRef] = *fetched;
-
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(tree.storePath), lockedRef);
-
-    state.allowPath(tree.storePath);
-
-    assert(!originalRef.input.getNarHash() || tree.storePath == originalRef.input.computeStorePath(*state.store));
-
-    return {std::move(tree), resolvedRef, lockedRef};
-}
-
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
     if (value.isThunk() && value.isTrivial())
@@ -301,35 +243,35 @@ static Flake readFlake(
     return flake;
 }
 
+static FlakeRef maybeResolve(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    bool useRegistries)
+{
+    if (!originalRef.input.isDirect()) {
+        if (!useRegistries)
+            throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
+        return originalRef.resolve(state.store);
+    } else
+        return originalRef;
+}
+
 static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
-    bool allowLookup,
-    FlakeCache & flakeCache,
+    bool useRegistries,
     const InputPath & lockRootPath)
 {
-    auto resolvedRef = originalRef;
-
-    if (!originalRef.input.isDirect()) {
-        if (!allowLookup)
-            throw Error("'%s' is an indirect flake reference, but registry lookups are not allowed", originalRef);
-        resolvedRef = originalRef.resolve(state.store);
-    }
+    auto resolvedRef = maybeResolve(state, originalRef, useRegistries);
 
     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
     return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {state.registerAccessor(accessor), CanonPath::root}, lockRootPath);
 }
 
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup, FlakeCache & flakeCache)
+Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
 {
-    return getFlake(state, originalRef, allowLookup, flakeCache, {});
-}
-
-Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup)
-{
-    FlakeCache flakeCache;
-    return getFlake(state, originalRef, allowLookup, flakeCache);
+    return getFlake(state, originalRef, useRegistries, {});
 }
 
 static LockFile readLockFile(const Flake & flake)
@@ -349,11 +291,9 @@ LockedFlake lockFlake(
 {
     settings.requireExperimentalFeature(Xp::Flakes);
 
-    FlakeCache flakeCache;
-
     auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
-    auto flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, flakeCache, {}));
+    auto flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, {}));
 
     if (lockFlags.applyNixConfig) {
         flake->config.apply();
@@ -459,7 +399,7 @@ LockedFlake lockFlake(
                             // file what the parent flake is.
                             return readFlake(state, *input.ref, *input.ref, *input.ref, inputSourcePath, inputPath);
                         } else
-                            return getFlake(state, *input.ref, useRegistries, flakeCache, inputPath);
+                            return getFlake(state, *input.ref, useRegistries, inputPath);
                     };
 
                     /* Do we have an entry in the existing lock file? And we
@@ -591,8 +531,10 @@ LockedFlake lockFlake(
                         }
 
                         else {
-                            auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
-                                state, *input.ref, useRegistries, flakeCache);
+                            auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
+
+                            auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+
                             node->inputs.insert_or_assign(id,
                                 std::make_shared<LockedNode>(lockedRef, *input.ref, false));
                         }
@@ -677,8 +619,7 @@ LockedFlake lockFlake(
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
                         auto prevLockedRef = flake->lockedRef;
-                        FlakeCache dummyCache;
-                        flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, dummyCache));
+                        flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries));
 
                         if (lockFlags.commitLockFile &&
                             flake->lockedRef.input.getRev() &&
