@@ -150,7 +150,7 @@ Examples:
 - remote store accessible via SSH
 - binary cache store accessible via HTTP
 
-Every store ultimately has to make store objects accessible to processes through the file system.
+To make store objects accessible to processes, stores ultimately have to expose store objects through the file system.
 
 ## A [Rosetta stone][rosetta-stone] for build system terminology
 
