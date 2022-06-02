@@ -130,6 +130,7 @@ public:
     void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
     bool debugQuit;
+    bool ignoreTry;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
