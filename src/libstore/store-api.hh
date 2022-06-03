@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nar-info.hh"
 #include "realisation.hh"
 #include "path.hh"
 #include "derived-path.hh"
@@ -364,6 +365,12 @@ public:
         Source & source,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs);
+    virtual void addMultipleToStore(
+        std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>> & pathsToCopy,
+        Activity & act,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs
+    );
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
