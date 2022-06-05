@@ -43,10 +43,21 @@ R""(
   # nix search nixpkgs 'firefox|chromium'
   ```
 
-* Search for packages containing `git'`and either `frontend` or `gui`:
+* Search for packages containing `git` and either `frontend` or `gui`:
 
   ```console
   # nix search nixpkgs git 'frontend|gui'
+  ```
+
+* Search for packages containing `neovim` but hide ones containing either `gui` or `python`:
+
+  ```console
+  # nix search nixpkgs neovim -e 'python|gui'
+  ```
+  or
+
+  ```console
+  # nix search nixpkgs neovim -e 'python' -e 'gui'
   ```
 
 # Description

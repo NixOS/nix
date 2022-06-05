@@ -18,16 +18,24 @@ using namespace nix;
 
 std::string wrap(std::string prefix, std::string s)
 {
-    return prefix + s + ANSI_NORMAL;
+    return concatStrings(prefix, s, ANSI_NORMAL);
 }
 
 struct CmdSearch : InstallableCommand, MixJSON
 {
     std::vector<std::string> res;
+    std::vector<std::string> excludeRes;
 
     CmdSearch()
     {
         expectArgs("regex", &res);
+        addFlag(Flag {
+            .longName = "exclude",
+            .shortName = 'e',
+            .description = "Hide packages whose attribute path, name or description contain *regex*.",
+            .labels = {"regex"},
+            .handler = Handler(&excludeRes),
+        });
     }
 
     std::string description() override
@@ -62,10 +70,15 @@ struct CmdSearch : InstallableCommand, MixJSON
             res.push_back("^");
 
         std::vector<std::regex> regexes;
+        std::vector<std::regex> excludeRegexes;
         regexes.reserve(res.size());
+        excludeRegexes.reserve(excludeRes.size());
 
         for (auto & re : res)
             regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
+
+        for (auto & re : excludeRes)
+            excludeRegexes.emplace_back(re, std::regex::extended | std::regex::icase);
 
         auto state = getEvalState();
 
@@ -105,6 +118,14 @@ struct CmdSearch : InstallableCommand, MixJSON
                     std::vector<std::smatch> descriptionMatches;
                     std::vector<std::smatch> nameMatches;
                     bool found = false;
+
+                    for (auto & regex : excludeRegexes) {
+                        if (
+                            std::regex_search(attrPath2, regex)
+                            || std::regex_search(name.name, regex)
+                            || std::regex_search(description, regex))
+                            return;
+                    }
 
                     for (auto & regex : regexes) {
                         found = false;
