@@ -36,3 +36,9 @@ e=$'\x1b' # grep doesn't support \e, \033 or even \x1b
 (( $(nix search -f search.nix '' 'o' | grep -Eo "$e\[32;1mo{1,2}$e\[(0|0;1)m" | wc -l) == 3 ))
 # Searching for 'b' should yield the 'b' in bar and the two 'b's in 'broken bar'
 (( $(nix search -f search.nix '' 'b' | grep -Eo "$e\[32;1mb$e\[(0|0;1)m" | wc -l) == 3 ))
+
+## Tests for --exclude
+(( $(nix search -f search.nix -e hello | grep -c hello) == 0 ))
+
+(( $(nix search -f search.nix foo --exclude 'foo|bar' | grep -Ec 'foo|bar') == 0 ))
+(( $(nix search -f search.nix foo -e foo --exclude bar | grep -Ec 'foo|bar') == 0 ))
