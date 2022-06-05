@@ -154,15 +154,15 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hiliteMatches(name.name, std::move(nameMatches), ANSI_GREEN, "\e[0;2m");
+                            auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hiliteMatches(attrPath2, std::move(attrPathMatches), ANSI_GREEN, "\e[0;1m")),
+                                wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->cout(
-                                    "  %s", hiliteMatches(description, std::move(descriptionMatches), ANSI_GREEN, ANSI_NORMAL));
+                                    "  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));
                         }
                     }
                 }
