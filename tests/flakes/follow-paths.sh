@@ -148,3 +148,33 @@ git -C $flakeFollowsA add flake.nix
 
 nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
 nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
+
+# Test nested flake overrides
+
+cat <<EOF > $flakeFollowsD/flake.nix
+{ outputs = _: {}; }
+EOF
+cat <<EOF > $flakeFollowsC/flake.nix
+{
+  inputs.D.url = "path:nosuchflake";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsB/flake.nix
+{
+  inputs.C.url = "path:$flakeFollowsC";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsA/flake.nix
+{
+  inputs.B.url = "path:$flakeFollowsB";
+  inputs.D.url = "path:$flakeFollowsD";
+  inputs.B.inputs.C.inputs.D.follows = "D";
+  outputs = _: {};
+}
+EOF
+
+nix flake lock $flakeFollowsA
+
+[[ $(jq -c .nodes.C.inputs.D $flakeFollowsA/flake.lock) = '["D"]' ]]
